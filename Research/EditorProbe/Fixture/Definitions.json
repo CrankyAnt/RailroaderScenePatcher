@@ -1,0 +1,24 @@
+{
+  "objects": [
+    {
+      "identifier": "crankyant/editorfixture14map",
+      "metadata": {
+        "name": "crankyant/editorfixture14map",
+        "description": "A new item",
+        "tags": [],
+        "credits": ""
+      },
+      "definition": {
+        "kind": "Map",
+        "mapData": "./Map.json",
+        "terrainTileSets": [
+          "rr/nc-bryson"
+        ],
+        "mapLayers": [
+          "rr/bushnell-whittier"
+        ],
+        "components": {}
+      }
+    }
+  ]
+}

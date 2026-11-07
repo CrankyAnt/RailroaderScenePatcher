@@ -1,0 +1,67 @@
+{
+  "graph": {
+    "nodes": {
+      "5hqgfi": {
+        "position":[8604.483,546.937,7245.621]
+      },
+      "N51l": {
+        "position":[25227.7383,623.376,-768.012]
+      },
+      "NCrankyAntInventoryBoardA": {
+        "position":[25621.3574,633.5,441.813],
+        "rotation":[0.0,90.0,0.0]
+      },
+      "NCrankyAntInventoryBoardB": {
+        "position":[25773.4629,633.5,441.813],
+        "rotation":[0.0,90.0,0.0]
+      },
+      "NCrankyAntInventoryFixedN51l": {
+        "position":[25207.7383,623.376,-768.012],
+        "rotation":[-0.4296,18.9062,0.0]
+      },
+      "NCrankyAntInventoryFixedNmzo": {
+        "position":[25178.7559,623.038,-832.103],
+        "rotation":[-0.4296,29.26,0.0]
+      },
+      "Nmzo": {
+        "position":[25198.7559,623.038,-832.103]
+      },
+      "qocgc2": {
+        "position":[8635.959,546.61,7310.28]
+      }
+    },
+    "segments": {
+      "SCrankyAntInventoryBoard": {
+        "a": "NCrankyAntInventoryBoardA",
+        "b": "NCrankyAntInventoryBoardB",
+        "groupId": "",
+        "speedLimit": 10
+      },
+      "Serb": {
+        "a": "NCrankyAntInventoryFixedN51l"
+      },
+      "Sou5": {
+        "b": "NCrankyAntInventoryFixedNmzo"
+      },
+      "S9sc": null,
+      "Sj7c": null,
+      "Sjdl": null,
+      "Sozu": null,
+      "Sz8t": null
+    }
+  },
+  "objects": {
+    "circlemask": {
+      "kind": "CircleMask",
+      "order": 0,
+      "radius": 50.0,
+      "falloff": 0.0,
+      "flattenHeightmap": true,
+      "biomeClass": 22,
+      "position":[25581.4043,627.798157,363.729],
+      "rotation":[0.0,55.217,0.0],
+      "scale":[1.0,1.0,1.0],
+      "folder": "Ftky0yrr3"
+    }
+  }
+}
