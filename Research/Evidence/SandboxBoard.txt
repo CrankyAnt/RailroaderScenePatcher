@@ -1,0 +1,7 @@
+# Selected lines from Boot02SceneBoardAndSave.log
+# Filter: 2026-11-07T22:34:59 to 2026-11-07T22:36:57, UTC; nonmatching lines omitted.
+2026-11-07T22:34:59.5838716Z marker instance=1197210 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E id=M5pp location=<Shuo, A -> 58,695> enabled=True activeSelf=True activeHierarchy=True position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838)
+2026-11-07T22:35:36.0228144Z resolve board matches=1
+2026-11-07T22:35:36.0238157Z baseline instance=1136562 path=World/Signs/Loc: Sylva Int worldPosition=(21692.9800, 633.4856, -4558.1870) localPosition=(25692.9800, 633.4856, 441.8128) worldRotation=(0.0000, 0.2203, 0.0000, -0.9754) localRotation=(0.0000, 0.2203, 0.0000, -0.9754) activeSelf=True activeHierarchy=True
+2026-11-07T22:36:35.2434367Z move instance=1136562 path=World/Signs/Loc: Sylva Int worldPosition=(21702.9800, 633.4856, -4558.1870) localPosition=(25702.9800, 633.4856, 441.8130) worldRotation=(0.0000, 0.0910, 0.0000, -0.9958) localRotation=(0.0000, 0.0910, 0.0000, -0.9958) activeSelf=True activeHierarchy=True
+2026-11-07T22:36:56.5816333Z restore instance=1136562 path=World/Signs/Loc: Sylva Int worldPosition=(21692.9800, 633.4856, -4558.1870) localPosition=(25692.9800, 633.4856, 441.8130) worldRotation=(0.0000, 0.2203, 0.0000, -0.9754) localRotation=(0.0000, 0.2203, 0.0000, -0.9754) activeSelf=True activeHierarchy=True

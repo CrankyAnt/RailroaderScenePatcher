@@ -1,0 +1,3 @@
+# Selected matching lines from Boot02EditorProbe.log; no timestamps on these rows.
+independent World/Signs/Loc: Sylva Int instance=677006 active=True world=(21692.9766,633.4856,-4558.187) game=(25692.9766,633.4856,441.813)
+independent World/Signs/Loc: Sylva Int instance=677006 active=False world=(192.976563,633.4856,441.8128) game=(25692.9766,633.4856,441.8128)

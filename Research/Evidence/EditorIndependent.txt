@@ -1,0 +1,25 @@
+# Selected lines from Boot04EditorProbe.log and Boot05EditorProbe.log; nonmatching lines omitted.
+2026-11-07T23:09:37.9773518Z focus requested segment=SCrankyAntSceneProbe end=a node=NCrankyAntSceneProbeA game=(25241.1465,622.7342,-800) native selection unchanged by probe
+marker=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E instance=893894 active=True world=(201.146484,622.7342,221.91803) game=(25201.1465,622.7342,-778.082) segment=SCrankyAntSceneProbe distance=58,69453 end=A segmentExists=True nodeA=NCrankyAntSceneProbeA positionA=(25241.1465,622.7342,-800) nodeB=NCrankyAntSceneProbeB positionB=(25241.1465,622.7342,-700) resolved=True trackPoint=(25241.1465,622.7342,-741.3058)
+2026-11-07T23:33:54.0882254Z scan=1 Scanned 4 objects
+2026-11-07T23:34:05.1631809Z focus requested segment=SCrankyAntSceneProbe end=a node=NCrankyAntSceneProbeA game=(25241.1465,622.7342,-800) native selection unchanged by probe
+2026-11-07T23:34:18.9670612Z focus requested World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E game=(25201.1465,622.7342,-778.082) native selection unchanged by probe
+2026-11-07T23:34:55.4035123Z scan=2 Scanned 4 objects
+marker=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E instance=421522 active=True world=(206.146484,622.7342,221.91803) game=(25206.1465,622.7342,-778.082) segment=Shuo distance=58,69453 end=A segmentExists=True nodeA=Nmzo positionA=(25178.7559,623.038,-832.103) nodeB=N51l positionB=(25207.7383,623.376,-768.012) resolved=True trackPoint=(25203.7656,623.300964,-779.069458)
+2026-11-07T23:35:24.1964381Z unsubscribed NodeDidChange
+2026-11-07T23:35:24.1974551Z unsubscribed DidChange
+2026-11-07T23:35:24.1974551Z Controller: none
+2026-11-07T23:35:24.4178586Z behaviour destroyed
+2026-11-07T23:35:41.3905969Z behaviour created
+2026-11-07T23:35:41.4071189Z Controller: none
+2026-11-07T23:37:50.8577185Z behaviour created
+2026-11-07T23:37:50.8687287Z behaviour destroyed
+2026-11-07T23:37:50.8797609Z Controller: none
+2026-11-07T23:38:11.0620322Z behaviour destroyed
+2026-11-07T23:38:16.0677956Z behaviour created
+2026-11-07T23:38:16.1817765Z Controller: -1351835620
+2026-11-07T23:38:16.1822911Z subscribed Game.MapEditor.GraphEditor.NodeDidChange
+2026-11-07T23:38:16.1822911Z subscribed Core.UndoManager.DidChange
+2026-11-07T23:38:16.1832948Z attachment editor=True graph=True undo=True
+2026-11-07T23:38:40.6679836Z scan=1 Scanned 4 objects
+marker=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E instance=815774 active=True world=(21201.1465,622.7342,-5778.082) game=(25201.1465,622.7342,-778.082031) segment=Shuo distance=58,69453 end=A segmentExists=True nodeA=Nmzo positionA=(25178.7559,623.038,-832.103) nodeB=N51l positionB=(25207.7383,623.376,-768.012) resolved=True trackPoint=(25203.7656,623.300964,-779.069458)

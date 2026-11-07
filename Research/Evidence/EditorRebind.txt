@@ -1,0 +1,41 @@
+# Selected lines from Boot04SceneProbe.log
+# Filter: 2026-11-07T23:10:46 to 2026-11-07T23:11:56, UTC; nonmatching lines omitted.
+2026-11-07T23:10:46.3130788Z registration bucket=Shuo id=M5pp location=<Shuo, A -> 58,695> objectMatches=True
+2026-11-07T23:10:46.3130788Z verified segment=Shuo distance=58,69453 end=A
+2026-11-07T23:10:46.3140785Z marker instance=893894 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E id=M5pp location=<Shuo, A -> 58,695> enabled=True activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838)
+2026-11-07T23:10:46.3140785Z marker serialized segment=Shuo distance=58,69453 end=A
+2026-11-07T23:10:46.3150787Z graph marker=M5pp segment=Shuo entryType=Track.Graph+NamedLocation
+2026-11-07T23:10:46.3150787Z graph marker=M5pp count=1
+2026-11-07T23:10:46.3150787Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) components=UnityEngine.Transform,Track.TrackMarker,Track.TrackRelativePosition
+2026-11-07T23:10:46.3161598Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) components=UnityEngine.Transform,UnityEngine.MeshFilter,UnityEngine.MeshRenderer
+2026-11-07T23:11:19.8443081Z registration bucket=Shuo id=M5pp location=<Shuo, A -> 58,695> objectMatches=True
+2026-11-07T23:11:19.8443081Z verified segment=Shuo distance=58,69453 end=A
+2026-11-07T23:11:19.8488148Z registration bucket=SCrankyAntSceneProbe id=M5pp location=<SCrankyAntSceneProbe, A -> 58,695> objectMatches=True
+2026-11-07T23:11:19.8488148Z verified segment=SCrankyAntSceneProbe distance=58,69453 end=A
+2026-11-07T23:11:19.8488148Z marker rebind requested replacement=SCrankyAntSceneProbe
+2026-11-07T23:11:19.8523215Z marker instance=893894 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E id=M5pp location=<SCrankyAntSceneProbe, A -> 58,695> enabled=True activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838)
+2026-11-07T23:11:19.8523215Z marker serialized segment=SCrankyAntSceneProbe distance=58,69453 end=A
+2026-11-07T23:11:19.8533214Z graph marker=M5pp segment=SCrankyAntSceneProbe entryType=Track.Graph+NamedLocation
+2026-11-07T23:11:19.8533214Z graph marker=M5pp count=1
+2026-11-07T23:11:19.8543212Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) components=UnityEngine.Transform,Track.TrackMarker,Track.TrackRelativePosition
+2026-11-07T23:11:19.8543212Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) components=UnityEngine.Transform,UnityEngine.MeshFilter,UnityEngine.MeshRenderer
+2026-11-07T23:11:44.4235707Z registration bucket=SCrankyAntSceneProbe id=M5pp location=<SCrankyAntSceneProbe, A -> 58,695> objectMatches=True
+2026-11-07T23:11:44.4235707Z verified segment=SCrankyAntSceneProbe distance=58,69453 end=A
+2026-11-07T23:11:44.4270792Z registration bucket=SCrankyAntSceneProbe id=M5pp location=<SCrankyAntSceneProbe, A -> 58,695> objectMatches=True
+2026-11-07T23:11:44.4280781Z verified segment=SCrankyAntSceneProbe distance=58,69453 end=A
+2026-11-07T23:11:44.4280781Z marker rebind requested replacement=SCrankyAntSceneProbe
+2026-11-07T23:11:44.4315868Z marker instance=893894 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E id=M5pp location=<SCrankyAntSceneProbe, A -> 58,695> enabled=True activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838)
+2026-11-07T23:11:44.4315868Z marker serialized segment=SCrankyAntSceneProbe distance=58,69453 end=A
+2026-11-07T23:11:44.4345875Z graph marker=M5pp segment=SCrankyAntSceneProbe entryType=Track.Graph+NamedLocation
+2026-11-07T23:11:44.4345875Z graph marker=M5pp count=1
+2026-11-07T23:11:44.4355878Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) components=UnityEngine.Transform,Track.TrackMarker,Track.TrackRelativePosition
+2026-11-07T23:11:44.4355878Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) components=UnityEngine.Transform,UnityEngine.MeshFilter,UnityEngine.MeshRenderer
+2026-11-07T23:11:55.4406259Z registration bucket=Shuo id=M5pp location=<Shuo, A -> 58,695> objectMatches=True
+2026-11-07T23:11:55.4406259Z verified segment=Shuo distance=58,69453 end=A
+2026-11-07T23:11:55.4416307Z marker restore verified locationChanged=True componentChanged=False rootChanged=False targetChanged=False
+2026-11-07T23:11:55.4446295Z marker instance=893894 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E id=M5pp location=<Shuo, A -> 58,695> enabled=True activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838)
+2026-11-07T23:11:55.4446295Z marker serialized segment=Shuo distance=58,69453 end=A
+2026-11-07T23:11:55.4456293Z graph marker=M5pp segment=Shuo entryType=Track.Graph+NamedLocation
+2026-11-07T23:11:55.4456293Z graph marker=M5pp count=1
+2026-11-07T23:11:55.4456293Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) components=UnityEngine.Transform,Track.TrackMarker,Track.TrackRelativePosition
+2026-11-07T23:11:55.4466292Z marker child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle activeSelf=True activeHierarchy=True position=(201.1465, 622.7342, 221.9180) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) components=UnityEngine.Transform,UnityEngine.MeshFilter,UnityEngine.MeshRenderer
