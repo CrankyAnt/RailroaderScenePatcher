@@ -1,0 +1,7 @@
+# Selected Boot05EditorProbe.log scan rows; other rows omitted.
+2026-11-07T23:44:39.7542237Z scan=2 Scanned 4 objects
+marker=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E instance=815774 active=True world=(21201.1465,622.7342,-5778.082) game=(25201.1465,622.7342,-778.082031) segment=SCrankyAntSceneProbe distance=58,69453 end=A segmentExists=True nodeA=NCrankyAntSceneProbeA positionA=(25241.1465,622.7342,-800) nodeB=NCrankyAntSceneProbeB positionB=(25241.1465,622.7342,-700) resolved=True trackPoint=(25241.1465,622.7342,-741.3058)
+independent World/Signs/Loc: Sylva Int instance=755126 active=True world=(21692.9766,633.4856,-4558.187) game=(25692.9766,633.4856,441.813)
+2026-11-07T23:47:40.9359981Z scan=3 Scanned 4 objects
+marker=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E instance=815774 active=True world=(21201.1465,622.7342,-5778.082) game=(25201.1465,622.7342,-778.082031) segment=Shuo distance=58,69453 end=A segmentExists=True nodeA=Nmzo positionA=(25178.7559,623.038,-832.103) nodeB=N51l positionB=(25207.7383,623.376,-768.012) resolved=True trackPoint=(25203.7656,623.300964,-779.069458)
+independent World/Signs/Loc: Sylva Int instance=755126 active=True world=(21692.9766,633.4856,-4558.187) game=(25692.9766,633.4856,441.813)
