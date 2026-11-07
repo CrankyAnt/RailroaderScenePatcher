@@ -1,0 +1,1 @@
+{"identifier":"crankyant/ownership-a","name":"Ownership research A","author":"CrankyAnt","version":"1.0.0","dependencies":{"required":["rr/game >=0.6.0","crankyant/ownership-probe >=1.0.0"]}}

@@ -1,0 +1,33 @@
+4096: [OwnershipProbe] OnWorldLoad
+4097: [OwnershipProbe] OnWorldLoad active=present
+4098: [OwnershipProbe] OnWorldLoad Identifier=crankyant/ownership-b-map
+4099: [OwnershipProbe] OnWorldLoad MapDataAbsolutePath=fixture-B
+4100: [OwnershipProbe] OnWorldLoad MapLayerIdentifiers=[crankyant/ownership-a-map,rr/bushnell-whittier,]
+4101: [OwnershipProbe] OnWorldLoad MapLayerDataPaths=[fixture-A,game-core,]
+4102: [OwnershipProbe] OnWorldLoad IsEditTarget=True
+4206: [OwnershipProbe] OnWorldLoad definitionOwner=fixture-B
+4207: [OwnershipProbe] OnWorldLoad Track.TrackMarker count=388
+4208: [OwnershipProbe] OnWorldLoad Track.TrackRelativePosition count=370
+4209: [OwnershipProbe] OnWorldLoad Track.TrackSpan count=357
+12261: [OwnershipProbe] OnWorldLoad
+12262: [OwnershipProbe] OnWorldLoad active=present
+12263: [OwnershipProbe] OnWorldLoad Identifier=crankyant/ownership-b-map
+12264: [OwnershipProbe] OnWorldLoad MapDataAbsolutePath=fixture-B
+12265: [OwnershipProbe] OnWorldLoad MapLayerIdentifiers=[crankyant/ownership-a-map,rr/bushnell-whittier,]
+12266: [OwnershipProbe] OnWorldLoad MapLayerDataPaths=[fixture-A,game-core,]
+12267: [OwnershipProbe] OnWorldLoad IsEditTarget=False
+12371: [OwnershipProbe] OnWorldLoad definitionOwner=fixture-B
+12372: [OwnershipProbe] OnWorldLoad Track.TrackMarker count=388
+12373: [OwnershipProbe] OnWorldLoad Track.TrackRelativePosition count=370
+12374: [OwnershipProbe] OnWorldLoad Track.TrackSpan count=357
+23574: [OwnershipProbe] OnWorldLoad
+23575: [OwnershipProbe] OnWorldLoad active=present
+23576: [OwnershipProbe] OnWorldLoad Identifier=crankyant/ownership-b-map
+23577: [OwnershipProbe] OnWorldLoad MapDataAbsolutePath=fixture-B
+23578: [OwnershipProbe] OnWorldLoad MapLayerIdentifiers=[crankyant/ownership-a-map,rr/bushnell-whittier,]
+23579: [OwnershipProbe] OnWorldLoad MapLayerDataPaths=[fixture-A,game-core,]
+23580: [OwnershipProbe] OnWorldLoad IsEditTarget=False
+23683: [OwnershipProbe] OnWorldLoad definitionOwner=fixture-B
+23684: [OwnershipProbe] OnWorldLoad Track.TrackMarker count=388
+23685: [OwnershipProbe] OnWorldLoad Track.TrackRelativePosition count=370
+23686: [OwnershipProbe] OnWorldLoad Track.TrackSpan count=357

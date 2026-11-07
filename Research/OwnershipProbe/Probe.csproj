@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <AssemblyName>OwnershipProbe</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Railroader.Modding"><HintPath>$(RailroaderManaged)\Railroader.Modding.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(RailroaderManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

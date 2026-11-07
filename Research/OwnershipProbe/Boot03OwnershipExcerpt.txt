@@ -1,0 +1,50 @@
+958: [OwnershipProbe] sceneLoaded GameUI
+1072: [OwnershipProbe] sceneLoaded MapCore
+1190: [OwnershipProbe] sceneLoaded BushnellWhittier-MapManager
+1307: [OwnershipProbe] sceneLoaded Environment-Enviro
+1502: [OwnershipProbe] OnWorldLoad
+1503: [OwnershipProbe] OnWorldLoad active=present
+1504: [OwnershipProbe] OnWorldLoad Identifier=crankyant/ownership-b-map
+1505: [OwnershipProbe] OnWorldLoad MapDataAbsolutePath=fixture-B
+1506: [OwnershipProbe] OnWorldLoad MapLayerIdentifiers=[crankyant/ownership-a-map,rr/bushnell-whittier,]
+1507: [OwnershipProbe] OnWorldLoad MapLayerDataPaths=[fixture-A,game-core,]
+1508: [OwnershipProbe] OnWorldLoad IsEditTarget=False
+1611: [OwnershipProbe] OnWorldLoad definitionOwner=fixture-B
+1612: [OwnershipProbe] OnWorldLoad Track.TrackMarker count=388
+1613: [OwnershipProbe] OnWorldLoad Track.TrackRelativePosition count=370
+1614: [OwnershipProbe] OnWorldLoad Track.TrackSpan count=357
+2192: [OwnershipProbe] sceneUnloaded Environment-Enviro
+2305: [OwnershipProbe] sceneUnloaded BushnellWhittier-MapManager
+2418: [OwnershipProbe] sceneUnloaded GameUI
+2531: [OwnershipProbe] sceneUnloaded MapCore
+2644: [OwnershipProbe] OnWorldUnload
+2645: [OwnershipProbe] OnWorldUnload active=null
+2646: [OwnershipProbe] OnWorldUnload Identifier=null
+2753: [OwnershipProbe] OnWorldUnload Track.TrackMarker count=1
+2754: [OwnershipProbe] OnWorldUnload Track.TrackRelativePosition count=0
+2755: [OwnershipProbe] OnWorldUnload Track.TrackSpan count=0
+3437: [OwnershipProbe] sceneLoaded GameUI
+3551: [OwnershipProbe] sceneLoaded MapCore
+3667: [OwnershipProbe] sceneLoaded BushnellWhittier-MapManager
+3784: [OwnershipProbe] sceneLoaded Environment-Enviro
+3979: [OwnershipProbe] OnWorldLoad
+3980: [OwnershipProbe] OnWorldLoad active=present
+3981: [OwnershipProbe] OnWorldLoad Identifier=crankyant/ownership-b-map
+3982: [OwnershipProbe] OnWorldLoad MapDataAbsolutePath=fixture-B
+3983: [OwnershipProbe] OnWorldLoad MapLayerIdentifiers=[crankyant/ownership-a-map,rr/bushnell-whittier,]
+3984: [OwnershipProbe] OnWorldLoad MapLayerDataPaths=[fixture-A,game-core,]
+3985: [OwnershipProbe] OnWorldLoad IsEditTarget=False
+4088: [OwnershipProbe] OnWorldLoad definitionOwner=fixture-B
+4089: [OwnershipProbe] OnWorldLoad Track.TrackMarker count=388
+4090: [OwnershipProbe] OnWorldLoad Track.TrackRelativePosition count=370
+4091: [OwnershipProbe] OnWorldLoad Track.TrackSpan count=357
+5452: [OwnershipProbe] sceneUnloaded Environment-Enviro
+5565: [OwnershipProbe] sceneUnloaded BushnellWhittier-MapManager
+5678: [OwnershipProbe] sceneUnloaded GameUI
+5791: [OwnershipProbe] sceneUnloaded MapCore
+5904: [OwnershipProbe] OnWorldUnload
+5905: [OwnershipProbe] OnWorldUnload active=null
+5906: [OwnershipProbe] OnWorldUnload Identifier=null
+6013: [OwnershipProbe] OnWorldUnload Track.TrackMarker count=1
+6014: [OwnershipProbe] OnWorldUnload Track.TrackRelativePosition count=0
+6015: [OwnershipProbe] OnWorldUnload Track.TrackSpan count=0

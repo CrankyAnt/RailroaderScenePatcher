@@ -1,0 +1,1 @@
+{"identifier":"crankyant/ownership-probe","name":"Ownership research probe","author":"CrankyAnt","version":"1.0.0","assemblies":["OwnershipProbe.dll"],"dependencies":{"required":["rr/game >=0.6.0"]}}

@@ -1,0 +1,1 @@
+{"objects":[{"identifier":"crankyant/ownership-a-map","metadata":{"name":"Ownership research A","description":"Disposable research map","tags":[],"credits":""},"definition":{"kind":"Map","mapData":"./Map.json","terrainTileSets":["rr/nc-bryson"],"mapLayers":["rr/bushnell-whittier"],"components":{}}}]}

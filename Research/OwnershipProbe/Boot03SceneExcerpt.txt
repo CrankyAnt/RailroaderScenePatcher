@@ -1,0 +1,10 @@
+2026-11-07T22:43:21.0662789Z marker matches=1
+2026-11-07T22:43:21.0754940Z registration bucket=Shuo id=M5pp location=<Shuo, A -> 58,695> objectMatches=True
+2026-11-07T22:43:21.0774936Z graph marker=M5pp count=1
+2026-11-07T22:43:32.0569187Z resolve board matches=1
+2026-11-07T22:43:32.0584406Z baseline instance=196210 path=World/Signs/Loc: Sylva Int worldPosition=(21692.9800, 633.4856, -4558.1870) localPosition=(25692.9800, 633.4856, 441.8128) worldRotation=(0.0000, 0.2203, 0.0000, -0.9754) localRotation=(0.0000, 0.2203, 0.0000, -0.9754) activeSelf=True activeHierarchy=True
+2026-11-07T22:45:03.7042211Z marker matches=1
+2026-11-07T22:45:03.7072245Z registration bucket=Shuo id=M5pp location=<Shuo, A -> 58,695> objectMatches=True
+2026-11-07T22:45:03.7097330Z graph marker=M5pp count=1
+2026-11-07T22:45:12.3663917Z resolve board matches=1
+2026-11-07T22:45:12.3673925Z baseline instance=268110 path=World/Signs/Loc: Sylva Int worldPosition=(21692.9800, 633.4856, -4558.1870) localPosition=(25692.9800, 633.4856, 441.8128) worldRotation=(0.0000, 0.2203, 0.0000, -0.9754) localRotation=(0.0000, 0.2203, 0.0000, -0.9754) activeSelf=True activeHierarchy=True
