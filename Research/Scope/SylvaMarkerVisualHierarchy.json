@@ -1,0 +1,306 @@
+[
+  {
+    "marker_component": 29552,
+    "chain": [
+      {
+        "go": 4884,
+        "name": "T-45.1 Origin",
+        "active": true,
+        "position": {
+          "x": 25581.404296875,
+          "y": 629.12841796875,
+          "z": 363.7288818359375
+        },
+        "rotation": {
+          "x": -0.00022942398209124804,
+          "y": -0.4344007074832916,
+          "z": 3.8591137126786634e-05,
+          "w": -0.9007197022438049
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": [
+          {
+            "type": "RendererCuller",
+            "data": null
+          },
+          {
+            "type": "TextSynchronizer",
+            "data": null
+          },
+          {
+            "type": "TrackMarker",
+            "data": null
+          },
+          {
+            "type": "TrackRelativePosition",
+            "data": "0000000014130000000000000100000001000000bc1200000000000000000000000000007331000000000000cdcc4c400000000000000000000034430100000001000000"
+          },
+          {
+            "type": "MilePost",
+            "data": "00000000141300000000000001000000010000009b060000000000000000000001000000540000000000000066663442"
+          }
+        ]
+      },
+      {
+        "go": 522,
+        "name": "Mile Posts",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": []
+      },
+      {
+        "go": 308,
+        "name": "World",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": [
+          {
+            "type": "WorldTransformer",
+            "data": null
+          },
+          {
+            "type": "WorldTransformerTarget",
+            "data": null
+          }
+        ]
+      }
+    ],
+    "children": [
+      {
+        "name": "Front Label",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.054018668830394745
+        },
+        "components": [
+          {
+            "type": "MeshRenderer"
+          },
+          {
+            "type": "TextMeshPro",
+            "data": null
+          }
+        ]
+      },
+      {
+        "name": "MilePost",
+        "active": true,
+        "position": {
+          "x": 0.014417278580367565,
+          "y": 0.3400000035762787,
+          "z": -0.003724232316017151
+        },
+        "components": [
+          {
+            "type": "MeshFilter"
+          },
+          {
+            "type": "MeshRenderer"
+          }
+        ]
+      },
+      {
+        "name": "Side Label",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": -0.05941281467676163
+        },
+        "components": [
+          {
+            "type": "MeshRenderer"
+          },
+          {
+            "type": "TextMeshPro",
+            "data": null
+          }
+        ]
+      },
+      {
+        "name": "Map View Label",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "components": [
+          {
+            "type": "Canvas"
+          },
+          {
+            "type": "MapLabel",
+            "data": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "marker_component": 31102,
+    "chain": [
+      {
+        "go": 4061,
+        "name": "Whistle Sign E",
+        "active": true,
+        "position": {
+          "x": 132.94921875,
+          "y": 0.82659912109375,
+          "z": 135.67742919921875
+        },
+        "rotation": {
+          "x": -0.0026363215874880552,
+          "y": 0.17924149334430695,
+          "z": 0.0004744148754980415,
+          "w": 0.9838014841079712
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": [
+          {
+            "type": "TrackMarker",
+            "data": null
+          },
+          {
+            "type": "TrackRelativePosition",
+            "data": "00000000dd0f0000000000000100000001000000bc1200000000000000000000000000008539000000000000333333c00000000000000000000000000100000000000000"
+          }
+        ]
+      },
+      {
+        "go": 4761,
+        "name": "Crossing Unprotected - Allen (1)",
+        "active": true,
+        "position": {
+          "x": 568.197265625,
+          "y": 1.9075927734375,
+          "z": -13.7593994140625
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": []
+      },
+      {
+        "go": 50,
+        "name": "Roads Sylva",
+        "active": true,
+        "position": {
+          "x": 24500.0,
+          "y": 620.0,
+          "z": -900.0
+        },
+        "rotation": {
+          "x": -0.0,
+          "y": -0.0,
+          "z": -0.0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": []
+      },
+      {
+        "go": 308,
+        "name": "World",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "rotation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        },
+        "scale": {
+          "x": 1.0,
+          "y": 1.0,
+          "z": 1.0
+        },
+        "components": [
+          {
+            "type": "WorldTransformer",
+            "data": null
+          },
+          {
+            "type": "WorldTransformerTarget",
+            "data": null
+          }
+        ]
+      }
+    ],
+    "children": [
+      {
+        "name": "Sign-Whistle",
+        "active": true,
+        "position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "components": [
+          {
+            "type": "MeshFilter"
+          },
+          {
+            "type": "MeshRenderer"
+          }
+        ]
+      }
+    ]
+  }
+]

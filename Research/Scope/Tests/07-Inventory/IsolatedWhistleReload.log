@@ -1,0 +1,1541 @@
+[14:41:32 INF] RemoveCars [] {  }
+[14:41:33 INF] ApplyConfigs: Reloading packs to match new mod config {  }
+[14:41:33 INF] [kater/sylvainterchange/Data.rl] Executing modifyDefinitions {  }
+[14:41:33 INF] [nikii/br-textile/Data.rl] Executing modifyDefinitions {  }
+[14:41:33 INF] [nikii/wh-crossover/Data.rl] Executing modifyDefinitions {  }
+[14:41:33 INF] [sox/ser/Data.rl] Executing modifyDefinitions {  }
+[14:41:33 INF] [tct26/eastwhittiermowyard/Data.rl] Executing modifyDefinitions {  }
+[14:41:33 INF] CarLoadLibrary initialized with 55 loads {  }
+[14:41:33 INF] ApplyConfigs: Reloaded 103 packs {  }
+[14:41:34 INF] Client 0: status = "Anonymous" {  }
+[14:41:34 INF] Client 0: Running 0.5; now Anonymous {  }
+[14:41:34 INF] ClientStatusDidChange "Anonymous"  "Undetermined" {  }
+[14:41:34 INF] Client 0: Authenticated as playerId="REDACTED_STEAM_ID" name="REDACTED_PLAYER", steamName = "REDACTED_PLAYER" {  }
+[14:41:34 INF] Client 0: status = "Authenticated" {  }
+[14:41:34 INF] ClientStatusDidChange "Authenticated" REDACTED_STEAM_ID "President" {  }
+[14:41:34 INF] Editor mode: using the active mod set; skipping save-set reconciliation {  }
+[14:41:34 INF] ApplyConfigs: Reloading packs to match new mod config {  }
+[14:41:34 INF] CarLoadLibrary initialized with 55 loads {  }
+[14:41:34 INF] ApplyConfigs: Reloaded 103 packs {  }
+[14:41:34 INF] [RelayScript] kater/sylvainterchange: Data.rl doesn't run in the editor. {  }
+[14:41:34 INF] [RelayScript] nikii/br-textile: Data.rl doesn't run in the editor. {  }
+[14:41:34 INF] [RelayScript] nikii/wh-crossover: Data.rl doesn't run in the editor. {  }
+[14:41:34 INF] [RelayScript] sox/ser: Data.rl doesn't run in the editor. {  }
+[14:41:34 INF] [RelayScript] tct26/eastwhittiermowyard: Data.rl doesn't run in the editor. {  }
+[14:41:34 INF] Loading map from snapshot: crankyant/inventory {  }
+[14:41:34 INF] ActiveMapDefinition: crankyant/inventory, map data <USER_PROFILE>\OneDrive\Documents\My Games\Railroader\ModDev\test\Data\Map.json, map layers rr/bushnell-whittier, terrain layers D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Terrain, editTarget true {  }
+[14:41:34 INF] Window system initialized with 21 built-in windows { SourceContext: "UI.Windows.WindowManager" }
+GlobalGameManager.LoadMap: MapCore loaded in 44,135 ms
+[14:41:35 INF] MapDataLoader: Loaded 1868 nodes, 1897 segments from <USER_PROFILE>\OneDrive\Documents\My Games\Railroader\ModDev\test\Data\Map.json in 197.0ms (load: 154.2ms, deserialize: 42.7ms) {  }
+[14:41:35 INF] SetDensity 1, 0.8, richness "Rare" {  }
+[14:41:35 WRN] TrackMarker Speed Sign (Track.TrackMarker) location is null or null segment: null {  }
+[14:41:35 WRN] TrackMarker T-45.1 Origin (Track.TrackMarker) location is null or null segment: null {  }
+[14:41:35 WRN] [System] Yard Limit: Track marker Mkwd is not on the track at Sjdl + 38,6m and will have no effect. {  }
+[14:41:35 WRN] [System] Station Sign (1): Track marker Mi4f is not on the track at S9sc + 225,7m and will have no effect. {  }
+[14:41:35 WRN] [System] Speed Sign: Track marker Mwp1 is not on the track at Sjdl + 11,4m and will have no effect. {  }
+[14:41:35 WRN] [System] T-45.1 Origin: Track marker Mjd8 is not on the track at Sozu + 7,6m and will have no effect. {  }
+[14:41:35 WRN] [System] Crossing Pad: Track marker Mg74 is not on the track at Sj7c + 185,9m and will have no effect. {  }
+[14:41:35 WRN] [System] Whistle Sign E: Track marker Mm8w is not on the track at S9sc + 58,3m and will have no effect. {  }
+[14:41:35 WRN] [System] Crossing Pad: Track marker Mxwd is not on the track at Sz8t + 4,5m and will have no effect. {  }
+GlobalGameManager.LoadMap: BushnellWhittier-MapManager loaded in 320,652 ms
+[14:41:35 INF] MapObjectManager: spawned 492 map object(s) {  }
+[14:41:35 ERR] IndustryDataLoader: Failed to resolve track span locations for wilmot-station {  }
+Track.Graph+BadLocationException: Segment not found: "Sj7c|a|58.056"
+  at Track.Graph.ResolveLocationString (System.String locStr) [0x00053] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryDataLoader.CreateIndustrySpans (System.String industryId, System.Collections.Generic.SortedDictionary`2[TKey,TValue] spanDTOs) [0x00090] in <5a60632d406b4972b2162484a9007d35>:0
+[14:41:35 WRN] Span Span-wilmot-station.wilmot-station wilmot-station.wilmot-station missing points or invalid {  }
+[14:41:35 INF] Weather auto mode restored from state {  }
+[14:41:38 INF] MapObjectEnabledWorld: despawned 35 disabled and re-spawned 0 re-enabled map object(s) { SourceContext: "Game.MapEditor.MapObjectEnabledWorld" }
+[14:41:38 INF] MapEditorController enabled { SourceContext: "Game.MapEditor.MapEditorController" }
+[14:41:38 INF] Map editor session activated for crankyant/inventory (writable terrain: none) {  }
+GlobalGameManager.LoadMap: Environment-Enviro loaded in 3246,905 ms
+[14:41:38 INF] Map loaded successfully {  }
+[14:41:38 INF] InitializeDefaultSpawnIfNeeded: active map crankyant/inventory declares no spawns; falling back to scene/host spawn [Spawn] {  }
+[14:41:38 INF] InitializeDefaultSpawnIfNeeded: using scene SpawnPoint.Default at (4477.03, 528.59, 5398.69) [Spawn] {  }
+[14:41:38 INF] RebuildCollections: Feature(s) changed graph {  }
+[14:41:38 INF] RemoveCars [] {  }
+[14:41:38 INF] RestoreFromSnapshot: 0 players, local player REDACTED_STEAM_ID NOT found (will use SetPlayerPosition fallback) [Spawn] {  }
+[14:41:38 INF] HandleSnapshotPlayers: [] {  }
+[14:41:38 INF] No progression specified. {  }
+[14:41:38 INF] Signal mode CTC -> ABS; clearing directions. {  }
+FindTrackSegmentIslands: Found 7 islands in 1865 segments
+FindTrackSegmentIslands: Found 7 islands in 1899 segments
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 WRN] Switch 6n9t0v is within multiple blocks, only one will be used: ["br-m-mm","bryson-ws"] {  }
+[14:41:38 INF] Switch 6n9t0v in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 INF] Switch 7a3rv9 in block br-gi-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,006s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 WRN] Switch N0d5 is within multiple blocks, only one will be used: ["br-m-mm","br-m-ms"] {  }
+[14:41:38 INF] Switch N0d5 in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 WRN] Switch N2yi is within multiple blocks, only one will be used: ["br-m-mm","br-m-ms"] {  }
+[14:41:38 INF] Switch N2yi in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 INF] Switch N4jx in block db-cw changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 INF] Switch N4na in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 WRN] Switch N50ks is within multiple blocks, only one will be used: ["br-m-mm","br-m-ms"] {  }
+[14:41:38 INF] Switch N50ks in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 INF] Switch N5ko in block db-cw changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 INF] Switch N6bu in block we-na-3 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:38 INF] Switch N731 in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:38 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch N86r in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch N8do in block na-to-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Na4z in block we-na-3 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Navon in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nbdw in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nbo2 in block wh-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nc6q in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nceu in block db-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Ncsws in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Ncw8 in block na-to-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nf2u in block bryson-ww1 changed to false {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nffb in block db-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nfhx in block na-to-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nho9 in block db-cw changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nit5 in block aj-bk-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nj2f in block sy-w changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Njk9 in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nk1hr in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nkbia in block el-ms changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nlxj in block na-ms changed to false {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nmbq in block mc-ms changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nmt7 in block db-cw changed to false {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nnns in block cw-bc-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch No9b in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nod36 in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nojh in block bryson-ww3 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nok7 in block we-na-3 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nqt2 in block na-to-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nqtj in block mc-ms changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nro2 in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,005s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nscu in block sy-db changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nsnk in block br-m-es changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nsno in block we-ms changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nuts in block na-to-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nx1u in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nx5z in block br-m-em changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nyj2 in block mc-we-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nywd in block tv-wh-2 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch Nzy6 in block mc-we-1 changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch k0mpa7 in block wh-ms changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch ldn61i in block wh-ms changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,004s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 WRN] Switch x1hq5h is within multiple blocks, only one will be used: ["br-m-mm","br-m-ms"] {  }
+[14:41:39 INF] Switch x1hq5h in block br-m-mm changed to false {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:39 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:39 INF] Switch yd53ys in block bryson-ww1 changed to false {  }
+[14:41:39 INF] TimeObserver start with Day 1 7:00 {  }
+[14:41:39 INF] Weather override from state: 0 {  }
+[14:41:39 INF] [rr/ht-hopper01:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ld-f7:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ld-gp9:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ld-sd7:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ld-sw1:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-2100-d46:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-2102-f71:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-2442-l27:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-260-g24:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-262-g16:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-280-c46:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-280-c55:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-284-b65:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-442-a26:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-462-p48:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ne-usra-wood:Main.rl] Executing {  }
+[14:41:39 INF] [rr/pb-osgbrad-lightweight-steel-1915:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-440-a23:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-480-c40:Main.rl] Executing {  }
+[14:41:39 INF] [rr/ls-462-p43:Main.rl] Executing {  }
+[14:41:39 INF] Main.rl execution complete. Loaded 20 scripts, registered 21 UI extensions, 0 commands. {  }
+[14:41:39 INF] Requesting Active... {  }
+[14:41:39 INF] Client 0: status = "Active" {  }
+[14:41:40 INF] ClientStatusDidChange "Active" REDACTED_STEAM_ID "President" {  }
+[14:41:40 INF] Received player list of 1 entries. {  }
+[14:41:40 INF] HandleSnapshotPlayers: [{"PlayerId":"REDACTED_STEAM_ID","Name":"REDACTED_PLAYER"}] {  }
+[14:41:40 INF] RequestPriorityLoad: ["(8, 10)"] {  }
+FindTrackSegmentIslands: Found 7 islands in 1865 segments
+FindTrackSegmentIslands: Found 7 islands in 1899 segments
+Track marker is not set or invalid
+[14:41:40 INF] PrefabInstancer: growing buffer for "TiePlate" from 32768 to 49152 {  }
+WH-EL2: Search failed after 0,001s
+[14:41:40 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:40 ERR] TrackSpan BC-TV 2 has no route {  }
+Detected one or more triangles where the distance between any 2 vertices is greater than 500 units. The resulting Triangle Mesh can impact simulation and query stability. It is recommended to tessellate meshes that have large triangles. Source mesh name: store_5_phys
+[14:41:41 INF] RequestPriorityLoad: completed after 1.2647973999999067s, waitedAny = true {  }
+[14:41:41 INF] MoveWorld (8, 10) {  }
+WH-EL2: Search failed after 0,001s
+[14:41:41 ERR] TrackSpan WH-EL2 has no route {  }
+[14:41:42 INF] PrefabInstancer: growing buffer for "TiePlate" from 49152 to 73728 {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:42 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,002s
+[14:41:42 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:43 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:43 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:44 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:44 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:45 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:45 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:46 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:46 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:47 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:47 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:48 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:48 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:49 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:49 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,004s
+[14:41:50 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:50 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:51 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:51 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:52 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:52 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:53 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:53 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:54 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:54 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:55 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:55 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:56 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:56 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:57 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:57 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:58 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:58 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:41:59 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:41:59 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:00 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:00 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:01 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:01 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:02 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:02 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:03 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:03 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:04 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:04 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:05 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:05 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:06 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:06 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:07 ERR] TrackSpan BC-TV 2 has no route {  }
+WH-EL2: Search failed after 0,001s
+[14:42:07 ERR] TrackSpan WH-EL2 has no route {  }
+BC-TV 2: Search failed after 0,001s
+[14:42:08 ERR] TrackSpan BC-TV 2 has no route {  }

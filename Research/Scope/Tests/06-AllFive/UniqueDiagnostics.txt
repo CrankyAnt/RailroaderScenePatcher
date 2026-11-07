@@ -1,0 +1,26 @@
+[ERR] [Ops] br-textile.br-textile-loader: br-textile.br-textile-loader refers to undefined load "scold/textiles". {  }
+[ERR] [Ops] br-textile.br-textile-unloader: br-textile.br-textile-unloader refers to undefined load "scold/yarn". {  }
+[ERR] [Ops] br-textile.br-textile-unloader2: br-textile.br-textile-unloader2 refers to undefined load "scold/wool". {  }
+[ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/textiles". {  }
+[ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/wool". {  }
+[ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/yarn". {  }
+[ERR] CarLoaderBuiltin: map object 'OKatSylInt_diesel-fueling-stand-2' has an invalid supply configuration: supply is 'industry' but sourceIndustryId is missing. The structure will not dispense. {  }
+[ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+[ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+[ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+[ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+[ERR] Failed to initialize industry br-textile {  }
+[ERR] IndustryDataLoader: Failed to resolve track span locations for P7ec {  }
+[ERR] IndustryDataLoader: Failed to resolve track span locations for Pfaj {  }
+[WRN] [System] Crossing Pad (2): Track marker Muef is not on the track at Sqc5 + 46,2m and will have no effect. {  }
+[WRN] [System] Crossing Pad (3): Track marker M5ib is not on the track at Sqy8 + 3,5m and will have no effect. {  }
+[WRN] [System] starter-ewh-btrk1: Track marker starter-ewh-btrk1 is not on the track at Stky0sco4 + 60,0m and will have no effect. {  }
+[WRN] [System] starter-ewh-btrk2: Track marker starter-ewh-btrk2 is not on the track at Stky0sco4 + 31,1m and will have no effect. {  }
+[WRN] [System] starter-ewh-btrk3: Track marker starter-ewh-btrk3 is not on the track at Stky03ew3 + 94,7m and will have no effect. {  }
+[WRN] [System] Whistle Sign W: Track marker M5c0 is not on the track at wk44ps + 11,1m and will have no effect. {  }
+[WRN] MapObjectSpawner: map object 'Ela-water-column' could not apply its track anchor 'Skbi|a|8.871927' (no terrain under the offset point when snapToTerrain is set?); keeping its cached pose {  }
+[WRN] Span Span-sylva-interchange.P7ec sylva-interchange.P7ec missing points or invalid {  }
+[WRN] Span Span-sylva-interchange.Pfaj sylva-interchange.Pfaj missing points or invalid {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+Track.Graph+BadLocationException: Segment not found: "Sch6|a|42.938"
+Track.Graph+BadLocationException: Segment not found: "Sv6m|a|45.863"

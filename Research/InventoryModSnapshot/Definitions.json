@@ -1,0 +1,24 @@
+{
+  "objects": [
+    {
+      "identifier": "crankyant/inventory",
+      "metadata": {
+        "name": "crankyant/inventory",
+        "description": "A new item",
+        "tags": [],
+        "credits": ""
+      },
+      "definition": {
+        "kind": "Map",
+        "mapData": "./Map.json",
+        "terrainTileSets": [
+          "rr/nc-bryson"
+        ],
+        "mapLayers": [
+          "rr/bushnell-whittier"
+        ],
+        "components": {}
+      }
+    }
+  ]
+}

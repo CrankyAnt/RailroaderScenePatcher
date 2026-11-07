@@ -1,0 +1,710 @@
+{
+  "source": "Installed Railroader_Data/level4 and globalgamemanagers.assets, read-only UnityPy 1.25.4",
+  "coordinate_note": "World transforms are composed from serialized Unity local transforms at scene load, before floating-origin shifts. Nonuniform scale with rotated ancestors can introduce shear; check in runtime.",
+  "speed_sign": {
+    "component_path_id": 29531,
+    "marker_id": "Mwp1",
+    "marker_type": 0,
+    "segment_id": "Sjdl",
+    "distance": 11.417938232421875,
+    "end": 1,
+    "component_enabled": true,
+    "object": {
+      "gameobject_path_id": 4909,
+      "path": "World/Large Scenery/Alarka Signs/Speed Sign",
+      "active_self": true,
+      "transform_path_id": 12684,
+      "world_position": [
+        1205.9637451171875,
+        583.699462890625,
+        1176.5516357421875
+      ],
+      "world_rotation_xyzw": [
+        0.0012876695254817605,
+        -0.7049443125724792,
+        -0.0021917116828262806,
+        -0.7092581391334534
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 12684,
+          "type": "Transform"
+        },
+        {
+          "path_id": 29118,
+          "type": "Helpers.TextSynchronizer"
+        },
+        {
+          "path_id": 29531,
+          "type": "Track.TrackMarker"
+        },
+        {
+          "path_id": 28771,
+          "type": "Track.TrackRelativePosition"
+        },
+        {
+          "path_id": 31830,
+          "type": "Helpers.Culling.RendererCuller"
+        }
+      ]
+    }
+  },
+  "whistle_sign": {
+    "component_path_id": 31108,
+    "marker_id": "Mm8w",
+    "marker_type": 0,
+    "segment_id": "S9sc",
+    "distance": 58.3243408203125,
+    "end": 1,
+    "component_enabled": true,
+    "object": {
+      "gameobject_path_id": 4054,
+      "path": "World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E",
+      "active_self": true,
+      "transform_path_id": 14729,
+      "world_position": [
+        9741.328140258789,
+        546.4942016601562,
+        7272.74560546875
+      ],
+      "world_rotation_xyzw": [
+        -0.0005418505170382559,
+        0.9321722984313965,
+        0.0013952519511803985,
+        0.36201196908950806
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 14729,
+          "type": "Transform"
+        },
+        {
+          "path_id": 31108,
+          "type": "Track.TrackMarker"
+        },
+        {
+          "path_id": 28920,
+          "type": "Track.TrackRelativePosition"
+        }
+      ]
+    }
+  },
+  "unprotected_crossing_pad": {
+    "component_path_id": 30102,
+    "marker_id": "Mg74",
+    "marker_type": 3,
+    "segment_id": "Sj7c",
+    "distance": 185.94766235351562,
+    "end": 0,
+    "component_enabled": true,
+    "object": {
+      "gameobject_path_id": 1637,
+      "path": "World/Roads Wilmot/Crossing Unprotected/Crossing Pad",
+      "active_self": true,
+      "transform_path_id": 13142,
+      "world_position": [
+        16510.466797169775,
+        569.5239868192355,
+        2295.2041030375062
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.7201031619298455,
+        0.0,
+        0.6938670507175608
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 13142,
+          "type": "Transform"
+        },
+        {
+          "path_id": 30102,
+          "type": "Track.TrackMarker"
+        },
+        {
+          "path_id": 29732,
+          "type": "Track.TrackRelativePosition"
+        },
+        {
+          "path_id": 30884,
+          "type": "Track.TrackCurveMeshBuilder"
+        }
+      ]
+    }
+  },
+  "protected_crossing": {
+    "object": {
+      "gameobject_path_id": 3431,
+      "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett",
+      "active_self": true,
+      "transform_path_id": 13053,
+      "world_position": [
+        4386.75927734375,
+        528.8591918945312,
+        5378.87060546875
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.5791616439819336,
+        0.0,
+        0.8152127265930176
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 13053,
+          "type": "Transform"
+        },
+        {
+          "path_id": 30941,
+          "type": "Track.Crossings.GradeCrossingController"
+        },
+        {
+          "path_id": 30956,
+          "type": "KeyValue.Runtime.KeyValueObject"
+        },
+        {
+          "path_id": 31803,
+          "type": "RollingStock.Controls.GlobalKeyValueObject"
+        },
+        {
+          "path_id": 29384,
+          "type": "Helpers.Culling.GameObjectCuller"
+        }
+      ]
+    },
+    "controller_path_id": 30941,
+    "circuit_sets": [
+      {
+        "approachA": {
+          "component_path_id": 32374,
+          "span_id": "Pcyi",
+          "endpoint_a": {
+            "segment_id": "S8rj",
+            "distance": 0.3415679931640625,
+            "end": 1
+          },
+          "endpoint_b": {
+            "segment_id": "Sx88",
+            "distance": 2.823249578475952,
+            "end": 0
+          },
+          "object": {
+            "gameobject_path_id": 6241,
+            "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 1 East",
+            "active_self": true,
+            "transform_path_id": 14380,
+            "world_position": [
+              4386.75927734375,
+              528.8591918945312,
+              5378.87060546875
+            ],
+            "world_rotation_xyzw": [
+              0.0,
+              0.5791616439819336,
+              0.0,
+              0.8152127265930176
+            ],
+            "world_scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "components": [
+              {
+                "path_id": 14380,
+                "type": "Transform"
+              },
+              {
+                "path_id": 32374,
+                "type": "Track.TrackSpan"
+              }
+            ]
+          }
+        },
+        "island": {
+          "component_path_id": 32661,
+          "span_id": "Pipr",
+          "endpoint_a": {
+            "segment_id": "Sz8t",
+            "distance": 0.15679115056991577,
+            "end": 0
+          },
+          "endpoint_b": {
+            "segment_id": "Sz8t",
+            "distance": 45.12718200683594,
+            "end": 1
+          },
+          "object": {
+            "gameobject_path_id": 6769,
+            "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 1 Island",
+            "active_self": true,
+            "transform_path_id": 15417,
+            "world_position": [
+              4386.75927734375,
+              528.8591918945312,
+              5378.87060546875
+            ],
+            "world_rotation_xyzw": [
+              0.0,
+              0.5791616439819336,
+              0.0,
+              0.8152127265930176
+            ],
+            "world_scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "components": [
+              {
+                "path_id": 15417,
+                "type": "Transform"
+              },
+              {
+                "path_id": 32661,
+                "type": "Track.TrackSpan"
+              }
+            ]
+          }
+        },
+        "approachB": {
+          "component_path_id": 30914,
+          "span_id": "Pws9",
+          "endpoint_a": {
+            "segment_id": "Sz8t",
+            "distance": 9.086095809936523,
+            "end": 0
+          },
+          "endpoint_b": {
+            "segment_id": "S9xx",
+            "distance": 38.57130432128906,
+            "end": 1
+          },
+          "object": {
+            "gameobject_path_id": 4406,
+            "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 1 West",
+            "active_self": true,
+            "transform_path_id": 14170,
+            "world_position": [
+              4386.75927734375,
+              528.8591918945312,
+              5378.87060546875
+            ],
+            "world_rotation_xyzw": [
+              0.0,
+              0.5791616439819336,
+              0.0,
+              0.8152127265930176
+            ],
+            "world_scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "components": [
+              {
+                "path_id": 14170,
+                "type": "Transform"
+              },
+              {
+                "path_id": 30914,
+                "type": "Track.TrackSpan"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "approachA": {
+          "component_path_id": 30281,
+          "span_id": "Pdlh",
+          "endpoint_a": {
+            "segment_id": "S63c",
+            "distance": 1.70391845703125,
+            "end": 1
+          },
+          "endpoint_b": {
+            "segment_id": "S3ddf",
+            "distance": 8.98759937286377,
+            "end": 0
+          },
+          "object": {
+            "gameobject_path_id": 2581,
+            "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 2 East",
+            "active_self": true,
+            "transform_path_id": 14541,
+            "world_position": [
+              4386.75927734375,
+              528.8591918945312,
+              5378.87060546875
+            ],
+            "world_rotation_xyzw": [
+              0.0,
+              0.5791616439819336,
+              0.0,
+              0.8152127265930176
+            ],
+            "world_scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "components": [
+              {
+                "path_id": 14541,
+                "type": "Transform"
+              },
+              {
+                "path_id": 30281,
+                "type": "Track.TrackSpan"
+              }
+            ]
+          }
+        },
+        "island": {
+          "component_path_id": 32055,
+          "span_id": "P6id",
+          "endpoint_a": {
+            "segment_id": "Sccw",
+            "distance": 0.11684718728065491,
+            "end": 0
+          },
+          "endpoint_b": {
+            "segment_id": "Sccw",
+            "distance": 50.79974365234375,
+            "end": 1
+          },
+          "object": {
+            "gameobject_path_id": 5140,
+            "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 2 Island",
+            "active_self": true,
+            "transform_path_id": 14321,
+            "world_position": [
+              4386.75927734375,
+              528.8591918945312,
+              5378.87060546875
+            ],
+            "world_rotation_xyzw": [
+              0.0,
+              0.5791616439819336,
+              0.0,
+              0.8152127265930176
+            ],
+            "world_scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "components": [
+              {
+                "path_id": 14321,
+                "type": "Transform"
+              },
+              {
+                "path_id": 32055,
+                "type": "Track.TrackSpan"
+              }
+            ]
+          }
+        },
+        "approachB": {
+          "component_path_id": 29759,
+          "span_id": "P1db",
+          "endpoint_a": {
+            "segment_id": "Sccw",
+            "distance": 9.71475601196289,
+            "end": 0
+          },
+          "endpoint_b": {
+            "segment_id": "Snp1",
+            "distance": 43.59196472167969,
+            "end": 1
+          },
+          "object": {
+            "gameobject_path_id": 6169,
+            "path": "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 2 West",
+            "active_self": true,
+            "transform_path_id": 11236,
+            "world_position": [
+              4386.75927734375,
+              528.8591918945312,
+              5378.87060546875
+            ],
+            "world_rotation_xyzw": [
+              0.0,
+              0.5791616439819336,
+              0.0,
+              0.8152127265930176
+            ],
+            "world_scale": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "components": [
+              {
+                "path_id": 11236,
+                "type": "Transform"
+              },
+              {
+                "path_id": 29759,
+                "type": "Track.TrackSpan"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "bridge_candidates": [
+    {
+      "gameobject_path_id": 37,
+      "path": "World/Large Scenery/Ela/Ela Bridge",
+      "active_self": true,
+      "transform_path_id": 8588,
+      "world_position": [
+        8616.00146484375,
+        545.9800415039062,
+        7274.758758544922
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.9750780463218689,
+        0.0,
+        -0.22186246514320374
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 8588,
+          "type": "Transform"
+        },
+        {
+          "path_id": 28075,
+          "type": "Helpers.Culling.RendererCuller"
+        }
+      ]
+    },
+    {
+      "gameobject_path_id": 112,
+      "path": "MapFeatures/Bryson Bridge to Alarka Jct",
+      "active_self": true,
+      "transform_path_id": 8654,
+      "world_position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 8654,
+          "type": "Transform"
+        },
+        {
+          "path_id": 28157,
+          "type": "Game.Progression.MapFeature"
+        }
+      ]
+    },
+    {
+      "gameobject_path_id": 114,
+      "path": "World/Large Scenery/Plate Girder Bridge",
+      "active_self": true,
+      "transform_path_id": 8655,
+      "world_position": [
+        5106.43994140625,
+        528.739990234375,
+        5671.81982421875
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.47961097955703735,
+        0.0,
+        0.8774812817573547
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 8655,
+          "type": "Transform"
+        },
+        {
+          "path_id": 23197,
+          "type": "BoxCollider"
+        }
+      ]
+    },
+    {
+      "gameobject_path_id": 193,
+      "path": "World/Large Scenery/Ela/Ela Bridge Scenery",
+      "active_self": true,
+      "transform_path_id": 8723,
+      "world_position": [
+        8617.314453125,
+        542.39404296875,
+        7277.8427734375
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 8723,
+          "type": "Transform"
+        },
+        {
+          "path_id": 28249,
+          "type": "Game.Mow.TrackConstructionScenery"
+        }
+      ]
+    },
+    {
+      "gameobject_path_id": 223,
+      "path": "Progressions/Full from EWH/S2 Ela Bridge to Bryson",
+      "active_self": true,
+      "transform_path_id": 8749,
+      "world_position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 8749,
+          "type": "Transform"
+        },
+        {
+          "path_id": 28288,
+          "type": "Game.Progression.TrackConstructionMilestone"
+        },
+        {
+          "path_id": 28289,
+          "type": "Game.Progression.Triggers.RandomTrackConditionInitializer"
+        }
+      ]
+    },
+    {
+      "gameobject_path_id": 470,
+      "path": "MapFeatures/Ela Bridge",
+      "active_self": true,
+      "transform_path_id": 8973,
+      "world_position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 8973,
+          "type": "Transform"
+        },
+        {
+          "path_id": 28560,
+          "type": "Game.Progression.MapFeature"
+        }
+      ]
+    },
+    {
+      "gameobject_path_id": 510,
+      "path": "MapFeatures/Ela Bridge to Bryson",
+      "active_self": true,
+      "transform_path_id": 9010,
+      "world_position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "world_rotation_xyzw": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "world_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "components": [
+        {
+          "path_id": 9010,
+          "type": "Transform"
+        },
+        {
+          "path_id": 28606,
+          "type": "Game.Progression.MapFeature"
+        }
+      ]
+    }
+  ]
+}

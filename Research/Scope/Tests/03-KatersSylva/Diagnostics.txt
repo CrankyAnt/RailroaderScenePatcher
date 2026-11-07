@@ -1,0 +1,7 @@
+[04:01:45 ERR] CarLoaderBuiltin: map object 'OKatSylInt_diesel-fueling-stand-2' has an invalid supply configuration: supply is 'industry' but sourceIndustryId is missing. The structure will not dispense. {  }
+[04:01:45 ERR] IndustryDataLoader: Failed to resolve track span locations for P7ec {  }
+Track.Graph+BadLocationException: Segment not found: "Sch6|a|42.938"
+[04:01:45 WRN] Span Span-sylva-interchange.P7ec sylva-interchange.P7ec missing points or invalid {  }
+[04:01:45 ERR] IndustryDataLoader: Failed to resolve track span locations for Pfaj {  }
+Track.Graph+BadLocationException: Segment not found: "Sv6m|a|45.863"
+[04:01:45 WRN] Span Span-sylva-interchange.Pfaj sylva-interchange.Pfaj missing points or invalid {  }

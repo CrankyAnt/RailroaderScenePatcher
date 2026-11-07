@@ -1,0 +1,78 @@
+[
+  {
+    "Count": 327,
+    "Message": "TrackSpan BC-TV 2 has no route {  }"
+  },
+  {
+    "Count": 326,
+    "Message": "TrackSpan WH-EL2 has no route {  }"
+  },
+  {
+    "Count": 3,
+    "Message": "Switch geometry failed at N8xf: aProxy=Serb bProxy=Ssup — falling back to full SegmentDescriptors (spatial index not restored) {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "TrackMarker T-45.1 Origin (Track.TrackMarker) location is null or null segment: null {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "TrackMarker Speed Sign (Track.TrackMarker) location is null or null segment: null {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "Switch x1hq5h is within multiple blocks, only one will be used: [\"br-m-mm\",\"br-m-ms\"] {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "Switch N50ks is within multiple blocks, only one will be used: [\"br-m-mm\",\"br-m-ms\"] {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "Switch N2yi is within multiple blocks, only one will be used: [\"br-m-mm\",\"br-m-ms\"] {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "Switch N0d5 is within multiple blocks, only one will be used: [\"br-m-mm\",\"br-m-ms\"] {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "Switch 6n9t0v is within multiple blocks, only one will be used: [\"br-m-mm\",\"bryson-ws\"] {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "IndustryDataLoader: Failed to resolve track span locations for wilmot-station {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] Yard Limit: Track marker Mkwd is not on the track at Sjdl + 38,6m and will have no effect. {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] Whistle Sign E: Track marker Mm8w is not on the track at S9sc + 58,3m and will have no effect. {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] T-45.1 Origin: Track marker Mjd8 is not on the track at Sozu + 7,6m and will have no effect. {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] Station Sign (1): Track marker Mi4f is not on the track at S9sc + 225,7m and will have no effect. {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] Speed Sign: Track marker Mwp1 is not on the track at Sjdl + 11,4m and will have no effect. {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] Crossing Pad: Track marker Mxwd is not on the track at Sz8t + 4,5m and will have no effect. {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "Span Span-wilmot-station.wilmot-station wilmot-station.wilmot-station missing points or invalid {  }"
+  },
+  {
+    "Count": 1,
+    "Message": "[System] Crossing Pad: Track marker Mg74 is not on the track at Sj7c + 185,9m and will have no effect. {  }"
+  }
+]

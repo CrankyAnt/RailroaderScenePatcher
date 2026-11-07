@@ -1,0 +1,92 @@
+{
+  "map": "crankyant/inventory",
+  "game": "Installed experimental 0.6.2",
+  "cases": [
+    {
+      "id": "I01",
+      "family": "Milepost marker",
+      "target": "Mjd8, T-45.1 Origin",
+      "action": "Delete Sozu, preserving both endpoint nodes. Already performed in editor.",
+      "expected": "Missing marker reference on reload; physical post survives. No runtime repair applied.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I02",
+      "family": "Whistle marker, surviving segment ID",
+      "target": "M5pp, Whistle Sign E at Sylva",
+      "action": "Move Nmzo and N51l by +20 m X; retain Shuo and its ID.",
+      "expected": "Marker may resolve without warning while scene model retains old pose. Inspect physical and logical locations separately.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I03",
+      "family": "Speed sign marker",
+      "target": "Mwp1, World/Large Scenery/Alarka Signs/Speed Sign",
+      "action": "Delete Sjdl.",
+      "expected": "Missing marker reference; visible sign may survive.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I04",
+      "family": "Whistle marker, deleted segment",
+      "target": "Mm8w, Ela crossing whistle sign E",
+      "action": "Delete S9sc.",
+      "expected": "Missing marker reference; compare with I02 surviving-ID case.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I05",
+      "family": "Unprotected crossing pad",
+      "target": "Mg74, World/Roads Wilmot/Crossing Unprotected/Crossing Pad",
+      "action": "Delete Sj7c.",
+      "expected": "Missing crossing marker reference; inspect pad mesh and associated crossing signs separately.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I06",
+      "family": "Protected crossing scene spans",
+      "target": "Bryson Everett controller 30941, Pipr island and Pws9 approachB",
+      "action": "Delete Sz8t; leave second circuit track intact.",
+      "expected": "Invalid endpoints for Pipr and Pws9 are expected candidates. Other routing/CTC effects must be attributed separately. Train behavior is not tested by loading alone.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I07",
+      "family": "Retained scene bridge",
+      "target": "World/Large Scenery/Ela/Ela Bridge, GameObject 37",
+      "action": "Move bridge segment 31lvmw endpoints 5hqgfi and qocgc2 by +20 m X.",
+      "expected": "Scene bridge may remain at its old position. Segment association inferred from scene position and base graph; visual confirmation required. No collision claim.",
+      "result": "Pending reload and observation"
+    },
+    {
+      "id": "I08",
+      "family": "Standalone scene location board",
+      "target": "World/Signs/Loc: Sylva Int, GameObject 778",
+      "action": "Add a short isolated track through the stored board position.",
+      "expected": "Board stays in place with no missing track reference, because it has no TrackMarker. Visual obstruction test; one deliberately disconnected track island is expected.",
+      "result": "Pending reload and observation"
+    }
+  ],
+  "deletedSegments": [
+    "Sozu",
+    "Sjdl",
+    "S9sc",
+    "Sj7c",
+    "Sz8t"
+  ],
+  "movedNodes": [
+    "Nmzo",
+    "N51l",
+    "5hqgfi",
+    "qocgc2"
+  ],
+  "geometryAffectedBaseSegments": [
+    "31lvmw",
+    "Serb",
+    "Shuo",
+    "Sou5",
+    "Su7s",
+    "qcopn1"
+  ],
+  "note": "No scene object or marker repair is applied. Adjacent segments share moved nodes, so their geometry changes too. Normal saves and other mod packages are untouched."
+}

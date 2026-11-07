@@ -1,0 +1,247 @@
+Mono path[0] = 'D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/Managed'
+Mono config path = 'D:/SteamLibrary/steamapps/common/Railroader/MonoBleedingEdge/etc'
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+Initialize engine version: 6000.3.26f1 (de8167e7440c)
+[Subsystems] Discovering subsystems at path D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/UnitySubsystems
+[D3D12 Device Filter] Vendor Name: NVIDIA
+[D3D12 Device Filter] Device Name: NVIDIA GeForce RTX 3070 Ti
+[D3D12 Device Filter] Driver Version: 32.0.16.1742
+[D3D12 Device Filter] Feature Level: 12.2
+[D3D12 Device Filter] Graphics Memory: 8017 MB
+[D3D12 Device Filter] Processor Count: 26
+[D3D12 Device Filter] Device Type: Discrete
+GfxDevice: creating device client; kGfxThreadingModeSplitJobs
+d3d12: failed to query info queue interface (0x80004002).
+Direct3D:
+    Version:         Direct3D 12 [level 12.2]
+    Renderer:        NVIDIA GeForce RTX 3070 Ti (ID=0x2482)
+    Vendor:          NVIDIA
+    VRAM:            8017 MB
+    App VRAM Budget: 7249 MB
+    Driver:          32.0.16.1742
+Begin MonoManager ReloadAssembly
+- Loaded All Assemblies, in  0.165 seconds
+- Finished resetting the current domain, in  0.001 seconds
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+<RI> Initializing input.
+Using Windows.Gaming.Input
+<RI> Input initialized.
+UnloadTime: 0.359300 ms
+Local User: REDACTED_PLAYER
+[04:05:17 INF] Railroader 0.6.2 (26335745) {  }
+[04:05:17 INF] Home directory is <USER_PROFILE>\OneDrive\Documents\My Games\Railroader {  }
+[04:05:17 INF] HTTP.GameServer: Created MainThreadDispatcher {  }
+[04:05:17 INF] HTTP.GameServer: Info: Registered HTTP GET handler for: /api/info {  }
+[04:05:17 INF] HTTP.GameServer: Info: Registered HTTP GET handler for: /api/services {  }
+[04:05:17 INF] HTTP.GameServer: Info: Starting HTTP server on localhost:8630 {  }
+[04:05:17 INF] HTTP.GameServer: Info: DocumentRootPath set to: D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\HTTP {  }
+[04:05:17 INF] HTTP.GameServer: Info: Registered WebSocket service at ws://127.0.0.1:8630/ws {  }
+[04:05:17 INF] HTTP.GameServer: Info: Server started at http://localhost:8630 {  }
+[04:05:17 INF] HTTP.GameServer: Server started at http://127.0.0.1:8630/ {  }
+[04:05:17 INF] Analytics: Start {  }
+[04:05:17 INF] vSyncCount = 0, targetFrameRate = 60 {  }
+[04:05:17 INF] TextFilter: Steam text filtering is available {  }
+[04:05:18 INF] [nikii/br-textile/Data.rl] Executing modifyDefinitions {  }
+[04:05:18 INF] CarLoadLibrary initialized with 54 loads {  }
+[04:05:21 INF] Loading mapmodscopesandbox from <USER_PROFILE>\OneDrive\Documents\My Games\Railroader\Saves\mapmodscopesandbox.railroad {  }
+[04:05:22 INF] Deserialized world v0.6.2, snapshot v1 {  }
+[04:05:22 INF] HostManager: loaded save, DefaultSpawnPosition=(4477.03, 528.59, 5398.69), PlayerRecords=1 [Spawn] {  }
+[04:05:22 INF] History: loaded database (49,152 bytes). {  }
+[04:05:22 INF] Client 0: status = "Anonymous" {  }
+[04:05:22 INF] Client 0: Running 0.5; now Anonymous {  }
+[04:05:22 INF] ClientStatusDidChange "Anonymous"  "Undetermined" {  }
+[04:05:22 INF] Client 0: Authenticated as playerId="REDACTED_STEAM_ID" name="REDACTED_PLAYER", steamName = "REDACTED_PLAYER" {  }
+[04:05:22 INF] Client 0: status = "Authenticated" {  }
+[04:05:22 INF] ClientStatusDidChange "Authenticated" REDACTED_STEAM_ID "President" {  }
+[04:05:22 INF] Mod set differs from save; prompting player. Delta (current set → save's set):
+  - nikii/br-textile (1.0.0) {  }
+[04:05:22 INF] Loading map from snapshot: rr/bushnell-whittier {  }
+[04:05:22 INF] ActiveMapDefinition: rr/bushnell-whittier, map data D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Data\Map.json, map layers (none), terrain layers D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Terrain, editTarget false {  }
+[04:05:23 INF] Window system initialized with 21 built-in windows { SourceContext: "UI.Windows.WindowManager" }
+GlobalGameManager.LoadMap: MapCore loaded in 170,977 ms
+Shader 'Hidden/Railroader Terrain_Base-635393112': fallback shader 'Off' not found
+Shader 'Hidden/Railroader Terrain_Base-635393112': dependency 'BaseMapShader' shader 'Off' not found
+[04:05:24 INF] [nikii/br-textile/Data.rl] modifyMap begin {  }
+[04:05:25 INF] MapDataLoader: Loaded 1879 nodes, 1915 segments from D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Data\Map.json in 315.3ms (load: 247.7ms, deserialize: 67.7ms) {  }
+[04:05:25 INF] SetDensity 1, 0.8, richness "Rare" {  }
+GlobalGameManager.LoadMap: BushnellWhittier-MapManager loaded in 1386,092 ms
+[04:05:25 INF] MapObjectManager: spawned 468 map object(s) {  }
+[04:05:25 INF] MapObjectManager: skipped 35 disabled map object(s) {  }
+[04:05:25 ERR] [Ops] br-textile.br-textile-loader: br-textile.br-textile-loader refers to undefined load "scold/textiles". {  }
+[04:05:25 ERR] [Ops] br-textile.br-textile-unloader: br-textile.br-textile-unloader refers to undefined load "scold/yarn". {  }
+[04:05:25 ERR] [Ops] br-textile.br-textile-unloader2: br-textile.br-textile-unloader2 refers to undefined load "scold/wool". {  }
+[04:05:25 ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/yarn". {  }
+[04:05:25 ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/wool". {  }
+[04:05:25 ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/textiles". {  }
+[04:05:29 INF] Weather auto mode restored from state {  }
+GlobalGameManager.LoadMap: Environment-Enviro loaded in 3963,189 ms
+[04:05:29 INF] Map loaded successfully {  }
+[04:05:29 INF] RebuildCollections: Feature(s) changed graph {  }
+[04:05:29 INF] RemoveCars [] {  }
+[04:05:29 INF] RestoreFromSnapshot: 0 players, local player REDACTED_STEAM_ID NOT found (will use SetPlayerPosition fallback) [Spawn] {  }
+[04:05:29 INF] HandleSnapshotPlayers: [] {  }
+[04:05:29 ERR] Failed to initialize industry br-textile {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryStorageHelper.AddToStorage (Model.Ops.Definition.Load load, System.Single quantity, System.Single maxQuantity, System.String prefix) [0x00040] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.AddToStorage (Model.Ops.Definition.Load load, System.Single quantity, System.Single maxQuantity) [0x00014] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryUnloader.Initialize (Model.Ops.IIndustryContext ctx, Game.GameVersion fromVersion) [0x00047] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.InitializeIfNeeded () [0x00070] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.OpsController.InitializeAllIndustries () [0x0000f] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:29 INF] No progression specified. {  }
+[04:05:29 INF] Signal mode CTC -> ABS; clearing directions. {  }
+FindTrackSegmentIslands: Found 1 islands in 1755 segments
+FindTrackSegmentIslands: Found 1 islands in 1784 segments
+[04:05:29 INF] Switch 6n9t0v in block bryson-ws changed to false {  }
+[04:05:29 INF] Switch 7a3rv9 in block br-gi-1 changed to false {  }
+[04:05:29 INF] Switch N06nuu0x6 in block br-m-em changed to false {  }
+[04:05:29 INF] Switch N0d5 in block br-m-ms changed to false {  }
+[04:05:29 INF] Switch N28g in block bc-tv-2 changed to false {  }
+[04:05:29 INF] Switch N2yi in block br-m-ms changed to false {  }
+[04:05:29 INF] Switch N4na in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch N50ks in block br-m-ms changed to false {  }
+[04:05:29 INF] Switch N6bu in block we-na-3 changed to false {  }
+[04:05:29 INF] Switch N731 in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch N86r in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch N8do in block na-to-1 changed to false {  }
+[04:05:29 INF] Switch Na4z in block we-na-3 changed to false {  }
+[04:05:29 INF] Switch Navon in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nbdw in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nbo2 in block wh-mm changed to false {  }
+[04:05:29 INF] Switch Nc6q in block br-m-mm changed to false {  }
+[04:05:29 INF] Switch Nceu in block db-mm changed to false {  }
+[04:05:29 INF] Switch Ncsws in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Ncw8 in block na-to-1 changed to false {  }
+[04:05:29 INF] Switch Nf2u in block bryson-ww1 changed to false {  }
+[04:05:29 INF] Switch Nffb in block db-mm changed to false {  }
+[04:05:29 INF] Switch Nfhx in block na-to-1 changed to false {  }
+[04:05:29 INF] Switch Nit5 in block aj-bk-1 changed to false {  }
+[04:05:29 INF] Switch Nj2f in block sy-w changed to false {  }
+[04:05:29 INF] Switch Njk9 in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nk1hr in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nkbia in block el-ms changed to false {  }
+[04:05:29 INF] Switch Nlxj in block na-ms changed to false {  }
+[04:05:29 INF] Switch Nnn2 in block br-m-mm changed to false {  }
+[04:05:29 INF] Switch Nnns in block cw-bc-2 changed to false {  }
+[04:05:29 INF] Switch No9b in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nod36 in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nojh in block bryson-ww3 changed to false {  }
+[04:05:29 INF] Switch Nok7 in block we-na-3 changed to false {  }
+[04:05:29 INF] Switch Nqt2 in block na-to-1 changed to false {  }
+[04:05:29 INF] Switch Nro2 in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nscu in block sy-db changed to false {  }
+[04:05:29 INF] Switch Nsnk in block br-m-es changed to false {  }
+[04:05:29 INF] Switch Nsno in block we-ms changed to false {  }
+[04:05:29 INF] Switch Ntrd in block br-m-mm changed to false {  }
+[04:05:29 INF] Switch Nuts in block na-to-2 changed to false {  }
+[04:05:29 INF] Switch Nx5z in block br-m-em changed to false {  }
+[04:05:29 INF] Switch Nyj2 in block mc-we-1 changed to false {  }
+[04:05:29 INF] Switch Nywd in block tv-wh-2 changed to false {  }
+[04:05:29 INF] Switch Nzy6 in block mc-we-1 changed to false {  }
+[04:05:29 INF] Switch k0mpa7 in block wh-ms changed to false {  }
+[04:05:29 INF] Switch ldn61i in block wh-ms changed to false {  }
+[04:05:29 INF] Switch x1hq5h in block br-m-ms changed to false {  }
+[04:05:29 INF] Switch yd53ys in block bryson-ww1 changed to false {  }
+[04:05:29 INF] TimeObserver start with Day 1 7:01 {  }
+[04:05:30 INF] [rr/ht-hopper01:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ld-f7:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ld-gp9:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ld-sd7:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ld-sw1:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-2100-d46:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-2102-f71:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-2442-l27:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-260-g24:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-262-g16:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-280-c46:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-280-c55:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-284-b65:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-442-a26:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-462-p48:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ne-usra-wood:Main.rl] Executing {  }
+[04:05:30 INF] [rr/pb-osgbrad-lightweight-steel-1915:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-440-a23:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-480-c40:Main.rl] Executing {  }
+[04:05:30 INF] [rr/ls-462-p43:Main.rl] Executing {  }
+[04:05:30 INF] Main.rl execution complete. Loaded 20 scripts, registered 21 UI extensions, 0 commands. {  }
+[04:05:30 INF] Requesting Active... {  }
+[04:05:30 INF] Client 0: status = "Active" {  }
+[04:05:30 INF] ClientStatusDidChange "Active" REDACTED_STEAM_ID "President" {  }
+[04:05:30 INF] Received player list of 1 entries. {  }
+[04:05:30 INF] HandleSnapshotPlayers: [{"PlayerId":"REDACTED_STEAM_ID","Name":"REDACTED_PLAYER"}] {  }
+[04:05:30 INF] RequestPriorityLoad: ["(8, 10)"] {  }
+FindTrackSegmentIslands: Found 1 islands in 1755 segments
+FindTrackSegmentIslands: Found 1 islands in 1784 segments
+[04:05:30 INF] PrefabInstancer: growing buffer for "TiePlate" from 32768 to 49152 {  }
+Detected one or more triangles where the distance between any 2 vertices is greater than 500 units. The resulting Triangle Mesh can impact simulation and query stability. It is recommended to tessellate meshes that have large triangles. Source mesh name: store_5_phys
+[04:05:31 INF] RequestPriorityLoad: completed after 1.305830000000002s, waitedAny = true {  }
+[04:05:31 INF] MoveWorld (8, 10) {  }
+[04:05:32 INF] RequestPriorityLoad: ["(8, 10)"] {  }
+[04:05:32 INF] RequestPriorityLoad: completed after 1.399999998596968E-06s, waitedAny = false {  }
+[04:05:32 INF] PrefabInstancer: growing buffer for "TiePlate" from 49152 to 73728 {  }
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryComponent.StorageKeyFor (Model.Ops.Definition.Load load) [0x00008] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.AvailableToDraw (Model.Ops.Definition.Load load) [0x00000] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryLoader.Service (Model.Ops.IIndustryContext ctx) [0x0004c] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryUnloader.Service (Model.Ops.IIndustryContext ctx) [0x00019] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryUnloader.Service (Model.Ops.IIndustryContext ctx) [0x00019] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryStorageHelper.QuantityInStorage (Model.Ops.Definition.Load load, System.String prefix) [0x00000] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.QuantityInStorage (Model.Ops.Definition.Load load) [0x00012] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.FormulaicIndustryComponent.Service (Model.Ops.IIndustryContext ctx) [0x00057] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryComponent.StorageKeyFor (Model.Ops.Definition.Load load) [0x00008] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.AvailableToDraw (Model.Ops.Definition.Load load) [0x00000] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryLoader.Service (Model.Ops.IIndustryContext ctx) [0x0004c] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryUnloader.Service (Model.Ops.IIndustryContext ctx) [0x00019] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryUnloader.Service (Model.Ops.IIndustryContext ctx) [0x00019] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryStorageHelper.QuantityInStorage (Model.Ops.Definition.Load load, System.String prefix) [0x00000] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.QuantityInStorage (Model.Ops.Definition.Load load) [0x00012] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.FormulaicIndustryComponent.Service (Model.Ops.IIndustryContext ctx) [0x00057] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryComponent.StorageKeyFor (Model.Ops.Definition.Load load) [0x00008] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.AvailableToDraw (Model.Ops.Definition.Load load) [0x00000] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryLoader.Service (Model.Ops.IIndustryContext ctx) [0x0004c] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryUnloader.Service (Model.Ops.IIndustryContext ctx) [0x00019] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryUnloader.Service (Model.Ops.IIndustryContext ctx) [0x00019] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+  at Model.Ops.IndustryStorageHelper.QuantityInStorage (Model.Ops.Definition.Load load, System.String prefix) [0x00000] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.IndustryContext.QuantityInStorage (Model.Ops.Definition.Load load) [0x00012] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.FormulaicIndustryComponent.Service (Model.Ops.IIndustryContext ctx) [0x00057] in <5a60632d406b4972b2162484a9007d35>:0
+  at Model.Ops.Industry.DoService () [0x00073] in <5a60632d406b4972b2162484a9007d35>:0

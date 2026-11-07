@@ -1,0 +1,12 @@
+[
+  {
+    "identifier": "nikii/br-textile",
+    "version": "1.0.0",
+    "enabled": false
+  },
+  {
+    "identifier": "nikii/wh-crossover",
+    "version": "1.0.0",
+    "enabled": true
+  }
+]

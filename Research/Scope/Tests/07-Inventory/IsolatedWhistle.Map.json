@@ -1,0 +1,127 @@
+{
+  "graph": {
+    "nodes": {
+      "5hqgfi": {
+        "position": [
+          8618.76,
+          546.937,
+          7238.77
+        ]
+      },
+      "N51l": {
+        "position": [
+          25227.7383,
+          623.376,
+          -768.012
+        ]
+      },
+      "NCrankyAntInventoryBoardA": {
+        "position": [
+          25680.0,
+          633.5,
+          441.813
+        ],
+        "rotation": [
+          0.0,
+          90.0,
+          0.0
+        ]
+      },
+      "NCrankyAntInventoryBoardB": {
+        "position": [
+          25705.0,
+          633.5,
+          441.813
+        ],
+        "rotation": [
+          0.0,
+          90.0,
+          0.0
+        ]
+      },
+      "Nmzo": {
+        "position": [
+          25198.7559,
+          623.038,
+          -832.103
+        ]
+      },
+      "qocgc2": {
+        "position": [
+          8649.824,
+          546.61,
+          7303.626
+        ]
+      },
+      "NCrankyAntInventoryFixedNmzo": {
+        "position": [
+          25178.7559,
+          623.038,
+          -832.103
+        ],
+        "rotation": [
+          -0.4296,
+          29.26,
+          0.0
+        ]
+      },
+      "NCrankyAntInventoryFixedN51l": {
+        "position": [
+          25207.7383,
+          623.376,
+          -768.012
+        ],
+        "rotation": [
+          -0.4296,
+          18.9062,
+          0.0
+        ]
+      }
+    },
+    "segments": {
+      "SCrankyAntInventoryBoard": {
+        "a": "NCrankyAntInventoryBoardA",
+        "b": "NCrankyAntInventoryBoardB",
+        "groupId": "",
+        "speedLimit": 10
+      },
+      "S9sc": null,
+      "Sj7c": null,
+      "Sjdl": null,
+      "Sozu": null,
+      "Sz8t": null,
+      "Serb": {
+        "a": "NCrankyAntInventoryFixedN51l"
+      },
+      "Sou5": {
+        "b": "NCrankyAntInventoryFixedNmzo"
+      }
+    }
+  },
+  "objects": {
+    "circlemask": {
+      "kind": "CircleMask",
+      "order": 0,
+      "radius": 50.0,
+      "falloff": 0.0,
+      "flattenHeightmap": true,
+      "biomeClass": 22,
+      "position": [
+        25581.4043,
+        627.798157,
+        363.729
+      ],
+      "rotation": [
+        0.0,
+        55.217,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "folder": "Ftky0yrr3"
+    }
+  }
+}

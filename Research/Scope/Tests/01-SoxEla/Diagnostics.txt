@@ -1,0 +1,4 @@
+[03:56:12 WRN] [System] Whistle Sign W: Track marker M5c0 is not on the track at wk44ps + 11,1m and will have no effect. {  }
+[03:56:12 WRN] [System] Crossing Pad (3): Track marker M5ib is not on the track at Sqy8 + 3,5m and will have no effect. {  }
+[03:56:12 WRN] [System] Crossing Pad (2): Track marker Muef is not on the track at Sqc5 + 46,2m and will have no effect. {  }
+[03:56:12 WRN] MapObjectSpawner: map object 'Ela-water-column' could not apply its track anchor 'Skbi|a|8.871927' (no terrain under the offset point when snapToTerrain is set?); keeping its cached pose {  }

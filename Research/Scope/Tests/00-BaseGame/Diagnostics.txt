@@ -1,0 +1,4 @@
+d3d12: failed to query info queue interface (0x80004002).
+Shader 'Hidden/Railroader Terrain_Base-635393112': fallback shader 'Off' not found
+Shader 'Hidden/Railroader Terrain_Base-635393112': dependency 'BaseMapShader' shader 'Off' not found
+Detected one or more triangles where the distance between any 2 vertices is greater than 500 units. The resulting Triangle Mesh can impact simulation and query stability. It is recommended to tessellate meshes that have large triangles. Source mesh name: store_5_phys

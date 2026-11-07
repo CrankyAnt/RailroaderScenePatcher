@@ -1,0 +1,179 @@
+Mono path[0] = 'D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/Managed'
+Mono config path = 'D:/SteamLibrary/steamapps/common/Railroader/MonoBleedingEdge/etc'
+Input System module state changed to: Initialized.
+[Physics::Module] Initialized fallback backend.
+[Physics::Module] Id: 0xdecafbad
+Initialize engine version: 6000.3.26f1 (de8167e7440c)
+[Subsystems] Discovering subsystems at path D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/UnitySubsystems
+[D3D12 Device Filter] Vendor Name: NVIDIA
+[D3D12 Device Filter] Device Name: NVIDIA GeForce RTX 3070 Ti
+[D3D12 Device Filter] Driver Version: 32.0.16.1742
+[D3D12 Device Filter] Feature Level: 12.2
+[D3D12 Device Filter] Graphics Memory: 8017 MB
+[D3D12 Device Filter] Processor Count: 26
+[D3D12 Device Filter] Device Type: Discrete
+GfxDevice: creating device client; kGfxThreadingModeSplitJobs
+d3d12: failed to query info queue interface (0x80004002).
+Direct3D:
+    Version:         Direct3D 12 [level 12.2]
+    Renderer:        NVIDIA GeForce RTX 3070 Ti (ID=0x2482)
+    Vendor:          NVIDIA
+    VRAM:            8017 MB
+    App VRAM Budget: 7249 MB
+    Driver:          32.0.16.1742
+Begin MonoManager ReloadAssembly
+- Loaded All Assemblies, in  0.187 seconds
+- Finished resetting the current domain, in  0.002 seconds
+[Physics::Module] Selected backend.
+[Physics::Module] Name: PhysX
+[Physics::Module] Id: 0xf2b8ea05
+[Physics::Module] SDK Version: 4.1.2
+[Physics::Module] Integration Version: 1.0.0
+[Physics::Module] Threading Mode: Multi-Threaded
+<RI> Initializing input.
+Using Windows.Gaming.Input
+<RI> Input initialized.
+UnloadTime: 0.366200 ms
+Local User: REDACTED_PLAYER
+[03:56:01 INF] Railroader 0.6.2 (26335745) {  }
+[03:56:01 INF] Home directory is <USER_PROFILE>\OneDrive\Documents\My Games\Railroader {  }
+[03:56:01 INF] HTTP.GameServer: Created MainThreadDispatcher {  }
+[03:56:01 INF] HTTP.GameServer: Info: Registered HTTP GET handler for: /api/info {  }
+[03:56:01 INF] HTTP.GameServer: Info: Registered HTTP GET handler for: /api/services {  }
+[03:56:01 INF] HTTP.GameServer: Info: Starting HTTP server on localhost:8630 {  }
+[03:56:01 INF] HTTP.GameServer: Info: DocumentRootPath set to: D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\HTTP {  }
+[03:56:01 INF] HTTP.GameServer: Info: Registered WebSocket service at ws://127.0.0.1:8630/ws {  }
+[03:56:01 INF] HTTP.GameServer: Info: Server started at http://localhost:8630 {  }
+[03:56:01 INF] HTTP.GameServer: Server started at http://127.0.0.1:8630/ {  }
+[03:56:01 INF] Analytics: Start {  }
+[03:56:01 INF] vSyncCount = 0, targetFrameRate = 60 {  }
+[03:56:02 INF] TextFilter: Steam text filtering is available {  }
+[03:56:02 INF] [sox/ser/Data.rl] Executing modifyDefinitions {  }
+[03:56:02 INF] CarLoadLibrary initialized with 55 loads {  }
+[03:56:08 INF] Loading mapmodscopesandbox from <USER_PROFILE>\OneDrive\Documents\My Games\Railroader\Saves\mapmodscopesandbox.railroad {  }
+[03:56:08 INF] Deserialized world v0.6.2, snapshot v1 {  }
+[03:56:08 INF] HostManager: loaded save, DefaultSpawnPosition=(4477.03, 528.59, 5398.69), PlayerRecords=1 [Spawn] {  }
+[03:56:08 INF] History: loaded database (49,152 bytes). {  }
+[03:56:08 INF] Client 0: status = "Anonymous" {  }
+[03:56:08 INF] Client 0: Running 0.5; now Anonymous {  }
+[03:56:08 INF] ClientStatusDidChange "Anonymous"  "Undetermined" {  }
+[03:56:08 INF] Client 0: Authenticated as playerId="REDACTED_STEAM_ID" name="REDACTED_PLAYER", steamName = "REDACTED_PLAYER" {  }
+[03:56:08 INF] Client 0: status = "Authenticated" {  }
+[03:56:08 INF] ClientStatusDidChange "Authenticated" REDACTED_STEAM_ID "President" {  }
+[03:56:08 INF] Mod set differs from save; prompting player. Delta (current set → save's set):
+  - sox/ser (1.0.0) {  }
+[03:56:10 INF] Loading map from snapshot: rr/bushnell-whittier {  }
+[03:56:10 INF] ActiveMapDefinition: rr/bushnell-whittier, map data D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Data\Map.json, map layers (none), terrain layers D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Terrain, editTarget false {  }
+[03:56:10 INF] Window system initialized with 21 built-in windows { SourceContext: "UI.Windows.WindowManager" }
+GlobalGameManager.LoadMap: MapCore loaded in 160,908 ms
+Shader 'Hidden/Railroader Terrain_Base-635393112': fallback shader 'Off' not found
+Shader 'Hidden/Railroader Terrain_Base-635393112': dependency 'BaseMapShader' shader 'Off' not found
+[03:56:11 INF] [sox/ser/Data.rl] modifyMap begin {  }
+[03:56:12 INF] MapDataLoader: Loaded 1895 nodes, 1935 segments from D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Data\Map.json in 225.3ms (load: 168.4ms, deserialize: 56.8ms) {  }
+[03:56:12 INF] SetDensity 1, 0.8, richness "Rare" {  }
+[03:56:12 WRN] [System] Whistle Sign W: Track marker M5c0 is not on the track at wk44ps + 11,1m and will have no effect. {  }
+[03:56:12 WRN] [System] Crossing Pad (3): Track marker M5ib is not on the track at Sqy8 + 3,5m and will have no effect. {  }
+[03:56:12 WRN] [System] Crossing Pad (2): Track marker Muef is not on the track at Sqc5 + 46,2m and will have no effect. {  }
+GlobalGameManager.LoadMap: BushnellWhittier-MapManager loaded in 1163,034 ms
+[03:56:12 WRN] MapObjectSpawner: map object 'Ela-water-column' could not apply its track anchor 'Skbi|a|8.871927' (no terrain under the offset point when snapToTerrain is set?); keeping its cached pose {  }
+[03:56:12 INF] MapObjectManager: spawned 489 map object(s) {  }
+[03:56:12 INF] MapObjectManager: skipped 35 disabled map object(s) {  }
+[03:56:15 INF] Weather auto mode restored from state {  }
+GlobalGameManager.LoadMap: Environment-Enviro loaded in 3820,751 ms
+[03:56:16 INF] Map loaded successfully {  }
+[03:56:16 INF] RebuildCollections: Feature(s) changed graph {  }
+[03:56:16 INF] RemoveCars [] {  }
+[03:56:16 INF] RestoreFromSnapshot: 0 players, local player REDACTED_STEAM_ID NOT found (will use SetPlayerPosition fallback) [Spawn] {  }
+[03:56:16 INF] HandleSnapshotPlayers: [] {  }
+[03:56:16 INF] No progression specified. {  }
+[03:56:16 INF] Signal mode CTC -> ABS; clearing directions. {  }
+FindTrackSegmentIslands: Found 1 islands in 1775 segments
+FindTrackSegmentIslands: Found 1 islands in 1804 segments
+[03:56:16 INF] Switch 6n9t0v in block bryson-ws changed to false {  }
+[03:56:16 INF] Switch 7a3rv9 in block br-gi-1 changed to false {  }
+[03:56:16 INF] Switch N0d5 in block br-m-ms changed to false {  }
+[03:56:16 INF] Switch N28g in block bc-tv-2 changed to false {  }
+[03:56:16 INF] Switch N2yi in block br-m-ms changed to false {  }
+[03:56:16 INF] Switch N4na in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch N50ks in block br-m-ms changed to false {  }
+[03:56:16 INF] Switch N6bu in block we-na-3 changed to false {  }
+[03:56:16 INF] Switch N731 in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch N86r in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch N8do in block na-to-1 changed to false {  }
+[03:56:16 INF] Switch Na4z in block we-na-3 changed to false {  }
+[03:56:16 INF] Switch Navon in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nbdw in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nbo2 in block wh-mm changed to false {  }
+[03:56:16 INF] Switch Nc6q in block br-m-mm changed to false {  }
+[03:56:16 INF] Switch Nceu in block db-mm changed to false {  }
+[03:56:16 INF] Switch Ncsws in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Ncw8 in block na-to-1 changed to false {  }
+[03:56:16 INF] Switch Nf2u in block bryson-ww1 changed to false {  }
+[03:56:16 INF] Switch Nffb in block db-mm changed to false {  }
+[03:56:16 INF] Switch Nfhx in block na-to-1 changed to false {  }
+[03:56:16 INF] Switch Nit5 in block aj-bk-1 changed to false {  }
+[03:56:16 INF] Switch Nj2f in block sy-w changed to false {  }
+[03:56:16 INF] Switch Njk9 in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nk1hr in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nkbia in block el-ms changed to false {  }
+[03:56:16 INF] Switch Nlxj in block na-ms changed to false {  }
+[03:56:16 INF] Switch Nnn2 in block br-m-mm changed to false {  }
+[03:56:16 INF] Switch Nnns in block cw-bc-2 changed to false {  }
+[03:56:16 INF] Switch No9b in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nod36 in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nojh in block bryson-ww3 changed to false {  }
+[03:56:16 INF] Switch Nok7 in block we-na-3 changed to false {  }
+[03:56:16 INF] Switch Nqt2 in block na-to-1 changed to false {  }
+[03:56:16 INF] Switch Nro2 in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nscu in block sy-db changed to false {  }
+[03:56:16 INF] Switch Nsn91lyoe in block el-gi-1 changed to false {  }
+[03:56:16 INF] Switch Nsnk in block br-m-es changed to false {  }
+[03:56:16 INF] Switch Nsno in block we-ms changed to false {  }
+[03:56:16 INF] Switch Ntrd in block br-m-mm changed to false {  }
+[03:56:16 INF] Switch Nuts in block na-to-2 changed to false {  }
+[03:56:16 INF] Switch Nx5z in block br-m-em changed to false {  }
+[03:56:16 INF] Switch Nyj2 in block mc-we-1 changed to false {  }
+[03:56:16 INF] Switch Nywd in block tv-wh-2 changed to false {  }
+[03:56:16 INF] Switch Nzgn in block wh-el-2 changed to false {  }
+[03:56:16 INF] Switch Nzy6 in block mc-we-1 changed to false {  }
+[03:56:16 INF] Switch k0mpa7 in block wh-ms changed to false {  }
+[03:56:16 INF] Switch ldn61i in block wh-ms changed to false {  }
+[03:56:16 INF] Switch x1hq5h in block br-m-ms changed to false {  }
+[03:56:16 INF] Switch yd53ys in block bryson-ww1 changed to false {  }
+[03:56:16 INF] TimeObserver start with Day 1 7:01 {  }
+[03:56:16 INF] [rr/ht-hopper01:Main.rl] Executing {  }
+[03:56:16 INF] [rr/ld-f7:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ld-gp9:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ld-sd7:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ld-sw1:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-2100-d46:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-2102-f71:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-2442-l27:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-260-g24:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-262-g16:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-280-c46:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-280-c55:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-284-b65:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-442-a26:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-462-p48:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ne-usra-wood:Main.rl] Executing {  }
+[03:56:17 INF] [rr/pb-osgbrad-lightweight-steel-1915:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-440-a23:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-480-c40:Main.rl] Executing {  }
+[03:56:17 INF] [rr/ls-462-p43:Main.rl] Executing {  }
+[03:56:17 INF] Main.rl execution complete. Loaded 20 scripts, registered 21 UI extensions, 0 commands. {  }
+[03:56:17 INF] Requesting Active... {  }
+[03:56:17 INF] Client 0: status = "Active" {  }
+[03:56:17 INF] ClientStatusDidChange "Active" REDACTED_STEAM_ID "President" {  }
+[03:56:17 INF] Received player list of 1 entries. {  }
+[03:56:17 INF] HandleSnapshotPlayers: [{"PlayerId":"REDACTED_STEAM_ID","Name":"REDACTED_PLAYER"}] {  }
+[03:56:17 INF] RequestPriorityLoad: ["(8, 10)"] {  }
+FindTrackSegmentIslands: Found 1 islands in 1775 segments
+FindTrackSegmentIslands: Found 1 islands in 1804 segments
+[03:56:17 INF] PrefabInstancer: growing buffer for "TiePlate" from 32768 to 49152 {  }
+Detected one or more triangles where the distance between any 2 vertices is greater than 500 units. The resulting Triangle Mesh can impact simulation and query stability. It is recommended to tessellate meshes that have large triangles. Source mesh name: store_5_phys
+[03:56:18 INF] RequestPriorityLoad: completed after 1.2944075000000019s, waitedAny = true {  }
+[03:56:18 INF] MoveWorld (8, 10) {  }
+[03:56:19 INF] RequestPriorityLoad: ["(8, 10)"] {  }
+[03:56:19 INF] RequestPriorityLoad: completed after 1.3000000009810719E-06s, waitedAny = false {  }
+[03:56:19 INF] PrefabInstancer: growing buffer for "TiePlate" from 49152 to 73728 {  }

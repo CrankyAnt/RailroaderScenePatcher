@@ -1,0 +1,21 @@
+{
+  "graph": {
+    "segments": {
+      "Sozu": null
+    }
+  },
+  "objects": {
+    "circlemask": {
+      "kind": "CircleMask",
+      "order": 0,
+      "radius": 50.0,
+      "falloff": 0.0,
+      "flattenHeightmap": true,
+      "biomeClass": 22,
+      "position":[25581.4043,628.0,363.729],
+      "rotation":[0.0,55.217,0.0],
+      "scale":[1.0,1.0,1.0],
+      "folder": "Ftky0yrr3"
+    }
+  }
+}

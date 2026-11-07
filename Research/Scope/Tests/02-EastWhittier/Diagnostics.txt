@@ -1,0 +1,3 @@
+[04:00:10 WRN] [System] starter-ewh-btrk3: Track marker starter-ewh-btrk3 is not on the track at Stky03ew3 + 94,7m and will have no effect. {  }
+[04:00:10 WRN] [System] starter-ewh-btrk2: Track marker starter-ewh-btrk2 is not on the track at Stky0sco4 + 31,1m and will have no effect. {  }
+[04:00:10 WRN] [System] starter-ewh-btrk1: Track marker starter-ewh-btrk1 is not on the track at Stky0sco4 + 60,0m and will have no effect. {  }

@@ -1,0 +1,62 @@
+{
+  "name": "Loc: Sylva Int",
+  "path_id": 778,
+  "components": [
+    "RendererCuller",
+    "CircleMapMask",
+    "TextSynchronizer"
+  ],
+  "children": [
+    {
+      "name": "Sign-Location",
+      "path_id": 7126,
+      "components": [
+        "MeshFilter",
+        "MeshRenderer"
+      ],
+      "children": [],
+      "local_position": {
+        "x": -0.1080000028014183,
+        "y": 0.0,
+        "z": 0.0
+      },
+      "local_rotation": {
+        "x": -0.7071068286895752,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 0.7071068286895752
+      }
+    },
+    {
+      "name": "Text",
+      "path_id": 5008,
+      "components": [
+        "MeshRenderer",
+        "TextMeshPro"
+      ],
+      "children": [],
+      "local_position": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": -0.0
+      },
+      "local_rotation": {
+        "x": -0.0,
+        "y": -0.7071067094802856,
+        "z": -0.0,
+        "w": -0.7071069478988647
+      }
+    }
+  ],
+  "local_position": {
+    "x": 25692.9765625,
+    "y": 633.485595703125,
+    "z": 441.81280517578125
+  },
+  "local_rotation": {
+    "x": -0.0,
+    "y": 0.22025036811828613,
+    "z": -0.0,
+    "w": -0.9754433631896973
+  }
+}

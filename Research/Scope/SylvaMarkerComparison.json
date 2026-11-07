@@ -1,0 +1,309 @@
+{
+  "scene_marker_count": 361,
+  "deleted_base_segments": [
+    "S0gi",
+    "S2j4",
+    "Sch6",
+    "Sgoj",
+    "Sgru",
+    "Shp7",
+    "Shw5",
+    "Sl4f",
+    "Spfu",
+    "Stky0cbku",
+    "Stky0i21d",
+    "Stlm",
+    "Suah",
+    "Sv6m",
+    "Swap",
+    "Sx93",
+    "Sxwm",
+    "Syzf",
+    "Sz41"
+  ],
+  "modified_base_segments": [
+    "Sc01",
+    "Sd6n",
+    "Sdum",
+    "Slv4",
+    "Smkr",
+    "Sozu",
+    "Sr78"
+  ],
+  "geometry_changed_base_nodes": [
+    "N2o5",
+    "N48f",
+    "N51l",
+    "N7w9",
+    "N86n",
+    "N991",
+    "Nam9",
+    "Nc13",
+    "Nd5f",
+    "Ndxr",
+    "Nf8a",
+    "Ngp1",
+    "Niid",
+    "Nje2",
+    "Nl9k",
+    "Nlfg",
+    "Nll7",
+    "Nm7d",
+    "Nmjn",
+    "Nmzo",
+    "Nqou",
+    "Nqqs",
+    "Nr1i",
+    "Nt2v",
+    "Ntky02w98",
+    "Ntky0f306",
+    "Nvoz",
+    "Nwxm",
+    "Nyi1",
+    "Nys5"
+  ],
+  "markers_on_deleted_segments": [
+    {
+      "id": "Mpg1",
+      "name": "Speed Sign Sylva Wye",
+      "type": 0,
+      "segment": "Shp7",
+      "distance": 2.137237548828125,
+      "end": 0,
+      "segment_a_position": [
+        25299.6836,
+        625.343,
+        -499.728
+      ]
+    }
+  ],
+  "markers_on_any_affected_segment": [
+    {
+      "id": "Mjd8",
+      "name": "T-45.1 Origin",
+      "type": 0,
+      "segment": "Sozu",
+      "distance": 7.562054634094238,
+      "end": 1,
+      "segment_a_position": [
+        25503.4785,
+        631.582,
+        270.616
+      ]
+    },
+    {
+      "id": "Mpg1",
+      "name": "Speed Sign Sylva Wye",
+      "type": 0,
+      "segment": "Shp7",
+      "distance": 2.137237548828125,
+      "end": 0,
+      "segment_a_position": [
+        25299.6836,
+        625.343,
+        -499.728
+      ]
+    },
+    {
+      "id": "M5pp",
+      "name": "Whistle Sign E",
+      "type": 0,
+      "segment": "Shuo",
+      "distance": 58.69452667236328,
+      "end": 0,
+      "segment_a_position": [
+        25178.7559,
+        623.038,
+        -832.103
+      ]
+    }
+  ],
+  "markers_near_sylva": [
+    {
+      "id": "M9i8",
+      "name": "Whistle Sign E",
+      "type": 0,
+      "segment": "S377",
+      "distance": 7.511661052703857,
+      "end": 0,
+      "segment_a_position": [
+        24810.1543,
+        621.002,
+        -934.168
+      ]
+    },
+    {
+      "id": "M3eo",
+      "name": "Speed Sign Sylva Wye",
+      "type": 0,
+      "segment": "S2f1",
+      "distance": 7.2501935958862305,
+      "end": 0,
+      "segment_a_position": [
+        25082.8086,
+        622.386,
+        -911.701
+      ]
+    },
+    {
+      "id": "Mdow",
+      "name": "T-46 Origin",
+      "type": 0,
+      "segment": "Stvw",
+      "distance": 51.20402526855469,
+      "end": 1,
+      "segment_a_position": [
+        24971.8184,
+        621.88,
+        -932.084
+      ]
+    },
+    {
+      "id": "Mjd8",
+      "name": "T-45.1 Origin",
+      "type": 0,
+      "segment": "Sozu",
+      "distance": 7.562054634094238,
+      "end": 1,
+      "segment_a_position": [
+        25503.4785,
+        631.582,
+        270.616
+      ]
+    },
+    {
+      "id": "Mpg1",
+      "name": "Speed Sign Sylva Wye",
+      "type": 0,
+      "segment": "Shp7",
+      "distance": 2.137237548828125,
+      "end": 0,
+      "segment_a_position": [
+        25299.6836,
+        625.343,
+        -499.728
+      ]
+    },
+    {
+      "id": "Mcgx",
+      "name": "Crossing Pad",
+      "type": 3,
+      "segment": "Sg03",
+      "distance": 24.979341506958008,
+      "end": 0,
+      "segment_a_position": [
+        25320.28,
+        625.6,
+        -822.453
+      ]
+    },
+    {
+      "id": "Mmaz",
+      "name": "Crossing Pad",
+      "type": 3,
+      "segment": "Sr40",
+      "distance": 130.8581085205078,
+      "end": 0,
+      "segment_a_position": [
+        25154.5781,
+        622.569,
+        -886.294
+      ]
+    },
+    {
+      "id": "M8dx",
+      "name": "Crossing Pad",
+      "type": 3,
+      "segment": "Stvw",
+      "distance": 94.49604797363281,
+      "end": 0,
+      "segment_a_position": [
+        24971.8184,
+        621.88,
+        -932.084
+      ]
+    },
+    {
+      "id": "Mxtn",
+      "name": "Whistle Sign E",
+      "type": 0,
+      "segment": "Svhn",
+      "distance": 8.075555801391602,
+      "end": 1,
+      "segment_a_position": [
+        25122.3789,
+        622.614,
+        -896.434
+      ]
+    },
+    {
+      "id": "My5i",
+      "name": "Whistle Sign E",
+      "type": 0,
+      "segment": "Stky020fq",
+      "distance": 42.0169563293457,
+      "end": 0,
+      "segment_a_position": [
+        25285.19,
+        625.235,
+        -649.193
+      ]
+    },
+    {
+      "id": "M5pp",
+      "name": "Whistle Sign E",
+      "type": 0,
+      "segment": "Shuo",
+      "distance": 58.69452667236328,
+      "end": 0,
+      "segment_a_position": [
+        25178.7559,
+        623.038,
+        -832.103
+      ]
+    },
+    {
+      "id": "M6g0",
+      "name": "Whistle Sign W",
+      "type": 0,
+      "segment": "Spmq",
+      "distance": 3.655750274658203,
+      "end": 0,
+      "segment_a_position": [
+        25365.9766,
+        625.6,
+        -902.518
+      ]
+    },
+    {
+      "id": "Mqi1",
+      "name": "Whistle Sign W",
+      "type": 0,
+      "segment": "Sumv",
+      "distance": 9.855656623840332,
+      "end": 0,
+      "segment_a_position": [
+        25351.748,
+        625.6,
+        -908.041
+      ]
+    },
+    {
+      "id": "Mold",
+      "name": "Whistle Sign W",
+      "type": 0,
+      "segment": "S377",
+      "distance": 114.68566131591797,
+      "end": 1,
+      "segment_a_position": [
+        24810.1543,
+        621.002,
+        -934.168
+      ]
+    }
+  ],
+  "script_identity_verified": "globalgamemanagers.assets MonoScript 817 = Track.TrackMarker in Railroader",
+  "Mpg1_original_gameobject_activeSelf": false,
+  "Mpg1_original_component_enabled": true,
+  "partial_merge_correction": "Seven shared non-null segment overrides change flags only. Geometry changes arise through 30 shared node position/rotation overrides. Nineteen null segment records are deletions."
+}

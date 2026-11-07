@@ -1,0 +1,32 @@
+[04:05:25 ERR] [Ops] br-textile.br-textile-loader: br-textile.br-textile-loader refers to undefined load "scold/textiles". {  }
+[04:05:25 ERR] [Ops] br-textile.br-textile-unloader: br-textile.br-textile-unloader refers to undefined load "scold/yarn". {  }
+[04:05:25 ERR] [Ops] br-textile.br-textile-unloader2: br-textile.br-textile-unloader2 refers to undefined load "scold/wool". {  }
+[04:05:25 ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/yarn". {  }
+[04:05:25 ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/wool". {  }
+[04:05:25 ERR] [Ops] br-textile.formula: br-textile.formula refers to undefined load "scold/textiles". {  }
+[04:05:29 ERR] Failed to initialize industry br-textile {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:32 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:05:47 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile L1 (br-textile.br-textile-loader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile R1 (br-textile.br-textile-unloader2) {  }
+System.NullReferenceException: Object reference not set to an instance of an object
+[04:06:02 ERR] Exception during Service br-textile "Stuart Textile Company" Stuart Textile Company (br-textile.formula) {  }
+System.NullReferenceException: Object reference not set to an instance of an object

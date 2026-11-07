@@ -1,0 +1,1 @@
+No WRN, ERR or Exception lines at capture.

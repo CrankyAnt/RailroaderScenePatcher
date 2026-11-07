@@ -1,0 +1,7 @@
+[06:25:59 WRN] [System] Yard Limit: Track marker Mkwd is not on the track at Sjdl + 38,6m and will have no effect. {  }
+[06:25:59 WRN] [System] Station Sign (1): Track marker Mi4f is not on the track at S9sc + 225,7m and will have no effect. {  }
+[06:25:59 WRN] [System] Speed Sign: Track marker Mwp1 is not on the track at Sjdl + 11,4m and will have no effect. {  }
+[06:25:59 WRN] [System] T-45.1 Origin: Track marker Mjd8 is not on the track at Sozu + 7,6m and will have no effect. {  }
+[06:25:59 WRN] [System] Crossing Pad: Track marker Mg74 is not on the track at Sj7c + 185,9m and will have no effect. {  }
+[06:25:59 WRN] [System] Whistle Sign E: Track marker Mm8w is not on the track at S9sc + 58,3m and will have no effect. {  }
+[06:25:59 WRN] [System] Crossing Pad: Track marker Mxwd is not on the track at Sz8t + 4,5m and will have no effect. {  }
