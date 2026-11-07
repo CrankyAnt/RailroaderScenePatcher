@@ -1,0 +1,11 @@
+3481: [OwnershipProbe] OnWorldLoad
+3482: [OwnershipProbe] OnWorldLoad active=present
+3483: [OwnershipProbe] OnWorldLoad Identifier=crankyant/ownership-b-map
+3484: [OwnershipProbe] OnWorldLoad MapDataAbsolutePath=fixture-B
+3485: [OwnershipProbe] OnWorldLoad MapLayerIdentifiers=[crankyant/ownership-a-map,rr/bushnell-whittier,]
+3486: [OwnershipProbe] OnWorldLoad MapLayerDataPaths=[fixture-A,game-core,]
+3487: [OwnershipProbe] OnWorldLoad IsEditTarget=True
+3590: [OwnershipProbe] OnWorldLoad definitionOwner=fixture-B
+3591: [OwnershipProbe] OnWorldLoad Track.TrackMarker count=388
+3592: [OwnershipProbe] OnWorldLoad Track.TrackRelativePosition count=370
+3593: [OwnershipProbe] OnWorldLoad Track.TrackSpan count=357

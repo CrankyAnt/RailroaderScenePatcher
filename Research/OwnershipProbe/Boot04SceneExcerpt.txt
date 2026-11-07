@@ -1,0 +1,7 @@
+2026-11-07T23:00:43.8769960Z marker matches=1
+2026-11-07T23:00:43.8830203Z registration bucket=Shuo id=M5pp location=<Shuo, A -> 58,695> objectMatches=True
+2026-11-07T23:00:43.8830203Z verified segment=Shuo distance=58,69453 end=A
+2026-11-07T23:00:43.8840203Z marker instance=263456 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E id=M5pp location=<Shuo, A -> 58,695> enabled=True activeSelf=True activeHierarchy=True position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838)
+2026-11-07T23:00:43.8850200Z graph marker=M5pp count=1
+2026-11-07T23:00:53.7062113Z resolve board matches=1
+2026-11-07T23:00:53.7077177Z baseline instance=202808 path=World/Signs/Loc: Sylva Int worldPosition=(21692.9800, 633.4856, -4558.1870) localPosition=(25692.9800, 633.4856, 441.8128) worldRotation=(0.0000, 0.2203, 0.0000, -0.9754) localRotation=(0.0000, 0.2203, 0.0000, -0.9754) activeSelf=True activeHierarchy=True
