@@ -1,6 +1,6 @@
 # Editor diagnostic protocol
 
-This protocol supports [issue 14](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/14). It is prepared for human operation through the parent orchestrator. Boot02 and Boot04 supplied bounded editor observations. The parent supplied native-inspector and screenshot observations; a further fixture re-entry after the final Boot04 exit remains pending.
+This protocol supports [issue 14](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/14). It is prepared for human operation through the parent orchestrator. Boot02 and Boot04 supplied bounded editor observations. The parent supplied native-inspector and screenshot observations; a further same-process fixture re-entry and cleanup were observed after the final Boot04 edit-session exit.
 
 ## Build and static basis
 
@@ -44,7 +44,7 @@ The parent reports that board focus visibly reached the object while the native 
 
 The newly built probe adds an Open native pause menu button in a loaded ordinary world and in the editor. Static inspection of `PauseMenu.SetPaused(true)` shows it opens the existing canvas and updates pause state, time scale and audio. The button requires session SaveManager and StateManager, exactly one active loaded-scene PauseMenu, and does nothing if already paused. It does not invoke save, quit or delete. The native menu itself contains those actions and requires normal human care. Boot03 exercised this unsupported reflected route in an ordinary world; its editor behavior remains untested. The probe logs failure and does not attempt an alternative if its guards fail.
 
-Boot04 later exercised these fixture and edit cases. The parent supplied independent native-inspector checks and screenshot observations; see the investigation report for their scope. A focused fixture re-entry after final exit remains pending.
+Boot04 later exercised these fixture and edit cases. The parent supplied independent native-inspector checks and screenshot observations; see the investigation report for their scope. A further fixture re-entry after the edit-session exit was observed.
 
 
 ## Boot03 operator report
@@ -55,6 +55,6 @@ The new focus buttons read the current graph segment endpoint game coordinates a
 
 ## Boot04 follow-up
 
-The [investigation report](../EditorDiagnostics.md) records the fixture, scans, event order, exit and re-entry evidence, the operator-reported stale display, representative native-inspector checks, and the additional pending re-entry. Boot04 ownership evidence identifies the native fixture as the edit target. The append-only probe log contains earlier sessions, so use the session beginning at 2026-11-07T23:03:14Z for the edit sequence.
+The [investigation report](../EditorDiagnostics.md) records the fixture, scans, event order, exit and re-entry evidence, the operator-reported stale display, representative native-inspector checks, and the additional re-entry. Boot04 ownership evidence identifies the native fixture as the edit target. The append-only probe log contains earlier sessions, so use the session beginning at 2026-11-07T23:03:14Z for the edit sequence.
 
-Boot04Builds.json records the isolated installed EditorProbe DLL hash while the game was closed. The parent reports screenshots of the stale display and native N51l inspector through move, undo, redo, deletion and restoration. The screenshot files were not present in the inspected observations directory. The native checks are independent for that node, not an exhaustive scene inventory. A further scan and callback check after the final Boot04 exit remains pending; an earlier fixture re-entry is already documented.
+Boot04Builds.json records the isolated installed EditorProbe DLL hash while the game was closed. The parent reports screenshots of the stale display and native N51l inspector through move, undo, redo, deletion and restoration. The screenshot files were not present in the inspected observations directory. The native checks are independent for that node, not an exhaustive scene inventory. After the edit-session exit and a separate fixture, a fresh controller subscribed to both callbacks and scan 1 showed the original fixture state. Both callbacks were unsubscribed on application exit; the operator reports that no map save occurred.
