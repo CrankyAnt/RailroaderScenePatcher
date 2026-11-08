@@ -47,6 +47,7 @@ When in doubt about a place, ask the user.
 Every tracked top-level folder whose name does not start with a dot gets one line: the path and at most one short clause that names the folder's purpose, not its contents. No explanation, rules, status, subfolders, nested lists or file pointers. A new top-level folder adds its line; a removed one removes its line; a change that makes a clause untrue rewrites it in the same change.
 
 - `LICENSES/`: canonical license texts
+- `Research/`: retained research evidence
 - `docs/`: maintained repository documentation
 
 ## Testing instructions
@@ -56,6 +57,7 @@ One line per validation or test command and per CI workflow the repository runs.
 - `reuse --no-multiprocessing lint`: validates file-level copyright and license information
 - `git diff --check`: checks changes for whitespace errors
 - `actionlint`: validates GitHub Actions workflow definitions
+- `dotnet build Research/CandidateProbe/CandidateProbe.csproj -p:GameManaged=<managed-path> -p:BaseOutputPath=<external-bin> -p:BaseIntermediateOutputPath=<external-obj>`: builds the candidate ownership research probe against local game assemblies
 - `repository-hygiene` (shared, `v1`): the convention checks of branch names, commit subjects and pull-request titles, the credential scan, workflow validation, Dependabot coverage and the Markdown link check, and `reuse lint`
 
 ## Code style

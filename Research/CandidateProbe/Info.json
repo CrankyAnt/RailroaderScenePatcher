@@ -1,0 +1,1 @@
+{"identifier":"crankyant/candidate-probe","version":"0.0.1","name":"Candidate Probe","author":"CrankyAnt","assemblies":["CandidateProbe.dll"],"dependencies":{"required":["rr/game >=0.6.2"]}}

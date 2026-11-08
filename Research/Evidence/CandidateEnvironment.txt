@@ -1,0 +1,4 @@
+[05:41:35 INF] Home directory is C:\TMP\RailroaderMapResearch\RuntimeHome {  }
+[05:42:22 INF] ActiveMapDefinition: crankyant/ownership-a-map, map data C:\TMP\RailroaderMapResearch\RuntimeHome\ModDev\OwnershipResearchA\Data\Map.json, map layers rr/bushnell-whittier, terrain layers D:/SteamLibrary/steamapps/common/Railroader/Railroader_Data/StreamingAssets\AssetPacksCore\nc-bryson-terrain\Terrain, editTarget true {  }
+[05:42:26 INF] MapEditorController enabled { SourceContext: "Game.MapEditor.MapEditorController" }
+[05:42:26 INF] Map editor session activated for crankyant/ownership-a-map (writable terrain: none) {  }

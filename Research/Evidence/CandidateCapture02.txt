@@ -1,0 +1,226 @@
+2026-11-08T04:41:07.0383608Z loaded
+2026-11-08T04:41:35.3818771Z loaded
+2026-11-08T04:42:38.7562377Z capture begin
+2026-11-08T04:42:38.7667720Z reference-scan scope=loaded-scene-MonoBehaviour-instance-fields-and-direct-IList-elements only
+2026-11-08T04:42:38.7683381Z marker id=Mkwd matches=1
+2026-11-08T04:42:38.7693421Z ancestor path=World/Large Scenery/Alarka Signs scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(1190.0000, 585.0000, 1040.0000) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:38.7703419Z component UnityEngine.Transform@World/Large Scenery/Alarka Signs#218928 enabled=n/a
+2026-11-08T04:42:38.7728434Z ancestor path=World/Large Scenery scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:38.7728434Z component UnityEngine.Transform@World/Large Scenery#219042 enabled=n/a
+2026-11-08T04:42:38.7738484Z ancestor path=World scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-4000.0000, 0.0000, -5000.0000) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:38.7738484Z component UnityEngine.Transform@World#218902 enabled=n/a
+2026-11-08T04:42:38.7738484Z component Helpers.WorldTransformer@World#266662 enabled=True
+2026-11-08T04:42:38.7748475Z component Helpers.WorldTransformerTarget@World#255692 enabled=True
+2026-11-08T04:42:38.7748475Z subtree path=World/Large Scenery/Alarka Signs/Yard Limit scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-11.2163, -1.2756, 136.3411) localRotation=(0.0016, -0.7046, -0.0047, -0.7096)
+2026-11-08T04:42:38.7748475Z component UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit#221416 enabled=n/a
+2026-11-08T04:42:38.7763497Z component Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022 enabled=True
+2026-11-08T04:42:38.7773575Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022.id=Mkwd
+2026-11-08T04:42:38.7773575Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022.type=Generic
+2026-11-08T04:42:38.7783546Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location=[Track.SerializableLocation]
+2026-11-08T04:42:38.7783546Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location.segmentId=Sjdl
+2026-11-08T04:42:38.7783546Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location.distance=38.60006
+2026-11-08T04:42:38.7793544Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location.end=B
+2026-11-08T04:42:38.7793544Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022.OnLocationChanged=null
+2026-11-08T04:42:38.7793544Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._cachedPosition=null
+2026-11-08T04:42:38.7803550Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._warnedInvalid=False
+2026-11-08T04:42:38.7803550Z component Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962 enabled=True
+2026-11-08T04:42:38.7813535Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetTransform=UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit#221416
+2026-11-08T04:42:38.7813535Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetOffset=[UnityEngine.Vector3]
+2026-11-08T04:42:38.7813535Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetAngle=180
+2026-11-08T04:42:38.7813535Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.snapToTerrain=True
+2026-11-08T04:42:38.7813535Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetActiveFollowsTrackGroup=False
+2026-11-08T04:42:38.7828568Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._marker=Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022
+2026-11-08T04:42:38.7828568Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._observedGroupId=null
+2026-11-08T04:42:38.7828568Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._setTargetActive=null
+2026-11-08T04:42:38.7838605Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._observing=False
+2026-11-08T04:42:38.7838605Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T04:42:38.7843639Z component Helpers.Culling.RendererCuller@World/Large Scenery/Alarka Signs/Yard Limit#262560 enabled=True
+2026-11-08T04:42:38.7843639Z subtree path=World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(-0.7071, 0.0000, 0.0000, 0.7071)
+2026-11-08T04:42:38.7843639Z component UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#224926 enabled=n/a
+2026-11-08T04:42:38.7853678Z component UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#241918 enabled=n/a
+2026-11-08T04:42:38.7853678Z component UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#236028 enabled=False
+2026-11-08T04:42:38.7858717Z subtree path=World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-0.0010, 1.6559, 0.0090) localRotation=(0.0000, 1.0000, 0.0000, 0.0000)
+2026-11-08T04:42:38.7858717Z component UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#253798 enabled=n/a
+2026-11-08T04:42:38.7863748Z component UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#235148 enabled=False
+2026-11-08T04:42:38.7863748Z component TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#256566 enabled=True
+2026-11-08T04:42:38.7863748Z component UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#-56138 enabled=n/a
+2026-11-08T04:42:38.7873788Z subtree path=World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1) scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-0.0010, 1.6559, -0.0218) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:38.7873788Z component UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#253542 enabled=n/a
+2026-11-08T04:42:38.7873788Z component UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#236584 enabled=False
+2026-11-08T04:42:38.7873788Z component TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#256772 enabled=True
+2026-11-08T04:42:38.7883784Z component UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#-56254 enabled=n/a
+2026-11-08T04:42:38.7893782Z relative target field=targetTransform value=UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit#221416
+2026-11-08T04:42:38.7893782Z target subtree count=4 limit=256
+2026-11-08T04:42:38.7903788Z target-subtree path=World/Large Scenery/Alarka Signs/Yard Limit scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-11.2163, -1.2756, 136.3411) localRotation=(0.0016, -0.7046, -0.0047, -0.7096)
+2026-11-08T04:42:38.7903788Z component UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit#221416 enabled=n/a
+2026-11-08T04:42:38.7903788Z component Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022 enabled=True
+2026-11-08T04:42:38.7913789Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022.id=Mkwd
+2026-11-08T04:42:38.7913789Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022.type=Generic
+2026-11-08T04:42:38.7913789Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location=[Track.SerializableLocation]
+2026-11-08T04:42:38.7923786Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location.segmentId=Sjdl
+2026-11-08T04:42:38.7928826Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location.distance=38.60006
+2026-11-08T04:42:38.7928826Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._location.end=B
+2026-11-08T04:42:38.7938875Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022.OnLocationChanged=null
+2026-11-08T04:42:38.7938875Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._cachedPosition=null
+2026-11-08T04:42:38.7938875Z field Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022._warnedInvalid=False
+2026-11-08T04:42:38.7948864Z component Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962 enabled=True
+2026-11-08T04:42:38.7948864Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetTransform=UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit#221416
+2026-11-08T04:42:38.7948864Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetOffset=[UnityEngine.Vector3]
+2026-11-08T04:42:38.7948864Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetAngle=180
+2026-11-08T04:42:38.7963898Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.snapToTerrain=True
+2026-11-08T04:42:38.7963898Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.targetActiveFollowsTrackGroup=False
+2026-11-08T04:42:38.7963898Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._marker=Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022
+2026-11-08T04:42:38.7963898Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._observedGroupId=null
+2026-11-08T04:42:38.7963898Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._setTargetActive=null
+2026-11-08T04:42:38.7978982Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962._observing=False
+2026-11-08T04:42:38.7978982Z field Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T04:42:38.7978982Z component Helpers.Culling.RendererCuller@World/Large Scenery/Alarka Signs/Yard Limit#262560 enabled=True
+2026-11-08T04:42:38.7978982Z target-subtree path=World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(-0.7071, 0.0000, 0.0000, 0.7071)
+2026-11-08T04:42:38.7994523Z component UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#224926 enabled=n/a
+2026-11-08T04:42:38.7994523Z component UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#241918 enabled=n/a
+2026-11-08T04:42:38.7994523Z component UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#236028 enabled=False
+2026-11-08T04:42:38.8004557Z target-subtree path=World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-0.0010, 1.6559, 0.0090) localRotation=(0.0000, 1.0000, 0.0000, 0.0000)
+2026-11-08T04:42:38.8004557Z component UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#253798 enabled=n/a
+2026-11-08T04:42:38.8009588Z component UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#235148 enabled=False
+2026-11-08T04:42:38.8009588Z component TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#256566 enabled=True
+2026-11-08T04:42:38.8009588Z component UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#-56138 enabled=n/a
+2026-11-08T04:42:38.8019621Z target-subtree path=World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1) scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-0.0010, 1.6559, -0.0218) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:38.8024654Z component UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#253542 enabled=n/a
+2026-11-08T04:42:38.8024654Z component UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#236584 enabled=False
+2026-11-08T04:42:38.8024654Z component TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#256772 enabled=True
+2026-11-08T04:42:38.8024654Z component UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#-56254 enabled=n/a
+2026-11-08T04:42:38.8049908Z registration id=Mkwd segment=Sjdl object=Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022 markerMatches=True location=[Track.Location]
+2026-11-08T04:42:38.8049908Z registration.location.segment=[Track.TrackSegment]
+2026-11-08T04:42:38.8059905Z registration.location.segment.id=Sjdl
+2026-11-08T04:42:38.8064955Z registration.location.segment.a=[Track.TrackNode]
+2026-11-08T04:42:38.8064955Z registration.location.segment.b=[Track.TrackNode]
+2026-11-08T04:42:38.8074955Z registration.location.segment.priority=0
+2026-11-08T04:42:38.8074955Z registration.location.segment.speedLimit=15
+2026-11-08T04:42:38.8074955Z registration.location.segment.groupId=s3
+2026-11-08T04:42:38.8074955Z registration.location.segment.flags=0
+2026-11-08T04:42:38.8084977Z registration.location.segment.turntable=null
+2026-11-08T04:42:38.8084977Z registration.location.segment.<Ephemeral>k__BackingField=False
+2026-11-08T04:42:38.8084977Z registration.location.segment.<Available>k__BackingField=True
+2026-11-08T04:42:38.8094972Z registration.location.segment.<GroupEnabled>k__BackingField=True
+2026-11-08T04:42:38.8094972Z registration.location.segment.<VisualWear>k__BackingField=0.4
+2026-11-08T04:42:38.8094972Z registration.location.segment.<PostedTrackClass>k__BackingField=3
+2026-11-08T04:42:38.8094972Z registration.location.segment.<TiePaintStripe>k__BackingField=None
+2026-11-08T04:42:38.8094972Z registration.location.segment.<ConstructionState>k__BackingField=Complete
+2026-11-08T04:42:38.8110007Z registration.location.segment.<RightOfWayClearing>k__BackingField=1
+2026-11-08T04:42:38.8110007Z registration.location.segment._curve=[Core.BezierCurve]
+2026-11-08T04:42:38.8110007Z registration.location.segment._posRotCache=[Core.Bezier.BezierDistanceParameterCache]
+2026-11-08T04:42:38.8120043Z registration.location.segment._boundingBox=null
+2026-11-08T04:42:38.8120043Z registration.location.segment._lineCurve=null
+2026-11-08T04:42:38.8120043Z registration.location.distance=38.60006
+2026-11-08T04:42:38.8120043Z registration.location.end=B
+2026-11-08T04:42:38.8130324Z registration count=1
+2026-11-08T04:42:39.0783379Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#256566 field=TMPro.TextMeshPro.m_renderer target=UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#235148
+2026-11-08T04:42:39.0783379Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#256566 field=TMPro.TextMeshPro.m_meshFilter target=UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#-56138
+2026-11-08T04:42:39.0798410Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#256566 field=TMPro.TMP_Text.m_transform target=UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#253798
+2026-11-08T04:42:39.0808448Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#256566 field=TMPro.TMP_Text.m_rectTransform target=UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#253798
+2026-11-08T04:42:39.0918630Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#256772 field=TMPro.TextMeshPro.m_renderer target=UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#236584
+2026-11-08T04:42:39.0928642Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#256772 field=TMPro.TextMeshPro.m_meshFilter target=UnityEngine.MeshFilter@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#-56254
+2026-11-08T04:42:39.0938630Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#256772 field=TMPro.TMP_Text.m_transform target=UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#253542
+2026-11-08T04:42:39.0938630Z direct-reference owner=TMPro.TextMeshPro@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#256772 field=TMPro.TMP_Text.m_rectTransform target=UnityEngine.RectTransform@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#253542
+2026-11-08T04:42:39.1433806Z direct-reference owner=Helpers.Culling.RendererCuller@World/Large Scenery/Alarka Signs/Yard Limit#262560 field=Helpers.Culling.RendererCuller._cullRenderers target=index=0 target=UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Sign-PlacardRounded#236028
+2026-11-08T04:42:39.1433806Z direct-reference owner=Helpers.Culling.RendererCuller@World/Large Scenery/Alarka Signs/Yard Limit#262560 field=Helpers.Culling.RendererCuller._cullRenderers target=index=1 target=UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label#235148
+2026-11-08T04:42:39.1448842Z direct-reference owner=Helpers.Culling.RendererCuller@World/Large Scenery/Alarka Signs/Yard Limit#262560 field=Helpers.Culling.RendererCuller._cullRenderers target=index=2 target=UnityEngine.MeshRenderer@World/Large Scenery/Alarka Signs/Yard Limit/Rolling Stock Label (1)#236584
+2026-11-08T04:42:39.1533988Z direct-reference owner=Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962 field=Track.TrackRelativePosition.targetTransform target=UnityEngine.Transform@World/Large Scenery/Alarka Signs/Yard Limit#221416
+2026-11-08T04:42:39.1549015Z direct-reference owner=Track.TrackRelativePosition@World/Large Scenery/Alarka Signs/Yard Limit#264962 field=Track.TrackRelativePosition._marker target=Track.TrackMarker@World/Large Scenery/Alarka Signs/Yard Limit#260022
+2026-11-08T04:42:39.1614251Z reference-scan components=15809 hits=13 fieldErrors=0
+2026-11-08T04:42:39.1624247Z marker id=Mi4f matches=1
+2026-11-08T04:42:39.1624247Z ancestor path=World/Large Scenery/Ela/Signs scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:39.1634241Z component UnityEngine.Transform@World/Large Scenery/Ela/Signs#218982 enabled=n/a
+2026-11-08T04:42:39.1634241Z ancestor path=World/Large Scenery/Ela scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(9257.3140, 542.3940, 7557.8430) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:39.1649278Z component UnityEngine.Transform@World/Large Scenery/Ela#219278 enabled=n/a
+2026-11-08T04:42:39.1649278Z ancestor path=World/Large Scenery scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:39.1649278Z component UnityEngine.Transform@World/Large Scenery#219042 enabled=n/a
+2026-11-08T04:42:39.1664384Z ancestor path=World scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(-4000.0000, 0.0000, -5000.0000) localRotation=(0.0000, 0.0000, 0.0000, 1.0000)
+2026-11-08T04:42:39.1664384Z component UnityEngine.Transform@World#218902 enabled=n/a
+2026-11-08T04:42:39.1674422Z component Helpers.WorldTransformer@World#266662 enabled=True
+2026-11-08T04:42:39.1674422Z component Helpers.WorldTransformerTarget@World#255692 enabled=True
+2026-11-08T04:42:39.1684420Z subtree path=World/Large Scenery/Ela/Signs/Station Sign (1) scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(699.5859, 5.4453, -520.3989) localRotation=(0.0006, 0.9322, -0.0015, 0.3620)
+2026-11-08T04:42:39.1684420Z component UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)#221132 enabled=n/a
+2026-11-08T04:42:39.1694429Z component Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218 enabled=True
+2026-11-08T04:42:39.1694429Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218.id=Mi4f
+2026-11-08T04:42:39.1704422Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218.type=Generic
+2026-11-08T04:42:39.1704422Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location=[Track.SerializableLocation]
+2026-11-08T04:42:39.1714421Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location.segmentId=S9sc
+2026-11-08T04:42:39.1714421Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location.distance=225.6681
+2026-11-08T04:42:39.1714421Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location.end=A
+2026-11-08T04:42:39.1729455Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218.OnLocationChanged=null
+2026-11-08T04:42:39.1729455Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._cachedPosition=null
+2026-11-08T04:42:39.1729455Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._warnedInvalid=False
+2026-11-08T04:42:39.1729455Z component Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666 enabled=True
+2026-11-08T04:42:39.1744573Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetTransform=UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)#221132
+2026-11-08T04:42:39.1744573Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetOffset=[UnityEngine.Vector3]
+2026-11-08T04:42:39.1759700Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetAngle=180
+2026-11-08T04:42:39.1759700Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.snapToTerrain=True
+2026-11-08T04:42:39.1759700Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetActiveFollowsTrackGroup=False
+2026-11-08T04:42:39.1769735Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._marker=Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218
+2026-11-08T04:42:39.1769735Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._observedGroupId=null
+2026-11-08T04:42:39.1779721Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._setTargetActive=null
+2026-11-08T04:42:39.1779721Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._observing=False
+2026-11-08T04:42:39.1779721Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T04:42:39.1790048Z subtree path=World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(-0.7071, 0.0000, 0.0000, 0.7071)
+2026-11-08T04:42:39.1828132Z component UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station#225232 enabled=n/a
+2026-11-08T04:42:39.1833171Z component UnityEngine.MeshFilter@World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station#241872 enabled=n/a
+2026-11-08T04:42:39.1838186Z component UnityEngine.MeshRenderer@World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station#236106 enabled=True
+2026-11-08T04:42:39.1843498Z relative target field=targetTransform value=UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)#221132
+2026-11-08T04:42:39.1843498Z target subtree count=2 limit=256
+2026-11-08T04:42:39.1853541Z target-subtree path=World/Large Scenery/Ela/Signs/Station Sign (1) scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(699.5859, 5.4453, -520.3989) localRotation=(0.0006, 0.9322, -0.0015, 0.3620)
+2026-11-08T04:42:39.1853541Z component UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)#221132 enabled=n/a
+2026-11-08T04:42:39.1863531Z component Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218 enabled=True
+2026-11-08T04:42:39.1863531Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218.id=Mi4f
+2026-11-08T04:42:39.1873686Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218.type=Generic
+2026-11-08T04:42:39.1873686Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location=[Track.SerializableLocation]
+2026-11-08T04:42:39.1883687Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location.segmentId=S9sc
+2026-11-08T04:42:39.1883687Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location.distance=225.6681
+2026-11-08T04:42:39.1893694Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._location.end=A
+2026-11-08T04:42:39.1903686Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218.OnLocationChanged=null
+2026-11-08T04:42:39.1903686Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._cachedPosition=null
+2026-11-08T04:42:39.1903686Z field Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218._warnedInvalid=False
+2026-11-08T04:42:39.1919749Z component Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666 enabled=True
+2026-11-08T04:42:39.1929796Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetTransform=UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)#221132
+2026-11-08T04:42:39.1929796Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetOffset=[UnityEngine.Vector3]
+2026-11-08T04:42:39.1939790Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetAngle=180
+2026-11-08T04:42:39.1939790Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.snapToTerrain=True
+2026-11-08T04:42:39.1951169Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.targetActiveFollowsTrackGroup=False
+2026-11-08T04:42:39.1961166Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._marker=Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218
+2026-11-08T04:42:39.1961166Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._observedGroupId=null
+2026-11-08T04:42:39.1961166Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._setTargetActive=null
+2026-11-08T04:42:39.1961166Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666._observing=False
+2026-11-08T04:42:39.1976816Z field Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T04:42:39.1976816Z target-subtree path=World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station scene=BushnellWhittier-MapManager activeSelf=True activeHierarchy=True localPosition=(0.0000, 0.0000, 0.0000) localRotation=(-0.7071, 0.0000, 0.0000, 0.7071)
+2026-11-08T04:42:39.1986873Z component UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station#225232 enabled=n/a
+2026-11-08T04:42:39.1986873Z component UnityEngine.MeshFilter@World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station#241872 enabled=n/a
+2026-11-08T04:42:39.1996859Z component UnityEngine.MeshRenderer@World/Large Scenery/Ela/Signs/Station Sign (1)/Sign-Station#236106 enabled=True
+2026-11-08T04:42:39.1996859Z registration id=Mi4f segment=S9sc object=Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218 markerMatches=True location=[Track.Location]
+2026-11-08T04:42:39.1996859Z registration.location.segment=[Track.TrackSegment]
+2026-11-08T04:42:39.1996859Z registration.location.segment.id=S9sc
+2026-11-08T04:42:39.2011894Z registration.location.segment.a=[Track.TrackNode]
+2026-11-08T04:42:39.2011894Z registration.location.segment.b=[Track.TrackNode]
+2026-11-08T04:42:39.2011894Z registration.location.segment.priority=0
+2026-11-08T04:42:39.2011894Z registration.location.segment.speedLimit=0
+2026-11-08T04:42:39.2028064Z registration.location.segment.groupId=
+2026-11-08T04:42:39.2028064Z registration.location.segment.flags=0
+2026-11-08T04:42:39.2028064Z registration.location.segment.turntable=null
+2026-11-08T04:42:39.2038101Z registration.location.segment.<Ephemeral>k__BackingField=False
+2026-11-08T04:42:39.2043144Z registration.location.segment.<Available>k__BackingField=True
+2026-11-08T04:42:39.2043144Z registration.location.segment.<GroupEnabled>k__BackingField=True
+2026-11-08T04:42:39.2043144Z registration.location.segment.<VisualWear>k__BackingField=0.4
+2026-11-08T04:42:39.2053161Z registration.location.segment.<PostedTrackClass>k__BackingField=3
+2026-11-08T04:42:39.2053161Z registration.location.segment.<TiePaintStripe>k__BackingField=None
+2026-11-08T04:42:39.2053161Z registration.location.segment.<ConstructionState>k__BackingField=Complete
+2026-11-08T04:42:39.2063165Z registration.location.segment.<RightOfWayClearing>k__BackingField=1
+2026-11-08T04:42:39.2068205Z registration.location.segment._curve=[Core.BezierCurve]
+2026-11-08T04:42:39.2068205Z registration.location.segment._posRotCache=[Core.Bezier.BezierDistanceParameterCache]
+2026-11-08T04:42:39.2068205Z registration.location.segment._boundingBox=null
+2026-11-08T04:42:39.2068205Z registration.location.segment._lineCurve=null
+2026-11-08T04:42:39.2083237Z registration.location.distance=225.6681
+2026-11-08T04:42:39.2083237Z registration.location.end=A
+2026-11-08T04:42:39.2093272Z registration count=1
+2026-11-08T04:42:39.5048036Z direct-reference owner=Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666 field=Track.TrackRelativePosition.targetTransform target=UnityEngine.Transform@World/Large Scenery/Ela/Signs/Station Sign (1)#221132
+2026-11-08T04:42:39.5048036Z direct-reference owner=Track.TrackRelativePosition@World/Large Scenery/Ela/Signs/Station Sign (1)#258666 field=Track.TrackRelativePosition._marker target=Track.TrackMarker@World/Large Scenery/Ela/Signs/Station Sign (1)#260218
+2026-11-08T04:42:39.5264725Z reference-scan components=15809 hits=2 fieldErrors=0
+2026-11-08T04:42:39.5264725Z capture complete

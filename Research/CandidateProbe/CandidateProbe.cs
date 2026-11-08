@@ -1,0 +1,45 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Railroader.Modding;
+using UnityEngine;
+
+public sealed class CandidateProbeEntry : IModEntryPoint, IWorldLifecycle
+{
+    private GameObject host;
+    public void OnModLoad(IModContext context) { host = new GameObject("CrankyAnt CandidateProbe"); UnityEngine.Object.DontDestroyOnLoad(host); host.AddComponent<CandidateProbe>().Initialize(context.ModDirectory); }
+    public void OnWorldLoad() { }
+    public void OnWorldUnload() { }
+    public void OnModUnload() { if (host != null) UnityEngine.Object.Destroy(host); }
+}
+
+public sealed class CandidateProbe : MonoBehaviour
+{
+    private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+    private string log, status = "Load the disposable map, then capture.";
+    private Rect window = new Rect(20, 200, 390, 120);
+    public void Initialize(string directory) { log = Path.Combine(directory, "CandidateProbe.log"); Write("loaded"); }
+    private void Write(string value) { File.AppendAllText(log, DateTime.UtcNow.ToString("O") + " " + value + Environment.NewLine); }
+    private static Type TypeNamed(string name) { return AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType(name, false)).FirstOrDefault(t => t != null); }
+    private static object Read(object obj, string name) { var type = obj as Type ?? obj.GetType(); var receiver = obj is Type ? null : obj; var property = type.GetProperty(name, Flags); var field = type.GetField(name, Flags); if (property != null) return property.GetValue(receiver, null); if (field != null) return field.GetValue(receiver); throw new MissingMemberException(type.FullName, name); }
+    private static string PathOf(Transform t) { return t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name; }
+    private static bool Loaded(Component c) { return c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded; }
+    private static string Describe(object v) { if (v == null) return "null"; if (v is Component c) return c.GetType().FullName + "@" + PathOf(c.transform) + "#" + c.GetInstanceID(); if (v is GameObject g) return "GameObject@" + PathOf(g.transform) + "#" + g.GetInstanceID(); if (v is string || v.GetType().IsPrimitive || v.GetType().IsEnum) return Convert.ToString(v, CultureInfo.InvariantCulture); return "[" + v.GetType().FullName + "]"; }
+    private static IEnumerable<FieldInfo> Fields(Type type) { for (var t = type; t != null && t != typeof(MonoBehaviour) && t != typeof(UnityEngine.Object); t = t.BaseType) foreach (var f in t.GetFields(Flags | BindingFlags.DeclaredOnly)) if (!f.IsStatic) yield return f; }
+    private void DumpFields(object obj, string label, int depth) { foreach (var f in Fields(obj.GetType())) try { var v = f.GetValue(obj); Write(label + "." + f.Name + "=" + Describe(v)); if (depth > 0 && v != null && !(v is UnityEngine.Object) && !(v is string) && !v.GetType().IsPrimitive && !v.GetType().IsEnum && v.GetType().Namespace != null && v.GetType().Namespace.StartsWith("Track")) DumpFields(v, label + "." + f.Name, depth - 1); } catch (Exception e) { Write(label + "." + f.Name + " unavailable=" + e.GetType().Name); } }
+    private void Node(Transform t, string kind) { Write(kind + " path=" + PathOf(t) + " scene=" + t.gameObject.scene.name + " activeSelf=" + t.gameObject.activeSelf + " activeHierarchy=" + t.gameObject.activeInHierarchy + " localPosition=" + t.localPosition.ToString("F4") + " localRotation=" + t.localRotation.ToString("F4")); foreach (var c in t.GetComponents<Component>()) { if (c == null) { Write("component missing"); continue; } Write("component " + Describe(c) + " enabled=" + (c is Behaviour b ? b.enabled.ToString() : c is Renderer renderer ? renderer.enabled.ToString() : c is Collider collider ? collider.enabled.ToString() : "n/a")); if (c.GetType().FullName == "Track.TrackMarker" || c.GetType().FullName == "Track.TrackRelativePosition") DumpFields(c, "field " + Describe(c), 1); } }
+    private static IEnumerable<string> Matches(object value, HashSet<UnityEngine.Object> targets) { if (value is UnityEngine.Object u && u != null && targets.Contains(u)) yield return Describe(u); if (value is IList list) for (int i = 0; i < list.Count; i++) if (list[i] is UnityEngine.Object x && x != null && targets.Contains(x)) yield return "index=" + i + " target=" + Describe(x); }
+    private static object Field(object obj, string name) { for (var t = obj.GetType(); t != null; t = t.BaseType) { var f = t.GetField(name, Flags | BindingFlags.DeclaredOnly); if (f != null) return f.GetValue(obj); } throw new MissingFieldException(obj.GetType().FullName, name); }
+    private static void AddNode(HashSet<UnityEngine.Object> targets, Transform t) { targets.Add(t.gameObject); foreach (var c in t.GetComponents<Component>()) if (c != null) targets.Add(c); }
+    private void AddExternalTargets(HashSet<UnityEngine.Object> targets, Component marker) { foreach (var relative in marker.GetComponentsInChildren<MonoBehaviour>(true).Where(c => c != null && c.GetType().FullName == "Track.TrackRelativePosition")) foreach (var f in Fields(relative.GetType())) try { var v = f.GetValue(relative); Transform target = v is Transform tr ? tr : v is GameObject go ? go.transform : v is Component co ? co.transform : null; if (target == null || f.Name.IndexOf("target", StringComparison.OrdinalIgnoreCase) < 0) continue; Write("relative target field=" + f.Name + " value=" + Describe(v)); var children = target.GetComponentsInChildren<Transform>(true); Write("target subtree count=" + children.Length + " limit=256"); foreach (var child in children.Take(256)) { Node(child, "target-subtree"); AddNode(targets, child); } if (children.Length > 256) Write("target subtree truncated"); } catch (Exception e) { Write("relative target unavailable field=" + f.Name + " error=" + e.GetType().Name); } }
+    private void Registration(string id, Component marker) { try { var graph = Read(TypeNamed("Track.Graph"), "Shared"); var buckets = Read(graph, "_namedLocationsBySegmentId") as IDictionary; if (buckets == null) throw new InvalidOperationException("graph buckets unavailable"); int count = 0; foreach (DictionaryEntry bucket in buckets) if (bucket.Value is IDictionary entries) foreach (DictionaryEntry entry in entries) if (Convert.ToString(entry.Key) == id) { count++; var item = entry.Value; Write("registration id=" + id + " segment=" + bucket.Key + " object=" + Describe(Read(item, "ObjectValue")) + " markerMatches=" + ReferenceEquals(Read(item, "ObjectValue"), marker) + " location=" + Describe(Read(item, "Location"))); DumpFields(Read(item, "Location"), "registration.location", 1); } Write("registration count=" + count); } catch (Exception e) { Write("registration unavailable=" + e.GetType().Name + " " + e.Message); } }
+    private void Capture() { try { Write("capture begin"); var type = TypeNamed("Track.TrackMarker") ?? throw new InvalidOperationException("TrackMarker unavailable"); var all = Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(Loaded).ToArray(); var components = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(Loaded).ToArray(); Write("reference-scan scope=loaded-scene-MonoBehaviour-instance-fields-and-direct-IList-elements only"); foreach (var id in new[] { "Mkwd", "Mi4f" }) { var matches = new List<Component>(); foreach (var c in all) try { if (Convert.ToString(Field(c, "id")) == id) matches.Add(c); } catch (Exception e) { Write("marker id-field unavailable component=" + Describe(c) + " error=" + e.GetType().Name); } Write("marker id=" + id + " matches=" + matches.Count); foreach (var marker in matches) { var targets = new HashSet<UnityEngine.Object>(); for (var t = marker.transform.parent; t != null; t = t.parent) { Node(t, "ancestor"); AddNode(targets, t); } foreach (var t in marker.GetComponentsInChildren<Transform>(true)) { Node(t, "subtree"); AddNode(targets, t); } AddExternalTargets(targets, marker); Registration(id, marker); int hits = 0, errors = 0; foreach (var owner in components) foreach (var f in Fields(owner.GetType())) try { foreach (var hit in Matches(f.GetValue(owner), targets)) { hits++; Write("direct-reference owner=" + Describe(owner) + " field=" + f.DeclaringType.FullName + "." + f.Name + " target=" + hit); } } catch { errors++; } Write("reference-scan components=" + components.Length + " hits=" + hits + " fieldErrors=" + errors); } } Write("capture complete"); status = "Capture complete. Review CandidateProbe.log."; } catch (Exception e) { Write("capture ERROR " + e); status = "Capture failed. Review log."; } }
+    private void OnGUI() { window = GUI.Window(203912, window, Draw, "Candidate ownership"); }
+    private void Draw(int id) { GUILayout.Label(status); if (GUILayout.Button("Capture read-only")) Capture(); GUI.DragWindow(new Rect(0, 0, 10000, 20)); }
+}
