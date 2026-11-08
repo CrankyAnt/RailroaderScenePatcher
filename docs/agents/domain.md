@@ -1,27 +1,60 @@
-# Domain docs
+# Domain Docs
 
-How the engineering skills consume this repository's domain documentation.
+How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
 **Layout:** single-context
 
 ## Before exploring, read these
 
-- `GLOSSARY.md` at the repository root.
-- `docs/adr/`: read ADRs that touch the area being explored.
-- `SCOPE.md` at the repository root: read the product's purpose and non-goals when writing or recommending new work. During delivery the contract bounds the builder instead; triage applies this file to incidental findings.
+- **`GLOSSARY.md`** at the repo root, or
+- **`GLOSSARY-MAP.md`** at the repo root if it exists: it points at one `GLOSSARY.md` per context. Read each one relevant to the topic.
+- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+- **`SCOPE.md`** at the repo root: the product's scope, its purpose and non-goals. Read it when you write or recommend new work. During delivery the contract bounds the builder instead; triage applies this file to incidental findings.
 
-If any of these files do not exist, proceed silently. The `model-domain` skill, reached through `grill-and-document`, creates terms and decisions when they are resolved. `SCOPE.md` changes only through `grill-and-document`.
+If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `model-domain` skill (reached via `grill-and-document`) creates them lazily when terms or decisions actually get resolved, and `SCOPE.md` only through `grill-and-document`.
+
+Resolved terms, ADRs and `SCOPE.md` changes take one of two routes, by whether they arise inside a delivery as `docs/agents/delivery.md` defines it. Inside a delivery, commit them with the delivered change, for `deliver-spec` on the integration branch; they become valid when it lands. Outside a delivery, publish them to the default branch in a pull request of their own, merged as soon as its checks pass and before the next session starts, so that every later session starts from them.
+
+## File structure
+
+Single-context repo (most repos):
+
+```
+/
+├── GLOSSARY.md
+├── docs/adr/
+│   ├── 0001-event-sourced-orders.md
+│   └── 0002-postgres-for-write-model.md
+└── src/
+```
+
+Multi-context repo (presence of `GLOSSARY-MAP.md` at the root):
+
+```
+/
+├── GLOSSARY-MAP.md
+├── docs/adr/                          ← system-wide decisions
+└── src/
+    ├── ordering/
+    │   ├── GLOSSARY.md
+    │   └── docs/adr/                  ← context-specific decisions
+    └── billing/
+        ├── GLOSSARY.md
+        └── docs/adr/
+```
 
 ## Use the glossary's vocabulary
 
-When output names a domain concept, use the term as defined in `GLOSSARY.md`.
+When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `GLOSSARY.md`. Don't drift to synonyms the glossary explicitly avoids.
 
-If a needed concept is absent, reconsider whether it belongs to the product or note the gap for `model-domain`.
+If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `model-domain`).
 
 ## Flag ADR conflicts
 
-Surface any contradiction with an existing ADR explicitly.
+If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
+
+> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_
 
 ## Flag work outside the scope
 
-Work belongs to the product only when it serves the purpose in `SCOPE.md` and hits none of its non-goals. Put work outside that boundary to the user as one question: a conscious extension, or not. Never extend or reject the scope silently.
+Work belongs to the product only when it serves the purpose in `SCOPE.md` and hits none of its non-goals. If your output would not, put it to the user as one question: a conscious extension, or not. Never go outside the scope silently, and never reject work for it on your own.

@@ -1,5 +1,7 @@
 # Delivery
 
+A delivery is the implementation of one Work Brief or spec by `deliver-work` or `deliver-spec`, from its first commit until its work lands on the default branch. All other work happens outside a delivery, such as `map-the-work`, `grill-and-document`, `triage-requests`, or an agent that uses `model-domain` on its own.
+
 Every implementation Work Brief or spec, and no sliced ticket, records:
 
 ```markdown
@@ -11,11 +13,7 @@ Every implementation Work Brief or spec, and no sliced ticket, records:
 **Reason:** <risk-based reason>
 ```
 
-Use direct-main only for a recorded small, local, reversible change with no schema, data, dependency, security, authentication, public-API, or parallel-work risk, after relevant validation passes and when repository rules permit it. The builder commits to the default branch and the user or delegating agent checks the result afterwards.
-
-Use `none` on both lines only for work whose only output is tracker content, such as comments or new issues; its builder changes no repository, stops after the published result and its independent receipt by a fresh subagent, and leaves closing the request to the user or delegating agent.
-
-Under dedicated-branch, the builder owns a branch and works up to the recorded boundary. Before it decides a PR's state, a fresh subagent receives the work under the receive contract and ticks only demonstrated criteria. Under `pr` the builder opens a ready PR once every criterion is ticked and the user or delegating agent merges; under `merge` the builder merges after full receipt and the pre-merge gate. Missing evidence or an open decision keeps the PR draft.
+Use direct-main only for a recorded small, local, reversible change with no schema, data, dependency, security, authentication, public-API, or parallel-work risk, after relevant validation passes and when repository rules permit it. Small reversible documentation corrections may use direct-main after validation. The builder commits to the default branch and the user or delegating agent checks the result afterwards. Use `none` on both lines only for work whose only output is tracker content, such as comments or new issues; its builder changes no repository, stops after the published result and its independent receipt by a fresh subagent, and leaves closing the request to the user or delegating agent. Under dedicated-branch, the builder owns a branch and works up to the recorded boundary. Before it decides a PR's state, a fresh subagent receives the work under the receive contract and ticks only demonstrated criteria. Under `pr` the builder opens a ready PR once every criterion is ticked and the user or delegating agent merges; under `merge` the builder merges after full receipt and the pre-merge gate. Missing evidence or an open decision keeps the PR draft.
 
 Planning tickets inherit the invoking map's delivery strategy, or the repository strategy below when the map records no override. Apply an unambiguous direct-main exception autonomously; ask only when the applicable strategy genuinely cannot be determined.
 
@@ -28,7 +26,7 @@ Default to `merge`: the builder merges after independent receipt and the pre-mer
 **Required validation:** the commands and workflows under `## Testing instructions` in `AGENTS.md`
 **Reason:** branch-based delivery provides independent review and CI before changes reach the default branch.
 
-Outside delivery, commit resolved terms and ADRs to `main` immediately. During `deliver-spec` or `deliver-work`, commit them with the delivered change, for `deliver-spec` on the integration branch; they become valid when it lands.
+None.
 
 ## Gitleaks before a push
 
@@ -41,6 +39,4 @@ git fetch --prune <remote>
 gitleaks git --log-opts="<ref> --not --remotes=<remote>" --redact --no-banner --no-color
 ```
 
-No repository-specific Gitleaks configuration or baseline is used.
-
-Agents use the locally installed Gitleaks. When Gitleaks is not installed, the push waits and the agent reports it. This gate applies to every push that sends commits, whatever route produced them, research branches included; local commits may precede it.
+Setup records the repository's Gitleaks options here; add them to the command: none. Agents use the locally installed Gitleaks. When Gitleaks is not installed, the push waits and the agent reports it. This gate applies to every push that sends commits, whatever route produced them, research branches included; local commits may precede it.
