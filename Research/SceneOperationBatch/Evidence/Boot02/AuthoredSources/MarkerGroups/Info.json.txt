@@ -1,0 +1,14 @@
+{
+  "identifier": "crankyant/marker-groups-preflight",
+  "version": "0.0.1",
+  "name": "CrankyAnt",
+  "author": "CrankyAnt",
+  "assemblies": [
+    "MarkerGroups.dll"
+  ],
+  "dependencies": {
+    "required": [
+      "rr/game >=0.6.2"
+    ]
+  }
+}

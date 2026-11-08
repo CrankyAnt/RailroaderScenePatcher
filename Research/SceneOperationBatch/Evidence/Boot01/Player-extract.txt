@@ -1,0 +1,4 @@
+source line 6: Initialize engine version: 6000.3.26f1 (de8167e7440c)
+source line 16: d3d12: failed to query info queue interface (0x80004002).
+source line 40: [22:07:53 INF] Railroader 0.6.2 (26335745) {  }
+source line 41: [22:07:53 INF] Home directory is C:\TMP\RailroaderMapResearch\RuntimeHome {  }

@@ -1,0 +1,106 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using UnityEngine;
+
+public sealed partial class BridgeContactProbe
+{
+    private string sceneryDependencyBaseline;
+
+    // Capture referenced targets as well as descendants of the scenery component.
+    // The component can refer to objects outside its own hierarchy.
+    private void CaptureSceneryDependencies()
+    {
+        sceneryDependencyBaseline = null;
+        var seen = new HashSet<int>(states.Select(s => s.Node.GetInstanceID()));
+        sceneryDependencyBaseline = DescribeSceneryDependencies(t =>
+        {
+            foreach (var node in t.GetComponentsInChildren<Transform>(true))
+                if (seen.Add(node.GetInstanceID())) states.Add(new NodeState(node));
+        });
+        Write("scenery dependency baseline captured");
+    }
+
+    private void SnapshotSceneryDependencies(string phase)
+    {
+        if (sceneryDependencyBaseline == null)
+            throw new InvalidOperationException("Scenery dependencies were not captured.");
+        string current = DescribeSceneryDependencies(null);
+        bool matches = current == sceneryDependencyBaseline;
+        Write(phase + " scenery dependencies equalBaseline=" + matches);
+        if (phase == "restored immediate" && !matches)
+            throw new InvalidOperationException("Scenery dependencies differ from baseline. Never save.");
+    }
+
+    private string DescribeSceneryDependencies(Action<Transform> captureTarget)
+    {
+        if (approach == null) throw new InvalidOperationException("Scenery node unavailable.");
+        var components = approach.GetComponents<Component>()
+            .Where(c => c != null && c.GetType().FullName == "Game.Mow.TrackConstructionScenery").ToArray();
+        if (components.Length != 1)
+            throw new InvalidOperationException("Expected exactly one TrackConstructionScenery component.");
+        var scenery = components[0];
+        var result = new StringBuilder();
+        Action<string> record = line => { result.AppendLine(line); Write("scenery dependency " + line); };
+        record("component.id=" + scenery.GetInstanceID().ToString(CultureInfo.InvariantCulture));
+
+        var graphType = TypeNamed("Track.Graph");
+        var graph = graphType.GetProperty("Shared", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .GetValue(null, null);
+        if (graph == null) throw new InvalidOperationException("Track graph unavailable.");
+        var getSegment = graphType.GetMethod("GetSegment", Flags, null, new[] { typeof(string) }, null);
+        if (getSegment == null) throw new MissingMethodException("Track.Graph", "GetSegment");
+        var getUnconstructed = TypeNamed("Game.Mow.TrackConditionController").GetMethod("GetUnconstructedState",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+        if (getUnconstructed == null) throw new MissingMethodException("TrackConditionController", "GetUnconstructedState");
+        var ids = Field(scenery, "segmentIds") as string[];
+        if (ids == null) throw new InvalidOperationException("Scenery segmentIds is null.");
+        record("segment.count=" + ids.Length);
+        for (int i = 0; i < ids.Length; i++)
+        {
+            if (string.IsNullOrEmpty(ids[i])) throw new InvalidOperationException("Empty scenery segment ID at " + i);
+            var segment = getSegment.Invoke(graph, new object[] { ids[i] });
+            if (segment == null) throw new InvalidOperationException("Unresolved scenery segment " + ids[i]);
+            var type = segment.GetType();
+            var enabled = type.GetProperty("GroupEnabled", Flags).GetValue(segment, null);
+            var construction = type.GetProperty("ConstructionState", Flags).GetValue(segment, null);
+            var unconstructed = getUnconstructed.Invoke(null, new[] { segment });
+            record("segment[" + i + "] requested=" + ids[i] + " id=" + Field(segment, "id")
+                + " groupId=" + (Field(segment, "groupId") ?? "<null>") + " groupEnabled=" + enabled
+                + " construction=" + construction + " unconstructed=" + unconstructed);
+        }
+
+        var entries = Field(scenery, "entries") as IEnumerable;
+        if (entries == null) throw new InvalidOperationException("Scenery entries is null.");
+        int entryIndex = 0;
+        foreach (var entry in entries)
+        {
+            if (entry == null) throw new InvalidOperationException("Null scenery entry at " + entryIndex);
+            var targets = Field(entry, "targets") as GameObject[];
+            if (targets == null) throw new InvalidOperationException("Null scenery targets at " + entryIndex);
+            record("entry[" + entryIndex + "] state=" + Field(entry, "trackConstructionState")
+                + " condition=" + Field(entry, "condition") + " targetCount=" + targets.Length);
+            for (int i = 0; i < targets.Length; i++)
+            {
+                var target = targets[i];
+                if (target == null) throw new InvalidOperationException("Null scenery target at " + entryIndex + "/" + i);
+                if (!target.scene.IsValid() || !target.scene.isLoaded)
+                    throw new InvalidOperationException("Scenery target is outside a loaded scene at " + entryIndex + "/" + i);
+                record("target[" + entryIndex + "," + i + "] id=" + target.GetInstanceID()
+                    + " path=" + PathOf(target.transform));
+                foreach (var node in target.GetComponentsInChildren<Transform>(true))
+                    record("target.node id=" + node.GetInstanceID() + " path=" + PathOf(node));
+                if (captureTarget != null) captureTarget(target.transform);
+            }
+            entryIndex++;
+        }
+        record("entry.count=" + entryIndex);
+        return result.ToString();
+    }
+}

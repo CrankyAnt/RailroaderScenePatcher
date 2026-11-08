@@ -26,7 +26,7 @@ public sealed class BridgeContactEntry : IModEntryPoint, IWorldLifecycle
     public void OnModUnload() { if (host != null) UnityEngine.Object.Destroy(host); }
 }
 
-public sealed class BridgeContactProbe : MonoBehaviour
+public sealed partial class BridgeContactProbe : MonoBehaviour
 {
     private const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private const string BridgePath = "World/Large Scenery/Ela/Ela Bridge";
@@ -157,6 +157,7 @@ public sealed class BridgeContactProbe : MonoBehaviour
         states.Clear(); colliderBaseline.Clear();
         states.AddRange(bridge.GetComponentsInChildren<Transform>(true).Concat(
             approach.GetComponentsInChildren<Transform>(true)).Select(t => new NodeState(t)));
+        CaptureSceneryDependencies();
         origin = Origin();
         parentGamePosition = ConvertPoint("WorldToGame", bridge.parent.position); parentRotation = bridge.parent.rotation;
         Snapshot("baseline"); baselineComplete = true; status = "Captured bridge and separate scenery. Never save.";
@@ -177,6 +178,7 @@ public sealed class BridgeContactProbe : MonoBehaviour
     private void Snapshot(string phase)
     {
         CheckCapture(phase != "baseline");
+        SnapshotSceneryDependencies(phase);
         Write(phase + " origin=" + V(Origin()) + " frame=" + Time.frameCount + " dirty=" + dirty);
         foreach (var state in states)
         {

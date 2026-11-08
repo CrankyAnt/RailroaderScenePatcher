@@ -1,17 +1,17 @@
 <!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
 <!-- SPDX-License-Identifier: MIT -->
 
-# Scene operation batch preparation
+# Scene operation batch evidence
 
-This research supports the planning map [Define the first usable Railroader Scene Patcher](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/3). It prepares five existing investigations together. No game session or runtime trial was performed. The five questions remain open and the map's decision index is unchanged.
+This research supports the planning map [Define the first usable Railroader Scene Patcher](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/3). It prepares five existing investigations together. Preparation predates the runtime evidence linked below. The reports record each bounded result and its limits.
 
-| Investigation | Prepared evidence | Pending result |
+| Investigation | Evidence | Result and limits |
 | --- | --- | --- |
-| [Track-relative placement and group precedence](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/24) | [Marker group report](MarkerGroups/Report.md) | Placement, original and destination group behavior, explicit-disable precedence, restoration and material automatic reapplication behavior. |
-| [Milepost origin cache and dependent display restoration](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/25) | [Milepost report](Milepost/Report.md) | Populated cache behavior across a meaningful rebind, actual rendered display, repeat and restoration. |
-| [Crossing-pad geometry after marker changes](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/26) | [Crossing-pad report](CrossingPad/README.md) | Generated geometry, native update timing, visible result and restoration after the guarded rebind. |
-| [Bridge collision and separate scenery restoration](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/27) | [Geometry report](Geometry/Report.md) | Actual contact, visible alignment, culling and independent approach restoration. |
-| [Terrain output after independent board movement](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/28) | [Geometry report](Geometry/Report.md) | A relevant native rebuild, actual output at both sites and restored output. |
+| [Track-relative placement and group precedence](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/24) | [Preparation](MarkerGroups/Report.md), [Boot02 manual trial](Evidence/Boot02/MarkerGroups/Report.md), [Boot03 automatic trial](Evidence/Boot03/MarkerGroups/Report.md) | Boot03 automatic application returned true after a stable-ready guard. The report records a temporary activation during repeat while explicit disable was set, and native restore returned false before direct pose and registration restoration. Ordinary-save reload was not tested. |
+| [Milepost origin cache and dependent display restoration](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/25) | [Preparation](Milepost/Report.md), [Boot02 trial](Evidence/Boot02/Milepost/Report.md) | The trial observed a cache entry populated during its baseline, an unchanged rendered display, repeat and restoration. See the report for the boundaries of those observations. |
+| [Crossing-pad geometry after marker changes](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/26) | [Preparation](CrossingPad/README.md), [Boot02 trial](Evidence/Boot02/CrossingPad/README.md) | Rebind alone left sampled geometry and culling unchanged; explicit native generation changed them, and generation after restoration matched sampled baseline signatures. Visual detail was obscured. |
+| [Bridge collision and separate scenery restoration](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/27) | [Preparation](Geometry/Report.md), [Boot02 trial](Evidence/Boot02/Bridge/Report.md), [Boot03 trestle diagnostic](Evidence/Boot03/Bridge/Report.md) | Boot02 recorded actual ball contact with the bridge collider at baseline, moved and restored phases. Immediate restoration matched captured local transforms and collider identities and shapes, with world poses within 0.01 m and 0.01 degrees. Boot03 sampled two nearby AutoTrestles unchanged through those phases; it did not test collision or identify the photographed timber. |
+| [Terrain output after independent board movement](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/28) | [Preparation](Geometry/Report.md), [Boot02 trial](Evidence/Boot02/Terrain/Report.md), [Boot03 preflight](Evidence/Boot03/Terrain/Report.md), [Boot04 trial](Evidence/Boot04/Terrain/Report.md) | Boot03 found one generated tree inside the target core, then rejected movement before mutation because the guard expected a different radius. Boot04's native rebuild removed that tree from generated data and restoration returned the sampled baseline signature. Pixel-level disappearance at the target was not observed. |
 
 ## Shared preparation
 
@@ -23,32 +23,32 @@ Run the following from the repository root. Build intermediates and output stay 
 pwsh -NoProfile -File Research/SceneOperationBatch/Prepare-SceneOperationBatch.ps1
 ```
 
-The default command verifies the two installed assembly hashes and fixture map identity, compiles all five projects with warnings as errors, and stages only authored DLLs and manifests at `C:\TMP\RailroaderMapResearch\SceneOperationBatchStaging`. Every staged pack has one DLL and one `Info.json`. It writes exact source, fixture and output hashes to that staging directory's `BuildIdentity.json`. No vendor DLL, game asset or full player log is copied. The build manifest retained here records the completed preparation build. Compilation does not establish native-loader compatibility or runtime safety.
+The default command verifies the two installed assembly hashes and fixture map identity, compiles all five projects with warnings as errors, and stages only authored DLLs and manifests at `C:\TMP\RailroaderMapResearch\SceneOperationBatchStaging`. Every staged pack has one DLL and one `Info.json`. It writes exact source, fixture and output hashes to that staging directory's `BuildIdentity.json`. No vendor DLL, game asset or full player log is copied. [BuildIdentity.json](BuildIdentity.json) records the latest preparation build and may change when rebuilt. The frozen [Boot02](Evidence/Boot02/BuildIdentity.json), [Boot03](Evidence/Boot03/BuildIdentity.json) and [Boot04](Evidence/Boot04/BuildIdentity.json) manifests identify those staged builds. Compilation does not establish native-loader compatibility or runtime safety.
 
-The active isolated home remains neutral. Its `Mods`, `ModDev` and `Saves` directories and activation arrays were checked empty after staging. No persistent Steam settings or personal preferences were changed. The existing exclusive test-environment allocation covers this batch; no other session may use that home during the eventual trials.
+After preparation staging, the isolated home was verified neutral: its `Mods`, `ModDev` and `Saves` directories and activation arrays were empty. Runtime evidence was later collected in that home. The [final neutral-state verification](Evidence/NeutralStateVerification.txt) records no game process, empty active `Mods`, `ModDev` and `Saves` folders, and preferences matching the neutral backup. No persistent Steam settings or personal preferences were changed. The exclusive test-environment allocation covers this batch; do not use that home concurrently with a trial.
 
-## Combined user-present session
+## Runtime procedure
 
-The issue contracts require the user in the owning desktop session for runtime probes. Read the canonical `C:\Users\pghoe\source\repos\RailroaderScenePatcher\.docs\TestEnvironment.md` before continuing. The tests are pending that session. They do not require another product-scope decision or permission to prepare the probes.
-
-With the user present and Railroader stopped, run:
+Before runtime work, verify the exclusive game lease, isolated test environment and fixture identity. Install while Railroader is stopped. Use:
 
 ```powershell
-pwsh -NoProfile -File Research/SceneOperationBatch/Prepare-SceneOperationBatch.ps1 -Install -UserPresent
+pwsh -NoProfile -File Research/SceneOperationBatch/Prepare-SceneOperationBatch.ps1 -Install -RuntimeAuthorized
 ```
 
-This verifies the neutral isolated home and stopped game, then installs the five verified packs and the single fixture there. It leaves preferences unchanged. Explicitly enable the selected packs in the isolated profile. Use the canonical one-launch `-homedir` and `-logFile` arguments; do not change persistent Steam options. Confirm the process command line and fresh log identify RuntimeHome. DLL changes require a fresh process. The five panels are draggable and do no automatic mutation.
+The script verifies the isolated home and stopped game, then installs the five verified packs and the single fixture there. It leaves preferences unchanged. Explicitly enable only the selected packs in the isolated profile. Use the canonical one-launch `-homedir` and `-logFile` arguments; do not change persistent Steam options. Confirm the process command line and fresh log identify RuntimeHome. DLL changes require a fresh process. The panels are draggable. Mutation requires an explicit control, except that MarkerGroups can apply automatically after its auto-arm control is enabled and its readiness guard passes.
 
 Work sequentially within the shared fixture. First test marker placement/groups, restore and release that capture. Then test mileposts, because both cases use T-46. Follow with the crossing pad, bridge and board. Focus and let the origin settle before each capture. Capture telemetry and visible observations at baseline, after change, after repeat and after restoration. Do not use one probe while another has a pending mutation. A guard failure or incomplete restoration requires discarding the disposable world without saving. It does not justify forcing a field or bypassing a check.
 
 Keep delayed observations separate from immediate mutation logs. TMP properties do not prove rendered glyphs, a ray hit does not prove physical contact, a culling registration does not prove visibility, and a mask descriptor does not prove terrain output. Record the exact compiled DLL and fixture identities with each trial. No screenshots or audio observations exist for this preparation.
 
-The manual marker trial does not yet implement automatic marker reapplication on editor and ordinary-save reload. Its outcome must first establish which state and subscriptions need restoration. That remaining phase stays within the existing marker investigation; no claim from the board's earlier automatic-load trial is transferred to it. The crossing-pad probe tests a valid rebind and explicit native generation, which is sufficient to probe that consumer path before any separate placement experiment.
+Boot02 did not test automatic marker reapplication on editor and ordinary-save reload. The manual marker observations do not establish which state and subscriptions reload requires. No claim from the board's earlier automatic-load trial transfers to this marker. The crossing-pad Boot02 probe tested a valid rebind and explicit native generation; it did not test placement.
 
-After the trials, exit without saving, retain reviewed publishable observations, and return active folders and activation flags to the canonical neutral baseline. Keep the staged case packs available for continuation. The original CaseLibrary packs remain untouched.
+Boot03's automatic marker case and nearby AutoTrestle diagnostic have runtime reports in the table. Its terrain target-movement preflight refused mutation and did not test output changes. Boot04 recorded generated-data removal and restoration after a relevant native rebuild; pixel-level disappearance of the target tree was not observed.
+
+After each trial, exit without saving, retain reviewed observations, and return active folders and activation flags to the canonical neutral baseline. Boot02 evidence is retained under [Evidence/Boot02](Evidence/Boot02). Keep the staged case packs available for continuation. The original CaseLibrary packs remain untouched.
 
 ## Review and limits
 
 Independent source review found and corrected incomplete baseline gating, stale-world cache restoration, incomplete graph registration comparison, partial event cleanup, missing camera/pause isolation checks and incomplete collider-set comparison. The staging script rejects unexpected pack contents and copies only the two verified files per pack. These are static corrections. They do not demonstrate runtime behavior.
 
-The preparation adds no production patcher, JSON contract or release package. Static findings and clean builds do not meet the investigations' closure criteria. Each resolution still needs its own immutable runtime evidence and the named consumer decisions must remain blocked until that evidence is sufficient.
+The preparation adds no production patcher, JSON contract or release package. Static findings and clean builds are distinct from runtime evidence. Boot02 through Boot04 add bounded runtime observations, with limits stated in their reports. Boot01's exact DLL-to-source association remains unproven and exploratory; later frozen identities do not repair that evidence gap.

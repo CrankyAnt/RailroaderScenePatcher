@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: 2026 CrankyAnt
+# SPDX-License-Identifier: MIT
+# Selected telemetry. Raw timestamps and formatting are retained; other subscriptions and nodes are omitted.
+2026-11-08T21:54:22.0009095Z auto arm=True source=manual-ui
+2026-11-08T21:54:39.6808309Z auto phase=world-load generation=1
+2026-11-08T21:55:09.6885354Z auto phase=readiness timeout; no mutation attempted
+2026-11-08T21:55:50.4961370Z auto arm=True source=manual-ui
+2026-11-08T21:56:28.0410337Z auto phase=world-load generation=3
+2026-11-08T21:56:35.5729165Z auto phase=stable-ready seconds=5 origin=(4000.0000, 0.0000, 5000.0000)
+2026-11-08T21:56:35.5739169Z auto phase=readiness generation=3 ready=True; capture once
+2026-11-08T21:56:35.5959873Z capture registration bucket=Stvw expectedBucket=Stvw matchingObject=True matchingId=True matchingLocation=True location=<Stvw, B -> 51,204>
+2026-11-08T21:56:35.6015056Z baseline origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:56:35.6412516Z auto phase=baseline source=world-load
+2026-11-08T21:56:35.6422584Z auto baseline origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:56:35.6712573Z auto baseline node=World/Mile Posts/T-46 Origin pos=(21002.9200, 622.5887, -5914.9830) rot=(-0.0039, -0.6187, 0.0029, -0.7856) local=(25002.9200, 622.5887, -914.9828) active=True
+2026-11-08T21:56:35.6722582Z auto baseline placement offset=(3.20, 0.00, 0.00) angle=180 terrain=True oldEnabled=True newEnabled=True
+2026-11-08T21:56:35.6752542Z apply result=True origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:56:35.7017394Z apply result=True node=World/Mile Posts/T-46 Origin pos=(-26391.3300, 671.4081, -22160.5100) rot=(-0.0071, 0.8656, -0.0109, -0.5005) local=(-22391.3300, 671.4081, -17160.5100) active=True
+2026-11-08T21:56:35.7037427Z apply result=True placement offset=(2.00, 0.00, 1.00) angle=15 terrain=False oldEnabled=True newEnabled=True
+2026-11-08T21:56:35.7037427Z apply check registration bucket=Sn9f expectedBucket=Sn9f matchingObject=True matchingId=True matchingLocation=True location=<Sn9f, A -> 26,708>
+2026-11-08T21:56:35.7047401Z auto phase=apply returned=True dirty=True patched=True
+2026-11-08T21:56:35.7047401Z auto applied origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:56:35.7323855Z auto applied node=World/Mile Posts/T-46 Origin pos=(-26391.3300, 671.4081, -22160.5100) rot=(-0.0071, 0.8656, -0.0109, -0.5005) local=(-22391.3300, 671.4081, -17160.5100) active=True
+2026-11-08T21:56:35.7353862Z auto applied placement offset=(2.00, 0.00, 1.00) angle=15 terrain=False oldEnabled=True newEnabled=True
+2026-11-08T21:57:03.1569307Z apply result=True origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:57:03.1859642Z apply result=True node=World/Mile Posts/T-46 Origin pos=(-26391.3300, 671.4081, -22160.5100) rot=(-0.0071, 0.8656, -0.0109, -0.5005) local=(-22391.3300, 671.4081, -17160.5100) active=True
+2026-11-08T21:57:03.1869676Z apply result=True placement offset=(2.00, 0.00, 1.00) angle=15 terrain=False oldEnabled=True newEnabled=True
+2026-11-08T21:57:03.1879676Z apply check registration bucket=Sn9f expectedBucket=Sn9f matchingObject=True matchingId=True matchingLocation=True location=<Sn9f, A -> 26,708>
+2026-11-08T21:57:18.6494133Z explicit disabled origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:57:18.6885431Z explicit group off origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:57:18.7207883Z explicit disable callback
+2026-11-08T21:57:18.7212945Z explicit group on origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:57:34.0923722Z apply result=True origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:57:34.1216552Z apply result=True node=World/Mile Posts/T-46 Origin pos=(-26391.3300, 671.4081, -22160.5100) rot=(-0.0071, 0.8656, -0.0109, -0.5005) local=(-22391.3300, 671.4081, -17160.5100) active=True
+2026-11-08T21:57:34.1241688Z apply result=True placement offset=(2.00, 0.00, 1.00) angle=15 terrain=False oldEnabled=True newEnabled=True
+2026-11-08T21:57:34.1241688Z apply check registration bucket=Sn9f expectedBucket=Sn9f matchingObject=True matchingId=True matchingLocation=True location=<Sn9f, A -> 26,708>
+2026-11-08T21:57:34.1251673Z repeat explicit disabled origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:57:49.2708278Z toggle ERROR System.InvalidOperationException: Apply first with both groups enabled
+2026-11-08T21:58:34.9917922Z explicit disabled origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:58:35.0263675Z explicit group off origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:58:35.0579290Z explicit disable callback
+2026-11-08T21:58:35.0589285Z explicit group on origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Sn9f, A -> 26,708> observed=na-an observing=True nativeSubscriptions=1 patchSubscribed=True active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:58:51.8336140Z restored apply=False origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:58:51.8636549Z restored apply=False node=World/Mile Posts/T-46 Origin pos=(21002.9200, 622.5887, -5914.9830) rot=(-0.0039, -0.6187, 0.0029, -0.7856) local=(25002.9200, 622.5887, -914.9829) active=True
+2026-11-08T21:58:51.8646582Z restored apply=False placement offset=(3.20, 0.00, 0.00) angle=180 terrain=True oldEnabled=True newEnabled=True
+2026-11-08T21:58:51.8646582Z restore check registration bucket=Stvw expectedBucket=Stvw matchingObject=True matchingId=True matchingLocation=True location=<Stvw, B -> 51,204>
+2026-11-08T21:58:51.8661614Z restored toggle sy-db off origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=False hierarchy=False markerEnabled=True registrations=0
+2026-11-08T21:58:51.9037079Z restored toggle sy-db on origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:58:51.9392548Z restored toggle na-an off origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:58:51.9712966Z restored toggle na-an on origin=(4000.0000, 0.0000, 5000.0000) graph=923147080 location=<Stvw, B -> 51,204> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T21:58:51.9982833Z final check registration bucket=Stvw expectedBucket=Stvw matchingObject=True matchingId=True matchingLocation=True location=<Stvw, B -> 51,204>

@@ -1,0 +1,10 @@
+{
+  "checkedAtUtc": "2026-11-08T22:14:19.5852142Z",
+  "gameProcesses": 0,
+  "mods": 0,
+  "modDev": 0,
+  "saves": 0,
+  "preferencesMatchNeutral": true,
+  "preferencesSha256": "8335D93A45031F1C5D1825CBD3E201C37B354FE8B8A9D3EF7D19D73DA8AAB9A0",
+  "scope": "Isolated RuntimeHome only; no personal home or install-root mods changed"
+}

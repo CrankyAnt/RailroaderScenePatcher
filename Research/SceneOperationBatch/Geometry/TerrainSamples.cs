@@ -16,6 +16,7 @@ public sealed partial class TerrainOutputProbe
     private Delegate tileHandler;
     private int tileBuilds, buildsAtCapture;
     private readonly Dictionary<string, string> terrainBaselines = new Dictionary<string, string>();
+    private Vector3 TreeTarget() { return new Vector3(25772.99f, gamePosition.y, 393.795837f); }
 
     private void GuardIsolatedHome()
     {
@@ -75,7 +76,8 @@ public sealed partial class TerrainOutputProbe
             + " idle=" + terrainManager.GetType().GetMethod("IsTerrainWorkIdle", Instance).Invoke(terrainManager, null)
             + " tileBuildsSinceCapture=" + (tileBuilds - buildsAtCapture) + " frame=" + Time.frameCount
             + " observation=TerrainData-not-rendered-frame");
-        var centers = new[] { gamePosition, gamePosition + new Vector3(5, 0, 0) };
+        var centers = new[] { gamePosition, gamePosition + new Vector3(5, 0, 0), TreeTarget() };
+        Terrain originalTerrain = null;
         for (int site = 0; site < centers.Length; site++)
         {
             var point = ConvertPosition("GameToWorld", centers[site]);
@@ -84,8 +86,10 @@ public sealed partial class TerrainOutputProbe
                 && point.x < t.transform.position.x + t.terrainData.size.x
                 && point.z < t.transform.position.z + t.terrainData.size.z).ToArray();
             Write(phase + " site=" + site + " terrainMatches=" + terrains.Length);
-            if (terrains.Length != 1) throw new InvalidOperationException("Unique loaded terrain required at both output sites.");
+            if (terrains.Length != 1) throw new InvalidOperationException("Unique loaded terrain required at each output site.");
             var terrain = terrains[0];
+            if (site == 0) originalTerrain = terrain;
+            if (site == 2 && terrain != originalTerrain) throw new InvalidOperationException("Tree target is on a different terrain tile.");
             var data = terrain.terrainData;
             var normalized = point - terrain.transform.position;
             float u = normalized.x / data.size.x, v = normalized.z / data.size.z;
@@ -116,7 +120,8 @@ public sealed partial class TerrainOutputProbe
                 + " terrainData.id=" + data.GetInstanceID() + " treesInRadius=" + trees
                 + " radius=" + F(radius) + " sampledRows=" + rows.Count + " sha256=" + digest
                 + " equalsBaseline=" + (terrainBaselines.TryGetValue(key, out var baseline) && baseline == digest)
-                + " detailAndGPUOutput=not-sampled");
+                + " detailAndGPUOutput=separate-generated-tree-sample");
+            SampleGeneratedTrees(phase, terrain, site, point, radius);
         }
     }
 }

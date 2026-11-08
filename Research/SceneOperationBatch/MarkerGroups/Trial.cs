@@ -21,8 +21,83 @@ public sealed partial class MarkerGroups
     private bool subscribed;
     private int nativeBaseline;
     private int capturedScene;
+    private bool autoArmed, autoPending;
+    private int worldGeneration;
+    public void ToggleAutoArm()
+    {
+        if (!isolated || dirty || target != null || autoPending) { status = "Restore or release the capture before arming."; return; }
+        autoArmed = !autoArmed; Write("auto arm=" + autoArmed + " source=manual-ui");
+        status = autoArmed ? "Armed once for the next world load." : "Next-load arm cancelled.";
+    }
+    public void OnWorldLoaded()
+    {
+        worldGeneration++;
+        if (autoPending) { autoPending = false; autoArmed = false; Write("auto cancelled: another world-load callback arrived"); status = "Automatic trial cancelled; inspect log."; return; }
+        if (!autoArmed) return;
+        autoArmed = false;
+        if (!isolated || dirty || target != null || autoPending) { Write("auto rejected: isolation or prior capture"); status = "Automatic load rejected; inspect log."; return; }
+        autoPending = true; Write("auto phase=world-load generation=" + worldGeneration);
+        StartCoroutine(AutoWhenReady(worldGeneration));
+    }
+    private IEnumerator AutoWhenReady(int generation)
+    {
+        float deadline = Time.realtimeSinceStartup + 30f;
+        float stableSince = 0f;
+        object stableGraph = null;
+        Vector3 stableOrigin = Vector3.zero;
+        while (generation == worldGeneration && Time.realtimeSinceStartup < deadline)
+        {
+            bool ready = false;
+            object currentGraph = null;
+            Vector3 currentOrigin = Vector3.zero;
+            try
+            {
+                currentGraph = Read(TypeNamed("Track.Graph"), "Shared");
+                if (isolated && Convert.ToString(Read(TypeNamed("Game.ActiveMapDefinition"), "Identifier")) == "crankyant/scene-operations-map" && currentGraph != null)
+                {
+                    var m = At("World/Mile Posts/T-46 Origin", "Track.TrackMarker");
+                    var r = At("World/Mile Posts/T-46 Origin", "Track.TrackRelativePosition");
+                    var other = At("World/Mile Posts/T-93", "Track.TrackMarker");
+                    ready = m != null && r != null && other != null && Read(m, "Location") != null && Read(other, "Location") != null;
+                    if (ready) currentOrigin = Origin();
+                }
+            }
+            catch (Exception) { ready = false; }
+            if (!ready) { stableGraph = null; stableSince = 0f; }
+            else if (stableGraph == null || !ReferenceEquals(currentGraph, stableGraph) || (currentOrigin - stableOrigin).sqrMagnitude >= 0.0001f)
+            {
+                stableGraph = currentGraph; stableOrigin = currentOrigin; stableSince = Time.realtimeSinceStartup;
+            }
+            else if (Time.realtimeSinceStartup - stableSince >= 5f)
+            {
+                Write("auto phase=stable-ready seconds=5 origin=" + currentOrigin.ToString("F4"));
+                RunAutomatic(generation);
+                yield break;
+            }
+            yield return null;
+        }
+        if (generation == worldGeneration) { autoPending = false; Write("auto phase=readiness timeout; no mutation attempted"); status = "Automatic readiness timed out; no mutation."; }
+    }
+    private void RunAutomatic(int generation)
+    {
+        try
+        {
+            Write("auto phase=readiness generation=" + generation + " ready=True; capture once");
+            Capture();
+            if (target == null || dirty) { Write("auto phase=capture rejected; no mutation attempted"); return; }
+            Write("auto phase=baseline source=world-load");
+            Snapshot("auto baseline");
+            bool ok = ApplyTrial();
+            Write("auto phase=apply returned=" + ok + " dirty=" + dirty + " patched=" + patched);
+            if (ok) Snapshot("auto applied");
+        }
+        catch (Exception e) { Write("auto ERROR " + e); status = dirty ? "Automatic trial failed; restore or discard." : "Automatic preflight failed; no mutation."; }
+        finally { autoPending = false; }
+    }
     public void OnUnload()
     {
+        worldGeneration++; autoPending = false;
+        if (dirty) autoArmed = false;
         try { if (subscribed) RemoveHandler(); if (dirty) Write("UNLOADED DIRTY: restoration was not verified; discard this session"); }
         catch (Exception e) { Write("unload cleanup ERROR " + e); }
         finally { DropCapture(); status = "World unloaded. Prior trial cannot be restored."; }
@@ -128,7 +203,7 @@ public sealed partial class MarkerGroups
     private void RemoveHandler() { if (subscribed) { groupEvent.RemoveEventHandler(graph, disableHandler); subscribed = false; } }
     private void AddHandler() { if (!subscribed) { groupEvent.AddEventHandler(graph, disableHandler); subscribed = true; } }
     private void EnforceDisable(string group, bool enabled) { if (explicitDisable && group == newGroup && enabled && target != null) { target.gameObject.SetActive(false); Write("explicit disable callback"); } }
-    private void ApplyTrial()
+    private bool ApplyTrial()
     {
         try
         {
@@ -140,8 +215,9 @@ public sealed partial class MarkerGroups
             Snapshot("apply result=" + ok); if (!ok || Convert.ToString(Read(relative, "_observedGroupId")) != newGroup || NativeSubscriptions() != 1 || Registrations("apply check", destinationLocation) != 1) throw new InvalidOperationException("Apply postcondition failed");
             if (retainDisable) { AddHandler(); target.gameObject.SetActive(false); Snapshot("repeat explicit disabled"); }
             status = "Applied. Repeat or toggle groups, then restore.";
+            return true;
         }
-        catch (Exception e) { Write("apply ERROR " + e); status = "Apply failed. Restore or abandon without saving."; }
+        catch (Exception e) { Write("apply ERROR " + e); status = "Apply failed. Restore or abandon without saving."; return false; }
     }
     private void SetGroup(string group, bool enabled) { graph.GetType().GetMethod("SetGroupEnabled", Flags).Invoke(graph, new object[] { group, enabled }); }
     private void ToggleTrial()

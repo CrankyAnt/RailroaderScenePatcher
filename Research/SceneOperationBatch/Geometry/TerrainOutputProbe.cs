@@ -108,6 +108,50 @@ public sealed partial class TerrainOutputProbe : MonoBehaviour
         try { CheckCapture(); if (!root.gameObject.activeInHierarchy) throw new InvalidOperationException("Board inactive."); dirty = true; root.position = ConvertPosition("GameToWorld", gamePosition + new Vector3(5, 0, 0)); root.rotation = Quaternion.Euler(0, 15, 0) * baselineRotation; Refresh(); Snapshot("moved immediate", root, culler, mask); SampleTerrain("moved immediate"); status = "Moved. Wait, snapshot and restore; never save."; }
         catch (Exception e) { Write("move ERROR " + e); status = "Move failed. Restore, then abandon without saving."; }
     }
+    private void MoveToTree()
+    {
+        try
+        {
+            CheckCapture();
+            if (!root.gameObject.activeInHierarchy || !((Behaviour)culler).enabled || !((Behaviour)mask).enabled)
+                throw new InvalidOperationException("Board and consumers must be active.");
+            if (Mathf.Abs(Convert.ToSingle(Field(mask, "radius"), CultureInfo.InvariantCulture) - 1.5f) > 0.001f
+                || Mathf.Abs(Convert.ToSingle(Field(mask, "falloff"), CultureInfo.InvariantCulture) - 1f) > 0.001f)
+                throw new InvalidOperationException("Unexpected mask radius or falloff.");
+            Vector3 target = TreeTarget();
+            Vector3 delta = target - gamePosition;
+            if (delta.x * delta.x + delta.z * delta.z > 10000f || !targetHasBaselineTree)
+                throw new InvalidOperationException("Target is outside 100m or lacks a captured baseline tree in the mask radius.");
+            Vector3 current = ConvertPosition("WorldToGame", root.position);
+            if (((current - gamePosition).sqrMagnitude > 0.0001f && (current - target).sqrMagnitude > 0.0001f)
+                || Quaternion.Angle(root.rotation, baselineRotation) > 0.01f)
+                throw new InvalidOperationException("Restore baseline before moving to the tree target.");
+            if (!(bool)terrainManager.GetType().GetMethod("IsTerrainWorkIdle", Instance).Invoke(terrainManager, null)
+                || Convert.ToInt32(Property(terrainManager, "PendingInvalidationCount"), CultureInfo.InvariantCulture) != 0)
+                throw new InvalidOperationException("Wait for terrain work to become idle.");
+            var targets = (IEnumerable)Field(mask, "maskTargets");
+            if (targets == null || !targets.Cast<object>().Any(t => t != null
+                && Convert.ToString(Field(t, "kind")) == "Mask" && Convert.ToString(Field(t, "maskName")) == "CutTrees"
+                && Convert.ToSingle(Field(t, "value"), CultureInfo.InvariantCulture) == 1f))
+                throw new InvalidOperationException("CutTrees target is not configured.");
+            var modifiers = (IDictionary)Field(Field(terrainManager, "_maskModifiers"), "_modifiers");
+            var keys = ((IEnumerable)Field(mask, "_modifierKeys")).Cast<object>().Select(Convert.ToString).ToArray();
+            if (!keys.Any(k => modifiers.Contains(k) && Convert.ToString(Field(modifiers[k], "MaskName")) == "CutTrees"
+                && Convert.ToSingle(Field(modifiers[k], "Value"), CultureInfo.InvariantCulture) == 1f
+                && Property(modifiers[k], "Mask") != null))
+                throw new InvalidOperationException("Active CutTrees modifier is not registered.");
+            SampleTerrain("tree preflight");
+            if (!targetPreflightReady) throw new InvalidOperationException("Target baseline trees or loaded GPUI consumer changed.");
+            dirty = true;
+            root.position = ConvertPosition("GameToWorld", target);
+            root.rotation = baselineRotation;
+            Refresh();
+            Snapshot("tree target immediate", root, culler, mask);
+            SampleTerrain("tree target immediate");
+            status = "Tree target requested. Wait, snapshot and restore; never save.";
+        }
+        catch (Exception e) { Write("tree target ERROR " + e); status = "Tree target failed. Restore if needed; never save."; }
+    }
     private void Current()
     {
         try { CheckCapture(); Snapshot("current", root, culler, mask); SampleTerrain("current"); status = dirty ? "Current snapshot recorded. Restore before leaving." : "Current snapshot recorded."; }
@@ -127,5 +171,5 @@ public sealed partial class TerrainOutputProbe : MonoBehaviour
         catch (Exception e) { Write("restore ERROR " + e); status = "Restore failed. Abandon without saving."; }
     }
     private void Toggle() { try { CheckCapture(); dirty = true; root.gameObject.SetActive(!root.gameObject.activeSelf); Write("toggle activeSelf=" + root.gameObject.activeSelf); Snapshot("toggle", root, culler, mask); SampleTerrain("toggle immediate"); status = "Activity changed. Toggle again or restore; never save."; } catch (Exception e) { Write("toggle ERROR " + e); status = "Toggle failed; restore and abandon without saving."; } }
-    private void OnGUI() { window = GUI.Window(0x42445032, window, id => { GUILayout.Label(status); if (GUILayout.Button("Open pause menu")) Pause(); if (GUILayout.Button("Focus board")) Focus(); if (GUILayout.Button("Capture baseline")) Capture();  if (GUILayout.Button("Move or repeat baseline +5m/+15 degrees")) Move(); if (GUILayout.Button("Snapshot current")) Current(); if (GUILayout.Button("Toggle board activity")) Toggle(); if (GUILayout.Button("Restore captured game pose")) Restore(); if (dirty) GUILayout.Label("Restore before leaving. Never save."); GUI.DragWindow(new Rect(0, 0, 10000, 20)); }, "Board Continuation Probe"); }
+    private void OnGUI() { window = GUI.Window(0x42445032, window, id => { GUILayout.Label(status); if (GUILayout.Button("Open pause menu")) Pause(); if (GUILayout.Button("Focus board")) Focus(); if (GUILayout.Button("Capture baseline")) Capture();  if (GUILayout.Button("Move or repeat baseline +5m/+15 degrees")) Move(); if (GUILayout.Button("Move to observed tree")) MoveToTree(); if (GUILayout.Button("Snapshot current")) Current(); if (GUILayout.Button("Toggle board activity")) Toggle(); if (GUILayout.Button("Restore captured game pose")) Restore(); if (dirty) GUILayout.Label("Restore before leaving. Never save."); GUI.DragWindow(new Rect(0, 0, 10000, 20)); }, "Board Continuation Probe"); }
 }

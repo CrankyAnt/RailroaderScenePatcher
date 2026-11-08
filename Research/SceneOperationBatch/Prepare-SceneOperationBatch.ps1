@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [switch]$Install,
-    [switch]$UserPresent
+    [switch]$RuntimeAuthorized
 )
 $ErrorActionPreference = 'Stop'
 $repository = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -21,7 +21,7 @@ function Assert-Hash([string]$Path, [string]$Expected) {
 Assert-Hash (Join-Path $managed 'Railroader.dll') '8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E'
 Assert-Hash (Join-Path $managed 'Map.Runtime.dll') '9C52BD1FA8AA6D3D4417484F2002F985F6F4E01CBCD3C96E7675C4F19B8F0767'
 Assert-Hash (Join-Path $fixture 'Data\Map.json') '36A99A8EBB6E2198C28D3C6D4AA2C859CE70B1F85E0D4E14243FA6837C9029AE'
-if ($Install -and !$UserPresent) { throw 'Installation requires the owning user to be present. Use -UserPresent only during that session.' }
+if ($Install -and !$RuntimeAuthorized) { throw 'Installation requires authorization for the isolated runtime session. Pass -RuntimeAuthorized only within that authorization.' }
 if ($Install -and (Get-Process -Name Railroader -ErrorAction SilentlyContinue)) { throw 'Close Railroader before installation.' }
 
 $packs = @(

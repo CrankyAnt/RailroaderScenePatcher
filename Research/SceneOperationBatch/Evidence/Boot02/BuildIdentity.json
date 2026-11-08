@@ -1,0 +1,131 @@
+{
+  "evidenceKind": "build-only; no loader or runtime trial",
+  "sourceFiles": [
+    {
+      "path": "CrossingPad/CrossingPadProbe.cs",
+      "sha256": "72BDF2BEA646974207F8F616B919582354C6B4CD58BA2AB1604BADF350C22AC6"
+    },
+    {
+      "path": "CrossingPad/CrossingPadProbe.csproj",
+      "sha256": "5C09644728B797CA31F177D291C32B865E9261C83019BF1F92F2F258BB6778F4"
+    },
+    {
+      "path": "CrossingPad/Info.json",
+      "sha256": "67E4343BE6F783C2B8434139B8DE459C96BB5E07EB718A600576CD24747C8CAB"
+    },
+    {
+      "path": "Geometry/BridgeContactInfo.json",
+      "sha256": "D8324A6CA642E8C7236779EF8F21C3E35093341BD2622732132D78FB5BF3CC47"
+    },
+    {
+      "path": "Geometry/BridgeContactProbe.cs",
+      "sha256": "A336FA619D28480754D9BB5659530586A9D35A2B2369B2CF579AA1E8E178EF5C"
+    },
+    {
+      "path": "Geometry/BridgeContactProbe.csproj",
+      "sha256": "DA3E2DB8207007A3E21A2F607189B91C08A6BA95985F767AB81D382144A9D03A"
+    },
+    {
+      "path": "Geometry/BridgeSceneryState.cs",
+      "sha256": "A6188F1E5CBE2F33758E0E2043DFB7AF75195F93E38F08BAA4939ED8BFDDB536"
+    },
+    {
+      "path": "Geometry/TerrainOutputInfo.json",
+      "sha256": "1AA5D03825C80C55C4F7A58531412EE7C77A5C9DAD025039FBF0DAE045496377"
+    },
+    {
+      "path": "Geometry/TerrainOutputProbe.cs",
+      "sha256": "3C7C46A549BB68C5F0E6CE39DE1EB7624C9AF8714AB9379D870B0CD33A269093"
+    },
+    {
+      "path": "Geometry/TerrainOutputProbe.csproj",
+      "sha256": "007698C0A327FCAD789F933C8492EEAB47B52C4A82A4A875D4F068D7624DCAF4"
+    },
+    {
+      "path": "Geometry/TerrainSamples.cs",
+      "sha256": "587CF95B8835CFFECD9B65B154E994CC6478694E12AE55E37EF8A2B5C062676E"
+    },
+    {
+      "path": "Geometry/TerrainTreeOutput.cs",
+      "sha256": "A2873A376583218DE0F3DCFF85EC8CAFD66F40232D9471DAA910822CDEBBA57C"
+    },
+    {
+      "path": "MarkerGroups/Info.json",
+      "sha256": "7E184800712EAC9FDE94525A65F3FD5478678BC9B965087D08D033E278A3C3CF"
+    },
+    {
+      "path": "MarkerGroups/MarkerGroups.cs",
+      "sha256": "E83E77CD18F088A313F403B797E536DF16D7F521C652691243EFB7BF10B14F4C"
+    },
+    {
+      "path": "MarkerGroups/MarkerGroups.csproj",
+      "sha256": "E9F2A6362EEBB79F56E455FD09A4AF9B8AE458CC17218188E2EC2A88E1BF4FBF"
+    },
+    {
+      "path": "MarkerGroups/Trial.cs",
+      "sha256": "B2EEAC658F394807F918BE4843C5096568D5FF0417AD20173BCEEDCFF2D82E79"
+    },
+    {
+      "path": "Milepost/Info.json",
+      "sha256": "0D9050A603F19B0A9C29B4858674CA61C0015D249D99B6D74C10BC855BD11FFF"
+    },
+    {
+      "path": "Milepost/MilepostProbe.cs",
+      "sha256": "828F22ADB12FE8999A7275488CD42FD7799D0156FF65A75524D391C04AE2338B"
+    },
+    {
+      "path": "Milepost/MilepostProbe.csproj",
+      "sha256": "0969E0AAB58A6E6AFD69712569C58DFEA11104CEC20E674C523979503DCA60D4"
+    },
+    {
+      "path": "Prepare-SceneOperationBatch.ps1",
+      "sha256": "91BFB5030BE602FF2FE6C254425D9AD8F8C2F20BEC2D6B35B6735C3531A7BFF2"
+    }
+  ],
+  "fixtureFiles": [
+    {
+      "path": "Info.json",
+      "sha256": "590D4B7A28C7343E1A50E30D101C172373BFC34797CD213AE261B2D63A151D08"
+    },
+    {
+      "path": "Definitions.json",
+      "sha256": "0C34D360EBF250163A21448E21F2AEB5315D83BD7C6D8A3C4DB014D2F5C2446B"
+    },
+    {
+      "path": "Data/Map.json",
+      "sha256": "36A99A8EBB6E2198C28D3C6D4AA2C859CE70B1F85E0D4E14243FA6837C9029AE"
+    }
+  ],
+  "packs": [
+    {
+      "folder": "MarkerGroups",
+      "assembly": "MarkerGroups.dll",
+      "dllSha256": "75D6614AB72D033439DF3BDD8DB5AE59636FA80CA780A2D94B027FFCA9C9F141",
+      "infoSha256": "7E184800712EAC9FDE94525A65F3FD5478678BC9B965087D08D033E278A3C3CF"
+    },
+    {
+      "folder": "MilepostProbe",
+      "assembly": "MilepostProbe.dll",
+      "dllSha256": "4763FAEC02846D7CD2CF1DAB7B8C8A411E41D2675E7847CA7D7D04EFCC016B3D",
+      "infoSha256": "0D9050A603F19B0A9C29B4858674CA61C0015D249D99B6D74C10BC855BD11FFF"
+    },
+    {
+      "folder": "CrossingPadProbe",
+      "assembly": "CrossingPadProbe.dll",
+      "dllSha256": "C8B24771457BF130CAE7E713A40E80F3B99D9B7421CB96F9743ABB333B19E558",
+      "infoSha256": "67E4343BE6F783C2B8434139B8DE459C96BB5E07EB718A600576CD24747C8CAB"
+    },
+    {
+      "folder": "BridgeContactProbe",
+      "assembly": "BridgeContactProbe.dll",
+      "dllSha256": "2BC76294F9BA7DE17038AD8C15489E1CC38C5FEC8C670424DD438DB31ED2F3D9",
+      "infoSha256": "D8324A6CA642E8C7236779EF8F21C3E35093341BD2622732132D78FB5BF3CC47"
+    },
+    {
+      "folder": "TerrainOutputProbe",
+      "assembly": "TerrainOutputProbe.dll",
+      "dllSha256": "17EAA5B309C234D35112904FEE7EF7931A17679C29C9A2317AFA5CC327A06CB1",
+      "infoSha256": "1AA5D03825C80C55C4F7A58531412EE7C77A5C9DAD025039FBF0DAE045496377"
+    }
+  ]
+}

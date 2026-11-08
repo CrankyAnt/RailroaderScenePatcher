@@ -32,7 +32,7 @@ public sealed class MilepostProbe25 : MonoBehaviour
     private int stage;
     private int frame, originSceneHandle, dependentSceneHandle;
     private void Write(string s) { File.AppendAllText(log, DateTime.UtcNow.ToString("O") + " " + s + Environment.NewLine); }
-    public void Init(string dir) { modDirectory = dir; log = Path.Combine(dir, "MilepostProbe25.log"); Write("loaded"); }
+    public void Init(string dir) { modDirectory = dir; log = Path.Combine(dir, "MilepostProbe25.log"); Write("loaded homedirArgumentCount=" + Environment.GetCommandLineArgs().Count(a => string.Equals(a, "-homedir", StringComparison.OrdinalIgnoreCase))); }
     private static Type TypeOf(string n) { return AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType(n, false)).First(t => t != null); }
     private static object Read(object o, string n) { var t = o as Type ?? o.GetType(); var obj = o is Type ? null : o; var f = t.GetField(n, F); if (f != null) return f.GetValue(obj); var p = t.GetProperty(n, F); if (p != null) return p.GetValue(obj, null); throw new MissingMemberException(t.FullName, n); }
     private static string PathOf(Transform t) { return t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name; }
@@ -86,7 +86,7 @@ public sealed class MilepostProbe25 : MonoBehaviour
         {
             const string home = @"C:\TMP\RailroaderMapResearch\RuntimeHome";
             var args = Environment.GetCommandLineArgs(); var matches = Enumerable.Range(0, args.Length).Where(i => string.Equals(args[i], "-homedir", StringComparison.OrdinalIgnoreCase)).ToArray();
-            return matches.Length == 1 && matches[0] + 1 < args.Length
+            return matches.Length > 0 && matches[0] + 1 < args.Length
                 && string.Equals(FullPath(args[matches[0] + 1]), FullPath(home), StringComparison.OrdinalIgnoreCase)
                 && string.Equals(FullPath(modDirectory), FullPath(Path.Combine(home, "Mods", "MilepostProbe")), StringComparison.OrdinalIgnoreCase);
         }
@@ -136,6 +136,20 @@ public sealed class MilepostProbe25 : MonoBehaviour
         else if (phase == "restored" && (stableBaseline != a + "\n" + b || textBaseline != text || groupBaseline != groups)) throw new InvalidOperationException("Restored state differs from baseline");
         var s = Read(marker, "_location"); Write(phase + " binding segment=" + Read(s, "segmentId") + " distance=" + Read(s, "distance") + " end=" + Read(s, "end"));
     }
+    private void FocusDependent()
+    {
+        if (stage != 0 || initialized) throw new InvalidOperationException("Focus is available only before capture");
+        if (!CorrectHome() || Convert.ToString(Read(TypeOf("Game.ActiveMapDefinition"), "Identifier")) != "crankyant/scene-operations-map") throw new InvalidOperationException("Wrong test home or map");
+        var post = One("World/Mile Posts/T-47", "Helpers.MilePost");
+        var cameraType = TypeOf("CameraSelector"); var selector = Read(cameraType, "shared") ?? throw new InvalidOperationException("Camera selector unavailable");
+        var identifier = cameraType.GetNestedType("CameraIdentifier", F) ?? throw new InvalidOperationException("Camera identifier unavailable");
+        var strategy = Enum.Parse(identifier, "Strategy");
+        var toGame = TypeOf("Helpers.WorldTransformer").GetMethod("WorldToGame", F, null, new[] { typeof(Vector3) }, null) ?? throw new MissingMethodException("WorldToGame(Vector3)");
+        var position = (Vector3)toGame.Invoke(null, new object[] { post.transform.position });
+        cameraType.GetMethod("JumpToPoint").Invoke(selector, new object[] { position, Quaternion.identity, strategy });
+        Write("focus T-47 requested; allow floating origin to settle before capture");
+        status = "Focus requested. Allow the origin to settle before capture.";
+    }
     private void StartTrial()
     {
         if (stage != 0) throw new InvalidOperationException("Trial already active");
@@ -175,5 +189,5 @@ public sealed class MilepostProbe25 : MonoBehaviour
         catch (Exception e) { Write("RESTORE ERROR " + e); status = "Restore failed. Abandon disposable session without saving."; }
     }
     private void Do(Action action) { try { action(); } catch (Exception e) { Write("ERROR " + e); status = "Trial failed. Abandon disposable session without saving."; Abort(); } }
-    private void OnGUI() { window = GUI.Window(0x43524d50, window, id => { GUILayout.Label(status); if (stage == 0 && GUILayout.Button("Capture baseline and populate cache")) Do(StartTrial); if (stage == 1 && GUILayout.Button("Apply alternative binding")) Do(Apply); if ((stage == 2 || stage == 4 || stage == 6) && GUILayout.Button("Capture observed phase")) Do(Observe); if (stage == 3 && GUILayout.Button("Repeat binding")) Do(Repeat); if (stage == 5 && GUILayout.Button("Restore binding")) Do(Restore); if (stage > 0 && GUILayout.Button("Abort and restore")) Abort(); GUI.DragWindow(); }, "Milepost Probe 25"); }
+    private void OnGUI() { window = GUI.Window(0x43524d50, window, id => { GUILayout.Label(status); if (stage == 0 && GUILayout.Button("Focus T-47")) Do(FocusDependent); if (stage == 0 && GUILayout.Button("Capture baseline and populate cache")) Do(StartTrial); if (stage == 1 && GUILayout.Button("Apply alternative binding")) Do(Apply); if ((stage == 2 || stage == 4 || stage == 6) && GUILayout.Button("Capture observed phase")) Do(Observe); if (stage == 3 && GUILayout.Button("Repeat binding")) Do(Repeat); if (stage == 5 && GUILayout.Button("Restore binding")) Do(Restore); if (stage > 0 && GUILayout.Button("Abort and restore")) Abort(); GUI.DragWindow(); }, "Milepost Probe 25"); }
 }

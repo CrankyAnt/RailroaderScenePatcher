@@ -11,7 +11,7 @@ public sealed class MarkerGroupsEntry : IModEntryPoint, IWorldLifecycle
 {
     private GameObject host;
     public void OnModLoad(IModContext context) { host = new GameObject("CrankyAnt MarkerGroups"); UnityEngine.Object.DontDestroyOnLoad(host); host.AddComponent<MarkerGroups>().Initialize(context.ModDirectory); }
-    public void OnWorldLoad() { }
+    public void OnWorldLoad() { if (host != null) host.GetComponent<MarkerGroups>().OnWorldLoaded(); }
     public void OnWorldUnload() { if (host != null) host.GetComponent<MarkerGroups>().OnUnload(); }
     public void OnModUnload() { if (host != null) { host.GetComponent<MarkerGroups>().OnUnload(); UnityEngine.Object.Destroy(host); } }
 }
@@ -69,5 +69,25 @@ public sealed partial class MarkerGroups : MonoBehaviour
         }
         catch (Exception e) { Write("scan error=" + e); status = "Scan failed. Inspect log."; }
     }
-    private void OnGUI() { window = GUI.Window(0x434d4752, window, id => { GUILayout.Label(status); if (GUILayout.Button("Scan group followers")) Scan(); if (GUILayout.Button("Capture trial baseline")) Capture(); if (GUILayout.Button("Rebind and apply / repeat")) ApplyTrial(); if (GUILayout.Button("Toggle old and new groups")) ToggleTrial(); if (GUILayout.Button("Test explicit disable")) DisableTrial(); if (GUILayout.Button("Restore trial")) RestoreTrial(); if (dirty) GUILayout.Label("Dirty: restore before leaving. Never save."); GUI.DragWindow(); }, "Marker groups trial"); }
+    private void FocusMarker()
+    {
+        try
+        {
+            if (!isolated || target != null || dirty) throw new InvalidOperationException("Focus requires an isolated world without a captured trial");
+            if (Convert.ToString(Read(TypeNamed("Game.ActiveMapDefinition"), "Identifier")) != "crankyant/scene-operations-map") throw new InvalidOperationException("Wrong map");
+            var found = At("World/Mile Posts/T-46 Origin", "Track.TrackMarker");
+            if (Convert.ToString(Read(found, "id")) != "Mdow") throw new InvalidOperationException("Marker identity differs");
+            var world = TypeNamed("Helpers.WorldTransformer");
+            var toGame = world.GetMethod("WorldToGame", BindingFlags.Static | BindingFlags.Public, null, new[] { typeof(Vector3) }, null) ?? throw new MissingMethodException("WorldToGame");
+            var position = (Vector3)toGame.Invoke(null, new object[] { found.transform.position });
+            var camera = TypeNamed("CameraSelector");
+            var selector = Read(camera, "shared") ?? throw new InvalidOperationException("Camera unavailable");
+            var mode = Enum.Parse(camera.GetNestedType("CameraIdentifier", BindingFlags.Public | BindingFlags.NonPublic), "Strategy");
+            camera.GetMethod("JumpToPoint").Invoke(selector, new object[] { position, Quaternion.identity, mode });
+            Write("focus T-46 gamePosition=" + position.ToString("F4"));
+            status = "Focus requested. Wait for origin to settle before capture.";
+        }
+        catch (Exception e) { Write("focus ERROR " + e); status = "Focus failed. Inspect log."; }
+    }
+    private void OnGUI() { window = GUI.Window(0x434d4752, window, id => { GUILayout.Label(status); GUILayout.Label(autoPending ? "Automatic preflight waiting" : autoArmed ? "Next world load armed" : "Automatic application off"); if (!autoPending) { if (GUILayout.Button(autoArmed ? "Cancel next-load arm" : "Arm next world load")) ToggleAutoArm(); if (GUILayout.Button("Scan group followers")) Scan(); if (GUILayout.Button("Focus T-46 before capture")) FocusMarker(); if (GUILayout.Button("Capture trial baseline")) Capture(); if (GUILayout.Button("Rebind and apply / repeat")) ApplyTrial(); if (GUILayout.Button("Toggle old and new groups")) ToggleTrial(); if (GUILayout.Button("Test explicit disable")) DisableTrial(); if (GUILayout.Button("Restore trial")) RestoreTrial(); } if (dirty) GUILayout.Label("Dirty: restore before leaving. Never save."); GUI.DragWindow(); }, "Marker groups trial"); }
 }
