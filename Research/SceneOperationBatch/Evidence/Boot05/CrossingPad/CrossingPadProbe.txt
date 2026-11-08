@@ -1,0 +1,53 @@
+2026-11-08T23:23:28.9259627Z loaded isolated=True
+2026-11-08T23:25:06.5548622Z focus game=(16510.47000, 569.52400, 2295.20400)
+2026-11-08T23:26:07.8221241Z baseline registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:26:07.8231241Z baseline registrations=1
+2026-11-08T23:26:07.8241258Z baseline marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=185,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:26:07.8241258Z baseline builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(0.00, 0.25, 0.00) radius=4,307296 token=1411746498
+2026-11-08T23:26:07.8241258Z baseline culler index=198 removed=False sphere=(510.47070, 569.77400, 295.20450) radius=4,307296
+2026-11-08T23:26:07.8251236Z baseline mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-224120 vertices=1300 hash=E6846278CF9A927E bounds=Center: (0.00, 0.25, 0.00), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:26:25.2249632Z rebound registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:26:25.2249632Z rebound registrations=1
+2026-11-08T23:26:25.2259651Z rebound marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=186,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:26:25.2264693Z rebound builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(0.00, 0.25, 0.00) radius=4,307296 token=1411746498
+2026-11-08T23:26:25.2264693Z rebound culler index=198 removed=False sphere=(510.47070, 569.77400, 295.20450) radius=4,307296
+2026-11-08T23:26:25.2264693Z rebound mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-224120 vertices=1300 hash=E6846278CF9A927E bounds=Center: (0.00, 0.25, 0.00), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:26:42.2598011Z observation registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:26:42.2598011Z observation registrations=1
+2026-11-08T23:26:42.2608009Z observation marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=186,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:26:42.2608009Z observation builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(0.00, 0.25, 0.00) radius=4,307296 token=1411746498
+2026-11-08T23:26:42.2608009Z observation culler index=198 removed=False sphere=(510.47070, 569.77400, 295.20450) radius=4,307296
+2026-11-08T23:26:42.2623027Z observation mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-224120 vertices=1300 hash=E6846278CF9A927E bounds=Center: (0.00, 0.25, 0.00), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:26:57.5335848Z explicit-generate registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:26:57.5335848Z explicit-generate registrations=1
+2026-11-08T23:26:57.5345845Z explicit-generate marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=186,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:26:57.5345845Z explicit-generate builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(1.00, 0.25, -0.04) radius=4,307296 token=1411746498
+2026-11-08T23:26:57.5345845Z explicit-generate culler index=198 removed=False sphere=(511.46290, 569.77400, 295.16760) radius=4,307296
+2026-11-08T23:26:57.5360877Z explicit-generate mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-224120 vertices=1300 hash=E6846278CF9A927E bounds=Center: (0.00, 0.25, 0.00), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:26:57.5376001Z explicit-generate mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-410368 vertices=1300 hash=42D2D42A024C5E96 bounds=Center: (1.00, 0.25, -0.04), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:27:15.6661737Z observation registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:27:15.6671817Z observation registrations=1
+2026-11-08T23:27:15.6671817Z observation marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=186,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:27:15.6681812Z observation builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(1.00, 0.25, -0.04) radius=4,307296 token=1411746498
+2026-11-08T23:27:15.6681812Z observation culler index=198 removed=False sphere=(511.46290, 569.77400, 295.16760) radius=4,307296
+2026-11-08T23:27:15.6721821Z observation mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-410368 vertices=1300 hash=42D2D42A024C5E96 bounds=Center: (1.00, 0.25, -0.04), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:27:32.7346125Z binding-restored-before-generate registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:27:32.7346125Z binding-restored-before-generate registrations=1
+2026-11-08T23:27:32.7361159Z binding-restored-before-generate marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=185,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:27:32.7371197Z binding-restored-before-generate builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(1.00, 0.25, -0.04) radius=4,307296 token=1411746498
+2026-11-08T23:27:32.7371197Z binding-restored-before-generate culler index=198 removed=False sphere=(511.46290, 569.77400, 295.16760) radius=4,307296
+2026-11-08T23:27:32.7371197Z binding-restored-before-generate mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-410368 vertices=1300 hash=42D2D42A024C5E96 bounds=Center: (1.00, 0.25, -0.04), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:27:41.2031882Z explicit-generate registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:27:41.2031882Z explicit-generate registrations=1
+2026-11-08T23:27:41.2041886Z explicit-generate marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=185,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:27:41.2041886Z explicit-generate builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(0.00, 0.25, 0.00) radius=4,307296 token=1411746498
+2026-11-08T23:27:41.2051864Z explicit-generate culler index=198 removed=False sphere=(510.47070, 569.77400, 295.20450) radius=4,307296
+2026-11-08T23:27:41.2051864Z explicit-generate mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-410368 vertices=1300 hash=42D2D42A024C5E96 bounds=Center: (1.00, 0.25, -0.04), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:27:41.2061899Z explicit-generate mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-410378 vertices=1300 hash=E6846278CF9A927E bounds=Center: (0.00, 0.25, 0.00), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:30:12.7652182Z verify-restoration registration bucket=Sj7c sameMarker=True sameLocation=True
+2026-11-08T23:30:12.7662196Z verify-restoration registrations=1
+2026-11-08T23:30:12.7662196Z verify-restoration marker=World/Roads Wilmot/Crossing Unprotected/Crossing Pad segment=Sj7c end=A distance=185,9477 pose=(510.46680, 569.52400, 295.20410) target=World/Roads Wilmot/Crossing Unprotected/Crossing Pad pos=(510.46680, 569.52400, 295.20410) rot=(0.00000, 0.72010, 0.00000, 0.69387) origin=(16000.00000, 0.00000, 2000.00000) group= observing=False
+2026-11-08T23:30:12.7662196Z verify-restoration builderEnabled=True container=World/Roads Wilmot/Crossing Unprotected/Crossing Pad localCenter=(0.00, 0.25, 0.00) radius=4,307296 token=1411746498
+2026-11-08T23:30:12.7662196Z verify-restoration culler index=198 removed=False sphere=(510.47070, 569.77400, 295.20450) radius=4,307296
+2026-11-08T23:30:12.7677690Z verify-restoration mesh=World/Roads Wilmot/Crossing Unprotected/Crossing Pad/Curve Mesh object=-410378 vertices=1300 hash=E6846278CF9A927E bounds=Center: (0.00, 0.25, 0.00), Extents: (4.05, 0.15, 1.46) transform=(510.46680, 569.52400, 295.20410) rotation=(0.00000, 0.00000, 0.00000, 1.00000) renderer=True
+2026-11-08T23:30:12.7677690Z restoration contentAndSphereMatch=True

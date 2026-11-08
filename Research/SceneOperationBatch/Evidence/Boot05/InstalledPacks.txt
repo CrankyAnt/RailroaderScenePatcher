@@ -1,0 +1,14 @@
+{
+  "sourceInputs": 21,
+  "capturePhase": "frozen before launch",
+  "otherStagedPacksNotInstalled": [
+    "MilepostProbe",
+    "BridgeContactProbe",
+    "TerrainOutputProbe"
+  ],
+  "fixture": "crankyant/scene-operations-map",
+  "installedPacks": [
+    "MarkerGroups",
+    "CrossingPadProbe"
+  ]
+}

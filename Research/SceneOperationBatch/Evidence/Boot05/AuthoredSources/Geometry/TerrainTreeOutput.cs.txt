@@ -1,0 +1,87 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.CompilerServices;
+using UnityEngine;
+
+public sealed partial class TerrainOutputProbe
+{
+    private readonly Dictionary<int, string> generatedTreeBaselines = new Dictionary<int, string>();
+    private bool targetHasBaselineTree;
+    private string targetBaselineCoreDigest;
+    private bool targetPreflightReady;
+
+    private void SampleGeneratedTrees(string phase, Terrain terrain, int site, Vector3 point, float radius)
+    {
+        if (phase == "baseline" && site == 0) { generatedTreeBaselines.Clear(); targetHasBaselineTree = false; targetBaselineCoreDigest = null; }
+        if (phase == "tree preflight" && site == 0) targetPreflightReady = false;
+        var mapTerrain = terrain.GetComponent(TypeNamed("Map.Runtime.MapTerrain"));
+        var gpui = terrain.GetComponent(TypeNamed("Map.Runtime.RailroaderGPUITerrain"));
+        if (mapTerrain == null || gpui == null)
+            throw new InvalidOperationException("Generated tree association missing: MapTerrain=" + (mapTerrain != null)
+                + " RailroaderGPUITerrain=" + (gpui != null) + " terrain=" + PathOf(terrain.transform));
+        if ((Terrain)Field(mapTerrain, "terrain") != terrain)
+            throw new InvalidOperationException("MapTerrain references a different terrain.");
+
+        var generated = (TreeInstance[])Field(mapTerrain, "TreeInstances");
+        var handedOff = (TreeInstance[])Field(gpui, "TreeInstances");
+        var loaded = (TreeInstance[])Field(gpui, "_treeInstances");
+        bool isLoaded = (bool)Property(gpui, "IsTreeInstancesLoaded");
+        object manager = Property(gpui, "TreeManager");
+        Write(phase + " site=" + site + " generatedTrees terrain.id=" + terrain.GetInstanceID()
+            + " mapTerrain.id=" + mapTerrain.GetInstanceID() + " gpui.id=" + gpui.GetInstanceID()
+            + " generated=" + TreeArrayIdentity(generated) + " handedOff=" + TreeArrayIdentity(handedOff)
+            + " loaded=" + TreeArrayIdentity(loaded) + " handoffSame=" + ReferenceEquals(generated, handedOff)
+            + " loadedSame=" + ReferenceEquals(handedOff, loaded) + " isLoaded=" + isLoaded
+            + " managerPresent=" + (manager != null && !manager.Equals(null)));
+        if (generated == null)
+            throw new InvalidOperationException("Generated tree array is null; no tree output can be sampled.");
+
+        float maskExtent = radius - 2f;
+        if (maskExtent < 0) throw new InvalidOperationException("Invalid tree sample radius.");
+        var rows = new List<string>();
+        var maskRows = new List<string>();
+        var coreRows = new List<string>();
+        float coreRadius = Convert.ToSingle(Field(mask, "radius"), CultureInfo.InvariantCulture);
+        float nearestSquared = float.PositiveInfinity;
+        Vector3 nearest = default(Vector3);
+        foreach (var tree in generated)
+        {
+            Vector3 world = terrain.transform.position + Vector3.Scale(tree.position, terrain.terrainData.size);
+            Vector3 delta = world - point;
+            float squared = delta.x * delta.x + delta.z * delta.z;
+            if (squared < nearestSquared) { nearestSquared = squared; nearest = world; }
+            if (squared > radius * radius) continue;
+            string row = V(ConvertPosition("WorldToGame", world)) + " " + tree.prototypeIndex + " "
+                + F(tree.widthScale) + " " + F(tree.heightScale) + " " + F(tree.rotation);
+            rows.Add(row);
+            if (squared <= maskExtent * maskExtent) maskRows.Add(row);
+            if (squared <= coreRadius * coreRadius) coreRows.Add(row);
+        }
+        if (phase == "baseline" && site == 2) { targetHasBaselineTree = coreRows.Count > 0; targetBaselineCoreDigest = Digest(coreRows); }
+        if (phase == "tree preflight" && site == 2)
+            targetPreflightReady = coreRows.Count > 0 && Digest(coreRows) == targetBaselineCoreDigest
+                && ReferenceEquals(generated, handedOff) && ReferenceEquals(handedOff, loaded)
+                && isLoaded && manager != null && !manager.Equals(null);
+        string digest = Digest(rows);
+        if (phase == "baseline") generatedTreeBaselines[site] = digest;
+        string comparison = generatedTreeBaselines.TryGetValue(site, out var baseline)
+            ? (baseline == digest).ToString() : "unavailable";
+        Write(phase + " site=" + site + " generatedTrees samplePoint.game=" + V(ConvertPosition("WorldToGame", point))
+            + " total=" + generated.Length + " maskExtent=" + F(maskExtent) + " maskCount=" + maskRows.Count
+            + " maskSha256=" + Digest(maskRows) + " extraRadius=2 sampleRadius=" + F(radius)
+            + " coreRadius=" + F(coreRadius) + " coreCount=" + coreRows.Count + " coreSha256=" + Digest(coreRows)
+            + " sampleCount=" + rows.Count + " sampleSha256=" + digest + " equalsBaseline=" + comparison
+            + " nearestDistance=" + (float.IsPositiveInfinity(nearestSquared) ? "none" : F(Mathf.Sqrt(nearestSquared)))
+            + " nearest.game=" + (float.IsPositiveInfinity(nearestSquared) ? "none" : V(ConvertPosition("WorldToGame", nearest)))
+            + " observation=generated-tree-array-not-rendered-frame");
+    }
+
+    private static string TreeArrayIdentity(TreeInstance[] value)
+    {
+        return value == null ? "null" : value.Length.ToString(CultureInfo.InvariantCulture) + "@"
+            + RuntimeHelpers.GetHashCode(value).ToString(CultureInfo.InvariantCulture);
+    }
+}

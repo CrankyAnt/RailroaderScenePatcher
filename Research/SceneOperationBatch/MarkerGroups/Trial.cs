@@ -32,6 +32,7 @@ public sealed partial class MarkerGroups
     public void OnWorldLoaded()
     {
         worldGeneration++;
+        if (localAutoArmed) { StartLocalAuto(worldGeneration); return; }
         if (autoPending) { autoPending = false; autoArmed = false; Write("auto cancelled: another world-load callback arrived"); status = "Automatic trial cancelled; inspect log."; return; }
         if (!autoArmed) return;
         autoArmed = false;
@@ -96,6 +97,7 @@ public sealed partial class MarkerGroups
     }
     public void OnUnload()
     {
+        LocalUnload();
         worldGeneration++; autoPending = false;
         if (dirty) autoArmed = false;
         try { if (subscribed) RemoveHandler(); if (dirty) Write("UNLOADED DIRTY: restoration was not verified; discard this session"); }

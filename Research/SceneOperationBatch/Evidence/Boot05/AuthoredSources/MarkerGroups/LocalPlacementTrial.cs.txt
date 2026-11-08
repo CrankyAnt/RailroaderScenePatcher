@@ -1,0 +1,167 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections;
+using System.Reflection;
+using UnityEngine;
+
+public sealed partial class MarkerGroups
+{
+    private bool localMode, localFocused, localAutoArmed, localAutoPending;
+    private Vector3 localStableOrigin;
+    private float localStableSince;
+    private int localApplyCount;
+    private Vector3 localParentPosition, localParentScale;
+    private Quaternion localParentRotation;
+
+    private void Update()
+    {
+        if (!localFocused || target != null) return;
+        var current = Origin();
+        if ((current - localStableOrigin).sqrMagnitude >= 0.0001f) { localStableOrigin = current; localStableSince = Time.realtimeSinceStartup; }
+    }
+    private bool LocalMap() { return Convert.ToString(Read(TypeNamed("Game.ActiveMapDefinition"), "Identifier")) == "crankyant/scene-operations-map"; }
+    private void LocalFocus()
+    {
+        try
+        {
+            if (!isolated || dirty || target != null || autoArmed || autoPending || !LocalMap()) throw new InvalidOperationException("Focus requires an unused isolated fixture");
+            var m = At("World/Mile Posts/T-47", "Track.TrackMarker");
+            if (Convert.ToString(Read(m, "id")) != "Mnau") throw new InvalidOperationException("Unexpected T-47 marker");
+            var world = TypeNamed("Helpers.WorldTransformer");
+            var gamePosition = (Vector3)world.GetMethod("WorldToGame", BindingFlags.Static | BindingFlags.Public, null, new[] { typeof(Vector3) }, null).Invoke(null, new object[] { m.transform.position });
+            var camera = TypeNamed("CameraSelector");
+            var strategy = Enum.Parse(camera.GetNestedType("CameraIdentifier", Flags), "Strategy");
+            camera.GetMethod("JumpToPoint").Invoke(Read(camera, "shared"), new object[] { gamePosition, Quaternion.identity, strategy });
+            localFocused = true; localStableOrigin = Origin(); localStableSince = Time.realtimeSinceStartup;
+            Write("T47 focus generation=" + worldGeneration + " game=" + gamePosition.ToString("F4"));
+            status = "T-47 focus requested. Wait five stable seconds and frame the post.";
+        }
+        catch (Exception e) { localFocused = false; Write("T47 focus ERROR " + e); status = "T-47 focus failed; inspect log."; }
+    }
+    private object LocalPose(object location)
+    {
+        var method = graph.GetType().GetMethod("GetPositionRotation");
+        var accuracy = Enum.ToObject(method.GetParameters()[1].ParameterType, 0);
+        return method.Invoke(graph, new[] { location, accuracy });
+    }
+    private Vector3 LocalDiagnostic(string phase, object pose, Vector3 placementOffset, bool snap)
+    {
+        if (pose == null) throw new InvalidOperationException("PositionRotation unavailable");
+        var game = (Vector3)Read(pose, "Position"); var rotationValue = (Quaternion)Read(pose, "Rotation");
+        var toWorld = TypeNamed("Helpers.WorldTransformer").GetMethod("GameToWorld", BindingFlags.Static | BindingFlags.Public, null, new[] { typeof(Vector3) }, null);
+        var point = (Vector3)toWorld.Invoke(null, new object[] { game }) + rotationValue * placementOffset;
+        int layer = Convert.ToInt32(Read(TypeNamed("Helpers.Layers"), "Terrain"));
+        RaycastHit hit; bool found = Physics.Raycast(new Ray(point + Vector3.up * 10f, Vector3.down), out hit, 20f, 1 << layer);
+        // The visual trial requires terrain at both sites even when native snapping is disabled.
+        Write("T47 " + phase + " positionRotation=True point=" + point.ToString("F4") + " terrainRay=" + found + " snap=" + snap + " visualTrialRequiresTerrain=True" + (found ? " hit=" + hit.point.ToString("F4") : ""));
+        if (!found) throw new InvalidOperationException("Visual trial requires a terrain ray hit");
+        return point;
+    }
+    private void LocalCapture()
+    {
+        try
+        {
+            if (!isolated || dirty || target != null || autoArmed || autoPending || !LocalMap() || !localFocused || Time.realtimeSinceStartup - localStableSince < 5f || (Origin() - localStableOrigin).sqrMagnitude >= 0.0001f) throw new InvalidOperationException("Fixture, focus or stable-origin preflight failed");
+            var m = At("World/Mile Posts/T-47", "Track.TrackMarker"); var r = At("World/Mile Posts/T-47", "Track.TrackRelativePosition");
+            var g = Read(TypeNamed("Track.Graph"), "Shared") ?? throw new InvalidOperationException("Graph missing");
+            var original = Read(m, "Location") ?? throw new InvalidOperationException("Location missing");
+            var serial = Read(m, "_location");
+            if (Convert.ToString(Read(m, "id")) != "Mnau" || Convert.ToString(Read(serial, "segmentId")) != "Stky0cg9c" || Convert.ToString(Read(Read(original, "segment"), "groupId")) != "sy-db" || !ReferenceEquals(Read(r, "targetTransform"), m.transform) || !(bool)Read(r, "targetActiveFollowsTrackGroup") || !(bool)Read(r, "_observing") || Convert.ToString(Read(r, "_observedGroupId")) != "sy-db" || Read(r, "_setTargetActive") != null || !((Behaviour)m).enabled || !m.gameObject.activeInHierarchy || m.transform.parent == null) throw new InvalidOperationException("T-47 baseline differs");
+            graph = g; marker = m; relative = r; target = m.transform; parent = target.parent; originalLocation = original; oldGroup = newGroup = "sy-db"; markerId = "Mnau"; capturedScene = target.gameObject.scene.handle;
+            var copy = Activator.CreateInstance(serial.GetType());
+            foreach (var name in new[] { "segmentId", "distance", "end" }) { var f = serial.GetType().GetField(name, Flags); f.SetValue(copy, name == "distance" ? (object)(Convert.ToSingle(f.GetValue(serial)) + 1f) : f.GetValue(serial)); }
+            var args = new[] { copy, (object)null };
+            if (!(bool)graph.GetType().GetMethod("TryResolveLocation").Invoke(graph, args) || args[1] == null || SameLocation(original, args[1]) || !ReferenceEquals(Read(original, "segment"), Read(args[1], "segment")) || !Equals(Read(original, "end"), Read(args[1], "end")) || !Equals(Convert.ToSingle(Read(args[1], "distance")), Convert.ToSingle(Read(original, "distance")) + 1f) || Convert.ToString(Read(Read(args[1], "segment"), "groupId")) != oldGroup) throw new InvalidOperationException("Local destination invalid");
+            destinationLocation = args[1];
+            bool visibleRenderer = false; foreach (var renderer in target.GetComponentsInChildren<Renderer>(false)) if (renderer.enabled && renderer.gameObject.activeInHierarchy && renderer.isVisible) visibleRenderer = true;
+            if (!visibleRenderer) throw new InvalidOperationException("No active visible renderer on T-47");
+            if (!Enabled(oldGroup) || NativeSubscriptions() != 1 || Registrations("T47 capture", original) != 1) throw new InvalidOperationException("Baseline registration or observation differs");
+            origin = Origin(); position = target.position; rotation = target.rotation; localPosition = target.localPosition; localRotation = target.localRotation; originalActive = target.gameObject.activeSelf; offset = (Vector3)Read(relative, "targetOffset"); angle = Convert.ToSingle(Read(relative, "targetAngle")); terrain = (bool)Read(relative, "snapToTerrain"); originalLast = Read(relative, "<LastRuntimeApplySucceeded>k__BackingField"); nativeBaseline = NativeSubscriptions();
+            localParentPosition = parent.position; localParentRotation = parent.rotation; localParentScale = parent.lossyScale;
+            Write("T47 capture originalLast=" + (originalLast == null ? "null" : originalLast.ToString()));
+            var nativePose = Read(marker, "PositionRotation") ?? throw new InvalidOperationException("Native marker pose unavailable");
+            var baselinePoint = LocalDiagnostic("capture original", nativePose, offset, terrain);
+            var candidatePoint = LocalDiagnostic("capture candidate", LocalPose(destinationLocation), new Vector3(2f, 0f, 0f), false);
+            float separation = (candidatePoint - baselinePoint).magnitude;
+            if (float.IsNaN(separation) || float.IsInfinity(separation) || separation >= 10f) throw new InvalidOperationException("Candidate exceeds ten metres or is non-finite");
+            localApplyCount = 0; localMode = true; Snapshot("T47 baseline generation=" + worldGeneration + " scene=" + capturedScene); status = "T-47 baseline captured. Record the visible post, then apply.";
+        }
+        catch (Exception e) { Write("T47 capture ERROR " + e); if (!dirty) DropCapture(); localMode = false; status = "T-47 capture failed; no mutation attempted."; }
+    }
+    private void LocalApply()
+    {
+        try
+        {
+            if (!localMode) throw new InvalidOperationException("No T-47 capture"); LocalCheck();
+            LocalDiagnostic("pre-apply original", LocalPose(originalLocation), offset, terrain);
+            LocalDiagnostic("pre-apply candidate", LocalPose(destinationLocation), new Vector3(2f, 0f, 0f), false);
+            dirty = true; if (!patched) SetLocation(destinationLocation);
+            var nativePose = Read(marker, "PositionRotation") ?? throw new InvalidOperationException("Candidate marker pose unavailable");
+            LocalDiagnostic("apply marker", nativePose, new Vector3(2f, 0f, 0f), false);
+            bool ok = Configure(new Vector3(2f, 0f, 0f), 15f, false); patched = true; localApplyCount++;
+            Write("T47 apply number=" + localApplyCount + " native=" + ok); Snapshot("T47 apply number=" + localApplyCount + " native=" + ok); if (!ok || NativeSubscriptions() != 1 || Registrations("T47 apply", destinationLocation) != 1 || Convert.ToString(Read(relative, "_observedGroupId")) != oldGroup) throw new InvalidOperationException("Native application or postcondition failed");
+            status = "T-47 applied. Record the visible post; repeat or restore.";
+        }
+        catch (Exception e) { Write("T47 apply ERROR " + e); status = "T-47 apply failed. Restore or abandon without saving."; }
+    }
+    private void LocalRestore()
+    {
+        try
+        {
+            if (!localMode) throw new InvalidOperationException("No T-47 capture"); LocalCheck();
+            if (!dirty) { DropCapture(); localMode = false; status = "T-47 baseline released."; return; }
+            LocalDiagnostic("pre-restore original", LocalPose(originalLocation), offset, terrain);
+            SetLocation(originalLocation); patched = false;
+            LocalDiagnostic("restore marker", Read(marker, "PositionRotation"), offset, terrain);
+            bool ok = Configure(offset, angle, terrain);
+            var nativeLast = Read(relative, "<LastRuntimeApplySucceeded>k__BackingField");
+            Write("T47 restore native=" + ok + " nativeLast=" + (nativeLast == null ? "null" : nativeLast.ToString()) + " pose=" + target.position.ToString("F5") + " rotation=" + target.rotation.ToString("F5") + " positionError=" + Vector3.Distance(target.position, position) + " rotationError=" + Quaternion.Angle(target.rotation, rotation));
+            if (!ok) throw new InvalidOperationException("Native restoration failed; captured pose was not written");
+            target.position = position; target.rotation = rotation; target.gameObject.SetActive(originalActive);
+            Write("T47 captured pose written after native success positionError=" + Vector3.Distance(target.position, position) + " rotationError=" + Quaternion.Angle(target.rotation, rotation) + " localError=" + Vector3.Distance(target.localPosition, localPosition) + " localRotationError=" + Quaternion.Angle(target.localRotation, localRotation));
+            relative.GetType().GetField("<LastRuntimeApplySucceeded>k__BackingField", Flags).SetValue(relative, originalLast);
+            var restoredLast = Read(relative, "<LastRuntimeApplySucceeded>k__BackingField");
+            Write("T47 restoredOriginalLast=" + (restoredLast == null ? "null" : restoredLast.ToString()));
+            Snapshot("T47 restored");
+            if (!SameLocation(Read(marker, "Location"), originalLocation) || Convert.ToString(Read(relative, "_observedGroupId")) != oldGroup || NativeSubscriptions() != nativeBaseline || Registrations("T47 restore", originalLocation) != 1 || (target.localPosition - localPosition).sqrMagnitude > 0.0001f || Quaternion.Angle(target.localRotation, localRotation) > 0.01f || target.gameObject.activeSelf != originalActive) throw new InvalidOperationException("Restoration postcondition failed");
+            DropCapture(); localMode = false; localFocused = false; status = "T-47 restored. Record the visible post; never save.";
+        }
+        catch (Exception e) { Write("T47 restore ERROR " + e); status = "T-47 restore failed. Abandon without saving."; }
+    }
+    private void LocalCheck()
+    {
+        Check();
+        if ((parent.position - localParentPosition).sqrMagnitude > 0.0001f || Quaternion.Angle(parent.rotation, localParentRotation) > 0.01f || (parent.lossyScale - localParentScale).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Parent pose or scale changed. Abandon without saving.");
+    }
+    private void ToggleLocalAuto()
+    {
+        if (localAutoPending) { localAutoPending = false; localAutoArmed = false; status = "T-47 automatic preflight cancelled."; return; }
+        if (!isolated || dirty || target != null || autoArmed || autoPending) { status = "Release the existing trial first."; return; }
+        localAutoArmed = !localAutoArmed; Write("T47 auto arm=" + localAutoArmed); status = localAutoArmed ? "T-47 armed for one next load." : "T-47 arm cancelled.";
+    }
+    private void StartLocalAuto(int generation)
+    {
+        localAutoArmed = false; localAutoPending = true; localFocused = false; Write("T47 auto world-load generation=" + generation); StartCoroutine(LocalAuto(generation));
+    }
+    private IEnumerator LocalAuto(int generation)
+    {
+        float deadline = Time.realtimeSinceStartup + 30f; bool focusAttempted = false; object stableGraph = null;
+        while (localAutoPending && generation == worldGeneration && Time.realtimeSinceStartup < deadline)
+        {
+            if (!focusAttempted)
+            {
+                bool ready = false; try { ready = isolated && LocalMap() && At("World/Mile Posts/T-47", "Track.TrackMarker") != null && Read(TypeNamed("Track.Graph"), "Shared") != null; } catch (Exception) { }
+                if (ready) { focusAttempted = true; LocalFocus(); if (!localFocused) break; stableGraph = Read(TypeNamed("Track.Graph"), "Shared"); }
+            }
+            if (localFocused && !ReferenceEquals(stableGraph, Read(TypeNamed("Track.Graph"), "Shared"))) { Write("T47 auto graph changed; no mutation attempted"); break; }
+            if (localFocused && Time.realtimeSinceStartup - localStableSince >= 5f && (Origin() - localStableOrigin).sqrMagnitude < 0.0001f)
+            {
+                localAutoPending = false; Write("T47 auto stable-ready generation=" + generation + " map=" + LocalMap()); LocalCapture(); if (localMode) LocalApply(); yield break;
+            }
+            yield return null;
+        }
+        if (localAutoPending) { localAutoPending = false; Write("T47 auto timeout or focus failure; no mutation attempted generation=" + generation); status = "T-47 automatic preflight stopped without mutation."; }
+    }
+    private void LocalUnload() { if (localAutoPending) { localAutoPending = false; localAutoArmed = false; } localMode = false; localFocused = false; }
+}

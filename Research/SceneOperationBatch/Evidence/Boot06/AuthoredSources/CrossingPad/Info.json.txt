@@ -1,0 +1,14 @@
+{
+  "identifier": "crankyant/crossing-pad-probe",
+  "version": "0.0.1",
+  "name": "CrankyAnt",
+  "author": "CrankyAnt",
+  "assemblies": [
+    "CrossingPadProbe.dll"
+  ],
+  "dependencies": {
+    "required": [
+      "rr/game >=0.6.2"
+    ]
+  }
+}

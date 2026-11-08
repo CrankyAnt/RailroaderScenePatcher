@@ -1,0 +1,14 @@
+{
+  "identifier": "crankyant/milepost-probe",
+  "version": "0.0.1",
+  "name": "CrankyAnt",
+  "author": "CrankyAnt",
+  "assemblies": [
+    "MilepostProbe.dll"
+  ],
+  "dependencies": {
+    "required": [
+      "rr/game >=0.6.2"
+    ]
+  }
+}

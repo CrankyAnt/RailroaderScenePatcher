@@ -89,5 +89,17 @@ public sealed partial class MarkerGroups : MonoBehaviour
         }
         catch (Exception e) { Write("focus ERROR " + e); status = "Focus failed. Inspect log."; }
     }
-    private void OnGUI() { window = GUI.Window(0x434d4752, window, id => { GUILayout.Label(status); GUILayout.Label(autoPending ? "Automatic preflight waiting" : autoArmed ? "Next world load armed" : "Automatic application off"); if (!autoPending) { if (GUILayout.Button(autoArmed ? "Cancel next-load arm" : "Arm next world load")) ToggleAutoArm(); if (GUILayout.Button("Scan group followers")) Scan(); if (GUILayout.Button("Focus T-46 before capture")) FocusMarker(); if (GUILayout.Button("Capture trial baseline")) Capture(); if (GUILayout.Button("Rebind and apply / repeat")) ApplyTrial(); if (GUILayout.Button("Toggle old and new groups")) ToggleTrial(); if (GUILayout.Button("Test explicit disable")) DisableTrial(); if (GUILayout.Button("Restore trial")) RestoreTrial(); } if (dirty) GUILayout.Label("Dirty: restore before leaving. Never save."); GUI.DragWindow(); }, "Marker groups trial"); }
+    private void OpenPauseMenu()
+    {
+        try
+        {
+            if (!isolated) throw new InvalidOperationException("Isolation guard failed");
+            var matches = Resources.FindObjectsOfTypeAll(TypeNamed("PauseMenu")).OfType<Component>().Where(c => c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded && c.gameObject.activeInHierarchy).ToArray();
+            if (matches.Length != 1) throw new InvalidOperationException("Active pause menu count=" + matches.Length);
+            var method = matches[0].GetType().GetMethod("SetPaused", Flags, null, new[] { typeof(bool) }, null) ?? throw new MissingMethodException("PauseMenu.SetPaused(bool)");
+            method.Invoke(matches[0], new object[] { true }); Write("pause requested"); status = "Pause requested.";
+        }
+        catch (Exception e) { Write("pause ERROR " + e); status = "Pause failed; inspect log."; }
+    }
+    private void OnGUI() { window = GUI.Window(0x434d4752, window, id => { GUILayout.Label(status); GUILayout.Label(autoPending || localAutoPending ? "Automatic preflight waiting" : autoArmed || localAutoArmed ? "Next world load armed" : "Automatic application off"); if (GUILayout.Button(localAutoArmed || localAutoPending ? "Cancel T-47 automatic" : "Arm T-47 next load")) ToggleLocalAuto(); if (!autoPending && !localAutoPending) { if (GUILayout.Button("Focus T-47")) LocalFocus(); if (GUILayout.Button("Capture T-47")) LocalCapture(); if (GUILayout.Button("Apply T-47 / repeat")) LocalApply(); if (GUILayout.Button("Restore T-47")) LocalRestore(); if (!localMode && !localAutoArmed) { if (GUILayout.Button(autoArmed ? "Cancel T-46 next-load arm" : "Arm T-46 next load")) ToggleAutoArm(); if (GUILayout.Button("Scan group followers")) Scan(); if (GUILayout.Button("Focus T-46 before capture")) FocusMarker(); if (GUILayout.Button("Capture T-46 baseline")) Capture(); if (GUILayout.Button("Rebind T-46 / repeat")) ApplyTrial(); if (GUILayout.Button("Toggle old and new groups")) ToggleTrial(); if (GUILayout.Button("Test explicit disable")) DisableTrial(); if (GUILayout.Button("Restore T-46")) RestoreTrial(); } } if (dirty) GUILayout.Label("Dirty: restore before leaving. Never save."); if (GUILayout.Button("Open pause menu")) OpenPauseMenu(); GUI.DragWindow(); }, "Marker groups trial"); }
 }

@@ -1,0 +1,668 @@
+2026-11-08T23:41:31.2446465Z T47 auto arm=True
+2026-11-08T23:41:55.6386509Z T47 auto world-load generation=1
+2026-11-08T23:41:55.6396500Z T47 auto initial-settle seconds=10 generation=1
+2026-11-08T23:42:05.6533147Z T47 auto initial-settle complete generation=1
+2026-11-08T23:42:05.6711341Z T47 focus generation=1 game=(23405.7600, 612.0114, -1035.9450)
+2026-11-08T23:42:11.4808791Z T47 auto stable-ready generation=1 map=True
+2026-11-08T23:42:11.4989242Z T47 capture registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:42:11.5014341Z T47 capture originalLast=null
+2026-11-08T23:42:11.5024349Z T47 capture original positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:42:11.5039388Z T47 capture candidate positionRotation=True point=(405.0417, 612.2689, 462.6683) terrainRay=True snap=False visualTrialRequiresTerrain=True hit=(405.0417, 611.8411, 462.6683)
+2026-11-08T23:42:11.5054707Z T47 baseline generation=1 scene=-4694 registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:42:11.5054707Z T47 baseline generation=1 scene=-4694 origin=(23000.0000, 0.0000, -1500.0000) graph=2110101960 location=<Stky0cg9c, B -> 266,919> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T23:42:11.5054707Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackObjectManager.GraphOnGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5064755Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5064755Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5064755Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5074780Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5074780Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5074780Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5084750Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5084750Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5084750Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5084750Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5084750Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5084750Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=True
+2026-11-08T23:42:11.5099793Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5099793Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5099793Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5109877Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5109877Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5109877Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5119875Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5119875Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5119875Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5119875Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5119875Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5132457Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5132457Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5132457Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5142454Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5142454Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5142454Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5152474Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5152474Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5152474Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5152474Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5152474Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5164782Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5164782Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5164782Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5174771Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5174771Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5174771Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5174771Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5184773Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5184773Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5184773Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5184773Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5184773Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5199846Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5199846Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5199846Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5199846Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5238319Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5238319Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5238319Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5238319Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5251406Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5251406Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5251406Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5261456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5261456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5261456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5261456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5271459Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5271459Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5271459Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5271459Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5281456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5281456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5281456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5281456Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5296535Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5296535Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5296535Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5306609Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5306609Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5306609Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5306609Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5316585Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5316585Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5316585Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5316585Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5326602Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5326602Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5326602Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5326602Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5336593Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5336593Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5336593Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5336593Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5336593Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5351639Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5351639Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5351639Z T47 baseline generation=1 scene=-4694 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5361695Z T47 baseline generation=1 scene=-4694 subscription=Game.Mow.TrackConditionController.OnGroupAvailabilityChanged targetIsRelative=False
+2026-11-08T23:42:11.5361695Z T47 baseline generation=1 scene=-4694 parent=World/Mile Posts position=(-23000.0000, 0.0000, 1500.0000) rotation=(0.0000, 0.0000, 0.0000, 1.0000) local=(0.0000, 0.0000, 0.0000)
+2026-11-08T23:42:11.5361695Z T47 baseline generation=1 scene=-4694 node=World/Mile Posts/T-47 pos=(405.7617, 612.0114, 464.0547) rot=(-0.0043, -0.6267, 0.0035, -0.7792) local=(23405.7600, 612.0114, -1035.9450) active=True
+2026-11-08T23:42:11.5371692Z T47 baseline generation=1 scene=-4694 node=World/Mile Posts/T-47/Front Label pos=(405.8340, 612.8887, 464.0231) rot=(-0.0023, -0.5977, -0.0051, 0.8017) local=(0.0464, 0.8780, 0.0540) active=True
+2026-11-08T23:42:11.5371692Z T47 baseline generation=1 scene=-4694 node=World/Mile Posts/T-47/MilePost pos=(405.7656, 612.3514, 464.0406) rot=(0.4191, -0.5685, -0.5652, -0.4263) local=(0.0144, 0.3400, -0.0037) active=True
+2026-11-08T23:42:11.5371692Z T47 baseline generation=1 scene=-4694 node=World/Mile Posts/T-47/Side Label pos=(405.7246, 612.8900, 463.9955) rot=(0.0033, 0.3954, -0.0045, 0.9185) local=(0.0498, 0.8780, -0.0594) active=True
+2026-11-08T23:42:11.5371692Z T47 baseline generation=1 scene=-4694 node=World/Mile Posts/T-47/Map View Label pos=(405.9785, 632.0102, 464.1025) rot=(-0.5541, -0.4407, 0.4456, -0.5479) local=(0.0000, 20.0000, 0.0000) active=True
+2026-11-08T23:42:11.5381691Z T47 baseline generation=1 scene=-4694 node=World/Mile Posts/T-47/Map View Label/Label pos=(401.8926, 632.0102, 482.7142) rot=(0.7071, 0.0000, 0.0000, 0.7071) local=(-15.0000, 0.0000, 0.0000) active=True
+2026-11-08T23:42:11.5381691Z T47 baseline generation=1 scene=-4694 placement offset=(3.20, 0.00, 0.00) angle=180 terrain=True oldEnabled=True newEnabled=True
+2026-11-08T23:42:11.5396740Z T47 pre-apply original positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:42:11.5396740Z T47 pre-apply candidate positionRotation=True point=(405.0417, 612.2689, 462.6683) terrainRay=True snap=False visualTrialRequiresTerrain=True hit=(405.0417, 611.8411, 462.6683)
+2026-11-08T23:42:11.5406794Z T47 apply marker positionRotation=True point=(405.0417, 612.2689, 462.6683) terrainRay=True snap=False visualTrialRequiresTerrain=True hit=(405.0417, 611.8411, 462.6683)
+2026-11-08T23:42:11.5416792Z T47 apply number=1 native=True
+2026-11-08T23:42:11.5416792Z T47 apply number=1 native=True registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 267,919>
+2026-11-08T23:42:11.5426791Z T47 apply number=1 native=True origin=(23000.0000, 0.0000, -1500.0000) graph=2110101960 location=<Stky0cg9c, B -> 267,919> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T23:42:11.5426791Z T47 apply number=1 native=True subscription=Track.TrackObjectManager.GraphOnGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5426791Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5426791Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5436791Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5441876Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5441876Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5441876Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5451948Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5451948Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5451948Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5451948Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5462021Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5462021Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5462021Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5462021Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5472006Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5472006Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5472006Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5472006Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5472006Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5482012Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5482012Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5482012Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5482012Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5482012Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5497067Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5497067Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5497067Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5507128Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5507128Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5507128Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5507128Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5517122Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5517122Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5517122Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5517122Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5527120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5527120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5527120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5527120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5537120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5537120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5537120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5537120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5537120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5537120Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5552163Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5552163Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5552163Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5562216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5562216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5562216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5562216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5572216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5572216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5572216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5572216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5582216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5582216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5582216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5582216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5582216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5582216Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5597282Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5597282Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5597282Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5607361Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5607361Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5607361Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5607361Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5617341Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5617341Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5627343Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5627343Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5627343Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5637348Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5637348Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5637348Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5637348Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5637348Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5637348Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5654138Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5654138Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5654138Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5654138Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5664199Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5664199Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5664199Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5664199Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5674198Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5674198Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5674198Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:11.5674198Z T47 apply number=1 native=True subscription=Game.Mow.TrackConditionController.OnGroupAvailabilityChanged targetIsRelative=False
+2026-11-08T23:42:11.5674198Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=True
+2026-11-08T23:42:11.5684193Z T47 apply number=1 native=True parent=World/Mile Posts position=(-23000.0000, 0.0000, 1500.0000) rotation=(0.0000, 0.0000, 0.0000, 1.0000) local=(0.0000, 0.0000, 0.0000)
+2026-11-08T23:42:11.5684193Z T47 apply number=1 native=True node=World/Mile Posts/T-47 pos=(405.0410, 612.2689, 462.6683) rot=(-0.0040, 0.6908, -0.0038, -0.7230) local=(23405.0400, 612.2689, -1037.3320) active=True
+2026-11-08T23:42:11.5684193Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Front Label pos=(404.9785, 613.1462, 462.7175) rot=(0.0047, -0.8728, -0.0029, -0.4880) local=(0.0464, 0.8780, 0.0540) active=True
+2026-11-08T23:42:11.5684193Z T47 apply number=1 native=True node=World/Mile Posts/T-47/MilePost pos=(405.0410, 612.6089, 462.6827) rot=(0.6151, 0.3484, 0.3417, -0.6193) local=(0.0144, 0.3400, -0.0037) active=True
+2026-11-08T23:42:11.5699241Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Side Label pos=(405.0938, 613.1475, 462.7158) rot=(0.0049, -0.8590, 0.0026, 0.5119) local=(0.0498, 0.8780, -0.0594) active=True
+2026-11-08T23:42:11.5699241Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Map View Label pos=(404.8184, 632.2676, 462.6785) rot=(-0.5141, 0.4857, -0.4912, -0.5084) local=(0.0000, 20.0000, 0.0000) active=True
+2026-11-08T23:42:11.5699241Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Map View Label/Label pos=(403.9492, 632.2676, 443.6431) rot=(0.0923, -0.7011, 0.7011, 0.0923) local=(-15.0000, 0.0000, 0.0000) active=True
+2026-11-08T23:42:11.5699241Z T47 apply number=1 native=True placement offset=(2.00, 0.00, 0.00) angle=15 terrain=False oldEnabled=True newEnabled=True
+2026-11-08T23:42:11.5709297Z T47 apply registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 267,919>
+2026-11-08T23:42:24.9363232Z pause requested
+2026-11-08T23:42:33.5660744Z T47 pre-restore original positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:42:33.5670742Z T47 restore marker positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:42:33.5670742Z T47 restore native=True nativeLast=True pose=(405.76170, 611.87240, 464.05470) rotation=(-0.00434, -0.62669, 0.00349, -0.77925) positionError=0,1389771 rotationError=0
+2026-11-08T23:42:33.5680742Z T47 captured pose written after native success positionError=0 rotationError=0 localError=0 localRotationError=0
+2026-11-08T23:42:33.5680742Z T47 restoredOriginalLast=null
+2026-11-08T23:42:33.5680742Z T47 restored registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:42:33.5680742Z T47 restored origin=(23000.0000, 0.0000, -1500.0000) graph=2110101960 location=<Stky0cg9c, B -> 266,919> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T23:42:33.5695780Z T47 restored subscription=Track.TrackObjectManager.GraphOnGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5695780Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5695780Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5705820Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5705820Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5705820Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5705820Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5715819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5715819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5715819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5725819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5725819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5725819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5725819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5735819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5735819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5735819Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5745818Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5745818Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5750861Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5750861Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5750861Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5760883Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5760883Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5760883Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5770875Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5770875Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5770875Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5770875Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5780880Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5780880Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5780880Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5790880Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5790880Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5795901Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5795901Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5795901Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5795901Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5795901Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5811023Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5811023Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5811023Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5821047Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5821047Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5831075Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5831075Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5841085Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5841085Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5841085Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5855441Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5855441Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5865422Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5865422Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5865422Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5865422Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5875433Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5875433Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5885432Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5885432Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5885432Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5885432Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5895437Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5895437Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5895437Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5906582Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5906582Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5906582Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5916582Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5916582Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5916582Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5926585Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5926585Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5926585Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5926585Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5941624Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5941624Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5941624Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5951660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5951660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5951660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5961660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5961660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5971671Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5971671Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5971671Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5971671Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5971671Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5971671Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5989625Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5989625Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5989625Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5999660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:42:33.5999660Z T47 restored subscription=Game.Mow.TrackConditionController.OnGroupAvailabilityChanged targetIsRelative=False
+2026-11-08T23:42:33.5999660Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=True
+2026-11-08T23:42:33.6011396Z T47 restored parent=World/Mile Posts position=(-23000.0000, 0.0000, 1500.0000) rotation=(0.0000, 0.0000, 0.0000, 1.0000) local=(0.0000, 0.0000, 0.0000)
+2026-11-08T23:42:33.6011396Z T47 restored node=World/Mile Posts/T-47 pos=(405.7617, 612.0114, 464.0547) rot=(-0.0043, -0.6267, 0.0035, -0.7792) local=(23405.7600, 612.0114, -1035.9450) active=True
+2026-11-08T23:42:33.6021392Z T47 restored node=World/Mile Posts/T-47/Front Label pos=(405.8340, 612.8887, 464.0231) rot=(-0.0023, -0.5977, -0.0051, 0.8017) local=(0.0464, 0.8780, 0.0540) active=True
+2026-11-08T23:42:33.6021392Z T47 restored node=World/Mile Posts/T-47/MilePost pos=(405.7656, 612.3514, 464.0406) rot=(0.4191, -0.5685, -0.5652, -0.4263) local=(0.0144, 0.3400, -0.0037) active=True
+2026-11-08T23:42:33.6021392Z T47 restored node=World/Mile Posts/T-47/Side Label pos=(405.7246, 612.8900, 463.9955) rot=(0.0033, 0.3954, -0.0045, 0.9185) local=(0.0498, 0.8780, -0.0594) active=True
+2026-11-08T23:42:33.6031393Z T47 restored node=World/Mile Posts/T-47/Map View Label pos=(405.9785, 632.0102, 464.1025) rot=(-0.5541, -0.4407, 0.4456, -0.5479) local=(0.0000, 20.0000, 0.0000) active=True
+2026-11-08T23:42:33.6031393Z T47 restored node=World/Mile Posts/T-47/Map View Label/Label pos=(401.8926, 632.0102, 482.7142) rot=(0.7071, 0.0000, 0.0000, 0.7071) local=(-15.0000, 0.0000, 0.0000) active=True
+2026-11-08T23:42:33.6031393Z T47 restored placement offset=(3.20, 0.00, 0.00) angle=180 terrain=True oldEnabled=True newEnabled=True
+2026-11-08T23:42:33.6041404Z T47 restore registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:44:10.8571194Z T47 auto arm=True
+2026-11-08T23:44:27.0916943Z T47 auto world-load generation=5
+2026-11-08T23:44:27.0916943Z T47 auto initial-settle seconds=10 generation=5
+2026-11-08T23:44:37.0936681Z T47 auto initial-settle complete generation=5
+2026-11-08T23:44:37.1081754Z T47 focus generation=5 game=(23405.7600, 612.0114, -1035.9450)
+2026-11-08T23:44:42.9213446Z T47 auto stable-ready generation=5 map=True
+2026-11-08T23:44:42.9348995Z T47 capture registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:44:42.9348995Z T47 capture originalLast=null
+2026-11-08T23:44:42.9358998Z T47 capture original positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:44:42.9358998Z T47 capture candidate positionRotation=True point=(405.0417, 612.2689, 462.6683) terrainRay=True snap=False visualTrialRequiresTerrain=True hit=(405.0417, 611.8411, 462.6683)
+2026-11-08T23:44:42.9358998Z T47 baseline generation=5 scene=-333526 registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:44:42.9369030Z T47 baseline generation=5 scene=-333526 origin=(23000.0000, 0.0000, -1500.0000) graph=-383073976 location=<Stky0cg9c, B -> 266,919> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T23:44:42.9369030Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackObjectManager.GraphOnGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9369030Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9369030Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9384058Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9384058Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9384058Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9384058Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9384058Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9399984Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9399984Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9399984Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9410022Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9410022Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=True
+2026-11-08T23:44:42.9410022Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9425055Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9425055Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9425055Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9435095Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9435095Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9446390Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9446390Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9446390Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9456404Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9456404Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9456404Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9466406Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9466406Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9476402Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9476402Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9476402Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9486390Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9486390Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9486390Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9496392Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9496392Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9496392Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9507758Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9507758Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9507758Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9507758Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9522800Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9522800Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9522800Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9532837Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9532837Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9532837Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9542835Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9542835Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9552839Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9552839Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9562847Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9562847Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9562847Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9572839Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9572839Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9582834Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9582834Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9582834Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9582834Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9597878Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9597878Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9597878Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9607922Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9607922Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9607922Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9607922Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9622967Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9622967Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9622967Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9633016Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9633016Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9633016Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9643629Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9643629Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9643629Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9653646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9653646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9653646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9663645Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9663645Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9663645Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9663645Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9673633Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9673633Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9673633Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9683646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9683646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9683646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9683646Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9698674Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9698674Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9708708Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9708708Z T47 baseline generation=5 scene=-333526 subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9708708Z T47 baseline generation=5 scene=-333526 subscription=Game.Mow.TrackConditionController.OnGroupAvailabilityChanged targetIsRelative=False
+2026-11-08T23:44:42.9718711Z T47 baseline generation=5 scene=-333526 parent=World/Mile Posts position=(-23000.0000, 0.0000, 1500.0000) rotation=(0.0000, 0.0000, 0.0000, 1.0000) local=(0.0000, 0.0000, 0.0000)
+2026-11-08T23:44:42.9718711Z T47 baseline generation=5 scene=-333526 node=World/Mile Posts/T-47 pos=(405.7617, 612.0114, 464.0547) rot=(-0.0043, -0.6267, 0.0035, -0.7792) local=(23405.7600, 612.0114, -1035.9450) active=True
+2026-11-08T23:44:42.9718711Z T47 baseline generation=5 scene=-333526 node=World/Mile Posts/T-47/Front Label pos=(405.8340, 612.8887, 464.0231) rot=(-0.0023, -0.5977, -0.0051, 0.8017) local=(0.0464, 0.8780, 0.0540) active=True
+2026-11-08T23:44:42.9718711Z T47 baseline generation=5 scene=-333526 node=World/Mile Posts/T-47/MilePost pos=(405.7656, 612.3514, 464.0406) rot=(0.4191, -0.5685, -0.5652, -0.4263) local=(0.0144, 0.3400, -0.0037) active=True
+2026-11-08T23:44:42.9731380Z T47 baseline generation=5 scene=-333526 node=World/Mile Posts/T-47/Side Label pos=(405.7246, 612.8900, 463.9955) rot=(0.0033, 0.3954, -0.0045, 0.9185) local=(0.0498, 0.8780, -0.0594) active=True
+2026-11-08T23:44:42.9731380Z T47 baseline generation=5 scene=-333526 node=World/Mile Posts/T-47/Map View Label pos=(405.9785, 632.0102, 464.1025) rot=(-0.5541, -0.4407, 0.4456, -0.5479) local=(0.0000, 20.0000, 0.0000) active=True
+2026-11-08T23:44:42.9731380Z T47 baseline generation=5 scene=-333526 node=World/Mile Posts/T-47/Map View Label/Label pos=(401.8926, 632.0102, 482.7142) rot=(0.7071, 0.0000, 0.0000, 0.7071) local=(-15.0000, 0.0000, 0.0000) active=True
+2026-11-08T23:44:42.9741362Z T47 baseline generation=5 scene=-333526 placement offset=(3.20, 0.00, 0.00) angle=180 terrain=True oldEnabled=True newEnabled=True
+2026-11-08T23:44:42.9741362Z T47 pre-apply original positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:44:42.9751364Z T47 pre-apply candidate positionRotation=True point=(405.0417, 612.2689, 462.6683) terrainRay=True snap=False visualTrialRequiresTerrain=True hit=(405.0417, 611.8411, 462.6683)
+2026-11-08T23:44:42.9751364Z T47 apply marker positionRotation=True point=(405.0417, 612.2689, 462.6683) terrainRay=True snap=False visualTrialRequiresTerrain=True hit=(405.0417, 611.8411, 462.6683)
+2026-11-08T23:44:42.9751364Z T47 apply number=1 native=True
+2026-11-08T23:44:42.9761365Z T47 apply number=1 native=True registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 267,919>
+2026-11-08T23:44:42.9761365Z T47 apply number=1 native=True origin=(23000.0000, 0.0000, -1500.0000) graph=-383073976 location=<Stky0cg9c, B -> 267,919> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T23:44:42.9771367Z T47 apply number=1 native=True subscription=Track.TrackObjectManager.GraphOnGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9771367Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9771367Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9781372Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9781372Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9781372Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9781372Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9796414Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9796414Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9796414Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9806465Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9806465Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9806465Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9816453Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9816453Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9816453Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9816453Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9816453Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9835907Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9835907Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9835907Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9845944Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9845944Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9845944Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9855943Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9855943Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9855943Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9868308Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9868308Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9868308Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9878311Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9878311Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9878311Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9888316Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9888316Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9888316Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9898312Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9898312Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9898312Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9898312Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9898312Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9914999Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9914999Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9914999Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9925040Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9925040Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9925040Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9935039Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9935039Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9945068Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9945068Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9945068Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9955051Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9955051Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9955051Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9965050Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9965050Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9965050Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9975035Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9975035Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9975035Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9985039Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:42.9985039Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0000078Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0000078Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0000078Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0000078Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0015201Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0015201Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0025241Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0025241Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0025241Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0035238Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0035238Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0035238Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0035238Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0048108Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0048108Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0048108Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0058088Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0058088Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0058088Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0068089Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0068089Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0068089Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0078087Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0078087Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0078087Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0088089Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0088089Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0088089Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0098086Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:44:43.0098086Z T47 apply number=1 native=True subscription=Game.Mow.TrackConditionController.OnGroupAvailabilityChanged targetIsRelative=False
+2026-11-08T23:44:43.0098086Z T47 apply number=1 native=True subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=True
+2026-11-08T23:44:43.0098086Z T47 apply number=1 native=True parent=World/Mile Posts position=(-23000.0000, 0.0000, 1500.0000) rotation=(0.0000, 0.0000, 0.0000, 1.0000) local=(0.0000, 0.0000, 0.0000)
+2026-11-08T23:44:43.0098086Z T47 apply number=1 native=True node=World/Mile Posts/T-47 pos=(405.0410, 612.2689, 462.6683) rot=(-0.0040, 0.6908, -0.0038, -0.7230) local=(23405.0400, 612.2689, -1037.3320) active=True
+2026-11-08T23:44:43.0116896Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Front Label pos=(404.9785, 613.1462, 462.7175) rot=(0.0047, -0.8728, -0.0029, -0.4880) local=(0.0464, 0.8780, 0.0540) active=True
+2026-11-08T23:44:43.0116896Z T47 apply number=1 native=True node=World/Mile Posts/T-47/MilePost pos=(405.0410, 612.6089, 462.6827) rot=(0.6151, 0.3484, 0.3417, -0.6193) local=(0.0144, 0.3400, -0.0037) active=True
+2026-11-08T23:44:43.0116896Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Side Label pos=(405.0938, 613.1475, 462.7158) rot=(0.0049, -0.8590, 0.0026, 0.5119) local=(0.0498, 0.8780, -0.0594) active=True
+2026-11-08T23:44:43.0126935Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Map View Label pos=(404.8184, 632.2676, 462.6785) rot=(-0.5141, 0.4857, -0.4912, -0.5084) local=(0.0000, 20.0000, 0.0000) active=True
+2026-11-08T23:44:43.0126935Z T47 apply number=1 native=True node=World/Mile Posts/T-47/Map View Label/Label pos=(403.9492, 632.2676, 443.6431) rot=(0.0923, -0.7011, 0.7011, 0.0923) local=(-15.0000, 0.0000, 0.0000) active=True
+2026-11-08T23:44:43.0136936Z T47 apply number=1 native=True placement offset=(2.00, 0.00, 0.00) angle=15 terrain=False oldEnabled=True newEnabled=True
+2026-11-08T23:44:43.0136936Z T47 apply registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 267,919>
+2026-11-08T23:44:57.0261195Z pause requested
+2026-11-08T23:45:10.2254265Z T47 pre-restore original positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:45:10.2254265Z T47 restore marker positionRotation=True point=(405.7609, 612.2800, 464.0547) terrainRay=True snap=True visualTrialRequiresTerrain=True hit=(405.7609, 611.8724, 464.0547)
+2026-11-08T23:45:10.2269317Z T47 restore native=True nativeLast=True pose=(405.76170, 611.87240, 464.05470) rotation=(-0.00434, -0.62669, 0.00349, -0.77925) positionError=0,1389771 rotationError=0
+2026-11-08T23:45:10.2269317Z T47 captured pose written after native success positionError=0 rotationError=0 localError=0 localRotationError=0
+2026-11-08T23:45:10.2269317Z T47 restoredOriginalLast=null
+2026-11-08T23:45:10.2279354Z T47 restored registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>
+2026-11-08T23:45:10.2279354Z T47 restored origin=(23000.0000, 0.0000, -1500.0000) graph=-383073976 location=<Stky0cg9c, B -> 266,919> observed=sy-db observing=True nativeSubscriptions=1 patchSubscribed=False active=True hierarchy=True markerEnabled=True registrations=1
+2026-11-08T23:45:10.2289361Z T47 restored subscription=Track.TrackObjectManager.GraphOnGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2289361Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2289361Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2289361Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2303008Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2303008Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2303008Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2313055Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2313055Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2323054Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2323054Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2323054Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2323054Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2333055Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2333055Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2343066Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2343066Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2343066Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2353066Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2353066Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2353066Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2363065Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2363065Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2363065Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2373119Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2373119Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2373119Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2373119Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2373119Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2388153Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2388153Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2388153Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2398193Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2398193Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2398193Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2398193Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2408728Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2408728Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2408728Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2418722Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2418722Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2418722Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2428725Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2428725Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2428725Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2428725Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2438739Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2438739Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2438739Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2448733Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2448733Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2448733Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2458737Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2458737Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2458737Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2468731Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2468731Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2473772Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2473772Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2483803Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2483803Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2483803Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2483803Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2499924Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2499924Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2499924Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2509963Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2509963Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2509963Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2519998Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2519998Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2519998Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2529996Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2529996Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2529996Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2540010Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2540010Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2540010Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2540010Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2540010Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2555040Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2555040Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2555040Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2565091Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2565091Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2565091Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2565091Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2565091Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2580121Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2580121Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2580121Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2590182Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=False
+2026-11-08T23:45:10.2595207Z T47 restored subscription=Game.Mow.TrackConditionController.OnGroupAvailabilityChanged targetIsRelative=False
+2026-11-08T23:45:10.2595207Z T47 restored subscription=Track.TrackRelativePosition.OnGraphGroupEnabledDidChange targetIsRelative=True
+2026-11-08T23:45:10.2595207Z T47 restored parent=World/Mile Posts position=(-23000.0000, 0.0000, 1500.0000) rotation=(0.0000, 0.0000, 0.0000, 1.0000) local=(0.0000, 0.0000, 0.0000)
+2026-11-08T23:45:10.2595207Z T47 restored node=World/Mile Posts/T-47 pos=(405.7617, 612.0114, 464.0547) rot=(-0.0043, -0.6267, 0.0035, -0.7792) local=(23405.7600, 612.0114, -1035.9450) active=True
+2026-11-08T23:45:10.2605252Z T47 restored node=World/Mile Posts/T-47/Front Label pos=(405.8340, 612.8887, 464.0231) rot=(-0.0023, -0.5977, -0.0051, 0.8017) local=(0.0464, 0.8780, 0.0540) active=True
+2026-11-08T23:45:10.2605252Z T47 restored node=World/Mile Posts/T-47/MilePost pos=(405.7656, 612.3514, 464.0406) rot=(0.4191, -0.5685, -0.5652, -0.4263) local=(0.0144, 0.3400, -0.0037) active=True
+2026-11-08T23:45:10.2605252Z T47 restored node=World/Mile Posts/T-47/Side Label pos=(405.7246, 612.8900, 463.9955) rot=(0.0033, 0.3954, -0.0045, 0.9185) local=(0.0498, 0.8780, -0.0594) active=True
+2026-11-08T23:45:10.2615309Z T47 restored node=World/Mile Posts/T-47/Map View Label pos=(405.9785, 632.0102, 464.1025) rot=(-0.5541, -0.4407, 0.4456, -0.5479) local=(0.0000, 20.0000, 0.0000) active=True
+2026-11-08T23:45:10.2615309Z T47 restored node=World/Mile Posts/T-47/Map View Label/Label pos=(401.8926, 632.0102, 482.7142) rot=(0.7071, 0.0000, 0.0000, 0.7071) local=(-15.0000, 0.0000, 0.0000) active=True
+2026-11-08T23:45:10.2615309Z T47 restored placement offset=(3.20, 0.00, 0.00) angle=180 terrain=True oldEnabled=True newEnabled=True
+2026-11-08T23:45:10.2625348Z T47 restore registration bucket=Stky0cg9c expectedBucket=Stky0cg9c matchingObject=True matchingId=True matchingLocation=True location=<Stky0cg9c, B -> 266,919>

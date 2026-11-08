@@ -1,0 +1,14 @@
+{
+  "identifier": "crankyant/terrain-output-probe",
+  "version": "0.0.1",
+  "name": "CrankyAnt",
+  "author": "CrankyAnt",
+  "assemblies": [
+    "TerrainOutputProbe.dll"
+  ],
+  "dependencies": {
+    "required": [
+      "rr/game >=0.6.2"
+    ]
+  }
+}
