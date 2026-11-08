@@ -1,6 +1,6 @@
 # Crossing gate first-activation hypothesis
 
-This note records the observed first-activation gate movement and a matching static mechanism during issue 21 research. The original crossing reproduced the movement without adding the detection circuit in that session. The observer was loaded and the world used a custom fixture with an added graph. A separate uninstrumented base-map control is still needed to assess those factors.
+This note records the observed first-activation gate movement and a matching static mechanism during issue 21 research. The instrumented original-track control reproduced the movement without adding a detection circuit. A final uninstrumented control also reproduced the physical sequence on the ordinary base map after a full process restart without the probe or fixture in the active test folders. Those research packs are therefore not required for the behavior.
 
 ## Sources and scope
 
@@ -24,4 +24,4 @@ The control's recorded key transition and playable values match this mechanism: 
 
 ## Discriminating observation
 
-The control measured key presence through `KeyValueObject.Keys`, the `Get("gates")` value's `Type`, `IsNull`, and `BoolValue`, and each consumer's `invert`, `animationClip.length`, `animationClip.isLooping`, and playable `Time`, `Speed`, and `PlayState`. These readings support the proposed chain. An in-range time at the actual notification or evidence of another writer resetting the playable would challenge its attribution. An uninstrumented base-map first passage can test whether the physical behavior also occurs without the probe and custom fixture, but would not by itself identify the callback.
+The instrumented control measured key presence through `KeyValueObject.Keys`, the `Get("gates")` value's `Type`, `IsNull`, and `BoolValue`, and each consumer's `invert`, `animationClip.length`, `animationClip.isLooping`, and playable `Time`, `Speed`, and `PlayState`. These readings support the proposed chain. An in-range time at the actual notification or evidence of another writer resetting the playable would challenge its attribution. The [completed uninstrumented base-map control](CrossingDetectionObservations.md#uninstrumented-base-map-control) reproduces the physical behavior without the research packs. It does not identify the callback or measure its values.
