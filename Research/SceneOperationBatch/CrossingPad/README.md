@@ -1,0 +1,39 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+# Crossing pad investigation preparation
+
+[Crossing-pad geometry after marker changes](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/26) asks whether Mg74's generated geometry and culling state follow a valid marker change and can be restored. Runtime testing has not been performed. This preparation does not resolve the issue.
+
+## Sources and static inspection
+
+The starting point is the [operation continuation report](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableOperationsContinuation.md) and its [assessment](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableOperationsContinuationPlan.md). The [operations matrix](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableSceneOperations.md) records Mg74 as Crossing, Sj7c A 185.947662, with TrackMarker, TrackRelativePosition and TrackCurveMeshBuilder. That scene extraction does not establish the state of the next loaded world.
+
+Private inspection of the installed Railroader.dll with ilspycmd 10.1.1.8388 established the following paths for SHA-256 `8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E`:
+
+- `Track.TrackCurveMeshBuilder.GetCurves` reads the marker Location and uses `GetCurvesFromLocation` to obtain graph curves across the configured width. The latter traverses connected segments. This is not proof that a specific runtime candidate is suitable.
+- `BezierCurveMesh.CurveMeshBuilderBase.OnEnable` registers a sphere with the scenery culling manager. It does not invoke Generate. The earlier operations matrix incorrectly states that OnEnable invokes Generate for this build.
+- `CurveMeshBuilderBase.Generate` obtains curves, destroys container children, creates a generated mesh and renderer, updates bounds, and updates the culling token if present. `CullingSphereStateChanged` calls Generate only when its renderer array is null and the visibility or distance condition is met. `RequestUpdateCullingPosition` updates the sphere, not geometry.
+- `Track.TrackRelativePosition.TryApply` moves its configured target when the marker pose and target exist, and may change group observation. The probe below deliberately tests rebind alone; it does not invoke placement. The retained [static lifecycle assessment](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableLifecycleStatic.md) explains that separate path.
+
+No vendor source or game asset is included here. These are static paths, not runtime evidence. The assembly hash does not identify the scene assets.
+
+## Prepared probe and limits
+
+The native-loader DLL is opt-in, and no work occurs until a button is clicked. It gates on the disposable `crankyant/scene-operations-map`, exactly one active Mg74, Sj7c, a resolvable candidate one metre along the same segment, the captured graph and an unchanged floating origin. It logs registration, marker and target poses, group observation, generated mesh instance, vertex count and vertex-byte hash, bounds, renderer state, and culling sphere. The vertex hash uses FNV-1a on local vertex bytes; matching hashes alone do not prove all geometry, material, indices or visual state match. Mesh access may fail if Unity marks it unreadable. The probe does not author mesh or model data.
+
+The probe requires the first `-homedir` argument to name `C:\TMP\RailroaderMapResearch\RuntimeHome` and its own mod directory to be `C:\TMP\RailroaderMapResearch\RuntimeHome\Mods\CrossingPadProbe`. It refuses capture and mutation otherwise. A completed baseline with a live culling token and at least one readable mesh is required before mutation controls are enabled. A failed capture discards the captured references. Mutations are refused if the map, graph, scene or floating origin changes. Restoring the binding does not clear the pending state; the separate verification compares the original binding, mesh vertex signature, bounds and transform, and culling sphere against the baseline. It excludes mesh identity, so regeneration may produce a different object. It does not compare triangle indices, materials or every dependency. Reload without saving if verification fails.
+
+The probe does not apply track-relative placement, verify original offset configuration, validate registrations beyond the recorded marker, location and segment, or guarantee that restoration recreates the same mesh object. Its registration guard requires one entry with the expected segment, marker and location. A graph change or origin movement invalidates comparisons. Do not save the disposable world; if a guard or restoration fails, abandon it. This probe is preparation, not a verified safe runtime procedure. It requires review and a user-present exclusive game lease before use.
+
+## Proposed user-present trial
+
+1. Verify the installed assembly hash and selected fixture; acquire the exclusive game lease. Enable only the necessary packs in the isolated RuntimeHome, then launch with that home. Confirm the process command line and log. Record scene and fixture identity; do not use a personal save.
+2. Capture baseline, check unique matching registration and a live culling token, record the visible pad, then rebind. Capture immediately and after settling with the camera stationary. Record visible geometry separately. Repeat the same rebind and snapshot again. The generated mesh can remain stale despite a changed marker binding.
+3. If the baseline and delayed snapshots are interpretable, call native Generate explicitly and capture again. This is a separate intervention. Compare mesh identity and vertex hash, local and world pose, renderer state and culling sphere. Record visible geometry. A changed result only after this intervention is evidence against automatic generation during that observation window, not proof of all callback timings.
+4. Restore the binding and verify registration and pose. Capture before regeneration. If generation occurred, explicitly Generate on the original binding, snapshot after settling, and use Verify restoration against baseline. Check visible geometry. New object identity is expected to be possible. Failure to restore geometry or culling is an unresolved result. Reload the disposable world without saving and return the test profile to its neutral state.
+
+The separate `TrackRelativePosition` test needs its own guarded procedure covering original configuration, target/parent pose, group subscriptions, active state and restoration. It must not be inferred from this rebind test.
+
+## Build evidence
+
+Build from the repository root with `dotnet build Research/SceneOperationBatch/CrossingPad/CrossingPadProbe.csproj -p:GameManaged=<game-managed-directory> -p:BaseIntermediateOutputPath=<external-obj-directory>/ -p:OutputPath=<external-bin-directory>/`. The build uses installed game references and targets net472. It does not include or redistribute those assemblies. The build completed with zero warnings and errors. The final batch [build manifest](../BuildIdentity.json) records current LF source hashes and staged DLL and manifest hashes. Runtime, visual results, delayed culling, restoration and reload remain untested.

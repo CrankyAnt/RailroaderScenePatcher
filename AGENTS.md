@@ -47,6 +47,7 @@ When in doubt about a place, ask the user.
 Every tracked top-level folder whose name does not start with a dot gets one line: the path and at most one short clause that names the folder's purpose, not its contents. No explanation, rules, status, subfolders, nested lists or file pointers. A new top-level folder adds its line; a removed one removes its line; a change that makes a clause untrue rewrites it in the same change.
 
 - `LICENSES/`: canonical license texts
+- `Research/`: supporting feasibility evidence
 - `docs/`: maintained repository documentation
 
 ## Testing instructions
@@ -56,6 +57,12 @@ One line per validation or test command and per CI workflow the repository runs.
 - `reuse --no-multiprocessing lint`: validates file-level copyright and license information
 - `git diff --check`: checks changes for whitespace errors
 - `actionlint`: validates GitHub Actions workflow definitions
+- `dotnet build Research/SceneOperationBatch/MarkerGroups/MarkerGroups.csproj`: compiles the group placement research probe with external build paths and installed game references
+- `dotnet build Research/SceneOperationBatch/Milepost/MilepostProbe.csproj`: compiles the milepost cache research probe with external build paths and installed game references
+- `dotnet build Research/SceneOperationBatch/CrossingPad/CrossingPadProbe.csproj`: compiles the crossing-pad geometry research probe with external build paths and installed game references
+- `dotnet build Research/SceneOperationBatch/Geometry/BridgeContactProbe.csproj`: compiles the bridge contact research probe with external build paths and installed game references
+- `dotnet build Research/SceneOperationBatch/Geometry/TerrainOutputProbe.csproj`: compiles the terrain output research probe with external build paths and installed game references
+- `pwsh -NoProfile -File Research/SceneOperationBatch/Prepare-SceneOperationBatch.ps1`: verifies game and fixture identity, builds all five research probes with warnings as errors, and stages inactive packs outside the repository
 - `repository-hygiene` (shared, `v1`): the convention checks of branch names, commit subjects and pull-request titles, the credential scan, workflow validation, Dependabot coverage and the Markdown link check, and `reuse lint`
 
 ## Code style

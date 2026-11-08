@@ -1,0 +1,26 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+
+# Marker group placement preparation
+
+This work supports [track-relative placement and group precedence](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/24). It has not tested rebind, placement, group precedence, restoration, or reload. The issue remains open.
+
+## Sources and static inspection
+
+The [retained lifecycle inspection](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableLifecycleStatic.md#group-observation-and-restoration) reports the conditional subscription and placement paths. In particular, `Track.TrackRelativePosition.TryApply` can unsubscribe and observe the current group after a failed placement attempt; an absent marker returns earlier. `Track.TrackMarker.Location` changes logical binding without itself moving the target or updating graph registration. The subscriber's unsubscribe path uses the current shared graph, so graph replacement complicates cleanup. These are static findings, not observations of this fixture.
+
+Local read-only inspection of the installed `Railroader.dll` with Mono.Cecil confirmed method-call references in `Track.TrackRelativePosition.TryApply` to `MoveTransform`, `UnsubscribeFromGroupEvents`, and `ObserveTrackGroup`; `ConfigureAndApply` calls `TryApply`, and `OnDestroy` calls `UnsubscribeFromGroupEvents`. The original inspection above supplies the conditional behavior, which this call-reference check alone does not prove. The installed Railroader 0.6.2 experimental build 26335745 assembly SHA-256 is `8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E`. That hash does not identify scene assets.
+
+The [retained group experiment](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableProbeNext/ApplicableProbe.cs) toggled `sy-db` and installed a temporary explicit-disable callback. It did not rebind a marker to a different group. The [continuation report](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3e5970722bb278cbbaee003300ada6ce916df702/Research/ApplicableOperationsContinuation.md) does not resolve this marker question.
+
+## Prepared trial
+
+The opt-in `MarkerGroups` probe has manual capture, apply and repeat, group toggle, explicit-disable and restore controls. It requires the scene-operations map, T-46 marker `Mdow` in `sy-db`, a valid T-93 location in `na-an`, both groups enabled, one native subscriber, one matching marker registration, and an active target. The destination uses the other marker's resolved location. It does not modify that marker. The trial captures the original location, placement settings, parent and root pose, active state, callback count and last-apply value. It logs descendant poses, group subscriptions and registrations at each phase. Registration checks compare object identity, marker ID, segment bucket and the location segment identity, distance and end against the expected binding. The expected count follows marker activity. It configures a nonzero offset and angle with terrain snapping disabled, then reobserves the original group on restore. It tests old and new group toggles both before and after restoration. Repeat can be invoked while explicit disable is active. Group toggles affect all objects in those groups.
+
+The probe requires the first -homedir argument to name `C:\TMP\RailroaderMapResearch\RuntimeHome` and its mod directory to be `C:\TMP\RailroaderMapResearch\RuntimeHome\Mods\MarkerGroups`. Run it sequentially with other T-46 probes. The probe rejects a changed graph, map, loaded scene, parent or origin and reports cleanup failure rather than claiming recovery. Its unload handler removes its own callback from the captured graph, records a dirty unload, and drops all captured references; it cannot restore a replaced world. Its checks do not prove exact restoration of all group members, child transforms, downstream culling or caches. Telemetry does not prove visible placement. Review it before runtime use. A failed apply may have already changed native subscriptions, so restore must still be attempted; if the guard rejects restoration or any check fails, discard the session without saving.
+
+The native-loader manifest is `Info.json`. No runtime installation or execution occurred. The .NET SDK 10.0.403 build against the installed managed assemblies succeeded with zero warnings and errors, writing outside the checkout. The final batch [build manifest](../BuildIdentity.json) records current LF source hashes, staged DLL and manifest hashes, and fixture identities. The fixture map hash matches the retained continuation report. This does not identify all fixture or game assets. Probe logs may contain game-derived state and must be reviewed before sharing.
+
+## Remaining work
+
+Runtime requires the exclusive game lease and the user in the owning session, using the canonical isolated test environment. Inspect the trial and dependency coverage before activation, then record visible placement separately from telemetry. Automatic reapplication and reload remain untested for this marker. Results for this one component would not establish behavior for other marker consumers.
