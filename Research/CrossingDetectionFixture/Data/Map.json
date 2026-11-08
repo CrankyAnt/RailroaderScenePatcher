@@ -1,0 +1,22 @@
+{
+  "graph": {
+    "nodes": {
+      "NCrankyAntDetection21A": {
+        "position": [4106.8863, 529.0, 5269.2232],
+        "rotation": [0.0, 70.02088, 0.0]
+      },
+      "NCrankyAntDetection21B": {
+        "position": [4670.7766, 529.0, 5474.2297],
+        "rotation": [0.0, 70.02088, 0.0]
+      }
+    },
+    "segments": {
+      "SCrankyAntDetection21": {
+        "a": "NCrankyAntDetection21A",
+        "b": "NCrankyAntDetection21B",
+        "groupId": "",
+        "speedLimit": 15
+      }
+    }
+  }
+}

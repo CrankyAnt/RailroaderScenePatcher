@@ -1,0 +1,19 @@
+{
+  "Spans": [
+    {
+      "Id": "CrankyAntDetection21_A",
+      "Lower": {"Segment": "SCrankyAntDetection21", "End": "A", "Distance": 308},
+      "Upper": {"Segment": "SCrankyAntDetection21", "End": "A", "Distance": 550}
+    },
+    {
+      "Id": "CrankyAntDetection21_I",
+      "Lower": {"Segment": "SCrankyAntDetection21", "End": "A", "Distance": 292},
+      "Upper": {"Segment": "SCrankyAntDetection21", "End": "A", "Distance": 308}
+    },
+    {
+      "Id": "CrankyAntDetection21_B",
+      "Lower": {"Segment": "SCrankyAntDetection21", "End": "A", "Distance": 292},
+      "Upper": {"Segment": "SCrankyAntDetection21", "End": "A", "Distance": 50}
+    }
+  ]
+}

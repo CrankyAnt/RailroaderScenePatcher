@@ -1,0 +1,31 @@
+{
+  "gameVersion": "0.6.2 experimental",
+  "steamBuild": "26335745",
+  "railroaderSha256": "8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E",
+  "runtimeAssemblySha256": "5C6B3BD5AC0B3DE4484E56FC9B379521F1B336B0D04649DC1A8F3CB23937CE53",
+  "probeBuilds": [
+    {
+      "sha256": "244C8236A29D6ECA8A39E5CB6B3DCBEBE140A0C66B2572F14B34C47112E1ACBD",
+      "scope": "Initial Unity-parser refusal; no objects created by that refused call"
+    },
+    {
+      "moduleVersionId": "a6055fba-5b13-413e-9919-26cdd0233547",
+      "scope": "First successful construction, four passages and removal",
+      "sourceLimit": "An exact early source snapshot and binary hash were not separately retained"
+    },
+    {
+      "sha256": "D36BAD60D705A784DE84AE719A68BD76F4E2A07F0902E40D991F18BF7523C788",
+      "moduleVersionId": "0eb67376-7ae3-4d00-af35-d586fbba3466",
+      "scope": "Fresh-world construction, physical gate observation and second removal"
+    },
+    {
+      "sha256": "A0527B073ACC150F80B86D2EB96ECEDA843BFB972F1EBE919530B960E0C48219",
+      "moduleVersionId": "11d8775c-8192-48f4-b28e-3375e6e8871a",
+      "scope": "Original-circuit control with key and playable readings; no circuit addition",
+      "sourceFormatProvenance": "SourceFormatProvenance.json"
+    }
+  ],
+  "repeatSaveSha256": "ABFAAB73A878CF315A0699C15BC05214D1E3AB32C20EEE8B5263E30591E8077B",
+  "nativeControlSaveSha256": "E593C58F848C8BFCF5D15447E9F0A1CB6150441877203E60951FC68063E2654D",
+  "sourceFormatRule": "C denotes CRLF and L denotes LF. Restore the original trailing LF count to the retained text, then restore each recorded line ending and optional UTF-8 BOM. Original-source reconstruction hashes were checked before normalization."
+}

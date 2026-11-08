@@ -1,0 +1,18 @@
+{
+  "objects": [{
+    "identifier": "crankyant/crossing-detection-research",
+    "metadata": {
+      "name": "Crossing detection research",
+      "description": "Disposable additional-track detection experiment",
+      "tags": [],
+      "credits": "CrankyAnt"
+    },
+    "definition": {
+      "kind": "Map",
+      "mapData": "./Map.json",
+      "terrainTileSets": ["rr/nc-bryson"],
+      "mapLayers": ["rr/bushnell-whittier"],
+      "components": {}
+    }
+  }]
+}

@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/crossing-detection-probe",
+  "version": "0.0.1",
+  "name": "Crossing Detection Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["CrossingDetectionProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

@@ -2,3 +2,6 @@
 
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# Preserve raw diagnostic whitespace for exact evidence reconstruction.
+Research/Evidence/*.diagnostics.log whitespace=-blank-at-eol

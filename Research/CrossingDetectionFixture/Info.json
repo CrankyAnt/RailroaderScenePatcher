@@ -1,0 +1,7 @@
+{
+  "identifier": "crankyant/crossing-detection-fixture",
+  "name": "Crossing detection research fixture",
+  "author": "CrankyAnt",
+  "version": "1.0.0",
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}
