@@ -9,6 +9,8 @@ Evidence for [Establish missing evidence for applicable scene-object operations]
 
 ## Evidence identity
 
+[The continuation report](ApplicableOperationsContinuation.md) adds board culling and mask-registration refresh, origin-aware restoration, automatic load trials and warning callback ordering. Its limits and remaining consumer-specific questions supplement the historical matrix below.
+
 Repository text uses LF line endings. [Text provenance](TextProvenance.json) records original and retained hashes and the original CRLF line positions for normalized files, so captured input bytes can be reconstructed. Binary and complete runtime-log hashes identify the original captures; text normalization does not change those records.
 
 The prior audit identified Railroader 0.6.2 experimental `Railroader.dll` SHA-256 `8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E`. This hash does not identify all assets. The [native capability audit](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/00940975c8f1193928bad5f6aca1ff44e13f3f7b/Research/NativeCapabilityAudit.md) is static evidence; the [operations report](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/3db820db8e34b5dc98b6df4c4ffa376963bfa440/Research/SceneOperations.md) records the fixture, build hashes, methods, observations and limitations for the prior runtime cases. The [lifecycle report](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/0f8d3fb69cc362c5a56a22910bdb5a93aa75acc3/Research/SceneLifecycle.md) distinguishes static registration, placement and group-subscription paths. The [original inventory](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/4c00445b048adccb6920c238116d1f7e1e915db9/Research/README.md) supplies the candidate families.

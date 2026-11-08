@@ -1,0 +1,11 @@
+{
+  "graph": {
+    "nodes": {
+      "NCrankyAntSceneProbeA": {"position": [25241.1465, 622.7342, -800.0], "rotation": [0.0, 0.0, 0.0]},
+      "NCrankyAntSceneProbeB": {"position": [25241.1465, 622.7342, -700.0], "rotation": [0.0, 0.0, 0.0]}
+    },
+    "segments": {
+      "SCrankyAntSceneProbe": {"a": "NCrankyAntSceneProbeA", "b": "NCrankyAntSceneProbeB", "groupId": "CrankyAntIssue18Group", "speedLimit": 10}
+    }
+  }
+}

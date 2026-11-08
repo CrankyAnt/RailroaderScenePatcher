@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/board-continuation-probe",
+  "version": "0.0.1",
+  "name": "Board Continuation Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["BoardContinuationProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

@@ -1,0 +1,22 @@
+2026-11-08T18:46:46.3072916Z OnModLoad; read-only trace; warning count begins now
+2026-11-08T18:46:46.3088019Z subscribed Game.Events.MapWillLoadEvent
+2026-11-08T18:46:46.3103068Z subscribed Game.Events.MapDidLoadEvent
+2026-11-08T18:46:46.3133127Z OnModLoad map= graph=null markerCount=0 origin=(0.0000, 0.0000, 0.0000) matchingDiagnosticsSinceModLoad=0
+2026-11-08T18:46:46.3143127Z OnModLoad destination segment=SCrankyAntSceneProbe exists=unavailable graph=null
+2026-11-08T18:46:46.3143127Z OnModLoad marker details and location resolution unavailable: no matching loaded target
+2026-11-08T18:47:45.5484501Z Game.Events.MapWillLoadEvent map= graph=null markerCount=0 origin=(0.0000, 0.0000, 0.0000) matchingDiagnosticsSinceModLoad=0
+2026-11-08T18:47:45.5494497Z Game.Events.MapWillLoadEvent destination segment=SCrankyAntSceneProbe exists=unavailable graph=null
+2026-11-08T18:47:45.5499525Z Game.Events.MapWillLoadEvent marker details and location resolution unavailable: no matching loaded target
+2026-11-08T18:47:47.7972952Z matching diagnostic type=Warning message=[19:47:47 WRN] [System] Whistle Sign E: Track marker M5pp is not on the track at Shuo + 58,7m and will have no effect. {  }
+2026-11-08T18:47:49.0187684Z Game.Events.MapDidLoadEvent map=crankyant/broken-marker-test-map graph=-1629598264 markerCount=2 origin=(0.0000, 0.0000, 0.0000) matchingDiagnosticsSinceModLoad=1
+2026-11-08T18:47:49.0187684Z Game.Events.MapDidLoadEvent destination segment=SCrankyAntSceneProbe exists=True
+2026-11-08T18:47:49.0237775Z Game.Events.MapDidLoadEvent marker id=Mdow path=World/Mile Posts/T-46 Origin enabled=True active=True segment=Stvw distance=51,20403 end=B cachedPositionPresent=False warnedInvalid=False
+2026-11-08T18:47:49.0237775Z Game.Events.MapDidLoadEvent marker id=Mdow currentResolves=True currentResultPresent=True destination=SCrankyAntSceneProbe/A/50 destinationResolves=True destinationResultPresent=True
+2026-11-08T18:47:49.0247798Z Game.Events.MapDidLoadEvent marker id=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E enabled=True active=True segment=Shuo distance=58,69453 end=A cachedPositionPresent=False warnedInvalid=False
+2026-11-08T18:47:49.0247798Z Game.Events.MapDidLoadEvent marker id=M5pp currentResolves=False currentResultPresent=True destination=SCrankyAntSceneProbe/A/50 destinationResolves=True destinationResultPresent=True
+2026-11-08T18:47:52.7276832Z OnWorldLoad map=crankyant/broken-marker-test-map graph=-1629598264 markerCount=2 origin=(0.0000, 0.0000, 0.0000) matchingDiagnosticsSinceModLoad=1
+2026-11-08T18:47:52.7276832Z OnWorldLoad destination segment=SCrankyAntSceneProbe exists=True
+2026-11-08T18:47:52.7286873Z OnWorldLoad marker id=Mdow path=World/Mile Posts/T-46 Origin enabled=True active=True segment=Stvw distance=51,20403 end=B cachedPositionPresent=False warnedInvalid=False
+2026-11-08T18:47:52.7286873Z OnWorldLoad marker id=Mdow currentResolves=True currentResultPresent=True destination=SCrankyAntSceneProbe/A/50 destinationResolves=True destinationResultPresent=True
+2026-11-08T18:47:52.7286873Z OnWorldLoad marker id=M5pp path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E enabled=True active=True segment=Shuo distance=58,69453 end=A cachedPositionPresent=False warnedInvalid=False
+2026-11-08T18:47:52.7296857Z OnWorldLoad marker id=M5pp currentResolves=False currentResultPresent=True destination=SCrankyAntSceneProbe/A/50 destinationResolves=True destinationResultPresent=True

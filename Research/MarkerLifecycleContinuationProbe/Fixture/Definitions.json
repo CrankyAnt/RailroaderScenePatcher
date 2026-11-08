@@ -1,0 +1,1 @@
+{"objects":[{"identifier":"crankyant/scene-operations-map","metadata":{"name":"Scene operations research","description":"Disposable isolated replacement track","tags":[],"credits":""},"definition":{"kind":"Map","mapData":"./Map.json","terrainTileSets":["rr/nc-bryson"],"mapLayers":["rr/bushnell-whittier"],"components":{}}}]}

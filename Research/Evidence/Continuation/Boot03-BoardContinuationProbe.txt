@@ -1,0 +1,413 @@
+2026-11-08T18:18:17.4149007Z loaded assembly=BoardContinuationProbe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null source=issue18-board-continuation-v1
+2026-11-08T18:19:10.1357424Z OnDestroy
+2026-11-08T18:20:29.8361210Z loaded assembly=BoardContinuationProbe, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null source=issue18-board-continuation-v1
+2026-11-08T18:20:51.9993184Z OnWorldLoad
+2026-11-08T18:20:53.3917945Z OnDidMove delta=500,0,0 dirty=False
+2026-11-08T18:21:09.6625374Z OnWorldUnload dirty=False captureCancelled=true
+2026-11-08T18:21:15.7085919Z OnWorldLoad
+2026-11-08T18:21:17.5654990Z OnDidMove delta=-4000,0,-5000 dirty=False
+2026-11-08T18:21:29.3282562Z focus game=25692.9766,633.4856,441.813
+2026-11-08T18:21:30.1051926Z OnDidMove delta=-21500,0,5000 dirty=False
+2026-11-08T18:22:21.3524104Z baseline origin=25500,0,0
+2026-11-08T18:22:21.3534121Z baseline node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:21.3534121Z baseline component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:21.3534121Z baseline component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:22:21.3544145Z baseline component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:22:21.3544145Z baseline component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:22:21.3544145Z baseline node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:21.3554128Z baseline component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:21.3554128Z baseline component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:21.3554128Z baseline component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:21.3564123Z baseline node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:21.3564123Z baseline component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:22:21.3574156Z baseline component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:21.3574156Z baseline component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:22:21.3574156Z baseline component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:21.3574156Z baseline mask.radius=1.5
+2026-11-08T18:22:21.3574156Z baseline mask.falloff=1
+2026-11-08T18:22:21.3589192Z baseline mask.flattenHeightmap=False
+2026-11-08T18:22:21.3589192Z baseline mask.order=0
+2026-11-08T18:22:21.3589192Z baseline mask.modifierKey=m001
+2026-11-08T18:22:21.3599265Z baseline mask.maskTargets.count=1
+2026-11-08T18:22:21.3599265Z baseline mask.target.kind=Mask
+2026-11-08T18:22:21.3609237Z baseline mask.target.maskName=CutTrees
+2026-11-08T18:22:21.3609237Z baseline mask.target.value=1
+2026-11-08T18:22:21.3609237Z baseline mask.target.useCustomStampOffset=False
+2026-11-08T18:22:21.3609237Z baseline mask.target.stampOffset=0
+2026-11-08T18:22:21.3619276Z baseline mask.target.biomeCode=0
+2026-11-08T18:22:21.3624354Z baseline culler._cullingState=Visible
+2026-11-08T18:22:21.3630648Z baseline culler.cullingManagerName=Scenery
+2026-11-08T18:22:21.3630648Z baseline culler.visibleDistanceBand=1
+2026-11-08T18:22:21.3634420Z baseline culler.radius=2.5
+2026-11-08T18:22:21.3634420Z baseline culler.renderers=2
+2026-11-08T18:22:21.3644480Z baseline culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:22:21.3644480Z baseline culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:22:21.3644480Z baseline token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:22:32.1360534Z refresh RequestUpdateCullingPosition + Rebuild
+2026-11-08T18:22:32.1373861Z moved immediate origin=25500,0,0
+2026-11-08T18:22:32.1373861Z moved immediate node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:32.1373861Z moved immediate component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:32.1383859Z moved immediate component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:22:32.1383859Z moved immediate component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:22:32.1383859Z moved immediate component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:22:32.1393854Z moved immediate node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:32.1393854Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:32.1393854Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:32.1403872Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:32.1403872Z moved immediate node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:32.1403872Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:22:32.1403872Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:32.1403872Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:22:32.1418944Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:32.1424179Z moved immediate mask.radius=1.5
+2026-11-08T18:22:32.1424179Z moved immediate mask.falloff=1
+2026-11-08T18:22:32.1424179Z moved immediate mask.flattenHeightmap=False
+2026-11-08T18:22:32.1434234Z moved immediate mask.order=0
+2026-11-08T18:22:32.1434234Z moved immediate mask.modifierKey=m002
+2026-11-08T18:22:32.1434234Z moved immediate mask.maskTargets.count=1
+2026-11-08T18:22:32.1444252Z moved immediate mask.target.kind=Mask
+2026-11-08T18:22:32.1444252Z moved immediate mask.target.maskName=CutTrees
+2026-11-08T18:22:32.1444252Z moved immediate mask.target.value=1
+2026-11-08T18:22:32.1444252Z moved immediate mask.target.useCustomStampOffset=False
+2026-11-08T18:22:32.1459318Z moved immediate mask.target.stampOffset=0
+2026-11-08T18:22:32.1459318Z moved immediate mask.target.biomeCode=0
+2026-11-08T18:22:32.1459318Z moved immediate culler._cullingState=Visible
+2026-11-08T18:22:32.1459318Z moved immediate culler.cullingManagerName=Scenery
+2026-11-08T18:22:32.1474477Z moved immediate culler.visibleDistanceBand=1
+2026-11-08T18:22:32.1474477Z moved immediate culler.radius=2.5
+2026-11-08T18:22:32.1474477Z moved immediate culler.renderers=2
+2026-11-08T18:22:32.1474477Z moved immediate culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:22:32.1474477Z moved immediate culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:22:32.1490087Z moved immediate token.index=255 removed=False sphere.position=197.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:22:42.9337669Z current origin=25500,0,0
+2026-11-08T18:22:42.9347678Z current node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:42.9347678Z current component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:42.9357678Z current component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:22:42.9357678Z current component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:22:42.9357678Z current component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:22:42.9367701Z current node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:42.9367701Z current component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:42.9367701Z current component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:42.9367701Z current component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:42.9382739Z current node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:42.9382739Z current component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:22:42.9382739Z current component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:42.9382739Z current component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:22:42.9398260Z current component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:42.9398260Z current mask.radius=1.5
+2026-11-08T18:22:42.9398260Z current mask.falloff=1
+2026-11-08T18:22:42.9398260Z current mask.flattenHeightmap=False
+2026-11-08T18:22:42.9408311Z current mask.order=0
+2026-11-08T18:22:42.9408311Z current mask.modifierKey=m002
+2026-11-08T18:22:42.9408311Z current mask.maskTargets.count=1
+2026-11-08T18:22:42.9418307Z current mask.target.kind=Mask
+2026-11-08T18:22:42.9423346Z current mask.target.maskName=CutTrees
+2026-11-08T18:22:42.9423346Z current mask.target.value=1
+2026-11-08T18:22:42.9428431Z current mask.target.useCustomStampOffset=False
+2026-11-08T18:22:42.9428431Z current mask.target.stampOffset=0
+2026-11-08T18:22:42.9428431Z current mask.target.biomeCode=0
+2026-11-08T18:22:42.9438501Z current culler._cullingState=Visible
+2026-11-08T18:22:42.9438501Z current culler.cullingManagerName=Scenery
+2026-11-08T18:22:42.9438501Z current culler.visibleDistanceBand=1
+2026-11-08T18:22:42.9438501Z current culler.radius=2.5
+2026-11-08T18:22:42.9448478Z current culler.renderers=2
+2026-11-08T18:22:42.9448478Z current culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:22:42.9448478Z current culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:22:42.9458474Z current token.index=255 removed=False sphere.position=197.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:22:53.4417598Z refresh RequestUpdateCullingPosition + Rebuild
+2026-11-08T18:22:53.4417598Z moved immediate origin=25500,0,0
+2026-11-08T18:22:53.4417598Z moved immediate node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:53.4431489Z moved immediate component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:53.4436507Z moved immediate component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:22:53.4436507Z moved immediate component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:22:53.4436507Z moved immediate component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:22:53.4446556Z moved immediate node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:53.4446556Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:22:53.4446556Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:53.4456531Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:53.4456531Z moved immediate node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T18:22:53.4466529Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:22:53.4466529Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:22:53.4466529Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:22:53.4466529Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:22:53.4476548Z moved immediate mask.radius=1.5
+2026-11-08T18:22:53.4476548Z moved immediate mask.falloff=1
+2026-11-08T18:22:53.4476548Z moved immediate mask.flattenHeightmap=False
+2026-11-08T18:22:53.4486545Z moved immediate mask.order=0
+2026-11-08T18:22:53.4491590Z moved immediate mask.modifierKey=m003
+2026-11-08T18:22:53.4491590Z moved immediate mask.maskTargets.count=1
+2026-11-08T18:22:53.4491590Z moved immediate mask.target.kind=Mask
+2026-11-08T18:22:53.4491590Z moved immediate mask.target.maskName=CutTrees
+2026-11-08T18:22:53.4501622Z moved immediate mask.target.value=1
+2026-11-08T18:22:53.4501622Z moved immediate mask.target.useCustomStampOffset=False
+2026-11-08T18:22:53.4501622Z moved immediate mask.target.stampOffset=0
+2026-11-08T18:22:53.4501622Z moved immediate mask.target.biomeCode=0
+2026-11-08T18:22:53.4516713Z moved immediate culler._cullingState=Visible
+2026-11-08T18:22:53.4516713Z moved immediate culler.cullingManagerName=Scenery
+2026-11-08T18:22:53.4521911Z moved immediate culler.visibleDistanceBand=1
+2026-11-08T18:22:53.4521911Z moved immediate culler.radius=2.5
+2026-11-08T18:22:53.4521911Z moved immediate culler.renderers=2
+2026-11-08T18:22:53.4521911Z moved immediate culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:22:53.4537016Z moved immediate culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:22:53.4537016Z moved immediate token.index=255 removed=False sphere.position=197.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:23:02.9999068Z refresh RequestUpdateCullingPosition + Rebuild
+2026-11-08T18:23:02.9999068Z restored origin=25500,0,0
+2026-11-08T18:23:03.0009062Z restored node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:03.0009062Z restored component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:03.0009062Z restored component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:23:03.0019050Z restored component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:23:03.0019050Z restored component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:23:03.0019050Z restored node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:03.0019050Z restored component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:03.0019050Z restored component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:03.0038823Z restored component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:03.0038823Z restored node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:03.0038823Z restored component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:23:03.0048863Z restored component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:03.0048863Z restored component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:23:03.0048863Z restored component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:03.0058861Z restored mask.radius=1.5
+2026-11-08T18:23:03.0058861Z restored mask.falloff=1
+2026-11-08T18:23:03.0058861Z restored mask.flattenHeightmap=False
+2026-11-08T18:23:03.0058861Z restored mask.order=0
+2026-11-08T18:23:03.0069136Z restored mask.modifierKey=m004
+2026-11-08T18:23:03.0069136Z restored mask.maskTargets.count=1
+2026-11-08T18:23:03.0069136Z restored mask.target.kind=Mask
+2026-11-08T18:23:03.0079126Z restored mask.target.maskName=CutTrees
+2026-11-08T18:23:03.0079126Z restored mask.target.value=1
+2026-11-08T18:23:03.0079126Z restored mask.target.useCustomStampOffset=False
+2026-11-08T18:23:03.0079126Z restored mask.target.stampOffset=0
+2026-11-08T18:23:03.0089127Z restored mask.target.biomeCode=0
+2026-11-08T18:23:03.0089127Z restored culler._cullingState=Visible
+2026-11-08T18:23:03.0089127Z restored culler.cullingManagerName=Scenery
+2026-11-08T18:23:03.0099125Z restored culler.visibleDistanceBand=1
+2026-11-08T18:23:03.0099125Z restored culler.radius=2.5
+2026-11-08T18:23:03.0099125Z restored culler.renderers=2
+2026-11-08T18:23:03.0109130Z restored culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:23:03.0109130Z restored culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:23:03.0109130Z restored token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:23:03.0119129Z restore complete originChanged=False
+2026-11-08T18:23:30.9245489Z baseline origin=25500,0,0
+2026-11-08T18:23:30.9245489Z baseline node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:30.9255486Z baseline component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:30.9255486Z baseline component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:23:30.9265492Z baseline component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:23:30.9265492Z baseline component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:23:30.9265492Z baseline node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:30.9275486Z baseline component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:30.9275486Z baseline component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:30.9275486Z baseline component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:30.9285786Z baseline node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:30.9285786Z baseline component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:23:30.9285786Z baseline component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:30.9295823Z baseline component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:23:30.9295823Z baseline component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:30.9295823Z baseline mask.radius=1.5
+2026-11-08T18:23:30.9295823Z baseline mask.falloff=1
+2026-11-08T18:23:30.9305819Z baseline mask.flattenHeightmap=False
+2026-11-08T18:23:30.9305819Z baseline mask.order=0
+2026-11-08T18:23:30.9305819Z baseline mask.modifierKey=m004
+2026-11-08T18:23:30.9315808Z baseline mask.maskTargets.count=1
+2026-11-08T18:23:30.9315808Z baseline mask.target.kind=Mask
+2026-11-08T18:23:30.9320835Z baseline mask.target.maskName=CutTrees
+2026-11-08T18:23:30.9320835Z baseline mask.target.value=1
+2026-11-08T18:23:30.9320835Z baseline mask.target.useCustomStampOffset=False
+2026-11-08T18:23:30.9330869Z baseline mask.target.stampOffset=0
+2026-11-08T18:23:30.9330869Z baseline mask.target.biomeCode=0
+2026-11-08T18:23:30.9330869Z baseline culler._cullingState=Visible
+2026-11-08T18:23:30.9330869Z baseline culler.cullingManagerName=Scenery
+2026-11-08T18:23:30.9340868Z baseline culler.visibleDistanceBand=1
+2026-11-08T18:23:30.9340868Z baseline culler.radius=2.5
+2026-11-08T18:23:30.9340868Z baseline culler.renderers=2
+2026-11-08T18:23:30.9340868Z baseline culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:23:30.9350868Z baseline culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:23:30.9350868Z baseline token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:23:40.6104758Z toggle activeSelf=False
+2026-11-08T18:23:40.6114784Z toggle origin=25500,0,0
+2026-11-08T18:23:40.6119840Z toggle node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=False activeHierarchy=False
+2026-11-08T18:23:40.6119840Z toggle component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:40.6119840Z toggle component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:23:40.6119840Z toggle component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:23:40.6119840Z toggle component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:23:40.6135089Z toggle node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=False
+2026-11-08T18:23:40.6135089Z toggle component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:40.6135089Z toggle component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:40.6145134Z toggle component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:40.6145134Z toggle node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=False
+2026-11-08T18:23:40.6155166Z toggle component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:23:40.6155166Z toggle component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:40.6155166Z toggle component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:23:40.6155166Z toggle component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:40.6165131Z toggle mask.radius=1.5
+2026-11-08T18:23:40.6165131Z toggle mask.falloff=1
+2026-11-08T18:23:40.6165131Z toggle mask.flattenHeightmap=False
+2026-11-08T18:23:40.6175140Z toggle mask.order=0
+2026-11-08T18:23:40.6175140Z toggle mask.maskTargets.count=1
+2026-11-08T18:23:40.6175140Z toggle mask.target.kind=Mask
+2026-11-08T18:23:40.6185144Z toggle mask.target.maskName=CutTrees
+2026-11-08T18:23:40.6185144Z toggle mask.target.value=1
+2026-11-08T18:23:40.6185144Z toggle mask.target.useCustomStampOffset=False
+2026-11-08T18:23:40.6195138Z toggle mask.target.stampOffset=0
+2026-11-08T18:23:40.6195138Z toggle mask.target.biomeCode=0
+2026-11-08T18:23:40.6195138Z toggle culler._cullingState=Visible
+2026-11-08T18:23:40.6205134Z toggle culler.cullingManagerName=Scenery
+2026-11-08T18:23:40.6205134Z toggle culler.visibleDistanceBand=1
+2026-11-08T18:23:40.6205134Z toggle culler.radius=2.5
+2026-11-08T18:23:40.6205134Z toggle culler.renderers=2
+2026-11-08T18:23:40.6215135Z toggle culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:23:40.6215135Z toggle culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:23:40.6215135Z toggle token=null active=False
+2026-11-08T18:23:51.4516421Z toggle activeSelf=True
+2026-11-08T18:23:51.4526457Z toggle origin=25500,0,0
+2026-11-08T18:23:51.4526457Z toggle node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:51.4526457Z toggle component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:51.4536460Z toggle component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:23:51.4541490Z toggle component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:23:51.4541490Z toggle component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:23:51.4541490Z toggle node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:51.4551517Z toggle component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:23:51.4551517Z toggle component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:51.4551517Z toggle component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:51.4561551Z toggle node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T18:23:51.4561551Z toggle component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:23:51.4561551Z toggle component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:23:51.4571565Z toggle component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:23:51.4571565Z toggle component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:23:51.4576593Z toggle mask.radius=1.5
+2026-11-08T18:23:51.4576593Z toggle mask.falloff=1
+2026-11-08T18:23:51.4576593Z toggle mask.flattenHeightmap=False
+2026-11-08T18:23:51.4576593Z toggle mask.order=0
+2026-11-08T18:23:51.4591615Z toggle mask.modifierKey=m005
+2026-11-08T18:23:51.4597777Z toggle mask.maskTargets.count=1
+2026-11-08T18:23:51.4597777Z toggle mask.target.kind=Mask
+2026-11-08T18:23:51.4597777Z toggle mask.target.maskName=CutTrees
+2026-11-08T18:23:51.4607812Z toggle mask.target.value=1
+2026-11-08T18:23:51.4607812Z toggle mask.target.useCustomStampOffset=False
+2026-11-08T18:23:51.4617811Z toggle mask.target.stampOffset=0
+2026-11-08T18:23:51.4617811Z toggle mask.target.biomeCode=0
+2026-11-08T18:23:51.4622838Z toggle culler._cullingState=Visible
+2026-11-08T18:23:51.4622838Z toggle culler.cullingManagerName=Scenery
+2026-11-08T18:23:51.4632861Z toggle culler.visibleDistanceBand=1
+2026-11-08T18:23:51.4632861Z toggle culler.radius=2.5
+2026-11-08T18:23:51.4632861Z toggle culler.renderers=2
+2026-11-08T18:23:51.4642880Z toggle culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:23:51.4642880Z toggle culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:23:51.4652878Z toggle token.index=1035 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:24:01.2300772Z refresh RequestUpdateCullingPosition + Rebuild
+2026-11-08T18:24:01.2315814Z moved immediate origin=25500,0,0
+2026-11-08T18:24:01.2315814Z moved immediate node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T18:24:01.2325854Z moved immediate component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:24:01.2325854Z moved immediate component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:24:01.2335853Z moved immediate component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:24:01.2335853Z moved immediate component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:24:01.2335853Z moved immediate node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T18:24:01.2345861Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:24:01.2345861Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:24:01.2345861Z moved immediate component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:24:01.2355857Z moved immediate node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T18:24:01.2355857Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:24:01.2355857Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=True
+2026-11-08T18:24:01.2365858Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:24:01.2365858Z moved immediate component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:24:01.2365858Z moved immediate mask.radius=1.5
+2026-11-08T18:24:01.2365858Z moved immediate mask.falloff=1
+2026-11-08T18:24:01.2365858Z moved immediate mask.flattenHeightmap=False
+2026-11-08T18:24:01.2381271Z moved immediate mask.order=0
+2026-11-08T18:24:01.2381271Z moved immediate mask.modifierKey=m006
+2026-11-08T18:24:01.2381271Z moved immediate mask.maskTargets.count=1
+2026-11-08T18:24:01.2381271Z moved immediate mask.target.kind=Mask
+2026-11-08T18:24:01.2381271Z moved immediate mask.target.maskName=CutTrees
+2026-11-08T18:24:01.2396382Z moved immediate mask.target.value=1
+2026-11-08T18:24:01.2396382Z moved immediate mask.target.useCustomStampOffset=False
+2026-11-08T18:24:01.2396382Z moved immediate mask.target.stampOffset=0
+2026-11-08T18:24:01.2396382Z moved immediate mask.target.biomeCode=0
+2026-11-08T18:24:01.2406415Z moved immediate culler._cullingState=Visible
+2026-11-08T18:24:01.2406415Z moved immediate culler.cullingManagerName=Scenery
+2026-11-08T18:24:01.2406415Z moved immediate culler.visibleDistanceBand=1
+2026-11-08T18:24:01.2416415Z moved immediate culler.radius=2.5
+2026-11-08T18:24:01.2416415Z moved immediate culler.renderers=2
+2026-11-08T18:24:01.2421460Z moved immediate culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=True
+2026-11-08T18:24:01.2421460Z moved immediate culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=True
+2026-11-08T18:24:01.2421460Z moved immediate token.index=1035 removed=False sphere.position=197.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:24:15.2157224Z focus far game=35692.9766,633.4856,441.8128
+2026-11-08T18:24:15.2338393Z OnDidMove delta=-10000,0,0 dirty=True
+2026-11-08T18:25:07.3093135Z current origin=35500,0,0
+2026-11-08T18:25:07.3093135Z current node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=-9802.023,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T18:25:07.3108202Z current component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:25:07.3108202Z current component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:25:07.3118244Z current component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:25:07.3118244Z current component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:25:07.3118244Z current node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=-9802.129,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T18:25:07.3118244Z current component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:25:07.3131597Z current component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:25:07.3131597Z current component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=False
+2026-11-08T18:25:07.3131597Z current node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=-9802.107,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T18:25:07.3141642Z current component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:25:07.3141642Z current component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=False
+2026-11-08T18:25:07.3141642Z current component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:25:07.3151645Z current component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:25:07.3151645Z current mask.radius=1.5
+2026-11-08T18:25:07.3151645Z current mask.falloff=1
+2026-11-08T18:25:07.3161637Z current mask.flattenHeightmap=False
+2026-11-08T18:25:07.3161637Z current mask.order=0
+2026-11-08T18:25:07.3161637Z current mask.modifierKey=m006
+2026-11-08T18:25:07.3171638Z current mask.maskTargets.count=1
+2026-11-08T18:25:07.3171638Z current mask.target.kind=Mask
+2026-11-08T18:25:07.3171638Z current mask.target.maskName=CutTrees
+2026-11-08T18:25:07.3171638Z current mask.target.value=1
+2026-11-08T18:25:07.3181625Z current mask.target.useCustomStampOffset=False
+2026-11-08T18:25:07.3181625Z current mask.target.stampOffset=0
+2026-11-08T18:25:07.3181625Z current mask.target.biomeCode=0
+2026-11-08T18:25:07.3191625Z current culler._cullingState=NotVisible
+2026-11-08T18:25:07.3191625Z current culler.cullingManagerName=Scenery
+2026-11-08T18:25:07.3191625Z current culler.visibleDistanceBand=1
+2026-11-08T18:25:07.3201636Z current culler.radius=2.5
+2026-11-08T18:25:07.3201636Z current culler.renderers=2
+2026-11-08T18:25:07.3201636Z current culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=False
+2026-11-08T18:25:07.3201636Z current culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=False
+2026-11-08T18:25:07.3216672Z current token.index=1035 removed=False sphere.position=-9802.023,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:25:36.6926325Z refresh RequestUpdateCullingPosition + Rebuild
+2026-11-08T18:25:36.6936337Z restored origin=35500,0,0
+2026-11-08T18:25:36.6936337Z restored node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=-9807.023,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T18:25:36.6946339Z restored component=World/Signs/Loc: Sylva Int type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:25:36.6946339Z restored component=World/Signs/Loc: Sylva Int type=Helpers.Culling.RendererCuller enabled=True
+2026-11-08T18:25:36.6946339Z restored component=World/Signs/Loc: Sylva Int type=Map.Runtime.MaskComponents.CircleMapMask enabled=True
+2026-11-08T18:25:36.6946339Z restored component=World/Signs/Loc: Sylva Int type=Helpers.TextSynchronizer enabled=True
+2026-11-08T18:25:36.6946339Z restored node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=-9807.121,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T18:25:36.6961378Z restored component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.Transform enabled=n/a
+2026-11-08T18:25:36.6961378Z restored component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:25:36.6961378Z restored component=World/Signs/Loc: Sylva Int/Sign-Location type=UnityEngine.MeshRenderer enabled=False
+2026-11-08T18:25:36.6971404Z restored node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=-9807.102,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T18:25:36.6971404Z restored component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.RectTransform enabled=n/a
+2026-11-08T18:25:36.6971404Z restored component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshRenderer enabled=False
+2026-11-08T18:25:36.6981420Z restored component=World/Signs/Loc: Sylva Int/Text type=TMPro.TextMeshPro enabled=True
+2026-11-08T18:25:36.6981420Z restored component=World/Signs/Loc: Sylva Int/Text type=UnityEngine.MeshFilter enabled=n/a
+2026-11-08T18:25:36.6981420Z restored mask.radius=1.5
+2026-11-08T18:25:36.6981420Z restored mask.falloff=1
+2026-11-08T18:25:36.6981420Z restored mask.flattenHeightmap=False
+2026-11-08T18:25:36.6998629Z restored mask.order=0
+2026-11-08T18:25:36.6998629Z restored mask.modifierKey=m007
+2026-11-08T18:25:36.6998629Z restored mask.maskTargets.count=1
+2026-11-08T18:25:36.7008665Z restored mask.target.kind=Mask
+2026-11-08T18:25:36.7008665Z restored mask.target.maskName=CutTrees
+2026-11-08T18:25:36.7008665Z restored mask.target.value=1
+2026-11-08T18:25:36.7008665Z restored mask.target.useCustomStampOffset=False
+2026-11-08T18:25:36.7018665Z restored mask.target.stampOffset=0
+2026-11-08T18:25:36.7018665Z restored mask.target.biomeCode=0
+2026-11-08T18:25:36.7023706Z restored culler._cullingState=NotVisible
+2026-11-08T18:25:36.7023706Z restored culler.cullingManagerName=Scenery
+2026-11-08T18:25:36.7023706Z restored culler.visibleDistanceBand=1
+2026-11-08T18:25:36.7033736Z restored culler.radius=2.5
+2026-11-08T18:25:36.7033736Z restored culler.renderers=2
+2026-11-08T18:25:36.7033736Z restored culler.renderer=World/Signs/Loc: Sylva Int/Sign-Location enabled=False
+2026-11-08T18:25:36.7043772Z restored culler.renderer=World/Signs/Loc: Sylva Int/Text enabled=False
+2026-11-08T18:25:36.7043772Z restored token.index=1035 removed=False sphere.position=-9807.023,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T18:25:36.7043772Z restore complete originChanged=True
+2026-11-08T18:25:47.2782275Z focus game=25692.9766,633.4856,441.8128
+2026-11-08T18:25:48.0519639Z OnDidMove delta=10000,0,0 dirty=False
+2026-11-08T18:27:21.8517297Z OnWorldUnload dirty=False captureCancelled=true
+2026-11-08T18:29:46.4450569Z OnWorldLoad
+2026-11-08T18:29:48.2009384Z OnDidMove delta=-4000,0,-5000 dirty=False
+2026-11-08T18:30:32.9558109Z pause requested
+2026-11-08T18:30:44.7237821Z OnWorldUnload dirty=False captureCancelled=true
+2026-11-08T18:30:58.1206280Z OnDestroy

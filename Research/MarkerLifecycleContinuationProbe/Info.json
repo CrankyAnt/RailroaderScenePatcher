@@ -1,0 +1,1 @@
+{"identifier":"crankyant/marker-lifecycle-continuation-probe","version":"0.0.1","name":"Marker Lifecycle Continuation Probe","author":"CrankyAnt","assemblies":["MarkerLifecycleContinuationProbe.dll"],"dependencies":{"required":["rr/game >=0.6.2"]}}
