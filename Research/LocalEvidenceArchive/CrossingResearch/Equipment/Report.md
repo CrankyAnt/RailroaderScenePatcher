@@ -1,0 +1,29 @@
+# Crossing equipment research draft
+
+This note supports [issue 22](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/22) and the equipment portion of the [crossing direction](https://github.com/CrankyAnt/RailroaderScenePatcher/issues/19#issuecomment-6716850783). It is a working draft. No added equipment has yet been shown to operate.
+
+## Sources and limits
+
+The primary static source is the locally installed `Railroader_Data/Managed/Railroader.dll`, SHA-256 `8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E`. Metadata and method calls were inspected with Mono.Cecil, without copying game code or assets. Type and method names below are source locators in that assembly. The existing [applicable operation report](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/b41a6dda255accf2de1949414b35ea37f4b8d63c/Research/ApplicableSceneOperations.md) describes the Bryson Everett crossing and the previous occupied-circuit trial. That trial observed gate arms and sampled output values; it did not independently establish lamp flashes or audible bell behavior. The [native audit](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/8d3bfc0005d15e8b0404fc584479bd60f385c4fd/Research/NativeCapabilityAudit.md) describes the bounded native authoring search.
+
+## Static findings
+
+`Track.Crossings.GradeCrossingController` owns circuit sets and reads and writes `lights`, `gates` and `bell` values through a `KeyValue.Runtime.KeyValueObject` obtained from its own object in `OnEnableWithProperties`. It has no serialized list of lamp or gate devices in the inspected metadata. This does not prove which scene components consume those values.
+
+The controller creates a `Crossing Bell` child and adds `Audio.IntegerLoopingPlayer`, loads an audio reference, and starts a coroutine during initialization. Its default audio identifier is `rr/bell-uss-teardrop-crossing-rh`. On disable it stops its coroutine, cancels loading, destroys the player object and disposes the loaded reference. A cloned visual device is not evidence of a second physical audio emitter or of audible behavior. Actual asset availability and the audio response require runtime observation.
+
+Candidate consumer paths are `Track.KeyValueLampMaterialController` and `RollingStock.Controls.KeyValueBoolAnimator`. Their initialization searches the parent hierarchy for a `KeyValueObject`, reads a named key and registers an observer. The lamp discovers renderers and keeps material property blocks; the animator needs an `Animator` and its animation clip and creates a playable. Their disable paths dispose observers, and the animator destroys its playable on destruction. Both inherit `Game.GameBehaviour`, whose `OnEnable` registers initialization with `Game.State.RestoreNotifier`. Whether these components occur on this specific crossing, their assigned keys and the behavior of initialization after the world has restored require the read-only scene inspection and runtime trial.
+
+## Runtime preflight
+
+The independently authored `CrossingExpansionProbe.cs` inspects one exact controller under `World/Large Scenery/Bryson/Grade Crossing - Bryson Everett` in map `crankyant/crossing-expansion-research`. It reports descendant objects, component types, active states, and serialized fields and Unity object references. It changes only the camera on the explicit focus command and does not create or change equipment. The build succeeded using the installed managed assemblies with no warnings. The probe output and any subsequent guarded mutation are pending.
+
+## Decision consequences and open evidence
+
+A candidate clone must identify a retained source object and intended controller separately, preserve required child assets and component references, and initialize under the intended key-value owner. Instance paths and the assembly hash bound compatibility; they do not guarantee stable identity across game versions. A successful lamp observation cannot establish gate animation, bell playback, collision, source preservation, removal, or fresh-world reproduction. Those require separate evidence. No product failure policy or authoring schema follows from the static inspection alone.
+
+## Scene inspection
+
+The disposable map's first inspection found `Signal 1` and `Signal 2` under the exact controller. Each contains a `Track.KeyValueLampMaterialController` configured for `lights`, targeting its own `Crossing Signal Wishbone A (1)` model. The model has an `Animator` and `RollingStock.Controls.KeyValueBoolAnimator` configured for `gates`, with an animation clip named `Scene`. The controller's `GameObjectCuller` lists the two original outer signal roots. Its generated `Crossing Bell` contains `Audio.IntegerLoopingPlayer` and generated audio-source children. The inspection ran with an unrelated inventory mod enabled that deleted some original track segments. It establishes the observed equipment hierarchy only; it is not a valid train or circuit trial. The operator is restoring a clean fixture before mutation.
+
+`EquipmentResearch.cs` supplies a guarded, independently authored trial helper. It instantiates the first outer signal under a new inactive wrapper parented to the existing controller, checks that the lamp target was remapped to the cloned model, retains the animation asset, and then enables the wrapper. It samples the original and cloned gate transform and the renderer material property blocks associated with each lamp's actual material mappings. It checks the original source identity, original span objects and culler collection during the trial and after removal. The wrapper is not added to the native culler. Whether this clone initializes, responds, cleans up and can be reproduced is pending runtime evidence. The helper does not create another bell: the existing bell player is driven by controller-owned logic, so copying that player alone would not establish a connected audio device.

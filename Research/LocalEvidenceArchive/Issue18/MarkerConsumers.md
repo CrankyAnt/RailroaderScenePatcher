@@ -1,0 +1,21 @@
+# Track marker consumers
+
+Working note for issue 18. This is static inspection, not a runtime demonstration. The installed `Railroader_Data/Managed/Railroader.dll` has SHA-256 `8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E`. Mono.Cecil 10.1.1 was used to find method references; ILSpy 10.1.1 was used to inspect the named methods. The descriptions below are independently worded and do not reproduce game code. Scene IDs are version-specific.
+
+## Categories and query paths
+
+`Track.TrackMarkerType` has five members: `Generic`, `Signal`, `Flare`, `Crossing`, and `PassengerStop`. Speed, yard limit, whistle, and station sign are not members of that enum. A scene object's descriptive name does not establish its serialized enum value. `Track.TrackMarker.OnEnable` registers its ID, resolved location, integer enum value, and marker object with `Track.Graph.AddNamedLocation` when the location resolves. `Graph` stores named locations by segment and ID. Registration alone does not establish an operational effect.
+
+`Track.Graph.EnumerateTrackMarkers` is a downstream spatial query. A Mono.Cecil inspection of direct method references in top-level types found calls in `Model.AI.AutoEngineerPlanner.DistanceToNextSignalAfter`, `IsSwitchBlockerPresent`, and `Search`. The planner looks for signals and flares; its `Search` separately handles flare, crossing and passenger-stop categories. In that category switch, generic and signal entries have no action. This describes the inspected planner paths, not every possible component or indirect consumer of a scene object.
+
+`Game.Scripting.Modules.Railroader.NativeTrack.GetMarkerLocation`, exposed as `getMarkerLocation`, queries `Graph.TryGetNamedLocation` by ID. If registration is absent, it searches loaded `TrackMarker` objects including inactive objects and returns a matching marker's location if available. A successful lookup therefore does not itself prove active graph registration. Scripts that call this API, and whether any use these particular IDs, were not established.
+
+The planner's `CalculateMaxSpeedMph` consults track segment properties including posted track class. That is a concrete speed calculation path, but it does not prove how a scene speed sign or its marker influences any speed rule. The static inspection did not establish an operational query for a yard-limit sign, whistle board, or station-sign label. It also does not prove no such consumer exists.
+
+## Instance boundaries
+
+The [inventory](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/4c00445b048adccb6920c238116d1f7e1e915db9/Research/Scope/Tests/07-Inventory/Result.md) records missing-marker warnings for speed Mwp1 and yard limit Mkwd on deleted Sjdl, and whistle Mm8w and station sign Mi4f on deleted S9sc. It does not establish their actual serialized `TrackMarker.type`, object references, other attached components or downstream behavior. Resolve those per instance before assigning a category or proposing an equivalent operation. The [scene targets](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/4c00445b048adccb6920c238116d1f7e1e915db9/Research/Scope/SceneBatchTargets.md) identify `TrackMarker` and `TrackRelativePosition` on Mwp1 and Mm8w, but that does not establish all dependencies.
+
+The prior [native capability audit](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/00940975c8f1193928bad5f6aca1ff44e13f3f7b/Research/NativeCapabilityAudit.md) records a rebind, direct pose and restoration for whistle M5pp in an editor fixture. The [inventory](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/4c00445b048adccb6920c238116d1f7e1e915db9/Research/Scope/Tests/07-Inventory/Result.md) also notes a separate M5pp movement trial confounded by switch geometry. Neither establishes Mwp1, Mkwd, Mm8w or Mi4f behavior, a general repair, or a train response to a whistle board.
+
+For each candidate the missing evidence is the actual enum, attached components and object links, its position and active state, registration before and after a valid rebind, and any specific downstream consumer observed before, after and on restoration. For an operational claim, test the relevant train, speed, yard or sign behavior independently. Static query paths guide that observation; they do not substitute for it. Reload and persistence remain separate questions.
