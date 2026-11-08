@@ -1,0 +1,18 @@
+2026-11-08T01:16:52.7740171Z loaded
+2026-11-08T01:18:18.3719487Z loaded
+2026-11-08T01:19:01.9633875Z baseline originCacheExisted=False priorMatchesT46=False resolvedMatchesT46=True
+2026-11-08T01:19:01.9643873Z baseline registration id=Mdow bucket=Stvw objectMatches=True
+2026-11-08T01:19:01.9643873Z baseline post=World/Mile Posts/T-46 Origin prefix=T mileage=46 text=46 segment=Stvw distance=51,20403 end=B registrations=1 active=True position=(21002.9200, 622.5887, -5914.9830)
+2026-11-08T01:19:01.9653875Z baseline registration id=Mnau bucket=Stky0cg9c objectMatches=True
+2026-11-08T01:19:01.9653875Z baseline post=World/Mile Posts/T-47 prefix=T mileage=47 text=47 segment=Stky0cg9c distance=266,9192 end=B registrations=1 active=True position=(19405.7600, 612.0114, -6035.9450)
+2026-11-08T01:19:01.9719280Z rebound originCacheExisted=False priorMatchesT46=False resolvedMatchesT46=True
+2026-11-08T01:19:01.9719280Z rebound registration id=Mdow bucket=Stvw objectMatches=True
+2026-11-08T01:19:01.9729279Z rebound post=World/Mile Posts/T-46 Origin prefix=T mileage=46 text=46 segment=Stvw distance=51,45403 end=B registrations=1 active=True position=(21002.9200, 622.5887, -5914.9830)
+2026-11-08T01:19:01.9729279Z rebound registration id=Mnau bucket=Stky0cg9c objectMatches=True
+2026-11-08T01:19:01.9729279Z rebound post=World/Mile Posts/T-47 prefix=T mileage=47 text=47 segment=Stky0cg9c distance=266,9192 end=B registrations=1 active=True position=(19405.7600, 612.0114, -6035.9450)
+2026-11-08T01:19:01.9764326Z restored originCacheExisted=False priorMatchesT46=False resolvedMatchesT46=True
+2026-11-08T01:19:01.9774324Z restored registration id=Mdow bucket=Stvw objectMatches=True
+2026-11-08T01:19:01.9774324Z restored post=World/Mile Posts/T-46 Origin prefix=T mileage=46 text=46 segment=Stvw distance=51,20403 end=B registrations=1 active=True position=(21002.9200, 622.5887, -5914.9830)
+2026-11-08T01:19:01.9774324Z restored registration id=Mnau bucket=Stky0cg9c objectMatches=True
+2026-11-08T01:19:01.9784324Z restored post=World/Mile Posts/T-47 prefix=T mileage=47 text=47 segment=Stky0cg9c distance=266,9192 end=B registrations=1 active=True position=(19405.7600, 612.0114, -6035.9450)
+2026-11-08T01:19:01.9804444Z final activity binding registration verified

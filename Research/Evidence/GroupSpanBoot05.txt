@@ -1,0 +1,382 @@
+2026-11-08T00:59:55.2402289Z group baseline post=World/Mile Posts/T-46 Origin origin=(4000.0000, 0.0000, 5000.0000) position=(21002.9200, 622.5887, -5914.9830) rotation=(-0.0039, -0.6187, 0.0029, -0.7856) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.2402289Z group baseline component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.2412271Z field Helpers.TextSynchronizer.text=46
+2026-11-08T00:59:55.2422265Z group baseline component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.2422265Z field Track.TrackMarker.id=Mdow
+2026-11-08T00:59:55.2422265Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.2432261Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.2432261Z nested Track.TrackMarker._location.segmentId=Stvw
+2026-11-08T00:59:55.2442261Z nested Track.TrackMarker._location.distance=51.20403
+2026-11-08T00:59:55.2442261Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.2442261Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.2452285Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.2452285Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.2477405Z group baseline graph marker=Mdow bucket=Stvw objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.2477405Z group baseline graph marker=Mdow count=1
+2026-11-08T00:59:55.2477405Z group baseline component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.2487401Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.2487401Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.2492450Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.2492450Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.2502523Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.2502523Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.2512510Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.2512510Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.2512510Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.2522509Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.2522509Z group baseline component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.2532507Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.2532507Z field Helpers.MilePost.origin=True
+2026-11-08T00:59:55.2532507Z field Helpers.MilePost.mileage=46
+2026-11-08T00:59:55.2542508Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.2542508Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.2768064Z group baseline post=World/Mile Posts/T-47 origin=(4000.0000, 0.0000, 5000.0000) position=(19405.7600, 612.0114, -6035.9450) rotation=(-0.0043, -0.6267, 0.0035, -0.7792) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.2768064Z group baseline component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.2778064Z field Helpers.TextSynchronizer.text=47
+2026-11-08T00:59:55.2778064Z group baseline component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.2788065Z field Track.TrackMarker.id=Mnau
+2026-11-08T00:59:55.2793131Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.2793131Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.2803164Z nested Track.TrackMarker._location.segmentId=Stky0cg9c
+2026-11-08T00:59:55.2803164Z nested Track.TrackMarker._location.distance=266.9192
+2026-11-08T00:59:55.2803164Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.2813159Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.2813159Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.2813159Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.2823161Z group baseline graph marker=Mnau bucket=Stky0cg9c objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.2823161Z group baseline graph marker=Mnau count=1
+2026-11-08T00:59:55.2823161Z group baseline component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.2823161Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-47
+2026-11-08T00:59:55.2833159Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.2833159Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.2833159Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.2833159Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.2843158Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.2843158Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.2848224Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.2848224Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.2848224Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.2848224Z group baseline component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.2848224Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.2848224Z field Helpers.MilePost.origin=False
+2026-11-08T00:59:55.2898444Z field Helpers.MilePost.mileage=47
+2026-11-08T00:59:55.2898444Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-47
+2026-11-08T00:59:55.2908443Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.3154104Z group native disabled post=World/Mile Posts/T-46 Origin origin=(4000.0000, 0.0000, 5000.0000) position=(21002.9200, 622.5887, -5914.9830) rotation=(-0.0039, -0.6187, 0.0029, -0.7856) activeSelf=False activeHierarchy=False
+2026-11-08T00:59:55.3154104Z group native disabled component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.3164105Z field Helpers.TextSynchronizer.text=46
+2026-11-08T00:59:55.3164105Z group native disabled component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.3164105Z field Track.TrackMarker.id=Mdow
+2026-11-08T00:59:55.3164105Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.3179149Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.3179149Z nested Track.TrackMarker._location.segmentId=Stvw
+2026-11-08T00:59:55.3179149Z nested Track.TrackMarker._location.distance=51.20403
+2026-11-08T00:59:55.3189224Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.3189224Z field Track.TrackMarker.OnLocationChanged=null
+2026-11-08T00:59:55.3194294Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.3194294Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.3194294Z group native disabled graph marker=Mdow count=0
+2026-11-08T00:59:55.3204319Z group native disabled component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.3204319Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3204319Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.3204319Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.3214317Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.3214317Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.3219377Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3219377Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.3219377Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.3219377Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.3229404Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.3229404Z group native disabled component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.3229404Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.3229404Z field Helpers.MilePost.origin=True
+2026-11-08T00:59:55.3239403Z field Helpers.MilePost.mileage=46
+2026-11-08T00:59:55.3239403Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3239403Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3505185Z group native disabled post=World/Mile Posts/T-47 origin=(4000.0000, 0.0000, 5000.0000) position=(19405.7600, 612.0114, -6035.9450) rotation=(-0.0043, -0.6267, 0.0035, -0.7792) activeSelf=False activeHierarchy=False
+2026-11-08T00:59:55.3505185Z group native disabled component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.3505185Z field Helpers.TextSynchronizer.text=47
+2026-11-08T00:59:55.3515165Z group native disabled component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.3515165Z field Track.TrackMarker.id=Mnau
+2026-11-08T00:59:55.3515165Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.3525167Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.3525167Z nested Track.TrackMarker._location.segmentId=Stky0cg9c
+2026-11-08T00:59:55.3525167Z nested Track.TrackMarker._location.distance=266.9192
+2026-11-08T00:59:55.3525167Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.3535164Z field Track.TrackMarker.OnLocationChanged=null
+2026-11-08T00:59:55.3535164Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.3535164Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.3545158Z group native disabled graph marker=Mnau count=0
+2026-11-08T00:59:55.3545158Z group native disabled component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.3545158Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-47
+2026-11-08T00:59:55.3555158Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.3555158Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.3555158Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.3555158Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.3565159Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.3565159Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.3565159Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.3570225Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.3570225Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.3570225Z group native disabled component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.3570225Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.3570225Z field Helpers.MilePost.origin=False
+2026-11-08T00:59:55.3570225Z field Helpers.MilePost.mileage=47
+2026-11-08T00:59:55.3570225Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-47
+2026-11-08T00:59:55.3570225Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.3821472Z group native enabled post=World/Mile Posts/T-46 Origin origin=(4000.0000, 0.0000, 5000.0000) position=(21002.9200, 622.5887, -5914.9830) rotation=(-0.0039, -0.6187, 0.0029, -0.7856) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.3831470Z group native enabled component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.3831470Z field Helpers.TextSynchronizer.text=46
+2026-11-08T00:59:55.3831470Z group native enabled component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.3831470Z field Track.TrackMarker.id=Mdow
+2026-11-08T00:59:55.3841469Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.3841469Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.3841469Z nested Track.TrackMarker._location.segmentId=Stvw
+2026-11-08T00:59:55.3851469Z nested Track.TrackMarker._location.distance=51.20403
+2026-11-08T00:59:55.3851469Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.3856517Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.3856517Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.3856517Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.3856517Z group native enabled graph marker=Mdow bucket=Stvw objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.3866570Z group native enabled graph marker=Mdow count=1
+2026-11-08T00:59:55.3866570Z group native enabled component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.3866570Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3866570Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.3866570Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.3876568Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.3876568Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.3876568Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3886568Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.3886568Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.3891628Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.3891628Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.3891628Z group native enabled component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.3891628Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.3901656Z field Helpers.MilePost.origin=True
+2026-11-08T00:59:55.3901656Z field Helpers.MilePost.mileage=46
+2026-11-08T00:59:55.3901656Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.3901656Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.4202279Z group native enabled post=World/Mile Posts/T-47 origin=(4000.0000, 0.0000, 5000.0000) position=(19405.7600, 612.0114, -6035.9450) rotation=(-0.0043, -0.6267, 0.0035, -0.7792) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.4202279Z group native enabled component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.4202279Z field Helpers.TextSynchronizer.text=47
+2026-11-08T00:59:55.4217800Z group native enabled component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.4217800Z field Track.TrackMarker.id=Mnau
+2026-11-08T00:59:55.4227865Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.4227865Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.4227865Z nested Track.TrackMarker._location.segmentId=Stky0cg9c
+2026-11-08T00:59:55.4227865Z nested Track.TrackMarker._location.distance=266.9192
+2026-11-08T00:59:55.4227865Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.4243651Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.4243651Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.4243651Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.4254499Z group native enabled graph marker=Mnau bucket=Stky0cg9c objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.4254499Z group native enabled graph marker=Mnau count=1
+2026-11-08T00:59:55.4254499Z group native enabled component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.4260286Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-47
+2026-11-08T00:59:55.4260286Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.4260286Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.4260286Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.4260286Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.4270304Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.4270304Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.4270304Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.4270304Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.4285374Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.4285374Z group native enabled component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.4285374Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.4285374Z field Helpers.MilePost.origin=False
+2026-11-08T00:59:55.4295435Z field Helpers.MilePost.mileage=47
+2026-11-08T00:59:55.4295435Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-47
+2026-11-08T00:59:55.4295435Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.4315430Z group patch callback enabled=True count=1
+2026-11-08T00:59:55.4547378Z group explicit disable after activation post=World/Mile Posts/T-46 Origin origin=(4000.0000, 0.0000, 5000.0000) position=(21002.9200, 622.5887, -5914.9830) rotation=(-0.0039, -0.6187, 0.0029, -0.7856) activeSelf=False activeHierarchy=False
+2026-11-08T00:59:55.4547378Z group explicit disable after activation component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.4547378Z field Helpers.TextSynchronizer.text=46
+2026-11-08T00:59:55.4558202Z group explicit disable after activation component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.4558202Z field Track.TrackMarker.id=Mdow
+2026-11-08T00:59:55.4558202Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.4558202Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.4568119Z nested Track.TrackMarker._location.segmentId=Stvw
+2026-11-08T00:59:55.4568119Z nested Track.TrackMarker._location.distance=51.20403
+2026-11-08T00:59:55.4568119Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.4568119Z field Track.TrackMarker.OnLocationChanged=null
+2026-11-08T00:59:55.4578143Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.4593204Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.4593204Z group explicit disable after activation graph marker=Mdow count=0
+2026-11-08T00:59:55.4603217Z group explicit disable after activation component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.4603217Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.4603217Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.4613211Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.4613211Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.4613211Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.4613211Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.4613211Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.4623213Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.4623213Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.4623213Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.4623213Z group explicit disable after activation component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.4633223Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.4633223Z field Helpers.MilePost.origin=True
+2026-11-08T00:59:55.4638274Z field Helpers.MilePost.mileage=46
+2026-11-08T00:59:55.4638274Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.4643402Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.4939102Z group explicit disable after activation post=World/Mile Posts/T-47 origin=(4000.0000, 0.0000, 5000.0000) position=(19405.7600, 612.0114, -6035.9450) rotation=(-0.0043, -0.6267, 0.0035, -0.7792) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.4944163Z group explicit disable after activation component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.4944163Z field Helpers.TextSynchronizer.text=47
+2026-11-08T00:59:55.4944163Z group explicit disable after activation component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.4954192Z field Track.TrackMarker.id=Mnau
+2026-11-08T00:59:55.4954192Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.4954192Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.4964190Z nested Track.TrackMarker._location.segmentId=Stky0cg9c
+2026-11-08T00:59:55.4964190Z nested Track.TrackMarker._location.distance=266.9192
+2026-11-08T00:59:55.4969255Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.4969255Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.4969255Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.4969255Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.4979282Z group explicit disable after activation graph marker=Mnau bucket=Stky0cg9c objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.4979282Z group explicit disable after activation graph marker=Mnau count=1
+2026-11-08T00:59:55.4979282Z group explicit disable after activation component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.4979282Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-47
+2026-11-08T00:59:55.4989283Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.4994341Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.4994341Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.5004367Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.5004367Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.5004367Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.5014367Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.5014367Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.5014367Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.5014367Z group explicit disable after activation component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.5014367Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.5014367Z field Helpers.MilePost.origin=False
+2026-11-08T00:59:55.5014367Z field Helpers.MilePost.mileage=47
+2026-11-08T00:59:55.5014367Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-47
+2026-11-08T00:59:55.5029410Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.5034563Z group precedence observed callbackCount=1
+2026-11-08T00:59:55.5310372Z group restored post=World/Mile Posts/T-46 Origin origin=(4000.0000, 0.0000, 5000.0000) position=(21002.9200, 622.5887, -5914.9830) rotation=(-0.0039, -0.6187, 0.0029, -0.7856) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.5310372Z group restored component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.5310372Z field Helpers.TextSynchronizer.text=46
+2026-11-08T00:59:55.5325422Z group restored component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.5325422Z field Track.TrackMarker.id=Mdow
+2026-11-08T00:59:55.5325422Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.5335478Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.5335478Z nested Track.TrackMarker._location.segmentId=Stvw
+2026-11-08T00:59:55.5335478Z nested Track.TrackMarker._location.distance=51.20403
+2026-11-08T00:59:55.5345474Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.5345474Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.5345474Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.5355486Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.5355486Z group restored graph marker=Mdow bucket=Stvw objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.5355486Z group restored graph marker=Mdow count=1
+2026-11-08T00:59:55.5365476Z group restored component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.5365476Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.5375498Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.5375498Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.5385478Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.5385478Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.5390543Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.5390543Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.5390543Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.5390543Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.5400576Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.5400576Z group restored component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.5400576Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.5400576Z field Helpers.MilePost.origin=True
+2026-11-08T00:59:55.5400576Z field Helpers.MilePost.mileage=46
+2026-11-08T00:59:55.5410568Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.5410568Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:59:55.5646181Z group restored post=World/Mile Posts/T-47 origin=(4000.0000, 0.0000, 5000.0000) position=(19405.7600, 612.0114, -6035.9450) rotation=(-0.0043, -0.6267, 0.0035, -0.7792) activeSelf=True activeHierarchy=True
+2026-11-08T00:59:55.5656181Z group restored component=Helpers.TextSynchronizer enabled=True
+2026-11-08T00:59:55.5656181Z field Helpers.TextSynchronizer.text=47
+2026-11-08T00:59:55.5656181Z group restored component=Track.TrackMarker enabled=True
+2026-11-08T00:59:55.5666182Z field Track.TrackMarker.id=Mnau
+2026-11-08T00:59:55.5666182Z field Track.TrackMarker.type=Generic
+2026-11-08T00:59:55.5666182Z field Track.TrackMarker._location=type:Track.SerializableLocation
+2026-11-08T00:59:55.5676188Z nested Track.TrackMarker._location.segmentId=Stky0cg9c
+2026-11-08T00:59:55.5676188Z nested Track.TrackMarker._location.distance=266.9192
+2026-11-08T00:59:55.5676188Z nested Track.TrackMarker._location.end=B
+2026-11-08T00:59:55.5676188Z field Track.TrackMarker.OnLocationChanged=type:System.Action
+2026-11-08T00:59:55.5676188Z field Track.TrackMarker._cachedPosition=null
+2026-11-08T00:59:55.5686184Z field Track.TrackMarker._warnedInvalid=False
+2026-11-08T00:59:55.5691271Z group restored graph marker=Mnau bucket=Stky0cg9c objectMatches=True objectAccessor=True
+2026-11-08T00:59:55.5701296Z group restored graph marker=Mnau count=1
+2026-11-08T00:59:55.5701296Z group restored component=Track.TrackRelativePosition enabled=True
+2026-11-08T00:59:55.5701296Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-47
+2026-11-08T00:59:55.5711293Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:59:55.5711293Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:59:55.5711293Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:59:55.5711293Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:59:55.5721290Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.5721290Z field Track.TrackRelativePosition._observedGroupId=sy-db
+2026-11-08T00:59:55.5721290Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:59:55.5726351Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:59:55.5726351Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null
+2026-11-08T00:59:55.5726351Z group restored component=Helpers.MilePost enabled=True
+2026-11-08T00:59:55.5726351Z field Helpers.MilePost.prefix=T
+2026-11-08T00:59:55.5736380Z field Helpers.MilePost.origin=False
+2026-11-08T00:59:55.5736380Z field Helpers.MilePost.mileage=47
+2026-11-08T00:59:55.5736380Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-47
+2026-11-08T00:59:55.5746380Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:59:55.5746380Z group cleanup complete
+2026-11-08T01:00:03.6165580Z span baseline path=World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Track 1 Island id=Pipr lower=type:Track.SerializableLocation upper=type:Track.SerializableLocation
+2026-11-08T01:00:03.6165580Z nested span lower.segmentId=Sz8t
+2026-11-08T01:00:03.6175623Z nested span lower.distance=0.1567912
+2026-11-08T01:00:03.6185627Z nested span lower.end=A
+2026-11-08T01:00:03.6185627Z nested span upper.segmentId=Sz8t
+2026-11-08T01:00:03.6185627Z nested span upper.distance=45.12718
+2026-11-08T01:00:03.6197296Z nested span upper.end=B
+2026-11-08T01:00:03.6197296Z field Track.TrackSpan.id=Pipr
+2026-11-08T01:00:03.6197296Z field Track.TrackSpan._lower=type:Track.SerializableLocation
+2026-11-08T01:00:03.6207333Z nested Track.TrackSpan._lower.segmentId=Sz8t
+2026-11-08T01:00:03.6207333Z nested Track.TrackSpan._lower.distance=0.1567912
+2026-11-08T01:00:03.6217305Z nested Track.TrackSpan._lower.end=A
+2026-11-08T01:00:03.6217305Z field Track.TrackSpan._upper=type:Track.SerializableLocation
+2026-11-08T01:00:03.6217305Z nested Track.TrackSpan._upper.segmentId=Sz8t
+2026-11-08T01:00:03.6227316Z nested Track.TrackSpan._upper.distance=45.12718
+2026-11-08T01:00:03.6227316Z nested Track.TrackSpan._upper.end=B
+2026-11-08T01:00:03.6227316Z field Track.TrackSpan._cachedPoints=collection count=2
+2026-11-08T01:00:03.6237346Z field Track.TrackSpan._cachedSegments=collection count=1
+2026-11-08T01:00:03.6237346Z field Track.TrackSpan._length=8.955988
+2026-11-08T01:00:03.6237346Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T01:00:03.6247323Z span changed registered=true valid=true
+2026-11-08T01:00:03.6247323Z field Track.TrackSpan.id=Pipr
+2026-11-08T01:00:03.6257284Z field Track.TrackSpan._lower=type:Track.SerializableLocation
+2026-11-08T01:00:03.6257284Z nested Track.TrackSpan._lower.segmentId=Sz8t
+2026-11-08T01:00:03.6257284Z nested Track.TrackSpan._lower.distance=0.4067912
+2026-11-08T01:00:03.6257284Z nested Track.TrackSpan._lower.end=A
+2026-11-08T01:00:03.6269228Z field Track.TrackSpan._upper=type:Track.SerializableLocation
+2026-11-08T01:00:03.6269228Z nested Track.TrackSpan._upper.segmentId=Sz8t
+2026-11-08T01:00:03.6269228Z nested Track.TrackSpan._upper.distance=45.12718
+2026-11-08T01:00:03.6279246Z nested Track.TrackSpan._upper.end=B
+2026-11-08T01:00:03.6279246Z field Track.TrackSpan._cachedPoints=collection count=0
+2026-11-08T01:00:03.6279246Z field Track.TrackSpan._cachedSegments=collection count=0
+2026-11-08T01:00:03.6279246Z field Track.TrackSpan._length=0
+2026-11-08T01:00:03.6289250Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T01:00:03.6294345Z span repeat registered=true valid=true
+2026-11-08T01:00:03.6294345Z field Track.TrackSpan.id=Pipr
+2026-11-08T01:00:03.6294345Z field Track.TrackSpan._lower=type:Track.SerializableLocation
+2026-11-08T01:00:03.6304394Z nested Track.TrackSpan._lower.segmentId=Sz8t
+2026-11-08T01:00:03.6304394Z nested Track.TrackSpan._lower.distance=0.4067912
+2026-11-08T01:00:03.6304394Z nested Track.TrackSpan._lower.end=A
+2026-11-08T01:00:03.6304394Z field Track.TrackSpan._upper=type:Track.SerializableLocation
+2026-11-08T01:00:03.6314381Z nested Track.TrackSpan._upper.segmentId=Sz8t
+2026-11-08T01:00:03.6314381Z nested Track.TrackSpan._upper.distance=45.12718
+2026-11-08T01:00:03.6314381Z nested Track.TrackSpan._upper.end=B
+2026-11-08T01:00:03.6314381Z field Track.TrackSpan._cachedPoints=collection count=0
+2026-11-08T01:00:03.6324401Z field Track.TrackSpan._cachedSegments=collection count=0
+2026-11-08T01:00:03.6324401Z field Track.TrackSpan._length=0
+2026-11-08T01:00:03.6324401Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T01:00:03.6334809Z span restored original lower registered=true
+2026-11-08T01:00:03.6334809Z field Track.TrackSpan.id=Pipr
+2026-11-08T01:00:03.6334809Z field Track.TrackSpan._lower=type:Track.SerializableLocation
+2026-11-08T01:00:03.6334809Z nested Track.TrackSpan._lower.segmentId=Sz8t
+2026-11-08T01:00:03.6334809Z nested Track.TrackSpan._lower.distance=0.1567912
+2026-11-08T01:00:03.6334809Z nested Track.TrackSpan._lower.end=A
+2026-11-08T01:00:03.6352797Z field Track.TrackSpan._upper=type:Track.SerializableLocation
+2026-11-08T01:00:03.6352797Z nested Track.TrackSpan._upper.segmentId=Sz8t
+2026-11-08T01:00:03.6357944Z nested Track.TrackSpan._upper.distance=45.12718
+2026-11-08T01:00:03.6357944Z nested Track.TrackSpan._upper.end=B
+2026-11-08T01:00:03.6357944Z field Track.TrackSpan._cachedPoints=collection count=0
+2026-11-08T01:00:03.6367998Z field Track.TrackSpan._cachedSegments=collection count=0
+2026-11-08T01:00:03.6367998Z field Track.TrackSpan._length=0
+2026-11-08T01:00:03.6367998Z field Track.TrackSpan._warnedInvalid=False

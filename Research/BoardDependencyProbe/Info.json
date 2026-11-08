@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/board-dependency-probe",
+  "version": "0.0.1",
+  "name": "Board Dependency Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["BoardDependencyProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

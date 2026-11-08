@@ -1,0 +1,56 @@
+2026-11-08T00:45:19.9100635Z field Track.Crossings.GradeCrossingController.circuitSets=collection count=2
+2026-11-08T00:45:19.9649173Z field Track.TrackSpan.id=Pipr
+2026-11-08T00:45:19.9659167Z field Track.TrackSpan._cachedPoints=collection count=2
+2026-11-08T00:45:19.9659167Z field Track.TrackSpan._cachedSegments=collection count=1
+2026-11-08T00:45:19.9669168Z field Track.TrackSpan._length=8.955988
+2026-11-08T00:45:19.9669168Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T00:45:19.9689180Z field Track.TrackSpan.id=Pcyi
+2026-11-08T00:45:19.9699181Z field Track.TrackSpan._cachedPoints=collection count=50
+2026-11-08T00:45:19.9699181Z field Track.TrackSpan._cachedSegments=collection count=3
+2026-11-08T00:45:19.9709171Z field Track.TrackSpan._length=473.7067
+2026-11-08T00:45:19.9709171Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T00:45:19.9729185Z field Track.TrackSpan.id=Pws9
+2026-11-08T00:45:19.9739325Z field Track.TrackSpan._cachedPoints=collection count=47
+2026-11-08T00:45:19.9739325Z field Track.TrackSpan._cachedSegments=collection count=6
+2026-11-08T00:45:19.9749367Z field Track.TrackSpan._length=433.0013
+2026-11-08T00:45:19.9749367Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T00:45:19.9759414Z field Track.TrackSpan.id=P6id
+2026-11-08T00:45:19.9779414Z field Track.TrackSpan._cachedPoints=collection count=2
+2026-11-08T00:45:19.9779414Z field Track.TrackSpan._cachedSegments=collection count=1
+2026-11-08T00:45:19.9789404Z field Track.TrackSpan._length=8.336954
+2026-11-08T00:45:19.9789404Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T00:45:19.9799418Z field Track.TrackSpan.id=Pdlh
+2026-11-08T00:45:19.9809402Z field Track.TrackSpan._cachedPoints=collection count=58
+2026-11-08T00:45:19.9828397Z field Track.TrackSpan._cachedSegments=collection count=2
+2026-11-08T00:45:19.9828397Z field Track.TrackSpan._length=558.1025
+2026-11-08T00:45:19.9833626Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T00:45:19.9848833Z field Track.TrackSpan.id=P1db
+2026-11-08T00:45:19.9858816Z field Track.TrackSpan._cachedPoints=collection count=47
+2026-11-08T00:45:19.9868828Z field Track.TrackSpan._cachedSegments=collection count=6
+2026-11-08T00:45:19.9868828Z field Track.TrackSpan._length=431.0832
+2026-11-08T00:45:19.9868828Z field Track.TrackSpan._warnedInvalid=False
+2026-11-08T00:45:20.0009049Z milepost count=54
+2026-11-08T00:45:20.0335928Z milepost World/Mile Posts/T-46 Origin
+2026-11-08T00:45:20.0335928Z field Helpers.MilePost.prefix=T
+2026-11-08T00:45:20.0347338Z field Helpers.MilePost.origin=True
+2026-11-08T00:45:20.0347338Z field Helpers.MilePost.mileage=46
+2026-11-08T00:45:20.0347338Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-46 Origin
+2026-11-08T00:45:20.0357352Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-46 Origin
+2026-11-08T00:45:20.0548257Z milepost World/Mile Posts/T-47
+2026-11-08T00:45:20.0548257Z field Helpers.MilePost.prefix=T
+2026-11-08T00:45:20.0558258Z field Helpers.MilePost.origin=False
+2026-11-08T00:45:20.0558258Z field Helpers.MilePost.mileage=47
+2026-11-08T00:45:20.0558258Z field Helpers.MilePost._textSynchronizer=component:Helpers.TextSynchronizer:World/Mile Posts/T-47
+2026-11-08T00:45:20.0568244Z field Helpers.MilePost.<TrackMarker>k__BackingField=component:Track.TrackMarker:World/Mile Posts/T-47
+2026-11-08T00:45:20.1276797Z relative count=370 groupField=True
+2026-11-08T00:45:20.6099024Z groupFollower World/Mile Posts/T-93
+2026-11-08T00:45:20.6099024Z field Track.TrackRelativePosition.targetTransform=component:UnityEngine.Transform:World/Mile Posts/T-93
+2026-11-08T00:45:20.6099024Z field Track.TrackRelativePosition.targetOffset=type:UnityEngine.Vector3
+2026-11-08T00:45:20.6109039Z field Track.TrackRelativePosition.targetAngle=180
+2026-11-08T00:45:20.6109039Z field Track.TrackRelativePosition.snapToTerrain=True
+2026-11-08T00:45:20.6109039Z field Track.TrackRelativePosition.targetActiveFollowsTrackGroup=True
+2026-11-08T00:45:20.6119028Z field Track.TrackRelativePosition._marker=component:Track.TrackMarker:World/Mile Posts/T-93
+2026-11-08T00:45:20.6119028Z field Track.TrackRelativePosition._observedGroupId=na-an
+2026-11-08T00:45:20.6119028Z field Track.TrackRelativePosition._setTargetActive=null
+2026-11-08T00:45:20.6119028Z field Track.TrackRelativePosition._observing=True
+2026-11-08T00:45:20.6134142Z field Track.TrackRelativePosition.<LastRuntimeApplySucceeded>k__BackingField=null

@@ -1,0 +1,1 @@
+{"identifier":"crankyant/broken-marker-warning-probe","version":"0.0.1","name":"Broken Marker Warning Probe","author":"CrankyAnt","assemblies":["BrokenMarkerWarningProbe.dll"],"dependencies":{"required":["rr/game >=0.6.2"]}}

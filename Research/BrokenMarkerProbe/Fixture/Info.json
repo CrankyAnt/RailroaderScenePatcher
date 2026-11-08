@@ -1,0 +1,1 @@
+{"identifier":"crankyant/broken-marker-test-fixture","name":"Scene operations research fixture","author":"CrankyAnt","version":"1.0.0","dependencies":{"required":["rr/game >=0.6.2"]}}

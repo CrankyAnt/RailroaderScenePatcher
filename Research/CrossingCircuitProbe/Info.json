@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/crossing-circuit-probe",
+  "version": "0.0.1",
+  "name": "Crossing Circuit Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["CrossingCircuitProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

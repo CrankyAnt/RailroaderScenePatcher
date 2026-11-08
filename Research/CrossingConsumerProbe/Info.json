@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/crossing-consumer-probe",
+  "version": "0.0.1",
+  "name": "Crossing Consumer Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["CrossingConsumerProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

@@ -1,0 +1,15 @@
+2026-11-08T01:13:46.5939536Z baseline after GetSegments points=2 segments=1 length=8.955988
+2026-11-08T01:13:46.5949525Z baseline after GetSegments point[0]=4391.33154,529,5377.95557
+2026-11-08T01:13:46.5949525Z baseline after GetSegments point[1]=4382.91455,529,5374.89551
+2026-11-08T01:13:46.5959524Z baseline after GetSegments segment[0]=Sz8t
+2026-11-08T01:13:46.5969528Z candidate invalidated points=0 segments=0 length=0
+2026-11-08T01:13:46.5969528Z candidate after GetSegments points=2 segments=1 length=8.704061
+2026-11-08T01:13:46.5969528Z candidate after GetSegments point[0]=4391.09473,529,5377.86963
+2026-11-08T01:13:46.5979527Z candidate after GetSegments point[1]=4382.91455,529,5374.89551
+2026-11-08T01:13:46.5984610Z candidate after GetSegments segment[0]=Sz8t
+2026-11-08T01:13:46.5984610Z restored invalidated points=0 segments=0 length=0
+2026-11-08T01:13:46.6060404Z restored after GetSegments points=2 segments=1 length=8.955988
+2026-11-08T01:13:46.6075457Z restored after GetSegments point[0]=4391.33154,529,5377.95557
+2026-11-08T01:13:46.6075457Z restored after GetSegments point[1]=4382.91455,529,5374.89551
+2026-11-08T01:13:46.6075457Z restored after GetSegments segment[0]=Sz8t
+2026-11-08T01:13:46.6095539Z restore complete; cache equals baseline; never save

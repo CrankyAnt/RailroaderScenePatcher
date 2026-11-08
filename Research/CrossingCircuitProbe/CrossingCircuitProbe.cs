@@ -1,0 +1,169 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Railroader.Modding;
+using UnityEngine;
+
+public sealed class CrossingCircuitProbeEntry : IModEntryPoint, IWorldLifecycle
+{
+    private GameObject host;
+    public void OnModLoad(IModContext context) { host = new GameObject("Crossing Circuit Probe"); UnityEngine.Object.DontDestroyOnLoad(host); host.AddComponent<CrossingCircuitProbe>().Initialize(context.ModDirectory); }
+    public void OnWorldLoad() { }
+    public void OnWorldUnload() { host.GetComponent<CrossingCircuitProbe>().OnLeaving(); }
+    public void OnModUnload() { if (host != null) { host.GetComponent<CrossingCircuitProbe>().OnLeaving(); UnityEngine.Object.Destroy(host); } }
+}
+
+public sealed class CrossingCircuitProbe : MonoBehaviour
+{
+    private const BindingFlags F = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+    private const string Root = "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett";
+    private const string Save = @"C:\TMP\RailroaderMapResearch\Issue18BrokenHome\Saves\crankyant-crossing-research.railroad";
+    private const string Missing = "CrankyAntMissingPiprSegment";
+    private string directory, log, status = "Disposable save only. Never save during test.", phase = "idle";
+    private Rect window = new Rect(20, 200, 430, 260);
+    private Component crossing, span;
+    private object graph, original, originalSerial, train;
+    private object[] circuits;
+    private MethodInfo lookup, anyCars;
+    private bool dirty;
+    private float nextSample;
+    public void Initialize(string path) { directory = path; log = Path.Combine(path, "CrossingCircuitProbe.log"); Write("loaded"); }
+    private void Write(string message) { File.AppendAllText(log, DateTime.UtcNow.ToString("O") + " " + message + Environment.NewLine); }
+    private static Type TypeNamed(string name) { return AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType(name, false)).First(t => t != null); }
+    private static object Read(object target, string name)
+    {
+        var t = target as Type ?? target.GetType(); var instance = target is Type ? null : target;
+        var p = t.GetProperty(name, F); if (p != null) return p.GetValue(instance, null);
+        var f = t.GetField(name, F) ?? throw new MissingMemberException(t.FullName, name); return f.GetValue(instance);
+    }
+    private static string PathOf(Transform t) { return t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name; }
+    private static bool Loaded(Component c) { return c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded; }
+    private static bool Active(Component c) { return c is Behaviour b && b.enabled && c.gameObject.activeInHierarchy; }
+    private static string Id(object s) { return Convert.ToString(Read(s, "id")); }
+    private static object[] Spans(object[] sets) { return sets.SelectMany(s => new[] { Read(s, "approachA"), Read(s, "island"), Read(s, "approachB") }).ToArray(); }
+    private Vector3[] Points(Component target, string label)
+    {
+        var points = ((IEnumerable)target.GetType().GetMethod("GetPoints", F, null, Type.EmptyTypes, null).Invoke(target, null)).Cast<Vector3>().ToArray();
+        if (points.Length < 2 || points.Any(p => float.IsNaN(p.x) || float.IsNaN(p.y) || float.IsNaN(p.z) || float.IsInfinity(p.x) || float.IsInfinity(p.y) || float.IsInfinity(p.z))) throw new InvalidOperationException("Pipr points unavailable or invalid.");
+        for (int i = 0; i < points.Length; i++) Write(label + " point[" + i + "]=" + points[i].ToString("F4"));
+        return points;
+    }
+    private void Guard()
+    {
+        if (!File.Exists(Path.Combine(directory, "ARM_CROSSING_CIRCUIT_PROBE"))) throw new InvalidOperationException("Arm file absent.");
+        if (Convert.ToString(Read(TypeNamed("Game.ActiveMapDefinition"), "Identifier")) != "rr/bushnell-whittier") throw new InvalidOperationException("Wrong map.");
+        var manager = Read(TypeNamed("Game.State.SaveManager"), "Shared");
+        var path = Convert.ToString(Read(manager, "RailroadPath")); var context = Read(manager, "_saveContext");
+        if (!string.Equals(Path.GetFullPath(path), Save, StringComparison.OrdinalIgnoreCase) || Convert.ToString(Read(context, "RailroadName")) != "CrankyAnt Crossing Research") throw new InvalidOperationException("Wrong save.");
+    }
+    private static void Endpoint(object serial, string end, float distance)
+    {
+        if (Convert.ToString(Read(serial, "segmentId")) != "Sz8t" || Convert.ToString(Read(serial, "end")) != end || Math.Abs(Convert.ToSingle(Read(serial, "distance")) - distance) > 0.0001f) throw new InvalidOperationException("Endpoint mismatch.");
+    }
+    private void Identity()
+    {
+        Guard();
+        if (!Loaded(crossing) || !Active(crossing) || !Loaded(span) || !Active(span) || !ReferenceEquals(lookup.Invoke(graph, new object[] { "Pipr" }), span)) throw new InvalidOperationException("Identity or registration changed.");
+        var all = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(Loaded).ToArray();
+        if (all.Count(c => c.GetType().FullName == "Track.TrackSpan" && Id(c) == "Pipr") != 1 || all.Count(c => c.GetType().FullName == "Track.Crossings.GradeCrossingController" && PathOf(c.transform) == Root) != 1) throw new InvalidOperationException("Duplicate target.");
+        var now = ((IEnumerable)Read(crossing, "circuitSets")).Cast<object>().ToArray();
+        if (now.Length != 2 || !Spans(now).SequenceEqual(Spans(circuits))) throw new InvalidOperationException("Circuit references changed.");
+    }
+    private void ClearOfCars() { if (Spans(circuits).Any(s => (bool)anyCars.Invoke(train, new[] { s }))) throw new InvalidOperationException("A monitored span is occupied."); }
+    private Vector3 Origin() { return (Vector3)TypeNamed("Helpers.WorldTransformer").GetMethod("WorldToGame", F, null, new[] { typeof(Vector3) }, null).Invoke(null, new object[] { Vector3.zero }); }
+    private void Capture()
+    {
+        try
+        {
+            Guard(); if (dirty) throw new InvalidOperationException("Restore first.");
+            var all = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(Loaded).ToArray();
+            var controllers = all.Where(c => c.GetType().FullName == "Track.Crossings.GradeCrossingController" && PathOf(c.transform) == Root).ToArray();
+            var spans = all.Where(c => c.GetType().FullName == "Track.TrackSpan" && Id(c) == "Pipr").ToArray();
+            if (controllers.Length != 1 || spans.Length != 1 || !PathOf(spans[0].transform).StartsWith(Root + "/", StringComparison.Ordinal)) throw new InvalidOperationException("Target count or path mismatch.");
+            crossing = controllers[0]; span = spans[0]; circuits = ((IEnumerable)Read(crossing, "circuitSets")).Cast<object>().ToArray();
+            if (circuits.Length != 2 || Spans(circuits).Length != 6 || Spans(circuits).Distinct().Count() != 6 || Spans(circuits).Count(s => ReferenceEquals(s, span)) != 1 || !circuits.Any(s => ReferenceEquals(Read(s, "island"), span))) throw new InvalidOperationException("Unexpected circuit topology.");
+            var gt = TypeNamed("Track.Graph"); graph = Read(gt, "Shared"); lookup = gt.GetMethod("SpanForId", F, null, new[] { typeof(string) }, null);
+            train = Read(TypeNamed("TrainController"), "Shared"); anyCars = train.GetType().GetMethod("AnyCarsOnSpan", F);
+            Identity(); Endpoint(Read(span, "_lower"), "A", 0.1567912f); Endpoint(Read(span, "_upper"), "B", 45.12718f);
+            original = Read(span, "lower") ?? throw new InvalidOperationException("Lower unresolved."); originalSerial = Read(span, "_lower");
+            if (!(bool)Read(span, "IsValid") || gt.GetMethod("GetSegment", F).Invoke(graph, new object[] { Missing }) != null) throw new InvalidOperationException("Invalid baseline or missing ID exists.");
+            ClearOfCars(); Points(span, "baseline cache"); phase = "baseline"; Write("capture complete origin=" + Origin().ToString("F4")); Sample(); status = "Baseline telemetry active; never save.";
+        }
+        catch (Exception e) { phase = "idle"; Write("CAPTURE ERROR " + e); status = "Capture failed; inspect log."; }
+    }
+    private void Break()
+    {
+        try
+        {
+            if (phase != "baseline" || dirty) throw new InvalidOperationException("Capture baseline first."); Identity(); ClearOfCars();
+            Endpoint(Read(span, "_lower"), "A", 0.1567912f); Endpoint(Read(span, "_upper"), "B", 45.12718f);
+            var candidate = Read(span, "_lower"); candidate.GetType().GetField("segmentId", F).SetValue(candidate, Missing);
+            dirty = true; span.GetType().GetField("_lower", F).SetValue(span, candidate); span.GetType().GetMethod("InvalidateCache", F).Invoke(span, null);
+            if (Read(span, "lower") != null || (bool)Read(span, "IsValid")) throw new InvalidOperationException("Broken reference unexpectedly valid.");
+            Identity(); phase = "broken"; Write("broken reference installed"); Sample(); status = "Broken stage active; never save.";
+        }
+        catch (Exception e) { Write("BREAK ERROR " + e); status = "Break failed; restoring."; Restore(); }
+    }
+    private void Restore()
+    {
+        if (!dirty) return;
+        try
+        {
+            span.GetType().GetProperty("lower", F).SetValue(span, original, null); dirty = false;
+            Endpoint(Read(span, "_lower"), "A", 0.1567912f); Endpoint(Read(span, "_upper"), "B", 45.12718f);
+            if (!original.Equals(Read(span, "lower")) || !originalSerial.Equals(Read(span, "_lower")) || !ReferenceEquals(lookup.Invoke(graph, new object[] { "Pipr" }), span)) throw new InvalidOperationException("Restoration mismatch.");
+            span.GetType().GetMethod("GetSegments", F).Invoke(span, null); phase = "repaired"; Write("original lower restored; segments rebuilt"); status = "Repaired stage active; never save.";
+        }
+        catch (Exception e) { Write("RESTORE ERROR " + e); phase = "error"; status = "Restore failed; abandon without saving."; }
+    }
+    private void Repair()
+    {
+        try { if (phase != "broken" || !dirty) throw new InvalidOperationException("Broken stage not active."); Identity(); ClearOfCars(); Restore(); if (phase == "repaired") Sample(); }
+        catch (Exception e) { Write("REPAIR ERROR " + e); status = "Repair refused; clear the crossing and retry."; }
+    }
+    public void OnLeaving() { if (dirty) Restore(); phase = "idle"; }
+    private void Sample()
+    {
+        Identity(); var entries = Spans(circuits).Select((s, i) => "c" + (i / 3) + "." + new[] { "approachA", "island", "approachB" }[i % 3] + "=" + Id(s) + ":" + anyCars.Invoke(train, new[] { s })).ToArray();
+        var lower = Read(span, "_lower"); var upper = Read(span, "_upper");
+        Write("sample phase=" + phase + " origin=" + Origin().ToString("F4") + " lower=" + Read(lower, "segmentId") + "/" + Read(lower, "end") + "/" + Read(lower, "distance") + " upper=" + Read(upper, "segmentId") + "/" + Read(upper, "end") + "/" + Read(upper, "distance") + " valid=" + Read(span, "IsValid") + " lights=" + Read(crossing, "SignalLights") + " gates=" + Read(crossing, "SignalGates") + " bell=" + Read(crossing, "SignalBell") + " " + string.Join(" ", entries));
+    }
+    private void Update() { if (phase == "idle" || phase == "error" || Time.realtimeSinceStartup < nextSample) return; nextSample = Time.realtimeSinceStartup + 0.5f; try { Sample(); } catch (Exception e) { Write("SAMPLE ERROR " + e); status = "Telemetry failed; restore and abandon."; if (dirty) Restore(); phase = "error"; } }
+    private void Focus()
+    {
+        try
+        {
+            Guard(); if (dirty) throw new InvalidOperationException("Restore before moving camera.");
+            var targets = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => Loaded(c) && c.GetType().FullName == "Track.TrackSpan" && Id(c) == "Pipr").ToArray();
+            if (targets.Length != 1 || !Active(targets[0]) || PathOf(targets[0].transform) != Root + "/Track 1 Island") throw new InvalidOperationException("Pipr identity mismatch.");
+            Endpoint(Read(targets[0], "_lower"), "A", 0.1567912f); Endpoint(Read(targets[0], "_upper"), "B", 45.12718f);
+            var points = Points(targets[0], "focus cache"); var center = Vector3.zero; foreach (var point in points) center += point; center /= points.Length;
+            var camera = TypeNamed("CameraSelector"); var selector = Read(camera, "shared"); var mode = Enum.Parse(camera.GetNestedType("CameraIdentifier", BindingFlags.Public | BindingFlags.NonPublic), "Strategy");
+            camera.GetMethod("JumpToPoint", F).Invoke(selector, new object[] { center, Quaternion.identity, mode });
+            Write("camera focus requested game=" + center.ToString("F4")); status = "Crossing camera focus requested.";
+        }
+        catch (Exception e) { Write("FOCUS ERROR " + e); status = "Focus failed; inspect log."; }
+    }
+    private void Overview()
+    {
+        try
+        {
+            Guard(); if (dirty) throw new InvalidOperationException("Restore before moving camera.");
+            var targets = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => Loaded(c) && c.GetType().FullName == "Track.TrackSpan" && Id(c) == "Pipr").ToArray();
+            if (targets.Length != 1 || !Active(targets[0]) || PathOf(targets[0].transform) != Root + "/Track 1 Island") throw new InvalidOperationException("Pipr identity mismatch.");
+            Endpoint(Read(targets[0], "_lower"), "A", 0.1567912f); Endpoint(Read(targets[0], "_upper"), "B", 45.12718f);
+            var points = Points(targets[0], "overview cache"); var center = Vector3.zero; foreach (var point in points) center += point; center /= points.Length;
+            var selector = Read(TypeNamed("CameraSelector"), "shared"); if (Convert.ToString(Read(selector, "_cameraIdentifier")) != "Strategy") throw new InvalidOperationException("Focus crossing first to select strategy camera.");
+            var camera = Read(selector, "strategyCamera"); var current = camera.GetType().GetMethod("CaptureState", F).Invoke(camera, null);
+            var state = Activator.CreateInstance(TypeNamed("Cameras.StrategyCameraState"), new object[] { center, null, 80f, 70f, Convert.ToSingle(Read(current, "AngleY")) });
+            if (!(bool)camera.GetType().GetMethod("Restore", F).Invoke(camera, new[] { state })) throw new InvalidOperationException("Camera state restore refused.");
+            Write("camera overview game=" + center.ToString("F4") + " distance=80 pitch=70 yaw=" + Read(current, "AngleY")); status = "Crossing overview requested.";
+        }
+        catch (Exception e) { Write("OVERVIEW ERROR " + e); status = "Overview failed; inspect log."; }
+    }
+    private void OnGUI() { window = GUI.Window(0x43524352, window, id => { GUILayout.Label(status); GUILayout.Label("Phase: " + phase); if (GUILayout.Button("Focus crossing")) Focus(); if (GUILayout.Button("Crossing overview")) Overview(); if (GUILayout.Button("Capture baseline")) Capture(); if (GUILayout.Button("Break Pipr reference")) Break(); if (GUILayout.Button("Repair Pipr reference")) Repair(); GUI.DragWindow(); }, "Crossing Circuit Probe"); }
+}

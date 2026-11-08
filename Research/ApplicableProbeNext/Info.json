@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/applicable-probe",
+  "version": "0.0.1",
+  "name": "Applicable Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["ApplicableProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

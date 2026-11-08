@@ -1,0 +1,86 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Railroader.Modding;
+using UnityEngine;
+
+public sealed class BoardDependencyProbeEntry : IModEntryPoint, IWorldLifecycle
+{
+    private GameObject host;
+    public void OnModLoad(IModContext context) { host = new GameObject("Board Dependency Probe"); UnityEngine.Object.DontDestroyOnLoad(host); host.AddComponent<BoardDependencyProbe>().Initialize(context.ModDirectory); }
+    public void OnWorldLoad() { }
+    public void OnWorldUnload() { }
+    public void OnModUnload() { if (host != null) UnityEngine.Object.Destroy(host); }
+}
+public sealed class BoardDependencyProbe : MonoBehaviour
+{
+    private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+    private const string PathName = "World/Signs/Loc: Sylva Int";
+    private string log, status = "Disposable fixture only. Never save.";
+    private Rect window = new Rect(20, 200, 440, 100);
+    public void Initialize(string directory) { log = Path.Combine(directory, "BoardDependencyProbe.log"); }
+    private void Write(string s) { File.AppendAllText(log, DateTime.UtcNow.ToString("O") + " " + s + Environment.NewLine); }
+    private static string PathOf(Transform t) { return t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name; }
+    private static object Field(object o, string name) { for (var t = o.GetType(); t != null; t = t.BaseType) { var f = t.GetField(name, Instance | BindingFlags.DeclaredOnly); if (f != null) return f.GetValue(o); } throw new MissingFieldException(o.GetType().FullName, name); }
+    private static string F(float n) { return n.ToString("R", CultureInfo.InvariantCulture); }
+    private static string V(Vector3 v) { return F(v.x) + "," + F(v.y) + "," + F(v.z); }
+    private static string Q(Quaternion q) { return F(q.x) + "," + F(q.y) + "," + F(q.z) + "," + F(q.w); }
+    private static Vector3 Origin() { var t = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Helpers.WorldTransformer", false)).First(x => x != null); return (Vector3)t.GetMethod("WorldToGame", BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(Vector3) }, null).Invoke(null, new object[] { Vector3.zero }); }
+    private void Snapshot(string label, Transform root, Component culler, Component mask)
+    {
+        Write(label + " origin=" + V(Origin()));
+        foreach (var node in root.GetComponentsInChildren<Transform>(true))
+        {
+            Write(label + " node=" + PathOf(node) + " localPosition=" + V(node.localPosition) + " localRotation=" + Q(node.localRotation) + " worldPosition=" + V(node.position) + " worldRotation=" + Q(node.rotation) + " activeSelf=" + node.gameObject.activeSelf + " activeHierarchy=" + node.gameObject.activeInHierarchy);
+            foreach (var component in node.GetComponents<Component>()) if (component != null) Write(label + " component=" + PathOf(node) + " type=" + component.GetType().FullName + " enabled=" + (component is Behaviour b ? b.enabled.ToString() : component is Renderer r ? r.enabled.ToString() : "n/a"));
+        }
+        foreach (string name in new[] { "radius", "falloff", "flattenHeightmap", "order" }) Write(label + " mask." + name + "=" + Convert.ToString(Field(mask, name), CultureInfo.InvariantCulture));
+        var targets = (ICollection)Field(mask, "maskTargets"); Write(label + " mask.maskTargets.count=" + (targets == null ? "null" : targets.Count.ToString()));
+        if (targets != null) foreach (var target in targets) { if (target == null) { Write(label + " mask.target=null"); continue; } foreach (string name in new[] { "kind", "maskName", "value", "useCustomStampOffset", "stampOffset", "biomeCode" }) Write(label + " mask.target." + name + "=" + Convert.ToString(Field(target, name), CultureInfo.InvariantCulture)); }
+        foreach (string name in new[] { "_cullingState", "cullingManagerName", "visibleDistanceBand", "radius" }) Write(label + " culler." + name + "=" + Convert.ToString(Field(culler, name), CultureInfo.InvariantCulture));
+        var renderers = (Renderer[])Field(culler, "_cullRenderers"); Write(label + " culler.renderers=" + (renderers == null ? "null" : renderers.Length.ToString()));
+        if (renderers != null) foreach (var renderer in renderers) Write(label + " culler.renderer=" + (renderer == null ? "null" : PathOf(renderer.transform) + " enabled=" + renderer.enabled));
+        var token = Field(culler, "_cullingToken");
+        if (token == null) { Write(label + " token=null"); return; }
+        var index = (int)Field(token, "<Index>k__BackingField"); var removed = (bool)Field(token, "<IsRemoved>k__BackingField"); var manager = Field(token, "Manager");
+        var spheres = (BoundingSphere[])Field(manager, "_spheres"); var count = (int)Field(manager, "_sphereCount");
+        if (index < 0 || index >= count || index >= spheres.Length || removed) throw new InvalidOperationException("Culler token is not live.");
+        Write(label + " token.index=" + index + " removed=" + removed + " sphere.position=" + V(spheres[index].position) + " sphere.radius=" + F(spheres[index].radius));
+    }
+    private void Run()
+    {
+        Transform root = null, parent = null; Vector3 localPosition = default; Quaternion localRotation = default; bool changed = false;
+        try
+        {
+            var map = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType("Game.ActiveMapDefinition", false)).First(t => t != null);
+            var id = map.GetProperty("Identifier", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(null, null) ?? map.GetField("Identifier", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(null);
+            if (Convert.ToString(id) != "crankyant/scene-operations-map") throw new InvalidOperationException("Wrong map.");
+            var matches = Resources.FindObjectsOfTypeAll<Transform>().Where(t => t != null && t.gameObject.scene.IsValid() && t.gameObject.scene.isLoaded && PathOf(t) == PathName).ToArray();
+            if (matches.Length != 1) throw new InvalidOperationException("Board match count=" + matches.Length);
+            root = matches[0]; parent = root.parent;
+            if (parent == null || !root.gameObject.activeSelf || !root.gameObject.activeInHierarchy) throw new InvalidOperationException("Board baseline inactive or parent missing.");
+            var nodes = root.GetComponentsInChildren<Transform>(true); if (nodes.Length != 3 || nodes.Count(n => PathOf(n) == PathName + "/Sign-Location") != 1 || nodes.Count(n => PathOf(n) == PathName + "/Text") != 1) throw new InvalidOperationException("Unexpected hierarchy.");
+            if (nodes.SelectMany(n => n.GetComponents<Component>()).Any(c => c != null && c.GetType().FullName == "Track.TrackMarker")) throw new InvalidOperationException("Unexpected marker.");
+            var components = root.GetComponents<Component>(); var culler = components.Single(c => c != null && c.GetType().FullName == "Helpers.Culling.RendererCuller"); var mask = components.Single(c => c != null && c.GetType().FullName == "Map.Runtime.MaskComponents.CircleMapMask");
+            localPosition = root.localPosition; localRotation = root.localRotation; var origin = Origin(); var position = root.position; var rotation = root.rotation;
+            Snapshot("baseline", root, culler, mask);
+            changed = true; root.position = position + new Vector3(5, 0, 0); root.rotation = Quaternion.Euler(0, 15, 0) * rotation;
+            Snapshot("moved", root, culler, mask);
+            root.position = position + new Vector3(5, 0, 0); root.rotation = Quaternion.Euler(0, 15, 0) * rotation;
+            Snapshot("repeat", root, culler, mask);
+            if (root.parent != parent || (Origin() - origin).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Parent or origin changed during probe.");
+            status = "Snapshots captured; restoring.";
+        }
+        catch (Exception e) { Write("ERROR " + e); status = "Probe failed. Abandon without saving."; }
+        finally
+        {
+            if (changed) try { if (root == null || root.parent != parent) throw new InvalidOperationException("Cannot restore original parent."); root.localPosition = localPosition; root.localRotation = localRotation; if (!root.localPosition.Equals(localPosition) || !root.localRotation.Equals(localRotation)) throw new InvalidOperationException("Local pose restore mismatch."); var c = root.GetComponents<Component>().Single(x => x != null && x.GetType().FullName == "Helpers.Culling.RendererCuller"); var m = root.GetComponents<Component>().Single(x => x != null && x.GetType().FullName == "Map.Runtime.MaskComponents.CircleMapMask"); Snapshot("restored", root, c, m); Write("restore complete"); } catch (Exception e) { Write("restore ERROR " + e); status = "Restore failed. Abandon without saving."; }
+        }
+    }
+    private void OnGUI() { window = GUI.Window(0x42445031, window, id => { GUILayout.Label(status); if (GUILayout.Button("Snapshot, move twice and restore")) Run(); GUI.DragWindow(); }, "Board Dependency Probe"); }
+}

@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 CrankyAnt
+# SPDX-License-Identifier: MIT
+# Selection: final fresh-process load, settled origin, automatic repair, diagnostic and restoration records. Prior sessions omitted. Source timestamps remain UTC.
+2026-11-08T02:21:27.5785223Z loaded
+2026-11-08T02:21:59.2811061Z world=1 load; awaiting graph, marker and stable origin
+2026-11-08T02:21:59.4169562Z world=1 origin observed=(0.0000, 0.0000, 0.0000) secondsSinceLoad=0,14
+2026-11-08T02:22:01.1298762Z world=1 origin observed=(4000.0000, 0.0000, 5000.0000) secondsSinceLoad=1,85
+2026-11-08T02:22:09.2925325Z world=1 origin settled=(4000.0000, 0.0000, 5000.0000) secondsSinceLoad=10,01 stableSeconds=8,16
+2026-11-08T02:22:09.2970429Z world=1 preflight map=crankyant/broken-marker-test-map marker=256858 path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E original=Shuo/58.69453/A resolves=false registrations=0 replacement=SCrankyAntSceneProbe endpoints=A/B verified origin=(4000.0000, 0.0000, 5000.0000) position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) active=True hierarchy=True enabled=True
+2026-11-08T02:22:09.2970429Z world=1 preflight cachedPositionPresent=False warnedInvalid=False
+2026-11-08T02:22:09.2980508Z world=1 preflight child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:09.2990489Z world=1 preflight child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:09.2990489Z world=1 preflight target=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E parent=World/Roads Sylva/Crossing Unprotected - Allen (1) position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:09.3010484Z world=1 registration bucket=SCrankyAntSceneProbe objectMatches=True
+2026-11-08T02:22:09.3010484Z world=1 repaired registration=1 segment=SCrankyAntSceneProbe location=<SCrankyAntSceneProbe, A -> 58,695> origin=(4000.0000, 0.0000, 5000.0000) position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) active=True hierarchy=True enabled=True
+2026-11-08T02:22:09.3010484Z world=1 repaired child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:09.3010484Z world=1 repaired child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:09.3025550Z world=1 repaired target=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E parent=World/Roads Sylva/Crossing Unprotected - Allen (1) position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:09.3045608Z world=1 warning before total=1 candidates=1 exactMatches=1 expectedDescription=Track marker M5pp is not on the track at Shuo + 58,7m and will have no effect.
+2026-11-08T02:22:09.3055608Z world=1 authored control added identity=428730046 key=CrankyAnt.BrokenMarkerWarningProbe.Control description=CrankyAnt probe control warning; expected to remain
+2026-11-08T02:22:09.3055608Z world=1 warning after total=1 selectedRemaining=0 unrelatedBefore=1 unrelatedRetained=1 isRemoved=True controlRetained=True
+2026-11-08T02:22:32.2197743Z world=1 restore precheck markerCount=1 sameMarker=True path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E enabled=True activeHierarchy=True capturedOrigin=(4000.0000, 0.0000, 5000.0000) currentOrigin=(4000.0000, 0.0000, 5000.0000)
+2026-11-08T02:22:32.2217736Z world=1 registration bucket=SCrankyAntSceneProbe objectMatches=True
+2026-11-08T02:22:32.2217736Z world=1 before restore cachedPositionPresent=False warnedInvalid=False
+2026-11-08T02:22:32.2232772Z world=1 restore original=Shuo/58.69453/A resolves=false registrations=0 pose=verified warnings=1 unrelatedBefore=1 unrelatedRetained=1 controlRetained=True
+2026-11-08T02:22:32.2232772Z world=1 after restore cachedPositionPresent=False warnedInvalid=False
+2026-11-08T02:22:32.2242805Z world=1 restored child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:32.2242805Z world=1 restored child=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E/Sign-Whistle position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.6975, 0.1264, 0.1271, 0.6938) activeSelf=True activeHierarchy=True
+2026-11-08T02:22:32.2242805Z world=1 restored target=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E parent=World/Roads Sylva/Crossing Unprotected - Allen (1) position=(21201.1500, 622.7342, -5778.0820) rotation=(-0.0026, 0.1792, 0.0005, 0.9838) activeSelf=True activeHierarchy=True

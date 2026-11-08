@@ -1,0 +1,56 @@
+2026-11-08T01:20:31.0705196Z baseline origin=25500,0,0
+2026-11-08T01:20:31.0715232Z baseline node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:31.0735225Z baseline node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:31.0745251Z baseline node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:31.0755235Z baseline mask.radius=1.5
+2026-11-08T01:20:31.0770290Z baseline mask.falloff=1
+2026-11-08T01:20:31.0770290Z baseline mask.flattenHeightmap=False
+2026-11-08T01:20:31.0790353Z baseline mask.target.maskName=CutTrees
+2026-11-08T01:20:31.0805418Z baseline culler._cullingState=Visible
+2026-11-08T01:20:31.0815460Z baseline culler.radius=2.5
+2026-11-08T01:20:31.0825450Z baseline token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T01:20:41.5757448Z moved immediate origin=25500,0,0
+2026-11-08T01:20:41.5757448Z moved immediate node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:41.5782550Z moved immediate node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:41.5792536Z moved immediate node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:41.5814822Z moved immediate mask.radius=1.5
+2026-11-08T01:20:41.5814822Z moved immediate mask.falloff=1
+2026-11-08T01:20:41.5819875Z moved immediate mask.flattenHeightmap=False
+2026-11-08T01:20:41.5829934Z moved immediate mask.target.maskName=CutTrees
+2026-11-08T01:20:41.5855030Z moved immediate culler._cullingState=Visible
+2026-11-08T01:20:41.5865031Z moved immediate culler.radius=2.5
+2026-11-08T01:20:41.5875014Z moved immediate token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T01:20:55.5068612Z current origin=25500,0,0
+2026-11-08T01:20:55.5078594Z current node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:55.5098606Z current node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:55.5109297Z current node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T01:20:55.5129303Z current mask.radius=1.5
+2026-11-08T01:20:55.5129303Z current mask.falloff=1
+2026-11-08T01:20:55.5129303Z current mask.flattenHeightmap=False
+2026-11-08T01:20:55.5149304Z current mask.target.maskName=CutTrees
+2026-11-08T01:20:55.5159314Z current culler._cullingState=Visible
+2026-11-08T01:20:55.5159314Z current culler.radius=2.5
+2026-11-08T01:20:55.5174367Z current token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T01:21:08.2103964Z moved immediate origin=25500,0,0
+2026-11-08T01:21:08.2103964Z moved immediate node=World/Signs/Loc: Sylva Int localPosition=25697.9766,633.4856,441.8128 localRotation=0,0.09104519,0,-0.9958468 worldPosition=197.976563,633.4856,441.8128 worldRotation=0,0.09104519,0,-0.9958468 activeSelf=True activeHierarchy=True
+2026-11-08T01:21:08.2124005Z moved immediate node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=197.8711,633.4856,441.7932 worldRotation=0.7041701,0.06437868,0.06437868,-0.7041701 activeSelf=True activeHierarchy=True
+2026-11-08T01:21:08.2139043Z moved immediate node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=197.892578,635.1476,441.7972 worldRotation=0,0.6397913,0,0.768548846 activeSelf=True activeHierarchy=True
+2026-11-08T01:21:08.2159100Z moved immediate mask.radius=1.5
+2026-11-08T01:21:08.2159100Z moved immediate mask.falloff=1
+2026-11-08T01:21:08.2169119Z moved immediate mask.flattenHeightmap=False
+2026-11-08T01:21:08.2189095Z moved immediate mask.target.maskName=CutTrees
+2026-11-08T01:21:08.2209293Z moved immediate culler._cullingState=Visible
+2026-11-08T01:21:08.2219271Z moved immediate culler.radius=2.5
+2026-11-08T01:21:08.2229265Z moved immediate token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T01:21:20.0878678Z restored origin=25500,0,0
+2026-11-08T01:21:20.0878678Z restored node=World/Signs/Loc: Sylva Int localPosition=25692.9766,633.4856,441.8128 localRotation=0,0.220250368,0,-0.975443363 worldPosition=192.976563,633.4856,441.8128 worldRotation=0,0.220250368,0,-0.975443363 activeSelf=True activeHierarchy=True
+2026-11-08T01:21:20.0898716Z restored node=World/Signs/Loc: Sylva Int/Sign-Location localPosition=-0.108,0,0 localRotation=-0.7071068,0,0,0.7071068 worldPosition=192.8789,633.4856,441.7664 worldRotation=0.6897427,0.155740544,0.155740544,-0.6897427 activeSelf=True activeHierarchy=True
+2026-11-08T01:21:20.0913799Z restored node=World/Signs/Loc: Sylva Int/Text localPosition=-0.086,1.662,0 localRotation=0,-0.7071067,0,-0.707106948 worldPosition=192.898438,635.1476,441.775848 worldRotation=0,0.534002,0,0.8454833 activeSelf=True activeHierarchy=True
+2026-11-08T01:21:20.0923804Z restored mask.radius=1.5
+2026-11-08T01:21:20.0933780Z restored mask.falloff=1
+2026-11-08T01:21:20.0933780Z restored mask.flattenHeightmap=False
+2026-11-08T01:21:20.0953769Z restored mask.target.maskName=CutTrees
+2026-11-08T01:21:20.0973772Z restored culler._cullingState=Visible
+2026-11-08T01:21:20.0983772Z restored culler.radius=2.5
+2026-11-08T01:21:20.0998822Z restored token.index=255 removed=False sphere.position=192.976563,633.4856,441.8128 sphere.radius=2.5
+2026-11-08T01:21:20.0998822Z restore complete originChanged=False
