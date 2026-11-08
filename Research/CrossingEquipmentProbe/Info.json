@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/crossing-expansion-probe",
+  "version": "0.0.1",
+  "name": "Crossing Expansion Probe",
+  "author": "CrankyAnt",
+  "assemblies": ["CrossingExpansionProbe.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

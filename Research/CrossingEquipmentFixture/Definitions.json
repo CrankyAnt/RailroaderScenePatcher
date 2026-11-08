@@ -1,0 +1,18 @@
+{
+  "objects": [{
+    "identifier": "crankyant/crossing-expansion-research",
+    "metadata": {
+      "name": "Crossing equipment research",
+      "description": "Disposable equipment construction trial",
+      "tags": [],
+      "credits": "CrankyAnt"
+    },
+    "definition": {
+      "kind": "Map",
+      "mapData": "./Map.json",
+      "terrainTileSets": ["rr/nc-bryson"],
+      "mapLayers": ["rr/bushnell-whittier"],
+      "components": {}
+    }
+  }]
+}

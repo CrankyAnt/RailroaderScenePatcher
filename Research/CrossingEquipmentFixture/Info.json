@@ -1,0 +1,7 @@
+{
+  "identifier": "crankyant/crossing-equipment-fixture",
+  "name": "Crossing equipment research fixture",
+  "author": "CrankyAnt",
+  "version": "0.0.1",
+  "dependencies": { "required": ["rr/game >=0.6.2"] }
+}

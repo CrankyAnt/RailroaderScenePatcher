@@ -1,0 +1,22 @@
+{
+  "gameVersion": "0.6.2",
+  "build": 26335745,
+  "assemblies": [
+    {
+      "name": "Railroader.dll",
+      "sha256": "8E9ACFD583C1DA79655C970773D42F2179E999F62DC36A3C6BC3A7B94C27A91E"
+    },
+    {
+      "name": "KeyValue.Runtime.dll",
+      "sha256": "5C6B3BD5AC0B3DE4484E56FC9B379521F1B336B0D04649DC1A8F3CB23937CE53"
+    },
+    {
+      "name": "CrossingExpansionProbe.dll",
+      "sha256": "8F45C7408D3FE416289010CE03E4A99B8463413FD38A2B797E52EDC07060261C"
+    }
+  ],
+  "map": "crankyant/crossing-expansion-research",
+  "fixtureDataSha256": "CA3D163BAB055381827226140568F3BEF7EAAC187CEBD76878E0B63E9E442356",
+  "probeModuleVersionId": "0621a8ba-fad0-4a45-a1bc-70f9271909dd",
+  "evidenceLogSha256": "AEB14D2E68E42326DA935A01A98B5B05F28D8AE0E9EB22FF8EDCED51E69FB79F"
+}
