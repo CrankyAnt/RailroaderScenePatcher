@@ -6,17 +6,41 @@ This context covers scene changes supplied by map mods and authored for the Rail
 
 ## Language
 
-**MapMod**:
-A mod distributed as an asset pack that supplies a Railroader map definition or changes to a map. The term includes modifications to an existing map and packs that provide a new map; it does not mean that several packs are edited together.
+### Railroader terminology
+
+These terms retain the meanings in Railroader's [asset-pack guide](https://docs.railroadergame.com/modding/asset-packs/), [map-modding guide](https://docs.railroadergame.com/modding/map-modding/) and [load-order reference](https://docs.railroadergame.com/modding/load-order/).
+
+**Asset pack**:
+The package in which a Railroader mod distributes its content, including definitions, data, scripts or bundled assets. A pack and a Map definition within it are distinct.
 
 **Map definition**:
 The game's identified definition of a selectable map, with its map data, referenced map layers and terrain sources. A definition and its containing asset pack are distinct.
 
-**Native map layer**:
+**Map layer**:
 A Map definition referenced by another Map definition as inherited map content. An inherited layer is source context, not another active edit target.
+_Avoid_: Native map layer
 
-**Source scene**:
-A Unity scene that supplies existing scene objects to a loaded map. Sharing a source scene and inheriting native map data are distinct relationships.
+**Load order**:
+The order in which Railroader loads enabled asset packs. It is distinct from the order in which map layers compose a map.
+_Avoid_: Native pack load order
+
+### Unity terminology
+
+Unity scene retains its meaning in Unity's [scene documentation](https://docs.unity3d.com/6000.0/Documentation/Manual/CreatingScenes.html).
+
+**Unity scene**:
+A Unity container for scene objects, including their hierarchy and components. A Unity scene is distinct from Railroader's Map definition and map layers.
+_Avoid_: Source scene
+
+### Patcher terminology
+
+These are project terms for scene-patch authoring and application, not additional Railroader definition types or Unity object types.
+
+**MapMod**:
+An asset pack that supplies a Railroader Map definition or changes to a map. This includes modifications to an existing map and packs that provide a new map.
+
+**Scene object**:
+An object in a Unity scene loaded for the map that may have physical placement, activity, logical relationships, or dependent state.
 
 **Scene patch**:
 MapMod-supplied desired changes to supported scene objects and their relationships.
@@ -25,9 +49,6 @@ _Avoid_: Patch history, movement script
 **Patch document**:
 The document that expresses a MapMod's scene patch.
 _Avoid_: Patch history
-
-**Scene object**:
-An object in a loaded map scene that may have physical placement, activity, logical relationships, or dependent state.
 
 **Physical placement**:
 An object's position and rotation in the map.
@@ -71,9 +92,6 @@ The supplying MapMod that owns the selected Map definition being authored in the
 
 **Effective underlying state**:
 The state that remains for an existing object without a particular modification by its supplying MapMod, including the applicable native context and other retained modifications in that editing or runtime context.
-
-**Native pack load order**:
-The order in which Railroader loads enabled asset packs. It is distinct from the order in which native map layers compose a map.
 
 **Informational overlap notice**:
 A notice that applicable patch documents from different supplying MapMods attempt to modify the same resolved existing scene object. It indicates possible incompatibility, not a proven conflict.
