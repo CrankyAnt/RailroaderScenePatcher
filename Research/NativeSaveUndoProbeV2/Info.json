@@ -1,0 +1,1 @@
+{"identifier":"crankyant/native-save-undo-probe-v2","name":"Native Save Undo Probe V2","author":"CrankyAnt","version":"0.0.2","assemblies":["Probe.dll"],"dependencies":{"required":["rr/game >=0.6.2"]}}

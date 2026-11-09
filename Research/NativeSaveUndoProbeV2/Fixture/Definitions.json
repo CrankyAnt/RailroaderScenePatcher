@@ -1,0 +1,1 @@
+{"objects":[{"identifier":"crankyant/native-save-undo-map","metadata":{"name":"Native Save Undo Fixture","description":"Disposable test map","tags":[],"credits":""},"definition":{"kind":"Map","mapData":"./Map.json","terrainTileSets":["rr/nc-bryson"],"mapLayers":["rr/bushnell-whittier"],"components":{}}}]}
