@@ -1,0 +1,11 @@
+2026-11-09T03:25:53.9694879Z OnModLoad
+2026-11-09T03:25:54.1499856Z patch installed
+2026-11-09T03:26:24.1044316Z before id=M5pp instance=256858 map=crankyant/broken-marker-test-map fixturePackMatches=1 graph=True destination=True locationPresent=False oldSegment=Shuo
+2026-11-09T03:26:24.1063829Z marker candidates all=1 valid=1 loaded=0 targetSceneValid=True targetSceneLoaded=False targetSceneHandle=-6042
+2026-11-09T03:26:24.1073887Z marker candidate instance=256858 target=True sceneValid=True sceneLoaded=False sceneHandle=-6042 sceneName=BushnellWhittier-MapManager path=World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E
+2026-11-09T03:26:24.1083884Z repair preflight original=Shuo/58.69453/A instance=256858 testdata=matched
+2026-11-09T03:26:24.1098930Z repair applied; native check follows
+2026-11-09T03:26:24.1108983Z after id=M5pp instance=256858 map=crankyant/broken-marker-test-map fixturePackMatches=1 graph=True destination=True locationPresent=True oldSegment=SCrankyAntSceneProbe
+2026-11-09T03:26:24.1118982Z registration total=1 objectMatches=1 replacementMatches=1
+2026-11-09T03:26:29.0260226Z OnWorldLoad
+2026-11-09T03:26:29.0270227Z control emitted retained=True

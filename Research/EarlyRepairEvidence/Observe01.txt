@@ -1,0 +1,5 @@
+2026-11-09T03:15:13.3285289Z OnModLoad
+2026-11-09T03:15:13.5191209Z patch installed
+2026-11-09T03:17:04.4301998Z before id=M5pp instance=257222 map=crankyant/broken-marker-test-map fixturePackMatches=1 graph=True destination=True locationPresent=False oldSegment=Shuo
+2026-11-09T03:17:04.4327042Z after id=M5pp instance=257222 map=crankyant/broken-marker-test-map fixturePackMatches=1 graph=True destination=True locationPresent=False oldSegment=Shuo
+2026-11-09T03:17:09.5567887Z OnWorldLoad

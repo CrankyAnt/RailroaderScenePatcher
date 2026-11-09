@@ -1,0 +1,8 @@
+2026-11-09T03:22:17.1000341Z OnModLoad
+2026-11-09T03:22:17.2801458Z patch installed
+2026-11-09T03:23:28.7730566Z before id=M5pp instance=256858 map=crankyant/broken-marker-test-map fixturePackMatches=1 graph=True destination=True locationPresent=False oldSegment=Shuo
+2026-11-09T03:23:28.7750607Z repair refused: marker not unique
+2026-11-09T03:23:28.7780627Z after id=M5pp instance=256858 map=crankyant/broken-marker-test-map fixturePackMatches=1 graph=True destination=True locationPresent=False oldSegment=Shuo
+2026-11-09T03:23:28.7780627Z registration total=0 objectMatches=0 replacementMatches=0
+2026-11-09T03:23:33.7947641Z OnWorldLoad
+2026-11-09T03:23:33.7957640Z control emitted retained=True

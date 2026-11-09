@@ -1,0 +1,1 @@
+{"identifier":"crankyant/early-repair-mutation-probe","version":"0.0.1","name":"Early Repair Mutation Probe","author":"CrankyAnt","assemblies":["EarlyRepairMutationProbe.dll"],"dependencies":{"required":["rr/game >=0.6.2"]}}

@@ -1,0 +1,1 @@
+{"identifier":"crankyant/early-repair-observer","version":"0.0.1","name":"Early Repair Observer","author":"CrankyAnt","assemblies":["EarlyRepairProbe.dll"],"dependencies":{"required":["rr/game >=0.6.2"]}}
