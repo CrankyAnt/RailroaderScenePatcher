@@ -7,7 +7,16 @@ This context covers scene changes supplied by map mods and authored for the Rail
 ## Language
 
 **MapMod**:
-A mod that supplies a Railroader map definition or changes to a map.
+A mod distributed as an asset pack that supplies a Railroader map definition or changes to a map. The term includes modifications to an existing map and packs that provide a new map; it does not mean that several packs are edited together.
+
+**Map definition**:
+The game's identified definition of a selectable map, with its map data, referenced map layers and terrain sources. A definition and its containing asset pack are distinct.
+
+**Native map layer**:
+A Map definition referenced by another Map definition as inherited map content. An inherited layer is source context, not another active edit target.
+
+**Source scene**:
+A Unity scene that supplies existing scene objects to a loaded map. Sharing a source scene and inheriting native map data are distinct relationships.
 
 **Scene patch**:
 MapMod-supplied desired changes to supported scene objects and their relationships.
@@ -58,10 +67,22 @@ The MapMod that owns a scene-patch document, regardless of which source map or p
 _Avoid_: Target owner
 
 **Active edited MapMod**:
-The supplying MapMod currently being authored in the map editor.
+The supplying MapMod that owns the selected Map definition being authored in the editor. Other packs can supply inherited content without becoming edit targets.
 
 **Effective underlying state**:
-The state of an existing object after native and inherited map changes take effect, before this MapMod's scene patch is applied.
+The state that remains for an existing object without a particular modification by its supplying MapMod, including the applicable native context and other retained modifications in that editing or runtime context.
+
+**Native pack load order**:
+The order in which Railroader loads enabled asset packs. It is distinct from the order in which native map layers compose a map.
+
+**Informational overlap notice**:
+A notice that applicable patch documents from different supplying MapMods attempt to modify the same resolved existing scene object. It indicates possible incompatibility, not a proven conflict.
+
+**Supported source pattern**:
+A supported equipment behavior with its required components, relationships and available dependent data. A model name or visual resemblance alone does not identify a pattern.
+
+**Eligible equipment source**:
+An available equipment source that conforms to a supported source pattern and satisfies its applicable requirements.
 
 **Format version**:
 The version that identifies the meaning of patch-document data. It is separate from the release versions of the patcher and supplying MapMod.
