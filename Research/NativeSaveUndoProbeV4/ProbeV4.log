@@ -1,0 +1,18 @@
+2026-11-09T06:50:12.7672168Z World loaded; owned Save prefixes=1
+2026-11-09T06:50:49.5655184Z World loaded; owned Save prefixes=1
+2026-11-09T06:50:49.7171094Z Editor attached; initial history recorded
+2026-11-09T06:51:08.4994144Z Baseline actualA=0,0,0 actualB=0,1,0
+2026-11-09T06:51:08.5029206Z Set state 1,2 actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:51:15.9497857Z Save prefix failCustom=False state=1,2 actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:51:15.9507872Z Custom write complete
+2026-11-09T06:51:16.0503864Z Native Save completed; recorded saved history and custom state
+2026-11-09T06:51:25.4028726Z Set state 0,0 actualA=0,0,0 actualB=0,1,0
+2026-11-09T06:51:25.4363629Z History token transferred 1 to _redoStack actualA=0,0,0 actualB=0,1,0
+2026-11-09T06:51:34.3579232Z Set state 1,2 actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:51:34.3589219Z Dirty getter during Redo native=False augmented=True count=1
+2026-11-09T06:51:34.3599218Z Dirty getter during Redo native=False augmented=True count=1
+2026-11-09T06:51:34.3995223Z Chrome before token transfer dirty=True title=Map Editor - crankyant/native-save-undo-map * saveMatches=1 interactable=True isInteractable=True active=True
+2026-11-09T06:51:34.3995223Z History token transferred 1 to _undoStack actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:51:34.4015222Z Chrome after token transfer dirty=False title=Map Editor - crankyant/native-save-undo-map * saveMatches=1 interactable=True isInteractable=True active=True
+2026-11-09T06:51:34.4035482Z Chrome after RefreshChrome dirty=False title=Map Editor - crankyant/native-save-undo-map saveMatches=2
+2026-11-09T06:51:34.4266253Z Chrome next frame after RefreshChrome dirty=False title=Map Editor - crankyant/native-save-undo-map saveMatches=1 interactable=False isInteractable=False active=True

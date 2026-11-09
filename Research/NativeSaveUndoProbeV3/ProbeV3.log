@@ -1,0 +1,16 @@
+2026-11-09T06:44:38.7665282Z World loaded; owned Save prefixes=1
+2026-11-09T06:45:01.8611778Z World loaded; owned Save prefixes=1
+2026-11-09T06:45:02.0093972Z Editor attached; initial history recorded
+2026-11-09T06:45:12.3180098Z Baseline actualA=0,0,0 actualB=0,1,0
+2026-11-09T06:45:12.3215202Z Set state 1,2 actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:45:19.4701071Z Save prefix failCustom=False state=1,2 actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:45:19.4701071Z Custom write complete
+2026-11-09T06:45:19.5729989Z Native Save completed; recorded saved history and custom state
+2026-11-09T06:45:20.5552848Z Set state 0,0 actualA=0,0,0 actualB=0,1,0
+2026-11-09T06:45:20.5879432Z History token transferred 1 to _redoStack actualA=0,0,0 actualB=0,1,0
+2026-11-09T06:45:21.6533958Z Set state 1,2 actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:45:21.6895013Z Chrome before token transfer unavailable panel=False label=True button=True
+2026-11-09T06:45:21.6895013Z History token transferred 1 to _undoStack actualA=1,0,0 actualB=2,1,0
+2026-11-09T06:45:21.6915034Z Chrome after token transfer unavailable panel=False label=True button=True
+2026-11-09T06:45:21.6935011Z Chrome after RefreshChrome unavailable panel=False label=True button=True
+2026-11-09T06:45:21.7115511Z Chrome next frame after RefreshChrome unavailable panel=False label=True button=True

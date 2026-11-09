@@ -1,6 +1,6 @@
 # Native Save and Undo probe v2 protocol
 
-This follow-up probe is an experimental candidate for issue #34. The first probe and its results remain unchanged. The v2 runtime behavior has not yet been tested.
+This follow-up probe is an experimental candidate for issue #34. The first probe and its results remain unchanged. The [runtime observations](RuntimeObservations.md) record the completed v2 trial and its limits.
 
 The mod installs its Harmony hooks once in `OnModLoad` and reports the number of owned `MapEditor.Save` prefixes at each world load. A count other than one is a failed prerequisite. The temporary objects have distinct baseline positions. Each assignment and history-token transfer logs the actual `localPosition` read from each object, as well as the tracked values. Capture baseline, apply, Undo and Redo, and compare every coordinate.
 
