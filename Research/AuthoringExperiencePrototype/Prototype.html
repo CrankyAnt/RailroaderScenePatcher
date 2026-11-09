@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crossing authoring interaction prototype</title>
+<style>
+body{font:15px system-ui,sans-serif;color:#23323b;background:#f2f5f6;margin:0}main{max-width:1200px;margin:auto;padding:20px}h1{font-size:24px;margin:0}h2{font-size:17px;margin:0 0 8px}p{margin:8px 0 14px}button{font:inherit;padding:6px 10px;margin:2px;border:1px solid #9baeb7;border-radius:4px;background:white;cursor:pointer}button:disabled{opacity:.45;cursor:default}.layout{display:grid;grid-template-columns:2fr 1fr;gap:12px}.card{background:white;border:1px solid #cbd6db;border-radius:6px;padding:14px;margin-bottom:12px}.scene{background:#e7f0e9;overflow:hidden}svg{width:100%;height:300px;display:block}.track{stroke:#6d7c83;stroke-width:12;fill:none;cursor:pointer}.track.selected{stroke:#06718d}.track.covered{stroke:#398451}.track.selected.covered{stroke:#06718d;stroke-dasharray:18 6}.track:hover{stroke:#1094ad}.node{fill:white;stroke:#344a55;stroke-width:3;cursor:pointer}.road{stroke:#b7aa99;stroke-width:44}.label{font-size:14px;fill:#132f3b;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}dl{display:grid;grid-template-columns:140px 1fr;gap:5px;margin:0}dt{font-weight:600}dd{margin:0;overflow-wrap:anywhere}.tabs button.active{background:#06718d;color:white}.notice{color:#48616d;font-size:13px}.step{display:block;text-align:left;width:100%;margin:5px 0}.step.done{background:#e5f1f1}@media(max-width:760px){.layout{grid-template-columns:1fr}}
+:root{color-scheme:dark}
+body{color:#e2e8ef;background:#10151c}
+button{color:#e2e8ef;background:#26323f;border-color:#64748b}
+button:hover:not(:disabled){background:#34465a;border-color:#8db9d8}
+button:focus-visible{outline:3px solid #69ceff;outline-offset:2px}
+button:disabled{opacity:1;color:#93a3b5;background:#1b2530;border-color:#3c4b5d}
+.card{background:#19222d;border-color:#3c4b5d}
+.scene{background:#172723}
+.notice{color:#bac8d6}
+.track{stroke:#8c9ba5}
+.track.selected{stroke:#67cfff}
+.track.covered{stroke:#69d292}
+.track.selected.covered{stroke:#67cfff}
+.track:hover{stroke:#b0e5ff}
+.node{fill:#18232e;stroke:#d2e5ef}
+.road{stroke:#53504b}
+.label{fill:#e4eef7;stroke:#172723}
+.tabs button.active{background:#275c76;color:#f3f9ff;border-color:#67cfff}
+.step.done{background:#213f3b;color:#d3eee5}
+hr{border:0;border-top:1px solid #3c4b5d}
+</style>
+<main><h1>Crossing authoring interaction prototype</h1>
+<p>Can a modder choose an ambiguous approach track in the scene, inspect and navigate without losing the choice, and complete one grouped edit? This is a proposed custom interaction, not an editor extension or proof of a supported integration. Native right-drag camera movement cancels an armed pick, and changing native selection clears its target. This demo instead keeps a separate custom draft while navigating or inspecting. Its unsaved indicator compares scene snapshots, a simplification that does not claim to reproduce native change counting.</p>
+<div class="layout"><div><section class="card scene"><h2>Scene</h2><p class="notice">Purple marks retained original coverage T-001. Green marks added coverage, blue marks a pending candidate, and blue dashes mark both. Click a node or segment to inspect it. Navigation remains available while choosing.</p>
+<div><button onclick="pan(-35,0)">Pan left</button><button onclick="pan(35,0)">Pan right</button><button onclick="pan(0,-25)">Pan up</button><button onclick="pan(0,25)">Pan down</button><button onclick="zoom(.8)">Zoom in</button><button onclick="zoom(1.25)">Zoom out</button><button onclick="viewReset()">Reset view</button></div>
+<svg id="scene" viewBox="0 0 700 300" role="img" aria-label="Two approach tracks crossing a road"><line class="road" x1="350" y1="0" x2="350" y2="300"/><text class="label" x="365" y="28">Road crossing</text><line x1="35" y1="274" x2="230" y2="274" stroke="#c39aef" stroke-width="10"/><text class="label" x="35" y="262">Original coverage T-001 retained</text><path id="trackA" class="track" d="M30 110 L670 110" onclick="act('choose','T-101')"/><path id="trackB" class="track" d="M30 190 L670 190" onclick="act('choose','T-102')"/><text class="label" x="55" y="90">T-101 North approach</text><text class="label" x="55" y="222">T-102 South approach</text><circle class="node" cx="180" cy="110" r="9" onclick="act('inspect','Node N-11')"/><circle class="node" cx="520" cy="190" r="9" onclick="act('inspect','Node N-22')"/><text class="label" x="157" y="145">N-11</text><text class="label" x="497" y="165">N-22</text><text class="label" x="390" y="85" onclick="act('inspect','Segment S-101')" style="cursor:pointer">Inspect S-101</text><text class="label" x="390" y="245" onclick="act('inspect','Segment S-102')" style="cursor:pointer">Inspect S-102</text></svg></section>
+<section class="card"><h2>Actions</h2><p class="notice">Add track coverage is a provisional operation. It binds and registers the selected track together as one edit.</p><button onclick="act('add')">Add track coverage</button><button onclick="act('cancel')">Cancel</button><button onclick="act('save')">Save</button><button onclick="act('undo')">Undo</button><button onclick="act('redo')">Redo</button><button onclick="act('exit')">Exit</button><hr><p class="notice">Equipment examples: move existing equipment, or add validated equipment and delete it. Restore removes this mod's existing-equipment modification and reveals the inherited baseline as a new edit. It does not assume the baseline is the original game.</p><button onclick="act('move')">Move existing equipment</button><button onclick="act('addEquipment')">Add validated equipment</button><button onclick="act('deleteEquipment')">Delete added equipment</button><button onclick="act('restore')">Restore</button><button onclick="resetDemo()">Clear/reset demo</button></section></div>
+<aside><section class="card"><h2>Inspector</h2><dl id="state"></dl><p id="message" class="notice" aria-live="polite"></p><div id="exitPrompt" hidden><p id="exitText"></p><button onclick="act('stay')">Cancel</button><button onclick="act('confirmExit')">Exit</button></div><div id="reopen" hidden><button onclick="act('reopen')">Reopen simulation</button></div></section>
+<section class="card"><h2>Guided walkthroughs</h2><div id="tabs" class="tabs"></div><p id="scenario"></p><div id="steps"></div></section></aside></div></main>
+<script>
+// Pure state model. Scene edits are snapshots; view and inspection do not enter history.
+const initial = () => ({scene:{binding:null, registered:false, existing:'base', added:false}, saved:{binding:null,registered:false,existing:'base',added:false}, pending:null, inspect:'Crossing C-1', undo:[], redo:[], exit:false, closed:false, message:'Choose a track to start.'});
+const copy = x => JSON.parse(JSON.stringify(x));
+const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+function reduce(s, action, value) {
+  s = copy(s);
+  const edit = (next, message) => { if (!same(s.scene,next)) {s.undo.push(copy(s.scene));s.scene=next;s.redo=[];} s.message=message; };
+  if (s.closed && action !== 'reopen') return s;
+  if (s.exit && !['stay','confirmExit'].includes(action)) return s;
+  switch(action) {
+    case 'choose': s.pending=value;s.message='Candidate selected. No scene edit has been made.';break;
+    case 'inspect': s.inspect=value;s.message='Inspection changed. The pending choice remains.';break;
+    case 'add': if (!s.pending) {s.message='Choose an approach track first. Nothing changed.';break;} edit({...s.scene,binding:s.pending,registered:true},'Track binding and registration completed as one edit.');s.pending=null;break;
+    case 'cancel': s.pending=null;s.message='Pending choice cleared. Completed edits remain.';break;
+    case 'save': s.saved=copy(s.scene);s.message='Current scene saved.';break;
+    case 'undo': if(s.undo.length){s.redo.push(copy(s.scene));s.scene=s.undo.pop();s.message='Last edit undone.';}else s.message='Nothing to undo.';break;
+    case 'redo': if(s.redo.length){s.undo.push(copy(s.scene));s.scene=s.redo.pop();s.message='Last undone edit restored.';}else s.message='Nothing to redo.';break;
+    case 'move': edit({...s.scene,existing:'moved'},'Existing equipment moved.');break;
+    case 'addEquipment': edit({...s.scene,added:true},'Validated equipment added.');break;
+    case 'deleteEquipment': if(s.scene.added) edit({...s.scene,added:false},'Added equipment deleted.');else s.message='No added equipment to delete.';break;
+    case 'restore': edit({...s.scene,existing:'base'},"The equipment modification was removed, revealing the inherited baseline as a new edit.");break;
+    case 'exit': s.exit=true;s.message='Confirm exit or cancel.';break;
+    case 'stay': s.exit=false;s.message='Exit cancelled.';break;
+    case 'confirmExit': s.exit=false;s.closed=true;s.message=same(s.scene,s.saved)?'Simulation closed.':'Simulation closed without saving.';break;
+    case 'reopen': s.scene=copy(s.saved);s.pending=null;s.undo=[];s.redo=[];s.closed=false;s.message='Reopened the last saved scene.';break;
+  }
+  return s;
+}
+</script>
+<script>
+let state=initial(), box=[0,0,700,300], tab=0, progress=0;
+const scenarios=[
+ {name:'Happy path',text:'Choose a track, complete one edit, then undo and redo the whole binding.',steps:[['Choose T-101','choose','T-101'],['Add track coverage','add'],['Undo','undo'],['Redo','redo']]},
+ {name:'Inspect while choosing',text:'The candidate remains selected while you inspect another object and navigate.',steps:[['Choose T-102','choose','T-102'],['Inspect node N-11','inspect','Node N-11'],['Pan right','pan'],['Add track coverage','add']]},
+ {name:'Cancel vs undo',text:'Cancel clears a pending choice. Undo reverses a completed edit.',steps:[['Try adding without a choice','add'],['Choose T-101','choose','T-101'],['Cancel choice','cancel'],['Choose T-102','choose','T-102'],['Add track coverage','add'],['Choose T-101','choose','T-101'],['Cancel choice','cancel'],['Undo completed edit','undo']]},
+ {name:'Save and exit',text:'Save a binding, make another edit, then exit and reopen the saved scene.',steps:[['Choose T-101','choose','T-101'],['Add track coverage','add'],['Save','save'],['Move existing equipment','move'],['Exit','exit'],['Confirm exit','confirmExit'],['Reopen','reopen']]},
+ {name:'Equipment edits',text:'Move and undo existing equipment. Add, delete and undo added equipment. Restore creates a separate edit.',steps:[['Move existing equipment','move'],['Undo move','undo'],['Add validated equipment','addEquipment'],['Delete added equipment','deleteEquipment'],['Undo delete','undo'],['Move existing equipment','move'],['Restore inherited state','restore'],['Undo restore','undo']]}
+];
+function act(a,v){state=reduce(state,a,v);render()}
+function resetDemo(){state=initial();box=[0,0,700,300];progress=0;render()}
+function pan(x,y){box[0]+=x;box[1]+=y;render()}
+function zoom(f){const cx=box[0]+box[2]/2,cy=box[1]+box[3]/2;box[2]=Math.max(200,Math.min(1400,box[2]*f));box[3]=box[2]*300/700;box[0]=cx-box[2]/2;box[1]=cy-box[3]/2;render()}
+function viewReset(){box=[0,0,700,300];render()}
+function selectTab(i){tab=i;resetDemo()}
+function step(i){if(i!==progress)return;const a=scenarios[tab].steps[i];if(a[1]==='pan')pan(35,0);else act(a[1],a[2]);progress++;render()}
+function render(){
+ document.getElementById('scene').setAttribute('viewBox',box.join(' '));
+ for(const [id,name] of [['trackA','T-101'],['trackB','T-102']]) {const track=document.getElementById(id);track.classList.toggle('selected',state.pending===name);track.classList.toggle('covered',state.scene.binding===name);}
+ const fields=[['Pending candidate',state.pending||'None'],['Inspecting',state.inspect],['Original coverage','T-001 retained'],['Added coverage',state.scene.binding||'None'],['Registration',state.scene.registered?'Registered':'None'],['Saved added coverage',state.saved.binding||'None'],['Saved registration',state.saved.registered?'Registered':'None'],['Existing equipment',state.scene.existing],['Added equipment',state.scene.added?'Present':'Absent'],['Saved equipment',`${state.saved.existing}; added ${state.saved.added?'present':'absent'}`],['Unsaved edits',same(state.scene,state.saved)?'No':'Yes'],['Undo / redo',`${state.undo.length} / ${state.redo.length}`],['Simulation',state.closed?'Closed':'Open']];
+ document.getElementById('state').innerHTML=fields.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('');document.getElementById('message').textContent=state.message;document.getElementById('exitPrompt').hidden=!state.exit;document.getElementById('exitText').textContent=same(state.scene,state.saved)?'Exit the editor?':'Exit without saving? Unsaved edits will be lost when you reopen.';document.getElementById('reopen').hidden=!state.closed;
+ document.getElementById('tabs').innerHTML=scenarios.map((s,i)=>`<button class="${i===tab?'active':''}" onclick="selectTab(${i})">${s.name}</button>`).join('');document.getElementById('scenario').textContent=scenarios[tab].text;document.getElementById('steps').innerHTML=scenarios[tab].steps.map((s,i)=>`<button class="step ${i<progress?'done':''}" ${i!==progress?'disabled':''} onclick="step(${i})">${i+1}. ${s[0]}</button>`).join('');
+}
+render();
+</script></html>
