@@ -30,6 +30,7 @@ Unity scene retains its meaning in Unity's [scene documentation](https://docs.un
 
 **Unity scene**:
 A Unity container for scene objects, including their hierarchy and components. A Unity scene is distinct from Railroader's Map definition and map layers.
+_Avoid_: Source scene
 
 ### Patcher terminology
 
@@ -37,9 +38,6 @@ These are project terms for scene-patch authoring and application, not additiona
 
 **MapMod**:
 An asset pack that supplies a Railroader Map definition or changes to a map. This includes modifications to an existing map and packs that provide a new map.
-
-**Source scene**:
-A Unity scene that supplies existing scene objects to a loaded map. Sharing a source scene and inheriting native map data are distinct relationships.
 
 **Scene object**:
 An object in a Unity scene loaded for the map that may have physical placement, activity, logical relationships, or dependent state.
