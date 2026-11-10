@@ -47,6 +47,7 @@ When in doubt about a place, ask the user.
 Every tracked top-level folder whose name does not start with a dot gets one line: the path and at most one short clause that names the folder's purpose, not its contents. No explanation, rules, status, subfolders, nested lists or file pointers. A new top-level folder adds its line; a removed one removes its line; a change that makes a clause untrue rewrites it in the same change.
 
 - `LICENSES/`: canonical license texts
+- `Research/`: retained research evidence
 - `docs/`: maintained repository documentation
 
 ## Testing instructions
