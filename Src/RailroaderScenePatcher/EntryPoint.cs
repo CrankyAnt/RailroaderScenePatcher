@@ -30,6 +30,13 @@ namespace RailroaderScenePatcher {
         IModContext context;
         BoardScene scene;
         PatchEngine engine;
+        SceneInventory inventory;
+        InspectionInputBlocker inputBlocker;
+        SceneObservation selected;
+        string documentInspection = "";
+        string documentStamp;
+        bool definitionsStale = true;
+        float nextInventoryCheck;
         bool editor, open;
         string status = "Initializing", inspected = "", filter = "";
         readonly HashSet<string> reported = new HashSet<string>();
@@ -45,6 +52,14 @@ namespace RailroaderScenePatcher {
 #endif
             try {
                 editor = PackDocuments.IsEditor;
+                if (editor) inventory = new SceneInventory(new NativeInventory());
+                if (editor) {
+                    try { inputBlocker = gameObject.AddComponent<InspectionInputBlocker>(); inputBlocker.Initialize(); }
+                    catch (Exception e) {
+                        inputBlocker?.Release(); inputBlocker = null;
+                        Report("inspection-input", "Inspection UI unavailable: " + e.GetBaseException().Message);
+                    }
+                }
                 scene = new BoardScene(); engine = new PatchEngine(scene);
                 context.Log.Info("Scene Patcher 0.1.0: native board capability available; game " + Application.version + "; production integration unchecked");
                 ApplyDocuments();
@@ -99,76 +114,99 @@ namespace RailroaderScenePatcher {
             catch (Exception e) { context?.Log.Info("Native warning presentation unavailable: " + e.GetBaseException().Message); }
         }
         void Update() {
+            if (editor && open && inventory != null && Time.unscaledTime >= nextInventoryCheck) {
+                inventory.CheckFreshness(); nextInventoryCheck = Time.unscaledTime + 2f;
+                try { if (documentStamp != DocumentStamp(PackDocuments.Discover())) definitionsStale = true; }
+                catch { definitionsStale = true; }
+            }
             if (scene == null) return;
             try { scene.PollCompletion(); }
             catch (Exception e) { Report("terrain", "Dependent terrain state remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
         }
-        internal void Release() { scene?.Dispose(); scene = null; engine = null; }
+        internal void Release() { inputBlocker?.Release(); inputBlocker = null; scene?.Dispose(); scene = null; engine = null; inventory = null; selected = null; }
         void OnDestroy() { Release(); }
         void OnGUI() {
-            if (!editor) return;
-            if (GUI.Button(new Rect(20, 20, 160, 30), "Scene patches")) open = !open;
+            if (!editor || inputBlocker == null || !inputBlocker.Available) return;
+            var button = new Rect(20, 20, 160, 30);
+            inputBlocker.SetRegions(open, window, button);
+            if (GUI.Button(button, "Scene patches")) open = !open;
             if (open) window = GUI.Window(0x43525350, window, DrawWindow, "Railroader Scene Patcher");
+            inputBlocker.SetRegions(open, window, button);
         }
         void DrawWindow(int id) {
             GUILayout.Label(status);
             if (scene != null) GUILayout.Label(scene.Status);
-            GUILayout.Label("Manual fixed placement. Inventory refresh does not apply patches. Reload after external JSON correction.");
+            GUILayout.Label(inventory == null || inventory.IsStale || definitionsStale ? "Inventory is stale or not yet scanned. Refresh before relying on these observations." : "Inventory snapshot. Changes are checked while this panel is open. Refresh after native edits.");
+            GUILayout.Label("Search names, paths, families, binding identifiers, dependencies or problems.");
             filter = GUILayout.TextField(filter);
             scroll = GUILayout.BeginScrollView(scroll);
             if (GUILayout.Button("Refresh inventory and verify stored target identities")) Inspect();
-            if (scene != null) {
-                foreach (var board in Resources.FindObjectsOfTypeAll<GameObject>().Where(g => g.scene.IsValid() && g.scene.isLoaded && BoardScene.PathOf(g.transform) == BoardScene.BoardPath && g.name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)) {
-                    if (GUILayout.Button("Inspect " + board.name + " in " + board.scene.name)) inspected = Identity(board);
-                    if (GUILayout.Button("Focus " + board.name)) Focus(board);
+            if (inventory != null) {
+                GUILayout.Label(inventory.Entries.Count + " observed entries. Active and inactive loaded objects are included.");
+                foreach (var entry in inventory.Search(filter)) {
+                    if (GUILayout.Button("Inspect " + entry.Family + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]"))) {
+                        selected = entry; inspected = DescribeInspection(entry);
+                    }
                 }
             }
-            inspected = GUILayout.TextArea(inspected);
-            if (GUILayout.Button("Copy inspected identity")) GUIUtility.systemCopyBuffer = inspected;
+            if (selected != null) {
+                GUILayout.TextArea(inspected);
+                if (GUILayout.Button("Focus inspected object")) Focus(selected);
+                if (GUILayout.Button("Copy inspected identity")) GUIUtility.systemCopyBuffer = Identity(selected);
+            }
+            GUILayout.Label(documentInspection);
             foreach (var diagnostic in diagnostics) GUILayout.Label(diagnostic);
-            GUILayout.Label("Other object families, track binding, activity, authoring controls and Save/Undo are not implemented in this slice.");
+            foreach (var coverage in NativeInventory.Coverage) GUILayout.Label(coverage);
+            GUILayout.Label("Binding validity does not establish correct placement or intended track. Inspect the world before editing.");
+            if (GUILayout.Button("Inventory and dependency guidance")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/inspect-scene-objects.md");
             if (GUILayout.Button("Fixed-placement guidance")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md");
             if (GUILayout.Button("Document v1 reference")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-document-v1.md");
             GUILayout.EndScrollView(); GUI.DragWindow(new Rect(0, 0, 10000, 20));
         }
         void Inspect() {
             try {
-                var lines = new List<string>();
-                foreach (var pack in PackDocuments.Discover()) {
-                    if (pack.Error != null) { lines.Add(pack.Error); continue; }
-                    var document = PatchDocument.Load(pack.Json);
-                    if (!document.CanWrite) { lines.Add(document.Error); continue; }
-                    var root = JObject.Parse(document.Write());
-                    if (!scene.MapIds.Contains((string)root["sourceMap"]["mapId"])) { lines.Add(pack.Identifier + ": map context mismatch before target resolution"); continue; }
-                    foreach (var item in (JArray)root["modifications"]) {
-                        try {
-                            var identity = StoredIdentity((JObject)item["target"]);
-                            var matches = scene.Resolve(identity);
-                            string support = "";
-                            if (matches.Count == 1) { try { scene.Preflight(matches[0]); support = "; prerequisites available"; } catch (Exception e) { support = "; " + e.GetBaseException().Message; } }
-                            lines.Add(pack.Identifier + "/" + item["id"] + ": " + matches.Count + " exact matches" + support);
-                        } catch (Exception e) { lines.Add(pack.Identifier + "/" + item["id"] + ": " + e.GetBaseException().Message); }
-                    }
+                if (inventory == null) throw new InvalidOperationException("Map-editor inspection is unavailable");
+                inventory.Refresh();
+                if (selected != null) {
+                    selected = inventory.Entries.FirstOrDefault(e => ReferenceEquals(e.Handle, selected.Handle) && e.Identity.Component == selected.Identity.Component);
+                    inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected);
                 }
-                inspected = String.Join("\n", lines);
-                status = "Refreshed from current scene and documents. Inspect again after native changes; inventory is a snapshot.";
+                var lines = new List<string>();
+                var documents = PackDocuments.Discover().ToArray();
+                foreach (var pack in documents) {
+                    if (pack.Error != null) { lines.Add(pack.Identifier + ": " + pack.Error); continue; }
+                    foreach (var item in inventory.InspectDocument(pack.Json))
+                        lines.Add(pack.Identifier + "/" + (item.Id ?? "document") + ": " + item.MatchCount + " inspection matches; dependsOn=" + String.Join(", ", item.Dependencies) + "; " + String.Join("; ", item.Problems));
+                }
+                documentInspection = String.Join("\n", lines);
+                documentStamp = DocumentStamp(documents); definitionsStale = false;
+                status = "Refreshed scene observations and supplied definitions without applying patches.";
             } catch (Exception e) { EditorDiagnostic(e.GetBaseException().Message); }
         }
-        static TargetIdentity StoredIdentity(JObject value) => new TargetIdentity((string)value["scene"], (string)value["path"], (string)value["component"], (string)value["structure"]);
-        string Identity(GameObject board) {
-            var position = scene.ConvertPosition("WorldToGame", board.transform.position); var rotation = board.transform.rotation;
-            return new JObject {
-                ["sourceMap"] = new JObject { ["mapId"] = scene.MapIds.First() },
-                ["target"] = new JObject { ["scene"] = board.scene.name, ["path"] = BoardScene.PathOf(board.transform), ["component"] = BoardScene.CullerType, ["structure"] = BoardScene.Structure },
-                ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(position.x, position.y, position.z), ["rotation"] = new JArray(rotation.x, rotation.y, rotation.z, rotation.w) }
-            }.ToString();
+        static string DocumentStamp(IEnumerable<PackDocument> documents) => new JArray(documents.Select(p => new JArray(p.Identifier, p.Json, p.Error))).ToString(Newtonsoft.Json.Formatting.None);
+        string Identity(SceneObservation entry) {
+            var identity = new JObject {
+                ["sourceMap"] = new JObject { ["mapId"] = PackDocuments.MapIds().First() },
+                ["target"] = new JObject { ["scene"] = entry.Identity.Scene, ["path"] = entry.Identity.Path, ["component"] = entry.Identity.Component, ["structure"] = entry.Identity.Structure },
+                ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(entry.Position), ["rotation"] = new JArray(entry.Rotation) }
+            };
+            if (entry.Identity.Structure == null) ((JObject)identity["target"]).Remove("structure");
+            return identity.ToString();
         }
-        void Focus(GameObject board) {
+        string DescribeInspection(SceneObservation entry) => Identity(entry) + "\n" + entry.Family + "; active in hierarchy=" + entry.Active + "\n" + entry.Operations +
+            "\nBindings:\n" + String.Join("\n", entry.Bindings) + "\nDependencies:\n" + String.Join("\n", entry.Dependencies) +
+            "\nDetected problems:\n" + (entry.Problems.Count == 0 ? "None detected. Placement and intended binding require world inspection." : String.Join("\n", entry.Problems));
+        void Focus(SceneObservation entry) {
             try {
+                // Never focus a replacement with the same path. Refresh retains the selected handle.
+                var current = new NativeInventory().Discover().Where(e => ReferenceEquals(e.Handle, entry.Handle) && e.Identity.Component == entry.Identity.Component).ToArray();
+                if (current.Length != 1 || !entry.Matches(current[0])) throw new InvalidOperationException("Inspected object changed; refresh and inspect again");
+                if (entry.Position.Count != 3) throw new InvalidOperationException("Map coordinates unavailable for this observation");
+                var position = new Vector3((float)entry.Position[0], (float)entry.Position[1], (float)entry.Position[2]);
                 var type = Native.Type("CameraSelector");
                 var selector = Native.Read(type, "shared");
                 var strategy = Enum.Parse(type.GetNestedType("CameraIdentifier", Native.Flags), "Strategy");
-                Native.Call(selector, "JumpToPoint", scene.ConvertPosition("WorldToGame", board.transform.position), Quaternion.identity, strategy);
+                Native.Call(selector, "JumpToPoint", position, Quaternion.identity, strategy);
             } catch (Exception e) { EditorDiagnostic("Camera focus unavailable: " + e.GetBaseException().Message); }
         }
     }

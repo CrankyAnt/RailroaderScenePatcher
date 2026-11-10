@@ -10,13 +10,12 @@ using UnityEngine;
 namespace RailroaderScenePatcher {
     // The first native capability is the retained independent Sylva board pattern.
     // Other scene families require their own dependent-state adapters.
-    internal sealed class BoardScene : IScene, IDisposable {
+    internal sealed class BoardScene : IScene, IInspectionScene, IDisposable {
         internal const string BoardPath = "World/Signs/Loc: Sylva Int";
         internal const string BoardSceneName = "BushnellWhittier-MapManager";
         internal const string CullerType = "Helpers.Culling.RendererCuller";
         internal const string MaskType = "Map.Runtime.MaskComponents.CircleMapMask";
         internal const string Structure = "independent-board-v1";
-        readonly string[] maps;
         readonly Type transformer, culler, mask;
         readonly object terrain;
         readonly System.Reflection.EventInfo tileEvent;
@@ -25,7 +24,8 @@ namespace RailroaderScenePatcher {
         internal string Status { get; private set; } = "No dependent terrain work pending";
         internal bool HasPending => pending.Count != 0;
         public Capability Capability { get; private set; }
-        public IEnumerable<string> MapIds => maps;
+        public IEnumerable<string> MapIds => PackDocuments.MapIds();
+        public IEnumerable<SceneObservation> Discover() => new NativeInventory().Discover();
         sealed class Snapshot {
             internal Vector3 Position;
             internal Quaternion Rotation;
@@ -36,7 +36,7 @@ namespace RailroaderScenePatcher {
             internal readonly HashSet<Vector3> Positions = new HashSet<Vector3>();
         }
         internal BoardScene() {
-            maps = PackDocuments.MapIds();
+            _ = PackDocuments.MapIds();
             transformer = Native.Type("Helpers.WorldTransformer");
             culler = Native.Type(CullerType); mask = Native.Type(MaskType);
             terrain = Native.Read(Native.Type("Map.Runtime.MapManager"), "Instance");

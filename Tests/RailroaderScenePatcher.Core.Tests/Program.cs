@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
-class Scene : IScene {
+class Scene : IScene, IInspectionScene {
+    public Func<IEnumerable<SceneObservation>> Observations;
+    public IEnumerable<SceneObservation> Discover() => Observations == null ? Array.Empty<SceneObservation>() : Observations();
     public IEnumerable<string> MapIds => Maps;
     public string[] Maps = { "map", "layer" };
     public Capability Capability { get; set; } = Capability.Unchecked;
@@ -14,9 +16,10 @@ class Scene : IScene {
     public bool FailRestore { get; set; }
     public object FailingTarget { get; set; }
     public int ResolveCalls, MutationCalls;
+    public Action BeforeCapture;
     public IReadOnlyList<object> Resolve(TargetIdentity identity) { ResolveCalls++; return Objects.TryGetValue(identity.Path, out var found) ? found : new List<object>(); }
     public void Preflight(object target) { }
-    public object Capture(object target) { var box = (Box)target; return new[] { (double[])box.Position.Clone(), (double[])box.Rotation.Clone() }; }
+    public object Capture(object target) { BeforeCapture?.Invoke(); var box = (Box)target; return new[] { (double[])box.Position.Clone(), (double[])box.Rotation.Clone() }; }
     public void Apply(object target, Placement placement) { MutationCalls++; var box = (Box)target; box.Position = new[] { placement.Position[0] - Origin, placement.Position[1], placement.Position[2] }; box.Rotation = (double[])placement.Rotation.Clone(); if (FailApply || ReferenceEquals(target, FailingTarget)) throw new Exception("injected"); }
     public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var pose = (double[][])snapshot; box.Position = pose[0]; box.Rotation = pose[1]; return true; }
 }
@@ -44,7 +47,7 @@ class Program {
         var scene = new Scene(); var box = new Box(); scene.Objects["p"] = new List<object> { box };
         var engine = new PatchEngine(scene); var result = engine.Apply(Doc(Item("a", "p")));
         Assert(result.Error == null && box.X == 12, "Fixed map placement uses scene origin conversion on an unchecked build");
-        Assert(scene.ResolveCalls == 1 && scene.MutationCalls == 1, "A valid complete document reaches both observable scene calls");
+        Assert(scene.ResolveCalls == 2 && scene.MutationCalls == 1, "A valid complete document revalidates resolution before mutation");
         Assert(ReferenceEquals(result.Outcomes["a"].ResolvedTarget, box), "Only a uniquely resolved target can support overlap attribution");
         Assert(box.Position[1] == 2 && box.Position[2] == 3 && box.Rotation[0] == 0 && box.Rotation[1] == 0 && box.Rotation[2] == 0 && box.Rotation[3] == 1, "Entire position and rotation are applied");
         scene.Origin = 110; result = engine.Apply(Doc(Item("a", "p"))); Assert(box.X == 2, "Changed origin yields the same map placement"); scene.Origin = 100;
@@ -116,6 +119,7 @@ class Program {
 #else
         Assert(typeof(PatchEngine).Assembly.GetType("RailroaderScenePatcher.Core.JourneyObservation") == null, "The normal product build exposes no journey observation sink");
 #endif
+        InspectionTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

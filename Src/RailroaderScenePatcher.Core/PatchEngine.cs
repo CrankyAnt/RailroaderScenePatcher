@@ -66,6 +66,9 @@ namespace RailroaderScenePatcher.Core {
         public PatchEngine(IScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
         public DocumentResult Apply(string json) { return Apply(json, ""); }
         public DocumentResult Apply(string json, string documentKey) {
+            return Apply(json, documentKey, null);
+        }
+        public DocumentResult Apply(string json, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
             if (documentKey == null) throw new ArgumentNullException(nameof(documentKey));
             Observe("document-dispatch", documentKey);
             var result = new DocumentResult();
@@ -83,11 +86,11 @@ namespace RailroaderScenePatcher.Core {
                     entries.Add((string)item["id"], item);
                 }
                 var visiting = new HashSet<string>();
-                foreach (var id in entries.Keys) Execute(id, entries, outcomes, visiting, documentKey);
+                foreach (var id in entries.Keys) Execute(id, entries, outcomes, visiting, documentKey, inspectedTargets);
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
             return result;
         }
-        Outcome Execute(string id, Dictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string documentKey) {
+        Outcome Execute(string id, Dictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
             Outcome prior;
             if (outcomes.TryGetValue(id, out prior)) return prior;
             var outcome = new Outcome();
@@ -104,7 +107,7 @@ namespace RailroaderScenePatcher.Core {
                 if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
                 foreach (var dependency in dependencies) {
                     var dep = (string)dependency;
-                    if (!entries.ContainsKey(dep) || !Execute(dep, entries, outcomes, visiting, documentKey).Applied) throw new InvalidOperationException("Dependency failed: " + dep);
+                    if (!entries.ContainsKey(dep) || !Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets).Applied) throw new InvalidOperationException("Dependency failed: " + dep);
                 }
                 var target = item["target"] as JObject; var placement = item["placement"] as JObject;
                 if (target == null || !Only(target, "scene", "path", "component", "structure") || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)) throw new InvalidOperationException("Invalid or unsupported target");
@@ -116,12 +119,25 @@ namespace RailroaderScenePatcher.Core {
                 var matches = scene.Resolve(identity);
                 if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target must resolve uniquely");
                 var resolved = matches[0];
+                var mapContext = scene.MapIds.ToArray();
+                InspectedTarget expected = null;
+                if (inspectedTargets != null && (!inspectedTargets.TryGetValue(id, out expected) || expected == null))
+                    throw new InvalidOperationException("An inspected target is required for every edited modification");
+                expected?.Validate(scene, identity, resolved);
                 outcome.ResolvedTarget = resolved;
                 if (unsafeTargets.Contains(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
                 Observe("preflight", documentKey, id, identity.Path);
                 scene.Preflight(resolved);
                 Observe("capture", documentKey, id, identity.Path);
                 var snapshot = scene.Capture(resolved);
+                // Capture and preflight may invoke native callbacks. Never redirect to a new match.
+                scene.Preflight(resolved);
+                var current = scene.Resolve(identity);
+                if (current == null || current.Count != 1 || !ReferenceEquals(current[0], resolved))
+                    throw new InvalidOperationException("Target changed before mutation; refresh and inspect again");
+                if (!mapContext.SequenceEqual(scene.MapIds))
+                    throw new InvalidOperationException("Map context changed before mutation");
+                expected?.Validate(scene, identity, resolved);
                 try {
                     Observe("mutation", documentKey, id, identity.Path);
                     scene.Apply(resolved, pose);
