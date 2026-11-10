@@ -1,0 +1,33 @@
+name: Core tests
+on:
+  pull_request:
+    paths:
+      - 'Src/RailroaderScenePatcher.Core/**'
+      - 'Tests/RailroaderScenePatcher.Core.Tests/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/core-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Src/RailroaderScenePatcher.Core/**'
+      - 'Tests/RailroaderScenePatcher.Core.Tests/**'
+      - 'Directory.Build.props'
+      - '.github/workflows/core-tests.yml'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: core-tests-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  core-tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release

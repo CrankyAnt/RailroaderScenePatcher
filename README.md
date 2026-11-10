@@ -2,7 +2,7 @@
 
 A Railroader mod that lets map modders use JSON to reposition, rotate, enable or disable existing scene objects unsupported by the map editor, including objects with track markers. Required as a runtime dependency, it applies these changes and repairs supported track-marker references whenever a map loads.
 
-> **Status:** Planning phase. Not yet available for use.
+> **Status:** Under development. Not yet available for use.
 
 Author: CrankyAnt
 
