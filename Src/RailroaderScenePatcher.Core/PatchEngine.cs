@@ -61,6 +61,8 @@ namespace RailroaderScenePatcher.Core {
         readonly IScene scene;
         readonly HashSet<string> failed = new HashSet<string>();
         readonly HashSet<object> unsafeTargets = new HashSet<object>();
+        // Restored targets whose dependent output, such as regenerated terrain, has not yet verified.
+        readonly HashSet<object> awaitingOutput = new HashSet<object>();
         readonly Dictionary<object, ObjectState> underlying = new Dictionary<object, ObjectState>();
         internal IScene Scene { get { return scene; } }
         internal sealed class Modification {
@@ -132,7 +134,7 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidOperationException("An inspected target is required for every edited modification");
                 expected?.Validate(scene, identity, resolved);
                 outcome.ResolvedTarget = resolved;
-                if (unsafeTargets.Contains(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
+                if (IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
                 Observe("preflight", documentKey, id, identity.Path);
                 scene.Preflight(resolved);
                 Observe("capture", documentKey, id, identity.Path);
@@ -150,6 +152,7 @@ namespace RailroaderScenePatcher.Core {
                     try { restored = scene.Restore(resolved, snapshot); } catch { }
                     Observe("restore-result", documentKey, id, identity.Path, restored ? "verified" : "unverified");
                     if (!restored) unsafeTargets.Add(resolved);
+                    else if (AwaitOutput(resolved)) throw new InvalidOperationException("Mutation failed and was restored; the restored dependent output is still being regenerated, and this target waits until it verifies: " + e.Message);
                     throw new InvalidOperationException(restored ? "Mutation failed and was restored: " + e.Message : "Mutation failed; cleanup is unverified: " + e.Message);
                 }
                 outcome.Applied = true;
@@ -180,8 +183,25 @@ namespace RailroaderScenePatcher.Core {
                 throw new InvalidOperationException("Map context changed before mutation");
             expected?.Validate(scene, identity, resolved);
         }
-        internal bool IsUnsafe(object target) { return unsafeTargets.Contains(target); }
-        internal void SetUnsafe(object target, bool value) { if (value) unsafeTargets.Add(target); else unsafeTargets.Remove(target); }
+        // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
+        internal bool IsUnsafe(object target) {
+            if (unsafeTargets.Contains(target)) return true;
+            if (!awaitingOutput.Contains(target)) return false;
+            var output = Output(target);
+            if (output.Error != null) { awaitingOutput.Remove(target); unsafeTargets.Add(target); return true; }
+            if (!output.Settled) return true;
+            awaitingOutput.Remove(target);
+            return false;
+        }
+        internal void SetUnsafe(object target, bool value) { if (value) unsafeTargets.Add(target); else { unsafeTargets.Remove(target); awaitingOutput.Remove(target); } }
+        internal bool AwaitingOutput(object target) { return awaitingOutput.Contains(target); }
+        internal DependentOutput Output(object target) { return target != null && scene is IDependentOutputScene dependent ? dependent.Output(target) ?? DependentOutput.None : DependentOutput.None; }
+        // After a verified restoration: keeps the target guarded until its dependent output verifies. True when it waits.
+        internal bool AwaitOutput(object target) {
+            if (Output(target).Settled) return false;
+            awaitingOutput.Add(target);
+            return true;
+        }
         // Underlying state overlaid with every effective modification of this document for the object.
         internal ObjectState Desired(JArray modifications, object target) {
             var entries = new Dictionary<string, JObject>(StringComparer.Ordinal);

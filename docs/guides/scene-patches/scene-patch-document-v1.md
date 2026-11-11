@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Scene-patch document v1
 
-This reference defines the v1 JSON fields accepted by the core engine for fixed placement and activity. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support is limited to the independent Sylva board described in [author fixed scene placement](authoring-fixed-placement.md) and the Ela bridge described in [move or disable a bridge with its collision](placing-bridges.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
+This reference defines the v1 JSON fields accepted by the core engine for fixed placement and activity. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), and the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
 
 ## Document fields
 
@@ -39,9 +39,15 @@ The placement object accepts only `mode`, `position`, and `rotation`. `mode` mus
 
 ### Independent board
 
-The native adapter recognizes the independent Sylva board at `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene. Its target `component` is `Helpers.Culling.RendererCuller`; set `structure` to `independent-board-v1` to identify the supported pattern. The board, culler, and `Map.Runtime.MaskComponents.CircleMapMask` must be active. The adapter rejects unexpected `Track.*` descendants and requires the map conversion, culling, mask rebuild, and terrain completion hooks it uses.
+The native adapter recognizes independent boards. The target `scene` and `path` name the board object, its `component` is `Helpers.Culling.RendererCuller`, and `structure`, when present, must be `independent-board-v1`. The object must carry that culler and exactly one `Map.Runtime.MaskComponents.CircleMapMask`, both enabled, with active parents. The adapter refuses a mask that flattens terrain height and a hierarchy with a `Track.*` component, another culler, another mask component, another culling handler or a missing script. The board itself may be disabled through `active`. The adapter requires the map conversion, culling, mask, terrain tile and terrain completion functions it uses. A board placement has no track binding.
 
-After setting the board pose, the adapter requests a culling-position update and rebuilds the circle map mask. It reports dependent terrain work complete only after receiving tile-built notifications for both the old and new positions and observing idle terrain work with no pending invalidations. An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered board, updated culling sphere and registered mask at the desired pose, with settled terrain output. Both sampled tree regions were empty, so the test does not demonstrate removal of an occupied tree. This adapter implements no other board pattern. The bridge below has its own adapter; other object families are not implemented.
+After setting the board pose, the adapter requests a culling-position update and rebuilds the circle map mask. It then verifies that the culling sphere and every mask registration are at the board's position, or, for a disabled board, that neither registration remains; a mismatch fails the modification and restores the captured pose, activity and registrations. The game regenerates terrain output at the old and new positions. The adapter reports each position complete after a tile-built notification covering it and idle terrain work with no pending invalidations. A position whose terrain tile is not built needs no rebuild. A position that has not completed after 30 seconds is reported with the completed and outstanding positions; the modification stays applied. Save does not write the generated terrain output; the game regenerates it from the saved placement. Native edited terrain tiles are separate and are not changed by a board modification.
+
+After a failed mutation whose restoration verified, later modifications of the same board fail until the restored terrain output completes. If that output stops, or restoration cannot be verified, they fail for the rest of the load.
+
+An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered Sylva board, updated culling sphere and registered mask at the desired pose, with settled terrain output; its sampled tree regions were empty. A separate research trial on the same build moved the Sylva board's mask onto one generated tree, observed the tree leave the generated tile output and return after restoration. Other boards qualify through the component pattern without individual trials.
+
+The bridge below has its own adapter; other object families are not implemented.
 
 ### Bridge
 
@@ -65,6 +71,7 @@ The supplying MapMod's `Info.json` must list `crankyant/scene-patcher` under `de
 | --- | --- |
 | Fixed placement only | `0.1.0` |
 | Any modification with `active` | `0.2.0` |
+| A board target other than `World/Signs/Loc: Sylva Int` in `BushnellWhittier-MapManager` | `0.3.0` |
 | Any modification whose target `structure` is `bridge-colliders-v1` | `0.3.0` |
 
 Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry.

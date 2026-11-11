@@ -83,7 +83,7 @@ namespace RailroaderScenePatcher.Core {
     internal static class DependencyMetadata {
         static readonly Regex Version = new Regex("^(\\d+)\\.(\\d+)\\.(\\d+)([a-z]?)$");
         static readonly string[] Operators = { ">=", "<=", "==", ">", "<", "~", "^" };
-        static int Number(string version) {
+        internal static int Number(string version) {
             var match = Version.Match(version ?? "");
             int major, minor, patch;
             if (!match.Success || !Int32.TryParse(match.Groups[1].Value, out major) || !Int32.TryParse(match.Groups[2].Value, out minor) || !Int32.TryParse(match.Groups[3].Value, out patch) || major > 2146 || minor > 99 || patch > 99)
@@ -181,14 +181,48 @@ namespace RailroaderScenePatcher.Core {
         public string IncompleteOperation { get; private set; }
         public SaveReport LastSave { get; private set; }
         public string DocumentText { get { return document == null ? diskText : document.Serialize(); } }
-        // The oldest patcher that executes every authored capability of the document.
+        // The lowest patcher version that supports every modification in the document, from its format content and its targets' capabilities.
         public string MinimumPatcherVersion {
             get {
-                if (document == null) return "0.1.0";
-                var items = document.Modifications.OfType<JObject>().ToList();
-                if (items.Any(m => (m["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)m["target"]["structure"] == BridgeScene.Structure)) return "0.3.0";
-                return items.Any(m => m["active"] != null) ? "0.2.0" : "0.1.0";
+                var minimum = "0.1.0";
+                if (document == null) return minimum;
+                foreach (var item in document.Modifications.OfType<JObject>()) {
+                    if (item["active"] != null) minimum = Max(minimum, "0.2.0");
+                    // Bridge placement needs its capability whether or not it is available in this editor.
+                    if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.3.0");
+                    TargetIdentity target;
+                    try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
+                    // Board placement beyond the Sylva board needs its capability whether or not it is available in this editor.
+                    var board = IndependentBoards.RequiredVersion(target);
+                    if (board != null) minimum = Max(minimum, board);
+                    if (!(scene is IVersionedScene versioned)) continue;
+                    var required = versioned.MinimumPatcherVersion(target);
+                    if (required != null) minimum = Max(minimum, required);
+                }
+                return minimum;
             }
+        }
+        static string Max(string a, string b) { return DependencyMetadata.Number(b) > DependencyMetadata.Number(a) ? b : a; }
+        // Dependent native writes that follow the object's edits, such as terrain output regenerated from a board mask. Save does not write them.
+        public DependentOutput Output(TargetIdentity target) {
+            try { return engine.Output(engine.ResolveUnique(target)); }
+            catch (InvalidOperationException) { return DependentOutput.None; }
+        }
+        // Requests outstanding dependent writes again. The edit and the document are unchanged.
+        public Outcome RetryOutput(TargetIdentity target, InspectedTarget inspected = null) {
+            var outcome = new Outcome();
+            try {
+                var resolved = engine.ResolveUnique(target);
+                inspected?.Validate(scene, target, resolved);
+                outcome.ResolvedTarget = resolved;
+                if (!(scene is IDependentOutputScene dependent)) throw new InvalidOperationException("This object has no dependent output");
+                if (engine.Output(resolved).Outstanding.Count == 0) throw new InvalidOperationException("No dependent output is outstanding");
+                dependent.RetryOutput(resolved);
+                var output = engine.Output(resolved);
+                if (output.Error != null) throw new InvalidOperationException(output.Error);
+                outcome.Applied = true;
+            } catch (Exception e) { outcome.Error = e.Message; }
+            return outcome;
         }
 
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active) { return Edit(target, placement, active, null); }
@@ -224,7 +258,7 @@ namespace RailroaderScenePatcher.Core {
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
                 outcome.ResolvedTarget = resolved;
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before another edit");
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException(engine.AwaitingOutput(resolved) ? "Target cleanup is unverified until the restored dependent output completes; edit again once it has" : "Target cleanup is unverified. Recheck the object or reload before another edit");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside the editor first");
@@ -276,6 +310,7 @@ namespace RailroaderScenePatcher.Core {
                 var restored = false;
                 try { scene.Apply(target, prior); restored = Same(scene.Read(target), prior); } catch { }
                 if (!restored) engine.SetUnsafe(target, true);
+                else if (engine.AwaitOutput(target)) throw new InvalidOperationException("Edit failed and the prior state was restored; its dependent output is still being regenerated, and the object accepts edits once it verifies: " + e.Message);
                 throw new InvalidOperationException(restored ? "Edit failed and the prior state was restored: " + e.Message : "Edit failed; cleanup is unverified: " + e.Message);
             }
             return index;
@@ -298,6 +333,10 @@ namespace RailroaderScenePatcher.Core {
                     if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("The object still differs from the document; reload before another edit");
                 }
                 engine.SetUnsafe(resolved, false);
+                // Restored dependent output that stopped is requested again; the object stays guarded until it verifies.
+                var output = engine.Output(resolved);
+                if (output.Error != null && scene is IDependentOutputScene dependent) dependent.RetryOutput(resolved);
+                engine.AwaitOutput(resolved);
                 outcome.Applied = true;
             } catch (Exception e) { outcome.Error = e.Message; }
             return outcome;

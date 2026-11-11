@@ -9,7 +9,7 @@ namespace RailroaderScenePatcher.Core {
     // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
     // the capability that resolved it. A capability that is incompatible with the running game build fails
     // only the modifications that name its structure; unrelated supported work stays available.
-    public sealed class SceneCapabilities : IScene, IInspectionScene {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene {
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
@@ -60,5 +60,20 @@ namespace RailroaderScenePatcher.Core {
         public ObjectState Read(object target) => Owner(target).Read(target);
         public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
         public bool Restore(object target, object snapshot) => Owner(target).Restore(target, snapshot);
+        // Dependent output belongs to the adapter that resolved the object; an adapter without it reports none.
+        public DependentOutput Output(object target) {
+            if (target == null || target is Unavailable || !owners.TryGetValue(target, out var owner) || !(owner is IDependentOutputScene dependent)) return DependentOutput.None;
+            return dependent.Output(target) ?? DependentOutput.None;
+        }
+        public void RetryOutput(object target) { if (Owner(target) is IDependentOutputScene dependent) dependent.RetryOutput(target); }
+        // The highest version any adapter requires for the target.
+        public string MinimumPatcherVersion(TargetIdentity target) {
+            string minimum = null;
+            foreach (var versioned in capabilities.OfType<IVersionedScene>()) {
+                var required = versioned.MinimumPatcherVersion(target);
+                if (required != null && (minimum == null || DependencyMetadata.Number(required) > DependencyMetadata.Number(minimum))) minimum = required;
+            }
+            return minimum;
+        }
     }
 }

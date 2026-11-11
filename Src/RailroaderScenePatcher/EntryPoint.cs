@@ -32,7 +32,9 @@ namespace RailroaderScenePatcher {
     }
     public sealed class PatcherBehaviour : MonoBehaviour {
         IModContext context;
-        BoardScene scene;
+        BoardScene world;
+        IndependentBoards scene;
+        NativeInventory native;
         SceneCapabilities capabilities;
         PatchEngine engine;
         SceneInventory inventory;
@@ -67,10 +69,18 @@ namespace RailroaderScenePatcher {
 #endif
             try {
                 editor = PackDocuments.IsEditor;
+                try {
+                    world = new BoardScene();
+                    scene = new IndependentBoards(world, () => native.Discover());
+                } catch (Exception e) {
+                    world?.Dispose(); world = null;
+                    status = "Independent board capability incompatible or unavailable: " + e.GetBaseException().Message;
+                    Report("capability", status);
+                }
+                native = new NativeInventory(scene == null ? (Func<GameObject, string>)null : g => scene.Refusal(g));
                 if (editor) {
-                    var inspection = new NativeInventory();
-                    inventory = new SceneInventory(inspection);
-                    selection = new SpatialSelection(inspection);
+                    inventory = new SceneInventory(native);
+                    selection = new SpatialSelection(native);
                 }
                 if (editor) {
                     try { inputBlocker = gameObject.AddComponent<InspectionInputBlocker>(); inputBlocker.Initialize(); inputBlocker.RefreshRegions = SyncInputRegions; }
@@ -80,13 +90,9 @@ namespace RailroaderScenePatcher {
                     }
                 }
                 // Each capability checks its own game functions; an incompatible one fails only the modifications naming its structure.
-                capabilities = new SceneCapabilities(PackDocuments.MapIds, new NativeInventory());
-                try { scene = new BoardScene(); capabilities.Add(scene); }
-                catch (Exception e) {
-                    capabilities.AddUnavailable(BoardScene.Structure, e.GetBaseException().Message);
-                    status = "Independent board capability incompatible or unavailable: " + e.GetBaseException().Message;
-                    Report("capability", status);
-                }
+                capabilities = new SceneCapabilities(PackDocuments.MapIds, native);
+                if (scene != null) capabilities.Add(scene);
+                else capabilities.AddUnavailable(IndependentBoards.Structure, status);
                 try { capabilities.Add(new BridgeScene(new BridgeWorld(), Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
@@ -197,8 +203,11 @@ namespace RailroaderScenePatcher {
                 try { if (documentStamp != DocumentStamp(PackDocuments.Discover())) definitionsStale = true; }
                 catch { definitionsStale = true; }
             }
-            try { scene?.PollCompletion(); }
-            catch (Exception e) { Report("terrain", "Dependent terrain state remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
+            if (scene != null) try {
+                scene.Poll();
+                foreach (var failure in scene.Failures)
+                    Report("terrain/" + world.Label(failure.Key) + "/" + failure.Value.Error, "Terrain output for " + world.Label(failure.Key) + " did not complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". The board keeps its applied placement; reloading the map regenerates the output. Report to the patcher maintainer.");
+            } catch (Exception e) { Report("terrain", "Dependent terrain state remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
             if (presentation != null) {
                 var snapshot = PresentationSnapshot();
                 if (snapshot != presentationSnapshot) { presentationSnapshot = snapshot; presentation.RequestRefresh(); }
@@ -221,15 +230,21 @@ namespace RailroaderScenePatcher {
                 documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, outstanding);
+                selection?.Confirmed?.Identity, outstanding, TerrainSnapshot());
+        }
+        string TerrainSnapshot() {
+            if (authoring == null || selected == null || !Editable) return "";
+            var output = OutputOf(authoring.Session, selected.Identity, out var problem);
+            return problem ?? String.Join("|", String.Join(";", output.Completed), String.Join(";", output.Outstanding), output.Error);
         }
         internal void Release() { ReleaseParts(); }
         void ReleaseParts() {
             if (worldLabelBacking != null) Destroy(worldLabelBacking); worldLabelBacking = null;
             presentation?.Dispose(); presentation = null; attachedEditor = null;
             Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Cancel(); selection = null;
-            scene?.Dispose(); scene = null; capabilities = null; engine = null; inventory = null; selected = null;
+            scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; engine = null; inventory = null; native = null; selected = null;
         }
+        static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }
         void OnGUI() {
             if (presentation == null || !presentation.IsOpen || selection == null || Event.current.type != EventType.Repaint) return;
@@ -242,9 +257,10 @@ namespace RailroaderScenePatcher {
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
-        void Button(UIPanelBuilder builder, string label, Action action) {
+        IConfigurableElement Button(UIPanelBuilder builder, string label, Action action) {
             var button = builder.AddButtonCompact(label, presentation.Action(action));
             foreach (var text in button.RectTransform.GetComponentsInChildren<TMP_Text>(true)) text.richText = false;
+            return button;
         }
         void PlainLabel(UIPanelBuilder builder, string value) => builder.AddLabel(value, text => text.richText = false);
         void DrawWindow(UIPanelBuilder builder) {
@@ -300,8 +316,10 @@ namespace RailroaderScenePatcher {
             Button(builder, "World selection guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/select-world-targets.md"));
             PlainLabel(builder, "Track binding edits, the transform gizmo and snapping are not implemented.");
             Button(builder, "Fixed-placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md"));
+            Button(builder, "Board and terrain guidance", () => Application.OpenURL(BoardGuide));
             Button(builder, "Document v1 reference", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-document-v1.md"));
         }
+        const string BoardGuide = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/moving-boards.md";
         void DrawSelection(UIPanelBuilder builder) {
             if (selection == null) return;
             builder.AddSection("World selection");
@@ -367,7 +385,7 @@ namespace RailroaderScenePatcher {
             }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == BoardScene.Structure || selected.Identity.Structure == BridgeScene.Structure) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure) && selected.Handle is GameObject;
         void ReadPose() {
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
             var angles = new Quaternion((float)selected.Rotation[0], (float)selected.Rotation[1], (float)selected.Rotation[2], (float)selected.Rotation[3]).eulerAngles;
@@ -442,7 +460,28 @@ namespace RailroaderScenePatcher {
             Button(builder, "Recheck after failed edit", () => Edit("Recheck", (current, inspection) => current.Recheck(identity, inspection)));
             Button(builder, "Authoring guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/editing-placement-in-the-editor.md"));
             PlainLabel(builder, editResult);
+            DrawOutput(builder, session, identity);
             PlainLabel(builder, "Removal returns the object to its state without this MapMod's modification. Save writes map data, Data/scene-patches.json and the patcher dependency in Info.json, and never reloads. Reloading the editor ends Undo/Redo history.");
+        }
+        // Terrain output follows a board edit asynchronously; the game regenerates it, and Save does not write it.
+        void DrawOutput(UIPanelBuilder builder, AuthoringSession session, TargetIdentity identity) {
+            var output = OutputOf(session, identity, out var problem);
+            if (problem != null) { PlainLabel(builder, "Terrain output unknown: " + problem); return; }
+            if (output.Completed.Count == 0 && output.Settled) return;
+            PlainLabel(builder, output.Error != null ? "Terrain output stopped: " + output.Error + ". Completed: " + Join(output.Completed) + ". Outstanding: " + Join(output.Outstanding) + ". The board edit is kept."
+                : output.Settled ? "Terrain output complete: " + Join(output.Completed) + "."
+                : "Terrain output outstanding; the game is regenerating it: " + Join(output.Outstanding) + ". Completed: " + Join(output.Completed) + ".");
+            PlainLabel(builder, "Save does not write the terrain output generated from the board's mask: it writes the board's placement, and the game regenerates that output from it on every load. Native edited terrain tiles are saved separately and are not changed by this edit.");
+            Button(builder, "Retry terrain output", () => {
+                var outcome = session.RetryOutput(identity);
+                editResult = outcome.Applied ? "Terrain output requested again." : "Terrain output retry refused: " + outcome.Error;
+            }).Disable(output.Outstanding.Count == 0);
+            Button(builder, "Board and terrain guidance", () => Application.OpenURL(BoardGuide));
+        }
+        static DependentOutput OutputOf(AuthoringSession session, TargetIdentity identity, out string problem) {
+            problem = null;
+            try { return session.Output(identity); }
+            catch (Exception e) { problem = e.GetBaseException().Message; return DependentOutput.None; }
         }
         void Inspect() {
             try {
@@ -480,7 +519,7 @@ namespace RailroaderScenePatcher {
         void Focus(SceneObservation entry) {
             try {
                 // Never focus a replacement with the same path. Refresh retains the selected handle.
-                var current = new NativeInventory().Discover().Where(e => ReferenceEquals(e.Handle, entry.Handle) && e.Identity.Component == entry.Identity.Component).ToArray();
+                var current = native.Discover().Where(e => ReferenceEquals(e.Handle, entry.Handle) && e.Identity.Component == entry.Identity.Component).ToArray();
                 if (current.Length != 1 || !entry.Matches(current[0])) throw new InvalidOperationException("Inspected object changed; refresh and inspect again");
                 if (entry.Position.Count != 3) throw new InvalidOperationException("Map coordinates unavailable for this observation");
                 var position = new Vector3((float)entry.Position[0], (float)entry.Position[1], (float)entry.Position[2]);

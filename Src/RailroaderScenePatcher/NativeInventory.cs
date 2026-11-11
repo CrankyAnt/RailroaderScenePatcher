@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
             "Track markers, yard limits, station signs: typed marker and relative-position inspection; edits require the applicable adapter.",
             "Mileposts: marker, origin and display dependencies; model and mileage remain unchanged.",
             "Crossings: controllers, spans, pads, lights, gates and bells; relationships are explicit, never inferred from proximity.",
-            "Independent boards: culler/mask patterns; only the Sylva board has the existing fixed-placement adapter.",
+            "Independent boards: renderer culler with one circle map mask and no track relationship; placement and activity refresh culling, mask registration and generated terrain output.",
             "Bridges: only the retained Ela bridge has the fixed-placement adapter; it moves the bridge root with its colliders and culling.",
             "Construction scenery exposes segment and target relationships and is inspected separately. Generated track-owned trestles remain owned by native track geometry and are never moved by bridge placement.",
             "Passenger stops and map-object anchors: native operations/map-data editing; historical FUSE warning is outside current scope.",
@@ -28,6 +28,9 @@ namespace RailroaderScenePatcher {
             "Dependencies show components, serialized relationships and direct loaded-scene references; indirect consumers can remain unknown."
         };
         public IEnumerable<string> MapIds => PackDocuments.MapIds();
+        // Why a board candidate cannot be edited, from the board capability; null when that capability is unavailable.
+        readonly Func<GameObject, string> boardRefusal;
+        internal NativeInventory(Func<GameObject, string> boardRefusal = null) { this.boardRefusal = boardRefusal; }
         static bool Loaded(Component c) => c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded;
         static string TypeName(Component c) => c == null ? "missing component" : c.GetType().FullName;
         static Component Get(GameObject go, string type) => go.GetComponents<Component>().FirstOrDefault(c => c != null && TypeName(c) == type);
@@ -60,13 +63,13 @@ namespace RailroaderScenePatcher {
             if (type == Crossing) return "Crossing controller";
             if ((type == "Track.KeyValueLampMaterialController" || type == "RollingStock.Controls.KeyValueBoolAnimator" || type == "Audio.IntegerLoopingPlayer") && Parent(c, Crossing) != null)
                 return type == "Track.KeyValueLampMaterialController" ? "Crossing light" : type == "Audio.IntegerLoopingPlayer" ? "Crossing bell" : "Crossing gate";
-            if (type == BoardScene.CullerType && go.scene.name == BoardScene.BoardSceneName && BoardScene.PathOf(c.transform) == BoardScene.BoardPath) return "Independent board";
-            if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Culler/mask scene object";
             if (type == BoardScene.CullerType && BridgeWorld.SupportedPaths.Contains(BoardScene.PathOf(c.transform))) return "Bridge";
+            if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Independent board";
             if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == "World/Large Scenery/Ela/Ela Bridge Scenery") return "Bridge construction scenery";
             return null;
         }
-        public IEnumerable<SceneObservation> Discover() {
+        public IEnumerable<SceneObservation> Discover() => Discover(boardRefusal);
+        static IEnumerable<SceneObservation> Discover(Func<GameObject, string> boardRefusal) {
             var all = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(Loaded).ToArray();
             var incoming = new Dictionary<UnityEngine.Object, List<string>>(); var scanErrors = 0;
             foreach (var owner in all) foreach (var field in Fields(owner.GetType())) {
@@ -86,9 +89,9 @@ namespace RailroaderScenePatcher {
                 if (lookup == null) throw new InvalidOperationException("Track segment lookup unavailable");
                 segmentIds = new HashSet<string>(lookup.Keys.Cast<object>().Select(Text), StringComparer.Ordinal);
             } catch (Exception e) { graphError = e.GetBaseException().Message; }
-            foreach (var candidate in candidates) yield return Observe(candidate.Component, candidate.Family, incoming, scanErrors, segmentIds, graphError);
+            foreach (var candidate in candidates) yield return Observe(candidate.Component, candidate.Family, incoming, scanErrors, segmentIds, graphError, boardRefusal);
         }
-        static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, int scanErrors, HashSet<string> segmentIds, string graphError) {
+        static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>();
             var components = go.GetComponentsInChildren<Component>(true);
             foreach (var child in components) {
@@ -167,13 +170,14 @@ namespace RailroaderScenePatcher {
                 if (!coordinatesAvailable) throw new InvalidOperationException("Map coordinates unavailable");
             });
             var rotation = go.transform.rotation;
-            var board = go.scene.name == BoardScene.BoardSceneName && BoardScene.PathOf(go.transform) == BoardScene.BoardPath && TypeName(c) == BoardScene.CullerType;
-            if (board && ((go.transform.parent != null && !go.transform.parent.gameObject.activeInHierarchy) || !(Get(go, BoardScene.CullerType) is Behaviour culler) || !culler.enabled || !(Get(go, BoardScene.MaskType) is Behaviour mask) || !mask.enabled))
-                problems.Add("Fixed placement unavailable: the board's parents, culler and circle mask must be active");
+            var board = family == "Independent board";
+            string refusal = board ? "the board capability is unavailable" : null;
+            if (board && boardRefusal != null) Read(() => refusal = boardRefusal(go));
+            if (refusal != null) problems.Add("Fixed placement unavailable: " + refusal);
             var bridge = family == "Bridge";
             if (bridge) Read(() => { var problem = BridgeWorld.PatternProblem(go); if (problem != null) problems.Add("Bridge placement unavailable: " + problem); });
             var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : null;
-            var operations = board ? "Fixed placement and activity require active parents/culler/mask and successful preflight"
+            var operations = board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : "Inspection only until corrected: " + refusal)
                 : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
                 : "Inspection only; no mutation adapter for this pattern";
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,

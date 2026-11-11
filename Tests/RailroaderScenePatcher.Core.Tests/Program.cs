@@ -133,6 +133,8 @@ class Program {
         InspectionTests.Run();
         BridgeTests.Run();
         SelectionTests.Run();
+        BoardTests.Run();
+        CompositionTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

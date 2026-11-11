@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Author fixed scene placement
 
-This guide describes the v1 scene-patch document layout and the first native placement capability. The current adapter handles one retained independent board in the `BushnellWhittier-MapManager` scene: `World/Signs/Loc: Sylva Int`, with a `Helpers.Culling.RendererCuller` component and the `independent-board-v1` structure identity. The board, culler, and circle map mask must be active. An isolated test on Railroader 0.6.2 build 26335745 verified the board's fixed pose, visible rendering, culler membership and mask position after a measured origin shift. That test does not establish support for other boards, builds or the complete culling range.
+This guide describes the v1 scene-patch document layout and the native placement capability for independent boards: scene objects with a `Helpers.Culling.RendererCuller`, one circle map mask and no track relationship, identified by the `independent-board-v1` structure. The example uses the Sylva location board, `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene. An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed pose, visible rendering, culler membership and mask position after a measured origin shift. That test does not establish other builds or the complete culling range. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects and failure limits.
 
 ## Add the patch document
 
-Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. The owning MapMod must depend on `crankyant/scene-patcher` version `0.1.0` or later. To make these edits in the map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
+Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. The owning MapMod must depend on `crankyant/scene-patcher` version `0.1.0` or later, or `0.3.0` or later when it moves a board other than the Sylva board. To make these edits in the map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
 
 Save the document as strict UTF-8 JSON. Use the `mapId` of the selected Map definition or one of its resolved map layers. Keep one document with the supplying MapMod so editor inspection and runtime application read the same desired state.
 
@@ -42,13 +42,13 @@ Add one entry to `modifications` for each desired placement. The following examp
 }
 ```
 
-The target must resolve to exactly one supported board in the loaded map context. The position has three finite numbers in map coordinates. The rotation has four finite numbers in quaternion order and must be a unit quaternion. The adapter converts map coordinates through the game's world transformer. It updates the culling position and rebuilds the circle map mask after moving the board.
+The target must resolve to exactly one board in the loaded map context that matches the board pattern. The position has three finite numbers in map coordinates. The rotation has four finite numbers in quaternion order and must be a unit quaternion. The adapter converts map coordinates through the game's world transformer. It updates the culling position and rebuilds the circle map mask after moving the board.
 
 Use a unique, non-empty `id` for each modification. List prerequisite modification IDs in `dependsOn`; leave it empty when there are no prerequisites. A missing, failed, or cyclic dependency prevents the dependent modification from applying.
 
 ## Check the support boundary
 
-The adapter requires the board's parents, culler, and circle map mask to be active; the board itself may be disabled through `active`. It rejects unexpected `Track.*` child components, and checks the required map conversion, culling, mask, and terrain hooks. Other board patterns are not implemented. For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md); other object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
+The adapter requires the board's parents, culler, and circle map mask to be active; the board itself may be disabled through `active`. It rejects a height-flattening mask, `Track.*` components and other culling or mask components in the hierarchy, and checks the required map conversion, culling, mask, and terrain hooks. For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md); other object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
 
 If a modification fails during a load, the engine does not retry it during that load. Correct the document or target before a later load.
 

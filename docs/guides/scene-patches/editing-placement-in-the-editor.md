@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit and save fixed placement in the map editor
 
-This guide shows how to move, rotate, disable and restore a supported scene object in the map editor, and how Save, Undo and Redo treat those edits. The editor currently supports the independent board described in [author fixed scene placement](authoring-fixed-placement.md) and the Ela bridge described in [move or disable a bridge with its collision](placing-bridges.md). The automated tests cover the behavior below with controlled scene, history and storage dependencies. A recorded journey in Railroader for these editor steps is not yet part of this guide.
+This guide shows how to move, rotate, disable and restore a supported scene object in the map editor, and how Save, Undo and Redo treat those edits. The editor currently supports independent boards, described in [move a board with its terrain effects](moving-boards.md), and the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md). The automated tests cover the behavior below with controlled scene, history and storage dependencies. A recorded journey in Railroader for these editor steps is not yet part of this guide.
 
 ## Before you start
 
@@ -23,6 +23,8 @@ Every edit is bound to that observation. The patcher refuses the edit when the o
 ## Disable or enable the object
 
 Select **Disable object** or **Enable object**. The document stores the choice as `"active": false` or `"active": true` in the same modification as the placement. A disabled board releases its culling and terrain mask through the game's own component lifecycle. A disabled bridge stops colliding. A document with an activity change needs patcher version 0.2.0 or later; a document with a bridge modification needs 0.3.0 or later.
+
+After a board edit the panel shows the state of the terrain output the game regenerates at the old and new positions. Save does not write that generated output; see [move a board with its terrain effects](moving-boards.md) for its completion, retry and limits.
 
 ## Undo and redo
 
