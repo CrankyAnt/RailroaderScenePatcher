@@ -42,6 +42,12 @@ An asset pack that supplies a Railroader Map definition or changes to a map. Thi
 **Scene object**:
 An object in a Unity scene loaded for the map that may have physical placement, activity, logical relationships, or dependent state.
 
+**Independent board**:
+A board scene object whose physical placement is independent of any logical track binding.
+
+**Terrain output**:
+Content generated for terrain tiles from the current scene state, including vegetation affected by an independent board.
+
 **Scene patch**:
 MapMod-supplied desired changes to supported scene objects and their relationships.
 _Avoid_: Patch history, movement script
