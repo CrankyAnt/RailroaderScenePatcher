@@ -103,3 +103,7 @@ Duplicate JSON property names are rejected during parsing. Duplicate modificatio
   ]
 }
 ```
+
+## Transform gizmo authoring
+
+A completed [transform gizmo gesture](using-transform-gizmos.md) writes the same fixed placement as numeric authoring. Position remains in map coordinates and rotation uses quaternion order. Preview frames are temporary and do not appear in the document. The gesture creates no logical binding or additional placement mode. Native Save writes the active edited MapMod's canonical document and dependency metadata; Undo and Redo reverse completed gestures through native history.

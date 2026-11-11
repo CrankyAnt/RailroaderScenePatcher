@@ -40,6 +40,7 @@ namespace RailroaderScenePatcher {
         SceneInventory inventory;
         InspectionInputBlocker inputBlocker;
         SpatialSelection selection;
+        GizmoController gizmo;
         SceneObservation selected;
         string selectionProblem;
         string documentInspection = "";
@@ -163,7 +164,7 @@ namespace RailroaderScenePatcher {
             Detach(); attachedEditor = found; refusedEditor = null; presentationSnapshot = null;
             if (found == null) return;
             if (inputBlocker != null && inputBlocker.Available) {
-                try { presentation = new NativeEditorPresentation(DrawWindow, () => { selection?.Cancel(); selectionProblem = null; }); }
+                try { presentation = new NativeEditorPresentation(DrawWindow, () => { CancelGizmo(); selection?.Cancel(); selectionProblem = null; }); }
                 catch (Exception e) { Report("inspection-presentation", "Inspection UI unavailable: " + e.GetBaseException().Message); }
             }
             if (Hooks.Error != null) { refusedEditor = found; authoringStatus = Hooks.Error; return; }
@@ -176,6 +177,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { refusedEditor = found; authoringStatus = "Authoring unavailable: " + e.GetBaseException().Message; }
         }
         void Detach() {
+            CancelGizmo();
             if (authoring == null) return;
             if (ReferenceEquals(Hooks.Current, authoring)) Hooks.Current = null;
             authoring.Dispose(); authoring = null;
@@ -191,6 +193,7 @@ namespace RailroaderScenePatcher {
             try { Attach(); }
             catch (Exception e) { authoringStatus = "Authoring unavailable: " + e.GetBaseException().Message; }
             bool open = presentation != null && presentation.IsOpen;
+            if (!open) CancelGizmo();
             SyncInputRegions();
             if (open && selection?.Pending != null && inputBlocker?.WorldClick is Vector2 pointer) {
                 try { selection.Pick(pointer, presentation.WorldUiBounds()); selectionProblem = null; }
@@ -232,7 +235,7 @@ namespace RailroaderScenePatcher {
                 documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, outstanding, TerrainSnapshot());
+                selection?.Confirmed?.Identity, gizmo?.State, outstanding, TerrainSnapshot());
         }
         string TerrainSnapshot() {
             if (authoring == null || selected == null || !Editable) return "";
@@ -300,7 +303,7 @@ namespace RailroaderScenePatcher {
                             presentation.Action(() => {
                                 var observation = (SceneObservation)row.Value;
                                 if (!inventoryPresentation.CanSelect(inventory, observation)) return;
-                                selected = observation; inspected = DescribeInspection(selected); ReadPose();
+                                CancelGizmo(); selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
                             })();
                         });
                         var listLayout = outline.GetComponent<LayoutElement>();
@@ -320,7 +323,8 @@ namespace RailroaderScenePatcher {
             PlainLabel(builder, "Binding validity does not establish correct placement or intended track. Inspect the world before editing.");
             Button(builder, "Inventory and dependency guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/inspect-scene-objects.md"));
             Button(builder, "World selection guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/select-world-targets.md"));
-            PlainLabel(builder, "Track binding edits, the transform gizmo and snapping are not implemented.");
+            PlainLabel(builder, "Track binding edits and snapping are not implemented.");
+            Button(builder, "Transform gizmo guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/using-transform-gizmos.md"));
             Button(builder, "Fixed-placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md"));
             Button(builder, "Board and terrain guidance", () => Application.OpenURL(BoardGuide));
             Button(builder, "Document v1 reference", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-document-v1.md"));
@@ -359,7 +363,7 @@ namespace RailroaderScenePatcher {
                         catch (Exception e) { selectionProblem = "Camera focus unavailable: " + e.GetBaseException().Message; }
                     });
                     if (candidate.Observation != null) Button(builder, "Inspect candidate", () => {
-                        selected = candidate.Observation; inspected = DescribeInspection(selected); Inspect(); ReadPose();
+                        CancelGizmo(); selected = candidate.Observation; inspected = DescribeInspection(selected); Inspect(); ReadPose();
                     });
                     Button(builder, "Confirm identity", ConfirmSelection);
                 }
@@ -370,6 +374,7 @@ namespace RailroaderScenePatcher {
             if (selectionProblem != null) PlainLabel(builder, selectionProblem);
         }
         void BeginSelection(SelectionKind kind, SceneObservation origin) {
+            CancelGizmo();
             try { selection.Begin(kind, origin); selectionProblem = null; }
             catch (Exception e) { selectionProblem = "World selection unavailable: " + e.GetBaseException().Message; }
         }
@@ -400,7 +405,7 @@ namespace RailroaderScenePatcher {
         }
         // Every edit is bound to the inspected observation. A stale inventory refuses the edit instead of redirecting it.
         void Edit(string action, Func<AuthoringSession, InspectedTarget, Outcome> change) {
-            if (selection?.Pending != null) return;
+            if (selection?.Pending != null || gizmo?.Active == true) return;
             Outcome outcome;
             try { outcome = change(authoring.Session, inventory.Pin(selected)); }
             catch (Exception e) { editResult = action + " refused: " + e.GetBaseException().Message; return; }
@@ -426,6 +431,11 @@ namespace RailroaderScenePatcher {
                 return;
             }
             if (!Editable) { PlainLabel(builder, "Inspect an object with a fixed-placement adapter to edit it. Other observations are inspection only."); return; }
+            if (gizmo?.Active == true) {
+                PlainLabel(builder, gizmo.State);
+                Button(builder, "Cancel gizmo", CancelGizmo);
+                return;
+            }
             var target = (GameObject)selected.Handle;
             if (target == null) { PlainLabel(builder, "The inspected object no longer exists. Refresh the inventory."); return; }
             if (selected.Identity.Structure == BridgeScene.Structure) {
@@ -433,6 +443,8 @@ namespace RailroaderScenePatcher {
                 Button(builder, "Bridge placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/placing-bridges.md"));
             }
             PlainLabel(builder, "Selected: " + selected.Identity.Path + (target.activeSelf ? "" : " (disabled)") + ". Position in map coordinates; rotation in degrees. After Undo, Redo or a native edit, refresh the inventory before the next edit.");
+            Button(builder, "Move with gizmo", () => BeginGizmo(UI.Gizmos.TransformGizmoMode.Move));
+            Button(builder, "Rotate with gizmo", () => BeginGizmo(UI.Gizmos.TransformGizmoMode.Rotate));
             var labels = new[] { "X", "Y", "Z", "Rot X", "Rot Y", "Rot Z" };
             for (var row = 0; row < 2; row++) {
                 var first = row * 3;
@@ -488,6 +500,26 @@ namespace RailroaderScenePatcher {
             problem = null;
             try { return session.Output(identity); }
             catch (Exception e) { problem = e.GetBaseException().Message; return DependentOutput.None; }
+        }
+        void CancelGizmo() {
+            var pending = gizmo; gizmo = null;
+            if (pending != null) pending.Cancel();
+        }
+        void BeginGizmo(UI.Gizmos.TransformGizmoMode mode) {
+            CancelGizmo();
+            try {
+                if (!Editable || selection?.Pending != null || authoring == null) throw new InvalidOperationException("Inspect a supported target and finish world selection first");
+                var inspection = inventory.Pin(selected);
+                var root = new GameObject("CrankyAnt Scene Patcher transform gizmo");
+                root.transform.SetParent(transform, false);
+                gizmo = root.AddComponent<GizmoController>();
+                gizmo.Initialize(engine, capabilities, authoring, selected.Identity, inspection, mode, (outcome, message) => {
+                    gizmo = null;
+                    editResult = message ?? (outcome?.Applied == true ? "Gizmo placement completed. Use native Undo, Redo and Save." : "Gizmo placement refused: " + outcome?.Error);
+                    Inspect(); ReadPose(); authoring?.RefreshChrome();
+                    context?.Log.Info(editResult);
+                });
+            } catch (Exception e) { gizmo = null; editResult = "Gizmo unavailable: " + e.GetBaseException().Message; }
         }
         void Inspect() {
             try {
