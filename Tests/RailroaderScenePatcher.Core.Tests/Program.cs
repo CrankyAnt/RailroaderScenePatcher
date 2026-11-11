@@ -129,6 +129,8 @@ class Program {
 #else
         Assert(typeof(PatchEngine).Assembly.GetType("RailroaderScenePatcher.Core.JourneyObservation") == null, "The normal product build exposes no journey observation sink");
 #endif
+        WorldRibbonGeometryTests.Run();
+        WorldStrokeGeometryTests.Run();
         AuthoringTests.Run();
         InspectionTests.Run();
         BridgeTests.Run();

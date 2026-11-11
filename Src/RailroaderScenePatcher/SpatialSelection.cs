@@ -159,6 +159,11 @@ namespace RailroaderScenePatcher {
             ClearMarks();
         }
 
+        internal void Release() {
+            Cancel();
+            overlay.Release();
+        }
+
         void ClearMarks() {
             source = null;
             candidates = Array.Empty<SpatialCandidate>();

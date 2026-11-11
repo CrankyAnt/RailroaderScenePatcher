@@ -5,42 +5,38 @@ using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
+using MarkingPoint = RailroaderScenePatcher.Core.ScreenPoint;
 
 namespace RailroaderScenePatcher {
     // Screen shapes are shared by drawing and picking, including labels and the track-width ribbon.
     internal sealed class WorldSelectionOverlay {
         const float MarkerSize = 24f;
         const float TrackMinimumRadius = 10f;
-        sealed class Stroke {
-            internal Vector2 A, B;
-            internal float Radius;
-            internal bool Contains(Vector2 point) {
-                var direction = B - A;
-                var length = direction.magnitude;
-                if (length < .01f) return new Rect(A.x - Radius, A.y - Radius, 2 * Radius, 2 * Radius).Contains(point);
-                direction /= length;
-                var relative = point - A;
-                var along = Vector2.Dot(relative, direction);
-                var across = Vector2.Dot(relative, new Vector2(-direction.y, direction.x));
-                return along >= -Radius && along <= length + Radius && Mathf.Abs(across) <= Radius;
-            }
-        }
         sealed class Shape {
             internal SpatialCandidate Candidate;
             internal Rect Marker;
             internal readonly List<Rect> Objects = new List<Rect>();
-            internal readonly List<Stroke> Track = new List<Stroke>();
+            internal ProjectedWorldRibbon Track;
             internal Rect Label;
             internal string Text;
             internal Color Color;
             internal bool Detailed;
             internal bool Contains(Vector2 pointer) =>
-                Marker.Contains(pointer) || Objects.Any(r => r.Contains(pointer)) || Track.Any(s => s.Contains(pointer));
+                Marker.Contains(pointer) || Objects.Any(r => r.Contains(pointer)) ||
+                (Track != null && Track.Contains(new MarkingPoint(pointer.x, pointer.y)));
         }
         readonly List<Shape> labels = new List<Shape>();
         IReadOnlyList<Rect> covered = Array.Empty<Rect>();
         GUIStyle textStyle;
         float trackRadius;
+        Material trackMaterial;
+
+        internal void Release() {
+            if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
+            trackMaterial = null;
+            labels.Clear();
+        }
 
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
             IReadOnlyList<Rect> uiBounds) {
@@ -80,7 +76,7 @@ namespace RailroaderScenePatcher {
                 shape.Color = chosen ? new Color(.4f, 1f, .55f) : new Color(.46f, .81f, 1f);
                 shape.Detailed = offered || shape.Contains(pointer);
                 if (offered) shape.Text = (chosen ? "Candidate: " : "Choice: ") + candidate.Choice.Label;
-                if (shape.Track.Count == 0 || shape.Detailed) shapes.Add(shape);
+                if (shape.Track == null || shape.Detailed) shapes.Add(shape);
             }
             if (source != null && source.Points.Length > 0) {
                 var marked = shapes.FirstOrDefault(s => s.Text != null && s.Candidate.Choice.Matches(source.Choice));
@@ -103,6 +99,7 @@ namespace RailroaderScenePatcher {
             var oldContent = GUI.contentColor;
             try {
                 GUI.contentColor = Color.white;
+                DrawTracks(shapes, zones);
                 foreach (var zone in zones) {
                     GUI.BeginGroup(zone);
                     try {
@@ -152,77 +149,26 @@ namespace RailroaderScenePatcher {
                     if (Single.IsNaN(trackRadius) || Single.IsInfinity(trackRadius) || trackRadius <= 0)
                         throw new InvalidOperationException("Native track pick radius unavailable");
                 }
-                var min = candidate.ControlPoints[0];
-                var max = min;
-                foreach (var point in candidate.ControlPoints) {
-                    min = Vector3.Min(min, point);
-                    max = Vector3.Max(max, point);
-                }
-                if (!VisibleBounds(camera, min - Vector3.one * trackRadius, max + Vector3.one * trackRadius, origin)) return null;
-                AddCurve(shape.Track, candidate.ControlPoints[0], candidate.ControlPoints[1], candidate.ControlPoints[2],
-                    candidate.ControlPoints[3], camera, origin, 0);
+                // Clip the physical corridor and its end geometry before perspective division.
+                // An offscreen projected width cannot become a screen-wide stroke or hit area.
+                var matrix = camera.projectionMatrix * camera.worldToCameraMatrix;
+                var viewport = camera.pixelRect;
+                shape.Track = WorldRibbonGeometry.ProjectCurve(candidate.ControlPoints.Select(p => new WorldPoint(p.x, p.y, p.z)).ToArray(),
+                    trackRadius, p => {
+                        var clip = matrix * new Vector4((float)(p.X + origin.x), (float)(p.Y + origin.y), (float)(p.Z + origin.z), 1);
+                        return new ClipPoint(clip.x, clip.y, clip.z, clip.w);
+                    }, ScreenRect.FromEdges(viewport.xMin, Screen.height - viewport.yMax, viewport.xMax, Screen.height - viewport.yMin), TrackMinimumRadius);
             }
             if (!InFront(camera, anchor)) {
-                if (shape.Track.Count == 0) return null;
-                var mid = (shape.Track[0].A + shape.Track[0].B) * .5f;
-                anchor = new Vector3(mid.x, mid.y, camera.nearClipPlane);
+                if (shape.Track == null || shape.Track.Ribbon.Count == 0) return null;
+                var triangle = shape.Track.Ribbon[0];
+                anchor = new Vector3((float)((triangle.A.X + triangle.B.X + triangle.C.X) / 3),
+                    (float)((triangle.A.Y + triangle.B.Y + triangle.C.Y) / 3), camera.nearClipPlane);
             }
             shape.Marker = new Rect(anchor.x - MarkerSize / 2, anchor.y - MarkerSize / 2, MarkerSize, MarkerSize);
             var screen = new Rect(0, 0, Screen.width, Screen.height);
-            if (!screen.Overlaps(shape.Marker) && !shape.Objects.Any(screen.Overlaps) && shape.Track.Count == 0) return null;
+            if (!screen.Overlaps(shape.Marker) && !shape.Objects.Any(screen.Overlaps) && (shape.Track == null || shape.Track.Ribbon.Count == 0)) return null;
             return shape;
-        }
-
-        void AddCurve(List<Stroke> strokes, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Camera camera, Vector3 origin, int depth) {
-            var screenA = ScreenPoint(camera, a, origin);
-            var screenD = ScreenPoint(camera, d, origin);
-            if (depth < 10) {
-                var screenB = ScreenPoint(camera, b, origin);
-                var screenC = ScreenPoint(camera, c, origin);
-                if (!InFront(camera, screenA) || !InFront(camera, screenD) ||
-                    DistanceToLine(screenB, screenA, screenD) > 1f || DistanceToLine(screenC, screenA, screenD) > 1f) {
-                    var controls = new[] { screenA, screenB, screenC, screenD };
-                    if (controls.All(p => p.z < camera.nearClipPlane) || controls.All(p => p.z > camera.farClipPlane)) return;
-                    var ab = (a + b) * .5f;
-                    var bc = (b + c) * .5f;
-                    var cd = (c + d) * .5f;
-                    var abc = (ab + bc) * .5f;
-                    var bcd = (bc + cd) * .5f;
-                    var mid = (abc + bcd) * .5f;
-                    AddCurve(strokes, a, ab, abc, mid, camera, origin, depth + 1);
-                    AddCurve(strokes, mid, bcd, cd, d, camera, origin, depth + 1);
-                    return;
-                }
-            }
-            if (!InFront(camera, screenA) || !InFront(camera, screenD)) return;
-            var side = Vector3.Cross(Vector3.up, (d - a).normalized) * trackRadius;
-            var widthA = (Vector2)(ScreenPoint(camera, a + side, origin) - screenA);
-            var widthD = (Vector2)(ScreenPoint(camera, d + side, origin) - screenD);
-            var direction = (Vector2)(screenD - screenA).normalized;
-            var perpendicular = new Vector2(-direction.y, direction.x);
-            var radius = Mathf.Max(TrackMinimumRadius, Mathf.Abs(Vector2.Dot(widthA, perpendicular)), Mathf.Abs(Vector2.Dot(widthD, perpendicular)));
-            var bounds = Rect.MinMaxRect(Mathf.Min(screenA.x, screenD.x) - radius, Mathf.Min(screenA.y, screenD.y) - radius,
-                Mathf.Max(screenA.x, screenD.x) + radius, Mathf.Max(screenA.y, screenD.y) + radius);
-            if (bounds.Overlaps(new Rect(0, 0, Screen.width, Screen.height)))
-                strokes.Add(new Stroke { A = screenA, B = screenD, Radius = radius });
-        }
-
-        static float DistanceToLine(Vector2 point, Vector2 a, Vector2 b) {
-            var line = b - a;
-            var t = line.sqrMagnitude == 0 ? 0 : Mathf.Clamp01(Vector2.Dot(point - a, line) / line.sqrMagnitude);
-            return (point - a - t * line).magnitude;
-        }
-        static bool VisibleBounds(Camera camera, Vector3 min, Vector3 max, Vector3 origin) {
-            var points = new List<Vector3>();
-            for (int x = 0; x < 2; x++)
-                for (int y = 0; y < 2; y++)
-                    for (int z = 0; z < 2; z++)
-                        points.Add(ScreenPoint(camera, new Vector3(x == 0 ? min.x : max.x,
-                            y == 0 ? min.y : max.y, z == 0 ? min.z : max.z), origin));
-            if (points.All(p => p.z < camera.nearClipPlane) || points.All(p => p.z > camera.farClipPlane)) return false;
-            if (points.Any(p => p.z < camera.nearClipPlane)) return true;
-            return points.Max(p => p.x) >= 0 && points.Min(p => p.x) <= Screen.width &&
-                points.Max(p => p.y) >= 0 && points.Min(p => p.y) <= Screen.height;
         }
 
         static Vector3 ScreenPoint(Camera camera, Vector3 point, Vector3 origin) {
@@ -281,13 +227,46 @@ namespace RailroaderScenePatcher {
             return best;
         }
 
-        static void DrawShape(Shape shape, Vector2 origin) {
-            foreach (var stroke in shape.Track) {
-                GUI.color = new Color(shape.Color.r, shape.Color.g, shape.Color.b, .22f);
-                DrawLine(stroke.A - origin, stroke.B - origin, stroke.Radius, true);
-                GUI.color = shape.Color;
-                DrawLine(stroke.A - origin, stroke.B - origin, 1, false);
+        void DrawTracks(List<Shape> shapes, List<Rect> zones) {
+            if (zones.Count == 0 || !shapes.Any(shape => shape.Track != null && shape.Track.Ribbon.Count != 0)) return;
+            if (trackMaterial == null) {
+                var shader = Shader.Find("Hidden/Internal-Colored");
+                if (shader == null || !shader.isSupported)
+                    throw new InvalidOperationException("World track marking shader unavailable");
+                trackMaterial = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                trackMaterial.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+                trackMaterial.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+                trackMaterial.SetInt("_Cull", (int)CullMode.Off);
+                trackMaterial.SetInt("_ZWrite", 0);
+                trackMaterial.SetInt("_ZTest", (int)CompareFunction.Always);
             }
+            var visible = zones.Select(zone => ScreenRect.FromEdges(zone.xMin, zone.yMin, zone.xMax, zone.yMax)).ToArray();
+            GL.PushMatrix();
+            try {
+                if (!trackMaterial.SetPass(0)) throw new InvalidOperationException("World track marking shader pass unavailable");
+                // Geometry is already clipped in top-left screen pixels. No rotated GUI matrix or
+                // group scissor is relied upon to keep a wide stroke out of screen UI.
+                GL.LoadPixelMatrix(0, Screen.width, Screen.height, 0);
+                GL.Begin(GL.TRIANGLES);
+                try {
+                    foreach (var shape in shapes.Where(s => s.Track != null)) {
+                        DrawTriangles(WorldStrokeGeometry.ClipTriangles(shape.Track.Ribbon, visible), new Color(shape.Color.r, shape.Color.g, shape.Color.b, .22f));
+                        DrawTriangles(WorldStrokeGeometry.ClipTriangles(shape.Track.Centerline, visible), shape.Color);
+                    }
+                } finally { GL.End(); }
+            } finally { GL.PopMatrix(); GL.InvalidateState(); }
+        }
+
+        static void DrawTriangles(IReadOnlyList<ScreenTriangle> triangles, Color color) {
+            GL.Color(color);
+            foreach (var triangle in triangles) {
+                GL.Vertex3((float)triangle.A.X, (float)triangle.A.Y, 0);
+                GL.Vertex3((float)triangle.B.X, (float)triangle.B.Y, 0);
+                GL.Vertex3((float)triangle.C.X, (float)triangle.C.Y, 0);
+            }
+        }
+
+        static void DrawShape(Shape shape, Vector2 origin) {
             if (shape.Detailed) foreach (var rect in shape.Objects) Frame(Offset(rect, origin), shape.Color);
             var marker = Offset(shape.Marker, origin);
             if (marker.width == 0) return;
@@ -304,13 +283,6 @@ namespace RailroaderScenePatcher {
             GUI.DrawTexture(new Rect(rect.x, rect.yMax - 2, rect.width, 2), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(rect.x, rect.y, 2, rect.height), Texture2D.whiteTexture);
             GUI.DrawTexture(new Rect(rect.xMax - 2, rect.y, 2, rect.height), Texture2D.whiteTexture);
-        }
-        static void DrawLine(Vector2 a, Vector2 b, float radius, bool extend) {
-            var delta = b - a;
-            var original = GUI.matrix;
-            GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, a);
-            try { GUI.DrawTexture(new Rect(a.x - (extend ? radius : 0), a.y - radius, delta.magnitude + (extend ? 2 * radius : 0), 2 * radius), Texture2D.whiteTexture); }
-            finally { GUI.matrix = original; }
         }
     }
 }

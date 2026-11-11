@@ -43,7 +43,22 @@ namespace RailroaderScenePatcher {
         string entryCaption = "Scene patches", entryReason = "Open scene-patch inspection and authoring.";
         internal bool IsOpen => !disposed && window != null && window.NativeWindow.IsShown;
         internal Rect PanelBounds => IsOpen ? Bounds((RectTransform)window.transform) : Rect.zero;
-        internal Rect EntryBounds => !disposed && entry != null && entry.activeInHierarchy ? Bounds((RectTransform)entry.transform) : Rect.zero;
+        Rect EntryLayoutBounds => !disposed && entry != null && entry.activeInHierarchy ? Bounds((RectTransform)entry.transform) : Rect.zero;
+        internal Rect EntryBounds {
+            get {
+                if (disposed || entry == null || !entry.activeInHierarchy) return Rect.zero;
+                // The layout slot is wider than the compact button. Share only the actual
+                // painted button/label bounds with world clipping and input exclusion.
+                var result = Rect.zero;
+                foreach (var graphic in entry.GetComponentsInChildren<Graphic>()) {
+                    var rect = PaintBounds(graphic);
+                    if (rect.width <= 0 || rect.height <= 0) continue;
+                    result = result.width == 0 ? rect : Rect.MinMaxRect(Mathf.Min(result.xMin, rect.xMin),
+                        Mathf.Min(result.yMin, rect.yMin), Mathf.Max(result.xMax, rect.xMax), Mathf.Max(result.yMax, rect.yMax));
+                }
+                return result;
+            }
+        }
 
         internal NativeEditorPresentation(Action<UIPanelBuilder> build, Action onClosed) {
             content = build; closed = onClosed;
@@ -144,17 +159,10 @@ namespace RailroaderScenePatcher {
                 // never extend that rectangle into the world or another window.
                 if (graphic.GetComponentInParent<Window>() != null) continue;
                 var rootCanvas = graphic.canvas == null ? null : graphic.canvas.rootCanvas;
-                if (!graphic.isActiveAndEnabled || !graphic.raycastTarget || graphic.color.a == 0 ||
+                if (!graphic.raycastTarget ||
                     (!includeOwned && Owns(graphic.gameObject)) || graphic.GetComponentInParent<InspectionInputBlocker>() != null ||
-                    !ScreenCanvas(graphic.canvas) || graphic.canvasRenderer.cull ||
-                    graphic.canvasRenderer.GetInheritedAlpha() == 0) continue;
-                var rect = Bounds(graphic.rectTransform);
-                foreach (var mask in graphic.GetComponentsInParent<RectMask2D>()) {
-                    if (mask.isActiveAndEnabled) rect = Intersection(rect, Bounds(mask.rectTransform));
-                }
-                foreach (var mask in graphic.GetComponentsInParent<Mask>()) {
-                    if (mask.isActiveAndEnabled) rect = Intersection(rect, Bounds(mask.rectTransform));
-                }
+                    rootCanvas == null) continue;
+                var rect = PaintBounds(graphic);
                 if (rect.width <= 0 || rect.height <= 0) continue;
                 // A tooltip's CanvasGroup does not block raycasts. Its visible background must not
                 // move the very entry being hovered. Use Unity's actual raycast filters for layout.
@@ -166,6 +174,16 @@ namespace RailroaderScenePatcher {
                 // Full-screen input surfaces are not chrome; visible windows were included above.
                 if (rect.width * rect.height < Screen.width * Screen.height * 0.5f) AddBounds(bounds, rect);
             }
+        }
+        static Rect PaintBounds(Graphic graphic) {
+            if (!graphic.isActiveAndEnabled || graphic.color.a == 0 || !ScreenCanvas(graphic.canvas) ||
+                graphic.canvasRenderer.cull || graphic.canvasRenderer.GetInheritedAlpha() == 0) return Rect.zero;
+            var rect = Bounds(graphic.rectTransform);
+            foreach (var mask in graphic.GetComponentsInParent<RectMask2D>())
+                if (mask.isActiveAndEnabled) rect = Intersection(rect, Bounds(mask.rectTransform));
+            foreach (var mask in graphic.GetComponentsInParent<Mask>())
+                if (mask.isActiveAndEnabled) rect = Intersection(rect, Bounds(mask.rectTransform));
+            return rect;
         }
         static bool ScreenCanvas(Canvas canvas) {
             if (canvas == null || !canvas.isActiveAndEnabled) return false;
@@ -205,7 +223,7 @@ namespace RailroaderScenePatcher {
             CollectVisibleUi(chrome, false);
             float margin = 12 * scale, gap = 8 * scale;
             float entryWidth = 180 * scale, entryHeight = 30 * scale;
-            var previousEntry = EntryBounds;
+            var previousEntry = EntryLayoutBounds;
             var entryRect = new Rect(Screen.width - entryWidth - margin, previousEntry.height > 0 ? previousEntry.y : margin, entryWidth, entryHeight);
             if (!Safe(entryRect, margin)) {
                 entryRect.y = margin;

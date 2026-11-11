@@ -243,7 +243,7 @@ namespace RailroaderScenePatcher {
         void ReleaseParts() {
             if (worldLabelBacking != null) Destroy(worldLabelBacking); worldLabelBacking = null;
             presentation?.Dispose(); presentation = null; attachedEditor = null;
-            Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Cancel(); selection = null;
+            Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Release(); selection = null;
             scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; engine = null; inventory = null; native = null; selected = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
