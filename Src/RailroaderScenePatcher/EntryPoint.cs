@@ -55,6 +55,7 @@ namespace RailroaderScenePatcher {
         Texture2D worldLabelBacking;
         object attachedEditor;
         string presentationSnapshot;
+        readonly InventoryPresentationState inventoryPresentation = new InventoryPresentationState();
         readonly UIOutlineViewState inventoryOutline = new UIOutlineViewState();
         internal const string Version = "0.3.0";
         Authoring authoring;
@@ -210,7 +211,8 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { Report("terrain", "Dependent terrain state remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
             if (presentation != null) {
                 var snapshot = PresentationSnapshot();
-                if (snapshot != presentationSnapshot) { presentationSnapshot = snapshot; presentation.RequestRefresh(); }
+                var inventoryChanged = inventoryPresentation.Observe(inventory, selected, filter);
+                if (snapshot != presentationSnapshot || inventoryChanged) { presentationSnapshot = snapshot; presentation.RequestRefresh(); }
                 presentation.Tick(); SyncInputRegions();
             }
         }
@@ -295,7 +297,11 @@ namespace RailroaderScenePatcher {
                         var byKey = rows.ToDictionary(row => row.Identifier);
                         var outline = items.AddOutlineView(rows, inventoryOutline, new UIState<string>(selectedKey), key => {
                             if (!byKey.TryGetValue(key, out var row)) return;
-                            presentation.Action(() => { selected = (SceneObservation)row.Value; inspected = DescribeInspection(selected); ReadPose(); })();
+                            presentation.Action(() => {
+                                var observation = (SceneObservation)row.Value;
+                                if (!inventoryPresentation.CanSelect(inventory, observation)) return;
+                                selected = observation; inspected = DescribeInspection(selected); ReadPose();
+                            })();
                         });
                         var listLayout = outline.GetComponent<LayoutElement>();
                         listLayout.minHeight = 180; listLayout.preferredHeight = 180; listLayout.flexibleHeight = 0;
@@ -488,7 +494,7 @@ namespace RailroaderScenePatcher {
                 if (inventory == null) throw new InvalidOperationException("Map-editor inspection is unavailable");
                 inventory.Refresh();
                 if (selected != null) {
-                    selected = inventory.Entries.FirstOrDefault(e => ReferenceEquals(e.Handle, selected.Handle) && e.Identity.Component == selected.Identity.Component);
+                    selected = inventoryPresentation.CurrentSelection(inventory, selected);
                     inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected);
                 }
                 var lines = new List<string>();

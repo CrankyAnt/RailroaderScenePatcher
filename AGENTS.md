@@ -59,13 +59,13 @@ One line per validation or test command and per CI workflow the repository runs.
 - `git diff --check`: checks changes for whitespace errors
 - `actionlint`: validates GitHub Actions workflow definitions
 - `dotnet build Src/RailroaderScenePatcher -p:GameManaged=<Railroader_Data/Managed>`: builds the native mod against the installed game assemblies
-- `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release`: validates complete-document application and protection, capability isolation and composition, bridge placement with collider and separate-scenery verification, independent-board culling, mask registration and terrain output with their failures, inventory observations and stale-target revalidation, world selection, authoring, history accounting and persistence with write failures through controlled scene, board, bridge, history and storage dependencies
+- `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release`: validates complete-document application and protection, capability isolation and composition, bridge placement with collider and separate-scenery verification, independent-board culling, mask registration and terrain output with their failures, inventory refresh and presentation coherence, stale-target revalidation, world selection, authoring, history accounting and persistence with write failures through controlled scene, board, bridge, history and storage dependencies
 - `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release -p:DefineConstants=ISSUE39_OBSERVATION -p:BuildArtifactsRoot=<absolute-observation-output>`: validates attempt tracing and the core behavioral suite in a separate instrumented build
 - `dotnet build Tests/NativeObservation -p:GameManaged=<Railroader_Data/Managed>`: builds the isolated native observation artifact
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation with synthetic measurements
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-TestHome.ps1`: validates test-copy ownership and cleanup in a synthetic home
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates separation of active-world and unassigned attempt evidence
-- `core-tests`: builds and runs complete-document, scene inventory, selection and authoring tests without game assemblies
+- `core-tests`: builds and runs complete-document, scene inventory and presentation coherence, selection and authoring tests without game assemblies
 - `zizmor --offline .github/workflows/core-tests.yml`: checks the product workflow for locally detectable security findings
 - `repository-hygiene` (shared, `v1`): the convention checks of branch names, commit subjects and pull-request titles, the credential scan, workflow validation, Dependabot coverage and the Markdown link check, and `reuse lint`
 

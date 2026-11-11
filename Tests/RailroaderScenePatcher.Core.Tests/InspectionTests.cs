@@ -25,6 +25,7 @@ static class InspectionTests {
         Check(inventory.Search("missing-segment").Single().Problems.Contains("Broken binding"), "Search includes broken-binding identifiers and detected problems");
         Check(inventory.Entries.Count == 2 && !inventory.IsStale, "Refresh observes all supplied objects without making them active");
         var originalBoard = fixture.Objects[0];
+        RefreshPresentation(fixture, inventory, originalBoard);
         fixture.Objects[0] = new SceneObservation(originalBoard.Handle, originalBoard.Identity, originalBoard.Family, true,
             originalBoard.Position, originalBoard.Rotation, originalBoard.Bindings, originalBoard.Dependencies, originalBoard.Problems, originalBoard.Operations);
         inventory.CheckFreshness();
@@ -91,5 +92,45 @@ static class InspectionTests {
         result = new PatchEngine(mutable).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
         Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == mutationCount, "Changed binding after inspection cannot authorize a placement edit");
         Console.WriteLine("PASS: inventory classification and dependencies");
+    }
+
+    static void RefreshPresentation(Fixture fixture, SceneInventory inventory, SceneObservation original) {
+        var presentation = new RailroaderScenePatcher.InventoryPresentationState();
+        var selected = original;
+        Check(presentation.Observe(inventory, selected, "board"), "Initial inventory presentation needs rows");
+        Check(!presentation.Observe(inventory, selected, "board"), "Unchanged presentation does not repeatedly rebuild");
+        fixture.Objects[0] = new SceneObservation(original.Handle, original.Identity, original.Family, original.Active,
+            original.Position, original.Rotation, original.Bindings, original.Dependencies, original.Problems, original.Operations);
+        inventory.Refresh();
+        selected = presentation.CurrentSelection(inventory, selected);
+        Check(presentation.Observe(inventory, selected, "board"),
+            "Refresh with identical visible values must replace row callbacks and current selection");
+        Check(ReferenceEquals(selected, inventory.Entries[0]), "Refreshed selection is owned by the current inventory");
+        var refreshed = selected;
+        Action oldRowClick = () => { if (presentation.CanSelect(inventory, original)) selected = original; };
+        oldRowClick();
+        Check(ReferenceEquals(selected, refreshed), "A deferred callback from the previous inventory cannot restore an old observation");
+        Check(presentation.CanSelect(inventory, refreshed) && inventory.Pin(refreshed) != null,
+            "A normal refreshed row can select and pin the current observation");
+        bool refused = false;
+        try { inventory.Pin(original); } catch (InvalidOperationException) { refused = true; }
+        Check(refused, "Pin still refuses the previous inventory observation even with identical visible values");
+        Check(presentation.Observe(inventory, null, "board"), "Clearing selection invalidates the native selected row");
+        Check(presentation.Observe(inventory, null, "marker"), "Changed filter invalidates the cached outline");
+        Check(!presentation.Observe(inventory, null, "marker"), "A settled filtered presentation does not repeatedly rebuild");
+        inventory.Refresh();
+        Check(presentation.Observe(inventory, null, "marker"), "Refresh invalidates rows even without an inspected selection");
+        var current = inventory.Entries[0];
+        fixture.Objects[0] = new SceneObservation(new object(), original.Identity, original.Family, original.Active,
+            original.Position, original.Rotation, original.Bindings, original.Dependencies, original.Problems, original.Operations);
+        inventory.CheckFreshness();
+        Check(!presentation.CanSelect(inventory, current), "A replaced native target cannot be selected from stale rows");
+        refused = false;
+        try { inventory.Pin(current); } catch (InvalidOperationException) { refused = true; }
+        Check(refused, "Pin still refuses the replaced native target");
+        inventory.Refresh();
+        Check(presentation.CurrentSelection(inventory, current) == null, "Refresh does not transfer inspection to a replacement with the same identity");
+        fixture.Objects[0] = original;
+        inventory.Refresh();
     }
 }

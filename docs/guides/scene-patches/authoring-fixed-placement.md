@@ -12,7 +12,7 @@ Save the document as strict UTF-8 JSON. Use the `mapId` of the selected Map defi
 
 ## Describe a fixed placement
 
-In the map editor, open **Scene patches**, refresh the inventory, find the board, and select **Inspect** to display its target identity and dependencies. Select **Copy inspected identity** to copy that JSON. **Focus inspected object** moves the editor camera without changing the inspected selection. Refresh only inspects; it does not apply patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
+In the map editor, open **Scene patches**, refresh the inventory, find the board, and select its inventory row labeled `Inspect <family>: <path>` to display its target identity and dependencies. Select **Copy inspected identity** to copy that JSON. **Focus inspected object** moves the editor camera without changing the inspected selection. Refresh only inspects; it does not apply patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
 
 Add one entry to `modifications` for each desired placement. The following example shows the v1 field shape and the supported target identity. Replace the sample map ID and coordinates with values for the selected map.
 
