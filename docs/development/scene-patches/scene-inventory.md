@@ -50,6 +50,12 @@ The blocker also owns one hidden instance of the native manager's `windowPrefab`
 
 The isolated native regression must replay panel wheel scrolling after product Focus has selected Strategy, with a stable no-input camera control first. It must also retain the earlier scrollbar/title/outside-release and ordinary outside-navigation checks. Compare native selection and camera state. A core inventory test cannot establish this result.
 
+## World selection
+
+World picking uses the inventory's scene-object positions and the loaded graph's native segment and node IDs. The editor projects scene and node markings and samples segment curves in the current camera. It uses the current floating origin when projecting. A click offers every matching marking or segment path at the pointer. Distinct overlapping candidates require a separate choice. Confirmation checks map context, source, unique candidate identity, native handle, and observed graph geometry. The in-memory handoff records the confirmed source and target identities and map context. An operation using it still performs its own preflight.
+
+While a choice is pending, the pointer blocker arms a UI raycast region over the world before the primary press. The native UI gate checks cached pointer hover before raycasting again. The blocker checks native UI beneath its own region and removes the region during right or middle button navigation. The existing native Window shield still applies to the product panel and its drags. World marks are drawn by the panel and have no scene colliders or material changes.
+
 ## Validation limits
 
 The core executable covers inactive and independent observations, binding/problem search, dependency reporting, stale snapshots and complete-document revalidation. Its Refresh assertions verify replacement with the changed active value, cleared stale state and unchanged source activity, placement and marker binding. Controlled fixtures replace targets during capture and change pose after inspection. These tests miss native field extraction, rendering, camera movement, input and game lifecycle. A native build checks assembly references only. Live discovery, refresh and focus require separate retained observations; source-based family accounting and the prior fixed-placement journey do not establish those runtime results.

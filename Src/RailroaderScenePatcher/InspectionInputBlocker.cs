@@ -13,9 +13,13 @@ namespace RailroaderScenePatcher {
         Component nativeWindow;
         RectTransform nativeWindowBounds;
         RectTransform toggleRegion, panelRegion, dragRegion;
-        // Empty until the panel reports the bounds it drew; no region may shield input at an assumed position.
+        Image dragImage;
+        // Bounds arrive from the drawn panel and toggle.
         Rect toggle, panel;
-        bool panelOpen, captured;
+        bool panelOpen, captured, worldCaptured, worldHoverShield;
+        internal bool WorldPicking { get; set; }
+        internal Vector2? WorldClick { get; private set; }
+        internal string WorldInputProblem { get; private set; }
         internal bool Available => isActiveAndEnabled && canvasRoot != null && canvasRoot.activeInHierarchy && nativeWindow != null && nativeWindow.gameObject.activeInHierarchy && EventSystem.current != null;
 
         internal void Initialize() {
@@ -34,6 +38,7 @@ namespace RailroaderScenePatcher {
             toggleRegion = Region("Scene patches button", layer);
             panelRegion = Region("Scene patches panel", layer);
             dragRegion = Region("Scene patches pointer capture", layer);
+            dragImage = dragRegion.GetComponent<Image>();
             InitializeNativeWindow();
             SetRegions(false, panel, toggle);
         }
@@ -74,7 +79,7 @@ namespace RailroaderScenePatcher {
             if (canvasRoot == null) return;
             Place(toggleRegion, toggle, true);
             Place(panelRegion, panel, panelOpen);
-            Place(dragRegion, new Rect(0, 0, Screen.width, Screen.height), captured);
+            Place(dragRegion, new Rect(0, 0, Screen.width, Screen.height), captured || worldCaptured || worldHoverShield);
         }
         void SetNativeWindow(bool shown, Rect bounds) {
             if (nativeWindow == null || !nativeWindow.gameObject.activeInHierarchy) return;
@@ -97,6 +102,7 @@ namespace RailroaderScenePatcher {
             region.gameObject.SetActive(active);
         }
         void Update() {
+            WorldClick = null;
             if (canvasRoot == null) return;
             var position = Input.mousePosition;
             var point = new Vector2(position.x, Screen.height - position.y);
@@ -111,13 +117,38 @@ namespace RailroaderScenePatcher {
             var overPanel = panelOpen && panel.Contains(point);
             var overButton = toggle.Contains(point);
             if (pressed && (overButton || overPanel)) captured = true;
+            if (!Input.GetMouseButton(0) && !Input.GetMouseButtonUp(0)) worldCaptured = false;
+            worldHoverShield = false;
+            if (WorldPicking && Available && !captured && !worldCaptured && !overButton && !overPanel &&
+                !Input.GetMouseButton(1) && !Input.GetMouseButton(2)) {
+                try {
+                    // The native UI gate first checks the EventSystem's cached hover state.
+                    // Arm the shield before the click, and hide it while checking for native UI underneath.
+                    dragImage.raycastTarget = false;
+                    var input = Native.Type("UI.GameInput");
+                    bool overUi = (bool)Native.Call(input, "IsMouseOverUI", null, null);
+                    bool overWorld = (bool)Native.Call(input, "IsMouseOverGameWindow", new object[] { null });
+                    if (!overUi && overWorld) {
+                        worldHoverShield = true;
+                        if (Input.GetMouseButtonDown(0)) {
+                            worldCaptured = true;
+                            WorldClick = point;
+                        }
+                    }
+                    WorldInputProblem = null;
+                } catch (Exception e) {
+                    WorldInputProblem = "World selection input unavailable: " + e.GetBaseException().Message;
+                } finally { dragImage.raycastTarget = true; }
+            }
             SetRegions(panelOpen, panel, toggle);
+            // Only panel drags need the full native window shield for wheel input.
             SetNativeWindow(captured || overButton || overPanel, captured ? new Rect(0, 0, Screen.width, Screen.height) : overPanel ? panel : toggle);
         }
-        void OnDisable() { captured = false; SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false); }
+        void OnDisable() { captured = worldCaptured = worldHoverShield = false; WorldClick = null; SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false); }
         void OnEnable() { if (canvasRoot != null) canvasRoot.SetActive(true); }
         internal void Release() {
-            captured = false;
+            captured = worldCaptured = worldHoverShield = WorldPicking = false;
+            WorldClick = null;
             if (nativeWindow != null) {
                 var root = nativeWindow.gameObject;
                 if (root.activeInHierarchy) Native.Call(nativeWindow, "CloseWindow");

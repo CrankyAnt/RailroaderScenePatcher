@@ -12,7 +12,7 @@ Open **Scene patches**. The status line reads **Authoring ready** with the docum
 
 ## Set a numeric placement
 
-1. Select **Refresh inventory and verify stored target identities**, search for the object and select its **Inspect** button, as described in [inspect scene objects](inspect-scene-objects.md). For an object with a fixed-placement adapter, the six fields show its inspected position in map coordinates and its rotation in degrees. Other observations are inspection only.
+1. Find the object in the [inventory](inspect-scene-objects.md) or [select it in the world](select-world-targets.md) and confirm its identity. For an object with a fixed-placement adapter, the six fields show its inspected position in map coordinates and its rotation in degrees. Other observations are inspection only.
 2. Change the values. Use a decimal point.
 3. Select **Apply placement**.
 

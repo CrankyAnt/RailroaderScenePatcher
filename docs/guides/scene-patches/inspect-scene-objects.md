@@ -4,6 +4,8 @@
 
 Open **Scene patches** in the map editor. The button is on the right edge of the screen. The patcher samples positions down that edge and takes the highest one where it finds no native window or native control that responds to the pointer, such as the game's status icons. When it finds no free position, the button goes to the bottom of the right edge, where it can still cover a native control. A native element that does not respond to the pointer is not detected. The panel opens on the right side below the button, leaving the centre of the view free, and can be dragged by its title. Select **Refresh inventory and verify stored target identities**. Refresh reads the loaded scene and the active edited MapMod's supplied definitions. It does not apply patches, save files, change object activity, repair bindings or regenerate dependent output. Objects need no patch or warning to appear.
 
+Use [world selection](select-world-targets.md) to find an object by its marking or check a replacement candidate against the track and scene.
+
 ## Find and inspect an object
 
 Search by name, full hierarchy path, family, binding identifier, dependency or detected problem. The inventory includes active and inactive loaded objects. Select **Inspect** to see the Unity scene, hierarchy path, intended component, map-coordinate position, quaternion rotation, applicable serialized bindings, dependencies and detected problems. **Copy inspected identity** copies JSON values from that observation. A copied identity does not establish support for editing the object.
