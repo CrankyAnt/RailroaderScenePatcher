@@ -61,8 +61,9 @@ namespace RailroaderScenePatcher {
         public void Preflight(object target) {
             var board = (GameObject)target;
             if (board == null || !board.scene.isLoaded || board.scene.name != BoardSceneName || PathOf(board.transform) != BoardPath) throw new InvalidOperationException("This object has no implemented independent-placement capability");
-            if (!board.activeInHierarchy || !((Behaviour)board.GetComponent(culler)).enabled || !(board.GetComponent(mask) is Behaviour m) || !m.enabled)
-                throw new InvalidOperationException("The board, culler and circle mask must be active");
+            // The board itself may be inactive through an explicit disable; its parents and components may not.
+            if ((board.transform.parent != null && !board.transform.parent.gameObject.activeInHierarchy) || !(board.GetComponent(culler) is Behaviour cull) || !cull.enabled || !(board.GetComponent(mask) is Behaviour m) || !m.enabled)
+                throw new InvalidOperationException("The board's parents, culler and circle mask must be active");
             if (board.GetComponentsInChildren<Component>(true).Any(c => c == null || (c.GetType().FullName ?? "").StartsWith("Track.", StringComparison.Ordinal))) throw new InvalidOperationException("Unexpected board track dependency");
             if (!ReferenceEquals(Native.Read(Native.Type("Map.Runtime.MapManager"), "Instance"), terrain)) throw new InvalidOperationException("Terrain context changed");
             ConvertPosition("WorldToGame", board.transform.position);
@@ -71,31 +72,52 @@ namespace RailroaderScenePatcher {
             var board = (GameObject)target;
             return new Snapshot { Position = ConvertPosition("WorldToGame", board.transform.position), Rotation = board.transform.rotation, Parent = board.transform.parent, Active = board.activeSelf };
         }
-        public void Apply(object target, Placement placement) {
+        public ObjectState Read(object target) {
             var board = (GameObject)target;
-            var position = Vec(placement.Position);
-            var rotation = new Quaternion(CheckedFloat(placement.Rotation[0]), CheckedFloat(placement.Rotation[1]), CheckedFloat(placement.Rotation[2]), CheckedFloat(placement.Rotation[3]));
-            if (Math.Abs(Quaternion.Dot(rotation, rotation) - 1f) > 0.001f) throw new InvalidOperationException("Rotation must be a unit quaternion");
-            SetPose(board, position, rotation);
+            var position = ConvertPosition("WorldToGame", board.transform.position); var rotation = board.transform.rotation;
+            return new ObjectState(new Placement(new double[] { position.x, position.y, position.z }, new double[] { rotation.x, rotation.y, rotation.z, rotation.w }), board.activeSelf);
+        }
+        public void Apply(object target, ObjectState state) {
+            var board = (GameObject)target;
+            var position = ConvertPosition("WorldToGame", board.transform.position); var rotation = board.transform.rotation;
+            if (state.Placement != null) {
+                position = Vec(state.Placement.Position);
+                rotation = new Quaternion(CheckedFloat(state.Placement.Rotation[0]), CheckedFloat(state.Placement.Rotation[1]), CheckedFloat(state.Placement.Rotation[2]), CheckedFloat(state.Placement.Rotation[3]));
+                if (Math.Abs(Quaternion.Dot(rotation, rotation) - 1f) > 0.001f) throw new InvalidOperationException("Rotation must be a unit quaternion");
+            }
+            var active = state.Active ?? board.activeSelf;
+            // Enabling registers the culling sphere and mask at the current pose; the pose is refreshed afterwards.
+            if (active && !board.activeSelf) { Track(board, ConvertPosition("WorldToGame", board.transform.position)); board.SetActive(true); }
+            if (state.Placement != null) SetPose(board, position, rotation);
+            // Disabling releases the culling sphere and removes the mask through the components' own lifecycle.
+            if (!active && board.activeSelf) { Track(board, position); board.SetActive(false); }
+            if (board.activeSelf != active) throw new InvalidOperationException("Applied activity did not verify");
+        }
+        void Track(GameObject board, Vector3 position) {
+            // Track incomplete work before the first mutation, including interrupted refresh.
+            if (!pending.TryGetValue(board, out var work)) pending.Add(board, work = new Pending());
+            work.Positions.Add(position);
+            Status = "Board state applied; awaiting native terrain rebuild at the affected positions";
         }
         void SetPose(GameObject board, Vector3 position, Quaternion rotation) {
             var old = ConvertPosition("WorldToGame", board.transform.position);
             var local = ConvertPosition("GameToWorld", position);
             if ((ConvertPosition("WorldToGame", local) - position).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
-            // Track incomplete work before the first mutation, including interrupted refresh.
-            if (!pending.TryGetValue(board, out var work)) pending.Add(board, work = new Pending());
-            work.Positions.Add(old); work.Positions.Add(position);
+            // An inactive board holds no culling sphere or mask; both register at the new pose when it is enabled.
+            var registered = board.activeInHierarchy;
+            if (registered) { Track(board, old); Track(board, position); }
             board.transform.SetPositionAndRotation(local, rotation);
-            Native.Call(board.GetComponent(culler), "RequestUpdateCullingPosition");
-            Native.Call(board.GetComponent(mask), "Rebuild");
+            if (registered) {
+                Native.Call(board.GetComponent(culler), "RequestUpdateCullingPosition");
+                Native.Call(board.GetComponent(mask), "Rebuild");
+            }
             if ((ConvertPosition("WorldToGame", board.transform.position) - position).sqrMagnitude > 0.0001f || Quaternion.Angle(board.transform.rotation, rotation) > 0.01f)
                 throw new InvalidOperationException("Applied pose did not verify");
-            Status = "Board pose applied; awaiting native terrain rebuild at old and new positions";
         }
         public bool Restore(object target, object snapshot) {
             var board = (GameObject)target; var state = (Snapshot)snapshot;
-            if (board == null || board.transform.parent != state.Parent || board.activeSelf != state.Active) return false;
-            SetPose(board, state.Position, state.Rotation);
+            if (board == null || board.transform.parent != state.Parent) return false;
+            Apply(board, new ObjectState(new Placement(new double[] { state.Position.x, state.Position.y, state.Position.z }, new double[] { state.Rotation.x, state.Rotation.y, state.Rotation.z, state.Rotation.w }), state.Active));
             // Async output cannot be reported restored on a transform comparison alone.
             return !pending.ContainsKey(board);
         }

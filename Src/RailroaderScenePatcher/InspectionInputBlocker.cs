@@ -13,7 +13,8 @@ namespace RailroaderScenePatcher {
         Component nativeWindow;
         RectTransform nativeWindowBounds;
         RectTransform toggleRegion, panelRegion, dragRegion;
-        Rect toggle = new Rect(20, 20, 160, 30), panel;
+        // Empty until the panel reports the bounds it drew; no region may shield input at an assumed position.
+        Rect toggle, panel;
         bool panelOpen, captured;
         internal bool Available => isActiveAndEnabled && canvasRoot != null && canvasRoot.activeInHierarchy && nativeWindow != null && nativeWindow.gameObject.activeInHierarchy && EventSystem.current != null;
 
@@ -67,6 +68,7 @@ namespace RailroaderScenePatcher {
             region.GetComponent<CanvasRenderer>().cullTransparentMesh = false;
             return (RectTransform)region.transform;
         }
+        internal bool Owns(GameObject target) => canvasRoot != null && target != null && target.transform.IsChildOf(canvasRoot.transform);
         internal void SetRegions(bool open, Rect window, Rect button) {
             panelOpen = open; panel = window; toggle = button;
             if (canvasRoot == null) return;

@@ -7,15 +7,30 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
     internal sealed class PackDocument {
         internal string Identifier, Name, Version, Author, Website, Json, Error;
     }
+    // The two files of the active edited MapMod that the patcher writes. Inherited packs are never a destination.
+    internal sealed class ActiveStorage : IStorage {
+        readonly string root;
+        internal ActiveStorage() {
+            root = PackDocuments.ActiveRoot();
+            if (root == null || !Directory.Exists(root)) throw new InvalidOperationException("The active edited MapMod has no known writable location");
+        }
+        internal string PatchPath => Path.Combine(root, "Data", "scene-patches.json");
+        string InfoPath => Path.Combine(root, "Info.json");
+        public string ReadPatchDocument() => File.Exists(PatchPath) ? PackDocuments.ReadUtf8(PatchPath) : null;
+        public string ReadPackInfo() => File.Exists(InfoPath) ? PackDocuments.ReadUtf8(InfoPath) : null;
+        public void WritePatchDocument(string text) { Directory.CreateDirectory(Path.GetDirectoryName(PatchPath)); File.WriteAllBytes(PatchPath, PackDocuments.Utf8.GetBytes(text)); }
+        public void WritePackInfo(string text) { File.WriteAllBytes(InfoPath, PackDocuments.Utf8.GetBytes(text)); }
+    }
     internal static class PackDocuments {
         internal const string ModId = "crankyant/scene-patcher";
         internal static readonly Encoding Utf8 = new UTF8Encoding(false, true);
-        static string ReadUtf8(string path) {
+        internal static string ReadUtf8(string path) {
             var bytes = File.ReadAllBytes(path);
             var offset = bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf ? 3 : 0;
             return Utf8.GetString(bytes, offset, bytes.Length - offset);
@@ -29,6 +44,12 @@ namespace RailroaderScenePatcher {
             return new[] { id }.Concat(layers.Cast<object>().Select(v => v.ToString())).Distinct(StringComparer.Ordinal).ToArray();
         }
         internal static bool IsEditor => (bool)Native.Read(Native.Type("Game.ActiveMapDefinition"), "IsEditTarget");
+        internal static string ActiveId => Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")?.ToString();
+        internal static string ActiveRoot() {
+            var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
+            var root = Native.Call(manager, "GetPackBasePathForDefinition", Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")) as string;
+            return root == null ? null : Path.GetFullPath(root);
+        }
         internal static IEnumerable<PackDocument> Discover() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
             var packs = Native.Read(manager, "OrderedPacks") as IEnumerable;
@@ -48,7 +69,8 @@ namespace RailroaderScenePatcher {
                 var document = new PackDocument { Identifier = Native.Read(store, "Identifier").ToString() };
                 try {
                     var info = JObject.Parse(ReadUtf8(Path.Combine(root, "Info.json")));
-                    if (!(info["dependencies"]?["required"] is JArray dependencies) || !dependencies.Values<string>().Any(d => d != null && d.Split(' ')[0] == ModId)) continue;
+                    // The editor applies the active document before Save has declared the dependency.
+                    if (editorRoot == null && (!(info["dependencies"]?["required"] is JArray dependencies) || !dependencies.Values<string>().Any(d => d != null && d.Split(' ')[0] == ModId))) continue;
                     document.Name = (string)info["name"] ?? document.Identifier;
                     document.Version = (string)info["version"];
                     document.Author = (string)info["author"];

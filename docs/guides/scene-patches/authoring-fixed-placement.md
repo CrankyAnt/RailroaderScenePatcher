@@ -6,7 +6,7 @@ This guide describes the v1 scene-patch document layout and the first native pla
 
 ## Add the patch document
 
-Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. The owning MapMod must depend on `crankyant/scene-patcher` version `0.1.0` or later. At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
+Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. The owning MapMod must depend on `crankyant/scene-patcher` version `0.1.0` or later. To make these edits in the map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
 
 Save the document as strict UTF-8 JSON. Use the `mapId` of the selected Map definition or one of its resolved map layers. Keep one document with the supplying MapMod so editor inspection and runtime application read the same desired state.
 
@@ -48,7 +48,7 @@ Use a unique, non-empty `id` for each modification. List prerequisite modificati
 
 ## Check the support boundary
 
-The adapter requires the board, culler, and circle map mask to be active, rejects unexpected `Track.*` child components, and checks the required map conversion, culling, mask, and terrain hooks. Other board patterns and object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
+The adapter requires the board's parents, culler, and circle map mask to be active; the board itself may be disabled through `active`. It rejects unexpected `Track.*` child components, and checks the required map conversion, culling, mask, and terrain hooks. Other board patterns and object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
 
 If a modification fails during a load, the engine does not retry it during that load. Correct the document or target before a later load.
 

@@ -19,11 +19,21 @@ class Scene : IScene, IInspectionScene {
     public Action BeforeCapture;
     public IReadOnlyList<object> Resolve(TargetIdentity identity) { ResolveCalls++; return Objects.TryGetValue(identity.Path, out var found) ? found : new List<object>(); }
     public void Preflight(object target) { }
-    public object Capture(object target) { BeforeCapture?.Invoke(); var box = (Box)target; return new[] { (double[])box.Position.Clone(), (double[])box.Rotation.Clone() }; }
-    public void Apply(object target, Placement placement) { MutationCalls++; var box = (Box)target; box.Position = new[] { placement.Position[0] - Origin, placement.Position[1], placement.Position[2] }; box.Rotation = (double[])placement.Rotation.Clone(); if (FailApply || ReferenceEquals(target, FailingTarget)) throw new Exception("injected"); }
-    public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var pose = (double[][])snapshot; box.Position = pose[0]; box.Rotation = pose[1]; return true; }
+    public bool FailRead { get; set; }
+    public int FailNextApplies;
+    public object Capture(object target) { BeforeCapture?.Invoke(); var box = (Box)target; return new object[] { (double[])box.Position.Clone(), (double[])box.Rotation.Clone(), box.Active }; }
+    public Action BeforeRead;
+    public ObjectState Read(object target) { var hook = BeforeRead; BeforeRead = null; hook?.Invoke(); if (FailRead) throw new Exception("injected read"); var box = (Box)target; return new ObjectState(new Placement(new[] { box.Position[0] + Origin, box.Position[1], box.Position[2] }, (double[])box.Rotation.Clone()), box.Active); }
+    public void Apply(object target, ObjectState state) {
+        MutationCalls++; var box = (Box)target;
+        if (state.Placement != null) { box.Position = new[] { state.Placement.Position[0] - Origin, state.Placement.Position[1], state.Placement.Position[2] }; box.Rotation = (double[])state.Placement.Rotation.Clone(); }
+        if (state.Active != null) box.Active = state.Active.Value;
+        if (FailNextApplies > 0) { FailNextApplies--; throw new Exception("injected once"); }
+        if (FailApply || ReferenceEquals(target, FailingTarget)) throw new Exception("injected");
+    }
+    public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var pose = (object[])snapshot; box.Position = (double[])pose[0]; box.Rotation = (double[])pose[1]; box.Active = (bool)pose[2]; return true; }
 }
-class Box { public double[] Position = new double[3], Rotation = new double[4]; public double X { get => Position[0]; set => Position[0] = value; } }
+class Box { public double[] Position = new double[3], Rotation = new double[4]; public bool Active = true; public double X { get => Position[0]; set => Position[0] = value; } }
 class Program {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static void AssertWriteProtected(string json) {
@@ -119,6 +129,7 @@ class Program {
 #else
         Assert(typeof(PatchEngine).Assembly.GetType("RailroaderScenePatcher.Core.JourneyObservation") == null, "The normal product build exposes no journey observation sink");
 #endif
+        AuthoringTests.Run();
         InspectionTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }

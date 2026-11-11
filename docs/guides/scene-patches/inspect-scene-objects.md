@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Inspect scene objects
 
-Open **Scene patches** in the map editor and select **Refresh inventory and verify stored target identities**. Refresh reads the loaded scene and the active edited MapMod's supplied definitions. It does not apply patches, save files, change object activity, repair bindings or regenerate dependent output. Objects need no patch or warning to appear.
+Open **Scene patches** in the map editor. The button is on the right edge of the screen. The patcher samples positions down that edge and takes the highest one where it finds no native window or native control that responds to the pointer, such as the game's status icons. When it finds no free position, the button goes to the bottom of the right edge, where it can still cover a native control. A native element that does not respond to the pointer is not detected. The panel opens on the right side below the button, leaving the centre of the view free, and can be dragged by its title. Select **Refresh inventory and verify stored target identities**. Refresh reads the loaded scene and the active edited MapMod's supplied definitions. It does not apply patches, save files, change object activity, repair bindings or regenerate dependent output. Objects need no patch or warning to appear.
 
 ## Find and inspect an object
 

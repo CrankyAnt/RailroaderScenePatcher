@@ -8,7 +8,7 @@ try {
     foreach($name in @('Mods','ModDev','Saves')){[IO.Directory]::CreateDirectory((Join-Path $homePath $name))|Out-Null}
     [IO.File]::WriteAllText((Join-Path $homePath 'Preferences.json'),'{"settings":{"mods.allow-dll":1,"untouched":"keep"},"mods":[],"clientMods":[]}')
     $product=Join-Path $sandbox 'Product';[IO.Directory]::CreateDirectory($product)|Out-Null
-    foreach($name in @('RailroaderScenePatcher.dll','RailroaderScenePatcher.Core.dll')){[IO.File]::WriteAllText((Join-Path $product $name),'Synthetic test bytes, never loaded')}
+    foreach($name in @('RailroaderScenePatcher.dll','RailroaderScenePatcher.Core.dll','0Harmony.dll')){[IO.File]::WriteAllText((Join-Path $product $name),'Synthetic test bytes, never loaded')}
     [IO.File]::WriteAllText((Join-Path $product 'Info.json'),'{"identifier":"crankyant/scene-patcher"}')
     $observer=Join-Path $sandbox 'NativeObservation.dll';[IO.File]::WriteAllText($observer,'Synthetic observer bytes, never loaded')
     $fixtures=Join-Path $sandbox 'Fixtures'

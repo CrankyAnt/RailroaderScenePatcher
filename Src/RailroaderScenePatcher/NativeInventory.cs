@@ -168,11 +168,11 @@ namespace RailroaderScenePatcher {
             });
             var rotation = go.transform.rotation;
             var board = go.scene.name == BoardScene.BoardSceneName && BoardScene.PathOf(go.transform) == BoardScene.BoardPath && TypeName(c) == BoardScene.CullerType;
-            if (board && (!go.activeInHierarchy || !(Get(go, BoardScene.CullerType) is Behaviour culler) || !culler.enabled || !(Get(go, BoardScene.MaskType) is Behaviour mask) || !mask.enabled))
-                problems.Add("Fixed placement unavailable: board, culler and circle mask must be active");
+            if (board && ((go.transform.parent != null && !go.transform.parent.gameObject.activeInHierarchy) || !(Get(go, BoardScene.CullerType) is Behaviour culler) || !culler.enabled || !(Get(go, BoardScene.MaskType) is Behaviour mask) || !mask.enabled))
+                problems.Add("Fixed placement unavailable: the board's parents, culler and circle mask must be active");
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), board ? BoardScene.Structure : null), family,
                 go.activeInHierarchy, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
-                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), problems, board ? "Fixed placement requires active board/culler/mask and successful preflight" : "Inspection only; no mutation adapter for this pattern");
+                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), problems, board ? "Fixed placement and activity require active parents/culler/mask and successful preflight" : "Inspection only; no mutation adapter for this pattern");
         }
         static void Location(object location, string role, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
             var segment = Text(Field(location, "segmentId"));
