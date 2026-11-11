@@ -48,7 +48,7 @@ Use a unique, non-empty `id` for each modification. List prerequisite modificati
 
 ## Check the support boundary
 
-The adapter requires the board's parents, culler, and circle map mask to be active; the board itself may be disabled through `active`. It rejects unexpected `Track.*` child components, and checks the required map conversion, culling, mask, and terrain hooks. Other board patterns and object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
+The adapter requires the board's parents, culler, and circle map mask to be active; the board itself may be disabled through `active`. It rejects unexpected `Track.*` child components, and checks the required map conversion, culling, mask, and terrain hooks. Other board patterns are not implemented. For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md); other object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
 
 If a modification fails during a load, the engine does not retry it during that load. Correct the document or target before a later load.
 

@@ -1,0 +1,64 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+
+namespace RailroaderScenePatcher.Core {
+    // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
+    // the capability that resolved it. A capability that is incompatible with the running game build fails
+    // only the modifications that name its structure; unrelated supported work stays available.
+    public sealed class SceneCapabilities : IScene, IInspectionScene {
+        sealed class ByReference : IEqualityComparer<object> {
+            public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
+            public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
+        }
+        sealed class Unavailable {
+            internal string Structure, Reason;
+        }
+        readonly Func<IEnumerable<string>> mapIds;
+        readonly IInspectionScene inspection;
+        readonly List<IScene> capabilities = new List<IScene>();
+        readonly Dictionary<string, Unavailable> unavailable = new Dictionary<string, Unavailable>(StringComparer.Ordinal);
+        readonly Dictionary<object, IScene> owners = new Dictionary<object, IScene>(new ByReference());
+        public SceneCapabilities(Func<IEnumerable<string>> mapIds, IInspectionScene inspection = null) {
+            this.mapIds = mapIds ?? throw new ArgumentNullException(nameof(mapIds)); this.inspection = inspection;
+        }
+        public void Add(IScene capability) { capabilities.Add(capability ?? throw new ArgumentNullException(nameof(capability))); }
+        // Records a capability whose required game functions are missing. Targets naming its structure fail with the reason.
+        public void AddUnavailable(string structure, string reason) { unavailable[structure] = new Unavailable { Structure = structure, Reason = reason }; }
+        public IEnumerable<string> MapIds => mapIds();
+        public Capability Capability {
+            get {
+                var available = capabilities.Where(c => c.Capability != Capability.Incompatible).ToList();
+                if (available.Count == 0) return Capability.Incompatible;
+                return available.All(c => c.Capability == Capability.Checked) ? Capability.Checked : Capability.Unchecked;
+            }
+        }
+        public IEnumerable<SceneObservation> Discover() => inspection == null ? Enumerable.Empty<SceneObservation>() : inspection.Discover();
+        public IReadOnlyList<object> Resolve(TargetIdentity identity) {
+            var found = new List<object>();
+            foreach (var capability in capabilities) {
+                foreach (var item in capability.Resolve(identity) ?? Array.Empty<object>()) {
+                    // An object claimed by two capabilities appears twice and stays ambiguous.
+                    if (item != null) owners[item] = capability;
+                    found.Add(item);
+                }
+            }
+            if (identity.Structure != null && unavailable.TryGetValue(identity.Structure, out var missing)) found.Add(missing);
+            return found;
+        }
+        IScene Owner(object target) {
+            if (target is Unavailable missing) throw new InvalidOperationException("The " + missing.Structure + " capability is incompatible with this game build: " + missing.Reason + ". Report this to the patcher maintainer");
+            if (target == null || !owners.TryGetValue(target, out var owner)) throw new InvalidOperationException("No capability resolved this object");
+            if (owner.Capability == Capability.Incompatible) throw new InvalidOperationException("The capability for this object is incompatible with this game build. Report this to the patcher maintainer");
+            return owner;
+        }
+        public void Preflight(object target) { Owner(target).Preflight(target); }
+        public object Capture(object target) => Owner(target).Capture(target);
+        public ObjectState Read(object target) => Owner(target).Read(target);
+        public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
+        public bool Restore(object target, object snapshot) => Owner(target).Restore(target, snapshot);
+    }
+}

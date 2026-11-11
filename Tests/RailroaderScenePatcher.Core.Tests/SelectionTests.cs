@@ -116,6 +116,22 @@ static class SelectionTests {
             "The complete-document engine also refuses the ambiguous identity without moving either match");
         candidates.Items.Remove(duplicateCandidate);
         scene.Objects["replacement"].Remove(duplicate);
+        session.Cancel();
+        var other = new SelectionCandidate(original, SelectionIdentity.SceneObject(new TargetIdentity("scene", "original", "Culler")), "Original board");
+        candidates.Items.Add(other);
+        session.Begin(SelectionKind.SceneObject, "Replace scene target", candidate);
+        session.Pending.Offer(new[] { candidate, other });
+        Check(session.Pending.Source == candidate && session.Pending.Candidate == null && !session.Confirm(),
+            "An offered source remains an unchosen choice while scene-object hits overlap");
+        session.Pending.Choose(other);
+        Check(session.Pending.Candidate == other && session.Pending.Source == candidate && session.Confirmed == null,
+            "Choosing another object leaves the source unchosen and requires confirmation");
+        session.Pending.Choose(candidate);
+        Check(session.Pending.Candidate == candidate && session.Pending.Source == candidate && session.Confirmed == null,
+            "An explicit choice can make the source the candidate without confirming it");
+        session.Cancel();
+        Check(saved.Write() == json && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12,
+            "Cancelling source-in-overlap choices preserves the whole document and both scene objects");
     }
 
     static void ReplacementChoices(Scene scene, string json, Candidates candidates, SelectionCandidate source, DocumentResult completed,

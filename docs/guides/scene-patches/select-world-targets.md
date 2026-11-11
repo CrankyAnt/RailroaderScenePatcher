@@ -4,7 +4,13 @@
 
 Open **Scene patches** on the right side of the map editor. Choose **Select scene object in world** and click a blue object marking. The markings use the positions of supported inventory objects, including inactive objects. Check the candidate's name, scene, path, component, and any identifiers in its binding details. Choose **Confirm identity** to select that object for inspection. For an editable object, the placement fields then show the inspected pose.
 
+You can click the square marking, the outlined object bounds, or a displayed identity label. Labels keep a fixed screen text size on their opaque label backing. Markings and labels stay outside native windows and controls.
+
+Expanded object bounds come from enabled renderers on active objects. An inactive object remains selectable through its drawn square marker and identity label. When the source is also offered in an overlap, its label retains **Choice** until you explicitly choose it as the **Candidate**.
+
 With a scene object inspected, start **Choose replacement object**, **Choose replacement segment**, or **Choose replacement node**. The yellow source marking and the source name in the panel identify the object the choice belongs to. For a segment, point at its track in the world. For a node, click its blue marking. The panel shows the segment ID and both endpoint IDs, or the node ID and map position.
+
+Hovering a track shows the selectable ribbon around its curve, covering the rails and ties with a minimum screen width at a distance. Clicking a shared endpoint or overlapping ribbons offers every matching candidate for an explicit choice.
 
 The green marking identifies the candidate under consideration. If several candidates overlap at the pointer, choose one from the list by its identity or move the camera and pick again. Use **Focus candidate** to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source.
 

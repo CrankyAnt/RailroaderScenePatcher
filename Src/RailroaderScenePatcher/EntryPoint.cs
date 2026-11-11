@@ -7,8 +7,9 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using Railroader.Modding;
 using RailroaderScenePatcher.Core;
+using UI.Builder;
+using TMPro;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
@@ -32,6 +33,7 @@ namespace RailroaderScenePatcher {
     public sealed class PatcherBehaviour : MonoBehaviour {
         IModContext context;
         BoardScene scene;
+        SceneCapabilities capabilities;
         PatchEngine engine;
         SceneInventory inventory;
         InspectionInputBlocker inputBlocker;
@@ -42,23 +44,17 @@ namespace RailroaderScenePatcher {
         string documentStamp;
         bool definitionsStale = true;
         float nextInventoryCheck;
-        bool editor, open;
+        bool editor;
         string status = "Initializing", inspected = "", filter = "";
         readonly HashSet<string> reported = new HashSet<string>();
         readonly Dictionary<object, HashSet<string>> contributions = new Dictionary<object, HashSet<string>>();
         readonly List<string> diagnostics = new List<string>();
-        Rect window = new Rect(20, 60, 700, 620);
-        Rect toggle;
-        float nextTogglePlacement;
-        Vector2 toggleScreen;
-        readonly List<RaycastResult> chromeHits = new List<RaycastResult>();
-        readonly Vector3[] chromeCorners = new Vector3[4];
-        bool panelPlaced;
-        Texture2D panelBacking, toggleBacking, toggleHover;
-        GUIStyle panelStyle, toggleStyle;
-        Vector2 scroll;
-        Vector2 choiceScroll;
-        internal const string Version = "0.2.0";
+        NativeEditorPresentation presentation;
+        Texture2D worldLabelBacking;
+        object attachedEditor;
+        string presentationSnapshot;
+        readonly UIOutlineViewState inventoryOutline = new UIOutlineViewState();
+        internal const string Version = "0.3.0";
         Authoring authoring;
         object refusedEditor;
         string authoringStatus = "", editResult = "";
@@ -77,17 +73,30 @@ namespace RailroaderScenePatcher {
                     selection = new SpatialSelection(inspection);
                 }
                 if (editor) {
-                    try { inputBlocker = gameObject.AddComponent<InspectionInputBlocker>(); inputBlocker.Initialize(); }
+                    try { inputBlocker = gameObject.AddComponent<InspectionInputBlocker>(); inputBlocker.Initialize(); inputBlocker.RefreshRegions = SyncInputRegions; }
                     catch (Exception e) {
                         inputBlocker?.Release(); inputBlocker = null;
                         Report("inspection-input", "Inspection UI unavailable: " + e.GetBaseException().Message);
                     }
                 }
-                scene = new BoardScene(); engine = new PatchEngine(scene);
-                context.Log.Info("Scene Patcher " + Version + ": native board capability available; game " + Application.version + "; production integration unchecked");
+                // Each capability checks its own game functions; an incompatible one fails only the modifications naming its structure.
+                capabilities = new SceneCapabilities(PackDocuments.MapIds, new NativeInventory());
+                try { scene = new BoardScene(); capabilities.Add(scene); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(BoardScene.Structure, e.GetBaseException().Message);
+                    status = "Independent board capability incompatible or unavailable: " + e.GetBaseException().Message;
+                    Report("capability", status);
+                }
+                try { capabilities.Add(new BridgeScene(new BridgeWorld(), Capability.Unchecked)); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
+                engine = new PatchEngine(capabilities);
+                context.Log.Info("Scene Patcher " + Version + ": native capabilities checked; game " + Application.version + "; production integration unchecked");
                 ApplyDocuments();
             } catch (Exception e) {
-                status = "Independent board capability incompatible or unavailable: " + e.GetBaseException().Message;
+                status = "Scene capabilities unavailable: " + e.GetBaseException().Message;
                 Report("capability", status);
             }
         }
@@ -107,12 +116,12 @@ namespace RailroaderScenePatcher {
                         if (!item.Value.Applied) {
                             var error = Describe(pack, item.Key + ": " + item.Value.Error);
                             if (item.Value.Error.StartsWith("Unsupported", StringComparison.Ordinal) || item.Value.Error.StartsWith("Invalid or unsupported", StringComparison.Ordinal)) EditorDiagnostic(error);
-                            else Report(pack.Identifier + "/" + item.Key, error + (item.Value.Error.StartsWith("Mutation failed", StringComparison.Ordinal) ? ". Report to the patcher maintainer; affected state may need reload." : ". Report this supplied definition to its MapMod author."));
+                            else Report(pack.Identifier + "/" + item.Key, error + (item.Value.Error.StartsWith("Mutation failed", StringComparison.Ordinal) || item.Value.Error.Contains("incompatible with this game build") ? ". Report to the patcher maintainer; affected state may need reload." : ". Report this supplied definition to its MapMod author."));
                         }
                     }
                     try { ObserveOverlap(pack, result); }
                     catch (Exception e) { Report(pack.Identifier + "/overlap", "Overlap inspection failed; remaining documents will still be processed. Report to the patcher maintainer. " + e.GetBaseException().Message); }
-                    status = "Documents processed. " + scene.Status;
+                    status = "Documents processed. " + (scene?.Status ?? "");
                 }
             } catch (Exception e) { Report("discovery", "Loaded MapMod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); }
         }
@@ -141,8 +150,15 @@ namespace RailroaderScenePatcher {
             if (!editor || engine == null) return;
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared");
             var found = controller as UnityEngine.Object == null ? null : Native.Read(controller, "MapEditor");
-            if (found == null || ReferenceEquals(found, refusedEditor) || (authoring != null && ReferenceEquals(authoring.Editor, found))) return;
-            Detach();
+            if (ReferenceEquals(found, attachedEditor)) return;
+            presentation?.Dispose(); presentation = null;
+            selection?.Cancel(); selectionProblem = null;
+            Detach(); attachedEditor = found; refusedEditor = null; presentationSnapshot = null;
+            if (found == null) return;
+            if (inputBlocker != null && inputBlocker.Available) {
+                try { presentation = new NativeEditorPresentation(DrawWindow, () => { selection?.Cancel(); selectionProblem = null; }); }
+                catch (Exception e) { Report("inspection-presentation", "Inspection UI unavailable: " + e.GetBaseException().Message); }
+            }
             if (Hooks.Error != null) { refusedEditor = found; authoringStatus = Hooks.Error; return; }
             try {
                 authoring = new Authoring(engine, found); Hooks.Current = authoring;
@@ -157,9 +173,20 @@ namespace RailroaderScenePatcher {
             if (ReferenceEquals(Hooks.Current, authoring)) Hooks.Current = null;
             authoring.Dispose(); authoring = null;
         }
+        void SyncInputRegions() {
+            if (inputBlocker == null) return;
+            var open = presentation != null && presentation.IsOpen;
+            inputBlocker.SetRegions(open, open ? presentation.PanelBounds : Rect.zero, presentation == null ? Rect.zero : presentation.EntryBounds);
+            inputBlocker.WorldPicking = open && selection?.Pending != null;
+        }
         void Update() {
+            if (engine == null) return;
+            try { Attach(); }
+            catch (Exception e) { authoringStatus = "Authoring unavailable: " + e.GetBaseException().Message; }
+            bool open = presentation != null && presentation.IsOpen;
+            SyncInputRegions();
             if (open && selection?.Pending != null && inputBlocker?.WorldClick is Vector2 pointer) {
-                try { selection.Pick(pointer); selectionProblem = null; }
+                try { selection.Pick(pointer, presentation.WorldUiBounds()); selectionProblem = null; }
                 catch (Exception e) {
                     selection.Pending.Offer(Array.Empty<SelectionCandidate>());
                     selectionProblem = "World selection unavailable: " + e.GetBaseException().Message;
@@ -170,202 +197,154 @@ namespace RailroaderScenePatcher {
                 try { if (documentStamp != DocumentStamp(PackDocuments.Discover())) definitionsStale = true; }
                 catch { definitionsStale = true; }
             }
-            if (scene == null) return;
-            try { Attach(); }
-            catch (Exception e) { authoringStatus = "Authoring unavailable: " + e.GetBaseException().Message; }
-            try { scene.PollCompletion(); }
+            try { scene?.PollCompletion(); }
             catch (Exception e) { Report("terrain", "Dependent terrain state remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
+            if (presentation != null) {
+                var snapshot = PresentationSnapshot();
+                if (snapshot != presentationSnapshot) { presentationSnapshot = snapshot; presentation.RequestRefresh(); }
+                presentation.Tick(); SyncInputRegions();
+            }
         }
-        internal void Release() {
-            foreach (var texture in new[] { panelBacking, toggleBacking, toggleHover }) if (texture != null) Destroy(texture);
-            panelBacking = toggleBacking = toggleHover = null; panelStyle = toggleStyle = null;
-            ReleaseParts();
+        string PresentationSnapshot() {
+            var pending = selection?.Pending;
+            string outstanding = "";
+            try {
+                if (authoring != null) {
+                    var session = authoring.Session;
+                    outstanding = String.Join(", ", session.Outstanding(authoring.NativeDirty)) + "|" +
+                        session.LastSave?.Error + "|" + (session.LastSave == null ? "" : String.Join(", ", session.LastSave.Completed)) + "|" +
+                        (session.LastSave == null ? "" : String.Join(", ", session.LastSave.Outstanding)) + "|" +
+                        session.IncompleteOperation + "|" + authoring.Fault;
+                }
+            } catch (Exception e) { outstanding = e.GetBaseException().Message; }
+            return String.Join("|", status, scene?.Status, inventory?.IsStale, definitionsStale, authoringStatus, editResult,
+                documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
+                pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
+                pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
+                selection?.Confirmed?.Identity, outstanding);
         }
-        void ReleaseParts() { Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Cancel(); selection = null; scene?.Dispose(); scene = null; engine = null; inventory = null; selected = null; }
+        internal void Release() { ReleaseParts(); }
+        void ReleaseParts() {
+            if (worldLabelBacking != null) Destroy(worldLabelBacking); worldLabelBacking = null;
+            presentation?.Dispose(); presentation = null; attachedEditor = null;
+            Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Cancel(); selection = null;
+            scene?.Dispose(); scene = null; capabilities = null; engine = null; inventory = null; selected = null;
+        }
         void OnDestroy() { Release(); }
         void OnGUI() {
-            if (!editor || inputBlocker == null || !inputBlocker.Available) return;
-            Styles();
-            var button = ToggleRect();
-            inputBlocker.SetRegions(open, window, button);
-            if (open && selection != null) {
-                try { selection.Draw(selected); }
-                catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
-            }
-            if (GUI.Button(button, open ? "Close Scene patches" : "Scene patches", toggleStyle)) {
-                open = !open;
-                if (open && !panelPlaced) { panelPlaced = true; PlacePanel(button); }
-            }
-            if (open) window = GUI.Window(0x43525350, window, DrawWindow, "Railroader Scene Patcher", panelStyle);
-            // The pointer regions take the bounds that were drawn in this event, also while the panel is dragged.
-            inputBlocker.SetRegions(open, window, button);
-            inputBlocker.WorldPicking = open && selection?.Pending != null;
-        }
-        static Texture2D Solid(Color color) {
-            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
-            texture.SetPixel(0, 0, color); texture.Apply();
-            return texture;
-        }
-        // The default IMGUI skin is translucent over the world. The toggle and panel get an opaque backing and light text.
-        // These colours are provisional for readability; they are not taken from the native editor's assets.
-        void Styles() {
-            if (panelStyle != null && panelBacking != null) return;
-            panelBacking = Solid(new Color(0.11f, 0.12f, 0.14f, 1f));
-            toggleBacking = Solid(new Color(0.16f, 0.32f, 0.52f, 1f));
-            toggleHover = Solid(new Color(0.22f, 0.42f, 0.66f, 1f));
-            panelStyle = new GUIStyle(GUI.skin.window) { border = new RectOffset(0, 0, 0, 0) };
-            foreach (var state in new[] { panelStyle.normal, panelStyle.onNormal, panelStyle.focused, panelStyle.onFocused, panelStyle.hover, panelStyle.onHover, panelStyle.active, panelStyle.onActive }) { state.background = panelBacking; state.textColor = Color.white; }
-            toggleStyle = new GUIStyle(GUI.skin.button) { border = new RectOffset(0, 0, 0, 0) };
-            foreach (var state in new[] { toggleStyle.normal, toggleStyle.onNormal, toggleStyle.focused, toggleStyle.onFocused }) { state.background = toggleBacking; state.textColor = Color.white; }
-            foreach (var state in new[] { toggleStyle.hover, toggleStyle.onHover, toggleStyle.active, toggleStyle.onActive }) { state.background = toggleHover; state.textColor = Color.white; }
-        }
-        // The native Map Editor window in IMGUI screen coordinates (top-left origin), or null when it is not shown.
-        static Rect? NativeEditorWindow() {
+            if (presentation == null || !presentation.IsOpen || selection == null || Event.current.type != EventType.Repaint) return;
             try {
-                var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared");
-                var editorWindow = controller as UnityEngine.Object == null ? null : Native.Read(controller, "_window");
-                var native = editorWindow as UnityEngine.Object == null ? null : Native.Read(editorWindow, "Window") as Component;
-                if (native == null || !native.gameObject.activeInHierarchy || !(native.transform is RectTransform bounds)) return null;
-                // Native windows live on a screen-space overlay canvas: world corners are bottom-left screen pixels.
-                var corners = new Vector3[4]; bounds.GetWorldCorners(corners);
-                var rect = Rect.MinMaxRect(corners[0].x, Screen.height - corners[2].y, corners[2].x, Screen.height - corners[0].y);
-                return rect.width > 0 && rect.height > 0 ? rect : (Rect?)null;
-            } catch { return null; }
-        }
-        // Mod-owned windows stack on the right side of the viewport, leaving the centre to Focus and world objects.
-        // The toggle takes the first slot on the right edge, from the top, that no native chrome occupies:
-        // neither the native Map Editor window nor any native UI graphic that takes pointer input, such as
-        // the status and icon strip. The search repeats twice a second, so the toggle follows moved chrome.
-        Rect ToggleRect() {
-            const float width = 180, height = 30, gap = 8, margin = 20;
-            var size = new Vector2(Screen.width, Screen.height);
-            if (Time.unscaledTime < nextTogglePlacement && size == toggleScreen) return toggle;
-            nextTogglePlacement = Time.unscaledTime + 0.5f; toggleScreen = size;
-            var right = Mathf.Max(0, Screen.width - width - margin);
-            var native = NativeEditorWindow();
-            for (var y = Mathf.Min(margin, Mathf.Max(0, Screen.height - height)); y + height + margin <= Screen.height; y += height + gap) {
-                var candidate = new Rect(right, y, width, height);
-                if (!Occupied(candidate, native, gap)) return toggle = candidate;
-            }
-            // No free slot was found: keep the bottom of the right edge rather than cover the top chrome.
-            return toggle = new Rect(right, Mathf.Max(0, Screen.height - height - margin), width, height);
-        }
-        bool Occupied(Rect candidate, Rect? native, float gap) {
-            if (native is Rect window && new Rect(window.x - gap, window.y - gap, window.width + 2 * gap, window.height + 2 * gap).Overlaps(candidate)) return true;
-            var events = EventSystem.current;
-            if (events == null) return false;
-            for (var column = 0; column <= 4; column++) {
-                for (var row = 0; row <= 2; row++) {
-                    var point = new Vector2(candidate.x + candidate.width * column / 4f, Screen.height - (candidate.y + candidate.height * row / 2f));
-                    chromeHits.Clear();
-                    events.RaycastAll(new PointerEventData(events) { position = point }, chromeHits);
-                    foreach (var hit in chromeHits) {
-                        // Only UI graphics count, not world raycasts. The patcher's own regions and full-screen input surfaces are not chrome.
-                        if (!(hit.module is GraphicRaycaster) || hit.gameObject == null || inputBlocker.Owns(hit.gameObject)) continue;
-                        if (hit.gameObject.transform is RectTransform bounds) {
-                            bounds.GetWorldCorners(chromeCorners);
-                            if (Mathf.Abs(chromeCorners[2].x - chromeCorners[0].x) * Mathf.Abs(chromeCorners[2].y - chromeCorners[0].y) >= 0.5f * Screen.width * Screen.height) continue;
-                        }
-                        return true;
-                    }
+                if (worldLabelBacking == null) {
+                    worldLabelBacking = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+                    worldLabelBacking.SetPixel(0, 0, new Color(.11f, .12f, .14f, 1)); worldLabelBacking.Apply();
                 }
+                selection.Draw(selected, presentation.WorldUiBounds(), worldLabelBacking);
             }
-            return false;
+            catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
-        // The initial panel layout: right-aligned below the toggle, sized to the actual viewport. Dragging is not constrained afterwards.
-        void PlacePanel(Rect button) {
-            const float gap = 8, margin = 20;
-            window.width = Mathf.Min(700, Mathf.Max(360, Screen.width * 0.4f), Mathf.Max(1, Screen.width - 2 * margin));
-            window.x = Mathf.Max(0, Screen.width - window.width - margin);
-            window.y = Mathf.Clamp(button.yMax + gap, 0, Mathf.Max(0, Screen.height - 240 - margin));
-            window.height = Mathf.Min(620, Mathf.Max(1, Screen.height - window.y - margin));
+        void Button(UIPanelBuilder builder, string label, Action action) {
+            var button = builder.AddButtonCompact(label, presentation.Action(action));
+            foreach (var text in button.RectTransform.GetComponentsInChildren<TMP_Text>(true)) text.richText = false;
         }
-        void DrawWindow(int id) {
-            GUILayout.Label(status);
-            DrawSelection();
-            if (scene != null) GUILayout.Label(scene.Status);
-            GUILayout.Label(inventory == null || inventory.IsStale || definitionsStale ? "Inventory is stale or not yet scanned. Refresh before relying on these observations." : "Inventory snapshot. Changes are checked while this panel is open. Refresh after native edits.");
-            GUILayout.Label("Search names, paths, families, binding identifiers, dependencies or problems.");
-            filter = GUILayout.TextField(filter);
-            scroll = GUILayout.BeginScrollView(scroll);
-            if (GUILayout.Button("Refresh inventory and verify stored target identities")) Inspect();
+        void PlainLabel(UIPanelBuilder builder, string value) => builder.AddLabel(value, text => text.richText = false);
+        void DrawWindow(UIPanelBuilder builder) {
+            PlainLabel(builder, status);
+            DrawSelection(builder);
+            if (scene != null) PlainLabel(builder, scene.Status);
+            builder.AddSection("Inventory");
+            PlainLabel(builder, inventory == null || inventory.IsStale || definitionsStale ? "Inventory is stale or not yet scanned. Refresh before relying on these observations." : "Inventory snapshot. Changes are checked while this panel is open. Refresh after native edits.");
+            PlainLabel(builder, "Search names, paths, families, binding identifiers, dependencies or problems.");
+            UIPanel results = null;
+            builder.AddFilterField(filter, value => { filter = value; results?.SetNeedsRebuild(); }, null, true);
+            Button(builder, "Refresh inventory and verify stored target identities", Inspect);
             if (inventory != null) {
-                GUILayout.Label(inventory.Entries.Count + " observed entries. Active and inactive loaded objects are included.");
-                foreach (var entry in inventory.Search(filter)) {
-                    if (GUILayout.Button("Inspect " + entry.Family + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]"))) {
-                        selected = entry; inspected = DescribeInspection(entry); ReadPose();
-                    }
-                }
+                PlainLabel(builder, inventory.Entries.Count + " observed entries. Active and inactive loaded objects are included.");
+                results = builder.AddRebuildableSection(items => {
+                        var indices = inventory.Entries.Select((entry, index) => new { entry, index })
+                            .ToDictionary(pair => pair.entry, pair => pair.index.ToString(CultureInfo.InvariantCulture));
+                        var rows = new List<UIOutlineItem>();
+                        string selectedKey = null;
+                        foreach (var item in inventory.Search(filter)) {
+                            var key = indices[item];
+                            if (ReferenceEquals(selected, item)) selectedKey = key;
+                            var targetIdentity = new JObject {
+                                ["scene"] = item.Identity.Scene, ["path"] = item.Identity.Path,
+                                ["component"] = item.Identity.Component, ["structure"] = item.Identity.Structure
+                            };
+                            var label = "Inspect " + item.Family + ": " + item.Identity.Path + (item.Active ? "" : " [inactive]");
+                            rows.Add(new UIOutlineItem(key, label.Replace("<", "<noparse><</noparse>"), item) {
+                                Tooltip = targetIdentity.ToString().Replace("<", "\\u003c").Replace(">", "\\u003e")
+                            });
+                        }
+                        var byKey = rows.ToDictionary(row => row.Identifier);
+                        var outline = items.AddOutlineView(rows, inventoryOutline, new UIState<string>(selectedKey), key => {
+                            if (!byKey.TryGetValue(key, out var row)) return;
+                            presentation.Action(() => { selected = (SceneObservation)row.Value; inspected = DescribeInspection(selected); ReadPose(); })();
+                        });
+                        var listLayout = outline.GetComponent<LayoutElement>();
+                        listLayout.minHeight = 180; listLayout.preferredHeight = 180; listLayout.flexibleHeight = 0;
+                });
             }
             if (selected != null) {
-                GUILayout.TextArea(inspected);
-                if (GUILayout.Button("Focus inspected object")) Focus(selected);
-                if (GUILayout.Button("Copy inspected identity")) GUIUtility.systemCopyBuffer = Identity(selected);
+                PlainLabel(builder, inspected);
+                Button(builder, "Focus inspected object", () => Focus(selected));
+                Button(builder, "Copy inspected identity", () => GUIUtility.systemCopyBuffer = Identity(selected));
             }
-            GUILayout.Label(documentInspection);
-            foreach (var diagnostic in diagnostics) GUILayout.Label(diagnostic);
-            DrawAuthoring();
-            foreach (var coverage in NativeInventory.Coverage) GUILayout.Label(coverage);
-            GUILayout.Label("Binding validity does not establish correct placement or intended track. Inspect the world before editing.");
-            if (GUILayout.Button("Inventory and dependency guidance")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/inspect-scene-objects.md");
-            if (GUILayout.Button("World selection guidance")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/select-world-targets.md");
-            GUILayout.Label("Track binding edits, the transform gizmo and snapping are not implemented.");
-            if (GUILayout.Button("Fixed-placement guidance")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md");
-            if (GUILayout.Button("Document v1 reference")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-document-v1.md");
-            GUILayout.EndScrollView(); GUI.DragWindow(new Rect(0, 0, 10000, 20));
+            PlainLabel(builder, documentInspection);
+            foreach (var diagnostic in diagnostics) PlainLabel(builder, diagnostic);
+            DrawAuthoring(builder);
+            builder.AddSection("Guidance");
+            foreach (var coverage in NativeInventory.Coverage) PlainLabel(builder, coverage);
+            PlainLabel(builder, "Binding validity does not establish correct placement or intended track. Inspect the world before editing.");
+            Button(builder, "Inventory and dependency guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/inspect-scene-objects.md"));
+            Button(builder, "World selection guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/select-world-targets.md"));
+            PlainLabel(builder, "Track binding edits, the transform gizmo and snapping are not implemented.");
+            Button(builder, "Fixed-placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md"));
+            Button(builder, "Document v1 reference", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-document-v1.md"));
         }
-        void DrawSelection() {
+        void DrawSelection(UIPanelBuilder builder) {
             if (selection == null) return;
+            builder.AddSection("World selection");
             var pending = selection.Pending;
             var confirmed = selection.Confirmed;
             if (pending == null) {
-                if (GUILayout.Button("Select scene object in world")) BeginSelection(SelectionKind.SceneObject, null);
+                Button(builder, "Select scene object in world", () => BeginSelection(SelectionKind.SceneObject, null));
                 if (selected != null) {
-                    GUILayout.BeginHorizontal();
-                    if (GUILayout.Button("Choose replacement object")) BeginSelection(SelectionKind.SceneObject, selected);
-                    if (GUILayout.Button("Choose replacement segment")) BeginSelection(SelectionKind.TrackSegment, selected);
-                    if (GUILayout.Button("Choose replacement node")) BeginSelection(SelectionKind.TrackNode, selected);
-                    GUILayout.EndHorizontal();
+                    Button(builder, "Choose replacement object", () => BeginSelection(SelectionKind.SceneObject, selected));
+                    Button(builder, "Choose replacement segment", () => BeginSelection(SelectionKind.TrackSegment, selected));
+                    Button(builder, "Choose replacement node", () => BeginSelection(SelectionKind.TrackNode, selected));
                 }
             } else {
                 var candidate = selection.Find(pending.Candidate);
-                GUILayout.Label(pending.Purpose + ". Click a marking or track in the world.");
-                if (pending.Source != null) GUILayout.Label("Source: " + pending.Source.Label);
-                if (pending.Problem != null) GUILayout.Label(pending.Problem);
+                PlainLabel(builder, pending.Purpose + ". Click a marking or track in the world.");
+                if (pending.Source != null) PlainLabel(builder, "Source: " + pending.Source.Label);
+                if (pending.Problem != null) PlainLabel(builder, pending.Problem);
                 if (pending.Offers.Count > 1) {
-                    choiceScroll = GUILayout.BeginScrollView(choiceScroll, GUILayout.Height(110));
                     foreach (var offer in pending.Offers) {
                         if (ReferenceEquals(offer, pending.Candidate)) continue;
-                        if (GUILayout.Button("Choose " + offer.Label)) pending.Choose(offer);
+                        var choice = offer;
+                        Button(builder, "Choose " + choice.Label, () => pending.Choose(choice));
                     }
-                    GUILayout.EndScrollView();
                 }
                 if (candidate != null) {
-                    GUILayout.Label("Candidate: " + candidate.Choice.Label);
-                    GUILayout.Label(candidate.Choice.Identity.ToString());
-                    GUILayout.Label(candidate.Details);
-                    GUILayout.BeginHorizontal();
-                    if (GUILayout.Button("Focus candidate")) {
+                    PlainLabel(builder, "Candidate: " + candidate.Choice.Label);
+                    PlainLabel(builder, candidate.Choice.Identity.ToString());
+                    PlainLabel(builder, candidate.Details);
+                    Button(builder, "Focus candidate", () => {
                         try { JumpTo(candidate.Position); }
                         catch (Exception e) { selectionProblem = "Camera focus unavailable: " + e.GetBaseException().Message; }
-                    }
-                    if (candidate.Observation != null && GUILayout.Button("Inspect candidate")) {
-                        selected = candidate.Observation;
-                        inspected = DescribeInspection(selected);
-                        Inspect();
-                        ReadPose();
-                    }
-                    if (GUILayout.Button("Confirm identity")) ConfirmSelection();
-                    GUILayout.EndHorizontal();
+                    });
+                    if (candidate.Observation != null) Button(builder, "Inspect candidate", () => {
+                        selected = candidate.Observation; inspected = DescribeInspection(selected); Inspect(); ReadPose();
+                    });
+                    Button(builder, "Confirm identity", ConfirmSelection);
                 }
-                if (GUILayout.Button("Cancel selection")) { selection.Cancel(); selectionProblem = null; }
+                Button(builder, "Cancel selection", () => { selection.Cancel(); selectionProblem = null; });
             }
-            if (confirmed != null)
-                GUILayout.Label("Confirmed: " + confirmed.Identity + " in " + confirmed.MapIds[0]);
-            if (inputBlocker.WorldInputProblem != null && pending != null) GUILayout.Label(inputBlocker.WorldInputProblem);
-            if (selectionProblem != null) GUILayout.Label(selectionProblem);
+            if (confirmed != null) PlainLabel(builder, "Confirmed: " + confirmed.Identity + " in " + confirmed.MapIds[0]);
+            if (inputBlocker.WorldInputProblem != null && pending != null) PlainLabel(builder, inputBlocker.WorldInputProblem);
+            if (selectionProblem != null) PlainLabel(builder, selectionProblem);
         }
-
         void BeginSelection(SelectionKind kind, SceneObservation origin) {
             try { selection.Begin(kind, origin); selectionProblem = null; }
             catch (Exception e) { selectionProblem = "World selection unavailable: " + e.GetBaseException().Message; }
@@ -387,8 +366,8 @@ namespace RailroaderScenePatcher {
                 selectionProblem = "Identity could not be confirmed: " + e.GetBaseException().Message;
             }
         }
-        // Editing needs a mutation adapter; today that is the board pattern the inventory marks with its structure.
-        bool Editable => selected != null && selected.Identity.Structure == BoardScene.Structure && selected.Handle is GameObject;
+        // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
+        bool Editable => selected != null && (selected.Identity.Structure == BoardScene.Structure || selected.Identity.Structure == BridgeScene.Structure) && selected.Handle is GameObject;
         void ReadPose() {
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
             var angles = new Quaternion((float)selected.Rotation[0], (float)selected.Rotation[1], (float)selected.Rotation[2], (float)selected.Rotation[3]).eulerAngles;
@@ -406,51 +385,64 @@ namespace RailroaderScenePatcher {
             if (outcome.Applied) { Inspect(); ReadPose(); }
             try { context?.Log.Info(editResult + " Outstanding: " + authoring.Outstanding()); } catch { }
         }
-        void DrawAuthoring() {
-            GUILayout.Label(authoringStatus);
+        void DrawAuthoring(UIPanelBuilder builder) {
+            builder.AddSection("Authoring");
+            PlainLabel(builder, authoringStatus);
             if (authoring == null) return;
             var session = authoring.Session;
             try {
                 var outstanding = session.Outstanding(authoring.NativeDirty);
-                GUILayout.Label(outstanding.Count == 0 ? "All required writes are saved." : "Unsaved: " + String.Join(", ", outstanding) + ". Use the editor's Save button.");
-            } catch (Exception e) { GUILayout.Label("Outstanding work unknown: " + e.GetBaseException().Message); }
-            if (session.LastSave != null && session.LastSave.Error != null) GUILayout.Label("Last Save failed: " + session.LastSave.Error + " Completed: " + (session.LastSave.Completed.Count == 0 ? "none" : String.Join(", ", session.LastSave.Completed)) + ". Outstanding: " + String.Join(", ", session.LastSave.Outstanding) + ". Edits remain in memory; correct the cause and Save again.");
-            if (session.IncompleteOperation != null) GUILayout.Label("Incomplete operation: " + session.IncompleteOperation);
-            if (authoring.Fault != null) GUILayout.Label(authoring.Fault);
+                PlainLabel(builder, outstanding.Count == 0 ? "All required writes are saved." : "Unsaved: " + String.Join(", ", outstanding) + ". Use the editor's Save button.");
+            } catch (Exception e) { PlainLabel(builder, "Outstanding work unknown: " + e.GetBaseException().Message); }
+            if (session.LastSave != null && session.LastSave.Error != null) PlainLabel(builder, "Last Save failed: " + session.LastSave.Error + " Completed: " + (session.LastSave.Completed.Count == 0 ? "none" : String.Join(", ", session.LastSave.Completed)) + ". Outstanding: " + String.Join(", ", session.LastSave.Outstanding) + ". Edits remain in memory; correct the cause and Save again.");
+            if (session.IncompleteOperation != null) PlainLabel(builder, "Incomplete operation: " + session.IncompleteOperation);
+            if (authoring.Fault != null) PlainLabel(builder, authoring.Fault);
             if (selection?.Pending != null) {
-                GUILayout.Label("Confirm or cancel the world selection to edit placement or activity.");
+                PlainLabel(builder, "Confirm or cancel the world selection to edit placement or activity.");
                 return;
             }
-            if (!Editable) { GUILayout.Label("Inspect an object with a fixed-placement adapter to edit it. Other observations are inspection only."); return; }
+            if (!Editable) { PlainLabel(builder, "Inspect an object with a fixed-placement adapter to edit it. Other observations are inspection only."); return; }
             var target = (GameObject)selected.Handle;
-            if (target == null) { GUILayout.Label("The inspected object no longer exists. Refresh the inventory."); return; }
-            GUILayout.Label("Selected: " + selected.Identity.Path + (target.activeSelf ? "" : " (disabled)") + ". Position in map coordinates; rotation in degrees. After Undo, Redo or a native edit, refresh the inventory before the next edit.");
-            GUILayout.BeginHorizontal();
+            if (target == null) { PlainLabel(builder, "The inspected object no longer exists. Refresh the inventory."); return; }
+            if (selected.Identity.Structure == BridgeScene.Structure) {
+                PlainLabel(builder, "Bridge placement moves the bridge root with its colliders and culling. Generated track trestles, track geometry and construction scenery stay where they are; this is not a track binding.");
+                Button(builder, "Bridge placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/placing-bridges.md"));
+            }
+            PlainLabel(builder, "Selected: " + selected.Identity.Path + (target.activeSelf ? "" : " (disabled)") + ". Position in map coordinates; rotation in degrees. After Undo, Redo or a native edit, refresh the inventory before the next edit.");
             var labels = new[] { "X", "Y", "Z", "Rot X", "Rot Y", "Rot Z" };
-            for (var i = 0; i < 6; i++) { GUILayout.Label(labels[i], GUILayout.ExpandWidth(false)); pose[i] = GUILayout.TextField(pose[i], GUILayout.MinWidth(70)); }
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
+            for (var row = 0; row < 2; row++) {
+                var first = row * 3;
+                builder.HStack(fields => {
+                    for (var column = 0; column < 3; column++) {
+                        var index = first + column;
+                        fields.VStack(field => {
+                            field.AddLabel(labels[index]);
+                            var input = field.AddInputField(pose[index], value => pose[index] = value);
+                            input.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => pose[index] = value);
+                            var layout = input.gameObject.GetComponent<LayoutElement>() ?? input.gameObject.AddComponent<LayoutElement>();
+                            layout.minWidth = 70; layout.flexibleWidth = 1;
+                        }).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+                    }
+                });
+            }
             var identity = selected.Identity;
-            if (GUILayout.Button("Apply placement")) {
+            Button(builder, "Apply placement", () => {
                 var values = new float[6]; var valid = true;
                 for (var i = 0; i < 6; i++) valid &= Single.TryParse(pose[i], NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]);
                 if (!valid) editResult = "Placement refused: enter six numbers with a decimal point";
                 else {
                     var rotation = Quaternion.Euler(values[3], values[4], values[5]);
                     var placement = new Placement(new double[] { values[0], values[1], values[2] }, new double[] { rotation.x, rotation.y, rotation.z, rotation.w });
-                    Edit("Placement", (session, inspection) => session.Edit(identity, placement, null, inspection));
+                    Edit("Placement", (current, inspection) => current.Edit(identity, placement, null, inspection));
                 }
-            }
-            if (GUILayout.Button("Read inspected values")) ReadPose();
-            if (GUILayout.Button(target.activeSelf ? "Disable object" : "Enable object")) { var enable = !target.activeSelf; Edit("Activity change", (session, inspection) => session.Edit(identity, null, enable, inspection)); }
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Remove modification")) Edit("Removal", (session, inspection) => session.Remove(identity, inspection));
-            if (GUILayout.Button("Recheck after failed edit")) Edit("Recheck", (session, inspection) => session.Recheck(identity, inspection));
-            if (GUILayout.Button("Authoring guidance")) Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/editing-placement-in-the-editor.md");
-            GUILayout.EndHorizontal();
-            GUILayout.Label(editResult);
-            GUILayout.Label("Removal returns the object to its state without this MapMod's modification. Save writes map data, Data/scene-patches.json and the patcher dependency in Info.json, and never reloads. Reloading the editor ends Undo/Redo history.");
+            });
+            Button(builder, "Read inspected values", ReadPose);
+            Button(builder, target.activeSelf ? "Disable object" : "Enable object", () => { var enable = !target.activeSelf; Edit("Activity change", (current, inspection) => current.Edit(identity, null, enable, inspection)); });
+            Button(builder, "Remove modification", () => Edit("Removal", (current, inspection) => current.Remove(identity, inspection)));
+            Button(builder, "Recheck after failed edit", () => Edit("Recheck", (current, inspection) => current.Recheck(identity, inspection)));
+            Button(builder, "Authoring guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/editing-placement-in-the-editor.md"));
+            PlainLabel(builder, editResult);
+            PlainLabel(builder, "Removal returns the object to its state without this MapMod's modification. Save writes map data, Data/scene-patches.json and the patcher dependency in Info.json, and never reloads. Reloading the editor ends Undo/Redo history.");
         }
         void Inspect() {
             try {

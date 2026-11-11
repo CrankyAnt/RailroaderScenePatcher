@@ -20,8 +20,8 @@ namespace RailroaderScenePatcher {
             "Mileposts: marker, origin and display dependencies; model and mileage remain unchanged.",
             "Crossings: controllers, spans, pads, lights, gates and bells; relationships are explicit, never inferred from proximity.",
             "Independent boards: culler/mask patterns; only the Sylva board has the existing fixed-placement adapter.",
-            "Source-inventory retained bridge: Ela renderer-culler root and its Game.Mow.TrackConstructionScenery controller, inspected separately.",
-            "Construction scenery exposes segment and target relationships. Generated track-owned trestles remain owned by native track geometry.",
+            "Bridges: only the retained Ela bridge has the fixed-placement adapter; it moves the bridge root with its colliders and culling.",
+            "Construction scenery exposes segment and target relationships and is inspected separately. Generated track-owned trestles remain owned by native track geometry and are never moved by bridge placement.",
             "Passenger stops and map-object anchors: native operations/map-data editing; historical FUSE warning is outside current scope.",
             "Player-created signs: native sign editing; this does not establish inherited scene-sign editing.",
             "Signals, CTC and interlocking edits are outside the supported operation boundary.",
@@ -62,7 +62,7 @@ namespace RailroaderScenePatcher {
                 return type == "Track.KeyValueLampMaterialController" ? "Crossing light" : type == "Audio.IntegerLoopingPlayer" ? "Crossing bell" : "Crossing gate";
             if (type == BoardScene.CullerType && go.scene.name == BoardScene.BoardSceneName && BoardScene.PathOf(c.transform) == BoardScene.BoardPath) return "Independent board";
             if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Culler/mask scene object";
-            if (type == BoardScene.CullerType && BoardScene.PathOf(c.transform) == "World/Large Scenery/Ela/Ela Bridge") return "Bridge";
+            if (type == BoardScene.CullerType && BridgeWorld.SupportedPaths.Contains(BoardScene.PathOf(c.transform))) return "Bridge";
             if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == "World/Large Scenery/Ela/Ela Bridge Scenery") return "Bridge construction scenery";
             return null;
         }
@@ -170,9 +170,15 @@ namespace RailroaderScenePatcher {
             var board = go.scene.name == BoardScene.BoardSceneName && BoardScene.PathOf(go.transform) == BoardScene.BoardPath && TypeName(c) == BoardScene.CullerType;
             if (board && ((go.transform.parent != null && !go.transform.parent.gameObject.activeInHierarchy) || !(Get(go, BoardScene.CullerType) is Behaviour culler) || !culler.enabled || !(Get(go, BoardScene.MaskType) is Behaviour mask) || !mask.enabled))
                 problems.Add("Fixed placement unavailable: the board's parents, culler and circle mask must be active");
-            return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), board ? BoardScene.Structure : null), family,
+            var bridge = family == "Bridge";
+            if (bridge) Read(() => { var problem = BridgeWorld.PatternProblem(go); if (problem != null) problems.Add("Bridge placement unavailable: " + problem); });
+            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : null;
+            var operations = board ? "Fixed placement and activity require active parents/culler/mask and successful preflight"
+                : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
+                : "Inspection only; no mutation adapter for this pattern";
+            return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 go.activeInHierarchy, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
-                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), problems, board ? "Fixed placement and activity require active parents/culler/mask and successful preflight" : "Inspection only; no mutation adapter for this pattern");
+                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), problems, operations);
         }
         static void Location(object location, string role, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
             var segment = Text(Field(location, "segmentId"));

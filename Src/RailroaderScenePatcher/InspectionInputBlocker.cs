@@ -18,6 +18,7 @@ namespace RailroaderScenePatcher {
         Rect toggle, panel;
         bool panelOpen, captured, worldCaptured, worldHoverShield;
         internal bool WorldPicking { get; set; }
+        internal Action RefreshRegions { get; set; }
         internal Vector2? WorldClick { get; private set; }
         internal string WorldInputProblem { get; private set; }
         internal bool Available => isActiveAndEnabled && canvasRoot != null && canvasRoot.activeInHierarchy && nativeWindow != null && nativeWindow.gameObject.activeInHierarchy && EventSystem.current != null;
@@ -77,9 +78,11 @@ namespace RailroaderScenePatcher {
         internal void SetRegions(bool open, Rect window, Rect button) {
             panelOpen = open; panel = window; toggle = button;
             if (canvasRoot == null) return;
-            Place(toggleRegion, toggle, true);
-            Place(panelRegion, panel, panelOpen);
-            Place(dragRegion, new Rect(0, 0, Screen.width, Screen.height), captured || worldCaptured || worldHoverShield);
+            // Visible native controls now own their own raycasts and pointer capture.
+            // An overlay over them would consume the click before their callbacks receive it.
+            Place(toggleRegion, toggle, false);
+            Place(panelRegion, panel, false);
+            Place(dragRegion, new Rect(0, 0, Screen.width, Screen.height), worldCaptured || worldHoverShield);
         }
         void SetNativeWindow(bool shown, Rect bounds) {
             if (nativeWindow == null || !nativeWindow.gameObject.activeInHierarchy) return;
@@ -104,6 +107,7 @@ namespace RailroaderScenePatcher {
         void Update() {
             WorldClick = null;
             if (canvasRoot == null) return;
+            RefreshRegions?.Invoke();
             var position = Input.mousePosition;
             var point = new Vector2(position.x, Screen.height - position.y);
             bool pressed = false, held = false, released = false;
@@ -147,6 +151,7 @@ namespace RailroaderScenePatcher {
         void OnDisable() { captured = worldCaptured = worldHoverShield = false; WorldClick = null; SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false); }
         void OnEnable() { if (canvasRoot != null) canvasRoot.SetActive(true); }
         internal void Release() {
+            RefreshRegions = null;
             captured = worldCaptured = worldHoverShield = WorldPicking = false;
             WorldClick = null;
             if (nativeWindow != null) {

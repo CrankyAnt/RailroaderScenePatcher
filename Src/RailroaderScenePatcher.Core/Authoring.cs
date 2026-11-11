@@ -181,7 +181,15 @@ namespace RailroaderScenePatcher.Core {
         public string IncompleteOperation { get; private set; }
         public SaveReport LastSave { get; private set; }
         public string DocumentText { get { return document == null ? diskText : document.Serialize(); } }
-        public string MinimumPatcherVersion { get { return document != null && document.Modifications.OfType<JObject>().Any(m => m["active"] != null) ? "0.2.0" : "0.1.0"; } }
+        // The oldest patcher that executes every authored capability of the document.
+        public string MinimumPatcherVersion {
+            get {
+                if (document == null) return "0.1.0";
+                var items = document.Modifications.OfType<JObject>().ToList();
+                if (items.Any(m => (m["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)m["target"]["structure"] == BridgeScene.Structure)) return "0.3.0";
+                return items.Any(m => m["active"] != null) ? "0.2.0" : "0.1.0";
+            }
+        }
 
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active) { return Edit(target, placement, active, null); }
         // An editor edit passes the token of its inspected observation; the edit is refused when that observation no longer holds.

@@ -131,6 +131,7 @@ class Program {
 #endif
         AuthoringTests.Run();
         InspectionTests.Run();
+        BridgeTests.Run();
         SelectionTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }

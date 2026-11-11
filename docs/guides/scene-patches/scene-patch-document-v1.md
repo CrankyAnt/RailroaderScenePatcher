@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Scene-patch document v1
 
-This reference defines the v1 JSON fields accepted by the core engine for fixed placement and activity. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support is limited to the independent Sylva board described in [author fixed scene placement](authoring-fixed-placement.md). The native observations and their limits are described under Current native target below. The runtime capability classification remains `Unchecked`.
+This reference defines the v1 JSON fields accepted by the core engine for fixed placement and activity. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support is limited to the independent Sylva board described in [author fixed scene placement](authoring-fixed-placement.md) and the Ela bridge described in [move or disable a bridge with its collision](placing-bridges.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
 
 ## Document fields
 
@@ -33,13 +33,23 @@ The [editor inventory](inspect-scene-objects.md) supplies observed identifiers a
 
 [World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editor session. Version 1 stores fixed placement and activity. A pending choice or confirmed track or node identity stays in the editor session. Applying an edit and using the editor's Save writes the authored state.
 
-The placement object accepts only `mode`, `position`, and `rotation`. `mode` must be `fixed`. `position` must contain three finite JSON numbers in map coordinates. `rotation` must contain four finite JSON numbers, representing a nonzero quaternion. The board adapter requires a unit quaternion and performs the game map/world coordinate conversion. The adapter defines the meaning of optional `structure`.
+The placement object accepts only `mode`, `position`, and `rotation`. `mode` must be `fixed`. `position` must contain three finite JSON numbers in map coordinates. `rotation` must contain four finite JSON numbers, representing a nonzero quaternion. The board and bridge adapters require a unit quaternion and perform the game map/world coordinate conversion. The adapter defines the meaning of optional `structure`. Placement is separate from logical binding: no v1 field binds an object to a track, and placing an object never changes its track relationships.
 
-## Current native target
+## Current native targets
+
+### Independent board
 
 The native adapter recognizes the independent Sylva board at `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene. Its target `component` is `Helpers.Culling.RendererCuller`; set `structure` to `independent-board-v1` to identify the supported pattern. The board, culler, and `Map.Runtime.MaskComponents.CircleMapMask` must be active. The adapter rejects unexpected `Track.*` descendants and requires the map conversion, culling, mask rebuild, and terrain completion hooks it uses.
 
-After setting the board pose, the adapter requests a culling-position update and rebuilds the circle map mask. It reports dependent terrain work complete only after receiving tile-built notifications for both the old and new positions and observing idle terrain work with no pending invalidations. An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered board, updated culling sphere and registered mask at the desired pose, with settled terrain output. Both sampled tree regions were empty, so the test does not demonstrate removal of an occupied tree. Other object families and board patterns are not implemented.
+After setting the board pose, the adapter requests a culling-position update and rebuilds the circle map mask. It reports dependent terrain work complete only after receiving tile-built notifications for both the old and new positions and observing idle terrain work with no pending invalidations. An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered board, updated culling sphere and registered mask at the desired pose, with settled terrain output. Both sampled tree regions were empty, so the test does not demonstrate removal of an occupied tree. This adapter implements no other board pattern. The bridge below has its own adapter; other object families are not implemented.
+
+### Bridge
+
+The bridge adapter recognizes the Ela bridge root at `World/Large Scenery/Ela/Ela Bridge`, with target `component` `Helpers.Culling.RendererCuller`. Set `structure` to `bridge-colliders-v1`; the editor writes it. Use the `scene` value from the inspected identity. A modification may set `placement`, `active`, or both, as for the board.
+
+The adapter moves and enables or disables the bridge root. Its colliders and renderer cullers move with it; the adapter refreshes the culling position of every active culler in the hierarchy and synchronises the physics scene. The parents of the root and its root culler must be active, the hierarchy must contain at least one collider, no rigidbody and no track-owned component, and no construction-scenery entry may switch the root. Before mutation, the collider identities, shapes, enabled flags and positions relative to the root must equal their first observation in the load.
+
+After a change the adapter verifies the root pose and activity, the collider layout, collider activity under the root, and that the loaded generated trestles within 250 m of the bridge and the construction-scenery controller that references the bridge are unchanged. Separate track-owned scenery is never part of the moved hierarchy. A difference fails the modification and restores the captured bridge state; an unverified restoration blocks further operations on the bridge for the load. See [move or disable a bridge with its collision](placing-bridges.md) for the editor route and limits.
 
 ## Writing by the editor
 
@@ -55,10 +65,11 @@ The supplying MapMod's `Info.json` must list `crankyant/scene-patcher` under `de
 | --- | --- |
 | Fixed placement only | `0.1.0` |
 | Any modification with `active` | `0.2.0` |
+| Any modification whose target `structure` is `bridge-colliders-v1` | `0.3.0` |
 
 Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry.
 
-Duplicate JSON property names are rejected during parsing. Duplicate modification IDs reject the document. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
+Duplicate JSON property names are rejected during parsing. Duplicate modification IDs reject the document. A target whose `structure` names a capability that is incompatible with the running game build fails with that reason; other modifications still apply. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
 
 ## Minimal example
 
