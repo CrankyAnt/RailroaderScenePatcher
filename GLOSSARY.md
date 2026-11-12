@@ -114,6 +114,28 @@ The version that identifies the meaning of patch-document data. It is separate f
 **Checked build**:
 A Railroader build for which the patcher's relevant game functions and prerequisites have been explicitly checked.
 
+**Track group**:
+A named set of track that the map enables or makes available as a whole, for example through map features.
+
+**Group-driven activity**:
+An object's activity as the game sets it from whether its track group is enabled.
+_Avoid_: Group-following object
+
+**Group subscription**:
+An object's dependence on its track group, through which enabling or disabling the group changes the object's activity.
+
+**Explicit disable**:
+A scene patch's authored inactive state for an object, which takes precedence over later track-group activation.
+
+**Circuit**:
+One detection unit of an existing crossing's controller, whose approach and island spans decide when the crossing's equipment activates.
+
+**Crossing coverage**:
+The tracks each circuit of an existing crossing detects, authored per circuit as omitted, explicitly selected tracks or explicitly detached. Proximity never assigns it.
+
+**Owned span**:
+A detection span that a MapMod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; native spans are never removed.
+
 ### Editor terminology
 
 **Outliner**:
