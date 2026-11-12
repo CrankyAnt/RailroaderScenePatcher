@@ -11,12 +11,12 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     // Reads serialized bindings and direct references, never binding/cache getters or TryApply.
-    internal sealed class NativeInventory : IInspectionScene {
+    internal sealed class NativeInventory : ISteppedInspectionScene {
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
         const string ConstructionScenery = "Game.Mow.TrackConstructionScenery";
         internal static readonly string[] Coverage = {
-            "Track markers, yard limits, station signs: typed marker and relative-position inspection; edits require the applicable adapter.",
+            "Generic track markers, such as yard limits and station signs: set, replace or detach the marker's track location with its graph registration, and place or enable the object. Markers whose activity follows a track group, and markers with other location consumers, are inspection only.",
             "Mileposts: marker, origin and display dependencies; model and mileage remain unchanged.",
             "Crossings: controllers, spans, pads, lights, gates and bells; relationships are explicit, never inferred from proximity.",
             "Independent boards: renderer culler with one circle map mask and no track relationship; placement and activity refresh culling, mask registration and generated terrain output.",
@@ -68,30 +68,59 @@ namespace RailroaderScenePatcher {
             if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == "World/Large Scenery/Ela/Ela Bridge Scenery") return "Bridge construction scenery";
             return null;
         }
-        public IEnumerable<SceneObservation> Discover() => Discover(boardRefusal);
-        static IEnumerable<SceneObservation> Discover(Func<GameObject, string> boardRefusal) {
-            var all = Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(Loaded).ToArray();
+        // The discovery in one piece: the stepped walk without its pauses, so both read the scene in the same order.
+        public IEnumerable<SceneObservation> Discover() => DiscoverInSteps().Where(observation => observation != null);
+        public IEnumerable<SceneObservation> DiscoverInSteps() => Steps(boardRefusal);
+        // The order and the pauses are DiscoveryWalk's: after the search for loaded components, after each component's
+        // loaded check, after each owner's fields, after each component's classification and after the graph lookup. Every
+        // observation is one further unit. A caller that pauses reads the scene at different times; a component destroyed
+        // since the search, such as a widget of a rebuilt panel, is skipped instead of failing the walk.
+        static IEnumerable<SceneObservation> Steps(Func<GameObject, string> boardRefusal) {
             var incoming = new Dictionary<UnityEngine.Object, List<string>>(); var scanErrors = 0;
-            foreach (var owner in all) foreach (var field in Fields(owner.GetType())) {
+            // One walk over the fields serves the dependency strings and the marker reference scan. Every field of every
+            // owner is read once; a failed read or enumeration counts as one unreadable field for the dependencies, and
+            // the marker scan applies its own relevance and fail-closed rules to the same reads.
+            ReferenceScan markerReferrers = null;
+            string referrerError = null;
+            var walk = TrackMarkerWorld.ReferrerWalk((owner, field, value, error) => {
+                if (error != null) { scanErrors++; return; }
                 try {
-                    foreach (var target in References(field.GetValue(owner))) {
+                    foreach (var target in References(value)) {
                         if (!incoming.TryGetValue(target, out var refs)) incoming.Add(target, refs = new List<string>());
-                        refs.Add("Referenced by " + Label(owner) + "." + field.Name);
+                        refs.Add("Referenced by " + Label((Component)owner) + "." + field.Name);
                     }
                 } catch { scanErrors++; }
-            }
-            var candidates = all.Select(c => new { Component = c, Family = Family(c) }).Where(c => c.Family != null).ToArray();
+            });
+            HolderIndex setups = null;
             HashSet<string> segmentIds = null;
             string graphError = null;
-            try {
-                var graph = Native.Read(Native.Type("Track.Graph"), "Shared");
-                var lookup = Field(graph, "_segmentsLookup") as IDictionary;
-                if (lookup == null) throw new InvalidOperationException("Track segment lookup unavailable");
-                segmentIds = new HashSet<string>(lookup.Keys.Cast<object>().Select(Text), StringComparer.Ordinal);
-            } catch (Exception e) { graphError = e.GetBaseException().Message; }
-            foreach (var candidate in candidates) yield return Observe(candidate.Component, candidate.Family, incoming, scanErrors, segmentIds, graphError, boardRefusal);
+            var steps = DiscoveryWalk.Steps<MonoBehaviour>(() => Resources.FindObjectsOfTypeAll<MonoBehaviour>(), Loaded,
+                owner => {
+                    try { walk.Add(owner); return true; }
+                    catch (Exception e) {
+                        // The walk stopped early: the dependency strings are incomplete as well.
+                        referrerError = e.GetBaseException().Message; scanErrors++; walk = null;
+                        return false;
+                    }
+                },
+                () => {
+                    if (walk != null) markerReferrers = walk.Finish();
+                    setups = TrackMarkerWorld.SetupHolders();
+                },
+                Family,
+                () => {
+                    try {
+                        var graph = Native.Read(Native.Type("Track.Graph"), "Shared");
+                        var lookup = Field(graph, "_segmentsLookup") as IDictionary;
+                        if (lookup == null) throw new InvalidOperationException("Track segment lookup unavailable");
+                        segmentIds = new HashSet<string>(lookup.Keys.Cast<object>().Select(Text), StringComparer.Ordinal);
+                    } catch (Exception e) { graphError = e.GetBaseException().Message; }
+                },
+                (component, family) => Observe(component, family, incoming, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups));
+            foreach (var step in steps) yield return step;
         }
-        static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal) {
+        static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal,
+            ReferenceScan markerReferrers, string referrerError, HolderIndex setups) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>();
             var components = go.GetComponentsInChildren<Component>(true);
             foreach (var child in components) {
@@ -107,6 +136,7 @@ namespace RailroaderScenePatcher {
             if (marker != null) Read(() => {
                 bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + Text(Field(marker, "type")));
                 Location(Field(marker, "_location"), "Marker", bindings, problems, segmentIds, graphError);
+                Registrations(marker, bindings);
             });
             if (TypeName(c) == Span) Read(() => {
                 bindings.Add("Span id=" + Text(Field(c, "id")));
@@ -176,9 +206,17 @@ namespace RailroaderScenePatcher {
             if (refusal != null) problems.Add("Fixed placement unavailable: " + refusal);
             var bridge = family == "Bridge";
             if (bridge) Read(() => { var problem = BridgeWorld.PatternProblem(go); if (problem != null) problems.Add("Bridge placement unavailable: " + problem); });
-            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : null;
+            var marked = family == "Track marker";
+            string markerRefusal = marked ? "the track-marker capability is unavailable" : null;
+            if (marked) Read(() => markerRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
+                : TrackMarkerWorld.Problem(go, markerReferrers, setups));
+            if (markerRefusal != null) problems.Add("Track binding unavailable: " + markerRefusal);
+            var markerEditable = marked && markerRefusal == null;
+            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : null;
             var operations = board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : "Inspection only until corrected: " + refusal)
                 : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
+                : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
+                : marked ? "Inspection only until corrected: " + markerRefusal
                 : "Inspection only; no mutation adapter for this pattern";
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 go.activeInHierarchy, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
@@ -191,6 +229,20 @@ namespace RailroaderScenePatcher {
             else if (segmentIds == null) problems.Add(role + " binding validity unknown: " + graphError);
             else if (!segmentIds.Contains(segment)) problems.Add(role + " broken binding: missing segment " + segment);
             // Existence is not proof that the binding names the intended track.
+        }
+        // The track graph's named-location entries under the marker's ID: the registration that ID lookups find.
+        static void Registrations(Component marker, List<string> bindings) {
+            var id = Text(Field(marker, "id"));
+            var graph = Native.Read(Native.Type("Track.Graph"), "Shared") ?? throw new InvalidOperationException("Track graph unavailable");
+            var buckets = Field(graph, "_namedLocationsBySegmentId") as IDictionary ?? throw new InvalidOperationException("Named-location registration unavailable");
+            var found = 0;
+            foreach (DictionaryEntry bucket in buckets) {
+                if (!(bucket.Value is IDictionary entries) || !entries.Contains(id)) continue;
+                var named = entries[id]; var at = Field(named, "Location"); var segment = Field(at, "segment");
+                bindings.Add("Graph registration in bucket " + Text(bucket.Key) + ": segment=" + (segment == null ? "none" : Text(Field(segment, "id"))) + "; end=" + Text(Field(at, "end")) + "; distance=" + Text(Field(at, "distance")) + "; owner=" + (ReferenceEquals(Field(named, "ObjectValue"), marker) ? "this marker" : "another object"));
+                found++;
+            }
+            if (found == 0) bindings.Add("Graph registration: none");
         }
         static string Describe(object value) => value is Component c ? Label(c) : value is GameObject go ? go.scene.name + "/" + BoardScene.PathOf(go.transform) : Text(value);
     }

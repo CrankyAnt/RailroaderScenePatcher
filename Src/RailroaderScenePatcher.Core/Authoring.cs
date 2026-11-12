@@ -188,6 +188,8 @@ namespace RailroaderScenePatcher.Core {
                 if (document == null) return minimum;
                 foreach (var item in document.Modifications.OfType<JObject>()) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
+                    // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available in this editor.
+                    if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure)) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available in this editor.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.3.0");
                     TargetIdentity target;
@@ -243,9 +245,32 @@ namespace RailroaderScenePatcher.Core {
                 else if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
                 if (active != null) value["active"] = active.Value;
                 else if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
+                if (existing?["relationships"] != null) value["relationships"] = existing["relationships"].DeepClone();
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
             }, validateBeforeMutation);
+        }
+        // Sets, replaces or detaches this MapMod's track-marker relationship of the object. Placement and activity stay as authored.
+        // A null binding clears the authored relationship: the object returns to its effective underlying relationship.
+        public Outcome Bind(TargetIdentity target, MarkerBinding binding) { return Bind(target, binding, null); }
+        public Outcome Bind(TargetIdentity target, MarkerBinding binding, InspectedTarget inspected) {
+            return Change(binding == null ? "Clear track binding" : "Edit track binding", target, inspected, existing => {
+                if (existing != null) PatchEngine.Parse(existing);
+                if (binding == null) {
+                    if (existing?["relationships"] == null) throw new InvalidOperationException("This object has no authored relationship in the active document");
+                    var rest = (JObject)existing.DeepClone();
+                    rest.Remove("relationships");
+                    return rest["placement"] == null && rest["active"] == null ? null : rest;
+                }
+                var value = new JObject { ["id"] = existing?["id"] ?? NewId(target, "bind-") };
+                value["target"] = existing?["target"] ?? TargetJson(target);
+                if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
+                if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
+                value["relationships"] = new JObject { ["trackMarker"] = binding.IsDetached ? new JObject { ["detach"] = true }
+                    : new JObject { ["segment"] = binding.Location.Segment, ["end"] = binding.Location.End, ["distance"] = binding.Location.Distance } };
+                value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
+                return value;
+            });
         }
         // Removes this MapMod's saved or unsaved modification of the object; the object returns to its effective underlying state.
         public Outcome Remove(TargetIdentity target) { return Remove(target, null); }
@@ -303,6 +328,8 @@ namespace RailroaderScenePatcher.Core {
             var mutating = false;
             try {
                 var desired = engine.Desired(document.Modifications, target);
+                // Only the authored relationship needs a resolvable target; the underlying one may be the broken binding being repaired.
+                if (value != null) engine.CheckRelationships(target, PatchEngine.Parse(value).State);
                 // Reading state and resolving the document may invoke native callbacks. Never redirect to a new match.
                 engine.GuardMutation(identity, target, mapContext, inspected);
                 validateBeforeMutation?.Invoke();
@@ -358,9 +385,9 @@ namespace RailroaderScenePatcher.Core {
             }
             return own;
         }
-        string NewId(TargetIdentity target) {
+        string NewId(TargetIdentity target, string prefix = "place-") {
             var name = new string(target.Path.Substring(target.Path.LastIndexOf('/') + 1).ToLowerInvariant().Select(c => Char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-            var stem = "place-" + (name.Length == 0 ? "object" : name);
+            var stem = prefix + (name.Length == 0 ? "object" : name);
             var used = new HashSet<string>(document.Modifications.OfType<JObject>().Select(m => (string)m["id"]), StringComparer.Ordinal);
             var id = stem;
             for (var n = 2; used.Contains(id); n++) id = stem + "-" + n;
@@ -372,7 +399,7 @@ namespace RailroaderScenePatcher.Core {
             return value;
         }
         static bool Same(ObjectState a, ObjectState b) {
-            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null) return false;
+            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }

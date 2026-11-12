@@ -20,6 +20,8 @@ The object moves at once and the document receives one modification for that obj
 
 Every edit is bound to that observation. The patcher refuses the edit when the object, its placement, activity, bindings or dependencies no longer match what you inspected, or when the inventory is stale. A completed edit refreshes the inventory itself. After Undo, Redo or a native edit, refresh the inventory before the next edit; the refusal names this when you forget.
 
+An edit that is refused or does not run always says why. The reason appears below the controls of its section, **Track binding** or **Placement and activity**, and in the log. This includes a stale inventory, with what made it stale, entered values that cannot be read, and an edit requested while a world selection or a gizmo is pending.
+
 ## Disable or enable the object
 
 Select **Disable object** or **Enable object**. The document stores the choice as `"active": false` or `"active": true` in the same modification as the placement. A disabled board releases its culling and terrain mask through the game's own component lifecycle. A disabled bridge stops colliding. A document with an activity change needs patcher version 0.2.0 or later; a document with a bridge modification needs 0.3.0 or later.

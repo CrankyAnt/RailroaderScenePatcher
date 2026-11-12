@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Scene-patch document v1
 
-This reference defines the v1 JSON fields accepted by the core engine for fixed placement and activity. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), and the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
+This reference defines the v1 JSON fields accepted by the core engine for fixed placement, activity and track-marker relationships. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), and Generic track markers, described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
 
 ## Document fields
 
@@ -23,17 +23,40 @@ The engine applies a document only when its `sourceMap.mapId` matches the select
 | `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. |
 | `placement` | object | Optional. Must contain `mode`, `position`, and `rotation`. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Requires patcher 0.2.0 or later. |
+| `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.4.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same document. |
 
 The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
 
-A modification holds the desired state of one object and must contain `placement`, `active`, or both. An omitted member leaves that part of the object untouched by this MapMod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a document that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
+A modification holds the desired state of one object and must contain `placement`, `active`, `relationships`, or a combination. An omitted member leaves that part of the object untouched by this MapMod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a document that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
 
 The [editor inventory](inspect-scene-objects.md) supplies observed identifiers and placement without changing this format. An inspection-only entry does not enable a new v1 operation. The engine rechecks the resolved object and map context immediately before mutation. A missing, ambiguous or replaced target fails rather than redirecting the operation. Editor integrations can bind a complete-document edit to its inspected observations through an in-memory token; that token is not serialized or distributed.
 
-[World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editor session. Version 1 stores fixed placement and activity. A pending choice or confirmed track or node identity stays in the editor session. Applying an edit and using the editor's Save writes the authored state.
+[World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editor session. Version 1 stores fixed placement, activity and track-marker relationships. A pending choice or confirmed track or node identity stays in the editor session. Applying an edit and using the editor's Save writes the authored state.
 
-The placement object accepts only `mode`, `position`, and `rotation`. `mode` must be `fixed`. `position` must contain three finite JSON numbers in map coordinates. `rotation` must contain four finite JSON numbers, representing a nonzero quaternion. The board and bridge adapters require a unit quaternion and perform the game map/world coordinate conversion. The adapter defines the meaning of optional `structure`. Placement is separate from logical binding: no v1 field binds an object to a track, and placing an object never changes its track relationships.
+The placement object accepts only `mode`, `position`, and `rotation`. `mode` must be `fixed`. `position` must contain three finite JSON numbers in map coordinates. `rotation` must contain four finite JSON numbers, representing a nonzero quaternion. The board and bridge adapters require a unit quaternion and perform the game map/world coordinate conversion. The adapter defines the meaning of optional `structure`. Placement is separate from logical binding: placing an object never changes its track relationships, and a relationship never moves the object.
+
+## Relationships
+
+The `relationships` object accepts only `trackMarker`. Each relationship has three settings:
+
+| Setting | Meaning |
+| --- | --- |
+| Omitted | The relationship stays as it is. This MapMod does not touch it. |
+| A reference | Sets or replaces the relationship. |
+| `{ "detach": true }` | Clears the relationship. |
+
+A `trackMarker` reference is an object with exactly these members:
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `segment` | string | Required and non-empty. The ID of a track segment in the loaded track graph. |
+| `end` | string | Required. `a` or `b`: the segment end the distance is measured from. |
+| `distance` | number | Required. Finite, not negative, and at most the segment's length, in metres. |
+
+A detach object contains only `detach` with the value `true`. `null`, `{}`, `false` and a detach mixed with reference fields are invalid. Unknown relationship kinds and unknown fields inside `trackMarker` make the modification unsupported; the engine preserves and does not execute it. The target must resolve to an object whose adapter supports the relationship. The patcher refuses a relationship on any other object instead of ignoring it.
+
+The engine checks the reference before mutation. A segment that does not exist, a segment ID that matches more than one segment, or a distance outside the segment fails the modification, and the object keeps its relationship and registration. The engine never substitutes another target.
 
 [Explicit snapping](snapping-to-track.md) writes this same fixed placement. The editor computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to authoring preflight and are not serialized. Runtime application and reload use the resulting absolute pose without querying a snap target. This adds no placement mode or dependency minimum; later track movement does not change the saved pose.
 
@@ -49,7 +72,7 @@ After a failed mutation whose restoration verified, later modifications of the s
 
 An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered Sylva board, updated culling sphere and registered mask at the desired pose, with settled terrain output; its sampled tree regions were empty. A separate research trial on the same build moved the Sylva board's mask onto one generated tree, observed the tree leave the generated tile output and return after restoration. Other boards qualify through the component pattern without individual trials.
 
-The bridge below has its own adapter; other object families are not implemented.
+The bridge and track-marker targets below have their own adapters; other object families are not implemented.
 
 ### Bridge
 
@@ -59,11 +82,17 @@ The adapter moves and enables or disables the bridge root. Its colliders and ren
 
 After a change the adapter verifies the root pose and activity, the collider layout, collider activity under the root, and that the loaded generated trestles within 250 m of the bridge and the construction-scenery controller that references the bridge are unchanged. Separate track-owned scenery is never part of the moved hierarchy. A difference fails the modification and restores the captured bridge state; an unverified restoration blocks further operations on the bridge for the load. See [move or disable a bridge with its collision](placing-bridges.md) for the editor route and limits.
 
+### Track marker
+
+The track-marker adapter recognizes an object holding one Generic `Track.TrackMarker`. The target `component` is `Track.TrackMarker`; set `structure` to `track-marker-v1`. The object must not be a milepost, a crossing pad or part of a crossing; no other component may listen to the marker's location changes; a `Track.TrackRelativePosition` on it must not make its activity follow a track group; no loaded component other than that relative position may hold a direct reference to the marker, and a scan that cannot read a field able to hold a marker refuses every marker; and no new-game car placement may use it. A modification may set `relationships.trackMarker`, `placement`, `active`, or any combination.
+
+A `trackMarker` setting writes the marker's serialized location and its named-location registration in the track graph: the adapter removes the registration under the marker ID, writes the location, and registers the marker at the new location when it is enabled and active. A detach leaves no registration. Map labels below the marker are registered with the map again, so their dimming follows the new location's track group. Placement moves the object root and refreshes its renderer cullers; it never changes the binding. Before mutation the adapter requires one registration of this marker at its current location for an enabled, active marker with a resolvable location, and none otherwise. After a change it verifies the location, the pose, the activity, that registration rule and the map labels' track group. A difference fails the modification and restores the captured location, registration, pose and activity; an unverified restoration blocks further operations on the marker for the load. See [repair, replace or detach a track-marker binding](repairing-track-bindings.md) for the editor route and limits.
+
 ## Writing by the editor
 
-The editor writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark. It keeps the member order of the source, writes one modification per edited object, and gives a new modification the `id` `place-<object name>`, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
+The editor writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark. It keeps the member order of the source, writes one modification per edited object, and gives a new modification the `id` `place-<object name>`, or `bind-<object name>` when its first edit is a relationship, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
 
-Unknown fields at the document root and unknown modifications are preserved without being executed. Every number the editor did not replace keeps its source text, so a value such as `0.10` or a number beyond double precision is written back unchanged. The engine rejects unknown fields inside a modification, target, or placement when it tries to execute that modification; the editor preserves such a modification and does not edit or remove it. A document with a missing, malformed, or unsupported format version, a document for another map, and a document whose numbers cannot be matched to their source text are protected: the editor does not write them.
+Unknown fields at the document root and unknown modifications are preserved without being executed. Every number the editor did not replace keeps its source text, so a value such as `0.10` or a number beyond double precision is written back unchanged. The engine rejects unknown fields inside a modification, target, placement or relationship when it tries to execute that modification; the editor preserves such a modification and does not edit or remove it. A document with a missing, malformed, or unsupported format version, a document for another map, and a document whose numbers cannot be matched to their source text are protected: the editor does not write them.
 
 ## Dependency minimum
 
@@ -75,6 +104,7 @@ The supplying MapMod's `Info.json` must list `crankyant/scene-patcher` under `de
 | Any modification with `active` | `0.2.0` |
 | A board target other than `World/Signs/Loc: Sylva Int` in `BushnellWhittier-MapManager` | `0.3.0` |
 | Any modification whose target `structure` is `bridge-colliders-v1` | `0.3.0` |
+| Any modification with `relationships`, or whose target `structure` is `track-marker-v1` | `0.4.0` |
 
 Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry.
 

@@ -139,6 +139,7 @@ class Program {
         SelectionTests.Run();
         BoardTests.Run();
         CompositionTests.Run();
+        BindingTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

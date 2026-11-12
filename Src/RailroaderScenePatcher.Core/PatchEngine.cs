@@ -33,9 +33,12 @@ namespace RailroaderScenePatcher.Core {
     }
     // Desired or observed state of one object. A null member is left untouched by an application.
     public sealed class ObjectState {
-        public ObjectState(Placement placement, bool? active) { Placement = placement; Active = active; }
+        public ObjectState(Placement placement, bool? active) : this(placement, active, null) { }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker) { Placement = placement; Active = active; Marker = marker; }
         public Placement Placement { get; }
         public bool? Active { get; }
+        // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
+        public MarkerBinding Marker { get; }
     }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
@@ -119,7 +122,7 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidOperationException("Operation already failed during this load");
                 }
                 var item = entries[id];
-                if (!Only(item, "id", "target", "placement", "active", "dependsOn")) throw new InvalidOperationException("Unsupported modification content");
+                if (!Only(item, Known)) throw new InvalidOperationException("Unsupported modification content");
                 foreach (var dep in Dependencies(item))
                     if (!entries.ContainsKey(dep) || !Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets).Applied) throw new InvalidOperationException("Dependency failed: " + dep);
                 var parsed = Parse(item);
@@ -137,6 +140,7 @@ namespace RailroaderScenePatcher.Core {
                 if (IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
                 Observe("preflight", documentKey, id, identity.Path);
                 scene.Preflight(resolved);
+                CheckRelationships(resolved, parsed.State);
                 Observe("capture", documentKey, id, identity.Path);
                 Underlying(resolved);
                 var snapshot = scene.Capture(resolved);
@@ -183,6 +187,12 @@ namespace RailroaderScenePatcher.Core {
                 throw new InvalidOperationException("Map context changed before mutation");
             expected?.Validate(scene, identity, resolved);
         }
+        // Refuses a relationship the object does not support and a relationship target that does not resolve uniquely.
+        internal void CheckRelationships(object target, ObjectState state) {
+            if (state?.Marker == null) return;
+            if (!(scene is IRelationshipScene relationships)) throw new InvalidOperationException("This object has no supported track-marker relationship");
+            relationships.CheckRelationships(target, state);
+        }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
         internal bool IsUnsafe(object target) {
             if (unsafeTargets.Contains(target)) return true;
@@ -212,7 +222,7 @@ namespace RailroaderScenePatcher.Core {
             var state = Underlying(target);
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
-                state = new ObjectState(item.State.Placement ?? state.Placement, item.State.Active ?? state.Active);
+                state = new ObjectState(item.State.Placement ?? state.Placement, item.State.Active ?? state.Active, item.State.Marker ?? state.Marker);
             }
             return state;
         }
@@ -248,8 +258,9 @@ namespace RailroaderScenePatcher.Core {
             if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
             return dependencies.Select(x => (string)x).ToArray();
         }
+        internal static readonly string[] Known = { "id", "target", "placement", "active", "relationships", "dependsOn" };
         internal static Modification Parse(JObject item) {
-            if (!Only(item, "id", "target", "placement", "active", "dependsOn")) throw new InvalidOperationException("Unsupported modification content");
+            if (!Only(item, Known)) throw new InvalidOperationException("Unsupported modification content");
             var dependencies = Dependencies(item);
             var identity = ParseTarget(item["target"] as JObject);
             Placement pose = null;
@@ -259,8 +270,27 @@ namespace RailroaderScenePatcher.Core {
                 pose = CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4));
             }
             if (item["active"] != null && item["active"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid activity");
-            if (pose == null && item["active"] == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"]), Dependencies = dependencies };
+            var marker = item["relationships"] == null ? null : ParseRelationships(item["relationships"]);
+            if (pose == null && item["active"] == null && marker == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"], marker), Dependencies = dependencies };
+        }
+        // An explicit relationship setting: a reference sets or replaces it, detach clears it. An omitted relationship stays untouched.
+        static MarkerBinding ParseRelationships(JToken token) {
+            var relationships = token as JObject;
+            if (relationships == null || !Only(relationships, "trackMarker")) throw new InvalidOperationException("Unsupported relationships");
+            var marker = relationships["trackMarker"] as JObject;
+            if (marker == null) throw new InvalidOperationException("Unsupported relationships: trackMarker needs a location or an explicit detach");
+            if (marker["detach"] != null) {
+                if (!Only(marker, "detach") || marker["detach"].Type != JTokenType.Boolean || !(bool)marker["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone");
+                return MarkerBinding.Detached;
+            }
+            if (!Only(marker, "segment", "end", "distance")) throw new InvalidOperationException("Unsupported relationship content");
+            if (!RequiredString(marker, "segment")) throw new InvalidOperationException("Invalid relationship: segment must name a track segment");
+            if (marker["end"]?.Type != JTokenType.String || ((string)marker["end"] != "a" && (string)marker["end"] != "b")) throw new InvalidOperationException("Invalid relationship: end must be \"a\" or \"b\"");
+            if (marker["distance"] == null || (marker["distance"].Type != JTokenType.Integer && marker["distance"].Type != JTokenType.Float)) throw new InvalidOperationException("Invalid relationship: distance must be a number");
+            var distance = (double)marker["distance"];
+            if (Double.IsNaN(distance) || Double.IsInfinity(distance) || distance < 0) throw new InvalidOperationException("Invalid relationship: distance must be finite and not negative");
+            return MarkerBinding.At(new TrackLocation((string)marker["segment"], (string)marker["end"], distance));
         }
         static bool RequiredString(JObject obj, string name) { return obj[name]?.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)obj[name]); }
         static bool Only(JObject obj, params string[] allowed) { return obj.Properties().All(p => allowed.Contains(p.Name, StringComparer.Ordinal)); }

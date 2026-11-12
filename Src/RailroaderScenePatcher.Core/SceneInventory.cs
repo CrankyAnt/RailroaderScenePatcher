@@ -10,6 +10,40 @@ namespace RailroaderScenePatcher.Core {
         IEnumerable<string> MapIds { get; }
         IEnumerable<SceneObservation> Discover();
     }
+    // A scene whose discovery can pause. The walk is the one Discover runs: it yields null wherever it can pause between
+    // bounded units of work, and each observation as it is produced. Paused over several frames it reads the scene at
+    // different times, so its result can show that the scene differs from a snapshot, never what the scene currently is.
+    public interface ISteppedInspectionScene : IInspectionScene {
+        IEnumerable<SceneObservation> DiscoverInSteps();
+    }
+    // The order of one discovery over the components of a scene, for a provider that implements DiscoverInSteps: search,
+    // loaded check per component, field reads per owner, classification per component, then one observation per candidate.
+    // Null is yielded after each of those units. A paused walk meets components that left the scene since the search. It
+    // skips them, as a discovery that starts at that moment would not find them: the observations that depended on them
+    // then differ, and a component no observation depends on changes nothing.
+    public static class DiscoveryWalk {
+        // read returns false when the owner walk stops: no further owner is read. family returns null for no candidate.
+        public static IEnumerable<SceneObservation> Steps<T>(Func<IEnumerable<T>> find, Func<T, bool> loaded, Func<T, bool> read, Action afterReads,
+            Func<T, string> family, Action beforeObservations, Func<T, string, SceneObservation> observe) {
+            var found = find();
+            yield return null;
+            var all = new List<T>();
+            foreach (var component in found) { if (loaded(component)) all.Add(component); yield return null; }
+            foreach (var owner in all) {
+                if (loaded(owner) && !read(owner)) break;
+                yield return null;
+            }
+            afterReads();
+            var candidates = new List<KeyValuePair<T, string>>();
+            foreach (var component in all) {
+                if (loaded(component)) { var name = family(component); if (name != null) candidates.Add(new KeyValuePair<T, string>(component, name)); }
+                yield return null;
+            }
+            beforeObservations();
+            yield return null;
+            foreach (var candidate in candidates) if (loaded(candidate.Key)) yield return observe(candidate.Key, candidate.Value);
+        }
+    }
     // Observations contain copied values. The handle binds an observation to this load's object.
     public sealed class SceneObservation {
         public object Handle { get; }
@@ -41,10 +75,19 @@ namespace RailroaderScenePatcher.Core {
         string[] maps = Array.Empty<string>();
         public IReadOnlyList<SceneObservation> Entries { get; private set; } = Array.Empty<SceneObservation>();
         public bool IsStale { get; private set; } = true;
+        // Why the snapshot is stale: the first difference a check found, or its failure. Null while it is not stale.
+        public string StaleReason { get; private set; } = "not yet scanned";
         public SceneInventory(IInspectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
+        // A stepped comparison of the scene with the snapshot, and how many scanned observations match each entry.
+        IEnumerator<SceneObservation> check;
+        int[] checkMatches;
+        int checkSeen;
+        public bool CheckInProgress => check != null;
         public void Refresh() {
+            // A pass belongs to the snapshot it started against.
+            CancelFreshnessCheck();
             var observations = scene.Discover().ToArray();
-            maps = scene.MapIds.ToArray(); Entries = Array.AsReadOnly(observations); IsStale = false;
+            maps = scene.MapIds.ToArray(); Entries = Array.AsReadOnly(observations); IsStale = false; StaleReason = null;
         }
         public IEnumerable<SceneObservation> Search(string text) => Entries.Where(e => e.SearchText.IndexOf(text ?? "", StringComparison.OrdinalIgnoreCase) >= 0);
         public IReadOnlyList<DefinitionInspection> InspectDocument(string json) {
@@ -74,16 +117,58 @@ namespace RailroaderScenePatcher.Core {
         }
         public InspectedTarget Pin(SceneObservation entry) {
             CheckFreshness();
-            if (IsStale || !Entries.Contains(entry)) throw new InvalidOperationException("Inventory is stale; refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException("Inventory is stale (" + StaleReason + "); refresh and inspect again");
+            if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
             return new InspectedTarget(maps, entry);
         }
         public void CheckFreshness() {
             if (IsStale) return;
             try {
                 var current = scene.Discover().ToArray();
-                IsStale = !maps.SequenceEqual(scene.MapIds) || current.Length != Entries.Count ||
-                    Entries.Any(e => current.Count(e.Matches) != 1);
-            } catch { IsStale = true; }
+                Conclude(current.Length, Entries.Select(e => current.Count(e.Matches)).ToArray());
+            } catch (Exception e) { MarkStale("the scene check failed: " + e.GetBaseException().Message); }
+            if (IsStale) CancelFreshnessCheck();
+        }
+        // Stale when the map context changed, the number of observations differs, or an entry does not match exactly one
+        // current observation.
+        void Conclude(int seen, int[] matches) {
+            if (!maps.SequenceEqual(scene.MapIds)) { MarkStale("the map context changed"); return; }
+            if (seen != Entries.Count) { MarkStale(seen + " observations instead of " + Entries.Count); return; }
+            for (var i = 0; i < matches.Length; i++) if (matches[i] != 1) { MarkStale(Name(Entries[i]) + (matches[i] == 0 ? " changed or is missing" : " is observed " + matches[i] + " times")); return; }
+        }
+        static string Name(SceneObservation entry) => entry.Identity.Scene + "/" + entry.Identity.Path + " [" + entry.Identity.Component + "]";
+        void MarkStale(string reason) { if (!IsStale) StaleReason = reason; IsStale = true; }
+        // Continues the stepped comparison, or starts one: at least one unit of the scan, then further units while more()
+        // holds. A pass marks the snapshot stale on the difference CheckFreshness would find, or on a failure. It replaces
+        // no observation, and a pass that finds no difference concludes nothing: the scene was read at different times.
+        public void AdvanceFreshnessCheck(Func<bool> more) {
+            if (more == null) throw new ArgumentNullException(nameof(more));
+            if (IsStale) { CancelFreshnessCheck(); return; }
+            try {
+                if (check == null) {
+                    if (!maps.SequenceEqual(scene.MapIds)) { MarkStale("the map context changed"); return; }
+                    checkMatches = new int[Entries.Count]; checkSeen = 0;
+                    check = (scene is ISteppedInspectionScene stepped ? stepped.DiscoverInSteps() : scene.Discover()).GetEnumerator();
+                }
+                do {
+                    if (!check.MoveNext()) {
+                        Conclude(checkSeen, checkMatches);
+                        CancelFreshnessCheck();
+                        return;
+                    }
+                    var current = check.Current;
+                    if (current == null) continue;
+                    // More observations than entries, or a second match of one entry, cannot become equal again.
+                    if (++checkSeen > Entries.Count) MarkStale("more than the " + Entries.Count + " observations of the snapshot; first extra " + Name(current));
+                    for (var i = 0; i < Entries.Count; i++) if (Entries[i].Matches(current) && ++checkMatches[i] > 1) MarkStale(Name(Entries[i]) + " is observed " + checkMatches[i] + " times");
+                } while (!IsStale && more());
+            } catch (Exception e) { MarkStale("the scene check failed: " + e.GetBaseException().Message); }
+            if (IsStale) CancelFreshnessCheck();
+        }
+        // Ends an unfinished pass without a conclusion.
+        public void CancelFreshnessCheck() {
+            var ended = check; check = null; checkMatches = null;
+            try { ended?.Dispose(); } catch { }
         }
     }
     public sealed class DefinitionInspection {

@@ -9,7 +9,7 @@ namespace RailroaderScenePatcher.Core {
     // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
     // the capability that resolved it. A capability that is incompatible with the running game build fails
     // only the modifications that name its structure; unrelated supported work stays available.
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene {
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
@@ -60,6 +60,13 @@ namespace RailroaderScenePatcher.Core {
         public ObjectState Read(object target) => Owner(target).Read(target);
         public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
         public bool Restore(object target, object snapshot) => Owner(target).Restore(target, snapshot);
+        // Relationships belong to the adapter that resolved the object; an adapter without them refuses any relationship.
+        public void CheckRelationships(object target, ObjectState state) {
+            var owner = Owner(target);
+            if (state?.Marker == null) return;
+            if (!(owner is IRelationshipScene relationships)) throw new InvalidOperationException("This object has no supported track-marker relationship");
+            relationships.CheckRelationships(target, state);
+        }
         // Dependent output belongs to the adapter that resolved the object; an adapter without it reports none.
         public DependentOutput Output(object target) {
             if (target == null || target is Unavailable || !owners.TryGetValue(target, out var owner) || !(owner is IDependentOutputScene dependent)) return DependentOutput.None;

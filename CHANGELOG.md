@@ -2,6 +2,10 @@
 
 Notable changes to this project are recorded here, newest first.
 
+## 0.4.0
+
+- Set, replace or detach the track location of Generic track markers, such as yard-limit and station signs, in the editor and through `relationships.trackMarker` in `scene-patches.json` (`track-marker-v1`). The marker's track-graph registration follows the binding; the object does not move. Placement and activity of a marker object are separate settings. Mileposts, crossing pads, crossings and markers whose activity follows a track group are inspection only. Documents with a relationship or a track-marker target require patcher 0.4.0.
+
 ## 0.3.0
 
 - Move, rotate, disable and restore the Ela bridge with its colliders and culling, in the editor and through `scene-patches.json` (`bridge-colliders-v1`). Separate track-owned trestles and construction scenery stay unchanged. Documents with a bridge modification require patcher 0.3.0.

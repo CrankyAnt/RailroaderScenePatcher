@@ -23,6 +23,15 @@ namespace RailroaderScenePatcher {
             return changed;
         }
 
+        // The inventory line of the panel. Edits are refused while the inventory is missing or stale, because pinning
+        // refuses then; changed definitions alone refuse no edit.
+        internal static string Notice(SceneInventory inventory, bool definitionsStale) {
+            if (inventory != null && !inventory.IsStale && !definitionsStale) return "Inventory snapshot. Changes are checked while this panel is open. Refresh after native edits.";
+            var refuses = inventory == null || inventory.IsStale;
+            return "Inventory is stale: " + (inventory == null ? "inspection is unavailable" : inventory.IsStale ? inventory.StaleReason : "the supplied definitions changed or were not read") +
+                ". Refresh before relying on these observations." + (refuses ? " Edits are refused until then." : "");
+        }
+
         internal bool CanSelect(SceneInventory inventory, SceneObservation row) =>
             inventory != null && !inventory.IsStale && row != null && inventory.Entries.Contains(row);
 

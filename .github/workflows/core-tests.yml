@@ -4,6 +4,8 @@ on:
     paths:
       - 'Src/RailroaderScenePatcher.Core/**'
       - 'Tests/RailroaderScenePatcher.Core.Tests/**'
+      - 'Src/RailroaderScenePatcher/InventoryPresentationState.cs'
+      - 'Src/RailroaderScenePatcher/EditFeedback.cs'
       - 'Directory.Build.props'
       - '.github/workflows/core-tests.yml'
   push:
@@ -11,6 +13,8 @@ on:
     paths:
       - 'Src/RailroaderScenePatcher.Core/**'
       - 'Tests/RailroaderScenePatcher.Core.Tests/**'
+      - 'Src/RailroaderScenePatcher/InventoryPresentationState.cs'
+      - 'Src/RailroaderScenePatcher/EditFeedback.cs'
       - 'Directory.Build.props'
       - '.github/workflows/core-tests.yml'
   workflow_dispatch:

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move and rotate with a transform gizmo
 
-Use the map editor's **Scene patches** panel to place an existing object supported by the fixed-placement adapters. Independent boards and supported bridges use their own dependency checks. Other inventory entries remain inspection only.
+Use the map editor's **Scene patches** panel to place an existing object supported by the fixed-placement adapters. Independent boards, supported bridges and supported Generic track markers use their own dependency checks. Other inventory entries remain inspection only.
 
 1. Refresh the inventory and inspect the object, or confirm it through world selection. Use **Focus inspected object** to bring it into view.
 2. Select **Move with gizmo** or **Rotate with gizmo** in Authoring. The native gizmo uses world axes. Drag an axis, plane or rotation ring in the world. The object previews the result through its placement adapter.
@@ -12,7 +12,7 @@ Use the map editor's **Scene patches** panel to place an existing object support
 
 The document stores `placement.mode` as `fixed`, with a map-coordinate position and quaternion rotation. The display converts that position through the current local origin. An origin shift moves the gizmo's local frame without changing the authored map coordinates. A cumulative drag delta is relative to the gesture's starting map pose; it does not accumulate from earlier preview frames. See the [v1 document reference](scene-patch-document-v1.md).
 
-Physical placement does not create, repair or detach a logical binding. Bridge placement includes its collider and culling effects while separate track-owned scenery stays in place. Board previews refresh culling and mask registration; [terrain output](moving-boards.md) can remain outstanding after the gesture.
+Physical placement does not create, repair or detach a logical binding. On a track marker, a gesture moves the object and leaves its track location and graph registration unchanged; a binding authored in the same modification stays in it. Change the binding as described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md). Bridge placement includes its collider and culling effects while separate track-owned scenery stays in place. Board previews refresh culling and mask registration; [terrain output](moving-boards.md) can remain outstanding after the gesture.
 
 ## Cancel a pending gesture
 
