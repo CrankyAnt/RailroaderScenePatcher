@@ -19,3 +19,5 @@ Use **Confirm identity** after checking the candidate. The panel records the con
 Use **Cancel selection** to close a pending choice. A pending choice does not change the scene, patch document, or completed edit history. Confirmation records a choice for an editor operation. The [v1 document reference](scene-patch-document-v1.md) describes the supported patch fields and application behavior.
 
 Confirm or cancel the choice before applying placement or activity changes in **Scene patches**. Completed edits still use the map editor's **Undo**, **Redo**, and **Save** controls. See [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md).
+
+For a one-time physical placement, use **Choose snap track** or **Choose snap endpoint** in Authoring. Confirmation prepares the result; **Apply physical snap** makes the edit. See [snap an object's position to a track](snapping-to-track.md). The replacement choices above confirm identities without changing logical binding.

@@ -35,6 +35,8 @@ The [editor inventory](inspect-scene-objects.md) supplies observed identifiers a
 
 The placement object accepts only `mode`, `position`, and `rotation`. `mode` must be `fixed`. `position` must contain three finite JSON numbers in map coordinates. `rotation` must contain four finite JSON numbers, representing a nonzero quaternion. The board and bridge adapters require a unit quaternion and perform the game map/world coordinate conversion. The adapter defines the meaning of optional `structure`. Placement is separate from logical binding: no v1 field binds an object to a track, and placing an object never changes its track relationships.
 
+[Explicit snapping](snapping-to-track.md) writes this same fixed placement. The editor computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to authoring preflight and are not serialized. Runtime application and reload use the resulting absolute pose without querying a snap target. This adds no placement mode or dependency minimum; later track movement does not change the saved pose.
+
 ## Current native targets
 
 ### Independent board

@@ -20,6 +20,8 @@ Use **Cancel gizmo** or Escape to restore the captured state without adding a pa
 
 While the gizmo owns input, native map picking and editing shortcuts pause. The camera remains separate from that input route. Complete or cancel the gesture to resume native editing. A native pointer operation or field edit must finish before the patcher can start a gizmo.
 
+Starting a gizmo also discards any prepared [physical snap](snapping-to-track.md). Choosing a snap track or endpoint starts world selection and cancels the active gizmo before that selection begins. The snap controls return after the gizmo ends; a completed snap and a completed gesture remain separate operations in the shared native history.
+
 A changed, missing or ambiguous target refuses the edit. If another operation changes the object during a preview, cleanup does not overwrite that independent change. An unverified restoration guards further edits to that object. Refresh and inspect it, then use **Recheck after failed edit**, or reload the editor if its dependent state cannot be verified.
 
 Save does not reload the world. A later load applies the saved fixed desired state. Reloading the editor ends its native history. Current automated checks cover controlled placement, origin, persistence, history and failure scenarios. They do not establish native gizmo rendering, input coexistence or a Railroader Save/reload journey on a particular game build.

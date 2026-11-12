@@ -228,6 +228,11 @@ namespace RailroaderScenePatcher.Core {
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active) { return Edit(target, placement, active, null); }
         // An editor edit passes the token of its inspected observation; the edit is refused when that observation no longer holds.
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active, InspectedTarget inspected) {
+            return Edit(target, placement, active, inspected, null);
+        }
+        // A one-time placement operation may depend on an editor-only selection. Recheck it
+        // after document/state callbacks, inside the same restoration boundary as the edit.
+        public Outcome Edit(TargetIdentity target, Placement placement, bool? active, InspectedTarget inspected, Action validateBeforeMutation) {
             return Change("Edit scene object", target, inspected, existing => {
                 if (placement == null && active == null) throw new InvalidOperationException("Nothing to change");
                 if (placement != null) PatchEngine.CheckPlacement(placement.Position, placement.Rotation);
@@ -240,7 +245,7 @@ namespace RailroaderScenePatcher.Core {
                 else if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
-            });
+            }, validateBeforeMutation);
         }
         // Removes this MapMod's saved or unsaved modification of the object; the object returns to its effective underlying state.
         public Outcome Remove(TargetIdentity target) { return Remove(target, null); }
@@ -251,7 +256,7 @@ namespace RailroaderScenePatcher.Core {
                 return null;
             });
         }
-        Outcome Change(string name, TargetIdentity target, InspectedTarget inspected, Func<JObject, JObject> next) {
+        Outcome Change(string name, TargetIdentity target, InspectedTarget inspected, Func<JObject, JObject> next, Action validateBeforeMutation = null) {
             var outcome = new Outcome();
             try {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
@@ -268,7 +273,7 @@ namespace RailroaderScenePatcher.Core {
                 catch (InvalidOperationException e) when (existing != null && e.Message.StartsWith("Unsupported", StringComparison.Ordinal)) {
                     throw new InvalidOperationException("The existing modification holds content this patcher version does not understand; it is preserved and cannot be edited or removed here");
                 }
-                var index = Commit(target, resolved, inspected, existing, value, document.Modifications.Count);
+                var index = Commit(target, resolved, inspected, existing, value, document.Modifications.Count, validateBeforeMutation);
                 var slot = (string)(value ?? existing)["id"];
                 history.Register(() => Replay(name, slot, target, existing, index), name);
                 outcome.Applied = true;
@@ -290,7 +295,7 @@ namespace RailroaderScenePatcher.Core {
             }
             history.Register(() => Replay(name, slot, target, current, position), name);
         }
-        int Commit(TargetIdentity identity, object target, InspectedTarget inspected, JObject current, JObject value, int index) {
+        int Commit(TargetIdentity identity, object target, InspectedTarget inspected, JObject current, JObject value, int index, Action validateBeforeMutation = null) {
             var mapContext = scene.MapIds.ToArray();
             var prior = scene.Read(target);
             engine.Underlying(target);
@@ -300,6 +305,10 @@ namespace RailroaderScenePatcher.Core {
                 var desired = engine.Desired(document.Modifications, target);
                 // Reading state and resolving the document may invoke native callbacks. Never redirect to a new match.
                 engine.GuardMutation(identity, target, mapContext, inspected);
+                validateBeforeMutation?.Invoke();
+                // A prerequisite query can itself call native code. Keep its final check
+                // from redirecting a mutation to an object replaced during that query.
+                if (validateBeforeMutation != null) engine.GuardMutation(identity, target, mapContext, inspected);
                 mutating = true;
                 scene.Apply(target, desired);
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");

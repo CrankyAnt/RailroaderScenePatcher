@@ -132,6 +132,7 @@ class Program {
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
         AuthoringTests.Run();
+        SnapTests.Run();
         GizmoTests.Run();
         InspectionTests.Run();
         BridgeTests.Run();

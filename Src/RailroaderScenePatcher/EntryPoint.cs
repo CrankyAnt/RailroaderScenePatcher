@@ -40,6 +40,9 @@ namespace RailroaderScenePatcher {
         SceneInventory inventory;
         InspectionInputBlocker inputBlocker;
         SpatialSelection selection;
+        SnapController snap;
+        SnapRequest preparedSnap;
+        bool choosingSnap;
         GizmoController gizmo;
         SceneObservation selected;
         string selectionProblem;
@@ -160,16 +163,17 @@ namespace RailroaderScenePatcher {
             var found = controller as UnityEngine.Object == null ? null : Native.Read(controller, "MapEditor");
             if (ReferenceEquals(found, attachedEditor)) return;
             presentation?.Dispose(); presentation = null;
-            selection?.Cancel(); selectionProblem = null;
+            selection?.Cancel(); selectionProblem = null; ClearSnap();
             Detach(); attachedEditor = found; refusedEditor = null; presentationSnapshot = null;
             if (found == null) return;
             if (inputBlocker != null && inputBlocker.Available) {
-                try { presentation = new NativeEditorPresentation(DrawWindow, () => { CancelGizmo(); selection?.Cancel(); selectionProblem = null; }); }
+                try { presentation = new NativeEditorPresentation(DrawWindow, () => { CancelGizmo(); selection?.Cancel(); selectionProblem = null; ClearSnap(); }); }
                 catch (Exception e) { Report("inspection-presentation", "Inspection UI unavailable: " + e.GetBaseException().Message); }
             }
             if (Hooks.Error != null) { refusedEditor = found; authoringStatus = Hooks.Error; return; }
             try {
                 authoring = new Authoring(engine, found); Hooks.Current = authoring;
+                snap = new SnapController(authoring.Session, capabilities, new NativeSnapScene(native));
                 authoring.Log = message => context?.Log.Info(message);
                 authoringStatus = authoring.Session.Blocked ?? "Authoring ready for " + authoring.PatchPath;
                 // The editor built its title before this session could account for the document.
@@ -177,6 +181,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { refusedEditor = found; authoringStatus = "Authoring unavailable: " + e.GetBaseException().Message; }
         }
         void Detach() {
+            ClearSnap(); snap = null;
             CancelGizmo();
             if (authoring == null) return;
             if (ReferenceEquals(Hooks.Current, authoring)) Hooks.Current = null;
@@ -235,7 +240,7 @@ namespace RailroaderScenePatcher {
                 documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, gizmo?.State, outstanding, TerrainSnapshot());
+                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot());
         }
         string TerrainSnapshot() {
             if (authoring == null || selected == null || !Editable) return "";
@@ -303,7 +308,7 @@ namespace RailroaderScenePatcher {
                             presentation.Action(() => {
                                 var observation = (SceneObservation)row.Value;
                                 if (!inventoryPresentation.CanSelect(inventory, observation)) return;
-                                CancelGizmo(); selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
+                                CancelGizmo(); ClearSnap(); selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
                             })();
                         });
                         var listLayout = outline.GetComponent<LayoutElement>();
@@ -323,7 +328,7 @@ namespace RailroaderScenePatcher {
             PlainLabel(builder, "Binding validity does not establish correct placement or intended track. Inspect the world before editing.");
             Button(builder, "Inventory and dependency guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/inspect-scene-objects.md"));
             Button(builder, "World selection guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/select-world-targets.md"));
-            PlainLabel(builder, "Track binding edits and snapping are not implemented.");
+            PlainLabel(builder, "Track binding edits are not implemented.");
             Button(builder, "Transform gizmo guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/using-transform-gizmos.md"));
             Button(builder, "Fixed-placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md"));
             Button(builder, "Board and terrain guidance", () => Application.OpenURL(BoardGuide));
@@ -344,7 +349,7 @@ namespace RailroaderScenePatcher {
                 }
             } else {
                 var candidate = selection.Find(pending.Candidate);
-                PlainLabel(builder, pending.Purpose + ". Click a marking or track in the world.");
+                PlainLabel(builder, (choosingSnap ? "Select physical snap target" : pending.Purpose) + ". Click a marking or track in the world.");
                 if (pending.Source != null) PlainLabel(builder, "Source: " + pending.Source.Label);
                 if (pending.Problem != null) PlainLabel(builder, pending.Problem);
                 if (pending.Offers.Count > 1) {
@@ -367,7 +372,7 @@ namespace RailroaderScenePatcher {
                     });
                     Button(builder, "Confirm identity", ConfirmSelection);
                 }
-                Button(builder, "Cancel selection", () => { selection.Cancel(); selectionProblem = null; });
+                Button(builder, "Cancel selection", () => { selection.Cancel(); selectionProblem = null; ClearSnap(); });
             }
             if (confirmed != null) PlainLabel(builder, "Confirmed: " + confirmed.Identity + " in " + confirmed.MapIds[0]);
             if (inputBlocker.WorldInputProblem != null && pending != null) PlainLabel(builder, inputBlocker.WorldInputProblem);
@@ -375,6 +380,7 @@ namespace RailroaderScenePatcher {
         }
         void BeginSelection(SelectionKind kind, SceneObservation origin) {
             CancelGizmo();
+            ClearSnap();
             try { selection.Begin(kind, origin); selectionProblem = null; }
             catch (Exception e) { selectionProblem = "World selection unavailable: " + e.GetBaseException().Message; }
         }
@@ -384,6 +390,10 @@ namespace RailroaderScenePatcher {
                 var candidate = selection.Confirm();
                 if (candidate == null) return;
                 selectionProblem = null;
+                if (choosingSnap) {
+                    preparedSnap = snap.Prepare(selected.Identity, inventory.Pin(selected), selection.Confirmed, candidate.Choice);
+                    choosingSnap = false;
+                }
                 if (candidate.Observation != null) {
                     selected = candidate.Observation;
                     inspected = DescribeInspection(selected);
@@ -397,6 +407,27 @@ namespace RailroaderScenePatcher {
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
         bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure) && selected.Handle is GameObject;
+        void ClearSnap() { preparedSnap = null; choosingSnap = false; }
+        void BeginSnap(SelectionKind kind) {
+            BeginSelection(kind, selected);
+            choosingSnap = selection?.Pending != null;
+        }
+        void DrawSnap(UIPanelBuilder builder) {
+            if (snap == null) return;
+            PlainLabel(builder, "Snap changes position once and keeps rotation and logical binding. Select a track or endpoint, verify its ID, then apply. Save records fixed map coordinates.");
+            Button(builder, "Choose snap track", () => BeginSnap(SelectionKind.TrackSegment));
+            Button(builder, "Choose snap endpoint", () => BeginSnap(SelectionKind.TrackNode));
+            if (preparedSnap != null) {
+                PlainLabel(builder, "Physical snap target: " + preparedSnap.Identity + ". Resulting map position: " +
+                    String.Join(", ", preparedSnap.Placement.Position.Select(v => v.ToString("R", CultureInfo.InvariantCulture))));
+                Button(builder, "Apply physical snap", () => {
+                    var request = preparedSnap;
+                    Edit("Physical snap", (session, inspection) => snap.Apply(request));
+                });
+                Button(builder, "Cancel prepared snap", ClearSnap);
+            }
+            Button(builder, "Snapping guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/snapping-to-track.md"));
+        }
         void ReadPose() {
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
             var angles = new Quaternion((float)selected.Rotation[0], (float)selected.Rotation[1], (float)selected.Rotation[2], (float)selected.Rotation[3]).eulerAngles;
@@ -406,6 +437,7 @@ namespace RailroaderScenePatcher {
         // Every edit is bound to the inspected observation. A stale inventory refuses the edit instead of redirecting it.
         void Edit(string action, Func<AuthoringSession, InspectedTarget, Outcome> change) {
             if (selection?.Pending != null || gizmo?.Active == true) return;
+            ClearSnap();
             Outcome outcome;
             try { outcome = change(authoring.Session, inventory.Pin(selected)); }
             catch (Exception e) { editResult = action + " refused: " + e.GetBaseException().Message; return; }
@@ -438,6 +470,7 @@ namespace RailroaderScenePatcher {
             }
             var target = (GameObject)selected.Handle;
             if (target == null) { PlainLabel(builder, "The inspected object no longer exists. Refresh the inventory."); return; }
+            DrawSnap(builder);
             if (selected.Identity.Structure == BridgeScene.Structure) {
                 PlainLabel(builder, "Bridge placement moves the bridge root with its colliders and culling. Generated track trestles, track geometry and construction scenery stay where they are; this is not a track binding.");
                 Button(builder, "Bridge placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/placing-bridges.md"));
@@ -507,6 +540,7 @@ namespace RailroaderScenePatcher {
         }
         void BeginGizmo(UI.Gizmos.TransformGizmoMode mode) {
             CancelGizmo();
+            ClearSnap();
             try {
                 if (!Editable || selection?.Pending != null || authoring == null) throw new InvalidOperationException("Inspect a supported target and finish world selection first");
                 var inspection = inventory.Pin(selected);
@@ -522,6 +556,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { gizmo = null; editResult = "Gizmo unavailable: " + e.GetBaseException().Message; }
         }
         void Inspect() {
+            ClearSnap();
             try {
                 if (inventory == null) throw new InvalidOperationException("Map-editor inspection is unavailable");
                 inventory.Refresh();
