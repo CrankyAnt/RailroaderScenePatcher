@@ -113,3 +113,30 @@ The version that identifies the meaning of patch-document data. It is separate f
 
 **Checked build**:
 A Railroader build for which the patcher's relevant game functions and prerequisites have been explicitly checked.
+
+### Editor terminology
+
+**Outliner**:
+The searchable list of inventory scene objects beside the inspector in the production editor.
+_Avoid_: Object list, tree
+
+**Problems filter**:
+The outliner filter that limits the list to scene objects with a detected problem.
+
+**Inspector**:
+The editor region that shows the inspected scene object's values, dependencies and actions.
+_Avoid_: Properties panel
+
+**Object heading**:
+The inspector's title for the inspected scene object.
+
+**Command band**:
+The row of object-level commands and status in the inspector, below the object heading.
+_Avoid_: Toolbar
+
+**Guided mode**:
+An inspector mode that completes one supported operation for a pinned target through the Target, Values, Review and Apply steps.
+_Avoid_: Wizard
+
+**Guided task**:
+One supported operation carried out in Guided mode, with its own pinned target and draft.
