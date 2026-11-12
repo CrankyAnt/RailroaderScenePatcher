@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+<!--
+  PROTOTYPE - throwaway UI concept exploration for the Scene patches editor interface.
+  Three structurally different concepts on one route, switchable via ?variant=A|B|C
+  (no parameter shows the comparison overview). All data is mocked and held in memory.
+  Nothing here reads or changes a game, a save, a file or a mod. See ConceptNotes.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scene patches UI concepts (prototype)</title>
+<style>
+:root{
+  --bg:#1d1915; --bg2:#262019; --bg3:#14110e; --frame:#5c4b37; --rule:#4e493e;
+  --tx:#beb5a3; --tx2:#8f8776; --hi:#e6dfcf; --sel:#d8d0bf; --selTx:#1d1915;
+  --ok:#86cf6e; --warn:#e0a84a; --bad:#e2735c; --info:#7fb6c9; --concept:#b99ad6;
+  --ui:"Montserrat","Segoe UI Variable Text","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --serif:"Libre Baskerville","Baskerville Old Face","Book Antiqua",Georgia,serif;
+  --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0d0b09;color:var(--tx);font:500 16px/1.3 var(--ui)}
+button,input{font:inherit;color:inherit}
+#root{position:absolute;inset:0;overflow:auto}
+#root.fit{overflow:hidden}
+#wrap{position:relative;margin:0 auto}
+#stage{position:absolute;left:0;top:0;width:2560px;height:1440px;transform-origin:0 0;overflow:hidden;background:#333}
+.world{position:absolute;inset:0;width:2560px;height:1440px}
+.world [data-a]{cursor:pointer}
+.vig{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 220px rgba(120,40,20,.35)}
+
+/* ---- native-style primitives (shared vocabulary, not shared layout) ---- */
+.win{position:absolute;background:var(--bg);border:2px solid var(--frame);border-radius:7px;box-shadow:0 6px 30px rgba(0,0,0,.55);display:flex;flex-direction:column;min-width:300px;min-height:120px;overflow:hidden}
+.win.rs{resize:both}
+.tb{flex:none;height:26px;line-height:24px;text-align:center;font-size:14px;color:var(--tx2);background:linear-gradient(#2c251d,#221c16);border-bottom:1px solid var(--rule);cursor:move;position:relative;user-select:none}
+.tb .x{position:absolute;right:8px;top:0;cursor:pointer;font-size:17px}
+.b{height:26px;padding:0 10px;border:1.5px solid #8a8170;border-radius:8px;background:#2a241d;color:var(--tx);cursor:pointer;white-space:nowrap;line-height:22px}
+.b:hover{background:#3a3228;color:var(--hi)}
+.b.pri{background:#cfc6b3;color:#1d1915;border-color:#e6dfcf;font-weight:600}
+.b.pri:hover{background:#e6dfcf}
+.b.on{background:var(--sel);color:var(--selTx)}
+.b.dis{opacity:.42;cursor:not-allowed}
+.b.dis:hover{background:#2a241d;color:var(--tx)}
+.b.sm{height:22px;line-height:18px;font-size:14px;padding:0 8px}
+.seg{display:inline-flex}
+.seg .b{border-radius:0;margin-left:-1.5px}
+.seg .b:first-child{border-radius:8px 0 0 8px;margin-left:0}
+.seg .b:last-child{border-radius:0 8px 8px 0}
+.cap{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--tx2);font-weight:600;margin:10px 0 3px}
+.cap i{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
+.ttl{font:700 21px/1.2 var(--serif);color:var(--hi)}
+.sub{font-size:13px;color:var(--tx2);font-weight:400}
+.in{height:26px;background:var(--bg3);border:1px solid #6d6556;border-radius:3px;padding:0 6px;width:100%;font-size:15px;color:var(--hi);font-variant-numeric:tabular-nums}
+.in:focus{outline:1px solid var(--sel)}
+.xyz{display:grid;grid-template-columns:14px 1fr 14px 1fr 14px 1fr;gap:4px;align-items:center;font-size:12px;color:var(--tx2)}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.kv{display:grid;grid-template-columns:132px 1fr;gap:2px 10px;font-size:14.5px}
+.kv dt{color:var(--tx2);font-weight:400}
+.kv dd{margin:0;color:var(--hi);overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:11px;font-size:12.5px;font-weight:600;border:1px solid var(--rule);color:var(--tx2);white-space:nowrap}
+.chip.ok{color:var(--ok);border-color:#44613a}
+.chip.warn{color:var(--warn);border-color:#7a5c26}
+.chip.bad{color:var(--bad);border-color:#7c3a2d}
+.chip.info{color:var(--info);border-color:#3b5a66}
+.chip.cpt{color:var(--concept);border-color:#5d4a70}
+.chip[data-a]{cursor:pointer}
+.i{display:inline-block;width:16px;height:16px;line-height:14px;text-align:center;border:1px solid var(--tx2);border-radius:50%;font-size:11px;color:var(--tx2);cursor:help;font-weight:600;text-transform:none;letter-spacing:0}
+.msg{border-left:3px solid var(--info);background:#211d18;padding:6px 26px 6px 9px;font-size:14px;position:relative;line-height:1.35}
+.msg b{font-weight:700;margin-right:4px}
+.msg.ok{border-color:var(--ok)} .msg.ok b{color:var(--ok)}
+.msg.refused{border-color:var(--warn)} .msg.refused b{color:var(--warn)}
+.msg.failed{border-color:var(--bad)} .msg.failed b{color:var(--bad)}
+.msg .b{margin:4px 4px 0 0}
+.msg .mx{position:absolute;right:4px;top:2px;background:none;border:0;cursor:pointer;color:var(--tx2);font-size:16px}
+.concept{border:1px dashed #5d4a70;color:var(--concept);font-size:12.5px;padding:5px 8px;border-radius:4px;margin:6px 0;line-height:1.35}
+.concept.rep{border-color:#7a5c26;color:var(--warn)}
+.pend{background:#2d2a1c;border:1px solid #7a6a2c;border-radius:5px;padding:7px 9px;font-size:14px}
+.pend b{color:#f0d27a}
+.hr{height:1px;background:var(--rule);margin:8px 0}
+.list{overflow:auto}
+.it{padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;font-size:15px}
+.it:hover{background:#2f2921}
+.it.sel{background:var(--sel);color:var(--selTx)}
+.it .nm{overflow:hidden;text-overflow:ellipsis;flex:1}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.grpH{padding:5px 8px 2px;font-size:14px;color:var(--tx2)}
+.scroll{overflow:auto;min-height:0}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#6a6253;border-radius:5px}::-webkit-scrollbar-track{background:#191511}
+.json{font:13px/1.35 var(--mono);white-space:pre;color:#a9a08e;background:var(--bg3);padding:8px;border-radius:3px;overflow:auto}
+.ck{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+.ck s{width:16px;height:16px;border:1.5px solid #8a8170;border-radius:3px;display:inline-block;text-decoration:none;text-align:center;line-height:13px;font-size:13px;background:var(--bg3)}
+
+/* ---- native Map Editor stand-in and HUD (surrounding product, same in all variants) ---- */
+.hud{position:absolute;right:10px;top:6px;height:40px;padding:0 16px;border-radius:0 0 0 12px;background:#2a211a;border:2px solid var(--frame);display:flex;gap:18px;align-items:center;color:var(--tx2)}
+.nat .pad{padding:6px 8px;display:flex;flex-direction:column;gap:6px}
+.nat .ph{font-size:12px;color:#6f685b;text-align:center;padding:4px;border-top:1px solid var(--rule)}
+
+/* ---- Variant A: outliner and inspector ---- */
+.A-band{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--rule)}
+.A-split{flex:1;display:flex;min-height:0}
+.A-out{width:262px;flex:none;border-right:1px solid var(--rule);display:flex;flex-direction:column;padding:6px 0 0}
+.A-out .top{padding:0 8px 6px;display:flex;flex-direction:column;gap:6px}
+.A-insp{flex:1;display:flex;flex-direction:column;min-width:0}
+.A-head{flex:none;padding:8px 10px 6px}
+.A-tabs{flex:none;padding:0 10px 8px;border-bottom:1px solid var(--rule)}
+.A-body{flex:1;padding:2px 10px 12px}
+.A-gbar{flex:none;padding:8px 10px 0;border-top:1px solid var(--rule);background:#231e18;display:flex;flex-direction:column;gap:7px}
+.A-foot{flex:none;border-top:1px solid var(--rule);background:#211c17;padding:8px 10px;display:flex;flex-direction:column;gap:7px}
+
+/* ---- Variant B: world-anchored tools ---- */
+.B-bar{position:absolute;left:760px;top:6px;width:1000px;height:42px;background:var(--bg);border:2px solid var(--frame);border-radius:0 0 10px 10px;display:flex;align-items:center;gap:8px;padding:0 10px}
+.B-bar .nm{font:700 15px var(--serif);color:var(--hi);margin-right:4px}
+.B-drop{position:absolute;top:48px;background:var(--bg);border:2px solid var(--frame);border-radius:6px;width:470px;max-height:420px;overflow:auto;box-shadow:0 6px 30px rgba(0,0,0,.55);padding:4px 0}
+.B-card{width:432px;min-height:0}
+.B-card .hd{padding:7px 10px 6px;cursor:move;border-bottom:1px solid var(--rule);position:relative}
+.B-card .ops{padding:7px 10px;border-bottom:1px solid var(--rule)}
+.B-card .tool{padding:2px 10px 10px}
+.B-card .act{padding:8px 10px;border-top:1px solid var(--rule);background:#211c17;display:flex;flex-direction:column;gap:7px}
+.B-prompt{position:absolute;left:830px;bottom:150px;width:900px;background:rgba(29,25,21,.95);border:2px solid #7a6a2c;border-radius:8px;padding:8px 12px;display:flex;gap:10px;align-items:center}
+.B-cand{position:absolute;background:var(--bg);border:2px solid #f0d27a;border-radius:6px;padding:5px 8px;display:flex;gap:8px;align-items:center;font-size:14px;white-space:nowrap}
+
+/* ---- Variant C: change sheet ---- */
+.C-col{position:absolute;right:0;top:0;bottom:0;width:548px;background:var(--bg);border-left:2px solid var(--frame);display:flex;flex-direction:column;box-shadow:-6px 0 30px rgba(0,0,0,.5)}
+.C-col.shut{width:58px;align-items:center;padding-top:10px;gap:10px;cursor:pointer}
+.C-doc{flex:none;padding:10px 12px 8px;border-bottom:1px solid var(--rule)}
+.C-tabs{flex:none;padding:8px 12px;border-bottom:1px solid var(--rule)}
+.C-job{flex:none;border-bottom:2px solid var(--frame);background:#231e18;padding:9px 12px;display:flex;flex-direction:column;gap:7px;max-height:62%}
+.C-steps{display:flex;gap:0;font-size:13px}
+.C-steps span{flex:1;padding:3px 6px;border-bottom:3px solid var(--rule);color:var(--tx2)}
+.C-steps span.cur{border-color:var(--sel);color:var(--hi);font-weight:700}
+.C-steps span.done{border-color:#6f8a5f}
+.C-body{flex:1;padding:6px 12px 14px}
+.C-ent{border:1px solid var(--rule);border-radius:5px;padding:7px 9px;margin-top:7px;font-size:14.5px}
+.C-ent .h{display:flex;gap:8px;align-items:center}
+.C-ent .n{color:var(--tx2);font-variant-numeric:tabular-nums}
+.C-ent.new{border-color:var(--sel)}
+.C-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+.C-grid .b{height:auto;min-height:44px;text-align:left;white-space:normal;line-height:1.2;padding:5px 9px}
+.C-grid small{display:block;font-size:12px;color:var(--tx2);font-weight:400}
+.diff{display:grid;grid-template-columns:120px 1fr 16px 1fr;gap:3px 6px;font-size:14px;align-items:baseline}
+.diff .k{color:var(--tx2)} .diff .o{color:#a59c8b} .diff .nw{color:var(--hi);font-weight:600} .diff .same{grid-column:2/5;color:var(--tx2)}
+
+/* ---- prototype chrome: deliberately not in the game's style ---- */
+#bar{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:50;background:#fff;color:#111;border-radius:999px;box-shadow:0 4px 22px rgba(0,0,0,.6);display:flex;align-items:center;gap:6px;padding:5px 10px;font:600 13px "Segoe UI",Arial,sans-serif;white-space:nowrap;max-width:98vw;overflow:auto}
+#bar button{font:inherit;border:1px solid #bbb;background:#f3f3f3;color:#111;border-radius:999px;padding:4px 10px;cursor:pointer}
+#bar button:hover{background:#e2e2e2}
+#bar button.on{background:#111;color:#fff;border-color:#111}
+#bar .lab{min-width:238px;text-align:center}
+#bar .tag{background:#c2185b;color:#fff;border-radius:999px;padding:3px 9px;font-size:11px;letter-spacing:.05em}
+#bar .sepr{width:1px;height:20px;background:#ccc;margin:0 3px}
+#bar small{font-weight:400;color:#555}
+#dump{position:fixed;right:10px;bottom:58px;z-index:49;width:430px;max-height:60vh;overflow:auto;background:#fff;color:#111;font:12px/1.35 Consolas,monospace;white-space:pre-wrap;padding:10px;border-radius:8px;box-shadow:0 4px 22px rgba(0,0,0,.6)}
+#tip{position:fixed;z-index:60;max-width:340px;background:#15120f;color:#e6dfcf;border:1px solid #8a8170;border-radius:5px;padding:6px 9px;font:400 13px/1.35 var(--ui);pointer-events:none;display:none;box-shadow:0 3px 14px rgba(0,0,0,.6)}
+
+/* ---- overview page ---- */
+.ov{max-width:1280px;margin:0 auto;padding:26px 22px 110px;font-size:15px;font-weight:400;line-height:1.45}
+.ov h1{font:700 30px var(--serif);color:var(--hi);margin:0 0 4px}
+.ov h2{font:700 20px var(--serif);color:var(--hi);margin:26px 0 8px}
+.ov .proto{display:inline-block;background:#c2185b;color:#fff;font:700 12px "Segoe UI",Arial;letter-spacing:.06em;padding:3px 9px;border-radius:999px;vertical-align:middle;margin-left:10px}
+.ov .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:14px}
+.ov .card{background:var(--bg);border:2px solid var(--frame);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ov .card h3{font:700 19px var(--serif);color:var(--hi);margin:0}
+.ov .card p{margin:0}
+.ov .thumb{position:relative;aspect-ratio:16/9;border-radius:4px;overflow:hidden;background:linear-gradient(#6f97c7 0 38%,#55683c 38% 56%,#6a6157 56% 82%,#2a2520 82%);cursor:pointer}
+.ov .thumb i{position:absolute;background:rgba(29,25,21,.94);border:1px solid #8a7558;border-radius:2px}
+.ov .thumb i.n{background:rgba(29,25,21,.6);border-style:dashed}
+.ov .thumb i.h{background:#d8d0bf}
+.ov .thumb u{position:absolute;font:600 9px var(--ui);color:#e6dfcf;text-decoration:none}
+.ov table{border-collapse:collapse;width:100%;font-size:14px}
+.ov th,.ov td{border:1px solid var(--rule);padding:6px 8px;text-align:left;vertical-align:top}
+.ov th{color:var(--hi);font-weight:600;background:var(--bg2)}
+.ov td:first-child{color:var(--tx2);width:170px}
+.ov ol{margin:6px 0;padding-left:22px}
+.ov .note{border-left:3px solid var(--warn);padding:6px 10px;background:var(--bg);margin-top:10px}
+@media(max-width:900px){.ov .cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="bar"></div>
+<div id="dump" hidden></div>
+<div id="tip"></div>
+<script>
+'use strict';
+/* PROTOTYPE: mock data and in-memory state only. Not production code. */
+
+// ---------- mock map context ----------
+const SEG = {
+  Shuo:{y:830,x1:500,x2:1300,len:84.2,nodes:'N3f1 / N7ka'},
+  Rm2c:{y:830,x1:1300,x2:2100,len:80.0,nodes:'N7ka / Nq02'},
+  Sx4k:{y:905,x1:400,x2:1500,len:112.6,nodes:'Nb81 / Nc44'},
+  Tq9a:{y:990,x1:700,x2:1900,len:121.9,nodes:'Nd10 / Ne93'}
+};
+// task status per family:
+//   1   = present in the reference snapshot, ticket closed (not independently verified by this prototype)
+//   'r' = controls exist in the reference snapshot, but the capability is not yet accepted (#45 open)
+//   'p' = planned (concept only); absent = not applicable
+const FAM = {
+  marker:{l:'Track marker',t:{place:1,bind:'r',activity:1},
+    na:{}},
+  board:{l:'Board',t:{place:1,activity:1},spec:{l:'Terrain output',st:1},
+    na:{bind:'Independent boards have no supported logical binding.'}},
+  milepost:{l:'Milepost',t:{place:'p',bind:'p',activity:'p'},spec:{l:'Milepost',st:'p',ref:'#48'},na:{}},
+  crossing:{l:'Existing crossing',t:{},spec:{l:'Crossing',st:'p',ref:'#53-#56'},
+    na:{place:'A crossing is corrected through coverage, detection and equipment, not moved as one object.',bind:'Crossing relationships are edited under Crossing.',activity:'Not offered for crossings.'}},
+  pad:{l:'Crossing pad',t:{place:'p'},spec:{l:'Pad geometry',st:'p',ref:'#51'},
+    na:{bind:'A pad has no logical binding of its own.',activity:'Not offered for pads.'}},
+  bridge:{l:'Bridge',t:{place:1,activity:1},spec:{l:'Collision limits',st:1},
+    na:{bind:'Bridges have no supported logical binding.'}}
+};
+const TASKL = {place:'Placement',bind:'Binding',activity:'Activity'};
+function mkObjects(){ return [
+  {id:'wse',name:'Whistle Sign E',fam:'marker',path:'World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign E',active:true,
+   pos:[25201.15,622.73,-778.08],rot:[359.69,20.65,0],binding:{seg:'Shuo',end:'a',dist:58.69},reg:'Registered with Shuo',wx:1120,wy:770,
+   deps:['Parent: Crossing Unprotected - Allen (1)','Track segment Shuo (logical binding)'],problems:[]},
+  {id:'wsw',name:'Whistle Sign W',fam:'marker',path:'World/Roads Sylva/Crossing Unprotected - Allen (1)/Whistle Sign W',active:true,
+   pos:[25145.02,622.61,-777.40],rot:[0.2,200.4,0],binding:{seg:'Kd7x',end:'b',dist:12.5},reg:'Not registered',wx:560,wy:775,
+   deps:['Parent: Crossing Unprotected - Allen (1)','Track segment Kd7x (missing)'],problems:['Bound segment Kd7x is not in the loaded map context. The marker is not registered with any track.']},
+  {id:'mp47',name:'Milepost 47',fam:'milepost',path:'World/Mileposts/MP 47',active:true,
+   pos:[25171.3,622.7,-777.9],rot:[0,90,0],binding:{seg:'Tq9a',end:'a',dist:12.0},reg:'Registered with Tq9a',wx:820,wy:780,
+   deps:['Track segment Tq9a (logical binding)','Model and value: concrete post, "47"'],problems:[],check:'Binding is valid, but the bound segment Tq9a is two tracks away from the post. Valid does not mean intended.'},
+  {id:'brd',name:'Loc: Sylva Int',fam:'board',path:'World/Signs/Loc: Sylva Int',active:true,
+   pos:[25245.9,623.4,-783.2],rot:[0,181.5,0],binding:null,reg:'Independent',wx:1560,wy:730,out:1,
+   deps:['Terrain output: 1 mask'],problems:[]},
+  {id:'spd',name:'Speed 25 Sylva Yard',fam:'marker',path:'World/Signs/Speed 25 Sylva Yard',active:false,
+   pos:[25122.4,622.5,-774.9],rot:[0,18.0,0],binding:{seg:'Sx4k',end:'a',dist:4.1},reg:'Registered with Sx4k (inactive)',wx:330,wy:800,
+   deps:['Track segment Sx4k (logical binding)'],problems:[]},
+  {id:'xing',name:'Main St crossing',fam:'crossing',path:'World/Roads Sylva/Crossing Protected - Main St',active:true,
+   pos:[25229.0,622.6,-790.0],rot:[0,90,0],binding:null,reg:'Covers Shuo, Sx4k',wx:1400,wy:860,
+   deps:['Covered tracks: Shuo, Sx4k','Equipment: 2 lights, 1 bell','Pad: Main St pad 2'],problems:[],check:'Track Tq9a passes through the crossing but is not covered.'},
+  {id:'pad',name:'Main St pad 2',fam:'pad',path:'World/Roads Sylva/Crossing Protected - Main St/Pad 2',active:true,
+   pos:[25229.0,622.6,-797.5],rot:[0,90,0],binding:null,reg:'Part of Main St crossing',wx:1400,wy:975,
+   deps:['Parent: Main St crossing','Generated geometry'],problems:[]},
+  {id:'brg',name:'Tuckasegee deck girder',fam:'bridge',path:'World/Bridges/Tuckasegee Deck Girder',active:true,
+   pos:[25304.6,618.9,-795.1],rot:[0,90.5,0],binding:null,reg:'Independent',wx:2150,wy:985,
+   deps:['Collision volume: deck and abutments'],problems:[]}
+].map(o=>Object.assign(o,{pos0:o.pos.slice(),wx0:o.wx,wy0:o.wy})); }
+
+// ---------- shared state (one conceptual state behind all three concepts) ----------
+let S;
+function reset(){
+  S={view:S?S.view:'overview',fit:S?S.fit:true,objs:mkObjects(),sel:null,stale:false,failNext:false,pending:null,gizmo:null,
+     draft:{},hist:[],redo:[],seq:0,saved:'',attempts:[],msg:null,dump:false,win:{},
+     ui:{aTab:'sum',aGuide:false,aFilter:'all',q:'',bTool:null,bDrop:null,bData:false,cTab:'work',cOpen:true,job:null,cNew:null}};
+}
+reset();
+const $=s=>document.querySelector(s);
+const h=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ob=id=>S.objs.find(o=>o.id===id);
+const cur=()=>S.sel?ob(S.sel):null;
+const st=(o,t)=>FAM[o.fam].t[t];
+const usable=x=>x===1||x==='r';
+const mark=x=>x==='p'?' ◦':x==='r'?' ◇':'';
+const markTip=x=>x==='p'?'Planned capability, shown as concept.':x==='r'?'Controls exist in the source snapshot, but this capability is not yet accepted (#45 open). The flow here is mocked.':'';
+const PLANNED='Planned capability. Shown as concept only.';
+const naWhy=(o,t)=>FAM[o.fam].na[t]||'Not applicable to this object family.';
+const f2=n=>(+n).toFixed(2);
+const sig=()=>S.hist.map(e=>e.n).join(',');
+const dirty=()=>sig()!==S.saved;
+const unsaved=()=>{const sv=S.saved?S.saved.split(','):[];return S.hist.filter(e=>!sv.includes(String(e.n))).length+sv.filter(n=>!S.hist.some(e=>String(e.n)===n)).length;};
+const changed=o=>S.hist.some(e=>e.id===o.id);
+const problems=()=>S.objs.filter(o=>o.problems.length);
+const checks=()=>S.objs.filter(o=>o.check);
+function D(o){ return S.draft[o.id]||(S.draft[o.id]=freshDraft(o)); }
+function freshDraft(o){ return {x:f2(o.pos[0]),y:f2(o.pos[1]),z:f2(o.pos[2]),rx:f2(o.rot[0]),ry:f2(o.rot[1]),rz:f2(o.rot[2]),
+  seg:o.binding?o.binding.seg:'',end:o.binding?o.binding.end:'a',dist:o.binding?f2(o.binding.dist):'0.00',snap:null}; }
+function placeChanged(o){const d=D(o),f=freshDraft(o);return ['x','y','z','rx','ry','rz'].some(k=>+d[k]!==+f[k]);}
+function bindChanged(o){const d=D(o),b=o.binding;return !b||d.seg!==b.seg||d.end!==b.end||+d.dist!==+b.dist;}
+function pin(o,p){p=p||o.pos;return {x:o.wx0+(p[0]-o.pos0[0])*14,y:o.wy0-(p[2]-o.pos0[2])*8};}
+function draftPin(o){const d=D(o);return pin(o,[+d.x||0,0,+d.z||0]);}
+function bindPt(b){const s=SEG[b.seg];if(!s)return null;const px=Math.min(+b.dist*9.5,s.x2-s.x1);return {x:b.end==='a'?s.x1+px:s.x2-px,y:s.y};}
+const bindTxt=b=>b?`${b.seg} · end ${b.end} · ${f2(b.dist)} m`:'None (independent)';
+const posTxt=p=>p.map(f2).join(', ');
+
+// ---------- actions (mocked; nothing leaves this page) ----------
+function why(kind){ const o=cur(); if(!o) return 'Select an object first.'; const d=D(o);
+  if(S.pending) return 'Finish or cancel the pending world choice first.';
+  if(kind==='place'){ if(!usable(st(o,'place'))) return st(o,'place')==='p'?PLANNED:naWhy(o,'place');
+    return placeChanged(o)?'':'Nothing to apply: the draft equals the inspected placement.'; }
+  if(kind==='bind'){ if(!usable(st(o,'bind'))) return st(o,'bind')==='p'?PLANNED:naWhy(o,'bind');
+    if(!d.seg) return 'Choose a segment in the world or type its ID first.';
+    if(!SEG[d.seg]) return 'Segment "'+d.seg+'" is not in the loaded map context.';
+    return bindChanged(o)?'':'Nothing to apply: the draft equals the current binding.'; }
+  if(kind==='detach'){ if(!usable(st(o,'bind'))) return st(o,'bind')==='p'?PLANNED:naWhy(o,'bind'); return o.binding?'':'This object has no binding to detach.'; }
+  if(kind==='active') return usable(st(o,'activity'))?'':(st(o,'activity')==='p'?PLANNED:naWhy(o,'activity'));
+  return ''; }
+function apply(kind){ const o=cur(); if(!o||why(kind)) return false; const d=D(o); let label,patch,okText;
+  if(kind==='place'){ const v=['x','y','z','rx','ry','rz'].map(k=>parseFloat(d[k]));
+    if(v.some(isNaN)){ S.msg={t:'refused',text:'Placement needs six numbers with a decimal point. Nothing was changed.'}; return false; }
+    label=(d.snap?'Snap to '+d.snap:'Move')+' · '+o.name; patch={pos:v.slice(0,3),rot:v.slice(3)};
+    okText='Placement applied'+(d.snap?' (snapped once to '+d.snap+')':'')+'. Logical binding unchanged. Observation refreshed.'; }
+  if(kind==='bind'){ label='Set binding · '+o.name; patch={binding:{seg:d.seg,end:d.end,dist:parseFloat(d.dist)||0},reg:'Registered with '+d.seg};
+    okText='Binding set to '+bindTxt(patch.binding)+'. The object was not moved. Observation refreshed.'; }
+  if(kind==='detach'){ label='Detach from track · '+o.name; patch={binding:null,reg:'Not registered'}; okText='Detached from track. The object was not moved. Observation refreshed.'; }
+  if(kind==='active'){ label=(o.active?'Disable':'Enable')+' · '+o.name; patch={active:!o.active}; okText='Object '+(o.active?'disabled':'enabled')+'. Placement and binding unchanged.'; }
+  if(S.stale){ S.msg={t:'refused',rec:'refresh',text:label+': the inspected target changed since the last refresh. Nothing was changed. Your draft is kept.'};
+    S.attempts.push({n:++S.seq,id:o.id,label,state:'refused',kind}); return false; }
+  if(S.failNext){ S.failNext=false; S.msg={t:'failed',rec:'retry',kind,text:label+': the dependent registration update failed. The previous state was restored and verified.'};
+    S.attempts.push({n:++S.seq,id:o.id,label,state:'failed',kind}); return false; }
+  const before={}; for(const k in patch) before[k]=JSON.parse(JSON.stringify(o[k]));
+  S.hist.push({n:++S.seq,id:o.id,label,kind,before,after:JSON.parse(JSON.stringify(patch))}); S.redo=[];
+  Object.assign(o,JSON.parse(JSON.stringify(patch))); if(kind==='bind'||kind==='detach') fixProblems(o);
+  S.draft[o.id]=freshDraft(o); S.gizmo=null; S.msg={t:'ok',text:okText}; S.ui.cNew=S.seq; return true; }
+function fixProblems(o){ o.problems=o.binding&&!SEG[o.binding.seg]?['Bound segment '+o.binding.seg+' is not in the loaded map context. The marker is not registered with any track.']:[]; }
+function setObj(e,which){ const o=ob(e.id); Object.assign(o,JSON.parse(JSON.stringify(e[which]))); fixProblems(o); S.draft[o.id]=freshDraft(o); }
+const ACT={
+  sel(id){ if(S.pending) return; const j=S.ui.job;
+    if(j&&j.target){ if(id!==j.target) S.msg={t:'info',text:'The open job is pinned to '+ob(j.target).name+'. The selection was not changed. Go back to Target or cancel the job to work on another object.'}; return; }
+    if(j&&j.home==='A'){ if(j.step===4) S.ui.job=null; }   // guided mode in A: at Target or after Apply the selection is free
+    else if(j){ const w=jobOk(j.type,ob(id)); if(w) S.msg={t:'info',text:ob(id).name+' cannot take this job. '+w}; else ACT.jobSel(id); return; }
+    S.sel=id; S.msg=null; S.gizmo=null; S.ui.bDrop=null; delete S.win.Bcard; const o=ob(id);
+    if(S.ui.aTab!=='sum'&&S.ui.aTab!=='id'){ const ok=S.ui.aTab==='spec'?FAM[o.fam].spec:st(o,S.ui.aTab); if(!ok) S.ui.aTab='sum'; }
+    if(S.ui.bTool&&S.ui.bTool!=='spec'&&!st(o,S.ui.bTool)) S.ui.bTool=null; if(S.ui.bTool==='spec'&&!FAM[o.fam].spec) S.ui.bTool=null; },
+  desel(){ if(!S.pending&&!(S.ui.job&&S.ui.job.target)){ if(S.ui.job&&S.ui.job.step===4) S.ui.job=null; S.sel=null; S.gizmo=null; S.msg=null; } },
+  choose(kind){ S.pending={kind,cand:null}; S.gizmo=null; S.msg=null; },
+  cand(seg){ if(S.pending) S.pending.cand=seg; },
+  confirm(){ const p=S.pending,o=cur(); if(!p||!p.cand||!o) return; const d=D(o),s=SEG[p.cand];
+    if(p.kind==='bind'){ d.seg=p.cand; S.msg={t:'info',text:'Segment '+p.cand+' confirmed as draft. Nothing is changed until you set the binding.'}; }
+    else { const pp=pin(o), ax=Math.max(s.x1,Math.min(s.x2,pp.x)), ay=s.y-55;
+      d.x=f2(o.pos0[0]+(ax-o.wx0)/14); d.z=f2(o.pos0[2]-(ay-o.wy0)/8); d.snap=p.cand;
+      S.msg={t:'info',text:'Snap preview on '+p.cand+'. Position changes once on apply; rotation and binding stay.'}; }
+    S.pending=null; },
+  cancel(){ S.pending=null; S.msg={t:'info',text:'Choice cancelled. Nothing was changed.'}; },
+  apply(kind){ apply(kind); },
+  // Inside a task, Retry takes the same completion transition as Apply, so the task ends after one applied change.
+  retry(){ const k=S.msg&&S.msg.kind, j=S.ui.job; S.msg=null; if(!k) return; if(j&&j.target) ACT.jobApply(); else apply(k); },
+  refresh(){ S.stale=false; S.msg={t:'info',text:'Inventory refreshed and the target inspected again. Draft values were kept; apply again when ready.'}; },
+  dismiss(){ S.msg=null; },
+  revert(){ const o=cur(); if(o){ S.draft[o.id]=freshDraft(o); S.gizmo=null; } },
+  gizmo(m){ S.gizmo=S.gizmo===m?null:m; },
+  nudge(v){ const o=cur(),d=D(o),[k,a]=v.split(':'); d[k]=f2((+d[k]||0)+(+a)); d.snap=null; },
+  end(v){ D(cur()).end=v; },
+  gen(){ const o=cur(); o.out=0; o.deps=['Terrain output: current']; S.msg={t:'ok',text:'Terrain output generated for '+o.name+'.'}; },
+  undo(){ const e=S.hist.pop(); if(!e) return; setObj(e,'before'); S.redo.push(e); S.msg={t:'info',text:'Native Undo: '+e.label+'. Observation refreshed.'+jobReset(e)}; },
+  redo(){ const e=S.redo.pop(); if(!e) return; setObj(e,'after'); S.hist.push(e); S.msg={t:'info',text:'Native Redo: '+e.label+'. Observation refreshed.'+jobReset(e)}; },
+  save(){ S.saved=sig(); S.msg={t:'ok',text:'Saved by the native editor: patch document and map written.'+(S.objs.some(o=>o.out)?' Terrain output still outstanding for 1 board.':'')}; },
+  focus(){ S.msg={t:'info',text:'Camera focused on '+cur().name+' (not mocked: the backdrop is a still illustration).'}; },
+  nomock(v){ S.msg={t:'info',text:v+' is not mocked in this prototype.'}; },
+  // prototype harness
+  view(v){ setView(v); }, fit(){ S.fit=!S.fit; }, dump(){ S.dump=!S.dump; },
+  stale(){ S.stale=true; }, fail(){ S.failNext=!S.failNext; }, reset(){ reset(); },
+  // variant-local UI state
+  aTab(v){ S.ui.aTab=v; }, aFilter(v){ S.ui.aFilter=v; },
+  bTool(v){ S.ui.bTool=S.ui.bTool===v?null:v; S.gizmo=null; }, bDrop(v){ S.ui.bDrop=S.ui.bDrop===v?null:v; }, bData(){ S.ui.bData=!S.ui.bData; },
+  cTab(v){ S.ui.cTab=v; }, cOpen(){ S.ui.cOpen=!S.ui.cOpen; },
+  // A job pins its target and owns that target's draft: it starts from the inspected scene values,
+  // and cancelling, returning to Target or leaving Concept C discards the draft.
+  job(t){ startJob(t,'C'); },
+  // Guided mode in A: the same job state and rules, hosted in the inspector pane.
+  guide(t){ S.ui.aGuide=true; startJob(t,'A'); },
+  guideMore(){ S.ui.job=null; S.msg=null; },
+  aMode(v){ const j=S.ui.job; if(v==='guided'){ S.ui.aGuide=true; return; }
+    S.ui.aGuide=false; if(!j) return; if(j.step===4){ S.ui.job=null; return; }
+    ACT.jobCancel(); S.msg={t:'info',text:'Guided task cancelled. Its values were discarded; nothing was changed.'}; },
+  jobSel(id){ const j=S.ui.job; S.sel=id; j.target=id; S.draft[id]=freshDraft(ob(id)); S.msg=null; j.step=JOBS[j.type].values?2:3; },
+  jobStep(n){ const j=S.ui.job; n=+n;
+    if(n>=2&&!j.target){ const o=cur(); if(o&&jobOk(j.type,o)==='') ACT.jobSel(o.id); return; }   // leaving Target pins the target
+    j.step=n; if(j.step===2&&!JOBS[j.type].values) j.step=1; if(j.step===1) jobDrop(j); },
+  jobCancel(){ jobDrop(S.ui.job); S.ui.job=null; S.msg=null; },
+  jobApply(){ const j=S.ui.job; S.sel=j.target; if(!apply(JOBS[j.type].kind)) return;
+    if(j.home==='A') S.ui.job={type:j.type,step:4,target:null,home:'A',done:S.hist[S.hist.length-1].label}; else { S.ui.job=null; S.ui.cTab='changes'; } },
+  repair(id){ S.sel=id; ACT.job('bind'); }
+};
+function jobDrop(j){ if(j.target) S.draft[j.target]=freshDraft(ob(j.target)); j.target=null; S.pending=null; S.gizmo=null; }
+function jobReset(e){ const j=S.ui.job; if(!j||j.target!==e.id) return ''; S.pending=null; S.gizmo=null; if(JOBS[j.type].values) j.step=2; return ' The open job was reset to the new scene values.'; }
+function startJob(t,home){ S.ui.job={type:t,step:1,target:null,home}; S.msg=null; S.pending=null; S.gizmo=null; if(S.sel&&jobOk(t,cur())==='') ACT.jobSel(S.sel); }
+function setView(v){ const j=S.ui.job; if(j&&v!==j.home){ if(j.step===4) S.ui.job=null;
+    else { ACT.jobCancel(); S.msg={t:'info',text:'The task that was open was cancelled when you left that concept. Its values were discarded; nothing was changed.'}; } }
+  S.view=v; }
+
+// ---------- small render helpers ----------
+function btn(label,a,v,o){ o=o||{}; const dis=o.dis||''; return `<button class="b${o.pri?' pri':''}${o.on?' on':''}${o.sm?' sm':''}${dis?' dis':''}" data-a="${a}"${v!=null?` data-v="${h(v)}"`:''}${dis||o.tip?` data-tip="${h(dis||o.tip)}"`:''}>${label}</button>`; }
+const info=t=>`<span class="i" data-tip="${h(t)}">i</span>`;
+const inp=(k,v,ph)=>`<input class="in" data-in="${k}" data-k="in-${k}" value="${h(v)}" placeholder="${h(ph||'')}" spellcheck="false">`;
+function msgHtml(){ const m=S.msg; if(!m) return '';
+  return `<div class="msg ${m.t}"><b>${{ok:'Done.',refused:'Refused.',failed:'Failed, restored.',info:'Note.'}[m.t]}</b>${h(m.text)}<br>${m.rec==='refresh'?btn('Refresh and inspect again','refresh',null,{pri:1,sm:1,tip:'Reads the scene again without applying anything. Your draft values stay.'}):''}${m.rec==='retry'?btn('Retry','retry',null,{pri:1,sm:1}):''}<button class="mx" data-a="dismiss" data-tip="Dismiss">×</button></div>`; }
+function staleChip(){ return S.stale?`<span class="chip warn" data-a="refresh" data-tip="A native edit changed the scene after this snapshot. Edits are refused until you refresh. Click to refresh.">Snapshot stale · Refresh</span>`
+  :`<span class="chip ok" data-tip="Inventory snapshot matches the scene. ${S.objs.length} of 825 observed objects shown in this mock.">Snapshot current</span>`; }
+function saveChip(){ const n=unsaved(); return dirty()?`<span class="chip warn" data-tip="Unsaved scene-patch changes. Save and Undo/Redo belong to the native Map Editor window.">${n} unsaved</span>`
+  :`<span class="chip" data-tip="No unsaved scene-patch changes.">Saved</span>`; }
+function badges(o){ let s=`<span class="chip">${FAM[o.fam].l}</span>`;
+  s+=o.binding?`<span class="chip info" data-tip="Logical binding: ${h(bindTxt(o.binding))}">Bound</span>`:`<span class="chip">Independent</span>`;
+  if(!o.active) s+=`<span class="chip">Inactive</span>`;
+  if(changed(o)) s+=`<span class="chip ok" data-tip="This object has changes in the scene patch.">Patched</span>`;
+  if(o.problems.length) s+=`<span class="chip bad" data-tip="${h(o.problems[0])}">Problem</span>`;
+  else if(o.check) s+=`<span class="chip warn" data-tip="${h(o.check)}">Check</span>`;
+  return s; }
+const conceptNote=(ref,what)=>`<div class="concept">CONCEPT · ${h(what)} is planned (${h(ref)}), not implemented. Shown only to test where it would live.</div>`;
+function statusNote(o,task){ const x=st(o,task), sp=FAM[o.fam].spec;
+  return x==='p'?conceptNote(sp?sp.ref:'#48',TASKL[task]+' for this family')
+    :x==='r'?`<div class="concept rep">NOT YET ACCEPTED · ${TASKL[task]} controls exist in the source snapshot, but the capability is still open (#45) and its end-to-end behaviour is not accepted. The successful flow shown here is mocked.</div>`:''; }
+function pendHtml(withBtns){ const p=S.pending; if(!p) return ''; const what=p.kind==='bind'?'binding segment':'snap track';
+  return `<div class="pend"><b>Choosing ${what} in the world.</b> ${p.cand?`Candidate <b>${p.cand}</b> · ${SEG[p.cand].len} m · nodes ${SEG[p.cand].nodes}.`:'Click a highlighted track. You can keep moving the camera; nothing changes until you confirm.'}`
+   +(withBtns?`<div class="row" style="margin-top:6px">${btn('Confirm '+(p.cand||''),'confirm',null,{pri:1,dis:p.cand?'':'Click a track in the world first.'})}${btn('Cancel','cancel',null,{tip:'Also Esc'})}</div>`:'')+`</div>`; }
+
+// ---------- content fragments (fields only; each concept composes them differently) ----------
+function fragPose(o){ const d=D(o);
+  return `<div class="cap">Position <i>map coordinates, m</i></div><div class="xyz">X${inp('x',d.x)}Y${inp('y',d.y)}Z${inp('z',d.z)}</div>
+  <div class="cap">Rotation <i>degrees</i></div><div class="xyz">X${inp('rx',d.rx)}Y${inp('ry',d.ry)}Z${inp('rz',d.rz)}</div>`; }
+function fragGizmoSnap(o){ const d=D(o), b=S.pending?'Finish or cancel the pending world choice first.':'';
+  return `<div class="cap">In the world ${info('The gizmo previews a move; nothing is written until you apply. In this mock, click the arrows next to the object.')}</div>
+  <div class="row">${btn('Move with gizmo','gizmo','move',{on:S.gizmo==='move',dis:b})}${btn('Rotate with gizmo','gizmo','rot',{on:S.gizmo==='rot',dis:b})}</div>
+  <div class="cap">Snap to track ${info('Snap changes the position once and keeps rotation and logical binding. Save records fixed map coordinates. It does not make the object follow the track.')}</div>
+  <div class="row">${btn('Choose track in world','choose','snap',{dis:b})}${d.snap?`<span class="chip info">Preview on ${d.snap}</span>`:'<span class="sub">No snap chosen</span>'}</div>`; }
+function fragBindNow(o){ return `<dl class="kv"><dt>Segment</dt><dd>${o.binding?o.binding.seg+(SEG[o.binding.seg]?'':' <span style="color:var(--bad)">· missing</span>'):'—'}</dd><dt>End / distance</dt><dd>${o.binding?o.binding.end+' · '+f2(o.binding.dist)+' m':'—'}</dd><dt>Registration</dt><dd>${h(o.reg)}</dd></dl>`; }
+function fragBindDraft(o){ const d=D(o), b=S.pending?'Finish or cancel the pending world choice first.':'';
+  return `<div class="cap">Segment ${info('The track segment the game relates this object to. Choosing it in the world shows its ID before you confirm; nearby tracks are never picked automatically.')}</div>
+  <div class="row" style="flex-wrap:nowrap">${inp('seg',d.seg,'segment ID')}${btn('Choose in world','choose','bind',{dis:b})}</div>
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:0 14px;align-items:end"><div><div class="cap">End</div><span class="seg">${btn('a','end','a',{on:d.end==='a'})}${btn('b','end','b',{on:d.end==='b'})}</span></div>
+  <div><div class="cap">Distance from end <i>m</i></div>${inp('dist',d.dist)}</div></div>`; }
+function fragFollow(){ return `<div class="cap">Track-following placement</div>${conceptNote('#46','Keeping placement relative to the bound track')}<span class="ck" style="opacity:.5" data-tip="Planned. Today binding and placement are independent: changing one never changes the other."><s></s> Keep placement relative to the bound track</span>`; }
+function fragActivity(o){ return `<span class="ck" data-a="apply" data-v="active" data-tip="${h(why('active')||'Active objects exist in the running scene. Disabling keeps placement and binding in the patch.')}" ${why('active')?'style="opacity:.45"':''}><s>${o.active?'✓':''}</s> Active in scene</span>`; }
+function fragSpec(o){ const f=o.fam, sp=FAM[f].spec; if(!sp) return '';
+  if(f==='board') return `<dl class="kv"><dt>Terrain output</dt><dd>${o.out?'<span style="color:var(--warn)">1 mask outstanding</span>':'Current'}</dd><dt>Last generated</dt><dd>${o.out?'Before the last placement change':'Just now'}</dd></dl>
+    <div class="row" style="margin-top:8px">${btn(o.out?'Generate terrain output':'Regenerate','gen',null,{tip:'Writes the terrain output that belongs to this board. Mocked.'})}</div>
+    <p class="sub">A board's terrain output follows its placement. It is generated separately and can be retried without repeating the placement.</p>`;
+  if(f==='bridge') return `<dl class="kv"><dt>Collision volume</dt><dd>Deck and abutments</dd><dt>Placement limit</dt><dd>Checked against track clearance on apply</dd><dt>Last check</dt><dd>Clear</dd></dl><p class="sub">Limits are information. A placement that would break clearance is refused with the reason next to Apply.</p>`;
+  if(f==='milepost') return conceptNote(sp.ref,'Milepost editing')+`<dl class="kv"><dt>Value</dt><dd>47 (preserved)</dd><dt>Model</dt><dd>Concrete post (preserved)</dd></dl>
+    <div class="cap">Move and rebind together</div><p class="sub">One coherent operation: choose the track, the post moves beside it and is bound to it. Model and value stay.</p>
+    <div class="row">${btn('Choose track for milepost','x',null,{dis:'Planned capability. Shown as concept only.'})}</div>`;
+  if(f==='crossing') return conceptNote(sp.ref,'Crossing coverage, detection and equipment')+
+    `<div class="cap">Track coverage</div><div class="row"><span class="ck"><s>✓</s> Shuo</span><span class="ck"><s>✓</s> Sx4k</span><span class="ck" style="color:var(--warn)"><s></s> Tq9a · not covered</span></div>
+     <div class="cap">Detection</div><dl class="kv"><dt>Explicit detection</dt><dd>None added</dd></dl>
+     <div class="cap">Equipment ${info('Only eligible equipment sources that match a supported source pattern can be selected. A similar-looking model is not enough.')}</div>
+     <dl class="kv"><dt>Lights</dt><dd>2 · controller: Main St</dd><dt>Bell</dt><dd>1 · controller: Main St</dd><dt>Gates</dt><dd>None</dd></dl>
+     <div class="row" style="margin-top:6px">${btn('Add track to coverage','x',null,{dis:'Planned capability. Shown as concept only.'})}${btn('Add detection','x',null,{dis:'Planned capability. Shown as concept only.'})}${btn('Select equipment','x',null,{dis:'Planned capability. Shown as concept only.'})}</div>`;
+  if(f==='pad') return conceptNote(sp.ref,'Crossing pad placement')+`<dl class="kv"><dt>Geometry</dt><dd>Generated from placement</dd><dt>State</dt><dd>Current</dd></dl><p class="sub">Moving a pad regenerates its geometry as part of the same operation.</p>`;
+  return ''; }
+function fragDeps(o){ return `<div class="cap">Depends on</div>${o.deps.map(d=>`<div>${h(d)}</div>`).join('')}`
+  +(o.problems.length?`<div class="cap" style="color:var(--bad)">Problem</div>${o.problems.map(p=>`<div>${h(p)}</div>`).join('')}`:'')
+  +(o.check?`<div class="cap" style="color:var(--warn)">Worth checking</div><div>${h(o.check)}</div>`:''); }
+function patchJson(o){ const e=S.hist.filter(x=>x.id===o.id); const ops={}; e.forEach(x=>Object.assign(ops,x.after));
+  return JSON.stringify({sourceMap:{mapId:'crankyant/sylva-yard-fix'},target:{path:o.path,family:FAM[o.fam].l},changes:e.length?ops:'(none authored)'},null,2); }
+function fragIdentity(o){ return `<dl class="kv"><dt>Scene path</dt><dd class="mono">${h(o.path)}</dd><dt>Family</dt><dd>${FAM[o.fam].l}</dd><dt>Stable identity</dt><dd class="mono">${o.id}-7f3a91c2</dd><dt>Source</dt><dd>Base map · layer s-sylva</dd><dt>Format version</dt><dd>1</dd></dl>
+  <div class="cap">Patch entry <i>for manual authoring or recovery</i></div><div class="json">${h(patchJson(o))}</div>`; }
+function fragPoseRead(o){ return `<dl class="kv"><dt>Position</dt><dd>${posTxt(o.pos)}</dd><dt>Rotation</dt><dd>${posTxt(o.rot)}</dd><dt>Active</dt><dd>${o.active?'Yes':'No'}</dd></dl>`; }
+function filtered(q,flt){ q=(q||'').toLowerCase(); return S.objs.filter(o=>(!q||(o.name+' '+o.path+' '+FAM[o.fam].l+' '+(o.binding?o.binding.seg:'')).toLowerCase().includes(q))
+  &&(flt==='problems'?(o.problems.length||o.check):flt==='changed'?changed(o):true)); }
+function itemRow(o,act){ return `<div class="it${o.id===S.sel?' sel':''}" data-a="${act||'sel'}" data-v="${o.id}" data-tip="${h(o.path)}"><span class="dot" style="background:${o.problems.length?'var(--bad)':o.check?'var(--warn)':changed(o)?'var(--ok)':'transparent'}"></span><span class="nm" style="${o.active?'':'opacity:.55'}">${h(o.name)}</span><span class="sub">${FAM[o.fam].l}</span></div>`; }
+
+// ---------- world backdrop: self-authored illustration with clickable objects ----------
+function world(opt){ opt=opt||{}; let s=`<svg class="world" viewBox="0 0 2560 1440" data-a="desel"><defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f83c4"/><stop offset=".7" stop-color="#9db7cf"/><stop offset="1" stop-color="#d8c2a4"/></linearGradient>
+  <linearGradient id="gr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4c6a33"/><stop offset="1" stop-color="#5b5a3a"/></linearGradient></defs>
+  <rect width="2560" height="700" fill="url(#sky)"/><path d="M0 560 Q400 430 800 540 T1500 500 T2560 520 V720 H0Z" fill="#4a6b4f"/>`;
+  let r=7; const rnd=()=>(r=(r*9301+49297)%233280)/233280;
+  for(let i=0;i<64;i++){ const x=i*41+rnd()*30,y=590+rnd()*50,ry=90+rnd()*90; s+=`<rect x="${x-4}" y="${y}" width="8" height="${ry}" fill="#3b2c20"/><ellipse cx="${x}" cy="${y}" rx="${46+rnd()*30}" ry="${ry}" fill="${['#2f5a2a','#3d6b2f','#2a4d27','#47752f'][i%4]}"/>`; }
+  s+=`<rect y="690" width="2560" height="110" fill="url(#gr)"/><rect y="790" width="2560" height="360" fill="#6a6158"/><rect y="1150" width="2560" height="290" fill="#2b2622"/>
+  <path d="M0 1150 H2560 V1190 H0Z" fill="#3a332c"/><path d="M1790 0 H2560 V640 H1900 Z" fill="#3c4a52"/><path d="M1740 250 L2560 90 V0 H1790Z" fill="#232b2d"/>
+  <rect x="1340" y="800" width="120" height="340" fill="#4a4038" opacity=".85"/>`;
+  const ys=[...new Set(Object.values(SEG).map(g=>g.y)),1085];
+  ys.forEach(y=>{ s+=`<line x1="0" x2="2560" y1="${y}" y2="${y}" stroke="#2b201a" stroke-width="30" stroke-dasharray="9 17"/><line x1="0" x2="2560" y1="${y-9}" y2="${y-9}" stroke="#7a4a36" stroke-width="4"/><line x1="0" x2="2560" y1="${y+9}" y2="${y+9}" stroke="#7a4a36" stroke-width="4"/>`; });
+  const o=cur(), p=S.pending;
+  for(const id in SEG){ const g=SEG[id], c=p&&p.cand===id;
+    if(p) s+=`<g data-a="cand" data-v="${id}"><line x1="${g.x1}" x2="${g.x2}" y1="${g.y}" y2="${g.y}" stroke="${c?'#f0d27a':'#6fd6e0'}" stroke-width="${c?16:10}" opacity="${c?.9:.45}" stroke-linecap="round"/>
+      <rect x="${(g.x1+g.x2)/2-44}" y="${g.y-15}" width="88" height="30" rx="6" fill="#1d1915" stroke="${c?'#f0d27a':'#6fd6e0'}" stroke-width="2"/><text x="${(g.x1+g.x2)/2}" y="${g.y+6}" text-anchor="middle" fill="#e6dfcf" font-size="17" font-weight="600">${id}</text></g>`;
+    s+=`<circle cx="${g.x1}" cy="${g.y}" r="7" fill="#dfe9ee" opacity=".85"/><circle cx="${g.x2}" cy="${g.y}" r="7" fill="#dfe9ee" opacity=".85"/>`; }
+  if(o){ const pp=pin(o), d=D(o);
+    if(o.binding){ const bp=bindPt(o.binding); if(bp) s+=`<line x1="${pp.x}" y1="${pp.y}" x2="${bp.x}" y2="${bp.y}" stroke="#6fd6e0" stroke-width="3" stroke-dasharray="3 6"/><circle cx="${bp.x}" cy="${bp.y}" r="9" fill="none" stroke="#6fd6e0" stroke-width="3"/>`; }
+    if(usable(st(o,'bind'))&&d.seg&&SEG[d.seg]&&bindChanged(o)){ const bp=bindPt({seg:d.seg,end:d.end,dist:d.dist}); s+=`<line x1="${pp.x}" y1="${pp.y}" x2="${bp.x}" y2="${bp.y}" stroke="#f0d27a" stroke-width="3" stroke-dasharray="10 6"/><circle cx="${bp.x}" cy="${bp.y}" r="9" fill="none" stroke="#f0d27a" stroke-width="3"/>`; }
+    if(placeChanged(o)){ const g=draftPin(o); s+=`<line x1="${pp.x}" y1="${pp.y}" x2="${g.x}" y2="${g.y}" stroke="#e6dfcf" stroke-width="2" stroke-dasharray="4 5"/>${glyph(o,g.x,g.y,.55,true)}`; }
+    if(S.gizmo){ const g=draftPin(o); s+=S.gizmo==='move'?
+      `<g stroke-width="7" stroke-linecap="round"><g data-a="nudge" data-v="x:0.5" stroke="#e2574c"><line x1="${g.x+16}" y1="${g.y}" x2="${g.x+86}" y2="${g.y}"/><path d="M${g.x+86} ${g.y-12} l22 12 l-22 12z" fill="#e2574c"/></g>
+       <g data-a="nudge" data-v="x:-0.5" stroke="#e2574c" opacity=".6"><line x1="${g.x-16}" y1="${g.y}" x2="${g.x-70}" y2="${g.y}"/></g>
+       <g data-a="nudge" data-v="z:0.5" stroke="#4c8de2"><line x1="${g.x}" y1="${g.y-16}" x2="${g.x}" y2="${g.y-86}"/><path d="M${g.x-12} ${g.y-86} l12 -22 l12 22z" fill="#4c8de2"/></g>
+       <g data-a="nudge" data-v="z:-0.5" stroke="#4c8de2" opacity=".6"><line x1="${g.x}" y1="${g.y+16}" x2="${g.x}" y2="${g.y+70}"/></g></g>`
+      :`<g data-a="nudge" data-v="ry:5"><circle cx="${g.x}" cy="${g.y}" r="62" fill="none" stroke="#7bd66b" stroke-width="7"/><circle cx="${g.x}" cy="${g.y}" r="62" fill="transparent"/></g>`; } }
+  S.objs.forEach(q=>{ const pp=pin(q); s+=`<g data-a="sel" data-v="${q.id}" data-tip="${h(q.name+' · '+FAM[q.fam].l)}">${glyph(q,pp.x,pp.y,q.active?1:.45,false)}</g>`; });
+  s+=`</svg>`;
+  if(o){ const pp=pin(o); s+=`<div style="position:absolute;left:${pp.x+22}px;top:${pp.y-78}px;font:600 15px var(--ui);color:#fff;text-shadow:0 1px 4px #000;pointer-events:none">${h(o.name)}</div>`; }
+  if(p&&p.cand&&opt.candInWorld){ const g=SEG[p.cand]; s+=`<div class="B-cand" style="left:${(g.x1+g.x2)/2-150}px;top:${g.y+26}px"><span><b style="color:#f0d27a">${p.cand}</b> · ${g.len} m · ${g.nodes}</span>${btn('Confirm','confirm',null,{pri:1,sm:1})}${btn('Cancel','cancel',null,{sm:1})}</div>`; }
+  return s+`<div class="vig"></div>`; }
+function glyph(o,x,y,op,ghost){ const sel=o.id===S.sel&&!ghost, c=ghost?'#e6dfcf':'#f2f2f2'; let g=`<g opacity="${op}">`;
+  if(sel) g+=`<circle cx="${x}" cy="${y-34}" r="46" fill="rgba(230,223,207,.14)" stroke="#e6dfcf" stroke-width="3"/>`; else g+=`<circle cx="${x}" cy="${y-34}" r="40" fill="transparent"/>`;
+  if(o.fam==='bridge') g+=`<rect x="${x-110}" y="${y-30}" width="220" height="34" fill="#4d4a47" stroke="${c}" stroke-width="2"/><path d="M${x-110} ${y-30} l22 34 l22 -34 l22 34 l22 -34 l22 34 l22 -34 l22 34 l22 -34 l22 34 l22 -34" fill="none" stroke="#2b2826" stroke-width="3"/>`;
+  else if(o.fam==='pad') g+=`<rect x="${x-56}" y="${y-18}" width="112" height="36" fill="#7b6a55" stroke="${c}" stroke-width="2" stroke-dasharray="${ghost?'5 4':'0'}"/>`;
+  else if(o.fam==='crossing') g+=`<rect x="${x-4}" y="${y-90}" width="8" height="90" fill="#ddd"/><g stroke="#f4f4f4" stroke-width="9" stroke-linecap="round"><line x1="${x-30}" y1="${y-104}" x2="${x+30}" y2="${y-66}"/><line x1="${x+30}" y1="${y-104}" x2="${x-30}" y2="${y-66}"/></g><circle cx="${x-18}" cy="${y-48}" r="8" fill="#b3261e"/><circle cx="${x+18}" cy="${y-48}" r="8" fill="#b3261e"/>`;
+  else if(o.fam==='milepost') g+=`<rect x="${x-9}" y="${y-58}" width="18" height="58" fill="${ghost?'none':'#e8e4da'}" stroke="${c}" stroke-width="2"/><text x="${x}" y="${y-34}" text-anchor="middle" font-size="12" font-weight="700" fill="#222">47</text>`;
+  else if(o.fam==='board') g+=`<rect x="${x-3}" y="${y-70}" width="6" height="70" fill="#3b3b3b"/><rect x="${x-50}" y="${y-92}" width="100" height="30" fill="${ghost?'none':'#e9e2cf'}" stroke="${ghost?c:'#222'}" stroke-width="2"/><text x="${x}" y="${y-72}" text-anchor="middle" font-size="13" font-weight="700" fill="#222">${ghost?'':'SYLVA INT'}</text>`;
+  else g+=`<rect x="${x-3}" y="${y-70}" width="6" height="70" fill="${ghost?c:'#ececec'}"/><g stroke="${ghost?c:'#6ea6dc'}" stroke-width="7" stroke-linecap="round"><line x1="${x-20}" y1="${y-88}" x2="${x+20}" y2="${y-60}"/><line x1="${x+20}" y1="${y-88}" x2="${x-20}" y2="${y-60}"/></g>`;
+  if(!ghost&&o.problems.length) g+=`<path d="M${x+22} ${y-96} l14 24 h-28z" fill="#e2735c" stroke="#1d1915" stroke-width="2"/>`;
+  return g+`</g>`; }
+
+// ---------- surrounding product: native Map Editor stand-in ----------
+function nativeEditor(){ const u=S.hist[S.hist.length-1], r=S.redo[S.redo.length-1], o=cur();
+  return `<div class="hud"><span>▤</span><span>⌂</span><span>✎</span><span>⚙</span><span>$ 0</span><span>10:14:16</span></div>
+  <div class="win nat" style="left:8px;top:8px;width:580px;height:316px"><div class="tb">Map Editor - crankyant/sylva-yard-fix${dirty()?' *':''}<span class="x">×</span></div>
+  <div class="pad"><div class="row">${btn('Undo','undo',null,{dis:u?'':'Nothing to undo.',tip:u?'Undo: '+u.label:''})}${btn('Redo','redo',null,{dis:r?'':'Nothing to redo.',tip:r?'Redo: '+r.label:''})}<span class="sp"></span>${btn('View','nomock','View')}${btn('Save','save',null,{pri:dirty(),tip:dirty()?'Save the map and its scene patch ('+unsaved()+' unsaved).':'Nothing to save.'})}</div>
+  <div class="row"><span>${o?'1 selected':'Nothing selected'}</span><span class="sp"></span>${btn('Focus',o?'focus':'x',null,{dis:o?'':'Select an object first.'})}${btn('Clear','desel')}${btn('Delete','x',null,{dis:'Native action, not part of this prototype.'})}</div>
+  <div class="row"><span class="seg">${['Select','Box','Move','Rotate','Scale'].map((t,i)=>btn(t,'x',null,{on:i===0,tip:'Native tool strip (stand-in).'})).join('')}</span></div>
+  <div class="ph">Native outliner and inspector continue here. This stand-in keeps the real window's place, Undo/Redo and Save so each concept can be judged next to it.</div>
+  ${o?`<div style="padding:0 2px"><div class="ttl" style="font-size:18px">${h(o.name)}</div><div class="sub">Selected in the world. Native selection and Scene patches share one target.</div></div>`:`<div class="sub" style="text-align:center">Click an object in the world to select it.</div>`}</div></div>`; }
+function winStyle(id,x,y,w,hh){ const p=S.win[id]||{}; return `left:${p.x!=null?p.x:x}px;top:${p.y!=null?p.y:y}px;width:${p.w||w}px;${hh?`height:${p.h||hh}px`:''}`; }
+
+// ====================================================================
+// Variant A: Outliner and inspector. Object-first, one resizable window, native master/detail.
+// ====================================================================
+function variantA(){ const o=cur(), ui=S.ui, list=filtered(ui.q,ui.aFilter); const groups={}; list.forEach(x=>(groups[x.fam]=groups[x.fam]||[]).push(x));
+  const modeSw=g=>`<span class="seg" style="flex:none">${btn('Inspector','aMode','insp',{on:!g,sm:1,tip:g?'Return to the normal inspector. An unfinished guided task is cancelled and its values are discarded.':'Tabs with every control for this object.'})}${btn('Guided','aMode','guided',{on:g,sm:1,tip:'Do one task step by step: Target, Values, Review, Apply.'})}</span>`;
+  let insp;
+  if(ui.job||(ui.aGuide&&o)) insp=guidedA(o,modeSw(true));
+  else if(!o) insp=`<div style="padding:40px 24px;text-align:center"><div class="ttl" style="color:var(--tx2);font-family:var(--ui);font-weight:400">No Selection</div><p class="sub">Pick an object in the list or click it in the world.<br>The inspector then shows only what that object supports.</p></div>`;
+  else { const sp=FAM[o.fam].spec, tab=ui.aTab;
+    const tabBtn=(k,l,status,whyNot)=>btn(l+mark(status),'aTab',k,{on:tab===k,dis:status?'':whyNot,tip:markTip(status)});
+    let body='',foot='';
+    if(tab==='sum'){ body=`<div class="cap">Placement</div>${fragPoseRead(o)}<div class="cap">Binding and registration</div>${fragBindNow(o)}${fragDeps(o)}`
+        +(o.problems.length&&usable(st(o,'bind'))?`<div class="row" style="margin-top:8px">${btn('Fix step by step','guide','bind',{tip:'Opens Guided mode on this problem: confirm the target, choose the track, review, apply. You can also fix it yourself on the Binding tab.'})}</div>`:'');
+      foot=`<div class="row">${btn('Focus camera','focus')}${st(o,'place')?btn('Edit placement','aTab','place'):''}${st(o,'bind')?btn(o.problems.length?'Repair binding':'Edit binding','aTab','bind',{pri:!!o.problems.length}):''}</div>`; }
+    if(tab==='place'){ body=statusNote(o,'place')+fragPose(o)+fragGizmoSnap(o)+`<div class="cap">Activity</div>`+fragActivity(o);
+      foot=`<div class="row"><span class="sub">${placeChanged(o)?'Draft differs from the scene. Binding will not change.':'Draft equals the scene.'}</span><span class="sp"></span>${btn('Revert','revert',null,{dis:placeChanged(o)?'':'No draft to revert.'})}${btn('Apply placement','apply','place',{pri:1,dis:why('place'),tip:'Applies position and rotation, then refreshes the observation.'})}</div>`; }
+    if(tab==='bind'){ body=statusNote(o,'bind')+`<div class="cap">Current ${info('A logical binding relates this object to a track. It is independent of where the object stands.')}</div>${fragBindNow(o)}<div class="hr"></div><div class="cap" style="color:var(--hi)">Change to</div>${fragBindDraft(o)}<div class="hr"></div>${fragFollow()}`;
+      foot=`<div class="row"><span class="sub">${bindChanged(o)&&D(o).seg?'Draft differs. The object will not move.':''}</span><span class="sp"></span>${btn('Detach','apply','detach',{dis:why('detach'),tip:'Removes the relationship; the object stays where it is.'})}${btn(o.binding?'Replace binding':'Set binding','apply','bind',{pri:1,dis:why('bind')})}</div>`; }
+    if(tab==='spec'){ body=fragSpec(o); foot=''; }
+    if(tab==='id'){ body=fragIdentity(o); foot=''; }
+    if(S.pending) foot=pendHtml(true);
+    insp=`<div class="A-head"><div class="row" style="flex-wrap:nowrap;align-items:flex-start"><div class="ttl" style="flex:1">${h(o.name)}</div>${modeSw(false)}</div><div class="row" style="margin-top:5px;gap:4px">${badges(o)}</div></div>
+    <div class="A-tabs"><span class="seg">${tabBtn('sum','Summary',1)}${tabBtn('place','Placement',st(o,'place'),naWhy(o,'place'))}${tabBtn('bind','Binding',st(o,'bind'),naWhy(o,'bind'))}${tabBtn('spec',sp?sp.l:'Special',sp?sp.st:0,'This family has no specialized operations.')}${tabBtn('id','Identity',1)}</span></div>
+    <div class="A-body scroll" data-sc="A-body">${body}</div>
+    ${(S.msg||foot)?`<div class="A-foot">${msgHtml()}${foot}</div>`:''}`; }
+  return `<div class="win rs" data-win="A" style="${winStyle('A',1880,70,668,800)}"><div class="tb" data-drag="A">Scene patches<span class="x" data-tip="Close (stand-in)">×</span></div>
+   <div class="A-band">${btn('Refresh','refresh',null,{tip:'Read the scene again. Nothing is applied.'})}${staleChip()}<span class="sp"></span>${saveChip()}</div>
+   <div class="A-split"><div class="A-out"><div class="top"><input class="in" data-q="1" data-k="q" value="${h(ui.q)}" placeholder="Search name, path, segment">
+     <span class="seg">${btn('All','aFilter','all',{on:ui.aFilter==='all',sm:1})}${btn('Problems '+(problems().length+checks().length),'aFilter','problems',{on:ui.aFilter==='problems',sm:1,tip:'Detected problems and items worth checking.'})}${btn('Patched','aFilter','changed',{on:ui.aFilter==='changed',sm:1})}</span></div>
+     <div class="list scroll" data-sc="A-list" style="flex:1">${Object.keys(groups).map(f=>`<div class="grpH">▾ ${FAM[f].l}</div>`+groups[f].map(x=>itemRow(x)).join('')).join('')||'<div class="sub" style="padding:10px">No objects match.</div>'}</div></div>
+   <div class="A-insp">${insp}</div></div></div>`; }
+
+// Guided mode of A: an optional step-by-step region that replaces only the tabs, body and footer of the
+// inspector pane. Window, band, outliner and object heading stay as they are. Back and Next move only these steps.
+const GUIDE=['bind','detach','move','snap','active'];
+function guidedA(o,sw){ const j=S.ui.job, back=btn('‹ Inspector','aMode','insp',{sm:1,tip:j&&j.step<4?'Return to the normal inspector. This cancels the guided task and discards its values; nothing was changed.':'Return to the normal inspector.'});
+  const head=`<div class="A-head"><div class="row" style="flex-wrap:nowrap;align-items:flex-start"><div class="ttl" style="flex:1">${o?h(o.name):'<span style="color:var(--tx2)">No object</span>'}</div>${sw}</div>${o?`<div class="row" style="margin-top:5px;gap:4px">${badges(o)}</div>`:''}</div>`;
+  if(!j){ const fix=o.problems.length&&jobOk('bind',o)==='';
+    return head+`<div class="A-gbar"><div class="row">${back}<span class="cap" style="margin:0">Guided · choose a task</span></div></div>
+    <div class="A-body scroll" data-sc="A-guide"><p class="sub" style="margin:10px 0 6px">Each task takes four steps: Target, Values, Review, Apply. Nothing changes before Apply.</p>
+    ${fix?`<div class="msg failed" style="margin-bottom:8px"><b>Problem.</b>${h(o.problems[0])}<br>${btn('Fix this binding ◇','guide','bind',{pri:1,sm:1,tip:markTip('r')})}</div>`:''}
+    <div class="C-grid">${GUIDE.map(k=>{ const w=jobOk(k,o); return btn(`${JOBS[k].l}<small>${h(w||JOBS[k].d)}</small>`,'guide',k,{dis:w}); }).join('')}</div></div>
+    ${S.msg?`<div class="A-foot">${msgHtml()}</div>`:''}`; }
+  const J=JOBS[j.type], n=j.step, okT=o?jobOk(j.type,o):'Pick an object in the list or the world.', pend=S.pending?'Finish or cancel the pending world choice first.':'';
+  let b='', foot='';
+  if(n===1) b=`<div class="cap">Target</div>`+(o?`<dl class="kv"><dt>Object</dt><dd>${h(o.name)}</dd><dt>Family</dt><dd>${FAM[o.fam].l}</dd><dt>Scene path</dt><dd class="mono">${h(o.path)}</dd><dt>Binding</dt><dd>${h(bindTxt(o.binding))}</dd></dl>`
+      +(o.problems.length?`<div class="cap" style="color:var(--bad)">Problem</div><div>${h(o.problems[0])}</div>`:'')
+      +`<p class="sub">${okT?'This object cannot take the task. '+h(okT):'Next pins this object as the target of the task.'} To use another object, pick it in the list or the world.</p>`
+      :`<p class="sub">Pick an object in the list or the world.</p>`);
+  else if(n<4) b=statusNote(o,J.task)+`<div class="cap">${n===2?'Values':'Review'} ${n===3?info('Left is the inspected scene, right is what Apply will write. Lines marked unchanged are not touched.'):''}</div>`+jobStepBody(j,o);
+  else b=`<div class="msg ok" style="margin-top:10px;padding-right:9px"><b>Applied.</b>${h(j.done)}. The observation was refreshed.</div>
+    <dl class="kv" style="margin-top:10px"><dt>Placement</dt><dd>${posTxt(o.pos)}</dd><dt>Binding</dt><dd>${h(bindTxt(o.binding))}</dd><dt>Registration</dt><dd>${h(o.reg)}</dd><dt>Active</dt><dd>${o.active?'Yes':'No'}</dd></dl>
+    <p class="sub">${dirty()?unsaved()+' unsaved. Save and Undo are in the native Map Editor window.':'Saved.'}</p>`;
+  if(n<4) foot=`<div class="row">${n>1?btn('Back','jobStep',n-1,{dis:pend,tip:n===2||!J.values?'Back to Target. This unpins the target and discards the entered values.':'Back to Values. The entered values are kept.'}):''}<span class="sp"></span>${
+      n===1?btn('Next','jobStep',2,{pri:1,dis:okT,tip:'Pins the target and continues.'})
+      :n===2?btn('Next','jobStep',3,{pri:1,dis:pend,tip:'Review the change before anything is applied.'})
+      :btn('Apply','jobApply',null,{pri:1,dis:why(J.kind),tip:'One coherent operation: applied, verified, then the observation is refreshed.'})}</div>`;
+  else foot=`<div class="row">${btn('Another guided task','guideMore')}<span class="sp"></span>${btn('Back to inspector','aMode','insp',{pri:1})}</div>`;
+  const steps=['Target',J.values?'Values':'Values (none)','Review','Apply'];
+  return head+`<div class="A-gbar"><div class="row">${back}<span class="cap" style="margin:0">Guided</span><b style="color:var(--hi)">${J.l}</b><span class="sp"></span>${j.target?`<span class="chip info" data-tip="This task is pinned to its target. Selecting another object does not change it. Go back to Target to pick a different one; that discards the entered values.">Target pinned</span>`:''}</div>
+    <div class="C-steps">${steps.map((l,i)=>`<span class="${i+1===n?'cur':i+1<n?'done':''}">${i+1} ${l}</span>`).join('')}</div></div>
+    <div class="A-body scroll" data-sc="A-guide">${b}</div>
+    <div class="A-foot">${n<4?msgHtml():''}${foot}</div>`; }
+
+// ====================================================================
+// Variant B: World-anchored tools. World-first, a slim bar plus small task windows at the object.
+// ====================================================================
+function variantB(){ const o=cur(), ui=S.ui; let s=`<div class="B-bar"><span class="nm">Scene patches</span>
+   <input class="in" style="width:250px" data-q="1" data-k="q" value="${h(ui.q)}" placeholder="Find object…">
+   ${btn('Problems '+(problems().length+checks().length),'bDrop','problems',{on:ui.bDrop==='problems'})}
+   <span class="sp"></span>${btn('Refresh','refresh',null,{tip:'Read the scene again. Nothing is applied.'})}${staleChip()}${saveChip()}${btn('Data sheet','bData',null,{on:ui.bData,tip:'Open the read-only data window for the selected object.'})}</div>`;
+  const drop=ui.q?filtered(ui.q,'all'):ui.bDrop==='problems'?filtered('','problems'):null;
+  if(drop) s+=`<div class="B-drop" style="left:${ui.q?868:1130}px">${drop.map(x=>itemRow(x)).join('')||'<div class="sub" style="padding:10px">No objects match.</div>'}</div>`;
+  if(o){ const pp=pin(o), sp=FAM[o.fam].spec, tool=ui.bTool; const ax=Math.min(Math.max(pp.x+70,600),2100), ay=Math.max(pp.y-520,70);
+    const opBtn=(k,l,status,whyNot)=>btn(l+mark(status),'bTool',k,{on:tool===k,dis:status?'':whyNot,tip:markTip(status)});
+    let body='',act='';
+    if(tool==='place'){ body=statusNote(o,'place')+fragPose(o)+fragGizmoSnap(o);
+      act=`<div class="row"><span class="sub">Binding will not change.</span><span class="sp"></span>${btn('Revert','revert',null,{dis:placeChanged(o)?'':'No draft to revert.'})}${btn('Apply placement','apply','place',{pri:1,dis:why('place')})}</div>`; }
+    if(tool==='bind'){ body=statusNote(o,'bind')+`<div class="cap">Now</div><div>${o.binding?h(bindTxt(o.binding)):'No binding'} · <span class="sub">${h(o.reg)}</span></div><div class="cap" style="color:var(--hi)">Change to</div>${fragBindDraft(o)}`;
+      act=`<div class="row"><span class="sub">The object will not move.</span><span class="sp"></span>${btn('Detach','apply','detach',{dis:why('detach')})}${btn(o.binding?'Replace binding':'Set binding','apply','bind',{pri:1,dis:why('bind')})}</div>`; }
+    if(tool==='spec') body=fragSpec(o);
+    if(tool==='activity'){ body=`<div style="padding-top:10px">${fragActivity(o)}</div><p class="sub">Disabling keeps placement and binding in the patch.</p>`; }
+    if(S.pending) act='';
+    s+=`<svg style="position:absolute;inset:0;width:2560px;height:1440px;pointer-events:none">${S.win.Bcard?'':`<line x1="${pp.x+30}" y1="${pp.y-50}" x2="${ax}" y2="${ay+40}" stroke="#8a7558" stroke-width="2"/>`}</svg>
+    <div class="win B-card" data-win="Bcard" style="${winStyle('Bcard',ax,ay,432)}"><div class="hd" data-drag="Bcard" data-tip="Follows the object. Drag to park it elsewhere."><div class="ttl" style="font-size:18px">${h(o.name)}</div><div class="row" style="margin-top:4px;gap:4px">${badges(o)}</div><span class="x" style="position:absolute;right:9px;top:4px;cursor:pointer;font-size:18px" data-a="desel">×</span></div>
+     <div class="ops"><span class="seg">${opBtn('place','Place',st(o,'place'),naWhy(o,'place'))}${opBtn('bind','Bind',st(o,'bind'),naWhy(o,'bind'))}${sp?opBtn('spec',sp.l,sp.st):''}${opBtn('activity','Activity',st(o,'activity'),naWhy(o,'activity'))}</span></div>
+     ${tool?`<div class="tool">${body}</div>`:`<div class="tool" style="padding-top:8px"><span class="sub">${o.problems.length?h(o.problems[0]):o.check?h(o.check):'Choose what to do with this object. Only its supported operations are offered.'}</span></div>`}
+     ${(S.msg||act)?`<div class="act">${msgHtml()}${act}</div>`:''}</div>`;
+    if(ui.bData) s+=`<div class="win rs" data-win="Bdata" style="${winStyle('Bdata',8,336,580,640)}"><div class="tb" data-drag="Bdata">Data sheet · ${h(o.name)}<span class="x" data-a="bData">×</span></div>
+      <div class="scroll" data-sc="B-data" style="flex:1;padding:2px 10px 12px"><div class="cap">Placement</div>${fragPoseRead(o)}<div class="cap">Binding and registration</div>${fragBindNow(o)}${fragDeps(o)}<div class="hr"></div><div class="cap">Identity</div>${fragIdentity(o)}</div></div>`;
+  } else { if(S.msg) s+=`<div class="win" style="left:960px;top:60px;width:600px;min-height:0">${msgHtml()}</div>`;
+    if(ui.bData) s+=`<div class="win" style="left:8px;top:336px;width:580px;min-height:0"><div class="tb">Data sheet<span class="x" data-a="bData">×</span></div><div class="sub" style="padding:14px">Select an object to see its recorded data.</div></div>`; }
+  if(S.pending){ const p=S.pending; s+=`<div class="B-prompt"><b style="color:#f0d27a">Choosing ${p.kind==='bind'?'binding segment':'snap track'} for ${h(o.name)}</b><span>${p.cand?'Confirm on the track label, or pick another track.':'Click a highlighted track. Camera stays free; nothing changes until you confirm.'}</span><span class="sp"></span>${btn('Cancel','cancel',null,{tip:'Also Esc'})}</div>`; }
+  return s; }
+
+// ====================================================================
+// Variant C: Change sheet. Job-first, a docked column around the patch document and its changes.
+// ====================================================================
+const JOBS={
+  move:{l:'Move or rotate',d:'Numbers or gizmo',task:'place',kind:'place',values:1},
+  snap:{l:'Snap to a track',d:'Position once, beside a track',task:'place',kind:'place',values:1},
+  bind:{l:'Change binding ◇',d:'Relate to another track · not yet accepted',task:'bind',kind:'bind',values:1},
+  detach:{l:'Detach from track ◇',d:'Remove the relationship · not yet accepted',task:'bind',kind:'detach'},
+  active:{l:'Enable or disable',d:'Activity in the scene',task:'activity',kind:'active'},
+  xcov:{l:'Crossing coverage ◦',d:'Concept · planned',planned:'#53'},
+  xeq:{l:'Crossing equipment ◦',d:'Concept · planned',planned:'#55'},
+  mile:{l:'Move a milepost ◦',d:'Concept · planned',planned:'#48'}
+};
+function jobOk(t,o){ const j=JOBS[t]; if(j.planned) return 'Planned capability.'; const x=st(o,j.task); if(usable(x)){ return t==='detach'&&!o.binding?'No binding to detach.':''; } return x==='p'?'Planned for '+FAM[o.fam].l.toLowerCase()+'s.':naWhy(o,j.task); }
+// Values and Review content of a job step; shared by Concept C and the guided mode in A.
+function jobStepBody(j,o){ const J=JOBS[j.type]; let b='';
+  if(j.step===2){ b=j.type==='move'?fragPose(o)+`<div class="cap">In the world</div><div class="row">${btn('Move with gizmo','gizmo','move',{on:S.gizmo==='move'})}${btn('Rotate with gizmo','gizmo','rot',{on:S.gizmo==='rot'})}</div>`
+        :j.type==='snap'?(S.pending?pendHtml(true):`<div class="row" style="margin-top:6px">${btn(D(o).snap?'Choose another track':'Choose track in world','choose','snap',{pri:!D(o).snap})}${D(o).snap?`<span class="chip info">Preview on ${D(o).snap}</span>`:''}</div><p class="sub">Snap sets the position once. It keeps rotation and binding and does not make the object follow the track.</p>`)
+        :(S.pending?pendHtml(true):fragBindDraft(o)); }
+    else { const d=D(o); let rows='';
+      if(J.kind==='place') rows=`<span class="k">Position</span><span class="o">${posTxt(o.pos)}</span><span>→</span><span class="nw">${[d.x,d.y,d.z].map(f2).join(', ')}</span><span class="k">Rotation</span><span class="o">${posTxt(o.rot)}</span><span>→</span><span class="nw">${[d.rx,d.ry,d.rz].map(f2).join(', ')}</span><span class="k">Binding</span><span class="same">Unchanged · ${h(bindTxt(o.binding))}</span>`;
+      if(J.kind==='bind') rows=`<span class="k">Binding</span><span class="o">${h(bindTxt(o.binding))}</span><span>→</span><span class="nw">${h(d.seg?bindTxt({seg:d.seg,end:d.end,dist:d.dist}):'—')}</span><span class="k">Registration</span><span class="o">${h(o.reg)}</span><span>→</span><span class="nw">${d.seg?'Registered with '+h(d.seg):'—'}</span><span class="k">Placement</span><span class="same">Unchanged · the object does not move</span>`;
+      if(J.kind==='detach') rows=`<span class="k">Binding</span><span class="o">${h(bindTxt(o.binding))}</span><span>→</span><span class="nw">None</span><span class="k">Placement</span><span class="same">Unchanged · the object does not move</span>`;
+      if(J.kind==='active') rows=`<span class="k">Active</span><span class="o">${o.active?'Yes':'No'}</span><span>→</span><span class="nw">${o.active?'No':'Yes'}</span><span class="k">Placement, binding</span><span class="same">Unchanged</span>`;
+      b=`<div class="diff">${rows}</div>`; }
+  return b; }
+function variantC(){ const ui=S.ui, o=cur(), nP=problems().length+checks().length;
+  if(!ui.cOpen) return `<div class="C-col shut" data-a="cOpen" data-tip="Open the change sheet"><b style="font-family:var(--serif);color:var(--hi)">‹</b><span class="dot" style="background:${S.stale?'var(--warn)':'var(--ok)'}" data-tip="${S.stale?'Snapshot stale':'Snapshot current'}"></span><span style="writing-mode:vertical-rl;font-size:14px">${dirty()?unsaved()+' unsaved · ':''}${nP} to review${S.ui.job?' · job open':''}</span></div>`;
+  let job=''; const j=ui.job;
+  if(j){ const J=JOBS[j.type], stepL=['Target',J.values?'Values':'—','Review and apply']; let b='';
+    if(J.planned) b=conceptNote(J.planned,J.l.replace(' ◦',''))+`<p class="sub">This job would walk through target, eligible choices and a before/after review like the others.</p>`;
+    else if(j.step===1){ b=`<div class="sub">Pick the object in the world or below. Objects that cannot take this job say why.</div><div class="list scroll" style="max-height:250px;border:1px solid var(--rule);border-radius:4px;margin-top:5px">`+
+      S.objs.map(x=>{ const w=jobOk(j.type,x); return w?`<div class="it" style="opacity:.45;cursor:not-allowed" data-tip="${h(w)}"><span class="nm">${h(x.name)}</span><span class="sub">${h(w.length>34?FAM[x.fam].l:w)}</span></div>`:itemRow(x,'jobSel'); }).join('')+`</div>`; }
+    else b=jobStepBody(j,o);
+    if(!J.planned&&o&&j.target) b=statusNote(o,J.task)+b;
+    const canNext=j.step===1?(o&&jobOk(j.type,o)===''?'':'Pick a target first.'):'';
+    job=`<div class="C-job"><div class="row"><span class="ttl" style="font-size:18px">${J.l}</span>${j.target?`<span class="chip info" data-tip="This job is pinned to its target. Selecting another object does not change it. Go back to Target to pick a different one; that discards the entered values.">Target · ${h(ob(j.target).name)}</span>`:''}<span class="sp"></span>${btn('Cancel job','jobCancel',null,{sm:1,tip:'Discards the values entered in this job. Nothing was changed.'})}</div>
+      <div class="C-steps">${stepL.map((l,i)=>`<span class="${i+1===j.step?'cur':i+1<j.step?'done':''}">${i+1} ${l}</span>`).join('')}</div>
+      <div class="scroll" style="min-height:0">${b}</div>${msgHtml()}
+      ${J.planned?'':`<div class="row">${j.step>1?btn('Back','jobStep',j.step-1):''}<span class="sp"></span>${j.step<3?btn('Next','jobStep',J.values?j.step+1:3,{pri:1,dis:canNext||(S.pending?'Finish or cancel the pending world choice first.':'')}):btn('Apply','jobApply',null,{pri:1,dis:why(J.kind),tip:'One coherent operation: applied, verified, then listed under Changes.'})}</div>`}</div>`; }
+  let body='';
+  if(ui.cTab==='work'){ body=`<div class="cap">Needs attention</div>`+
+      (problems().map(x=>`<div class="C-ent"><div class="h"><span class="chip bad">Problem</span><b>${h(x.name)}</b><span class="sp"></span>${btn('Repair binding','repair',x.id,{sm:1,pri:1,dis:j?'Finish or cancel the open job first.':''})}</div><div class="sub" style="margin-top:4px">${h(x.problems[0])}</div></div>`).join('')
+      +checks().map(x=>`<div class="C-ent"><div class="h"><span class="chip warn">Check</span><b>${h(x.name)}</b><span class="sp"></span>${btn('Show','sel',x.id,{sm:1})}</div><div class="sub" style="margin-top:4px">${h(x.check)}</div></div>`).join('')
+      +S.objs.filter(x=>x.out).map(x=>`<div class="C-ent"><div class="h"><span class="chip info">Output</span><b>${h(x.name)}</b><span class="sp"></span>${btn('Show','sel',x.id,{sm:1})}</div><div class="sub" style="margin-top:4px">Terrain output outstanding: 1 mask.</div></div>`).join('')||'<div class="sub">Nothing detected.</div>')
+      +`<div class="cap" style="margin-top:16px">Start a job ${info('Each job is one coherent operation with a before/after review. A job starts from the inspected scene values and pins its target. Jobs marked ◇ have controls in the source snapshot but are not yet accepted. Jobs marked ◦ are planned capabilities shown as concept.')}</div><div class="C-grid">`
+      +Object.keys(JOBS).map(k=>btn(`${JOBS[k].l}<small>${JOBS[k].d}</small>`,'job',k,{dis:j?'Finish or cancel the open job first.':''})).join('')+`</div>`
+      +(o?`<div class="cap" style="margin-top:16px">Selected in the world</div><div class="C-ent"><div class="h"><b>${h(o.name)}</b></div><div class="row" style="margin:5px 0;gap:4px">${badges(o)}</div>${fragPoseRead(o)}<dl class="kv"><dt>Binding</dt><dd>${h(bindTxt(o.binding))}</dd></dl>${FAM[o.fam].spec?`<div class="hr"></div><div class="cap">${FAM[o.fam].spec.l}</div>${fragSpec(o)}`:''}</div>`:''); }
+  if(ui.cTab==='changes'){ const sv=S.saved?S.saved.split(','):[]; const rows=[...S.hist.map(e=>({...e,state:sv.includes(String(e.n))?'saved':'unsaved'})),...S.redo.map(e=>({...e,state:'undone'})),...S.attempts].sort((a,b)=>b.n-a.n);
+    const top=S.hist[S.hist.length-1];
+    body=(j?'':msgHtml())+(rows.length?'':`<div class="sub" style="margin-top:10px">No changes yet. Start a job from the Worklist.</div>`)+rows.map(e=>{ const x=ob(e.id);
+      const chip={saved:'<span class="chip">Saved</span>',unsaved:'<span class="chip warn">Unsaved</span>',undone:'<span class="chip">Undone</span>',refused:'<span class="chip warn">Refused · nothing changed</span>',failed:'<span class="chip bad">Failed · restored</span>'}[e.state];
+      let det=''; if(e.after){ det=Object.keys(e.after).filter(k=>k!=='reg').map(k=>{ const fm=v=>k==='binding'?bindTxt(v):k==='active'?(v?'Active':'Inactive'):posTxt(v); return `<span class="k">${k==='pos'?'Position':k==='rot'?'Rotation':k==='binding'?'Binding':'Activity'}</span><span class="o">${h(fm(e.before[k]))}</span><span>→</span><span class="nw">${h(fm(e.after[k]))}</span>`; }).join(''); }
+      return `<div class="C-ent${e.n===ui.cNew?' new':''}" style="${e.state==='undone'?'opacity:.55':''}"><div class="h"><span class="n">#${e.n}</span><b>${h(e.label)}</b><span class="sp"></span>${chip}</div>${det?`<div class="diff" style="margin-top:5px">${det}</div>`:''}
+        <div class="row" style="margin-top:6px">${btn('Show','sel',e.id,{sm:1})}${top&&e.n===top.n?btn('Undo','undo',null,{sm:1,tip:'Same as native Undo. History is linear: only the latest change can be undone.'}):''}${e.state==='undone'&&S.redo[S.redo.length-1].n===e.n?btn('Redo','redo',null,{sm:1}):''}</div></div>`; }).join(''); }
+  if(ui.cTab==='doc'){ const out=S.objs.filter(x=>x.out).length;
+    body=`<div class="cap">Persistence</div><dl class="kv"><dt>Patch document</dt><dd>${dirty()?'<span style="color:var(--warn)">'+unsaved()+' unsaved changes</span>':'Written'}</dd><dt>Map</dt><dd>${dirty()?'Unsaved':'Written'}</dd><dt>Terrain output</dt><dd>${out?'<span style="color:var(--warn)">'+out+' outstanding</span>':'Current'}</dd><dt>Format version</dt><dd>1</dd></dl>
+     <div class="row" style="margin-top:8px">${btn('Save','save',null,{pri:dirty(),tip:'Same as Save in the native Map Editor window.'})}${btn('Reload scene…','nomock','Reload',{tip:'Reload ends native Undo history and needs unsaved work to be saved or discarded first.'})}</div>
+     <div class="cap" style="margin-top:14px">Patch document <i>advanced: manual authoring or recovery</i></div><div class="json">${h(JSON.stringify({formatVersion:1,sourceMap:{mapId:'crankyant/sylva-yard-fix'},targets:S.objs.filter(changed).map(x=>({path:x.path,changes:S.hist.filter(e=>e.id===x.id).reduce((a,e)=>Object.assign(a,e.after),{})}))},null,2))}</div>`; }
+  return `<div class="C-col"><div class="C-doc"><div class="row"><span class="ttl">Scene patch</span><span class="sp"></span>${btn('›','cOpen',null,{sm:1,tip:'Collapse to a rail to see more of the world.'})}</div>
+    <div class="sub">crankyant/sylva-yard-fix</div><div class="row" style="margin-top:6px">${btn('Refresh','refresh',null,{sm:1,tip:'Read the scene again. Nothing is applied.'})}${staleChip()}${saveChip()}</div></div>
+    ${job}
+    <div class="C-tabs"><span class="seg">${btn('Worklist '+nP,'cTab','work',{on:ui.cTab==='work'})}${btn('Changes '+(S.hist.length+S.attempts.length),'cTab','changes',{on:ui.cTab==='changes'})}${btn('Document','cTab','doc',{on:ui.cTab==='doc'})}</span></div>
+    <div class="C-body scroll" data-sc="C-body">${body}</div></div>`; }
+
+// ---------- overview ----------
+const VAR={A:{n:'Outliner and inspector',f:variantA},B:{n:'World-anchored tools',f:variantB},C:{n:'Change sheet',f:variantC}};
+function overview(){ const th={
+  A:`<i class="n" style="left:1%;top:2%;width:22%;height:22%"></i><i style="left:73%;top:5%;width:26%;height:56%"></i><i style="left:73%;top:5%;width:10%;height:56%"></i><i class="h" style="left:74%;top:22%;width:8%;height:3%"></i><i class="h" style="left:84%;top:54%;width:14%;height:5%"></i><u style="left:74%;top:63%">list │ inspector tabs │ pinned actions</u>`,
+  B:`<i class="n" style="left:1%;top:2%;width:22%;height:22%"></i><i style="left:30%;top:1%;width:39%;height:5%"></i><i style="left:47%;top:16%;width:17%;height:30%"></i><i class="h" style="left:48%;top:40%;width:15%;height:4%"></i><i style="left:1%;top:26%;width:22%;height:40%;opacity:.7"></i><u style="left:47%;top:48%">tools at the object</u><u style="left:2%;top:68%">data sheet (optional)</u>`,
+  C:`<i class="n" style="left:1%;top:2%;width:22%;height:22%"></i><i style="left:79%;top:0;width:21%;height:100%"></i><i style="left:80%;top:14%;width:19%;height:30%;border-color:#d8d0bf"></i><i class="h" style="left:91%;top:38%;width:7%;height:4%"></i><i style="left:80%;top:52%;width:19%;height:8%"></i><i style="left:80%;top:62%;width:19%;height:8%"></i><u style="left:60%;top:18%">job steps</u><u style="left:58%;top:58%">change ledger</u>`};
+  const card=(k,idea,start,good,cost)=>`<div class="card"><div class="thumb" data-a="view" data-v="${k}">${th[k]}</div><h3>${k} · ${VAR[k].n}</h3><p>${idea}</p><p><b>Starts from:</b> ${start}</p><p><b>Strong when:</b> ${good}</p><p><b>Costs:</b> ${cost}</p><div class="row">${btn('Open concept '+k,'view',k,{pri:1})}</div></div>`;
+  return `<div class="ov"><h1>Scene patches editor UI concepts <span class="proto">PROTOTYPE</span></h1>
+  <p>Three structurally different ways to organise the Scene patches editor work inside Railroader's map editor. Everything is mocked in memory: no game, file, save or mod is read or changed. Capabilities marked ◦ or CONCEPT are planned, not implemented. Marker binding, marked ◇ or NOT YET ACCEPTED, has controls in the source snapshot but its ticket is still open, so its successful flow here is a mock and not evidence of working behaviour. Unmarked operations exist in the source snapshot under closed tickets; this prototype did not verify them. </p>
+  <div class="note" style="border-color:var(--ok)"><b>Direction selected for further exploration:</b> Concept A as the base, with an optional Guided mode taken from Concept C's step-by-step job. In A, the Inspector / Guided switch sits beside the object name, and a detected problem offers "Fix step by step". B and C stay here unchanged for comparison. This remains a throwaway mock; nothing is implemented in the product.</div>
+  <p><b>Question:</b> how should a map modder find an object, change its logical binding or its physical placement, see specialized operations, and recover from a refused or failed edit, without reading a wall of text and without losing the world or the native editor?</p>
+  <div class="cards">
+  ${card('A','One resizable window in the native master/detail grammar. A searchable object list on the left; the selected object\'s inspector on the right with task tabs and an action footer that never scrolls away.','an object','you inspect many objects in a row and want everything about one object in a fixed place','the largest single window; the object list is always on screen even during a long edit')}
+  ${card('B','No main window. A slim bar for find, state and save status; selecting an object puts a small tool card next to it in the world, showing one operation at a time. Recorded data lives in a separate optional data sheet.','the world','you work spatially, object by object, and want the least screen cover','browsing and comparing objects is weaker; the card moves with the selection; more separate pieces')}
+  ${card('C','A docked column organised around the patch document. A worklist of problems and jobs, a three-step job panel with a before/after review, and a ledger of every change, refusal and failure with its saved state.','a job or a problem','you repair, review and save a set of changes and want to see what happened and what is unsaved','more clicks for a quick nudge; free inspection is secondary; the column takes a fixed strip of the world')}
+  </div>
+  <h2>Side by side</h2>
+  <table><tr><th></th><th>A · Outliner and inspector</th><th>B · World-anchored tools</th><th>C · Change sheet</th></tr>
+  <tr><td>Top-level grouping</td><td>Objects by family; per object: Summary, Placement, Binding, specialized, Identity</td><td>The selected object's operations: Place, Bind, specialized, Activity</td><td>Worklist, Changes, Document; jobs by intent</td></tr>
+  <tr><td>Where actions live</td><td>Pinned footer of the inspector</td><td>Bottom of the tool card, at the object</td><td>Pinned job panel above the lists</td></tr>
+  <tr><td>Where recorded data lives</td><td>Summary and Identity tabs, scrolling above the footer</td><td>Separate data sheet window</td><td>Inline summary of the selection; JSON under Document</td></tr>
+  <tr><td>Refusal and recovery</td><td>In the footer, directly above the action</td><td>On the tool card, plus state chips in the bar</td><td>In the review step and kept as a ledger row</td></tr>
+  <tr><td>World choice in progress</td><td>Footer becomes the pending choice with Confirm and Cancel</td><td>Prompt strip plus Confirm on the track label in the world</td><td>Step 2 of the job holds the pending choice</td></tr>
+  <tr><td>Specialized objects</td><td>One extra tab named after the family</td><td>One extra operation on the card</td><td>Extra job types and a section in the selection summary</td></tr>
+  <tr><td>Narrow or small screens</td><td>List can collapse first; inspector keeps working</td><td>Smallest footprint; card can be parked</td><td>Column collapses to a rail</td></tr></table>
+  <h2>Try the same jobs in each concept</h2>
+  <ol><li>Select <b>Whistle Sign E</b> (click it in the world or find it).</li><li>Change its binding: choose a segment in the world, confirm the candidate, set the binding. The sign must not move.</li>
+  <li>Move it: nudge with the gizmo arrows or snap to a track, then apply. The binding must not change.</li><li>Press <b>Make stale</b> in the prototype bar, then apply something. Find the refusal and recover.</li>
+  <li>Toggle <b>Fail next</b> and apply. Find the failure and retry.</li><li>Undo and Redo in the native Map Editor stand-in, then Save. Watch the unsaved state.</li>
+  <li>In A, select <b>Whistle Sign W</b> (problem) and press <b>Fix step by step</b>: Target, Values, Review, Apply. Try selecting another object midway, Back, and returning to the Inspector.</li><li>Select <b>Whistle Sign W</b> (problem),<b>Main St crossing</b> and <b>Milepost 47</b> (planned capabilities, concept only).</li></ol>
+  <div class="note">The reported panel slowness is investigated separately and its cause is not yet attributed. This page does not measure, diagnose or fix game performance, and no layout here is a remedy for it. The concepts only keep data scrolling and action controls in separate regions.</div>
+  <p class="sub">Keys: ← → switch concepts (not while typing). Esc cancels a pending world choice. The white bar at the bottom is prototype chrome, not part of any design.</p></div>`; }
+
+// ---------- render loop ----------
+function scale(){ return S.fit?Math.min(innerWidth/2560,innerHeight/1440):1; }
+function render(){ const root=$('#root');
+  const ae=document.activeElement, fk=ae&&ae.dataset?ae.dataset.k:null, cs=fk?[ae.selectionStart,ae.selectionEnd]:null;
+  const sc={}; root.querySelectorAll('[data-sc]').forEach(e=>sc[e.dataset.sc]=e.scrollTop);
+  root.querySelectorAll('.rs[data-win]').forEach(e=>{ const w=S.win[e.dataset.win]=S.win[e.dataset.win]||{}; w.w=e.offsetWidth; w.h=e.offsetHeight; });
+  if(S.view==='overview'){ root.className=''; root.innerHTML=overview(); }
+  else { const k=scale(); root.className=S.fit?'fit':'';
+    root.innerHTML=`<div id="wrap" style="width:${2560*k}px;height:${1440*k}px"><div id="stage" style="transform:scale(${k})">${world({candInWorld:S.view==='B'})}${nativeEditor()}${VAR[S.view].f()}</div></div>`; }
+  root.querySelectorAll('[data-sc]').forEach(e=>{ if(sc[e.dataset.sc]) e.scrollTop=sc[e.dataset.sc]; });
+  if(fk){ const e=root.querySelector(`[data-k="${fk}"]`); if(e){ e.focus(); try{ e.setSelectionRange(cs[0],cs[1]); }catch(_){} } }
+  const v=S.view, on=v!=='overview';
+  $('#bar').innerHTML=`<span class="tag">PROTOTYPE</span><button data-a="prev">←</button><span class="lab">${on?v+' · '+VAR[v].n:'Overview'}</span><button data-a="next">→</button>
+    <button data-a="view" data-v="overview" class="${on?'':'on'}">Overview</button>${on?`<span class="sepr"></span><button data-a="fit" title="Fit shows the whole 2560 × 1440 game screen. 1:1 shows true size with scrolling.">${S.fit?'Fit':'1:1'}</button>
+    <span class="sepr"></span><small>Scenario</small><button data-a="stale" class="${S.stale?'on':''}" title="Simulate a native edit that makes the inspected target stale.">Make stale</button><button data-a="fail" class="${S.failNext?'on':''}" title="The next apply fails and is restored.">Fail next</button><button data-a="reset">Reset</button><button data-a="dump" class="${S.dump?'on':''}">State</button>`:''}`;
+  const dp=$('#dump'); dp.hidden=!(S.dump&&on); if(!dp.hidden){ const o=cur(); dp.textContent=JSON.stringify({variant:v,task:S.ui.job,guidedMode:S.ui.aGuide,selected:o?o.name:null,stale:S.stale,failNext:S.failNext,pending:S.pending,gizmo:S.gizmo,draft:o?D(o):null,
+    scene:o?{pos:o.pos,rot:o.rot,binding:o.binding,registration:o.reg,active:o.active}:null,history:S.hist.map(e=>'#'+e.n+' '+e.label),redo:S.redo.map(e=>'#'+e.n+' '+e.label),attempts:S.attempts.map(e=>'#'+e.n+' '+e.state+' '+e.label),dirty:dirty(),message:S.msg},null,1); }
+  try{ const u=new URL(location.href); if(on) u.searchParams.set('variant',v); else u.searchParams.delete('variant'); history.replaceState(null,'',u); }catch(_){}
+}
+function cycle(d){ const ks=Object.keys(VAR), i=ks.indexOf(S.view); setView(ks[(i<0?(d>0?0:ks.length-1):i+d+ks.length)%ks.length]); }
+document.addEventListener('click',e=>{ const t=e.target.closest('[data-a]'); if(!t||t.classList.contains('dis')) return;
+  const a=t.dataset.a; if(a==='x') return; if(a==='prev') cycle(-1); else if(a==='next') cycle(1); else if(ACT[a]) ACT[a](t.dataset.v);
+  $('#tip').style.display='none'; render(); });
+document.addEventListener('input',e=>{ const t=e.target; if(t.dataset.q){ S.ui.q=t.value; S.ui.bDrop=null; render(); }
+  else if(t.dataset.in&&cur()){ const d=D(cur()); d[t.dataset.in]=t.value; if('xyz'.includes(t.dataset.in)&&t.dataset.in.length===1) d.snap=null; } });
+document.addEventListener('change',e=>{ if(e.target.dataset.in) render(); });
+document.addEventListener('keydown',e=>{ const t=e.target, typing=t.matches&&t.matches('input,textarea,select,[contenteditable]');
+  if(e.key==='Escape'&&S.pending){ ACT.cancel(); render(); return; }
+  if(e.key==='Enter'&&typing&&t.dataset.in){ t.blur(); return; }
+  if(typing) return; if(e.key==='ArrowLeft'){ cycle(-1); render(); } if(e.key==='ArrowRight'){ cycle(1); render(); } });
+// drag windows by their title bar (positions are per-session only)
+let drag=null;
+document.addEventListener('pointerdown',e=>{ const hd=e.target.closest('[data-drag]'); if(!hd||e.target.closest('[data-a]')) return; const w=hd.closest('.win');
+  drag={id:hd.dataset.drag,el:w,x:e.clientX,y:e.clientY,l:w.offsetLeft,t:w.offsetTop}; e.preventDefault(); });
+document.addEventListener('pointermove',e=>{ if(drag){ const k=scale(), x=drag.l+(e.clientX-drag.x)/k, y=drag.t+(e.clientY-drag.y)/k; drag.el.style.left=x+'px'; drag.el.style.top=y+'px';
+    const w=S.win[drag.id]=S.win[drag.id]||{}; w.x=x; w.y=y; return; }
+  const t=e.target.closest&&e.target.closest('[data-tip]'), tip=$('#tip'); if(t&&t.dataset.tip){ tip.textContent=t.dataset.tip; tip.style.display='block';
+    tip.style.left=Math.min(e.clientX+14,innerWidth-350)+'px'; tip.style.top=(e.clientY+18+tip.offsetHeight>innerHeight?e.clientY-tip.offsetHeight-10:e.clientY+18)+'px'; } else tip.style.display='none'; });
+document.addEventListener('pointerup',()=>{ if(drag){ drag=null; render(); } });
+addEventListener('resize',render);
+{ const v=(new URLSearchParams(location.search).get('variant')||'').toUpperCase(); S.view=VAR[v]?v:'overview'; }
+render();
+</script>
+</body>
+</html>
