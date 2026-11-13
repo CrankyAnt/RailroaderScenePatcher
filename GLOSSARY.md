@@ -136,6 +136,9 @@ The tracks each circuit of an existing crossing detects, authored per circuit as
 **Owned span**:
 A detection span that a MapMod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; native spans are never removed.
 
+**Detection addition**:
+An authored extra circuit at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying MapMod. It adds detection without changing the crossing's native circuits.
+
 ### Editor terminology
 
 **Outliner**:
