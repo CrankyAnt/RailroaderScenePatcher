@@ -212,11 +212,18 @@ namespace RailroaderScenePatcher {
                 : TrackMarkerWorld.Problem(go, markerReferrers, setups));
             if (markerRefusal != null) problems.Add("Track binding unavailable: " + markerRefusal);
             var markerEditable = marked && markerRefusal == null;
-            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : null;
+            var crossing = family == "Crossing controller";
+            string coverageRefusal = crossing ? "the crossing-coverage capability is unavailable" : null;
+            if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
+            if (coverageRefusal != null) problems.Add("Crossing coverage unavailable: " + coverageRefusal);
+            var coverageEditable = crossing && coverageRefusal == null;
+            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
             var operations = board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : "Inspection only until corrected: " + refusal)
                 : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
                 : marked ? "Inspection only until corrected: " + markerRefusal
+                : coverageEditable ? "Crossing coverage: select tracks for, or detach, each circuit explicitly; native spans stay registered and the crossing itself does not move"
+                : crossing ? "Inspection only until corrected: " + coverageRefusal
                 : "Inspection only; no mutation adapter for this pattern";
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 go.activeInHierarchy, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },

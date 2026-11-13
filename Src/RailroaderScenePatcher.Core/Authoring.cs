@@ -22,6 +22,12 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<object> RedoGroups { get; }
         void Register(Action inverse, string name);
     }
+    // The intended effect of a coverage edit on each circuit of a crossing, or why it would be refused.
+    public sealed class CoveragePreview {
+        internal CoveragePreview(IReadOnlyList<string> lines, string error) { Lines = lines; Error = error; }
+        public IReadOnlyList<string> Lines { get; }
+        public string Error { get; }
+    }
     public sealed class SaveReport {
         internal SaveReport(IEnumerable<string> completed, IEnumerable<string> outstanding, string error) {
             Completed = completed.ToArray(); Outstanding = outstanding.ToArray(); Error = error;
@@ -194,6 +200,8 @@ namespace RailroaderScenePatcher.Core {
                     if ((item["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)item["placement"]["mode"] == PatchEngine.TrackFollowingMode) minimum = Max(minimum, TrackFollowingVersion);
                     // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available in this editor.
                     if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure)) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
+                    // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available in this editor.
+                    if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available in this editor.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.3.0");
                     TargetIdentity target;
@@ -372,6 +380,64 @@ namespace RailroaderScenePatcher.Core {
                 return value;
             });
         }
+        // Selects tracks for, or detaches, one circuit of this MapMod's crossing coverage. Other circuits keep their authored or
+        // effective coverage. A null coverage clears the circuit's authored entry: it returns to its effective underlying coverage.
+        public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage) { return Cover(target, circuit, coverage, null); }
+        public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected) {
+            return Change(coverage == null ? "Clear crossing coverage" : "Edit crossing coverage", target, inspected, existing => CoverageValue(target, existing, circuit, coverage));
+        }
+        // The crossing's current coverage of every circuit, read from the scene.
+        public CrossingCoverage Coverage(TargetIdentity target) {
+            var resolved = engine.ResolveUnique(target);
+            scene.Preflight(resolved);
+            return scene.Read(resolved).Coverage ?? throw new InvalidOperationException("This object has no crossing coverage");
+        }
+        // The effect a Cover edit would have on every circuit, without changing the scene, the document or the history.
+        public CoveragePreview PreviewCoverage(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected = null) {
+            try {
+                if (Blocked != null) throw new InvalidOperationException(Blocked);
+                var resolved = engine.ResolveUnique(target);
+                inspected?.Validate(scene, target, resolved);
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before another edit");
+                scene.Preflight(resolved);
+                var own = Own(resolved);
+                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside the editor first");
+                var existing = own.FirstOrDefault();
+                var value = CoverageValue(target, existing, circuit, coverage);
+                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value).State);
+                var candidate = (JArray)document.Modifications.DeepClone();
+                var index = existing == null ? -1 : document.Modifications.IndexOf(existing);
+                if (index >= 0) { if (value == null) candidate.RemoveAt(index); else candidate[index] = value; }
+                else if (value != null) candidate.Add(value);
+                var current = scene.Read(resolved).Coverage;
+                var desired = engine.Desired(candidate, resolved).Coverage;
+                return new CoveragePreview(CrossingCoverage.Describe(current, desired), null);
+            } catch (Exception e) { return new CoveragePreview(Array.Empty<string>(), e.Message); }
+        }
+        JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage) {
+            if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException("Choose a circuit of the crossing");
+            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the circuit's authored coverage to return it to its native spans");
+            if (existing != null) PatchEngine.Parse(existing);
+            var value = existing == null ? new JObject { ["id"] = NewId(target, "cover-"), ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+            var relationships = value["relationships"] as JObject ?? new JObject();
+            var circuits = relationships["crossingCoverage"] as JArray ?? new JArray();
+            var entry = circuits.OfType<JObject>().FirstOrDefault(c => (string)c["circuit"] == circuit);
+            if (coverage == null && entry == null) throw new InvalidOperationException("Circuit " + circuit + " has no authored coverage in the active document");
+            var replacement = coverage == null ? null : CircuitJson(circuit, coverage);
+            if (entry != null) { if (replacement == null) entry.Remove(); else entry.Replace(replacement); }
+            else circuits.Add(replacement);
+            if (circuits.Count == 0) relationships.Remove("crossingCoverage"); else relationships["crossingCoverage"] = circuits;
+            if (relationships.HasValues) value["relationships"] = relationships; else value.Remove("relationships");
+            if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
+            return value["placement"] == null && value["active"] == null && value["relationships"] == null ? null : value;
+        }
+        static JObject CircuitJson(string circuit, CircuitCoverage coverage) {
+            var value = new JObject { ["circuit"] = circuit };
+            if (coverage.Kind == CircuitKind.Detached) { value["detach"] = true; return value; }
+            for (var i = 0; i < 3; i++) value[CircuitCoverage.Roles[i]] = new JObject { ["from"] = LocationJson(coverage.Ranges[i].From), ["to"] = LocationJson(coverage.Ranges[i].To) };
+            return value;
+        }
+        static JObject LocationJson(TrackLocation location) => new JObject { ["segment"] = location.Segment, ["end"] = location.End, ["distance"] = location.Distance };
         // Clears this MapMod's activity value of the object: it returns to its effective underlying activity, which for an
         // object following a track group is group-driven again. Placement and relationships stay as authored.
         public Outcome ClearActivity(TargetIdentity target, InspectedTarget inspected = null) {
@@ -510,7 +576,7 @@ namespace RailroaderScenePatcher.Core {
             return value;
         }
         static bool Same(ObjectState a, ObjectState b) {
-            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker)) return false;
+            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }

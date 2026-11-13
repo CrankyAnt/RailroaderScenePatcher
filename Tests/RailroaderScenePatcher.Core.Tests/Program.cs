@@ -142,6 +142,7 @@ class Program {
         BindingTests.Run();
         TrackFollowingTests.Run();
         GroupActivityTests.Run();
+        CoverageTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

@@ -70,13 +70,18 @@ namespace RailroaderScenePatcher {
         string authoringStatus = "";
         // The last edit result, shown in the panel section of its control and written to the log.
         readonly EditFeedback feedback = new EditFeedback();
-        const string BindingPlace = "binding", PlacementPlace = "placement", InteractionPlace = "interaction";
+        const string BindingPlace = "binding", PlacementPlace = "placement", InteractionPlace = "interaction", CoveragePlace = "coverage";
         bool staleLogged = true;
         NativeTrackPoses trackPoses;
         float nextTrackFollow;
         const string FollowPlace = "follow";
         readonly string[] pose = { "", "", "", "", "", "" };
         readonly string[] binding = { "", "a", "" };
+        // Crossing coverage being edited: the circuit, four fields per role (segment, end, from, to) and the previewed change.
+        string coverageCircuit;
+        readonly string[] coverageFields = new string[12];
+        sealed class PreparedCoverage { internal string Circuit; internal CircuitCoverage Value; internal CoveragePreview Preview; }
+        PreparedCoverage preparedCoverage;
         readonly string loadId = Guid.NewGuid().ToString("N");
         internal void Initialize(IModContext value) {
             context = value;
@@ -123,6 +128,11 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) {
                     capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": track-marker capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
+                try { capabilities.Add(new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked)); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": crossing-coverage capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); }
                 catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": track-following placement unavailable: " + e.GetBaseException().Message); }
@@ -290,7 +300,8 @@ namespace RailroaderScenePatcher {
                 documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot());
+                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot(),
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error);
         }
         string TerrainSnapshot() {
             if (authoring == null || selected == null || !Editable) return "";
@@ -358,7 +369,7 @@ namespace RailroaderScenePatcher {
                             presentation.Action(() => {
                                 var observation = (SceneObservation)row.Value;
                                 if (!inventoryPresentation.CanSelect(inventory, observation)) return;
-                                CancelGizmo(); ClearSnap(); selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
+                                CancelGizmo(); ClearSnap(); coverageCircuit = null; selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
                             })();
                         });
                         var listLayout = outline.GetComponent<LayoutElement>();
@@ -381,6 +392,7 @@ namespace RailroaderScenePatcher {
             Button(builder, "Transform gizmo guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/using-transform-gizmos.md"));
             Button(builder, "Fixed-placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/authoring-fixed-placement.md"));
             Button(builder, "Board and terrain guidance", () => Application.OpenURL(BoardGuide));
+            Button(builder, "Crossing coverage guidance", () => Application.OpenURL(CoverageGuide));
             Button(builder, "Document v1 reference", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-document-v1.md"));
         }
         const string BoardGuide = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/moving-boards.md";
@@ -455,8 +467,8 @@ namespace RailroaderScenePatcher {
             }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure) && selected.Handle is GameObject;
-        void ClearSnap() { preparedSnap = null; choosingSnap = false; }
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure) && selected.Handle is GameObject;
+        void ClearSnap() { preparedSnap = null; choosingSnap = false; preparedCoverage = null; }
         void BeginSnap(SelectionKind kind) {
             BeginSelection(kind, selected);
             choosingSnap = selection?.Pending != null;
@@ -561,6 +573,7 @@ namespace RailroaderScenePatcher {
             }
             var target = (GameObject)selected.Handle;
             if (target == null) { PlainLabel(builder, "The inspected object no longer exists. Refresh the inventory."); return; }
+            if (selected.Identity.Structure == CrossingCoverageScene.Structure) { DrawCoverage(builder, session, selected.Identity); return; }
             if (selected.Identity.Structure == TrackMarkerScene.Structure) DrawBinding(builder, selected.Identity);
             DrawSnap(builder);
             if (selected.Identity.Structure == BridgeScene.Structure) {
@@ -645,6 +658,104 @@ namespace RailroaderScenePatcher {
             if (feedback.Place == BindingPlace) PlainLabel(builder, feedback.Result);
             Button(builder, "Track binding guidance", () => Application.OpenURL(BindingGuide));
             builder.AddSection("Placement and activity");
+        }
+        const string CoverageGuide = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/correcting-crossing-coverage.md";
+        // The crossing's detection coverage by circuit. Each change is previewed for every circuit before it is applied; the
+        // crossing object never moves, and proximity never assigns coverage.
+        void DrawCoverage(UIPanelBuilder builder, AuthoringSession session, TargetIdentity identity) {
+            builder.AddSection("Crossing coverage");
+            PlainLabel(builder, "Each circuit has an approach A, island and approach B span. Select the tracks a circuit covers, or detach it, explicitly; the patcher never assigns coverage by proximity. The native spans stay registered and unchanged, and circuits you do not edit keep their coverage. Preview a change to see its effect on every circuit, then apply it.");
+            CrossingCoverage current = null;
+            try { current = session.Coverage(identity); }
+            catch (Exception e) { PlainLabel(builder, "Coverage unavailable: " + e.GetBaseException().Message); }
+            if (current != null) {
+                foreach (var circuit in current.Circuits) {
+                    var key = circuit.Key; var value = circuit.Value;
+                    PlainLabel(builder, "Circuit " + key + ": " + value + ".");
+                    Button(builder, "Edit circuit " + key, () => { coverageCircuit = key; preparedCoverage = null; ReadCoverage(value); presentation.RequestRefresh(); });
+                }
+                if (current.Residue.Count > 0) PlainLabel(builder, "Owned spans left by an incomplete cleanup: " + String.Join(", ", current.Residue) + ". Use Recheck after failed edit.");
+            }
+            if (coverageCircuit != null) {
+                PlainLabel(builder, "Editing circuit " + coverageCircuit + ". Distances are metres from the chosen end. From is the end next to the island for each approach and island lower for the island.");
+                var confirmed = selection?.Confirmed?.Identity;
+                var labels = new[] { "Segment", "End (a or b)", "From (m)", "To (m)" };
+                for (var role = 0; role < 3; role++) {
+                    var first = role * 4; var roleName = CircuitCoverage.Roles[role];
+                    PlainLabel(builder, roleName);
+                    builder.HStack(fields => {
+                        for (var column = 0; column < 4; column++) {
+                            var index = first + column; var label = labels[column];
+                            fields.VStack(field => {
+                                field.AddLabel(label);
+                                var input = field.AddInputField(coverageFields[index] ?? "", value => { coverageFields[index] = value; preparedCoverage = null; });
+                                input.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => { coverageFields[index] = value; preparedCoverage = null; });
+                                var layout = input.gameObject.GetComponent<LayoutElement>() ?? input.gameObject.AddComponent<LayoutElement>();
+                                layout.minWidth = 60; layout.flexibleWidth = 1;
+                            }).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
+                        }
+                    });
+                    Button(builder, "Use confirmed segment for " + roleName, () => { if (confirmed != null && confirmed.Kind == SelectionKind.TrackSegment) { coverageFields[first] = confirmed.Identifier; preparedCoverage = null; } presentation.RequestRefresh(); })
+                        .Disable(confirmed == null || confirmed.Kind != SelectionKind.TrackSegment);
+                }
+                Button(builder, "Choose track in world", () => BeginSelection(SelectionKind.TrackSegment, selected));
+                var circuitKey = coverageCircuit;
+                Button(builder, "Preview selected tracks", () => {
+                    var value = ParseCoverage(out var problem);
+                    if (value == null) feedback.Refuse(CoveragePlace, "Coverage preview", problem);
+                    else PrepareCoverage(session, identity, circuitKey, value);
+                });
+                // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach as well.
+                var lastCovered = CrossingCoverage.LastCovered(current, circuitKey);
+                if (lastCovered) PlainLabel(builder, "Circuit " + circuitKey + " is the crossing's last covered circuit. Detaching it would leave the crossing without detection, so the patcher refuses it; select tracks for it instead, or keep another circuit covered.");
+                Button(builder, "Preview detach", () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached)).Disable(lastCovered);
+                Button(builder, "Preview clearing the authored circuit", () => PrepareCoverage(session, identity, circuitKey, null));
+                if (preparedCoverage != null && preparedCoverage.Circuit == coverageCircuit) {
+                    if (preparedCoverage.Preview.Error != null) PlainLabel(builder, "Preview refused: " + preparedCoverage.Preview.Error);
+                    else {
+                        PlainLabel(builder, "Intended crossing relationship:");
+                        foreach (var line in preparedCoverage.Preview.Lines) PlainLabel(builder, line);
+                        var prepared = preparedCoverage;
+                        Button(builder, "Apply previewed coverage", () => Edit(CoveragePlace, "Crossing coverage", (current2, inspection) => current2.Cover(identity, prepared.Circuit, prepared.Value, inspection)));
+                    }
+                    Button(builder, "Cancel preview", () => { preparedCoverage = null; presentation.RequestRefresh(); });
+                }
+            }
+            if (feedback.Place == CoveragePlace) PlainLabel(builder, feedback.Result);
+            Button(builder, "Remove modification", () => Edit(CoveragePlace, "Removal", (current2, inspection) => current2.Remove(identity, inspection)));
+            Button(builder, "Recheck after failed edit", () => Edit(CoveragePlace, "Recheck", (current2, inspection) => current2.Recheck(identity, inspection)));
+            Button(builder, "Crossing coverage guidance", () => Application.OpenURL(CoverageGuide));
+            PlainLabel(builder, "Removal returns every circuit to its coverage without this MapMod's modification. Save writes Data/scene-patches.json and the patcher dependency; the game rebuilds the selected coverage from the document on every load. Reloading the editor ends Undo/Redo history.");
+        }
+        void PrepareCoverage(AuthoringSession session, TargetIdentity identity, string circuit, CircuitCoverage value) {
+            CoveragePreview preview;
+            try { preview = session.PreviewCoverage(identity, circuit, value, inventory.Pin(selected)); }
+            catch (Exception e) { feedback.Refuse(CoveragePlace, "Coverage preview", e.GetBaseException().Message); preparedCoverage = null; return; }
+            preparedCoverage = new PreparedCoverage { Circuit = circuit, Value = value, Preview = preview };
+            presentation.RequestRefresh();
+        }
+        // Fills the fields from the circuit's selected tracks; a circuit with native spans or detached starts empty.
+        void ReadCoverage(CircuitCoverage value) {
+            for (var role = 0; role < 3; role++) {
+                var range = value.Kind == CircuitKind.Tracks ? value.Ranges[role] : null;
+                coverageFields[role * 4] = range?.From.Segment ?? "";
+                coverageFields[role * 4 + 1] = range?.From.End ?? "a";
+                coverageFields[role * 4 + 2] = range == null ? "" : range.From.Distance.ToString("R", CultureInfo.InvariantCulture);
+                coverageFields[role * 4 + 3] = range == null ? "" : range.To.Distance.ToString("R", CultureInfo.InvariantCulture);
+            }
+        }
+        CircuitCoverage ParseCoverage(out string problem) {
+            problem = null;
+            var ranges = new SpanRange[3];
+            for (var role = 0; role < 3; role++) {
+                var segment = (coverageFields[role * 4] ?? "").Trim(); var end = (coverageFields[role * 4 + 1] ?? "").Trim().ToLowerInvariant();
+                if (segment.Length == 0 || (end != "a" && end != "b") || !Double.TryParse(coverageFields[role * 4 + 2], NumberStyles.Float, CultureInfo.InvariantCulture, out var from) || !Double.TryParse(coverageFields[role * 4 + 3], NumberStyles.Float, CultureInfo.InvariantCulture, out var to)) {
+                    problem = "enter a segment ID, end a or b, and from and to distances with a decimal point for " + CircuitCoverage.Roles[role];
+                    return null;
+                }
+                ranges[role] = new SpanRange(new TrackLocation(segment, end, from), new TrackLocation(segment, end, to));
+            }
+            return CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2]);
         }
         // Terrain output follows a board edit asynchronously; the game regenerates it, and Save does not write it.
         void DrawOutput(UIPanelBuilder builder, AuthoringSession session, TargetIdentity identity) {

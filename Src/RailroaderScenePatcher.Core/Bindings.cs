@@ -247,6 +247,7 @@ namespace RailroaderScenePatcher.Core {
             if (difference != null) throw new InvalidOperationException("The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it");
         }
         public void CheckRelationships(object target, ObjectState state) {
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             var group = world.GroupActivity(target);
             if (group != null && state?.Active == true)
                 throw new InvalidOperationException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");

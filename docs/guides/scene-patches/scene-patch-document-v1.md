@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Scene-patch document v1
 
-This reference defines the v1 JSON fields accepted by the core engine for fixed and track-following placement, activity and track-marker relationships. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), and Generic track markers, described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
+This reference defines the v1 JSON fields accepted by the core engine for fixed and track-following placement, activity, track-marker relationships and crossing coverage. Each supplying MapMod keeps one document at `Data/scene-patches.json` in its own pack, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The map editor writes it for the active edited MapMod, as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), Generic track markers, described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md), and the detection coverage of existing crossings, described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
 
 ## Document fields
 
@@ -32,7 +32,7 @@ A modification holds the desired state of one object and must contain `placement
 
 The [editor inventory](inspect-scene-objects.md) supplies observed identifiers and placement without changing this format. An inspection-only entry does not enable a new v1 operation. The engine rechecks the resolved object and map context immediately before mutation. A missing, ambiguous or replaced target fails rather than redirecting the operation. Editor integrations can bind a complete-document edit to its inspected observations through an in-memory token; that token is not serialized or distributed.
 
-[World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editor session. Version 1 stores fixed and track-following placement, activity and track-marker relationships. A pending choice or confirmed track or node identity stays in the editor session. Applying an edit and using the editor's Save writes the authored state.
+[World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editor session. Version 1 stores fixed and track-following placement, activity, track-marker relationships and crossing coverage. A pending choice or confirmed track or node identity stays in the editor session. Applying an edit and using the editor's Save writes the authored state.
 
 ## Placement
 
@@ -55,7 +55,7 @@ A segment or node that is missing, or a distance outside the segment, fails the 
 
 ## Relationships
 
-The `relationships` object accepts only `trackMarker`. Each relationship has three settings:
+The `relationships` object accepts `trackMarker` and `crossingCoverage`, and must contain at least one of them. Each relationship has three settings:
 
 | Setting | Meaning |
 | --- | --- |
@@ -75,6 +75,20 @@ A detach object contains only `detach` with the value `true`. `null`, `{}`, `fal
 
 The engine checks the reference before mutation. A segment that does not exist, a segment ID that matches more than one segment, or a distance outside the segment fails the modification, and the object keeps its relationship and registration. The engine never substitutes another target.
 
+### Crossing coverage
+
+`crossingCoverage` requires patcher 0.5.0 or later. It is a non-empty array with one entry per explicitly set circuit of the target crossing. An entry contains `circuit` and either the three spans or a detach:
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `circuit` | string | Required and non-empty. The ID of the circuit's native island span; it must name a circuit of the target crossing. Each circuit appears at most once. |
+| `approachA`, `island`, `approachB` | object | Required together, unless the entry detaches. Each holds `from` and `to`, both track locations with the `segment`, `end` and `distance` fields above. |
+| `detach` | boolean | `true`, alone with `circuit`. The crossing stops evaluating the circuit. |
+
+The three settings apply per circuit. An omitted circuit keeps its effective coverage, and an omitted `crossingCoverage` leaves every circuit untouched. Selected tracks replace the circuit's spans with spans the patcher owns, covering the route from `from` to `to`; `from` is the native lower end, which lies next to the island for each approach. A detached circuit leaves the crossing's evaluation. In both cases the circuit's native spans stay registered and unchanged, so a still-valid old route stops triggering the crossing without being removed. Circuits keep their identity and native order.
+
+The engine checks every entry before mutation: the circuit must exist on the crossing, each segment must exist exactly once, each distance must lie inside its segment and no span may have zero length. At least one circuit of the crossing must keep detection: a modification whose result, together with the crossing's current effective coverage, detaches every circuit is refused. A refusal leaves the crossing's coverage unchanged. Unknown fields in an entry make the modification unsupported; an entry with `detach` and span fields, `"detach": false`, an empty array and a partial set of spans are invalid.
+
 [Explicit snapping](snapping-to-track.md) writes a fixed placement. The editor computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to authoring preflight and are not serialized. Runtime application and reload use the resulting absolute pose without querying a snap target. Snapping adds no dependency minimum; later track movement does not change the saved pose. Track-following placement is the separate mode above.
 
 ## Current native targets
@@ -89,7 +103,7 @@ After a failed mutation whose restoration verified, later modifications of the s
 
 An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered Sylva board, updated culling sphere and registered mask at the desired pose, with settled terrain output; its sampled tree regions were empty. A separate research trial on the same build moved the Sylva board's mask onto one generated tree, observed the tree leave the generated tile output and return after restoration. Other boards qualify through the component pattern without individual trials.
 
-The bridge and track-marker targets below have their own adapters; other object families are not implemented.
+The bridge, track-marker and crossing targets below have their own adapters; other object families are not implemented.
 
 ### Bridge
 
@@ -117,9 +131,17 @@ A marker object whose `Track.TrackRelativePosition` has its activity follow the 
 
 After a change the adapter also verifies the subscription count, the observed group and the activity the group or the hold requires. A difference fails the modification and restores the captured location, registration, subscription, hold, pose and activity; an unverified restoration blocks further operations on the marker for the load.
 
+### Crossing
+
+The crossing-coverage adapter recognizes an object holding one `Track.Crossings.GradeCrossingController` whose circuit list is non-empty and whose circuits each hold an approach A, island and approach B span with an ID. The target `component` is `Track.Crossings.GradeCrossingController`; set `structure` to `crossing-coverage-v1`. A modification may set only `relationships.crossingCoverage`; `placement`, `active` and `trackMarker` are refused before mutation.
+
+The adapter records the crossing's circuits and their native spans at its first observation in the load, which requires every native span to be registered in the track graph under its ID. A selected circuit gets three spans owned by the patcher, created disabled under a root that is not saved, given their ID and endpoints and enabled so that the native span lifecycle registers them; a repeated application reuses matching owned spans. The circuit then refers to them. A detached circuit is removed from the controller's circuit list and keeps its native references; the controller evaluates the remaining circuits in their native order from its next pass. Owned spans that no circuit uses are disabled, which removes their registration, and destroyed.
+
+Before mutation the adapter requires that the controller evaluates only its own circuits in native order, that each circuit holds its native spans or owned spans, and that every native span stays registered. After a change it verifies each circuit's coverage, those rules, and that exactly the owned spans in use are registered and cover track. A difference fails the modification and restores the captured coverage; owned spans that stay registered after restoration make cleanup unverified and block further operations on the crossing for the load. The map editor's Save writes neither the controller's references nor the owned spans, so each load rebuilds them from the document. See [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) for the editor route and limits.
+
 ## Writing by the editor
 
-The editor writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark. It keeps the member order of the source, writes one modification per edited object, and gives a new modification the `id` `place-<object name>`, `bind-<object name>` when its first edit is a relationship, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
+The editor writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark. It keeps the member order of the source, writes one modification per edited object, and gives a new modification the `id` `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
 
 Unknown fields at the document root and unknown modifications are preserved without being executed. Every number the editor did not replace keeps its source text, so a value such as `0.10` or a number beyond double precision is written back unchanged. The engine rejects unknown fields inside a modification, target, placement or relationship when it tries to execute that modification; the editor preserves such a modification and does not edit or remove it. A document with a missing, malformed, or unsupported format version, a document for another map, and a document whose numbers cannot be matched to their source text are protected: the editor does not write them.
 
@@ -136,6 +158,7 @@ The supplying MapMod's `Info.json` must list `crankyant/scene-patcher` under `de
 | Any modification with `relationships`, or whose target `structure` is `track-marker-v1` | `0.4.0` |
 | Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
 | Any modification with `active` whose target `structure` is `track-marker-v1` | `0.5.0` |
+| Any modification with `relationships.crossingCoverage`, or whose target `structure` is `crossing-coverage-v1` | `0.5.0` |
 
 The minimum follows from the document content alone, whether or not the target is loaded or its capability is available in this editor. An `active` value on a track-marker target can be the explicit disable of a group follower, which patcher 0.4.0 refuses; patcher 0.4.0 rejects a `trackFollowing` placement as unsupported, so only that modification would fail. Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry.
 

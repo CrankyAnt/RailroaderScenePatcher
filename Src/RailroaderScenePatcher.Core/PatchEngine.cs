@@ -37,11 +37,15 @@ namespace RailroaderScenePatcher.Core {
     // Desired or observed state of one object. A null member is left untouched by an application.
     public sealed class ObjectState {
         public ObjectState(Placement placement, bool? active) : this(placement, active, null) { }
-        public ObjectState(Placement placement, bool? active, MarkerBinding marker) { Placement = placement; Active = active; Marker = marker; }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker) : this(placement, active, marker, null) { }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage) { Placement = placement; Active = active; Marker = marker; Coverage = coverage; }
         public Placement Placement { get; }
         public bool? Active { get; }
         // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
         public MarkerBinding Marker { get; }
+        // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. Authored coverage
+        // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
+        public CrossingCoverage Coverage { get; }
     }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
@@ -196,6 +200,7 @@ namespace RailroaderScenePatcher.Core {
         internal void CheckRelationships(object target, ObjectState state) {
             if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
         }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
         internal bool IsUnsafe(object target) {
@@ -226,7 +231,7 @@ namespace RailroaderScenePatcher.Core {
             var state = Underlying(target);
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
-                state = new ObjectState(item.State.Placement ?? state.Placement, item.State.Active ?? state.Active, item.State.Marker ?? state.Marker);
+                state = new ObjectState(item.State.Placement ?? state.Placement, item.State.Active ?? state.Active, item.State.Marker ?? state.Marker, CrossingCoverage.Overlay(state.Coverage, item.State.Coverage));
             }
             return Evaluate(state);
         }
@@ -236,7 +241,7 @@ namespace RailroaderScenePatcher.Core {
             var following = state?.Placement?.Following;
             if (following == null) return state;
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
-            return new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker);
+            return new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage);
         }
         Modification Effective(string id, Dictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting) {
             Modification known;
@@ -284,9 +289,15 @@ namespace RailroaderScenePatcher.Core {
                 else throw new InvalidOperationException("Unsupported placement");
             }
             if (item["active"] != null && item["active"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid activity");
-            var marker = item["relationships"] == null ? null : ParseRelationships(item["relationships"]);
-            if (pose == null && item["active"] == null && marker == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"], marker), Dependencies = dependencies };
+            MarkerBinding marker = null; CrossingCoverage coverage = null;
+            if (item["relationships"] != null) {
+                var relationships = item["relationships"] as JObject;
+                if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
+                if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
+                if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]);
+            }
+            if (pose == null && item["active"] == null && marker == null && coverage == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"], marker, coverage), Dependencies = dependencies };
         }
         public const string TrackFollowingMode = "trackFollowing";
         // A placement relative to an explicitly selected segment location or endpoint node.
@@ -312,16 +323,47 @@ namespace RailroaderScenePatcher.Core {
             return new TrackLocation((string)marker["segment"], (string)marker["end"], distance);
         }
         // An explicit relationship setting: a reference sets or replaces it, detach clears it. An omitted relationship stays untouched.
-        static MarkerBinding ParseRelationships(JToken token) {
-            var relationships = token as JObject;
-            if (relationships == null || !Only(relationships, "trackMarker")) throw new InvalidOperationException("Unsupported relationships");
-            var marker = relationships["trackMarker"] as JObject;
+        static MarkerBinding ParseTrackMarker(JToken token) {
+            var marker = token as JObject;
             if (marker == null) throw new InvalidOperationException("Unsupported relationships: trackMarker needs a location or an explicit detach");
             if (marker["detach"] != null) {
                 if (!Only(marker, "detach") || marker["detach"].Type != JTokenType.Boolean || !(bool)marker["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone");
                 return MarkerBinding.Detached;
             }
             return MarkerBinding.At(ParseLocation(marker, "relationship"));
+        }
+        // Explicit crossing coverage: each listed circuit, named by its native island span, gets selected tracks or an explicit
+        // detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every circuit untouched.
+        static CrossingCoverage ParseCoverage(JToken token) {
+            var circuits = token as JArray;
+            if (circuits == null || circuits.Count == 0) throw new InvalidOperationException("Invalid relationship: crossingCoverage must list at least one circuit");
+            var parsed = new List<KeyValuePair<string, CircuitCoverage>>();
+            foreach (var entry in circuits) {
+                var circuit = entry as JObject;
+                if (circuit == null || !RequiredString(circuit, "circuit")) throw new InvalidOperationException("Invalid relationship: each crossingCoverage entry names its circuit by island span ID");
+                var key = (string)circuit["circuit"];
+                if (parsed.Any(p => p.Key == key)) throw new InvalidOperationException("Invalid relationship: circuit " + key + " is listed twice");
+                if (circuit["detach"] != null) {
+                    if (!Only(circuit, "circuit", "detach") || circuit["detach"].Type != JTokenType.Boolean || !(bool)circuit["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone with its circuit");
+                    parsed.Add(new KeyValuePair<string, CircuitCoverage>(key, CircuitCoverage.Detached));
+                    continue;
+                }
+                if (!Only(circuit, "circuit", "approachA", "island", "approachB")) throw new InvalidOperationException("Unsupported relationship content");
+                var ranges = new SpanRange[3];
+                for (var i = 0; i < 3; i++) {
+                    var role = CircuitCoverage.Roles[i];
+                    var range = circuit[role] as JObject;
+                    if (range == null) throw new InvalidOperationException("Invalid relationship: circuit " + key + " needs approachA, island and approachB, or an explicit detach");
+                    if (!Only(range, "from", "to")) throw new InvalidOperationException("Unsupported relationship content");
+                    ranges[i] = new SpanRange(RangeEnd(range["from"]), RangeEnd(range["to"]));
+                }
+                parsed.Add(new KeyValuePair<string, CircuitCoverage>(key, CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2])));
+            }
+            return new CrossingCoverage(parsed);
+        }
+        static TrackLocation RangeEnd(JToken token) {
+            if (!(token is JObject location)) throw new InvalidOperationException("Invalid relationship: a track location needs segment, end and distance");
+            return ParseLocation(location, "relationship");
         }
         static bool RequiredString(JObject obj, string name) { return obj[name]?.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)obj[name]); }
         static bool Only(JObject obj, params string[] allowed) { return obj.Properties().All(p => allowed.Contains(p.Name, StringComparer.Ordinal)); }

@@ -68,6 +68,7 @@ namespace RailroaderScenePatcher.Core {
             var owner = Owner(target);
             if (owner is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
         }
         // Dependent output belongs to the adapter that resolved the object; an adapter without it reports none.
         public DependentOutput Output(object target) {
