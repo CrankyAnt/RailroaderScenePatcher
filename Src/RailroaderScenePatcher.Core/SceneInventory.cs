@@ -185,6 +185,8 @@ namespace RailroaderScenePatcher.Core {
         readonly SceneObservation observed;
         internal InspectedTarget(string[] maps, SceneObservation observed) { this.maps = (string[])maps.Clone(); this.observed = observed; }
         public void Validate(IScene scene, TargetIdentity identity, object resolved) {
+            // A capability that failed its game checks resolves to a placeholder; name that cause instead of a changed context.
+            (scene as SceneCapabilities)?.CheckAvailable(resolved);
             if (!maps.SequenceEqual(scene.MapIds) || !ReferenceEquals(resolved, observed.Handle) ||
                 identity.Scene != observed.Identity.Scene || identity.Path != observed.Identity.Path ||
                 identity.Component != observed.Identity.Component || (identity.Structure != null && identity.Structure != observed.Identity.Structure) || !(scene is IInspectionScene inspection))

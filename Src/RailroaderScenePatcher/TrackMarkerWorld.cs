@@ -13,16 +13,18 @@ namespace RailroaderScenePatcher {
     // The serialized location is the relationship; the track graph's named-location bucket for that segment is its
     // registration, which the native marker adds when it is enabled and removes when it is disabled. Setting the
     // location does not change that registration, so this adapter performs the matching remove and add steps.
-    // Mileposts, crossing pads and crossing markers keep their own later slices; signals are outside scope.
+    // Crossing pads use CrossingPadWorld; mileposts and crossing markers keep their own later slices; signals are outside scope.
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
     // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
-    internal sealed class TrackMarkerWorld : ITrackMarkerWorld, ITrackMarkerDiagnostics {
+    internal class TrackMarkerWorld : ITrackMarkerWorld, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern {
         readonly NativeMarkerWarnings warningHistory = new NativeMarkerWarnings();
         readonly NativeCurrentWarnings currentWarnings = new NativeCurrentWarnings();
         internal const string MarkerType = "Track.TrackMarker";
-        const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location", Relative = "Track.TrackRelativePosition";
-        const string Milepost = "Helpers.MilePost", PadBuilder = "Track.TrackCurveMeshBuilder", Crossing = "Track.Crossings.GradeCrossingController";
+        const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location";
+        internal const string Relative = "Track.TrackRelativePosition", Milepost = "Helpers.MilePost";
+        internal const string PadBuilder = "Track.TrackCurveMeshBuilder";
+        const string Crossing = "Track.Crossings.GradeCrossingController";
         const string MapBuilderType = "UI.Map.MapBuilder", MapLabelType = "UI.Map.MapLabel", SetupType = "Game.Progression.SetupDescriptor";
         readonly Type marker, graph, segment, location, end, transformer, culler, mapBuilder, mapLabel;
         readonly PropertyInfo markerLocation;
@@ -87,21 +89,34 @@ namespace RailroaderScenePatcher {
             for (var t = type; t != null; t = t.BaseType) { var f = t.GetField(name, Native.Flags | BindingFlags.DeclaredOnly); if (f != null) return f; }
             return null;
         }
-        static object Field(object owner, string name) => (FieldOf(owner.GetType(), name) ?? throw new MissingFieldException(owner.GetType().FullName, name)).GetValue(owner);
-        static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
-        static Component Get(GameObject go, string type) => go.GetComponents<Component>().FirstOrDefault(c => c != null && c.GetType().FullName == type);
+        internal static object Field(object owner, string name) => (FieldOf(owner.GetType(), name) ?? throw new MissingFieldException(owner.GetType().FullName, name)).GetValue(owner);
+        internal static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
+        internal static Component Get(GameObject go, string type) => go.GetComponents<Component>().FirstOrDefault(c => c != null && c.GetType().FullName == type);
         static object Graph() => Native.Read(Native.Type(GraphType), "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
-        Component MarkerOf(object target) => ((GameObject)target).GetComponent(marker) ?? throw new InvalidOperationException("The object no longer holds a track marker");
+        internal Component MarkerOf(object target) => ((GameObject)target).GetComponent(marker) ?? throw new InvalidOperationException("The object no longer holds a track marker");
         // The loaded objects at the path that hold a marker. Starting from the marker components avoids building the path of
         // every loaded object; an object with several markers is one match, as before.
-        public IReadOnlyList<object> Resolve(TargetIdentity identity) {
+        // Crossing pads belong to the crossing-pad capability, so the two capabilities never claim the same object.
+        public IReadOnlyList<object> Resolve(TargetIdentity identity) => Markers(identity, Belongs);
+        protected virtual bool Belongs(GameObject g) => Get(g, PadBuilder) == null;
+        // The held object still exists in its loaded scene at the identity's path and still belongs to this capability.
+        // This reads one object, never the scene; uniqueness is checked again by the next resolution.
+        public bool StillIdentifies(object target, TargetIdentity identity) {
+            var g = target as GameObject;
+            return g != null && identity.Component == MarkerType && Loaded(g) && g.scene.name == identity.Scene && g.GetComponent(marker) != null && Belongs(g)
+                && BoardScene.PathOf(g.transform) == identity.Path;
+        }
+        protected IReadOnlyList<object> Markers(TargetIdentity identity, Func<GameObject, bool> belongs) {
             if (identity.Component != MarkerType) return Array.Empty<object>();
             return Resources.FindObjectsOfTypeAll(marker).OfType<Component>().Where(c => c != null).Select(c => c.gameObject).Distinct()
-                .Where(g => VisibleForCheck(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path).Cast<object>().ToArray();
+                .Where(g => VisibleForCheck(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path && belongs(g)).Cast<object>().ToArray();
         }
-        public string PatternProblem(object target) {
+        public virtual string PatternProblem(object target) =>
+            Problem(target as GameObject, CurrentReferrers(), HolderIndex.Lazy(() => SetupPlacementMarkers(VisibleForCheck)), ReferenceEquals(target, enablingTarget));
+        // Direct references to marker components from the objects the current check may see, scanned at most once per frame.
+        protected ReferenceScan CurrentReferrers() {
             if (referrersFrame != Time.frameCount) { referrers = Referrers(Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && VisibleForCheck(c.gameObject))); referrersFrame = Time.frameCount; }
-            return Problem(target as GameObject, referrers, HolderIndex.Lazy(() => SetupPlacementMarkers(VisibleForCheck)), ReferenceEquals(target, enablingTarget));
+            return referrers;
         }
         // Every direct field or list reference from a loaded component to a marker component. A relevant field that
         // cannot be read leaves the scan incomplete, which refuses every marker. An observer receives every field read of
@@ -144,17 +159,26 @@ namespace RailroaderScenePatcher {
         static string Describe(object owner) => owner is Component c && c != null ? c.GetType().FullName + " on " + BoardScene.PathOf(c.transform) : System.Convert.ToString(owner);
         // Why the object does not conform to the supported Generic-marker pattern, or null. Shared with the inventory,
         // which supplies the reference scan and setup index of its discovery.
-        internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups, bool enabling = false) {
+        // The pattern without the consumer scans, for an update that changes only the pose of a held object.
+        public virtual string PlacementProblem(object target) => Problem(target as GameObject, null, null, ReferenceEquals(target, enablingTarget), true);
+        internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups, bool enabling = false, bool placementOnly = false) {
             if (!Loaded(go) && !(enabling && go != null && go.scene.IsValid())) return "This object has no implemented track-marker capability";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
             if (markers.Length != 1) return markers.Length == 0 ? "The object holds no track marker" : "The object holds several track markers";
             var m = markers[0];
             if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the marker object";
             if (Get(go, Milepost) != null) return "Milepost markers keep their milepost-specific slice; this binding operation does not apply";
-            if (Get(go, PadBuilder) != null) return "Crossing pad markers keep their pad-specific slice; this binding operation does not apply";
+            if (Get(go, PadBuilder) != null) return "Crossing pad markers use the crossing-pad capability; this Generic-marker operation does not apply";
             for (var t = go.transform; t != null; t = t.parent) if (Get(t.gameObject, Crossing) != null) return "Markers inside a crossing keep the crossing-specific slice";
             var type = System.Convert.ToString(Field(m, "type"));
             if (type != "Generic") return "Only Generic track markers are supported; this marker is " + type;
+            return Consumers(go, m, references, setups, (owner, field) => owner is Component c && c.gameObject == go && c.GetType().FullName == Relative && field == "_marker", placementOnly);
+        }
+        // The consumer checks shared by the Generic-marker and crossing-pad patterns: the marker's ID, location listeners,
+        // group-following activity, new-game car placements and direct holders other than the allowed colocated ones.
+        // A placement-only check reads this object alone: the setup placements and the direct-reference scan concern
+        // consumers of the marker's location, which a pose update does not change.
+        internal static string Consumers(GameObject go, Component m, ReferenceScan references, HolderIndex setups, Func<object, string, bool> allowed, bool placementOnly = false) {
             if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID; its graph registration cannot be identified";
             // A listener of location changes is a dependent consumer this adapter does not refresh.
             if (Field(m, "OnLocationChanged") is Delegate listeners && listeners.GetInvocationList().Length != 0) return "Another component consumes this marker's location changes; its dependent state is not supported";
@@ -165,11 +189,14 @@ namespace RailroaderScenePatcher {
                 if (Field(relative, "_setTargetActive") is Delegate callback && !(callback.Target is HoldTarget)) return "Another component replaced the track-group activation of this object; that consumer is not supported";
             }
             // A new-game setup car placement reads its marker's location when the setup runs; its timing relative to patch application is unverified.
+            if (placementOnly) return null;
             if ((setups ?? SetupHolders()).Holds(m)) return "A new-game car placement reads this marker's location; that consumer is not supported";
             // The colocated relative position holds its marker; any other holder of the component may cache what it read.
             if (references == null) return "The direct-reference scan is unavailable; other holders of this marker are unknown";
-            return references.Refusal(m, (owner, field) => owner is Component c && c.gameObject == go && c.GetType().FullName == Relative && field == "_marker", Describe);
+            return references.Refusal(m, allowed, Describe);
         }
+        // The native marker location (a boxed Track.Location), or null when it does not resolve.
+        protected object ResolvedLocation(object target) => markerLocation.GetValue(MarkerOf(target));
         public TrackLocation Location(object target) {
             var serialized = Field(MarkerOf(target), "_location");
             var id = Field(serialized, "segmentId") as string;
@@ -203,6 +230,7 @@ namespace RailroaderScenePatcher {
             // Preserve captured missing references; resolved locations use the native setter and its cache notifications.
             NativeMarkerLocation.Write(MarkerOf(target), value, value == null ? null : Segment(value.Segment), location, end);
         }
+        // Crossing pads share this: a pad marker emits the same native warning for a binding that is not on the track.
         public void AfterVerifiedState(object target) {
             try {
                 var m = MarkerOf(target);

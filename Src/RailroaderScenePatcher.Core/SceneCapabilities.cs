@@ -9,7 +9,7 @@ namespace RailroaderScenePatcher.Core {
     // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
     // the capability that resolved it. A capability that is incompatible with the running game build fails
     // only the modifications that name its structure; unrelated supported work stays available.
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
@@ -59,6 +59,8 @@ namespace RailroaderScenePatcher.Core {
             return owner;
         }
         public void Preflight(object target) { Owner(target).Preflight(target); }
+        // Throws the incompatibility of a capability whose game functions are missing, when the target is its placeholder.
+        internal void CheckAvailable(object target) { if (target is Unavailable) Owner(target); }
         public object Capture(object target) => Owner(target).Capture(target);
         public ObjectState Read(object target) => Owner(target).Read(target);
         public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
@@ -70,6 +72,15 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
         }
+        // Only the adapter that resolved the object can confirm it; an object no adapter resolved is not confirmed.
+        public bool StillIdentifies(object target, TargetIdentity identity) =>
+            target != null && owners.TryGetValue(target, out var owner) && owner.Capability != Capability.Incompatible && owner is ITargetConfirmation confirmation && confirmation.StillIdentifies(target, identity);
+        // An adapter without a follow update applies the state as an edit.
+        public void ApplyFollowUpdate(object target, ObjectState state) { var owner = Owner(target); if (owner is IFollowUpdateScene follow) follow.ApplyFollowUpdate(target, state); else owner.Apply(target, state); }
+        // An adapter without a placement preflight takes its full preflight.
+        public void PreflightPlacement(object target) { var owner = Owner(target); if (owner is IPlacementPreflight placement) placement.PreflightPlacement(target); else owner.Preflight(target); }
+        // Derived state belongs to the adapter that resolved the object; an adapter without it reports none.
+        public string DerivedProblem(object target, ObjectState desired) => Owner(target) is IDerivedStateScene derived ? derived.DerivedProblem(target, desired) : null;
         // Dependent output belongs to the adapter that resolved the object; an adapter without it reports none.
         public DependentOutput Output(object target) {
             if (target == null || target is Unavailable || !owners.TryGetValue(target, out var owner) || !(owner is IDependentOutputScene dependent)) return DependentOutput.None;

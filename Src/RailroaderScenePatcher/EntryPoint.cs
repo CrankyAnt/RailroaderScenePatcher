@@ -142,6 +142,11 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
+                try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld(), Capability.Unchecked)); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(CrossingPadScene.Structure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": crossing-pad capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
                 try { capabilities.Add(new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
@@ -538,7 +543,7 @@ namespace RailroaderScenePatcher {
             }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure) && selected.Handle is GameObject;
         void ClearSnap() { preparedSnap = null; choosingSnap = false; preparedCoverage = null; }
         void BeginSnap(SelectionKind kind) {
             BeginSelection(kind, selected);
@@ -645,7 +650,7 @@ namespace RailroaderScenePatcher {
             var target = (GameObject)selected.Handle;
             if (target == null) { PlainLabel(builder, "The inspected object no longer exists. Refresh the inventory."); return; }
             if (selected.Identity.Structure == CrossingCoverageScene.Structure) { DrawCoverage(builder, session, selected.Identity); return; }
-            if (selected.Identity.Structure == TrackMarkerScene.Structure) DrawBinding(builder, selected.Identity);
+            if (selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure) DrawBinding(builder, selected.Identity);
             DrawSnap(builder);
             if (selected.Identity.Structure == BridgeScene.Structure) {
                 PlainLabel(builder, "Bridge placement moves the bridge root with its colliders and culling. Generated track trestles, track geometry and construction scenery stay where they are; this is not a track binding.");
@@ -693,11 +698,15 @@ namespace RailroaderScenePatcher {
             DrawOutput(builder, session, identity);
             PlainLabel(builder, "Removal returns the object to its state without this MapMod's modification. Save writes map data, Data/scene-patches.json and the patcher dependency in Info.json, and never reloads. Reloading the editor ends Undo/Redo history.");
         }
+        const string PadGuide = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/rebinding-crossing-pads.md";
         const string BindingGuide = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/repairing-track-bindings.md";
         // The marker's track relationship. A binding edit registers the marker at the new location and never moves the object.
         void DrawBinding(UIPanelBuilder builder, TargetIdentity identity) {
-            builder.AddSection("Track binding");
-            PlainLabel(builder, "The binding is the track location this marker is registered at. Setting, replacing or detaching it does not move the object; placement below stays a separate setting. Mileposts, crossing pads and crossings keep their own operations.");
+            var pad = identity.Structure == CrossingPadScene.Structure;
+            builder.AddSection(pad ? "Crossing pad binding" : "Track binding");
+            PlainLabel(builder, pad
+                ? "The binding is the track location this pad's marker is registered at. Setting or replacing it regenerates the pad geometry along the track at that location and moves its culling with it; the pad object does not move. A pad cannot be detached: disable it to hide it."
+                : "The binding is the track location this marker is registered at. Setting, replacing or detaching it does not move the object; placement below stays a separate setting. Mileposts and crossings keep their own operations.");
             foreach (var line in selected.Bindings.Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith("Graph registration", StringComparison.Ordinal))) PlainLabel(builder, "Current: " + line);
             var labels = new[] { "Segment", "End (a or b)", "Distance (m)" };
             builder.HStack(fields => {
@@ -724,10 +733,10 @@ namespace RailroaderScenePatcher {
                     Edit(BindingPlace, "Track binding", (current, inspection) => current.Bind(identity, value, inspection));
                 }
             });
-            Button(builder, "Detach from track", () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)));
+            if (!pad) Button(builder, "Detach from track", () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)));
             Button(builder, "Clear authored binding", () => Edit(BindingPlace, "Clearing the authored binding", (current, inspection) => current.Bind(identity, null, inspection)));
             if (feedback.Place == BindingPlace) PlainLabel(builder, feedback.Result);
-            Button(builder, "Track binding guidance", () => Application.OpenURL(BindingGuide));
+            Button(builder, pad ? "Crossing pad guidance" : "Track binding guidance", () => Application.OpenURL(pad ? PadGuide : BindingGuide));
             builder.AddSection("Placement and activity");
         }
         const string CoverageGuide = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/correcting-crossing-coverage.md";

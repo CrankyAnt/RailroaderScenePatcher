@@ -23,7 +23,7 @@ The [original scope inventory](https://github.com/CrankyAnt/RailroaderScenePatch
 | Source family or case | Inspection or ownership disposition |
 | --- | --- |
 | Retained whistle/speed/yard-limit/station signs | Typed `TrackMarker` and `TrackRelativePosition`. This covers M5pp, Mm8w, Mwp1 and the Mkwd/Mi4f identities recovered by #20; labels do not determine marker enums. |
-| Crossing pads | Typed markers with `TrackCurveMeshBuilder`, including Mg74 and the original M5ib/Muef cases. Generated geometry is a dependency, not an inferred binding. |
+| Crossing pads | Typed markers with `TrackCurveMeshBuilder`, including Mg74 and the original M5ib/Muef cases. Generated geometry is a dependency, not an inferred binding. Pads that match `CrossingPadWorld.PadProblem` carry `crossing-pad-v1`; their generated `DontSave` mesh objects are described by one dependency line through `HierarchyDependencies.Describe`, so culling and regeneration do not change the observation fingerprint. |
 | Independent boards | The identified Sylva culler/mask hierarchy has no invented track binding. #16 separates pose, activity and logical references. Every culler object with a circle mask and no track marker is classified as an independent board; the board capability's `Refusal` supplies its problems. |
 | Mileposts and group-following visuals | `Helpers.MilePost` and serialized `TrackRelativePosition` observations account for T-46/T-47 and applicable target/group relationships. |
 | Existing crossing detection and equipment | Typed spans, explicit controller circuit roles and controller-bound lamp/gate/bell components account for the Bryson Everett case without assigning relationships by proximity. |

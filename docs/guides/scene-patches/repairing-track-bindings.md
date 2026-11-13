@@ -19,7 +19,7 @@ The patcher edits a marker when all of these hold:
 
 Each of these refusals names a consumer of the marker's location that a binding edit would leave behind. For an object whose activity follows its track group, a binding edit also moves that group subscription to the new segment's group; see [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
-The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. Any other marker lists **Track binding unavailable** with the reason and stays inspection only. Mileposts and crossing pads have their own later operations; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
+The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. Any other marker lists **Track binding unavailable** with the reason and stays inspection only. Crossing pads have their own operation, described in [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md). Mileposts have their own later operation; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
 
 ## Set or replace the binding in the editor
 

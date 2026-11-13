@@ -206,6 +206,8 @@ namespace RailroaderScenePatcher.Core {
                     if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available in this editor.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.5.0");
+                    // Crossing-pad rebinding needs its capability whether or not it is available in this editor.
+                    if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingPadScene.Structure) minimum = Max(minimum, CrossingPadScene.RequiredVersion);
                     TargetIdentity target;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
                     // Board placement beyond the Sylva board needs its capability whether or not it is available in this editor.
@@ -328,13 +330,19 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<KeyValuePair<string, Outcome>> ReconcileTrackFollowing() {
             var results = new List<KeyValuePair<string, Outcome>>();
             if (document == null || Blocked != null) return results;
-            foreach (var item in document.Modifications.OfType<JObject>().ToList()) {
+            var items = document.Modifications.OfType<JObject>().ToList();
+            foreach (var stale in heldTargets.Keys.Where(k => !items.Any(i => ReferenceEquals(i, heldTargets[k].Item))).ToList()) heldTargets.Remove(stale);
+            foreach (var item in items) {
                 PatchEngine.Modification parsed;
                 try { parsed = PatchEngine.Parse(item); } catch (InvalidOperationException) { continue; }
                 if (parsed.State.Placement?.Following == null) continue;
+                if (Current(item, parsed, items)) continue;
+                var held = HeldUpdate(item, parsed, items);
+                if (held != null) { results.Add(new KeyValuePair<string, Outcome>(parsed.Id, held)); continue; }
                 var outcome = new Outcome();
                 object resolved;
-                try { resolved = engine.ResolveUnique(parsed.Identity); } catch (InvalidOperationException) { continue; }
+                try { resolved = engine.ResolveUnique(parsed.Identity); } catch (InvalidOperationException) { heldTargets.Remove(parsed.Id); continue; }
+                heldTargets[parsed.Id] = new Held { Item = item, Target = resolved };
                 outcome.ResolvedTarget = resolved;
                 var report = true;
                 try {
@@ -343,14 +351,15 @@ namespace RailroaderScenePatcher.Core {
                     scene.Preflight(resolved);
                     var desired = engine.Desired(document.Modifications, resolved, documentKey);
                     var prior = scene.Read(resolved);
-                    if (Same(prior, desired)) { report = false; continue; }
+                    // A pose that already agrees can still leave derived state, such as a pad's generated geometry, behind its track.
+                    if (Same(prior, desired) && (!(scene is IDerivedStateScene derived) || derived.DerivedProblem(resolved, desired) == null)) { report = false; continue; }
                     engine.GuardMutation(parsed.Identity, resolved, mapContext, null);
                     try {
-                        scene.Apply(resolved, desired);
+                        FollowUpdate(resolved, desired);
                         if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
                     } catch (Exception e) {
                         var restored = false;
-                        try { scene.Apply(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch { }
+                        try { FollowUpdate(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch { }
                         if (!restored) engine.SetUnsafe(resolved, true);
                         throw new InvalidOperationException(restored ? "Following the track failed and the prior state was restored: " + e.Message : "Following the track failed; cleanup is unverified: " + e.Message);
                     }
@@ -359,6 +368,62 @@ namespace RailroaderScenePatcher.Core {
                 finally { if (report) results.Add(new KeyValuePair<string, Outcome>(parsed.Id, outcome)); }
             }
             return results;
+        }
+        // The target each following modification resolved to, while that modification object stays in the document.
+        sealed class Held { internal JObject Item; internal object Target; }
+        readonly Dictionary<string, Held> heldTargets = new Dictionary<string, Held>(StringComparer.Ordinal);
+        // The check of a reconciliation pass that needs no scene-wide search, reference scan or rebuild: the held target is
+        // still the object the scene identifies, it is the modification's only target in the document, and its state and
+        // derived state already agree with the modification evaluated at the anchor's current pose. Nothing is mutated, so
+        // no preflight is needed; any disagreement or doubt takes the full path, which resolves and preflights again.
+        bool Current(JObject item, PatchEngine.Modification parsed, List<JObject> items) {
+            if (!heldTargets.TryGetValue(parsed.Id, out var held) || !ReferenceEquals(held.Item, item)) return false;
+            if (!(scene is ITargetConfirmation confirmation)) return false;
+            try {
+                if (!confirmation.StillIdentifies(held.Target, parsed.Identity) || engine.IsUnsafe(held.Target)) return false;
+                var key = TargetKey(item);
+                if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return false;
+                var underlying = engine.Underlying(held.Target);
+                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage)));
+                if (!Same(scene.Read(held.Target), desired)) return false;
+                return !(scene is IDerivedStateScene derived) || derived.DerivedProblem(held.Target, desired) == null;
+            } catch (Exception) { return false; }
+        }
+        // A follow update of a held target that changes only its pose or derived state, such as during a track drag. The
+        // scene confirms the held object, a placement preflight checks its own pattern and registration without scene-wide
+        // scans, and the relationship, activity and coverage must already agree, so the update writes placement only.
+        // Null when the update needs the full path.
+        Outcome HeldUpdate(JObject item, PatchEngine.Modification parsed, List<JObject> items) {
+            if (!heldTargets.TryGetValue(parsed.Id, out var held) || !ReferenceEquals(held.Item, item)) return null;
+            if (!(scene is ITargetConfirmation confirmation) || !(scene is IPlacementPreflight placement)) return null;
+            object target = held.Target; ObjectState desired, prior;
+            try {
+                if (!confirmation.StillIdentifies(target, parsed.Identity) || engine.IsUnsafe(target)) return null;
+                var key = TargetKey(item);
+                if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return null;
+                var underlying = engine.Underlying(target);
+                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage)));
+                prior = scene.Read(target);
+                if (prior.Active != desired.Active || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage)) return null;
+                placement.PreflightPlacement(target);
+            } catch (Exception) { return null; }
+            var outcome = new Outcome { ResolvedTarget = target };
+            try {
+                FollowUpdate(target, desired);
+                if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
+                outcome.Applied = true;
+            } catch (Exception e) {
+                var restored = false;
+                try { FollowUpdate(target, prior); restored = Same(scene.Read(target), prior); } catch { }
+                if (!restored) engine.SetUnsafe(target, true);
+                outcome.Error = restored ? "Following the track failed and the prior state was restored: " + e.Message : "Following the track failed; cleanup is unverified: " + e.Message;
+            }
+            return outcome;
+        }
+        void FollowUpdate(object target, ObjectState state) { if (scene is IFollowUpdateScene follow) follow.ApplyFollowUpdate(target, state); else scene.Apply(target, state); }
+        static string TargetKey(JObject item) {
+            var target = item["target"] as JObject;
+            return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"];
         }
         // Sets, replaces or detaches this MapMod's track-marker relationship of the object. Placement and activity stay as authored.
         // A null binding clears the authored relationship: the object returns to its effective underlying relationship.

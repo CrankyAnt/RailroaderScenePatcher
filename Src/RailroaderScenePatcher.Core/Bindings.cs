@@ -232,26 +232,69 @@ namespace RailroaderScenePatcher.Core {
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
     // placement stays a separate, independently authored setting.
-    public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene {
+    public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
         public const string Structure = "track-marker-v1", RequiredVersion = "0.5.0";
-        const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
-        sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; }
-        readonly ITrackMarkerWorld world;
-        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
-        public IEnumerable<string> MapIds => world.MapIds;
+        readonly MarkerRelationship relationship;
+        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability) { relationship = new MarkerRelationship(world, Structure, null); Capability = capability; }
+        public IEnumerable<string> MapIds => relationship.MapIds;
         public Capability Capability { get; }
-        public IReadOnlyList<object> Resolve(TargetIdentity identity) {
-            if (identity.Structure != null && identity.Structure != Structure) return Array.Empty<object>();
+        public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
+        public bool StillIdentifies(object target, TargetIdentity identity) => relationship.StillIdentifies(target, identity);
+        public void PreflightPlacement(object target) => relationship.PreflightPlacement(target);
+        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == "Track.TrackMarker") ? RequiredVersion : null;
+        public void Preflight(object target) => relationship.Preflight(target);
+        public void CheckRelationships(object target, ObjectState state) => relationship.CheckRelationships(target, state);
+        public object Capture(object target) => relationship.Capture(target);
+        public ObjectState Read(object target) => relationship.Read(target);
+        public void Apply(object target, ObjectState state) => relationship.Apply(target, state);
+        public void ApplyFollowUpdate(object target, ObjectState state) => relationship.Apply(target, state, true);
+        public bool Restore(object target, object snapshot) => relationship.Restore(target, snapshot);
+    }
+    // State that a marker's consumer derives from the marker's location and the object's pose, such as generated geometry.
+    internal interface IMarkerConsumer {
+        object Capture(object target);
+        // Brings the derived state up to date with the current location and pose. A following object's placement follows
+        // a track, so its derived state also follows that track's shape; an explicit application, such as an edit or a
+        // removal, also brings derived state up to date with a track shape it recorded.
+        void Refresh(object target, bool resolvable, bool following, bool explicitApply);
+        // Why the derived state disagrees with the current location and pose, or null.
+        string Problem(object target, bool resolvable, bool following, bool explicitApply);
+        // Why the restored derived state differs from the captured one, or null.
+        string Restored(object target, object captured);
+    }
+    // The shared relationship of a track-marker object: the serialized location, its graph registration, the object's
+    // pose and activity, and an optional consumer of the location.
+    internal sealed class MarkerRelationship {
+        const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
+        sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; internal object Consumer; }
+        readonly ITrackMarkerWorld world;
+        readonly string structure;
+        readonly IMarkerConsumer consumer;
+        internal MarkerRelationship(ITrackMarkerWorld world, string structure, IMarkerConsumer consumer) {
+            this.world = world ?? throw new ArgumentNullException(nameof(world)); this.structure = structure; this.consumer = consumer;
+        }
+        internal IEnumerable<string> MapIds => world.MapIds;
+        internal IReadOnlyList<object> Resolve(TargetIdentity identity) {
+            if (identity.Structure != null && identity.Structure != structure) return Array.Empty<object>();
             return world.Resolve(identity) ?? Array.Empty<object>();
         }
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == "Track.TrackMarker") ? RequiredVersion : null;
-        public void Preflight(object target) {
+        internal bool StillIdentifies(object target, TargetIdentity identity) =>
+            (identity.Structure == null || identity.Structure == structure) && world is ITargetConfirmation confirmation && confirmation.StillIdentifies(target, identity);
+        // The preflight of a pose-only update: the object's own pattern and its registration, without the consumer scans.
+        // A world without the placement check takes the full preflight.
+        internal void PreflightPlacement(object target) {
+            var problem = world is IPlacementPattern placement ? placement.PlacementProblem(target) : world.PatternProblem(target);
+            if (problem != null) throw new InvalidOperationException(problem);
+            var difference = Coherence(target);
+            if (difference != null) throw new InvalidOperationException("The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it");
+        }
+        internal void Preflight(object target) {
             var problem = world.PatternProblem(target);
             if (problem != null) throw new InvalidOperationException(problem);
             var difference = Coherence(target);
             if (difference != null) throw new InvalidOperationException("The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it");
         }
-        public void CheckRelationships(object target, ObjectState state) {
+        internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             var group = world.GroupActivity(target);
             if (group != null && state?.Active == true)
@@ -262,7 +305,7 @@ namespace RailroaderScenePatcher.Core {
             if (problem != null) throw new InvalidPatchDefinitionException(problem);
         }
         // Why a location cannot be bound, or null: its segment must exist exactly once and contain the distance.
-        string Unresolved(TrackLocation location) {
+        internal string Unresolved(TrackLocation location) {
             if (location.End != "a" && location.End != "b") return "Relationship end must be \"a\" or \"b\"";
             var lengths = world.SegmentLengths(location.Segment) ?? Array.Empty<double>();
             if (lengths.Count == 0) return "Relationship target segment " + location.Segment + " is missing";
@@ -271,31 +314,40 @@ namespace RailroaderScenePatcher.Core {
                 return "Relationship distance " + location.Distance.ToString("R", CultureInfo.InvariantCulture) + " lies outside segment " + location.Segment;
             return null;
         }
-        public object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true };
+        bool Resolvable(TrackLocation location) => location != null && Unresolved(location) == null;
+        internal object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true, Consumer = consumer?.Capture(target) };
         // The activity of a group follower is group-driven (null) unless the explicit-disable hold is installed.
-        public ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target)));
+        internal ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target)));
         bool? ReadActive(object target) {
             var group = world.GroupActivity(target);
             return group == null || group.Held ? world.Active(target) : (bool?)null;
         }
-        public void Apply(object target, ObjectState state) {
+        internal void Apply(object target, ObjectState state, bool followUpdate = false) {
             var before = world.Location(target);
             var location = state.Marker == null ? before : state.Marker.Location;
             var follower = world.GroupActivity(target) != null;
             if (follower && state.Active == true) CheckRelationships(target, state);
             // A follower without an explicit disable returns to group-driven activity.
             var active = follower ? (state.Active == false ? false : (bool?)null) : state.Active ?? world.Active(target);
-            Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location));
-            var difference = Verify(target, location, state.Placement, active);
+            var following = state.Placement?.Following != null;
+            var activeBefore = world.Active(target);
+            var relationshipWritten = Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location), following, true);
+            var difference = Verify(target, location, state.Placement, active, following, true);
             if (difference != null) throw new InvalidOperationException("Applied marker state did not verify: " + difference);
-            (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
+            // The native warning depends on the binding's validity and the marker's activity. A track-following update that
+            // changes neither skips the reconciliation and its search of every marker; an explicit application always runs it.
+            if (!followUpdate || relationshipWritten || world.Active(target) != activeBefore) (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
         }
-        public bool Restore(object target, object snapshot) {
+        // Why the object's derived state disagrees with the desired state although its pose may already agree, or null.
+        internal string DerivedProblem(object target, ObjectState desired) =>
+            consumer?.Problem(target, Resolvable(world.Location(target)), desired?.Placement?.Following != null, false);
+        internal bool Restore(object target, object snapshot) {
             var captured = (Snapshot)snapshot;
             try {
                 var active = world.GroupActivity(target) == null ? captured.Active : (captured.Held ? false : (bool?)null);
-                Write(target, captured.Location, captured.Position, captured.Rotation, active, true);
-                var verified = Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active) == null;
+                Write(target, captured.Location, captured.Position, captured.Rotation, active, true, false, false);
+                var verified = Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active, false, false) == null
+                    && (consumer == null || consumer.Restored(target, captured.Consumer) == null);
                 if (verified) (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
                 return verified;
             } catch { return false; }
@@ -303,16 +355,19 @@ namespace RailroaderScenePatcher.Core {
         // The relationship first, so the registration follows the new location; activity then lets the native lifecycle register or remove it.
         // A group follower's hold is installed before anything can activate the object and released only after the
         // relationship; its subscription is observed again for the current location; without the hold the group sets activity.
-        void Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind) {
+        // The consumer follows the final location and pose.
+        // True when the relationship and its registration were written.
+        bool Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind, bool following, bool explicitApply) {
             var group = world.GroupActivity(target);
             if (group != null && active == false) {
                 if (!group.Held) world.HoldDisabled(target, true);
                 if (world.Active(target)) world.SetActive(target, false);
             }
-            if (rebind || Coherence(target) != null || world.DependentProblem(target) != null) {
+            var written = rebind || Coherence(target) != null || world.DependentProblem(target) != null;
+            if (written) {
                 world.Unregister(target);
                 world.SetLocation(target, location);
-                if (world.Registers(target) && location != null && Unresolved(location) == null) world.Register(target);
+                if (world.Registers(target) && Resolvable(location)) world.Register(target);
                 world.RefreshDependents(target);
             }
             if (group != null) {
@@ -322,13 +377,15 @@ namespace RailroaderScenePatcher.Core {
             } else if (active == true && !world.Active(target)) world.SetActive(target, true);
             if (position != null) world.SetPose(target, position, rotation);
             if (group == null && active == false && world.Active(target)) world.SetActive(target, false);
+            consumer?.Refresh(target, Resolvable(world.Location(target)), following, explicitApply);
+            return written;
         }
-        string Verify(object target, TrackLocation location, Placement placement, bool? active) {
+        string Verify(object target, TrackLocation location, Placement placement, bool? active, bool following, bool explicitApply) {
             if (!TrackLocation.Same(world.Location(target), location)) return "the serialized location is " + (world.Location(target)?.ToString() ?? "detached") + ", expected " + (location?.ToString() ?? "detached");
             var group = world.GroupActivity(target);
             if (group == null ? world.Active(target) != active : group.Held != (active == false)) return "activity differs";
             if (placement != null && (!Near(world.Position(target), placement.Position) || !SameRotation(world.Rotation(target), placement.Rotation))) return "pose differs";
-            return Coherence(target) ?? world.DependentProblem(target) ?? GroupProblem(target);
+            return Coherence(target) ?? world.DependentProblem(target) ?? GroupProblem(target) ?? consumer?.Problem(target, Resolvable(location), following, explicitApply);
         }
         // The subscription and activity the native observation holds for the current location: one handler for the
         // location's group, none without a group or a resolvable location; activity from the group, or inactive under the
@@ -349,7 +406,7 @@ namespace RailroaderScenePatcher.Core {
         string Coherence(object target) {
             var location = world.Location(target);
             var entries = world.Registrations(target) ?? Array.Empty<MarkerRegistration>();
-            var expected = world.Registers(target) && location != null && Unresolved(location) == null;
+            var expected = world.Registers(target) && Resolvable(location);
             if (!expected) return entries.Count == 0 ? null : entries.Count + " graph registrations remain for an unregistered marker";
             if (entries.Count != 1) return entries.Count + " graph registrations instead of one";
             var entry = entries[0];
@@ -357,7 +414,7 @@ namespace RailroaderScenePatcher.Core {
             if (entry.Bucket != location.Segment || !TrackLocation.Same(entry.Location, location)) return "the graph registers the marker at " + entry.Location + " instead of " + location;
             return null;
         }
-        static bool Near(IReadOnlyList<double> a, IReadOnlyList<double> b) {
+        internal static bool Near(IReadOnlyList<double> a, IReadOnlyList<double> b) {
             if (a == null || b == null || a.Count != b.Count) return false;
             for (var i = 0; i < a.Count; i++) if (Math.Abs(a[i] - b[i]) > PositionTolerance) return false;
             return true;

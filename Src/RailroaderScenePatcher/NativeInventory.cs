@@ -17,6 +17,7 @@ namespace RailroaderScenePatcher {
         const string ConstructionScenery = "Game.Mow.TrackConstructionScenery";
         internal static readonly string[] Coverage = {
             "Generic track markers, such as yard limits and station signs: set, replace or detach the marker's track location with its graph registration, and place or enable the object. A marker whose activity follows its own track group keeps that subscription coherent through rebinding and accepts an explicit disable that holds through later group activation. Markers with other location consumers are inspection only.",
+            "Crossing pads: set or replace the pad marker's track location with its graph registration; the game's pad generation then rebuilds the pad geometry and culling at the new location. Placement and activity stay separate settings; a pad cannot be detached.",
             "Mileposts: marker, origin and display dependencies; model and mileage remain unchanged.",
             "Crossings: controllers, spans, pads, lights, gates and bells; relationships are explicit, never inferred from proximity.",
             "Independent boards: renderer culler with one circle map mask and no track relationship; placement and activity refresh culling, mask registration and generated terrain output.",
@@ -123,12 +124,14 @@ namespace RailroaderScenePatcher {
             ReferenceScan markerReferrers, string referrerError, HolderIndex setups) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>();
             var components = go.GetComponentsInChildren<Component>(true);
+            var parts = new List<HierarchyPart>();
             foreach (var child in components) {
                 if (child == null) { problems.Add("Missing script in inspected hierarchy"); continue; }
                 if (child is Transform) continue;
-                dependencies.Add("Component " + Label(child) + (child is Behaviour b ? "; enabled=" + b.enabled : ""));
-                if (incoming.TryGetValue(child, out var refs)) dependencies.AddRange(refs);
+                parts.Add(new HierarchyPart(Label(child), child is Behaviour b ? b.enabled : (bool?)null, (child.gameObject.hideFlags & HideFlags.DontSave) != 0,
+                    incoming.TryGetValue(child, out var refs) ? refs : null));
             }
+            dependencies.AddRange(HierarchyDependencies.Describe(family == "Crossing pad marker", parts));
             if (incoming.TryGetValue(go, out var rootRefs)) dependencies.AddRange(rootRefs);
             if (scanErrors != 0) problems.Add("Direct-reference scan incomplete: " + scanErrors + " unreadable fields");
             void Read(Action action) { try { action(); } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); } }
@@ -212,16 +215,24 @@ namespace RailroaderScenePatcher {
                 : TrackMarkerWorld.Problem(go, markerReferrers, setups));
             if (markerRefusal != null) problems.Add("Track binding unavailable: " + markerRefusal);
             var markerEditable = marked && markerRefusal == null;
+            var pad = family == "Crossing pad marker";
+            string padRefusal = pad ? "the crossing-pad capability is unavailable" : null;
+            if (pad) Read(() => padRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
+                : CrossingPadWorld.PadProblem(go, markerReferrers, setups));
+            if (padRefusal != null) problems.Add("Pad binding unavailable: " + padRefusal);
+            var padEditable = pad && padRefusal == null;
             var crossing = family == "Crossing controller";
             string coverageRefusal = crossing ? "the crossing-coverage capability is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
             if (coverageRefusal != null) problems.Add("Crossing coverage unavailable: " + coverageRefusal);
             var coverageEditable = crossing && coverageRefusal == null;
-            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
+            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
             var operations = board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : "Inspection only until corrected: " + refusal)
                 : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
                 : marked ? "Inspection only until corrected: " + markerRefusal
+                : padEditable ? "Pad binding: set or replace the marker location with its graph registration and regenerate the pad geometry and culling; fixed placement and activity stay separate settings"
+                : pad ? "Inspection only until corrected: " + padRefusal
                 : coverageEditable ? "Crossing coverage: select tracks for, or detach, each circuit explicitly, or add detection for explicitly selected extra tracks; native spans stay registered and the crossing itself does not move"
                 : crossing ? "Inspection only until corrected: " + coverageRefusal
                 : "Inspection only; no mutation adapter for this pattern";
