@@ -140,6 +140,7 @@ class Program {
         BoardTests.Run();
         CompositionTests.Run();
         BindingTests.Run();
+        DiagnosticTests.Run();
         TrackFollowingTests.Run();
         GroupActivityTests.Run();
         CoverageTests.Run();

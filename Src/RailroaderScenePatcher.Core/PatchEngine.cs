@@ -8,6 +8,10 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace RailroaderScenePatcher.Core {
+    // A checked supplied value/reference is invalid. Native or unexpected exceptions retain an unknown cause.
+    public sealed class InvalidPatchDefinitionException : InvalidOperationException {
+        public InvalidPatchDefinitionException(string message) : base(message) { }
+    }
 #if ISSUE39_OBSERVATION
     // Only the explicitly instrumented integration-test build exposes this sink.
     public static class JourneyObservation {
@@ -62,14 +66,19 @@ namespace RailroaderScenePatcher.Core {
         public bool Applied { get; internal set; }
         public string Error { get; internal set; }
         public object ResolvedTarget { get; internal set; }
+        public FailureCause Cause { get; internal set; }
+        public bool EditorOnly { get; internal set; }
+        public TargetIdentity Target { get; internal set; }
     }
     public sealed class DocumentResult {
         public string Error { get; internal set; }
         public IReadOnlyDictionary<string, Outcome> Outcomes { get; internal set; }
+        public bool EditorOnly { get; internal set; }
+        public string EarlyRouteUnavailable { get; internal set; }
     }
     public sealed class PatchEngine {
         readonly IScene scene;
-        readonly HashSet<string> failed = new HashSet<string>();
+        readonly Dictionary<string, Outcome> failed = new Dictionary<string, Outcome>();
         readonly HashSet<object> unsafeTargets = new HashSet<object>();
         // Restored targets whose dependent output, such as regenerated terrain, has not yet verified.
         readonly HashSet<object> awaitingOutput = new HashSet<object>();
@@ -98,14 +107,22 @@ namespace RailroaderScenePatcher.Core {
             return Apply(json, documentKey, null);
         }
         public DocumentResult Apply(string json, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
+            return ApplyDocument(json, documentKey, inspectedTargets, null);
+        }
+        // The complete envelope is checked before selecting a dependency-free relationship repair for this native check.
+        public DocumentResult BeforeNativeCheck(string json, string documentKey, TargetIdentity target) {
+            if (target == null) throw new ArgumentNullException(nameof(target));
+            return ApplyDocument(json, documentKey, null, target);
+        }
+        DocumentResult ApplyDocument(string json, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget) {
             if (documentKey == null) throw new ArgumentNullException(nameof(documentKey));
             Observe("document-dispatch", documentKey);
             var result = new DocumentResult();
             var outcomes = new Dictionary<string, Outcome>(); result.Outcomes = outcomes;
             var document = PatchDocument.Load(json);
-            if (!document.CanWrite) { result.Error = document.Error; return result; }
+            if (!document.CanWrite) { result.Error = document.Error; result.EditorOnly = true; return result; }
             try {
-                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Source map does not match loaded map context"; return result; }
+                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Source map does not match loaded map context"; result.EditorOnly = true; return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var modifications = (JArray)document.Root["modifications"];
                 var entries = new Dictionary<string, JObject>(StringComparer.Ordinal);
@@ -116,32 +133,76 @@ namespace RailroaderScenePatcher.Core {
                 }
                 sharedAdditions = SharedAdditionIds(entries.Values);
                 var visiting = new HashSet<string>();
-                foreach (var id in entries.Keys) Execute(id, entries, outcomes, visiting, documentKey, inspectedTargets);
+                foreach (var id in entries.Keys) {
+                    if (nativeTarget != null && !EarlyRepair(entries[id], nativeTarget, out var unavailable)) {
+                        if (unavailable != null) result.EarlyRouteUnavailable = unavailable;
+                        continue;
+                    }
+                    Execute(id, entries, outcomes, visiting, documentKey, inspectedTargets);
+                }
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
             return result;
+        }
+        bool EarlyRepair(JObject entry, TargetIdentity target, out string unavailable) {
+            unavailable = null;
+            try {
+                var parsed = Parse(entry); var identity = parsed.Identity;
+                if (identity.Scene != target.Scene || identity.Path != target.Path || identity.Component != target.Component ||
+                    identity.Structure != null && identity.Structure != target.Structure || parsed.State.Marker?.Location == null) return false;
+                if (parsed.Dependencies.Length != 0 || parsed.State.Placement != null || parsed.State.Active != null) {
+                    unavailable = "Operation " + (string)entry["id"] + " requires world-load scheduling for dependencies, placement or activity";
+                    return false;
+                }
+                // A prerequisite missing at OnEnable is not yet a failed runtime attempt. The definitive world-load
+                // application still owns invalid-definition reporting and the existing guarded-failure policy.
+                try {
+                    var matches = scene.Resolve(identity);
+                    if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target is not yet unique and available");
+                    scene.Preflight(matches[0]);
+                    CheckRelationships(matches[0], parsed.State);
+                    return true;
+                } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + e.Message; return false; }
+            } catch (InvalidOperationException) { return false; }
         }
         Outcome Execute(string id, Dictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
             Outcome prior;
             if (outcomes.TryGetValue(id, out prior)) return prior;
             var outcome = new Outcome();
-            if (!visiting.Add(id)) { outcome.Error = "Dependency cycle"; return outcome; }
+            if (!visiting.Add(id)) { outcome.Error = "Dependency cycle"; outcome.Cause = FailureCause.InvalidDefinition; return outcome; }
             var key = documentKey.Length + ":" + documentKey + id;
             try {
-                if (failed.Contains(key)) {
+                if (failed.ContainsKey(key)) {
                     Observe("retry-blocked", documentKey, id);
-                    throw new InvalidOperationException("Operation already failed during this load");
+                    var previous = failed[key];
+                    outcome.Error = "Operation already failed during this load: " + previous.Error;
+                    outcome.Cause = previous.Cause; outcome.EditorOnly = previous.EditorOnly; outcome.Target = previous.Target;
+                    outcomes[id] = outcome;
+                    return outcome;
                 }
                 var item = entries[id];
-                if (!Only(item, Known)) throw new InvalidOperationException("Unsupported modification content");
+                if (!Only(item, Known)) { outcome.EditorOnly = true; throw new InvalidOperationException("Unsupported modification content"); }
                 var shared = AdditionIds(item).FirstOrDefault(sharedAdditions.Contains);
-                if (shared != null) throw new InvalidOperationException(SharedAddition(shared));
-                foreach (var dep in Dependencies(item))
-                    if (!entries.ContainsKey(dep) || !Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets).Applied) throw new InvalidOperationException("Dependency failed: " + dep);
-                var parsed = Parse(item, documentKey);
+                if (shared != null) throw new InvalidPatchDefinitionException(SharedAddition(shared));
+                string[] dependencies;
+                try { dependencies = Dependencies(item); }
+                catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(e.Message); }
+                foreach (var dep in dependencies) {
+                    if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency failed: " + dep);
+                    var dependency = Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets);
+                    if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.EditorOnly = dependency.EditorOnly; throw new InvalidOperationException("Dependency failed: " + dep); }
+                }
+                Modification parsed;
+                try { outcome.Target = ParseTarget(item["target"] as JObject); parsed = Parse(item, documentKey); }
+                catch (InvalidOperationException e) {
+                    outcome.Cause = FailureCause.InvalidDefinition;
+                    outcome.EditorOnly = e.Message.StartsWith("Unsupported", StringComparison.Ordinal) || e.Message == "Invalid or unsupported target";
+                    throw;
+                }
                 var identity = parsed.Identity;
+                outcome.Target = identity;
                 Observe("resolve", documentKey, id, identity.Path);
                 var matches = scene.Resolve(identity);
-                if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target must resolve uniquely");
+                if (matches == null || matches.Count != 1 || matches[0] == null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException("Target must resolve uniquely"); }
                 var resolved = matches[0];
                 var mapContext = scene.MapIds.ToArray();
                 InspectedTarget expected = null;
@@ -173,7 +234,7 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidOperationException(restored ? "Mutation failed and was restored: " + e.Message : "Mutation failed; cleanup is unverified: " + e.Message);
                 }
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; failed.Add(key); Observe("failed", documentKey, id, error: e.Message); }
+            } catch (Exception e) { outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition; failed[key] = outcome; Observe("failed", documentKey, id, error: e.Message); }
             finally { visiting.Remove(id); }
             outcomes[id] = outcome;
             return outcome;

@@ -22,8 +22,8 @@ The engine applies a document only when its `sourceMap.mapId` matches the select
 | `id` | string | Required, non-empty, and unique within the document. |
 | `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position` and `rotation`; a track-following placement contains `mode`, `track`, `offset` and `rotation`. See Placement below. |
-| `active` | boolean | Optional. `false` disables the object, `true` enables it. Requires patcher 0.2.0 or later. |
-| `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.4.0 or later. |
+| `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
+| `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.5.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same document. |
 
 The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
@@ -108,6 +108,12 @@ For each addition the engine builds one circuit with three owned spans, register
 
 [Explicit snapping](snapping-to-track.md) writes a fixed placement. The editor computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to authoring preflight and are not serialized. Runtime application and reload use the resulting absolute pose without querying a snap target. Snapping adds no dependency minimum; later track movement does not change the saved pose. Track-following placement is the separate mode above.
 
+## Runtime failure reports
+
+The runtime reports a failed document or modification in a structured game warning, separate from the historical file log. A modification warning identifies the source as Railroader Scene Patcher and includes the supplying MapMod name, identifier and version, `Data/scene-patches.json`, operation, target when resolved, error, patcher version and game version. The warning also includes the supplied author and an HTTP or HTTPS website when present. It does not invent contact details.
+
+Invalid supplied definitions are reported to the MapMod author. Unknown failures and demonstrated patcher faults are reported to the patcher maintainer. The runtime reports a given source and operation once per loaded world. Invalid or unsupported document content that requires recovery remains an editor matter; this reporting behavior adds no JSON fields or format version.
+
 ## Current native targets
 
 ### Independent board
@@ -170,14 +176,14 @@ The supplying MapMod's `Info.json` must list `crankyant/scene-patcher` under `de
 | --- | --- |
 | Fixed placement only | `0.1.0` |
 | Any modification with `active` | `0.2.0` |
-| A board target other than `World/Signs/Loc: Sylva Int` in `BushnellWhittier-MapManager` | `0.3.0` |
-| Any modification whose target `structure` is `bridge-colliders-v1` | `0.3.0` |
-| Any modification with `relationships`, or whose target `structure` is `track-marker-v1` | `0.4.0` |
-| Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
+| An independent-board target other than the legacy Sylva location sign | `0.5.0` |
+| Any modification whose target `structure` is `bridge-colliders-v1` | `0.5.0` |
+| Any modification with `relationships`, a `Track.TrackMarker` target component, or target `structure` `track-marker-v1` | `0.5.0` |
 | Any modification with `active` whose target `structure` is `track-marker-v1` | `0.5.0` |
-| Any modification with `relationships.crossingCoverage`, including a detection addition, or whose target `structure` is `crossing-coverage-v1` | `0.5.0` |
+| Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
+| Any modification with `relationships.crossingCoverage`, including a detection addition, a `Track.Crossings.GradeCrossingController` target component, or target `structure` `crossing-coverage-v1` | `0.5.0` |
 
-The minimum follows from the document content alone, whether or not the target is loaded or its capability is available in this editor. An `active` value on a track-marker target can be the explicit disable of a group follower, which patcher 0.4.0 refuses; patcher 0.4.0 rejects a `trackFollowing` placement as unsupported, so only that modification would fail. Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry.
+Fixed placement is the base minimum; other content in the document can raise it according to the table. The minimum follows the document content, whether or not the target is loaded or its capability is available in this editor. The legacy Sylva location sign does not raise the pattern-based board dependency minimum. Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry. Runtime reporting adds no document, schema or capability requirement.
 
 Duplicate JSON property names are rejected during parsing. Duplicate modification IDs reject the document. A target whose `structure` names a capability that is incompatible with the running game build fails with that reason; other modifications still apply. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
 

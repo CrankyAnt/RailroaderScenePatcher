@@ -201,11 +201,11 @@ namespace RailroaderScenePatcher.Core {
                     // Track-following placement needs its capability whether or not it is available in this editor.
                     if ((item["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)item["placement"]["mode"] == PatchEngine.TrackFollowingMode) minimum = Max(minimum, TrackFollowingVersion);
                     // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available in this editor.
-                    if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure)) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
+                    if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == "Track.TrackMarker")) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
                     // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available in this editor.
-                    if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
+                    if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available in this editor.
-                    if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.3.0");
+                    if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.5.0");
                     TargetIdentity target;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
                     // Board placement beyond the Sylva board needs its capability whether or not it is available in this editor.

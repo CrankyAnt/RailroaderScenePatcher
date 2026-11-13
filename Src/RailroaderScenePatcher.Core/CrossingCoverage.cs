@@ -209,7 +209,7 @@ namespace RailroaderScenePatcher.Core {
             if (identity.Structure != null && identity.Structure != Structure) return Array.Empty<object>();
             return world.Resolve(identity) ?? Array.Empty<object>();
         }
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == ComponentType) ? RequiredVersion : null;
         // Spans the patcher owns for the controller in this load, for inspection.
         public IReadOnlyList<object> OwnedSpans(object target) => baselines.TryGetValue(target, out var b) ? b.Owned.ToArray() : Array.Empty<object>();
         Baseline BaselineOf(object target) {

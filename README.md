@@ -12,6 +12,8 @@ For map makers whose track changes leave existing signs, bridges or other scene 
 
 Players using map mods that depend on Railroader Scene Patcher need to keep it installed and enabled for those changes to take effect.
 
+If a patch fails while loading a map, the game warning identifies the supplying MapMod, its identifier and version, the operation, object and error, plus the patcher and game versions. Send invalid definitions to the MapMod author. Send unknown failures or a demonstrated patcher fault to the patcher maintainer. The warning may include author and website details supplied by the MapMod. The patcher does not provide a separate support channel.
+
 ## License
 
 This repository uses per-file license assignment according to the REUSE

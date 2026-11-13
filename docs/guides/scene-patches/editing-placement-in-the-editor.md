@@ -24,7 +24,7 @@ An edit that is refused or does not run always says why. The reason appears belo
 
 ## Disable or enable the object
 
-Select **Disable object** or **Enable object**. The document stores the choice as `"active": false` or `"active": true` in the same modification as the placement. A disabled board releases its culling and terrain mask through the game's own component lifecycle. A disabled bridge stops colliding. A document with an activity change needs patcher version 0.2.0 or later; a document with a bridge modification needs 0.3.0 or later.
+Select **Disable object** or **Enable object**. The document stores the choice as `"active": false` or `"active": true` in the same modification as the placement. A disabled board releases its culling and terrain mask through the game's own component lifecycle. A disabled bridge stops colliding. Generic activity requires patcher 0.2.0; native board, bridge and track-marker activity capabilities require 0.5.0. Save derives the dependency minimum from the document's content; see [the document reference](scene-patch-document-v1.md#dependency-minimum).
 
 After a board edit the panel shows the state of the terrain output the game regenerates at the old and new positions. Save does not write that generated output; see [move a board with its terrain effects](moving-boards.md) for its completion, retry and limits.
 
@@ -52,7 +52,7 @@ Use the editor's **Save**. One Save covers three writes for the active edited Ma
 - `Data/scene-patches.json`,
 - the patcher dependency in `Info.json`.
 
-Save adds `crankyant/scene-patcher >=<version>` when the dependency is missing, and raises the minimum only when the document needs a newer patcher. A constraint that already requires that version or a later one stays unchanged, and so does an upper bound. Save writes each patcher file only when its content differs. Save never reloads the editor.
+Save adds or raises `crankyant/scene-patcher >=<minimum>` to the highest minimum required by the document's content. Legacy fixed placement needs `0.1.0`, generic activity needs `0.2.0`, and newer capabilities retain their `0.5.0` requirements; see the [dependency reference](scene-patch-document-v1.md#dependency-minimum). A constraint that already requires the necessary version or a later one stays unchanged, and so does an upper bound. Save writes each patcher file only when its content differs. Save never reloads the editor.
 
 The title star and the Save button follow all three writes. They stay active after Undo, Redo or a new edit whenever the current state differs from the last complete Save, including when a different history reaches the same number of changes.
 

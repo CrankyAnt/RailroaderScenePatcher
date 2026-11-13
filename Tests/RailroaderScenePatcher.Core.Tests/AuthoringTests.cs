@@ -98,7 +98,7 @@ static class AuthoringTests {
         public World(string patch = null, string info = null) {
             Scene.Objects["p"] = new List<object> { Box }; Scene.Objects["q"] = new List<object> { Other }; Store.Patch = patch;
             if (info != null) Store.Info = info;
-            else if (patch != null) Store.Info = Store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.1.0\"");
+            else if (patch != null) Store.Info = Store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.5.0\"");
             var engine = new PatchEngine(Scene);
             if (patch != null) engine.Apply(patch, "author/pack");
             Session = new AuthoringSession(engine, Editor, Store, "map");
@@ -214,15 +214,21 @@ static class AuthoringTests {
         Assert(first.Editor.IsDirty, "A failed Save records no saved identity for a later equal change count");
     }
     static void DependencyMinimumRisesOnlyWhenRequired() {
+        var legacy = new World();
+        Assert(legacy.Session.MinimumPatcherVersion == "0.1.0", "A document without a newer capability keeps the fixed-placement baseline");
+        legacy.Session.Edit(P, Pose(112), null);
+        Assert(legacy.Session.MinimumPatcherVersion == "0.1.0", "Runtime reporting does not raise a legacy placement document's minimum");
+        legacy.Session.Edit(P, null, false);
+        Assert(legacy.Session.MinimumPatcherVersion == "0.2.0", "Generic activity requires its own minimum rather than the newer capability version");
         Func<string, string> info = entry => "{\"version\":\"1.0.0\",\"build\":0.10,\"dependencies\":{\"required\":[" + entry + "]}}";
-        var w = new World(null, info("\"crankyant/scene-patcher >=0.1.0\""));
+        var w = new World(null, info("\"crankyant/scene-patcher >=0.5.0\""));
         w.Session.Edit(P, Pose(112), null);
         Assert(w.Editor.Save() == null && w.Store.InfoWrites == 0, "A satisfied minimum is not rewritten");
         w.Session.Edit(P, null, false);
-        Assert(w.Session.MinimumPatcherVersion == "0.2.0" && w.Session.Outstanding(false).Contains(AuthoringSession.Metadata), "An activity change requires the patcher version that introduced it");
-        Assert(w.Editor.Save() == null && Required(w).SequenceEqual(new[] { "crankyant/scene-patcher >=0.2.0" }) && w.Store.Info.Contains("0.10"), "Save raises the minimum and preserves other metadata exactly");
+        Assert(w.Session.MinimumPatcherVersion == "0.2.0" && !w.Session.Outstanding(false).Contains(AuthoringSession.Metadata), "Generic activity retains its minimum while a higher existing constraint is preserved");
+        Assert(w.Editor.Save() == null && Required(w).SequenceEqual(new[] { "crankyant/scene-patcher >=0.5.0" }) && w.Store.Info.Contains("0.10"), "Save preserves the satisfied delivery minimum and other metadata exactly");
         w.Editor.Undo();
-        Assert(w.Editor.Save() == null && Required(w).Single() == "crankyant/scene-patcher >=0.2.0" && w.Store.InfoWrites == 1, "A raised minimum is not lowered again");
+        Assert(w.Editor.Save() == null && Required(w).Single() == "crankyant/scene-patcher >=0.5.0" && w.Store.InfoWrites == 0, "A satisfied delivery minimum is not rewritten after Undo");
         w = new World(null, info("\"crankyant/scene-patcher >= 0.5.0 <2.0.0\""));
         w.Session.Edit(P, Pose(112), false);
         Assert(w.Editor.Save() == null && w.Store.InfoWrites == 0, "A stricter existing constraint is preserved");
@@ -235,6 +241,10 @@ static class AuthoringTests {
         w = new World(null, info("\"crankyant/scene-patcher\""));
         w.Session.Edit(P, Pose(112), null);
         Assert(w.Editor.Save() == null && Required(w).Single() == "crankyant/scene-patcher >=0.1.0", "An unconstrained dependency receives the minimum without an upper bound");
+        w = new World(null, info("\"crankyant/scene-patcher >=0.1.0\""));
+        w.Session.Edit(P, Pose(112), null);
+        Assert(w.Session.MinimumPatcherVersion == "0.1.0" && !w.Session.Outstanding(false).Contains(AuthoringSession.Metadata), "Fixed placement alone does not acquire a newer capability requirement");
+        Assert(w.Editor.Save() == null && Required(w).Single() == "crankyant/scene-patcher >=0.1.0" && w.Store.InfoWrites == 0, "Save keeps a sufficient legacy dependency unchanged");
     }
     static void PruningAndHistoryErrorsStayTruthful() {
         var w = new World(); w.Editor.MaxLevels = 2;

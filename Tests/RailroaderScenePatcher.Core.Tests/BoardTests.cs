@@ -155,8 +155,8 @@ static class BoardTests {
         var result = engine.Apply(Doc(Mod("other", Place(new[] { 110.0, 5.0, 90.0 }), path: OtherPath)), "author/pack");
         Assert(result.Outcomes["other"].Applied && Near(other.Position, new[] { 110.0, 5.0, 90.0 }) && Consistent(world, other), "Another board conforming to the pattern receives placement and refreshed registrations");
         Assert(Near(board.Position, new FakeBoard().Position), "Placing one board leaves another unchanged");
-        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, OtherPath, IndependentBoards.CullerType, IndependentBoards.Structure)) == "0.3.0", "Boards beyond the Sylva board need the pattern-based patcher");
-        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType, IndependentBoards.Structure)) == null, "The Sylva board keeps its earlier minimum");
+        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, OtherPath, IndependentBoards.CullerType, IndependentBoards.Structure)) == "0.5.0", "Boards beyond the Sylva board need the pattern-based patcher");
+        Assert(boards.MinimumPatcherVersion(new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType, IndependentBoards.Structure)) == null, "The original Sylva target needs no newer capability minimum");
     }
     static void PreflightRefusalLeavesBoardUnchanged() {
         foreach (var (name, change, reason) in new (string, Action<FakeBoard>, string)[] {
@@ -330,7 +330,7 @@ static class BoardTests {
         var (world, board, boards, session, editor, store) = Authoring();
         world.Add(new FakeBoard { Path = OtherPath, Position = new[] { 100.0, 5.0, 100.0 } });
         Assert(session.Edit(Sylva, Pose(Moved), null).Applied && session.MinimumPatcherVersion == "0.1.0", "The Sylva board keeps the fixed-placement minimum");
-        Assert(session.Edit(Whittier, Pose(new[] { 110.0, 5.0, 90.0 }), null).Applied && session.MinimumPatcherVersion == "0.3.0", "Another conforming board needs the pattern-based patcher");
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.3.0"), "Save writes the raised dependency minimum");
+        Assert(session.Edit(Whittier, Pose(new[] { 110.0, 5.0, 90.0 }), null).Applied && session.MinimumPatcherVersion == "0.5.0", "Another conforming board needs the pattern-based patcher");
+        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save writes the raised dependency minimum");
     }
 }

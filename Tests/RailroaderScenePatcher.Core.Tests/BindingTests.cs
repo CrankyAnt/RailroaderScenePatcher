@@ -535,7 +535,7 @@ static class BindingTests {
         var item = Only(session);
         Assert((string)item["relationships"]["trackMarker"]["segment"] == "Nnew" && (string)item["relationships"]["trackMarker"]["end"] == "b" && (double)item["relationships"]["trackMarker"]["distance"] == 12
             && item["placement"] == null && item["active"] == null, "The document records only the binding: " + item);
-        Assert(session.MinimumPatcherVersion == "0.4.0", "A relationship requires the patcher version that introduced it");
+        Assert(session.MinimumPatcherVersion == "0.5.0", "A relationship requires the common delivery minimum");
         var moved = new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.Edit(Sign, moved, null).Applied && sign.Position[0] == 40 && Entry(world, sign) == "Nnew|b|12", "A later placement edit keeps the binding");
         Assert(Only(session)["relationships"] != null && Only(session)["placement"] != null, "The placement edit preserves the authored relationship");
@@ -644,7 +644,7 @@ static class BindingTests {
         var (world, sign, other, session, editor, store) = Session();
         session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12.25)));
         session.Bind(Other, MarkerBinding.Detached);
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.4.0"), "Save raises the dependency to the relationship version: " + store.Info);
+        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the relationship version: " + store.Info);
         var (fresh, freshSign, freshOther, freshScene) = Setup();
         var engine = new PatchEngine(freshScene);
         var reload = engine.Apply(store.Patch);

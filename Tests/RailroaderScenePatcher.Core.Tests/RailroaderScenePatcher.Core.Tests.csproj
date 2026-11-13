@@ -6,5 +6,7 @@
   <ItemGroup>
     <Compile Include="../../Src/RailroaderScenePatcher/InventoryPresentationState.cs" Link="InventoryPresentationState.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/EditFeedback.cs" Link="EditFeedback.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/NativeMarkerLocation.cs" Link="NativeMarkerLocation.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/NativeMarkerWarnings.cs" Link="NativeMarkerWarnings.cs" />
   </ItemGroup>
 </Project>

@@ -4,8 +4,14 @@ Notable changes to this project are recorded here, newest first.
 
 ## 0.5.0
 
+- Remove a marker repair even when its original track is missing. Restore the captured native reference and warning; Undo and Redo recover the repaired and broken states without changing unrelated warning rows.
+
 - Make an object follow an explicitly selected track segment location or endpoint, in the editor and through `placement.mode = "trackFollowing"` in `scene-patches.json`. The object keeps its position and orientation relative to that track; it moves with the track in the editor and is placed from the track's current pose on every load. Documents with a track-following placement require patcher 0.5.0.
 - Generic track markers whose activity follows a track group can be edited. Rebinding moves the group subscription with the marker. An explicit disable holds the object inactive when the group is enabled later; without it the group keeps switching the object. Clearing the authored activity or removing the modification returns the object to its group. Documents with an `active` value on a track-marker object require patcher 0.5.0.
+- Runtime failures produce structured game warnings with the supplying MapMod, operation, target when resolved, error, and patcher and game versions. For eligible dependency-free relationship-only marker repairs, the patcher tries repair before the game's native marker check. If that route is unavailable, it removes only the exact current warning row after a successful operation and separate verification of the binding and dependent state. Reporting adds no document, schema or capability requirement.
+
+- Remove the duplicated source prefix from runtime diagnostic text. The originating source remains available as the native warning originator.
+
 - Add detection for explicitly selected extra tracks at an existing grade crossing, in the editor and through an `addition` entry in `relationships.crossingCoverage`. An addition has an ID that is unique in its MapMod's document, and the tracks and area of its three spans. The patcher builds one circuit with its own spans for it on every load, reuses it on a repeated load and removes it when the entry is deleted. Native circuits keep their coverage.
 - Correct the detection coverage of existing grade crossings, in the editor and through `relationships.crossingCoverage` in `scene-patches.json` (`crossing-coverage-v1`). Each circuit, named by its native island span, keeps its coverage when omitted, covers explicitly selected tracks, or is detached. Native spans stay registered and unchanged, so a still-valid old route stops triggering the crossing; other circuits keep working. The editor previews the effect on every circuit before applying. Documents with crossing coverage or a crossing-coverage target require patcher 0.5.0.
 

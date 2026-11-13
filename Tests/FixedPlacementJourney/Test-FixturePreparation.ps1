@@ -16,6 +16,10 @@ try {
     @{sourceMap=@{mapId=$baseline.mapId};target=@{scene=$baseline.board.scene;path=$baseline.board.path;component=$baseline.board.component;structure=$baseline.board.structure};placement=@{position=$baseline.board.mapPosition;rotation=$baseline.board.rotation}}|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $inspector -Encoding utf8
     $out=Join-Path $testRoot 'generated'
     & "$PSScriptRoot/Prepare-Fixtures.ps1" -ObservationPath $observations -Sequence 7 -ConfirmSequence 8 -InspectorPath $inspector -LoadId test-load -ExpectedGameSha256 ('A'*64) -OutputRoot $out
+    foreach ($name in @('Valid', 'InvalidIndependent', 'Restoration')) {
+        $info=Get-Content (Join-Path $out "$name/Info.json") -Raw | ConvertFrom-Json
+        if ('crankyant/scene-patcher >=0.5.0' -notin $info.dependencies.required) {throw 'Every generated patch fixture must require the common delivery minimum'}
+    }
     $valid=Get-Content (Join-Path $out 'Valid/Data/scene-patches.json') -Raw | ConvertFrom-Json
     if (($valid.modifications[0].placement.position -join ',') -ne '105,200,300') {throw 'The 5m map-X translation was not derived from the selected baseline'}
     $q=$valid.modifications[0].placement.rotation

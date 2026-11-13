@@ -93,10 +93,10 @@ static class CompositionTests {
         var cases = new (string Name, string Items, bool BoardAvailable, bool BridgeAvailable, string Expected)[] {
             ("Sylva placement", Board("a", Moved), true, true, "0.1.0"),
             ("Sylva with activity", Board("a", Moved, extra: ",\"active\":false"), true, true, "0.2.0"),
-            ("another board", Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard), true, true, "0.3.0"),
-            ("bridge with Sylva activity", Board("a", Moved, extra: ",\"active\":false") + "," + Bridge("b"), true, true, "0.3.0"),
-            ("another board without its capability", Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard), false, true, "0.3.0"),
-            ("bridge without its capability", Bridge("b"), true, false, "0.3.0"),
+            ("another board", Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard), true, true, "0.5.0"),
+            ("bridge with Sylva activity", Board("a", Moved, extra: ",\"active\":false") + "," + Bridge("b"), true, true, "0.5.0"),
+            ("another board without its capability", Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard), false, true, "0.5.0"),
+            ("bridge without its capability", Bridge("b"), true, false, "0.5.0"),
         };
         foreach (var c in cases) {
             var w = new World(c.BoardAvailable, c.BridgeAvailable);
@@ -104,8 +104,13 @@ static class CompositionTests {
             Assert(session.Blocked == null, c.Name + ": the document is editable: " + session.Blocked);
             Assert(session.MinimumPatcherVersion == c.Expected, c.Name + ": the minimum is the highest requirement of the document, got " + session.MinimumPatcherVersion);
         }
+        foreach (var component in new[] { "Track.TrackMarker", CrossingCoverageScene.ComponentType }) {
+            var content = "{\"id\":\"disable\",\"target\":{\"scene\":\"scene\",\"path\":\"unavailable\",\"component\":\"" + component + "\"},\"active\":false,\"dependsOn\":[]}";
+            var session = Session(new World(false, false), new Store { Patch = Doc(content) });
+            Assert(session.MinimumPatcherVersion == "0.5.0", "A known newer target component requires 0.5.0 even without optional structure or an available adapter: " + component);
+        }
         var stricter = new World();
-        var store = new Store { Patch = Doc(Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard)), Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.4.0\"]}}" };
+        var store = new Store { Patch = Doc(Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard)), Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.5.0\"]}}" };
         stricter.Boards.Add(new FakeBoard { Path = OtherBoard, Position = new[] { 100.0, 5.0, 100.0 } });
         var kept = Session(stricter, store);
         Assert(!kept.Outstanding(false).Contains(AuthoringSession.Metadata), "A stricter existing constraint is kept");

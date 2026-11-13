@@ -6,6 +6,8 @@ on:
       - 'Tests/RailroaderScenePatcher.Core.Tests/**'
       - 'Src/RailroaderScenePatcher/InventoryPresentationState.cs'
       - 'Src/RailroaderScenePatcher/EditFeedback.cs'
+      - 'Src/RailroaderScenePatcher/NativeMarkerLocation.cs'
+      - 'Src/RailroaderScenePatcher/NativeMarkerWarnings.cs'
       - 'Directory.Build.props'
       - '.github/workflows/core-tests.yml'
   push:
@@ -15,6 +17,8 @@ on:
       - 'Tests/RailroaderScenePatcher.Core.Tests/**'
       - 'Src/RailroaderScenePatcher/InventoryPresentationState.cs'
       - 'Src/RailroaderScenePatcher/EditFeedback.cs'
+      - 'Src/RailroaderScenePatcher/NativeMarkerLocation.cs'
+      - 'Src/RailroaderScenePatcher/NativeMarkerWarnings.cs'
       - 'Directory.Build.props'
       - '.github/workflows/core-tests.yml'
   workflow_dispatch:

@@ -4,7 +4,7 @@
 
 This guide shows how to set, replace or detach the track location of a Generic track marker, such as a yard-limit or station sign, and what changes with it. The binding is the location stored in the object's `Track.TrackMarker`: a segment ID, the segment end the distance counts from, and the distance in metres. The track graph registers the marker under that segment, and game code that looks the marker up by its ID finds it there.
 
-A binding edit never moves the object. Placement and activity are separate settings of the same modification; you can change them before, after or without a binding edit. A document with a binding, or with any modification of a track-marker object, needs patcher version 0.4.0 or later; the editor's Save writes that dependency.
+A binding edit never moves the object. Placement and activity are separate settings of the same modification; you can change them before, after or without a binding edit. Track-marker relationship and target capabilities require patcher 0.5.0 or later. The editor's Save derives the dependency minimum from the document's content; see [the document reference](scene-patch-document-v1.md#dependency-minimum).
 
 ## What qualifies
 
@@ -67,6 +67,16 @@ Copy the inspected identity with **Copy inspected identity** and add a modificat
 ```
 
 Replace the `trackMarker` value with `{ "detach": true }` to detach the marker. Add `placement` or `active` to the same modification to change those as well.
+
+## Repair feedback in the map editor
+
+When a marker binding edit is refused, read the editor feedback beside the binding controls. It names the failed operation and reason. Refresh the inventory and inspect the marker again before retrying, especially after Undo, Redo or another native edit. The editor keeps unknown or changed definitions protected; it does not ask players to edit JSON.
+
+Some markers can emit a game warning before the patcher can apply a MapMod repair. The patcher attempts an early repair only for a dependency-free relationship-only operation, before the game's original `TrackMarker.OnEnable` check, when the target belongs to a valid scene and the track graph is populated. The game's check still runs. If that route is unavailable, the patcher can remove only the exact current warning row emitted by that check, and only after the applicable operation succeeds and the marker binding and dependent state pass a separate verification. Historical log entries are not changed. Unknown, changed, ambiguous or unrelated warnings remain. If the patcher cannot establish ownership of a warning window, it leaves the window open; you may close it manually. The patcher does not close player windows.
+
+Recover unknown content or document-format problems in the map editor. Players should not create or edit JSON to resolve these reports.
+
+Remove a repair with **Remove modification**. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same document target the object, combine them into one before editing or removing it in the editor.
 
 ## Limits
 

@@ -17,7 +17,9 @@ namespace RailroaderScenePatcher {
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
     // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
-    internal sealed class TrackMarkerWorld : ITrackMarkerWorld {
+    internal sealed class TrackMarkerWorld : ITrackMarkerWorld, ITrackMarkerDiagnostics {
+        readonly NativeMarkerWarnings warningHistory = new NativeMarkerWarnings();
+        readonly NativeCurrentWarnings currentWarnings = new NativeCurrentWarnings();
         internal const string MarkerType = "Track.TrackMarker";
         const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location", Relative = "Track.TrackRelativePosition";
         const string Milepost = "Helpers.MilePost", PadBuilder = "Track.TrackCurveMeshBuilder", Crossing = "Track.Crossings.GradeCrossingController";
@@ -31,6 +33,14 @@ namespace RailroaderScenePatcher {
         // Direct references to marker components, scanned at most once per frame.
         ReferenceScan referrers;
         int referrersFrame = -1;
+        GameObject enablingTarget;
+        // Unity can invoke OnEnable before scene.isLoaded becomes true. Limit that allowance to the current native check.
+        internal T DuringEnable<T>(GameObject target, Func<T> action) {
+            var previous = enablingTarget; enablingTarget = target; referrersFrame = -1;
+            try { return action(); }
+            finally { enablingTarget = previous; referrersFrame = -1; }
+        }
+        bool VisibleForCheck(GameObject target) => Loaded(target) || enablingTarget != null && target != null && target.scene.IsValid();
         internal TrackMarkerWorld() {
             marker = Native.Type(MarkerType); graph = Native.Type(GraphType); segment = Native.Type(SegmentType); location = Native.Type(LocationType);
             transformer = Native.Type("Helpers.WorldTransformer"); culler = Native.Type(BoardScene.CullerType);
@@ -39,6 +49,11 @@ namespace RailroaderScenePatcher {
             markerLocation = marker.GetProperty("Location", Native.Flags) ?? throw new MissingMemberException(MarkerType, "Location");
             if (markerLocation.GetSetMethod(true) == null) throw new MissingMethodException(MarkerType, "set_Location");
             foreach (var field in new[] { "id", "type", "_location", "OnLocationChanged" }) if (FieldOf(marker, field) == null) throw new MissingFieldException(MarkerType, field);
+            var serializedLocation = FieldOf(marker, "_location").FieldType;
+            if (FieldOf(serializedLocation, "segmentId")?.FieldType != typeof(string) || FieldOf(serializedLocation, "distance")?.FieldType != typeof(float) || FieldOf(serializedLocation, "end")?.FieldType != end)
+                throw new MissingMemberException(MarkerType, "serialized location fields");
+            if (marker.GetMethod("InvalidateCache", Native.Flags, null, Type.EmptyTypes, null)?.ReturnType != typeof(void)) throw new MissingMethodException(MarkerType, "InvalidateCache");
+            if (marker.GetMethod("OnEnable", Native.Flags, null, Type.EmptyTypes, null)?.ReturnType != typeof(void)) throw new MissingMethodException(MarkerType, "OnEnable");
             if (FieldOf(graph, "_namedLocationsBySegmentId") == null) throw new MissingFieldException(GraphType, "_namedLocationsBySegmentId");
             foreach (var method in new[] { "GetSegment", "AddNamedLocation", "RemoveNamedLocation" }) if (graph.GetMethods(Native.Flags).Count(m => m.Name == method) != 1) throw new MissingMethodException(GraphType, method);
             if (segment.GetMethod("GetLength", Native.Flags, null, Type.EmptyTypes, null) == null || FieldOf(segment, "id") == null) throw new MissingMemberException(SegmentType, "GetLength or id");
@@ -82,11 +97,11 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != MarkerType) return Array.Empty<object>();
             return Resources.FindObjectsOfTypeAll(marker).OfType<Component>().Where(c => c != null).Select(c => c.gameObject).Distinct()
-                .Where(g => Loaded(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path).Cast<object>().ToArray();
+                .Where(g => VisibleForCheck(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path).Cast<object>().ToArray();
         }
         public string PatternProblem(object target) {
-            if (referrersFrame != Time.frameCount) { referrers = Referrers(Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && Loaded(c.gameObject))); referrersFrame = Time.frameCount; }
-            return Problem(target as GameObject, referrers, SetupHolders());
+            if (referrersFrame != Time.frameCount) { referrers = Referrers(Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && VisibleForCheck(c.gameObject))); referrersFrame = Time.frameCount; }
+            return Problem(target as GameObject, referrers, HolderIndex.Lazy(() => SetupPlacementMarkers(VisibleForCheck)), ReferenceEquals(target, enablingTarget));
         }
         // Every direct field or list reference from a loaded component to a marker component. A relevant field that
         // cannot be read leaves the scan incomplete, which refuses every marker. An observer receives every field read of
@@ -119,9 +134,9 @@ namespace RailroaderScenePatcher {
         }
         // The markers that new-game setup car placements hold, walked in the order the per-marker check walked them: each
         // setup's placements, then each placement's marker. The walk runs once, at the first marker that reaches the check.
-        internal static HolderIndex SetupHolders() => HolderIndex.Lazy(SetupPlacementMarkers);
-        static IEnumerable<object> SetupPlacementMarkers() {
-            foreach (var setup in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && Loaded(c.gameObject) && c.GetType().FullName == SetupType))
+        internal static HolderIndex SetupHolders() => HolderIndex.Lazy(() => SetupPlacementMarkers(Loaded));
+        static IEnumerable<object> SetupPlacementMarkers(Func<GameObject, bool> include) {
+            foreach (var setup in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && include(c.gameObject) && c.GetType().FullName == SetupType))
                 if (Field(setup, "placements") is IEnumerable placements)
                     foreach (var placement in placements)
                         if (placement != null) yield return Field(placement, "marker");
@@ -129,8 +144,8 @@ namespace RailroaderScenePatcher {
         static string Describe(object owner) => owner is Component c && c != null ? c.GetType().FullName + " on " + BoardScene.PathOf(c.transform) : System.Convert.ToString(owner);
         // Why the object does not conform to the supported Generic-marker pattern, or null. Shared with the inventory,
         // which supplies the reference scan and setup index of its discovery.
-        internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups) {
-            if (!Loaded(go)) return "This object has no implemented track-marker capability";
+        internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups, bool enabling = false) {
+            if (!Loaded(go) && !(enabling && go != null && go.scene.IsValid())) return "This object has no implemented track-marker capability";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
             if (markers.Length != 1) return markers.Length == 0 ? "The object holds no track marker" : "The object holds several track markers";
             var m = markers[0];
@@ -185,13 +200,34 @@ namespace RailroaderScenePatcher {
         }
         public bool Registers(object target) { var m = MarkerOf(target); return ((Behaviour)m).isActiveAndEnabled; }
         public void SetLocation(object target, TrackLocation value) {
-            object native = null;
-            if (value != null) {
-                var seg = Segment(value.Segment) ?? throw new InvalidOperationException("Relationship target segment " + value.Segment + " is missing");
-                native = Activator.CreateInstance(location, seg, (float)value.Distance, Enum.Parse(end, value.End == "a" ? "A" : "B"));
-            }
-            // The native setter serializes the location, clears the cached pose and notifies listeners; the pattern admits none.
-            markerLocation.SetValue(MarkerOf(target), native);
+            // Preserve captured missing references; resolved locations use the native setter and its cache notifications.
+            NativeMarkerLocation.Write(MarkerOf(target), value, value == null ? null : Segment(value.Segment), location, end);
+        }
+        public void AfterVerifiedState(object target) {
+            try {
+                var m = MarkerOf(target);
+                var id = (string)Field(m, "id");
+                if (String.IsNullOrEmpty(id) || Resources.FindObjectsOfTypeAll(marker).OfType<Component>().Count(c => c != null && c.gameObject.scene.IsValid() && (string)Field(c, "id") == id) != 1) return;
+                var resolved = markerLocation.GetValue(m);
+                var valid = resolved != null && (bool)Native.Read(resolved, "IsValid");
+                // A missing segment still has a serialized reference; an explicit detach does not.
+                var serializedReference = Location(target);
+                warningHistory.Verified(target, valid, Registers(target) && serializedReference != null, currentWarnings, () => {
+                    var collector = Game.Diagnostics.MessageCollector.Shared;
+                    if (collector == null) return null;
+                    var serialized = Field(m, "_location");
+                    var description = "Track marker " + Field(m, "id") + " is not on the track at " + Field(serialized, "segmentId") + " + " + ((float)Field(serialized, "distance")).ToString("F1", System.Globalization.CultureInfo.CurrentCulture) + "m and will have no effect.";
+                    var emitted = new List<CurrentWarning>();
+                    Action<Game.Diagnostics.DiagnosticMessage> observe = message => {
+                        if (message.Severity == Game.Diagnostics.MessageSeverity.Warning && message.Source == "System" && message.DeduplicationKey == (string)Field(m, "id") && message.Originator == m.name && message.Description == description)
+                            emitted.Add(NativeCurrentWarnings.Snapshot(message));
+                    };
+                    collector.OnMessageAdded += observe; collector.OnMessageUpdated += observe;
+                    try { NativeRepairHooks.CheckRestoredBinding(m, () => Native.Call(m, "OnEnable")); }
+                    finally { collector.OnMessageAdded -= observe; collector.OnMessageUpdated -= observe; }
+                    return emitted.Count == 1 ? emitted[0] : null;
+                });
+            } catch (Exception e) { Debug.LogWarning("Scene Patcher could not reconcile the restored marker's native warning; current rows remain: " + e.GetBaseException().Message); }
         }
         object Builder() => Native.Read(mapBuilder, "Shared");
         // The registered map labels in this object's hierarchy; the map builder caches the track group of the nearest marker location above each.

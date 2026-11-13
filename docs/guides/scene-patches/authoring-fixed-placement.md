@@ -6,7 +6,7 @@ This guide describes the v1 scene-patch document layout and the native placement
 
 ## Add the patch document
 
-Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. The owning MapMod must depend on `crankyant/scene-patcher` version `0.1.0` or later, or `0.3.0` or later when it moves a board other than the Sylva board. To make these edits in the map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
+Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. Fixed placement has a base minimum of `0.1.0`; target-specific capabilities can raise it. The native independent-board pattern raises the minimum to `0.5.0` except for the legacy Sylva location sign, which still uses the pattern checks but does not raise the pattern-based board dependency minimum. To make these edits in the map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
 
 Save the document as strict UTF-8 JSON. Use the `mapId` of the selected Map definition or one of its resolved map layers. Keep one document with the supplying MapMod so editor inspection and runtime application read the same desired state.
 

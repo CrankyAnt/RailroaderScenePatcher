@@ -4,7 +4,7 @@
 
 This guide shows how to move, rotate, disable and restore a supported bridge, and what stays where it is. Bridge placement moves the bridge's own hierarchy, including its colliders and culling. It does not move track, generated trestles or the construction scenery beside the bridge, and it does not change which track the bridge belongs to.
 
-The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Other bridges show up in the inventory for inspection only. A document that targets a bridge needs patcher version 0.3.0 or later; the editor's Save writes that dependency.
+The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Other bridges show up in the inventory for inspection only. A bridge target requires patcher 0.5.0 or later. The editor's Save derives the dependency minimum from the document's content; see [the document reference](scene-patch-document-v1.md#dependency-minimum).
 
 ## Move the bridge in the editor
 

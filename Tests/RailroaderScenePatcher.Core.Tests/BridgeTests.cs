@@ -192,7 +192,7 @@ static class BridgeTests {
         Assert(session.Edit(identity, moved, null).Applied && bridge.Position[0] == 55 && Offsets(bridge).SequenceEqual(offsets), "An editor bridge placement moves the root with its colliders");
         var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"][0];
         Assert((string)item["target"]["structure"] == BridgeScene.Structure && item["placement"] != null && item["active"] == null, "The document records bridge placement, not a binding or activity");
-        Assert(session.MinimumPatcherVersion == "0.3.0", "A bridge modification requires the patcher version that introduced the bridge capability");
+        Assert(session.MinimumPatcherVersion == "0.5.0", "A bridge modification requires the common delivery minimum");
         Assert(session.Edit(identity, null, false).Applied && !bridge.Active, "An editor disable deactivates the bridge");
         editor.Undo(); Assert(bridge.Active && bridge.Position[0] == 55, "Undo re-enables the moved bridge");
         editor.Undo(); Assert(bridge.Position.SequenceEqual(new[] { 50.0, 5, 7 }) && bridge.Rotation[3] == 1 && Offsets(bridge).SequenceEqual(offsets), "Undo restores the prior bridge pose and colliders");
@@ -201,7 +201,7 @@ static class BridgeTests {
         Assert(world.TrestlePosition.SequenceEqual(new[] { 60.0, 4, 7 }), "No editor route moves the separate trestle");
         Assert(editor.Save() == null && !store.Info.Contains("crankyant/scene-patcher"), "Save after removal writes no dependency for an empty document");
         editor.Undo(); Assert(bridge.Position[0] == 55, "Undo of the removal restores the authored bridge placement");
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.3.0"), "Save raises the dependency to the bridge capability version: " + store.Info);
+        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the bridge capability version: " + store.Info);
         var fresh = new FakeBridge(); var replay = new FakeBridgeWorld(); replay.Objects[BridgePath] = new List<object> { fresh };
         var reload = new PatchEngine(new BridgeScene(replay, Capability.Unchecked)).Apply(store.Patch);
         Assert(reload.Outcomes.Values.Single().Applied && fresh.Position[0] == 55 && fresh.Colliders.Count == 2, "A reloaded world reproduces the saved bridge placement without duplicated colliders");

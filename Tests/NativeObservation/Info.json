@@ -4,5 +4,5 @@
   "author": "CrankyAnt",
   "version": "0.1.0",
   "assemblies": ["NativeObservation.dll"],
-  "dependencies": { "required": ["rr/game >=0.6.2", "crankyant/scene-patcher >=0.1.0"] }
+  "dependencies": { "required": ["rr/game >=0.6.2", "crankyant/scene-patcher >=0.5.0"] }
 }

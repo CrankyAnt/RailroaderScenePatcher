@@ -224,11 +224,16 @@ namespace RailroaderScenePatcher.Core {
         // Installs or removes the explicit-disable hold in place of the native activation step.
         void HoldDisabled(object marker, bool hold);
     }
+    // A native world may reconcile the warning of a deliberately restored broken binding after complete verification.
+    public interface ITrackMarkerDiagnostics {
+        // Must leave uncertain warning rows intact and must not throw or alter the verified scene state.
+        void AfterVerifiedState(object marker);
+    }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
     // placement stays a separate, independently authored setting.
     public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene {
-        public const string Structure = "track-marker-v1", RequiredVersion = "0.4.0";
+        public const string Structure = "track-marker-v1", RequiredVersion = "0.5.0";
         const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
         sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; }
         readonly ITrackMarkerWorld world;
@@ -239,7 +244,7 @@ namespace RailroaderScenePatcher.Core {
             if (identity.Structure != null && identity.Structure != Structure) return Array.Empty<object>();
             return world.Resolve(identity) ?? Array.Empty<object>();
         }
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == "Track.TrackMarker") ? RequiredVersion : null;
         public void Preflight(object target) {
             var problem = world.PatternProblem(target);
             if (problem != null) throw new InvalidOperationException(problem);
@@ -250,11 +255,11 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             var group = world.GroupActivity(target);
             if (group != null && state?.Active == true)
-                throw new InvalidOperationException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");
+                throw new InvalidPatchDefinitionException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");
             var location = state?.Marker?.Location;
             if (location == null) return;
             var problem = Unresolved(location);
-            if (problem != null) throw new InvalidOperationException(problem);
+            if (problem != null) throw new InvalidPatchDefinitionException(problem);
         }
         // Why a location cannot be bound, or null: its segment must exist exactly once and contain the distance.
         string Unresolved(TrackLocation location) {
@@ -283,13 +288,16 @@ namespace RailroaderScenePatcher.Core {
             Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location));
             var difference = Verify(target, location, state.Placement, active);
             if (difference != null) throw new InvalidOperationException("Applied marker state did not verify: " + difference);
+            (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
         }
         public bool Restore(object target, object snapshot) {
             var captured = (Snapshot)snapshot;
             try {
                 var active = world.GroupActivity(target) == null ? captured.Active : (captured.Held ? false : (bool?)null);
                 Write(target, captured.Location, captured.Position, captured.Rotation, active, true);
-                return Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active) == null;
+                var verified = Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active) == null;
+                if (verified) (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
+                return verified;
             } catch { return false; }
         }
         // The relationship first, so the registration follows the new location; activity then lets the native lifecycle register or remove it.

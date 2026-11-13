@@ -45,7 +45,7 @@ The editor's **Undo** and **Redo** return the board to the earlier or later pose
 
 Save writes the board's placement and activity to `Data/scene-patches.json`, together with the native map data and the patcher dependency. Save does not write the terrain output that the board's mask generates, such as the trees removed around it. The game regenerates that output from the board's saved position when the map loads, so a reloaded world shows the same terrain effect without a second copy of the board's registrations. Terrain you edit with the native terrain tools is separate: the editor saves those edited terrain tiles through its own Save route, and a board edit does not change them.
 
-A document that moves a board other than the Sylva location sign needs patcher 0.3.0 or later; Save raises the dependency to `>=0.3.0` when it does. The Sylva board, `World/Signs/Loc: Sylva Int`, keeps the earlier minimum.
+Independent-board pattern targets other than the legacy Sylva location sign require patcher 0.5.0 or later. The Sylva target still uses the pattern checks, but does not raise the pattern-based board dependency minimum. Save derives the dependency minimum from the document's content; see [the document reference](scene-patch-document-v1.md#dependency-minimum).
 
 ## When the terrain output does not complete
 

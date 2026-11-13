@@ -21,7 +21,7 @@ function Save-Json($Value,[string]$Path) {
 }
 function Write-Fixture([string]$Name,[array]$Modifications) {
     $destination=Join-Path $OutputRoot $Name
-    Save-Json @{identifier='crankyant/fixed-placement-fixture';name='CrankyAnt';author='CrankyAnt';version='0.0.1';dependencies=@{required=@('rr/game >=0.6.2','crankyant/scene-patcher >=0.1.0')}} (Join-Path $destination 'Info.json')
+    Save-Json @{identifier='crankyant/fixed-placement-fixture';name='CrankyAnt';author='CrankyAnt';version='0.0.1';dependencies=@{required=@('rr/game >=0.6.2','crankyant/scene-patcher >=0.5.0')}} (Join-Path $destination 'Info.json')
     Save-Json @{objects=@(@{identifier=$mapId;metadata=@{name='Issue39 fixed placement';description='Disposable native test';credits='CrankyAnt';tags=@()};definition=@{kind='Map';mapData='./Map.json';terrainTileSets=@('rr/nc-bryson');mapLayers=@('rr/bushnell-whittier');components=@{}}})} (Join-Path $destination 'Definitions.json')
     Save-Json @{} (Join-Path $destination 'Data/Map.json')
     Save-Json @{formatVersion=1;sourceMap=@{mapId=$mapId};modifications=$Modifications} (Join-Path $destination 'Data/scene-patches.json')

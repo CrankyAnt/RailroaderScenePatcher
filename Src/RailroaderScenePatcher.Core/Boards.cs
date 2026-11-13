@@ -92,8 +92,8 @@ namespace RailroaderScenePatcher.Core {
         public const string Structure = "independent-board-v1";
         public const string CullerType = "Helpers.Culling.RendererCuller";
         public const string SylvaScene = "BushnellWhittier-MapManager", SylvaPath = "World/Signs/Loc: Sylva Int";
-        // Patcher 0.2.0 supported only the Sylva board; other boards need the pattern-based capability.
-        public const string PatternVersion = "0.3.0";
+        // Pattern-based boards share the delivery minimum; the original Sylva target retains its legacy support.
+        public const string PatternVersion = "0.5.0";
         public const double OutputTimeout = 30;
         const double PoseTolerance = 0.01, RegistrationTolerance = 0.1;
         readonly IBoardWorld world;
