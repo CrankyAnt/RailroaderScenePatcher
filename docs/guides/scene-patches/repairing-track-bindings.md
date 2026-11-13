@@ -13,11 +13,11 @@ The patcher edits a marker when all of these hold:
 - the object holds exactly one `Track.TrackMarker`, of type `Generic`, with a non-empty marker ID,
 - the object holds no `Helpers.MilePost` and no `Track.TrackCurveMeshBuilder`, and no parent holds a `Track.Crossings.GradeCrossingController`,
 - no other component listens to the marker's location changes,
-- a `Track.TrackRelativePosition` on the object, if present, does not make the object's activity follow a track group,
+- a `Track.TrackRelativePosition` on the object whose activity follows a track group activates this object itself, and no other component has replaced its activation callback,
 - no loaded component other than that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it does not know the holders and refuses every marker until the next check,
 - the graph holds one registration of the marker at its current location while the marker is enabled and active, and none otherwise.
 
-Each of these refusals names a consumer of the marker's location that a binding edit would leave behind. Objects whose activity follows a track group wait for the track-group operation that owns that subscription.
+Each of these refusals names a consumer of the marker's location that a binding edit would leave behind. For an object whose activity follows its track group, a binding edit also moves that group subscription to the new segment's group; see [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
 The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. Any other marker lists **Track binding unavailable** with the reason and stays inspection only. Mileposts, crossing pads and crossings have their own later operations. Signal markers fall outside the supported operations.
 
@@ -84,6 +84,6 @@ The game reads a Generic marker's binding in these places:
 - The flare and planner queries read registrations of their own marker types, not of Generic markers.
 - `Track.TrackRelativePosition` moves its object only when its relative placement is configured again. In the game, map objects do that, not the inherited scene signs.
 
-The inherited Generic signs in the research inventory are the whistle signs M5pp near Sylva and Mm8w at `World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E`, the speed sign Mwp1 at `World/Large Scenery/Alarka Signs/Speed Sign`, the yard limit Mkwd at `World/Large Scenery/Alarka Signs/Yard Limit` and the station sign Mi4f at `World/Large Scenery/Ela/Signs/Station Sign (1)`. In that journey's inventory, M5pp, Mm8w, Mkwd and Mi4f carried `track-marker-v1`; Mwp1's activity follows its track group, so it is refused and stays inspection only. Only Mkwd was edited; the other admitted signs are unverified after a binding edit, a Save and a reload. Segment IDs are unique keys of the loaded track graph, so the game itself has no ambiguous segment target. The ambiguity refusal guards the document contract.
+The inherited Generic signs in the research inventory are the whistle signs M5pp near Sylva and Mm8w at `World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E`, the speed sign Mwp1 at `World/Large Scenery/Alarka Signs/Speed Sign`, the yard limit Mkwd at `World/Large Scenery/Alarka Signs/Yard Limit` and the station sign Mi4f at `World/Large Scenery/Ela/Signs/Station Sign (1)`. In that journey's inventory, M5pp, Mm8w, Mkwd and Mi4f carried `track-marker-v1`; Mwp1's activity follows its track group, so that patcher version refused it. Patcher 0.5.0 admits it with its group subscription. Only Mkwd was edited; the other admitted signs are unverified after a binding edit, a Save and a reload. Segment IDs are unique keys of the loaded track graph, so the game itself has no ambiguous segment target. The ambiguity refusal guards the document contract.
 
-A track-relative object does not move when its marker is rebound, and its terrain snap does not run. Objects whose activity follows a track group are refused, because rebinding would also move that group subscription. Multiplayer is not covered.
+A track-relative object does not move when its marker is rebound, and its terrain snap does not run. For an object whose activity follows its track group, rebinding moves the subscription and keeps an explicit disable in place. Multiplayer is not covered.

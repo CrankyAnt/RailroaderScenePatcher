@@ -160,8 +160,30 @@ namespace RailroaderScenePatcher.Core {
     }
     // A scene whose objects can hold explicit relationships. Check runs before any mutation of the operation.
     public interface IRelationshipScene {
-        // Throws when the state holds a relationship the object does not support, or a relationship target that does not resolve uniquely.
+        // Throws when the state holds a relationship the object does not support, a relationship target that does not
+        // resolve uniquely, or a setting the object's relationships make unsupported, such as an explicit enable of an
+        // object whose activity follows a track group.
         void CheckRelationships(object target, ObjectState state);
+    }
+    // The group-following activity of a marker object: its TrackRelativePosition subscribes to the track graph's group
+    // event for the bound segment's group and activates or deactivates the object with that group. The explicit-disable
+    // hold replaces the native activation step and keeps the object inactive.
+    public sealed class GroupActivity {
+        public GroupActivity(bool held, bool observing, string observedGroup, int subscriptions, bool locationResolves, string locationGroup, bool groupEnabled) {
+            Held = held; Observing = observing; ObservedGroup = observedGroup; Subscriptions = subscriptions;
+            LocationResolves = locationResolves; LocationGroup = locationGroup; GroupEnabled = groupEnabled;
+        }
+        public bool Held { get; }
+        public bool Observing { get; }
+        public string ObservedGroup { get; }
+        // The relative position's handlers on the graph's group event.
+        public int Subscriptions { get; }
+        // Whether the marker's current location resolves to a loaded segment; the native observation needs one.
+        public bool LocationResolves { get; }
+        // The group of the current location's segment; null or empty when it has none.
+        public string LocationGroup { get; }
+        // Whether the graph currently enables that group; true for a segment without a group.
+        public bool GroupEnabled { get; }
     }
     // The game-facing operations of the track-marker capability. Positions are map coordinates.
     public interface ITrackMarkerWorld {
@@ -194,6 +216,13 @@ namespace RailroaderScenePatcher.Core {
         void SetPose(object marker, double[] position, double[] rotation);
         // Activates or deactivates the root; the native marker lifecycle then registers or removes the marker.
         void SetActive(object marker, bool active);
+        // The object's group-following activity, or null when its activity does not follow a track group.
+        GroupActivity GroupActivity(object marker);
+        // The native unsubscribe and observe steps for the current location's group. The observation sets the object's
+        // activity from the group, through the hold when it is installed.
+        void ObserveGroup(object marker);
+        // Installs or removes the explicit-disable hold in place of the native activation step.
+        void HoldDisabled(object marker, bool hold);
     }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
@@ -201,7 +230,7 @@ namespace RailroaderScenePatcher.Core {
     public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene {
         public const string Structure = "track-marker-v1", RequiredVersion = "0.4.0";
         const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
-        sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active; }
+        sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; }
         readonly ITrackMarkerWorld world;
         public TrackMarkerScene(ITrackMarkerWorld world, Capability capability) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
         public IEnumerable<string> MapIds => world.MapIds;
@@ -218,6 +247,9 @@ namespace RailroaderScenePatcher.Core {
             if (difference != null) throw new InvalidOperationException("The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it");
         }
         public void CheckRelationships(object target, ObjectState state) {
+            var group = world.GroupActivity(target);
+            if (group != null && state?.Active == true)
+                throw new InvalidOperationException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");
             var location = state?.Marker?.Location;
             if (location == null) return;
             var problem = Unresolved(location);
@@ -233,12 +265,20 @@ namespace RailroaderScenePatcher.Core {
                 return "Relationship distance " + location.Distance.ToString("R", CultureInfo.InvariantCulture) + " lies outside segment " + location.Segment;
             return null;
         }
-        public object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target) };
-        public ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), world.Active(target), MarkerBinding.Of(world.Location(target)));
+        public object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true };
+        // The activity of a group follower is group-driven (null) unless the explicit-disable hold is installed.
+        public ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target)));
+        bool? ReadActive(object target) {
+            var group = world.GroupActivity(target);
+            return group == null || group.Held ? world.Active(target) : (bool?)null;
+        }
         public void Apply(object target, ObjectState state) {
             var before = world.Location(target);
             var location = state.Marker == null ? before : state.Marker.Location;
-            var active = state.Active ?? world.Active(target);
+            var follower = world.GroupActivity(target) != null;
+            if (follower && state.Active == true) CheckRelationships(target, state);
+            // A follower without an explicit disable returns to group-driven activity.
+            var active = follower ? (state.Active == false ? false : (bool?)null) : state.Active ?? world.Active(target);
             Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location));
             var difference = Verify(target, location, state.Placement, active);
             if (difference != null) throw new InvalidOperationException("Applied marker state did not verify: " + difference);
@@ -246,27 +286,54 @@ namespace RailroaderScenePatcher.Core {
         public bool Restore(object target, object snapshot) {
             var captured = (Snapshot)snapshot;
             try {
-                Write(target, captured.Location, captured.Position, captured.Rotation, captured.Active, true);
-                return Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), captured.Active) == null;
+                var active = world.GroupActivity(target) == null ? captured.Active : (captured.Held ? false : (bool?)null);
+                Write(target, captured.Location, captured.Position, captured.Rotation, active, true);
+                return Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active) == null;
             } catch { return false; }
         }
         // The relationship first, so the registration follows the new location; activity then lets the native lifecycle register or remove it.
-        void Write(object target, TrackLocation location, double[] position, double[] rotation, bool active, bool rebind) {
+        // A group follower's hold is installed before anything can activate the object and released only after the
+        // relationship; its subscription is observed again for the current location; without the hold the group sets activity.
+        void Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind) {
+            var group = world.GroupActivity(target);
+            if (group != null && active == false) {
+                if (!group.Held) world.HoldDisabled(target, true);
+                if (world.Active(target)) world.SetActive(target, false);
+            }
             if (rebind || Coherence(target) != null || world.DependentProblem(target) != null) {
                 world.Unregister(target);
                 world.SetLocation(target, location);
                 if (world.Registers(target) && location != null && Unresolved(location) == null) world.Register(target);
                 world.RefreshDependents(target);
             }
-            if (active && !world.Active(target)) world.SetActive(target, true);
+            if (group != null) {
+                var release = active != false && world.GroupActivity(target).Held;
+                if (release) world.HoldDisabled(target, false);
+                if (rebind || release || GroupProblem(target) != null) world.ObserveGroup(target);
+            } else if (active == true && !world.Active(target)) world.SetActive(target, true);
             if (position != null) world.SetPose(target, position, rotation);
-            if (!active && world.Active(target)) world.SetActive(target, false);
+            if (group == null && active == false && world.Active(target)) world.SetActive(target, false);
         }
-        string Verify(object target, TrackLocation location, Placement placement, bool active) {
+        string Verify(object target, TrackLocation location, Placement placement, bool? active) {
             if (!TrackLocation.Same(world.Location(target), location)) return "the serialized location is " + (world.Location(target)?.ToString() ?? "detached") + ", expected " + (location?.ToString() ?? "detached");
-            if (world.Active(target) != active) return "activity differs";
+            var group = world.GroupActivity(target);
+            if (group == null ? world.Active(target) != active : group.Held != (active == false)) return "activity differs";
             if (placement != null && (!Near(world.Position(target), placement.Position) || !SameRotation(world.Rotation(target), placement.Rotation))) return "pose differs";
-            return Coherence(target) ?? world.DependentProblem(target);
+            return Coherence(target) ?? world.DependentProblem(target) ?? GroupProblem(target);
+        }
+        // The subscription and activity the native observation holds for the current location: one handler for the
+        // location's group, none without a group or a resolvable location; activity from the group, or inactive under the
+        // hold. Null when it agrees or the object does not follow a group.
+        string GroupProblem(object target) {
+            var group = world.GroupActivity(target);
+            if (group == null) return null;
+            if (!group.LocationResolves) return group.Observing || group.Subscriptions != 0 ? "the track-group subscription remains for a location that does not resolve" : null;
+            var expected = String.IsNullOrEmpty(group.LocationGroup) ? 0 : 1;
+            if (!group.Observing || (group.ObservedGroup ?? "") != (group.LocationGroup ?? "") || group.Subscriptions != expected)
+                return "the object observes track group " + (group.Observing ? group.ObservedGroup ?? "none" : "none") + " with " + group.Subscriptions + " subscriptions instead of " + (group.LocationGroup ?? "none") + " with " + expected;
+            if (group.Held ? world.Active(target) : world.Active(target) != group.GroupEnabled)
+                return group.Held ? "the explicitly disabled object is active" : "the object's activity differs from its track group " + group.LocationGroup;
+            return null;
         }
         // The registration the native lifecycle holds for the current location and activity: one owned entry
         // at a resolvable location of an active marker, none otherwise. Null when it agrees.

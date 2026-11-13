@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher {
         string presentationSnapshot;
         readonly InventoryPresentationState inventoryPresentation = new InventoryPresentationState();
         readonly UIOutlineViewState inventoryOutline = new UIOutlineViewState();
-        internal const string Version = "0.4.0";
+        internal const string Version = "0.5.0";
         Authoring authoring;
         object refusedEditor;
         string authoringStatus = "";
@@ -72,6 +72,9 @@ namespace RailroaderScenePatcher {
         readonly EditFeedback feedback = new EditFeedback();
         const string BindingPlace = "binding", PlacementPlace = "placement", InteractionPlace = "interaction";
         bool staleLogged = true;
+        NativeTrackPoses trackPoses;
+        float nextTrackFollow;
+        const string FollowPlace = "follow";
         readonly string[] pose = { "", "", "", "", "", "" };
         readonly string[] binding = { "", "a", "" };
         readonly string loadId = Guid.NewGuid().ToString("N");
@@ -121,6 +124,8 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": track-marker capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
+                try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); }
+                catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": track-following placement unavailable: " + e.GetBaseException().Message); }
                 engine = new PatchEngine(capabilities);
                 context.Log.Info("Scene Patcher " + Version + ": native capabilities checked; game " + Application.version + "; production integration unchecked");
                 ApplyDocuments();
@@ -242,6 +247,7 @@ namespace RailroaderScenePatcher {
                 staleLogged = inventory.IsStale;
                 if (staleLogged) context?.Log.Info("Scene inventory marked stale: " + inventory.StaleReason);
             }
+            FollowTracks();
             if (scene != null) try {
                 scene.Poll();
                 foreach (var failure in scene.Failures)
@@ -253,6 +259,20 @@ namespace RailroaderScenePatcher {
                 if (snapshot != presentationSnapshot || inventoryChanged) { presentationSnapshot = snapshot; presentation.RequestRefresh(); }
                 presentation.Tick(); SyncInputRegions();
             }
+        }
+        // Objects of the edited document that follow a track move with it, a few times a second. No document or history changes.
+        void FollowTracks() {
+            if (authoring == null || gizmo?.Active == true || Time.unscaledTime < nextTrackFollow) return;
+            nextTrackFollow = Time.unscaledTime + 0.25f;
+            try {
+                if (!authoring.Session.HasTrackFollowing) return;
+                foreach (var item in authoring.Session.ReconcileTrackFollowing())
+                    if (item.Value.Applied) context?.Log.Info("Scene Patcher: " + item.Key + " followed its track");
+                    else if (reported.Add("follow/" + item.Key + "/" + item.Value.Error)) {
+                        diagnostics.Add(item.Key + " could not follow its track: " + item.Value.Error);
+                        context?.Log.Info("Scene Patcher: " + item.Key + " could not follow its track: " + item.Value.Error);
+                    }
+            } catch (Exception e) { if (reported.Add("follow/" + e.GetBaseException().Message)) context?.Log.Info("Scene Patcher: track following stopped: " + e.GetBaseException().Message); }
         }
         string PresentationSnapshot() {
             var pending = selection?.Pending;
@@ -456,6 +476,34 @@ namespace RailroaderScenePatcher {
                 Button(builder, "Cancel prepared snap", ClearSnap);
             }
             Button(builder, "Snapping guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/snapping-to-track.md"));
+            DrawFollow(builder);
+        }
+        // Track-following placement: the object keeps its pose relative to an explicitly selected track or endpoint.
+        void DrawFollow(UIPanelBuilder builder) {
+            if (authoring == null) return;
+            builder.AddSection("Track following");
+            var identity = selected.Identity;
+            if (trackPoses == null) { PlainLabel(builder, "Track-following placement is unavailable in this game build."); return; }
+            var following = authoring.Session.FollowingOf(identity);
+            PlainLabel(builder, following == null
+                ? "Following keeps this object's current position and rotation relative to a selected track or endpoint, and moves it whenever that track moves. It does not change a logical binding or activity."
+                : "Following " + following.Anchor + " at offset " + String.Join(", ", following.Offset.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture))) + " in the track's frame. Placement edits keep following it with a new offset.");
+            Button(builder, "Choose track to follow", () => BeginSelection(SelectionKind.TrackSegment, selected));
+            Button(builder, "Choose endpoint to follow", () => BeginSelection(SelectionKind.TrackNode, selected));
+            var confirmed = selection?.Confirmed;
+            var usable = confirmed != null && confirmed.Identity.Kind != SelectionKind.SceneObject && (confirmed.Source == null || confirmed.Source.Equals(SelectionIdentity.SceneObject(identity)));
+            if (usable) Button(builder, "Follow confirmed " + confirmed.Identity, () => {
+                var maps = confirmed.MapIds.ToArray();
+                Edit(FollowPlace, "Track following", (current, inspection) => {
+                    if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("Map context changed; select the track again");
+                    var anchor = confirmed.Identity.Kind == SelectionKind.TrackNode ? TrackAnchor.Endpoint(confirmed.Identity.Identifier)
+                        : TrackAnchor.At(trackPoses.Nearest(confirmed.Identity.Identifier, ((GameObject)selected.Handle).transform.position));
+                    return current.Follow(identity, anchor, inspection);
+                });
+            });
+            if (following != null) Button(builder, "Stop following (keep current pose)", () => Edit(FollowPlace, "Stop following", (current, inspection) => current.StopFollowing(identity, inspection)));
+            if (feedback.Place == FollowPlace) PlainLabel(builder, feedback.Result);
+            Button(builder, "Track following guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/following-track.md"));
         }
         void ReadPose() {
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
@@ -519,6 +567,8 @@ namespace RailroaderScenePatcher {
                 PlainLabel(builder, "Bridge placement moves the bridge root with its colliders and culling. Generated track trestles, track geometry and construction scenery stay where they are; this is not a track binding.");
                 Button(builder, "Bridge placement guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/placing-bridges.md"));
             }
+            if (selected.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0))
+                PlainLabel(builder, "This object's activity follows its track group. Disable holds it inactive even when the group is enabled later; Clear authored activity returns it to the group. An explicit enable is refused.");
             PlainLabel(builder, "Selected: " + selected.Identity.Path + (target.activeSelf ? "" : " (disabled)") + ". Position in map coordinates; rotation in degrees. After Undo, Redo or a native edit, refresh the inventory before the next edit.");
             Button(builder, "Move with gizmo", () => BeginGizmo(UI.Gizmos.TransformGizmoMode.Move));
             Button(builder, "Rotate with gizmo", () => BeginGizmo(UI.Gizmos.TransformGizmoMode.Rotate));
@@ -551,6 +601,7 @@ namespace RailroaderScenePatcher {
             });
             Button(builder, "Read inspected values", ReadPose);
             Button(builder, target.activeSelf ? "Disable object" : "Enable object", () => { var enable = !target.activeSelf; Edit(PlacementPlace, "Activity change", (current, inspection) => current.Edit(identity, null, enable, inspection)); });
+            Button(builder, "Clear authored activity", () => Edit(PlacementPlace, "Clearing the authored activity", (current, inspection) => current.ClearActivity(identity, inspection)));
             Button(builder, "Remove modification", () => Edit(PlacementPlace, "Removal", (current, inspection) => current.Remove(identity, inspection)));
             Button(builder, "Recheck after failed edit", () => Edit(PlacementPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection)));
             Button(builder, "Authoring guidance", () => Application.OpenURL("https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/editing-placement-in-the-editor.md"));

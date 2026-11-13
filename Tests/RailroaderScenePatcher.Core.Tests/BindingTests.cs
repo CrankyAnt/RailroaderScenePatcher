@@ -14,6 +14,14 @@ class FakeMarker {
     public string Pattern;
     // A consumer cache derived from the bound segment, such as a map label's cached track group.
     public string CachedGroup;
+    // A TrackRelativePosition whose target is this object and whose activity follows the bound track group: the group it
+    // observes, whether it observes, its handlers on the graph's group event and the explicit-disable hold in place of
+    // the native activation callback.
+    public bool Follows, Observing, Held;
+    public string ObservedGroup;
+    public int Subscriptions;
+    // Every activation of the object, so a transient activation cannot hide behind a final inactive snapshot.
+    public int Activations;
 }
 // A loaded component scanned for direct references: its fields, each relevant when it can hold a marker.
 class FakeOwner {
@@ -134,12 +142,49 @@ class FakeMarkerWorld : ITrackMarkerWorld {
         Mutations++; var m = (FakeMarker)target;
         m.Position = new[] { position[0] - Origin, position[1], position[2] }; m.Rotation = (double[])rotation.Clone();
     }
-    public void SetActive(object target, bool active) {
-        Mutations++; var m = (FakeMarker)target;
+    public void SetActive(object target, bool active) { Mutations++; Activate((FakeMarker)target, active); }
+    void Activate(FakeMarker m, bool active) {
         if (m.Active == active) return;
         m.Active = active;
+        if (active) m.Activations++;
         if (!active) { foreach (var b in Buckets.Values) b.Remove(m.Id); } else if (Valid(m)) Add(m);
     }
+    // The graph's enabled track groups and its group event, as Graph.SetGroupEnabled raises it.
+    public HashSet<string> EnabledGroups = new HashSet<string> { "alarka", "ela", "extension" };
+    public bool SkipObserve;
+    // Fails the hold step that installs (true) or releases (false) the hold.
+    public bool? FailHold;
+    public void SetGroupEnabled(string group, bool enabled) {
+        if (enabled) EnabledGroups.Add(group); else EnabledGroups.Remove(group);
+        foreach (var m in Objects.Values.SelectMany(o => o).Cast<FakeMarker>().ToList())
+            if (m.Follows && m.Subscriptions > 0 && m.ObservedGroup == group) SetTargetActive(m, EnabledGroups.Contains(group));
+    }
+    // The native activation step: the hold, when installed, replaces it and keeps the object inactive.
+    void SetTargetActive(FakeMarker m, bool active) { if (m.Held) Activate(m, false); else Activate(m, active); }
+    public GroupActivity GroupActivity(object target) {
+        var m = (FakeMarker)target;
+        if (!m.Follows) return null;
+        var group = GroupOf(m);
+        return new GroupActivity(m.Held, m.Observing, m.ObservedGroup, m.Subscriptions, Valid(m), group, group == null || EnabledGroups.Contains(group));
+    }
+    // Native UnsubscribeFromGroupEvents followed by ObserveTrackGroup.
+    public void ObserveGroup(object target) {
+        Mutations++; var m = (FakeMarker)target;
+        m.Observing = false; m.Subscriptions = 0;
+        if (SkipObserve) { SkipObserve = false; return; }
+        if (!Valid(m)) return;
+        var group = GroupOf(m);
+        m.ObservedGroup = group; m.Observing = true;
+        if (group != null) m.Subscriptions = 1;
+        SetTargetActive(m, group == null || EnabledGroups.Contains(group));
+    }
+    public void HoldDisabled(object target, bool hold) {
+        Mutations++;
+        if (FailHold == hold) throw new Exception("hold injected");
+        ((FakeMarker)target).Held = hold;
+    }
+    // A group follower present at load, as its Awake observes the group.
+    public void LoadFollower(FakeMarker m) { m.Follows = true; ObserveGroup(m); Load(m); Mutations = 0; m.Activations = 0; }
 }
 static class BindingTests {
     const string SignPath = "World/Large Scenery/Ela/Signs/Station Sign (1)", OtherPath = "World/Large Scenery/Alarka Signs/Yard Limit";

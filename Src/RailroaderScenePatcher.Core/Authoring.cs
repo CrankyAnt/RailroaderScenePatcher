@@ -188,6 +188,10 @@ namespace RailroaderScenePatcher.Core {
                 if (document == null) return minimum;
                 foreach (var item in document.Modifications.OfType<JObject>()) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
+                    // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
+                    if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
+                    // Track-following placement needs its capability whether or not it is available in this editor.
+                    if ((item["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)item["placement"]["mode"] == PatchEngine.TrackFollowingMode) minimum = Max(minimum, TrackFollowingVersion);
                     // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available in this editor.
                     if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure)) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available in this editor.
@@ -204,6 +208,7 @@ namespace RailroaderScenePatcher.Core {
                 return minimum;
             }
         }
+        public const string TrackFollowingVersion = "0.5.0";
         static string Max(string a, string b) { return DependencyMetadata.Number(b) > DependencyMetadata.Number(a) ? b : a; }
         // Dependent native writes that follow the object's edits, such as terrain output regenerated from a board mask. Save does not write them.
         public DependentOutput Output(TargetIdentity target) {
@@ -241,7 +246,10 @@ namespace RailroaderScenePatcher.Core {
                 if (existing != null) PatchEngine.Parse(existing);
                 var value = new JObject { ["id"] = existing?["id"] ?? NewId(target) };
                 value["target"] = existing?["target"] ?? TargetJson(target);
-                if (placement != null) value["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(placement.Position.Cast<object>().ToArray()), ["rotation"] = new JArray(placement.Rotation.Cast<object>().ToArray()) };
+                // A placement edit of a track-following object keeps following the same track at the new relative placement.
+                var following = existing == null ? null : PatchEngine.Parse(existing).State.Placement?.Following;
+                if (placement != null && following != null) value["placement"] = PlacementJson(TrackFollowing.Relative(following.Anchor, TrackPose(following.Anchor), placement.Position, placement.Rotation));
+                else if (placement != null) value["placement"] = FixedJson(placement);
                 else if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
                 if (active != null) value["active"] = active.Value;
                 else if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
@@ -249,6 +257,98 @@ namespace RailroaderScenePatcher.Core {
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
             }, validateBeforeMutation);
+        }
+        // Makes the object follow an explicitly selected track or endpoint from where it stands: the document records its
+        // current pose relative to the anchor's current native pose. Activity and relationships stay as authored.
+        public Outcome Follow(TargetIdentity target, TrackAnchor anchor, InspectedTarget inspected = null, Action validateBeforeMutation = null) {
+            return Change("Follow track", target, inspected, existing => {
+                if (anchor == null) throw new InvalidOperationException("Explicitly select a track or endpoint to follow");
+                if (existing != null) PatchEngine.Parse(existing);
+                var current = scene.Read(engine.ResolveUnique(target)).Placement;
+                PatchEngine.CheckPlacement(current?.Position, current?.Rotation);
+                var following = TrackFollowing.Relative(anchor, TrackPose(anchor), current.Position, current.Rotation);
+                return WithPlacement(target, existing, PlacementJson(following));
+            }, validateBeforeMutation);
+        }
+        // The track-following placement of the object in the active document, or null.
+        public TrackFollowing FollowingOf(TargetIdentity target) {
+            if (document == null) return null;
+            try {
+                var resolved = engine.ResolveUnique(target);
+                var own = Own(resolved);
+                return own.Count == 1 ? PatchEngine.Parse(own[0]).State.Placement?.Following : null;
+            } catch (InvalidOperationException) { return null; }
+        }
+        // Whether any modification of the active document follows a track, read from the document alone.
+        public bool HasTrackFollowing => document != null && Blocked == null && document.Modifications.OfType<JObject>()
+            .Any(m => (m["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)m["placement"]["mode"] == PatchEngine.TrackFollowingMode);
+        // Ends track following: the object keeps its current pose as fixed placement.
+        public Outcome StopFollowing(TargetIdentity target, InspectedTarget inspected = null) {
+            return Change("Stop following track", target, inspected, existing => {
+                if (existing == null || PatchEngine.Parse(existing).State.Placement?.Following == null) throw new InvalidOperationException("This object does not follow a track in the active document");
+                var current = scene.Read(engine.ResolveUnique(target)).Placement;
+                return WithPlacement(target, existing, FixedJson(PatchEngine.CheckPlacement(current.Position, current.Rotation)));
+            });
+        }
+        JObject WithPlacement(TargetIdentity target, JObject existing, JObject placement) {
+            var value = new JObject { ["id"] = existing?["id"] ?? NewId(target, "follow-") };
+            value["target"] = existing?["target"] ?? TargetJson(target);
+            value["placement"] = placement;
+            if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
+            if (existing?["relationships"] != null) value["relationships"] = existing["relationships"].DeepClone();
+            value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
+            return value;
+        }
+        TrackPose TrackPose(TrackAnchor anchor) {
+            if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
+            return tracks.TrackPose(anchor);
+        }
+        static JObject FixedJson(Placement placement) => new JObject { ["mode"] = "fixed", ["position"] = new JArray(placement.Position.Cast<object>().ToArray()), ["rotation"] = new JArray(placement.Rotation.Cast<object>().ToArray()) };
+        static JObject PlacementJson(TrackFollowing following) {
+            PatchEngine.CheckPlacement(following.Offset, following.Rotation);
+            var anchor = following.Anchor;
+            var track = anchor.Node != null ? new JObject { ["node"] = anchor.Node }
+                : new JObject { ["segment"] = anchor.Location.Segment, ["end"] = anchor.Location.End, ["distance"] = anchor.Location.Distance };
+            return new JObject { ["mode"] = PatchEngine.TrackFollowingMode, ["track"] = track,
+                ["offset"] = new JArray(following.Offset.Cast<object>().ToArray()), ["rotation"] = new JArray(following.Rotation.Cast<object>().ToArray()) };
+        }
+        // Moves every object of the active document that follows a track to its placement relative to the track's current
+        // native pose. Neither the document nor the history changes. Each moved or failed object is reported by its
+        // modification ID; a failure restores the object's prior state or guards it until a recheck.
+        public IReadOnlyList<KeyValuePair<string, Outcome>> ReconcileTrackFollowing() {
+            var results = new List<KeyValuePair<string, Outcome>>();
+            if (document == null || Blocked != null) return results;
+            foreach (var item in document.Modifications.OfType<JObject>().ToList()) {
+                PatchEngine.Modification parsed;
+                try { parsed = PatchEngine.Parse(item); } catch (InvalidOperationException) { continue; }
+                if (parsed.State.Placement?.Following == null) continue;
+                var outcome = new Outcome();
+                object resolved;
+                try { resolved = engine.ResolveUnique(parsed.Identity); } catch (InvalidOperationException) { continue; }
+                outcome.ResolvedTarget = resolved;
+                var report = true;
+                try {
+                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before it follows the track again");
+                    var mapContext = scene.MapIds.ToArray();
+                    scene.Preflight(resolved);
+                    var desired = engine.Desired(document.Modifications, resolved);
+                    var prior = scene.Read(resolved);
+                    if (Same(prior, desired)) { report = false; continue; }
+                    engine.GuardMutation(parsed.Identity, resolved, mapContext, null);
+                    try {
+                        scene.Apply(resolved, desired);
+                        if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
+                    } catch (Exception e) {
+                        var restored = false;
+                        try { scene.Apply(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch { }
+                        if (!restored) engine.SetUnsafe(resolved, true);
+                        throw new InvalidOperationException(restored ? "Following the track failed and the prior state was restored: " + e.Message : "Following the track failed; cleanup is unverified: " + e.Message);
+                    }
+                    outcome.Applied = true;
+                } catch (Exception e) { outcome.Error = e.Message; }
+                finally { if (report) results.Add(new KeyValuePair<string, Outcome>(parsed.Id, outcome)); }
+            }
+            return results;
         }
         // Sets, replaces or detaches this MapMod's track-marker relationship of the object. Placement and activity stay as authored.
         // A null binding clears the authored relationship: the object returns to its effective underlying relationship.
@@ -270,6 +370,17 @@ namespace RailroaderScenePatcher.Core {
                     : new JObject { ["segment"] = binding.Location.Segment, ["end"] = binding.Location.End, ["distance"] = binding.Location.Distance } };
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
+            });
+        }
+        // Clears this MapMod's activity value of the object: it returns to its effective underlying activity, which for an
+        // object following a track group is group-driven again. Placement and relationships stay as authored.
+        public Outcome ClearActivity(TargetIdentity target, InspectedTarget inspected = null) {
+            return Change("Clear activity", target, inspected, existing => {
+                if (existing?["active"] == null) throw new InvalidOperationException("This object has no authored activity in the active document");
+                PatchEngine.Parse(existing);
+                var rest = (JObject)existing.DeepClone();
+                rest.Remove("active");
+                return rest["placement"] == null && rest["relationships"] == null ? null : rest;
             });
         }
         // Removes this MapMod's saved or unsaved modification of the object; the object returns to its effective underlying state.

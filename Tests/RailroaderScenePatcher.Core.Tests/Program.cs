@@ -140,6 +140,8 @@ class Program {
         BoardTests.Run();
         CompositionTests.Run();
         BindingTests.Run();
+        TrackFollowingTests.Run();
+        GroupActivityTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

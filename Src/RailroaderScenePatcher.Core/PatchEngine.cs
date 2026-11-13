@@ -30,6 +30,9 @@ namespace RailroaderScenePatcher.Core {
         public Placement(double[] position, double[] rotation) { Position = position; Rotation = rotation; }
         public double[] Position { get; internal set; }
         public double[] Rotation { get; internal set; }
+        // Set for a track-following placement: Position and Rotation are then its evaluation at the anchor's current pose,
+        // or null until it is evaluated. Null for a fixed placement.
+        public TrackFollowing Following { get; internal set; }
     }
     // Desired or observed state of one object. A null member is left untouched by an application.
     public sealed class ObjectState {
@@ -140,7 +143,8 @@ namespace RailroaderScenePatcher.Core {
                 if (IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
                 Observe("preflight", documentKey, id, identity.Path);
                 scene.Preflight(resolved);
-                CheckRelationships(resolved, parsed.State);
+                var state = Evaluate(parsed.State);
+                CheckRelationships(resolved, state);
                 Observe("capture", documentKey, id, identity.Path);
                 Underlying(resolved);
                 var snapshot = scene.Capture(resolved);
@@ -148,7 +152,7 @@ namespace RailroaderScenePatcher.Core {
                 GuardMutation(identity, resolved, mapContext, expected);
                 try {
                     Observe("mutation", documentKey, id, identity.Path);
-                    scene.Apply(resolved, parsed.State);
+                    scene.Apply(resolved, state);
                     Observe("applied", documentKey, id, identity.Path);
                 } catch (Exception e) {
                     bool restored = false;
@@ -188,10 +192,10 @@ namespace RailroaderScenePatcher.Core {
             expected?.Validate(scene, identity, resolved);
         }
         // Refuses a relationship the object does not support and a relationship target that does not resolve uniquely.
+        // A relationship scene also checks the settings its relationships make unsupported.
         internal void CheckRelationships(object target, ObjectState state) {
-            if (state?.Marker == null) return;
-            if (!(scene is IRelationshipScene relationships)) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            relationships.CheckRelationships(target, state);
+            if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
+            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
         }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
         internal bool IsUnsafe(object target) {
@@ -224,7 +228,15 @@ namespace RailroaderScenePatcher.Core {
                 if (!ReferenceEquals(targets[item], target)) continue;
                 state = new ObjectState(item.State.Placement ?? state.Placement, item.State.Active ?? state.Active, item.State.Marker ?? state.Marker);
             }
-            return state;
+            return Evaluate(state);
+        }
+        // The state with a track-following placement evaluated at its anchor's current native pose. Throws before any
+        // mutation when the anchor does not resolve.
+        internal ObjectState Evaluate(ObjectState state) {
+            var following = state?.Placement?.Following;
+            if (following == null) return state;
+            if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
+            return new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker);
         }
         Modification Effective(string id, Dictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting) {
             Modification known;
@@ -266,13 +278,38 @@ namespace RailroaderScenePatcher.Core {
             Placement pose = null;
             if (item["placement"] != null) {
                 var placement = item["placement"] as JObject;
-                if (placement == null || !Only(placement, "mode", "position", "rotation") || placement["mode"]?.Type != JTokenType.String || (string)placement["mode"] != "fixed") throw new InvalidOperationException("Unsupported placement");
-                pose = CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4));
+                var mode = placement?["mode"]?.Type == JTokenType.String ? (string)placement["mode"] : null;
+                if (mode == "fixed" && Only(placement, "mode", "position", "rotation")) pose = CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4));
+                else if (mode == TrackFollowingMode && Only(placement, "mode", "track", "offset", "rotation")) pose = new Placement { Following = ParseFollowing(placement) };
+                else throw new InvalidOperationException("Unsupported placement");
             }
             if (item["active"] != null && item["active"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid activity");
             var marker = item["relationships"] == null ? null : ParseRelationships(item["relationships"]);
             if (pose == null && item["active"] == null && marker == null) throw new InvalidOperationException("Unsupported placement");
             return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"], marker), Dependencies = dependencies };
+        }
+        public const string TrackFollowingMode = "trackFollowing";
+        // A placement relative to an explicitly selected segment location or endpoint node.
+        static TrackFollowing ParseFollowing(JObject placement) {
+            var track = placement["track"] as JObject;
+            if (track == null) throw new InvalidOperationException("Invalid track-following placement: track must name a segment location or a node");
+            TrackAnchor anchor;
+            if (track["node"] != null) {
+                if (!Only(track, "node") || !RequiredString(track, "node")) throw new InvalidOperationException("Invalid track-following placement: node must name a track node and stand alone");
+                anchor = TrackAnchor.Endpoint((string)track["node"]);
+            } else anchor = TrackAnchor.At(ParseLocation(track, "track-following placement"));
+            var offset = Numbers(placement["offset"], 3); var rotation = Numbers(placement["rotation"], 4);
+            CheckPlacement(offset, rotation);
+            return new TrackFollowing(anchor, offset, rotation);
+        }
+        static TrackLocation ParseLocation(JObject marker, string what) {
+            if (!Only(marker, "segment", "end", "distance")) throw new InvalidOperationException("Unsupported " + (what == "relationship" ? "relationship content" : what + " track content"));
+            if (!RequiredString(marker, "segment")) throw new InvalidOperationException("Invalid " + what + ": segment must name a track segment");
+            if (marker["end"]?.Type != JTokenType.String || ((string)marker["end"] != "a" && (string)marker["end"] != "b")) throw new InvalidOperationException("Invalid " + what + ": end must be \"a\" or \"b\"");
+            if (marker["distance"] == null || (marker["distance"].Type != JTokenType.Integer && marker["distance"].Type != JTokenType.Float)) throw new InvalidOperationException("Invalid " + what + ": distance must be a number");
+            var distance = (double)marker["distance"];
+            if (Double.IsNaN(distance) || Double.IsInfinity(distance) || distance < 0) throw new InvalidOperationException("Invalid " + what + ": distance must be finite and not negative");
+            return new TrackLocation((string)marker["segment"], (string)marker["end"], distance);
         }
         // An explicit relationship setting: a reference sets or replaces it, detach clears it. An omitted relationship stays untouched.
         static MarkerBinding ParseRelationships(JToken token) {
@@ -284,13 +321,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!Only(marker, "detach") || marker["detach"].Type != JTokenType.Boolean || !(bool)marker["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone");
                 return MarkerBinding.Detached;
             }
-            if (!Only(marker, "segment", "end", "distance")) throw new InvalidOperationException("Unsupported relationship content");
-            if (!RequiredString(marker, "segment")) throw new InvalidOperationException("Invalid relationship: segment must name a track segment");
-            if (marker["end"]?.Type != JTokenType.String || ((string)marker["end"] != "a" && (string)marker["end"] != "b")) throw new InvalidOperationException("Invalid relationship: end must be \"a\" or \"b\"");
-            if (marker["distance"] == null || (marker["distance"].Type != JTokenType.Integer && marker["distance"].Type != JTokenType.Float)) throw new InvalidOperationException("Invalid relationship: distance must be a number");
-            var distance = (double)marker["distance"];
-            if (Double.IsNaN(distance) || Double.IsInfinity(distance) || distance < 0) throw new InvalidOperationException("Invalid relationship: distance must be finite and not negative");
-            return MarkerBinding.At(new TrackLocation((string)marker["segment"], (string)marker["end"], distance));
+            return MarkerBinding.At(ParseLocation(marker, "relationship"));
         }
         static bool RequiredString(JObject obj, string name) { return obj[name]?.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)obj[name]); }
         static bool Only(JObject obj, params string[] allowed) { return obj.Properties().All(p => allowed.Contains(p.Name, StringComparer.Ordinal)); }

@@ -9,7 +9,7 @@ namespace RailroaderScenePatcher.Core {
     // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
     // the capability that resolved it. A capability that is incompatible with the running game build fails
     // only the modifications that name its structure; unrelated supported work stays available.
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene {
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
@@ -25,6 +25,9 @@ namespace RailroaderScenePatcher.Core {
         public SceneCapabilities(Func<IEnumerable<string>> mapIds, IInspectionScene inspection = null) {
             this.mapIds = mapIds ?? throw new ArgumentNullException(nameof(mapIds)); this.inspection = inspection;
         }
+        // The native track graph, for track-following placement of any capability's objects. Null leaves the mode unavailable.
+        public ITrackPoseScene Tracks { get; set; }
+        public TrackPose TrackPose(TrackAnchor anchor) => (Tracks ?? throw new InvalidOperationException("Track-following placement is unavailable: the track graph is not available")).TrackPose(anchor);
         public void Add(IScene capability) { capabilities.Add(capability ?? throw new ArgumentNullException(nameof(capability))); }
         // Records a capability whose required game functions are missing. Targets naming its structure fail with the reason.
         public void AddUnavailable(string structure, string reason) { unavailable[structure] = new Unavailable { Structure = structure, Reason = reason }; }
@@ -63,9 +66,8 @@ namespace RailroaderScenePatcher.Core {
         // Relationships belong to the adapter that resolved the object; an adapter without them refuses any relationship.
         public void CheckRelationships(object target, ObjectState state) {
             var owner = Owner(target);
-            if (state?.Marker == null) return;
-            if (!(owner is IRelationshipScene relationships)) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            relationships.CheckRelationships(target, state);
+            if (owner is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
+            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
         }
         // Dependent output belongs to the adapter that resolved the object; an adapter without it reports none.
         public DependentOutput Output(object target) {

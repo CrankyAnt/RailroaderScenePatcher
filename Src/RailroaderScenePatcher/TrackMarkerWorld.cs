@@ -14,6 +14,9 @@ namespace RailroaderScenePatcher {
     // registration, which the native marker adds when it is enabled and removes when it is disabled. Setting the
     // location does not change that registration, so this adapter performs the matching remove and add steps.
     // Mileposts, crossing pads and crossing markers keep their own later slices; signals are outside scope.
+    // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
+    // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
+    // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
     internal sealed class TrackMarkerWorld : ITrackMarkerWorld {
         internal const string MarkerType = "Track.TrackMarker";
         const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location", Relative = "Track.TrackRelativePosition";
@@ -21,7 +24,10 @@ namespace RailroaderScenePatcher {
         const string MapBuilderType = "UI.Map.MapBuilder", MapLabelType = "UI.Map.MapLabel", SetupType = "Game.Progression.SetupDescriptor";
         readonly Type marker, graph, segment, location, end, transformer, culler, mapBuilder, mapLabel;
         readonly PropertyInfo markerLocation;
-        readonly MethodInfo addLabel, removeLabel, labelGroup;
+        readonly MethodInfo addLabel, removeLabel, labelGroup, unsubscribe, observe;
+        readonly FieldInfo groupEvent, setTargetActive;
+        // The explicit-disable hold installed per relative position, so a hold can be recognised and released.
+        readonly System.Runtime.CompilerServices.ConditionalWeakTable<Component, Action<bool>> holds = new System.Runtime.CompilerServices.ConditionalWeakTable<Component, Action<bool>>();
         // Direct references to marker components, scanned at most once per frame.
         ReferenceScan referrers;
         int referrersFrame = -1;
@@ -47,6 +53,17 @@ namespace RailroaderScenePatcher {
             removeLabel = mapBuilder.GetMethod("Remove", Native.Flags, null, new[] { mapLabel }, null) ?? throw new MissingMethodException(MapBuilderType, "Remove(MapLabel)");
             labelGroup = mapBuilder.GetMethod("TrackGroupIdFor", Native.Flags, null, new[] { mapLabel }, null) ?? throw new MissingMethodException(MapBuilderType, "TrackGroupIdFor");
             if (FieldOf(mapBuilder, "_mapLabels") == null || mapBuilder.GetProperty("Shared", Native.Flags) == null) throw new MissingMemberException(MapBuilderType, "_mapLabels or Shared");
+            // The group-following steps of the relative position and the graph's group event.
+            var relative = Native.Type(Relative) ?? throw new InvalidOperationException("Track-relative position unavailable");
+            foreach (var field in new[] { "targetTransform", "targetActiveFollowsTrackGroup", "_observing", "_observedGroupId" }) if (FieldOf(relative, field) == null) throw new MissingFieldException(Relative, field);
+            setTargetActive = FieldOf(relative, "_setTargetActive");
+            if (setTargetActive == null || setTargetActive.FieldType != typeof(Action<bool>)) throw new MissingFieldException(Relative, "_setTargetActive");
+            unsubscribe = relative.GetMethod("UnsubscribeFromGroupEvents", Native.Flags, null, Type.EmptyTypes, null) ?? throw new MissingMethodException(Relative, "UnsubscribeFromGroupEvents");
+            observe = relative.GetMethod("ObserveTrackGroup", Native.Flags, null, Type.EmptyTypes, null) ?? throw new MissingMethodException(Relative, "ObserveTrackGroup");
+            if (relative.GetMethod("OnGraphGroupEnabledDidChange", Native.Flags) == null) throw new MissingMethodException(Relative, "OnGraphGroupEnabledDidChange");
+            groupEvent = FieldOf(graph, "GroupEnabledDidChange");
+            if (groupEvent == null || !typeof(Delegate).IsAssignableFrom(groupEvent.FieldType)) throw new MissingFieldException(GraphType, "GroupEnabledDidChange");
+            if (FieldOf(graph, "enabledGroupIds") == null || FieldOf(segment, "groupId") == null) throw new MissingFieldException(GraphType, "enabledGroupIds or groupId");
             var setup = Native.Type(SetupType);
             if (setup == null || FieldOf(setup, "placements") == null) throw new MissingMemberException(SetupType, "placements");
         }
@@ -127,8 +144,11 @@ namespace RailroaderScenePatcher {
             // A listener of location changes is a dependent consumer this adapter does not refresh.
             if (Field(m, "OnLocationChanged") is Delegate listeners && listeners.GetInvocationList().Length != 0) return "Another component consumes this marker's location changes; its dependent state is not supported";
             var relative = Get(go, Relative);
-            if (relative != null && Field(relative, "targetActiveFollowsTrackGroup") is bool follows && follows)
-                return "The object's activity follows the bound track group; rebinding would move that subscription, which this slice does not support";
+            if (relative != null && Field(relative, "targetActiveFollowsTrackGroup") is bool follows && follows) {
+                // The adapter supports a follower whose relative position activates this object itself, through the native step or the hold.
+                if (!ReferenceEquals(Field(relative, "targetTransform"), go.transform)) return "The object's activity follows a track group through another object; only a follower that activates itself is supported";
+                if (Field(relative, "_setTargetActive") is Delegate callback && !(callback.Target is HoldTarget)) return "Another component replaced the track-group activation of this object; that consumer is not supported";
+            }
             // A new-game setup car placement reads its marker's location when the setup runs; its timing relative to patch application is unverified.
             if ((setups ?? SetupHolders()).Holds(m)) return "A new-game car placement reads this marker's location; that consumer is not supported";
             // The colocated relative position holds its marker; any other holder of the component may cache what it read.
@@ -203,6 +223,35 @@ namespace RailroaderScenePatcher {
             var m = MarkerOf(target);
             var current = markerLocation.GetValue(m) ?? throw new InvalidOperationException("The marker location does not resolve");
             Native.Call(Graph(), "AddNamedLocation", (string)Field(m, "id"), current, System.Convert.ToInt32(Field(m, "type")), m);
+        }
+        sealed class HoldTarget { internal GameObject Target; internal void Keep(bool requested) { if (Target != null && Target.activeSelf) Target.SetActive(false); } }
+        Component Follower(object target) {
+            var relative = Get((GameObject)target, Relative);
+            return relative != null && Field(relative, "targetActiveFollowsTrackGroup") is bool follows && follows ? relative : null;
+        }
+        public GroupActivity GroupActivity(object target) {
+            var relative = Follower(target);
+            if (relative == null) return null;
+            var held = setTargetActive.GetValue(relative) is Delegate callback && callback.Target is HoldTarget;
+            var handlers = groupEvent.GetValue(Graph()) as Delegate;
+            var subscriptions = handlers == null ? 0 : handlers.GetInvocationList().Count(d => ReferenceEquals(d.Target, relative) && d.Method.Name == "OnGraphGroupEnabledDidChange");
+            var current = markerLocation.GetValue(MarkerOf(target));
+            var seg = current == null ? null : Field(current, "segment");
+            var group = seg == null ? null : Field(seg, "groupId") as string;
+            var enabled = String.IsNullOrEmpty(group) || ((IList)Field(Graph(), "enabledGroupIds")).Contains(group);
+            return new GroupActivity(held, (bool)Field(relative, "_observing"), Field(relative, "_observedGroupId") as string, subscriptions, seg != null, group, enabled);
+        }
+        // The native UnsubscribeFromGroupEvents and ObserveTrackGroup of the relative position.
+        public void ObserveGroup(object target) {
+            var relative = Follower(target) ?? throw new InvalidOperationException("The object's activity does not follow a track group");
+            unsubscribe.Invoke(relative, null);
+            observe.Invoke(relative, null);
+        }
+        public void HoldDisabled(object target, bool hold) {
+            var relative = Follower(target) ?? throw new InvalidOperationException("The object's activity does not follow a track group");
+            if (!hold) { setTargetActive.SetValue(relative, null); holds.Remove(relative); return; }
+            if (!holds.TryGetValue(relative, out var callback)) { callback = new HoldTarget { Target = (GameObject)target }.Keep; holds.Add(relative, callback); }
+            setTargetActive.SetValue(relative, callback);
         }
         public double[] Position(object target) { var p = Origin("WorldToGame", ((GameObject)target).transform.position); return new double[] { p.x, p.y, p.z }; }
         public double[] Rotation(object target) { var r = ((GameObject)target).transform.rotation; return new double[] { r.x, r.y, r.z, r.w }; }

@@ -16,7 +16,7 @@ namespace RailroaderScenePatcher {
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
         const string ConstructionScenery = "Game.Mow.TrackConstructionScenery";
         internal static readonly string[] Coverage = {
-            "Generic track markers, such as yard limits and station signs: set, replace or detach the marker's track location with its graph registration, and place or enable the object. Markers whose activity follows a track group, and markers with other location consumers, are inspection only.",
+            "Generic track markers, such as yard limits and station signs: set, replace or detach the marker's track location with its graph registration, and place or enable the object. A marker whose activity follows its own track group keeps that subscription coherent through rebinding and accepts an explicit disable that holds through later group activation. Markers with other location consumers are inspection only.",
             "Mileposts: marker, origin and display dependencies; model and mileage remain unchanged.",
             "Crossings: controllers, spans, pads, lights, gates and bells; relationships are explicit, never inferred from proximity.",
             "Independent boards: renderer culler with one circle map mask and no track relationship; placement and activity refresh culling, mask registration and generated terrain output.",
