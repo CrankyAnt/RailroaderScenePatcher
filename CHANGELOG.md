@@ -4,6 +4,8 @@ Notable changes to this project are recorded here, newest first.
 
 ## 0.5.0
 
+- Apply the scene patches of several loaded MapMods in Railroader's load order. A MapMod applies only when it declares the patcher dependency and its source map matches the loaded map or one of its layers. When MapMods change the same existing object, an informational game message names the object and the MapMods; it reports a possible incompatibility, chooses no winner and does not stop application. A failure in one MapMod's document leaves the other MapMods' work in place.
+
 - Remove a marker repair even when its original track is missing. Restore the captured native reference and warning; Undo and Redo recover the repaired and broken states without changing unrelated warning rows.
 
 - Make an object follow an explicitly selected track segment location or endpoint, in the editor and through `placement.mode = "trackFollowing"` in `scene-patches.json`. The object keeps its position and orientation relative to that track; it moves with the track in the editor and is placed from the track's current pose on every load. Documents with a track-following placement require patcher 0.5.0.

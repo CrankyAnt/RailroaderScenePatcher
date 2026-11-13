@@ -51,6 +51,8 @@ namespace RailroaderScenePatcher {
         PatchRuntime runtime;
         NativePatchDiagnostics nativeDiagnostics;
         readonly Dictionary<string, string> pendingWarnings = new Dictionary<string, string>();
+        // Informational overlap notices by native deduplication key; a newer notice for the same object replaces the pending one.
+        readonly Dictionary<string, string> pendingNotices = new Dictionary<string, string>();
         bool presentationErrorLogged;
         TrackMarkerWorld markerWorld;
         internal bool Initialized { get; private set; }
@@ -73,7 +75,6 @@ namespace RailroaderScenePatcher {
         bool editor;
         string status = "Initializing", inspected = "", filter = "";
         readonly HashSet<string> reported = new HashSet<string>();
-        readonly Dictionary<object, HashSet<string>> contributions = new Dictionary<object, HashSet<string>>();
         readonly List<string> diagnostics = new List<string>();
         NativeEditorPresentation presentation;
         Texture2D worldLabelBacking;
@@ -172,7 +173,6 @@ namespace RailroaderScenePatcher {
             nativeDiagnostics = new NativePatchDiagnostics(Report);
             runtime = new PatchRuntime(engine, nativeDiagnostics, Version, Application.version);
         }
-        static PatchSource Source(PackDocument pack) => new PatchSource(pack.Identifier, pack.Name, pack.Version, pack.Author, pack.Website);
         internal string BeforeMarkerCheck(IModContext value, Track.TrackMarker marker) {
             PrepareRuntime(value);
             if (markerWorld == null) return "Track-marker capability prerequisites unavailable before TrackMarker.OnEnable";
@@ -181,8 +181,8 @@ namespace RailroaderScenePatcher {
                 bool attempted = false;
                 string unavailable = null;
                 foreach (var pack in PackDocuments.Discover()) {
-                    if (pack.Error != null) continue;
-                    var result = runtime.BeforeNativeCheck(pack.Json, Source(pack), identity);
+                    if (!pack.Applicable) continue;
+                    var result = runtime.BeforeNativeCheck(pack.Json, pack.Source, identity);
                     if (result.Outcomes.Count > 0) attempted = true;
                     if (result.EarlyRouteUnavailable != null) unavailable = result.EarlyRouteUnavailable;
                 }
@@ -191,10 +191,19 @@ namespace RailroaderScenePatcher {
         }
         internal void ApplyDocuments() {
             if (engine == null) return;
-            try {
-                foreach (var pack in PackDocuments.Discover()) {
-                    if (pack.Error != null) { EditorDiagnostic(Describe(pack, pack.Error)); continue; }
-                    var result = runtime.Apply(pack.Json, Source(pack));
+            IReadOnlyList<LoadedDocument> documents;
+            try { documents = runtime.ApplyLoaded(PackDocuments.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
+            catch (Exception e) { Report("discovery", "Loaded MapMod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
+            foreach (var document in documents) {
+                var pack = document.Pack;
+                // Follow-up work for one document cannot stop the others; their application has already happened in load order.
+                try {
+                    if (document.PresentationError != null) context?.Log.Info(Describe(pack, document.PresentationError));
+                    if (document.Result == null) {
+                        if (pack.Error != null) EditorDiagnostic(Describe(pack, pack.Error));
+                        continue;
+                    }
+                    var result = document.Result;
                     if (result.Error != null) {
                         if (result.EditorOnly) EditorDiagnostic(Describe(pack, result.Error));
                         continue;
@@ -206,13 +215,21 @@ namespace RailroaderScenePatcher {
                         }
                         else ReconcileMarkerWarning(pack, item.Key, item.Value);
                     }
-                    try { ObserveOverlap(pack, result); }
-                    catch (Exception e) { Report(pack.Identifier + "/overlap", "Overlap inspection failed; remaining documents will still be processed. Report to the patcher maintainer. " + e.GetBaseException().Message); }
-                    status = "Documents processed. " + (scene?.Status ?? "");
-                }
-            } catch (Exception e) { Report("discovery", "Loaded MapMod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); }
+                } catch (Exception e) { context?.Log.Info(Describe(pack, "Follow-up after application failed: " + e.GetBaseException().Message)); }
+            }
+            status = "Documents processed. " + (scene?.Status ?? "");
         }
-        void ReconcileMarkerWarning(PackDocument pack, string operation, Outcome outcome) {
+        NativeOverlapNotices overlapNotices;
+        sealed class NativeOverlapNotices : IOverlapNotices {
+            readonly PatcherBehaviour owner;
+            internal NativeOverlapNotices(PatcherBehaviour owner) { this.owner = owner; }
+            public void Notice(OverlapNotice notice) {
+                owner.context?.Log.Info("Scene Patcher overlap notice: " + notice.Message);
+                owner.pendingNotices[notice.Key] = notice.Message;
+                owner.FlushWarnings();
+            }
+        }
+        void ReconcileMarkerWarning(LoadedPack pack, string operation, Outcome outcome) {
             if (markerWorld == null || !(outcome.ResolvedTarget is GameObject target) || target == null) return;
             var document = JObject.Parse(pack.Json);
             var entry = ((JArray)document["modifications"]).OfType<JObject>().Single(e => (string)e["id"] == operation);
@@ -220,7 +237,7 @@ namespace RailroaderScenePatcher {
             var binding = entry["relationships"]?["trackMarker"] as JObject;
             if (binding == null || binding["segment"]?.Type != JTokenType.String) return;
             foreach (var attribution in NativeRepairHooks.Warnings.Where(w => ReferenceEquals(w.Target, target))) {
-                if (runtime.Reconcile(Source(pack), operation, attribution, nativeDiagnostics, () => {
+                if (runtime.Reconcile(pack.Source, operation, attribution, nativeDiagnostics, () => {
                     if (target == null) return false;
                     var matches = capabilities.Resolve(outcome.Target);
                     if (matches.Count != 1 || !ReferenceEquals(matches[0], target)) return false;
@@ -230,18 +247,10 @@ namespace RailroaderScenePatcher {
                 })) context?.Log.Info("Scene Patcher reconciled one exactly attributed current marker warning after verified repair. Earlier route unavailable: " + attribution.EarlyRouteUnavailable);
             }
         }
-        void ObserveOverlap(PackDocument pack, DocumentResult result) {
-            foreach (var outcome in result.Outcomes.Values) {
-                if (!(outcome.ResolvedTarget is GameObject target) || target == null) continue;
-                if (!contributions.TryGetValue(target, out var packs)) contributions.Add(target, packs = new HashSet<string>());
-                packs.Add(pack.Identifier);
-                if (packs.Count > 1) {
-                    var key = "overlap/" + target.GetInstanceID() + "/" + String.Join(",", packs.OrderBy(x => x));
-                    if (reported.Add(key)) Game.Diagnostics.MessageLog.Info("Railroader Scene Patcher", "Possible incompatibility: supplying MapMods attempt to modify the same object " + BoardScene.PathOf(target.transform) + ": " + String.Join(", ", packs), "Scene patches", loadId + key);
-                }
-            }
+        static string Describe(LoadedPack loaded, string message) {
+            var pack = loaded.Source;
+            return (pack.Name ?? pack.Identifier) + " [" + pack.Identifier + " " + pack.Version + "] " + message + ". Patcher " + Version + ". Author: " + (pack.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(pack.Website) ? "" : "; website: " + pack.Website);
         }
-        static string Describe(PackDocument pack, string message) => (pack.Name ?? pack.Identifier) + " [" + pack.Identifier + " " + pack.Version + "] " + message + ". Patcher " + Version + ". Author: " + (pack.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(pack.Website) ? "" : "; website: " + pack.Website);
         void EditorDiagnostic(string message) { if (editor && !diagnostics.Contains(message)) diagnostics.Add(message); }
         void Report(string key, string message) {
             if (!reported.Add(key)) return;
@@ -259,6 +268,16 @@ namespace RailroaderScenePatcher {
                     pendingWarnings.Remove(item.Key);
                 } catch (Exception e) {
                     if (!presentationErrorLogged) { presentationErrorLogged = true; context?.Log.Info("Native structured warning delivery unavailable; delivery remains pending: " + e.GetBaseException().Message); }
+                    return;
+                }
+            }
+            // An informational row: it reports possible incompatibility and is never a failure warning.
+            foreach (var item in pendingNotices.ToArray()) {
+                try {
+                    Game.Diagnostics.MessageLog.Info("Railroader Scene Patcher", item.Value, "Scene patches", loadId + item.Key);
+                    pendingNotices.Remove(item.Key);
+                } catch (Exception e) {
+                    if (!presentationErrorLogged) { presentationErrorLogged = true; context?.Log.Info("Native structured notice delivery unavailable; delivery remains pending: " + e.GetBaseException().Message); }
                     return;
                 }
             }
@@ -389,7 +408,7 @@ namespace RailroaderScenePatcher {
             presentation?.Dispose(); presentation = null; attachedEditor = null;
             Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Release(); selection = null;
             scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; engine = null; inventory = null; native = null; selected = null;
-            runtime = null; markerWorld = null; nativeDiagnostics = null; pendingWarnings.Clear();
+            runtime = null; markerWorld = null; nativeDiagnostics = null; pendingWarnings.Clear(); pendingNotices.Clear(); overlapNotices = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }
@@ -908,16 +927,16 @@ namespace RailroaderScenePatcher {
                 var lines = new List<string>();
                 var documents = PackDocuments.Discover().ToArray();
                 foreach (var pack in documents) {
-                    if (pack.Error != null) { lines.Add(pack.Identifier + ": " + pack.Error); continue; }
+                    if (pack.Error != null) { lines.Add(pack.Source.Identifier + ": " + pack.Error); continue; }
                     foreach (var item in inventory.InspectDocument(pack.Json))
-                        lines.Add(pack.Identifier + "/" + (item.Id ?? "document") + ": " + item.MatchCount + " inspection matches; dependsOn=" + String.Join(", ", item.Dependencies) + "; " + String.Join("; ", item.Problems));
+                        lines.Add(pack.Source.Identifier + "/" + (item.Id ?? "document") + ": " + item.MatchCount + " inspection matches; dependsOn=" + String.Join(", ", item.Dependencies) + "; " + String.Join("; ", item.Problems));
                 }
                 documentInspection = String.Join("\n", lines);
                 documentStamp = DocumentStamp(documents); definitionsStale = false;
                 status = "Refreshed scene observations and supplied definitions without applying patches.";
             } catch (Exception e) { EditorDiagnostic(e.GetBaseException().Message); }
         }
-        static string DocumentStamp(IEnumerable<PackDocument> documents) => new JArray(documents.Select(p => new JArray(p.Identifier, p.Json, p.Error))).ToString(Newtonsoft.Json.Formatting.None);
+        static string DocumentStamp(IEnumerable<LoadedPack> documents) => new JArray(documents.Select(p => new JArray(p.Source.Identifier, p.Json, p.Error))).ToString(Newtonsoft.Json.Formatting.None);
         string Identity(SceneObservation entry) {
             var identity = new JObject {
                 ["sourceMap"] = new JObject { ["mapId"] = PackDocuments.MapIds().First() },

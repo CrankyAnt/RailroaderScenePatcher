@@ -6,13 +6,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    internal sealed class PackDocument {
-        internal string Identifier, Name, Version, Author, Website, Json, Error;
-    }
     // The two files of the active edited MapMod that the patcher writes. Inherited packs are never a destination.
     internal sealed class ActiveStorage : IStorage {
         readonly string root;
@@ -28,7 +24,7 @@ namespace RailroaderScenePatcher {
         public void WritePackInfo(string text) { File.WriteAllBytes(InfoPath, PackDocuments.Utf8.GetBytes(text)); }
     }
     internal static class PackDocuments {
-        internal const string ModId = "crankyant/scene-patcher";
+        internal const string ModId = LoadedPack.PatcherId;
         internal static readonly Encoding Utf8 = new UTF8Encoding(false, true);
         internal static string ReadUtf8(string path) {
             var bytes = File.ReadAllBytes(path);
@@ -61,7 +57,9 @@ namespace RailroaderScenePatcher {
                 }
             throw new InvalidOperationException("Active edited MapMod owner unavailable");
         }
-        internal static IEnumerable<PackDocument> Discover() {
+        // The packs carrying a patch document, in Railroader's load order (AssetPackManager.OrderedPacks). In the editor only the
+        // active edited MapMod is returned, marked as edit target. Whether a pack applies is decided by LoadedPack and the engine.
+        internal static IReadOnlyList<LoadedPack> Discover() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
             var packs = Native.Read(manager, "OrderedPacks") as IEnumerable;
             if (packs == null) throw new InvalidOperationException("Loaded pack order unavailable");
@@ -71,25 +69,30 @@ namespace RailroaderScenePatcher {
                 if (editorRoot == null) throw new InvalidOperationException("Active edited MapMod owner unavailable");
                 editorRoot = Path.GetFullPath(editorRoot);
             }
+            var found = new List<LoadedPack>();
+            var position = 0;
             foreach (var entry in packs) {
-                var store = Native.Read(entry, "Store");
-                var root = Path.GetFullPath((string)Native.Read(store, "BasePath"));
-                if (editorRoot != null && !String.Equals(root, editorRoot, StringComparison.OrdinalIgnoreCase)) continue;
-                var path = Path.Combine(root, "Data", "scene-patches.json");
-                if (!File.Exists(path)) continue;
-                var document = new PackDocument { Identifier = Native.Read(store, "Identifier").ToString() };
+                position++;
+                string identifier = null;
                 try {
-                    var info = JObject.Parse(ReadUtf8(Path.Combine(root, "Info.json")));
-                    // The editor applies the active document before Save has declared the dependency.
-                    if (editorRoot == null && (!(info["dependencies"]?["required"] is JArray dependencies) || !dependencies.Values<string>().Any(d => d != null && d.Split(' ')[0] == ModId))) continue;
-                    document.Name = (string)info["name"] ?? document.Identifier;
-                    document.Version = (string)info["version"];
-                    document.Author = (string)info["author"];
-                    document.Website = (string)info["website"];
-                    document.Json = ReadUtf8(path);
-                } catch (Exception e) { document.Error = "Cannot read patch document or supplying metadata: " + e.GetType().Name; }
-                yield return document;
+                    var store = Native.Read(entry, "Store");
+                    identifier = Native.Read(store, "Identifier")?.ToString();
+                    var root = Path.GetFullPath((string)Native.Read(store, "BasePath"));
+                    if (editorRoot != null && !String.Equals(root, editorRoot, StringComparison.OrdinalIgnoreCase)) continue;
+                    var path = Path.Combine(root, "Data", "scene-patches.json");
+                    if (!File.Exists(path)) continue;
+                    if (String.IsNullOrWhiteSpace(identifier)) throw new InvalidOperationException("Pack identifier unavailable");
+                    string info = null, json = null, error = null;
+                    try { info = ReadUtf8(Path.Combine(root, "Info.json")); json = ReadUtf8(path); }
+                    catch (Exception e) { error = "Cannot read patch document or supplying metadata: " + e.GetType().Name; }
+                    var pack = error == null ? LoadedPack.Read(identifier, info, json, editorRoot != null) : new LoadedPack(new PatchSource(identifier, identifier, null), null, null, editorRoot != null, error);
+                    found.Add(pack);
+                } catch (Exception e) {
+                    // One unreadable pack entry does not hide the packs after it.
+                    found.Add(new LoadedPack(new PatchSource(identifier ?? "loaded pack " + position, identifier ?? "loaded pack " + position, null), null, null, editorRoot != null, "Cannot inspect loaded pack: " + e.GetBaseException().Message));
+                }
             }
+            return found;
         }
     }
 }

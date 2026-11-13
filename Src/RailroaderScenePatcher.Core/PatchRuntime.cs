@@ -71,6 +71,54 @@ namespace RailroaderScenePatcher.Core {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine)); this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
             this.patcherVersion = patcherVersion; this.gameVersion = gameVersion;
         }
+        // Applies the documents of loaded packs in the given native load order. Only a pack that declares the patcher
+        // dependency, or the editor's edit target, reaches the engine, which checks its source map context.
+        public IReadOnlyList<LoadedDocument> ApplyLoaded(IEnumerable<LoadedPack> loadOrder, IOverlapNotices notices) {
+            if (loadOrder == null) throw new ArgumentNullException(nameof(loadOrder));
+            var documents = new List<LoadedDocument>();
+            foreach (var pack in loadOrder) {
+                if (pack == null) continue;
+                var document = new LoadedDocument(pack);
+                documents.Add(document);
+                if (pack.Error != null) { document.Skipped = pack.Error; continue; }
+                if (!pack.Applicable) { document.Skipped = "The pack does not declare a dependency on " + LoadedPack.PatcherId; continue; }
+                // The engine isolates document and operation failures itself; presentation faults stay with this document.
+                ClearSource(pack.Source);
+                document.Result = engine.Apply(pack.Json, pack.Source.Identifier);
+                try { ReportResult(document.Result, pack.Source); }
+                catch (Exception e) { document.PresentationError = "Failure report delivery failed: " + e.Message; }
+                try { ObserveOverlap(pack, document.Result, notices); }
+                catch (Exception e) { document.PresentationError = (document.PresentationError == null ? "" : document.PresentationError + "; ") + "Overlap notice delivery failed: " + e.Message; }
+            }
+            return documents;
+        }
+        sealed class ByReference : IEqualityComparer<object> {
+            public new bool Equals(object a, object b) => ReferenceEquals(a, b);
+            public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
+        }
+        sealed class Contribution { internal string Key; internal TargetIdentity Target; internal readonly List<LoadedPack> Packs = new List<LoadedPack>(); }
+        // Supplying packs per uniquely resolved object in this loaded world, in load order, and the notices already given.
+        readonly Dictionary<object, Contribution> contributions = new Dictionary<object, Contribution>(new ByReference());
+        readonly HashSet<string> noticed = new HashSet<string>(StringComparer.Ordinal);
+        // An outcome carries its resolved object only after unique resolution, so ambiguous or missing targets never count.
+        void ObserveOverlap(LoadedPack pack, DocumentResult result, IOverlapNotices notices) {
+            Exception fault = null;
+            foreach (var outcome in result.Outcomes.Values) {
+                if (outcome.ResolvedTarget == null || outcome.Target == null) continue;
+                if (!contributions.TryGetValue(outcome.ResolvedTarget, out var contribution)) {
+                    contribution = new Contribution { Target = outcome.Target, Key = "overlap/" + contributions.Count };
+                    contributions.Add(outcome.ResolvedTarget, contribution);
+                }
+                if (contribution.Packs.Any(p => p.Source.Identifier == pack.Source.Identifier)) continue;
+                contribution.Packs.Add(pack);
+                if (contribution.Packs.Count < 2 || notices == null) continue;
+                var signature = contribution.Key + "/" + String.Join("\n", contribution.Packs.Select(p => p.Source.Identifier));
+                if (noticed.Contains(signature)) continue;
+                try { notices.Notice(new OverlapNotice(contribution.Key, contribution.Target, contribution.Packs.ToArray())); noticed.Add(signature); }
+                catch (Exception e) { fault = fault ?? e; }
+            }
+            if (fault != null) throw fault;
+        }
         public DocumentResult Apply(string json, PatchSource source) {
             ClearSource(source);
             var result = engine.Apply(json, source.Identifier);
@@ -86,12 +134,15 @@ namespace RailroaderScenePatcher.Core {
         void ClearSource(PatchSource source) {
             foreach (var key in latest.Keys.Where(k => k.StartsWith(Key(source, ""), StringComparison.Ordinal)).ToArray()) latest.Remove(key);
         }
+        // Records every outcome before delivery, and attempts every report even when one delivery fails.
         void ReportResult(DocumentResult result, PatchSource source) {
-            if (result.Error != null && !result.EditorOnly) Report(source, "document", null, result.Error, FailureCause.Unknown, true);
-            foreach (var item in result.Outcomes) {
-                latest[Key(source, item.Key)] = item.Value;
-                if (!item.Value.Applied && !item.Value.EditorOnly) Report(source, item.Key, item.Value.Target, item.Value.Error, item.Value.Cause);
-            }
+            foreach (var item in result.Outcomes) latest[Key(source, item.Key)] = item.Value;
+            Exception fault = null;
+            void Deliver(Action report) { try { report(); } catch (Exception e) { fault = fault ?? e; } }
+            if (result.Error != null && !result.EditorOnly) Deliver(() => Report(source, "document", null, result.Error, FailureCause.Unknown, true));
+            foreach (var item in result.Outcomes)
+                if (!item.Value.Applied && !item.Value.EditorOnly) Deliver(() => Report(source, item.Key, item.Value.Target, item.Value.Error, item.Value.Cause));
+            if (fault != null) throw fault;
         }
         // Removes only the unchanged row attributed at the native check, after a separate observation of repaired state.
         // No window or historical-log operations are exposed here. Manual closure is safe when window ownership is unknown.

@@ -28,6 +28,8 @@ The engine applies a document only when its `sourceMap.mapId` matches the select
 
 The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
 
+The order of the entries in `modifications` has no meaning. The engine applies each modification after every modification its `dependsOn` names, whatever their positions in the array. A modification whose dependency fails is not applied; modifications that do not depend on it still apply.
+
 A modification holds the desired state of one object and must contain `placement`, `active`, `relationships`, or a combination. An omitted member leaves that part of the object untouched by this MapMod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a document that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
 
 The [editor inventory](inspect-scene-objects.md) supplies observed identifiers and placement without changing this format. An inspection-only entry does not enable a new v1 operation. The engine rechecks the resolved object and map context immediately before mutation. A missing, ambiguous or replaced target fails rather than redirecting the operation. Editor integrations can bind a complete-document edit to its inspected observations through an in-memory token; that token is not serialized or distributed.
@@ -107,6 +109,14 @@ The engine checks an addition before mutation like selected tracks: each segment
 For each addition the engine builds one circuit with three owned spans, registers the spans in the track graph and adds the circuit to the controller after its native circuits. Added circuits follow each other in the order of their identity, not the order of the entries. A repeated application reuses the circuit and every span whose tracks are unchanged, and replaces the spans of a role whose tracks changed. Deleting an addition removes its circuit from the controller, unregisters its spans and destroys them. Native circuits and other additions keep their state.
 
 [Explicit snapping](snapping-to-track.md) writes a fixed placement. The editor computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to authoring preflight and are not serialized. Runtime application and reload use the resulting absolute pose without querying a snap target. Snapping adds no dependency minimum; later track movement does not change the saved pose. Track-following placement is the separate mode above.
+
+## Several MapMods
+
+During ordinary play the runtime considers each loaded pack that has `Data/scene-patches.json` and lists `crankyant/scene-patcher` under `dependencies.required` in its `Info.json`. It processes those documents in Railroader's load order, the order of the game's loaded pack list. Map-layer order plays no part, and the document has no priority field. A document whose `sourceMap.mapId` matches neither the selected Map definition nor one of its resolved map layers is skipped without a warning. In the map editor only the active edited MapMod's document is applied, as described above.
+
+A failed document or modification does not undo the work of documents processed before it and does not stop the documents after it. An unreadable document or unreadable `Info.json` skips that pack as a whole.
+
+When documents of different MapMods each modify the same existing object, the runtime adds one informational game message for that object. It names the object as `scene/path [component]` and the MapMods with their identifiers in load order, and states any declared dependency among them. A further MapMod on the same object updates that message. The message reports a possible incompatibility, not a confirmed conflict: application continues in load order, no change is undone, and the later document's values are applied last. A declared dependency does not suppress the message. A target that resolves to no object or to several objects, or modifications from one MapMod alone, produce no message. The message is not a failure report and adds no JSON fields.
 
 ## Runtime failure reports
 
