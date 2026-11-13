@@ -50,6 +50,17 @@ namespace RailroaderScenePatcher {
             var root = Native.Call(manager, "GetPackBasePathForDefinition", Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")) as string;
             return root == null ? null : Path.GetFullPath(root);
         }
+        // The identifier of the pack that owns the active Map definition: the key its patch document is applied under.
+        internal static string ActivePackId() {
+            var root = ActiveRoot();
+            var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
+            if (root != null && Native.Read(manager, "OrderedPacks") is IEnumerable packs)
+                foreach (var entry in packs) {
+                    var store = Native.Read(entry, "Store");
+                    if (String.Equals(Path.GetFullPath((string)Native.Read(store, "BasePath")), root, StringComparison.OrdinalIgnoreCase)) return Native.Read(store, "Identifier").ToString();
+                }
+            throw new InvalidOperationException("Active edited MapMod owner unavailable");
+        }
         internal static IEnumerable<PackDocument> Discover() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
             var packs = Native.Read(manager, "OrderedPacks") as IEnumerable;

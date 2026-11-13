@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Correct the detection coverage of an existing crossing
 
-This guide shows how to move the train detection of an existing grade crossing from an old route to the tracks you choose, or how to detach a circuit, in the map editor or in `Data/scene-patches.json`. It applies to existing crossings only. It does not create new crossings or change lights, gates, bells, models, signals, CTC or interlocking.
+This guide shows how to move the train detection of an existing grade crossing from an old route to the tracks you choose, or how to detach a circuit, in the map editor or in `Data/scene-patches.json`. It applies to existing crossings only. To make a crossing detect a track it does not cover yet, see [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). This guide does not create new crossings or change lights, gates, bells, models, signals, CTC or interlocking.
 
 ## How a crossing detects trains
 
@@ -23,7 +23,7 @@ The patcher never assigns coverage by proximity. A track near the crossing gets 
 - The native spans of a corrected or detached circuit stay registered and unchanged. A track that used to trigger the crossing still exists and other consumers still see its spans. The crossing simply stops evaluating them, so a train on the old route no longer starts the warning.
 - Circuits you do not edit keep their coverage and keep working in both travel directions.
 - The crossing object, its equipment and its activity do not move or change. A crossing-coverage modification accepts no `placement` or `active`.
-- At least one circuit keeps detection. Detaching every circuit is refused, also when earlier edits or modifications already detached the others. In the editor, **Preview detach** is unavailable for the last covered circuit and the panel says why; a document that would detach it fails that modification and leaves the coverage unchanged.
+- At least one circuit or [detection addition](adding-crossing-detection.md) keeps detection. Detaching every circuit of a crossing without an addition is refused, also when earlier edits or modifications already detached the others. In the editor, **Preview detach** is unavailable for the last covered circuit and the panel says why; a document that would detach it fails that modification and leaves the coverage unchanged.
 
 ## Edit coverage in the map editor
 

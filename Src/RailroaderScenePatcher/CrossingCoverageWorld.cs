@@ -14,11 +14,15 @@ namespace RailroaderScenePatcher {
     // track span. The controller re-reads the sets and their span references on every pass of its loop, so changing them
     // changes detection from the next pass. A span registers in the track graph under its ID when it is enabled and removes
     // that ID when it is disabled. The map editor saves neither the controller's references nor runtime spans, so owned spans
-    // exist only in the load that the patch document builds them in.
+    // exist only in the load that the patch document builds them in. A circuit set is a plain object the controller's list
+    // refers to; a set the patcher adds for an authored addition is remembered by its own identity, so a later adapter over a
+    // retained world still tells it from the native sets.
     internal sealed class CrossingCoverageWorld : ICrossingCoverageWorld {
         const string GraphType = "Track.Graph", SpanType = "Track.TrackSpan", SegmentType = "Track.TrackSegment", LocationType = "Track.SerializableLocation";
         internal const string RootName = "CrankyAnt Scene Patcher crossing coverage";
-        readonly Type controller, span, graph, segment, end, location;
+        readonly Type controller, span, graph, segment, end, location, circuitSet;
+        // The addition key of every circuit set the patcher created in this process, held only while the set itself lives.
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, string> additions = new System.Runtime.CompilerServices.ConditionalWeakTable<object, string>();
         readonly FieldInfo circuitSets, spanId, lower, upper;
         readonly FieldInfo[] roles;
         readonly MethodInfo spanForId, invalidate;
@@ -31,7 +35,8 @@ namespace RailroaderScenePatcher {
             end = segment.GetNestedType("End", Native.Flags) ?? throw new MissingMemberException(SegmentType, "End");
             circuitSets = controller.GetField("circuitSets", Native.Flags) ?? throw new MissingFieldException(CrossingCoverageScene.ComponentType, "circuitSets");
             if (!typeof(IList).IsAssignableFrom(circuitSets.FieldType) || !circuitSets.FieldType.IsGenericType) throw new InvalidOperationException("Crossing circuit sets are not a list");
-            var set = circuitSets.FieldType.GetGenericArguments()[0];
+            var set = circuitSet = circuitSets.FieldType.GetGenericArguments()[0];
+            if (!set.IsClass || set.IsAbstract || set.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null) == null) throw new InvalidOperationException("A crossing circuit set cannot be constructed");
             roles = CircuitCoverage.Roles.Select(r => set.GetField(r, Native.Flags) ?? throw new MissingFieldException(set.FullName, r)).ToArray();
             if (roles.Any(r => r.FieldType != span)) throw new InvalidOperationException("Crossing circuit roles do not hold track spans");
             spanId = span.GetField("id", Native.Flags) ?? throw new MissingFieldException(SpanType, "id");
@@ -145,6 +150,14 @@ namespace RailroaderScenePatcher {
             go.SetActive(false);
             UnityEngine.Object.Destroy(go);
         }
+        // A new set stays outside every controller until SetCircuits lists it.
+        public object CreateCircuit(object target, string key) {
+            ControllerOf(target);
+            var set = Activator.CreateInstance(circuitSet, true);
+            additions.Add(set, key);
+            return set;
+        }
+        public string AdditionKey(object circuit) => circuit != null && additions.TryGetValue(circuit, out var key) ? key : null;
         public void SetSpans(object circuit, object approachA, object island, object approachB) {
             var values = new[] { approachA, island, approachB };
             if (values.Any(v => (v as UnityEngine.Object) == null)) throw new InvalidOperationException("A circuit needs three spans");

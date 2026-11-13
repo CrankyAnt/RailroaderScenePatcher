@@ -143,6 +143,7 @@ class Program {
         TrackFollowingTests.Run();
         GroupActivityTests.Run();
         CoverageTests.Run();
+        CoverageTests.RunAdditions();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

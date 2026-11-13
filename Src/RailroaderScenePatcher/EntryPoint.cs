@@ -78,9 +78,10 @@ namespace RailroaderScenePatcher {
         readonly string[] pose = { "", "", "", "", "", "" };
         readonly string[] binding = { "", "a", "" };
         // Crossing coverage being edited: the circuit, four fields per role (segment, end, from, to) and the previewed change.
-        string coverageCircuit;
+        // coverageAddition is the ID of the authored addition being added or edited, or null while a native circuit is edited.
+        string coverageCircuit, coverageAddition, newAddition = "";
         readonly string[] coverageFields = new string[12];
-        sealed class PreparedCoverage { internal string Circuit; internal CircuitCoverage Value; internal CoveragePreview Preview; }
+        sealed class PreparedCoverage { internal string Circuit, Addition; internal CircuitCoverage Value; internal CoveragePreview Preview; }
         PreparedCoverage preparedCoverage;
         readonly string loadId = Guid.NewGuid().ToString("N");
         internal void Initialize(IModContext value) {
@@ -369,7 +370,7 @@ namespace RailroaderScenePatcher {
                             presentation.Action(() => {
                                 var observation = (SceneObservation)row.Value;
                                 if (!inventoryPresentation.CanSelect(inventory, observation)) return;
-                                CancelGizmo(); ClearSnap(); coverageCircuit = null; selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
+                                CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; selected = inventoryPresentation.CurrentSelection(inventory, observation); inspected = selected == null ? "Inspected object no longer present" : DescribeInspection(selected); ReadPose();
                             })();
                         });
                         var listLayout = outline.GetComponent<LayoutElement>();
@@ -664,20 +665,31 @@ namespace RailroaderScenePatcher {
         // crossing object never moves, and proximity never assigns coverage.
         void DrawCoverage(UIPanelBuilder builder, AuthoringSession session, TargetIdentity identity) {
             builder.AddSection("Crossing coverage");
-            PlainLabel(builder, "Each circuit has an approach A, island and approach B span. Select the tracks a circuit covers, or detach it, explicitly; the patcher never assigns coverage by proximity. The native spans stay registered and unchanged, and circuits you do not edit keep their coverage. Preview a change to see its effect on every circuit, then apply it.");
+            PlainLabel(builder, "Each circuit has an approach A, island and approach B span. Select the tracks a circuit covers, or detach it, explicitly; the patcher never assigns coverage by proximity. The native spans stay registered and unchanged, and circuits you do not edit keep their coverage. To make the crossing detect an extra track, add detection for it: the patcher adds a circuit with its own three spans for the tracks you select. Preview a change to see its effect on every circuit, then apply it.");
             CrossingCoverage current = null;
             try { current = session.Coverage(identity); }
             catch (Exception e) { PlainLabel(builder, "Coverage unavailable: " + e.GetBaseException().Message); }
             if (current != null) {
                 foreach (var circuit in current.Circuits) {
                     var key = circuit.Key; var value = circuit.Value;
-                    PlainLabel(builder, "Circuit " + key + ": " + value + ".");
-                    Button(builder, "Edit circuit " + key, () => { coverageCircuit = key; preparedCoverage = null; ReadCoverage(value); presentation.RequestRefresh(); });
+                    var name = DetectionAddition.Name(key);
+                    PlainLabel(builder, name + ": " + value + ".");
+                    Button(builder, "Edit " + name, () => { coverageCircuit = key; coverageAddition = DetectionAddition.Id(key); preparedCoverage = null; ReadCoverage(value); presentation.RequestRefresh(); });
                 }
                 if (current.Residue.Count > 0) PlainLabel(builder, "Owned spans left by an incomplete cleanup: " + String.Join(", ", current.Residue) + ". Use Recheck after failed edit.");
+                // An addition starts from an ID the modder chooses and tracks the modder selects; nothing is taken from nearby track.
+                PlainLabel(builder, "Add detection for extra tracks. Give the addition an ID that is unique in this MapMod's patch document, then select its tracks.");
+                var idInput = builder.AddInputField(newAddition ?? "", value => newAddition = value);
+                idInput.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => newAddition = value);
+                Button(builder, "Add detection with this ID", () => {
+                    var id = (newAddition ?? "").Trim();
+                    if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "give the addition an ID first"); presentation.RequestRefresh(); return; }
+                    var existing = current.Circuits.FirstOrDefault(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == id);
+                    coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value); presentation.RequestRefresh();
+                });
             }
             if (coverageCircuit != null) {
-                PlainLabel(builder, "Editing circuit " + coverageCircuit + ". Distances are metres from the chosen end. From is the end next to the island for each approach and island lower for the island.");
+                PlainLabel(builder, "Editing " + (coverageAddition == null ? "circuit " + coverageCircuit : "added detection " + coverageAddition) + ". Distances are metres from the chosen end. From is the end next to the island for each approach and island lower for the island.");
                 var confirmed = selection?.Confirmed?.Identity;
                 var labels = new[] { "Segment", "End (a or b)", "From (m)", "To (m)" };
                 for (var role = 0; role < 3; role++) {
@@ -699,24 +711,31 @@ namespace RailroaderScenePatcher {
                         .Disable(confirmed == null || confirmed.Kind != SelectionKind.TrackSegment);
                 }
                 Button(builder, "Choose track in world", () => BeginSelection(SelectionKind.TrackSegment, selected));
-                var circuitKey = coverageCircuit;
+                var circuitKey = coverageCircuit; var additionId = coverageAddition;
                 Button(builder, "Preview selected tracks", () => {
-                    var value = ParseCoverage(out var problem);
+                    var value = ParseCoverage(out var problem, additionId != null);
                     if (value == null) feedback.Refuse(CoveragePlace, "Coverage preview", problem);
-                    else PrepareCoverage(session, identity, circuitKey, value);
+                    else PrepareCoverage(session, identity, circuitKey, value, additionId);
                 });
-                // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach as well.
+                // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach or deletion as well.
                 var lastCovered = CrossingCoverage.LastCovered(current, circuitKey);
-                if (lastCovered) PlainLabel(builder, "Circuit " + circuitKey + " is the crossing's last covered circuit. Detaching it would leave the crossing without detection, so the patcher refuses it; select tracks for it instead, or keep another circuit covered.");
-                Button(builder, "Preview detach", () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached)).Disable(lastCovered);
-                Button(builder, "Preview clearing the authored circuit", () => PrepareCoverage(session, identity, circuitKey, null));
+                if (additionId != null) {
+                    var authored = current != null && current.Circuits.Any(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == additionId);
+                    if (lastCovered) PlainLabel(builder, "Added detection " + additionId + " is the crossing's last detection. Deleting it would leave the crossing without detection, so the patcher refuses it; return a native circuit to its coverage first.");
+                    Button(builder, "Preview deleting the addition", () => PrepareCoverage(session, identity, circuitKey, null, additionId)).Disable(!authored || lastCovered);
+                } else {
+                    if (lastCovered) PlainLabel(builder, "Circuit " + circuitKey + " is the crossing's last covered circuit. Detaching it would leave the crossing without detection, so the patcher refuses it; select tracks for it instead, or keep another circuit covered.");
+                    Button(builder, "Preview detach", () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null)).Disable(lastCovered);
+                    Button(builder, "Preview clearing the authored circuit", () => PrepareCoverage(session, identity, circuitKey, null, null));
+                }
                 if (preparedCoverage != null && preparedCoverage.Circuit == coverageCircuit) {
                     if (preparedCoverage.Preview.Error != null) PlainLabel(builder, "Preview refused: " + preparedCoverage.Preview.Error);
                     else {
                         PlainLabel(builder, "Intended crossing relationship:");
                         foreach (var line in preparedCoverage.Preview.Lines) PlainLabel(builder, line);
                         var prepared = preparedCoverage;
-                        Button(builder, "Apply previewed coverage", () => Edit(CoveragePlace, "Crossing coverage", (current2, inspection) => current2.Cover(identity, prepared.Circuit, prepared.Value, inspection)));
+                        Button(builder, "Apply previewed coverage", () => Edit(CoveragePlace, "Crossing coverage", (current2, inspection) => prepared.Addition == null ? current2.Cover(identity, prepared.Circuit, prepared.Value, inspection)
+                            : prepared.Value == null ? current2.DeleteDetection(identity, prepared.Addition, inspection) : current2.AddDetection(identity, prepared.Addition, prepared.Value, inspection)));
                     }
                     Button(builder, "Cancel preview", () => { preparedCoverage = null; presentation.RequestRefresh(); });
                 }
@@ -725,26 +744,27 @@ namespace RailroaderScenePatcher {
             Button(builder, "Remove modification", () => Edit(CoveragePlace, "Removal", (current2, inspection) => current2.Remove(identity, inspection)));
             Button(builder, "Recheck after failed edit", () => Edit(CoveragePlace, "Recheck", (current2, inspection) => current2.Recheck(identity, inspection)));
             Button(builder, "Crossing coverage guidance", () => Application.OpenURL(CoverageGuide));
-            PlainLabel(builder, "Removal returns every circuit to its coverage without this MapMod's modification. Save writes Data/scene-patches.json and the patcher dependency; the game rebuilds the selected coverage from the document on every load. Reloading the editor ends Undo/Redo history.");
+            PlainLabel(builder, "Removal returns every circuit to its coverage without this MapMod's modification and deletes its added detection. Save writes Data/scene-patches.json and the patcher dependency; the game rebuilds the selected coverage from the document on every load. Reloading the editor ends Undo/Redo history.");
         }
-        void PrepareCoverage(AuthoringSession session, TargetIdentity identity, string circuit, CircuitCoverage value) {
+        void PrepareCoverage(AuthoringSession session, TargetIdentity identity, string circuit, CircuitCoverage value, string addition) {
             CoveragePreview preview;
-            try { preview = session.PreviewCoverage(identity, circuit, value, inventory.Pin(selected)); }
+            try { preview = addition == null ? session.PreviewCoverage(identity, circuit, value, inventory.Pin(selected)) : session.PreviewAddition(identity, addition, value, inventory.Pin(selected)); }
             catch (Exception e) { feedback.Refuse(CoveragePlace, "Coverage preview", e.GetBaseException().Message); preparedCoverage = null; return; }
-            preparedCoverage = new PreparedCoverage { Circuit = circuit, Value = value, Preview = preview };
+            preparedCoverage = new PreparedCoverage { Circuit = circuit, Addition = addition, Value = value, Preview = preview };
             presentation.RequestRefresh();
         }
-        // Fills the fields from the circuit's selected tracks; a circuit with native spans or detached starts empty.
+        // Fills the fields from the selected tracks of a circuit or addition; a circuit with native spans or detached, and a new
+        // addition, start empty.
         void ReadCoverage(CircuitCoverage value) {
             for (var role = 0; role < 3; role++) {
-                var range = value.Kind == CircuitKind.Tracks ? value.Ranges[role] : null;
+                var range = value?.Ranges?[role];
                 coverageFields[role * 4] = range?.From.Segment ?? "";
                 coverageFields[role * 4 + 1] = range?.From.End ?? "a";
                 coverageFields[role * 4 + 2] = range == null ? "" : range.From.Distance.ToString("R", CultureInfo.InvariantCulture);
                 coverageFields[role * 4 + 3] = range == null ? "" : range.To.Distance.ToString("R", CultureInfo.InvariantCulture);
             }
         }
-        CircuitCoverage ParseCoverage(out string problem) {
+        CircuitCoverage ParseCoverage(out string problem, bool addition) {
             problem = null;
             var ranges = new SpanRange[3];
             for (var role = 0; role < 3; role++) {
@@ -755,7 +775,7 @@ namespace RailroaderScenePatcher {
                 }
                 ranges[role] = new SpanRange(new TrackLocation(segment, end, from), new TrackLocation(segment, end, to));
             }
-            return CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2]);
+            return addition ? CircuitCoverage.Added(ranges[0], ranges[1], ranges[2]) : CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2]);
         }
         // Terrain output follows a board edit asynchronously; the game regenerates it, and Save does not write it.
         void DrawOutput(UIPanelBuilder builder, AuthoringSession session, TargetIdentity identity) {

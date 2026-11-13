@@ -222,7 +222,7 @@ namespace RailroaderScenePatcher {
                 : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
                 : marked ? "Inspection only until corrected: " + markerRefusal
-                : coverageEditable ? "Crossing coverage: select tracks for, or detach, each circuit explicitly; native spans stay registered and the crossing itself does not move"
+                : coverageEditable ? "Crossing coverage: select tracks for, or detach, each circuit explicitly, or add detection for explicitly selected extra tracks; native spans stay registered and the crossing itself does not move"
                 : crossing ? "Inspection only until corrected: " + coverageRefusal
                 : "Inspection only; no mutation adapter for this pattern";
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,

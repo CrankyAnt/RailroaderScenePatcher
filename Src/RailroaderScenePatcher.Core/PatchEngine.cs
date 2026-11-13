@@ -74,6 +74,8 @@ namespace RailroaderScenePatcher.Core {
         // Restored targets whose dependent output, such as regenerated terrain, has not yet verified.
         readonly HashSet<object> awaitingOutput = new HashSet<object>();
         readonly Dictionary<object, ObjectState> underlying = new Dictionary<object, ObjectState>();
+        // Addition IDs that more than one modification of the document being applied uses.
+        HashSet<string> sharedAdditions = new HashSet<string>(StringComparer.Ordinal);
         internal IScene Scene { get { return scene; } }
         internal sealed class Modification {
             internal string Id; internal TargetIdentity Identity; internal ObjectState State; internal string[] Dependencies;
@@ -112,6 +114,7 @@ namespace RailroaderScenePatcher.Core {
                     if (item == null || item["id"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)item["id"]) || entries.ContainsKey((string)item["id"])) { result.Error = "Modification identities must be unique strings"; return result; }
                     entries.Add((string)item["id"], item);
                 }
+                sharedAdditions = SharedAdditionIds(entries.Values);
                 var visiting = new HashSet<string>();
                 foreach (var id in entries.Keys) Execute(id, entries, outcomes, visiting, documentKey, inspectedTargets);
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
@@ -130,9 +133,11 @@ namespace RailroaderScenePatcher.Core {
                 }
                 var item = entries[id];
                 if (!Only(item, Known)) throw new InvalidOperationException("Unsupported modification content");
+                var shared = AdditionIds(item).FirstOrDefault(sharedAdditions.Contains);
+                if (shared != null) throw new InvalidOperationException(SharedAddition(shared));
                 foreach (var dep in Dependencies(item))
                     if (!entries.ContainsKey(dep) || !Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets).Applied) throw new InvalidOperationException("Dependency failed: " + dep);
-                var parsed = Parse(item);
+                var parsed = Parse(item, documentKey);
                 var identity = parsed.Identity;
                 Observe("resolve", documentKey, id, identity.Path);
                 var matches = scene.Resolve(identity);
@@ -221,13 +226,25 @@ namespace RailroaderScenePatcher.Core {
             awaitingOutput.Add(target);
             return true;
         }
-        // Underlying state overlaid with every effective modification of this document for the object.
-        internal ObjectState Desired(JArray modifications, object target) {
+        // The addition IDs a modification authors, and those that more than one modification of a document uses. An addition ID
+        // names one addition of its supplying MapMod, so every modification that shares one fails, wherever it stands.
+        internal static IEnumerable<string> AdditionIds(JObject item) =>
+            ((item["relationships"] as JObject)?["crossingCoverage"] as JArray)?.OfType<JObject>().Where(c => c["addition"]?.Type == JTokenType.String).Select(c => (string)c["addition"]).Distinct(StringComparer.Ordinal) ?? Enumerable.Empty<string>();
+        internal static HashSet<string> SharedAdditionIds(IEnumerable<JObject> items) {
+            var seen = new HashSet<string>(StringComparer.Ordinal); var shared = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var item in items) foreach (var id in AdditionIds(item)) if (!seen.Add(id)) shared.Add(id);
+            return shared;
+        }
+        internal static string SharedAddition(string id) => "Addition ID " + id + " is used by more than one modification; an addition ID names one addition in its document";
+        // Underlying state overlaid with every effective modification of this document for the object. The owner is the key
+        // of the document, which scopes the identities of its additions.
+        internal ObjectState Desired(JArray modifications, object target, string owner = "") {
             var entries = new Dictionary<string, JObject>(StringComparer.Ordinal);
             foreach (var item in modifications.OfType<JObject>()) if (item["id"]?.Type == JTokenType.String) entries[(string)item["id"]] = item;
             var effective = new Dictionary<string, Modification>(StringComparer.Ordinal);
             var order = new List<Modification>(); var targets = new Dictionary<Modification, object>();
-            foreach (var id in entries.Keys) Effective(id, entries, effective, order, targets, new HashSet<string>());
+            var shared = SharedAdditionIds(entries.Values);
+            foreach (var id in entries.Keys) Effective(id, entries, effective, order, targets, new HashSet<string>(), owner, shared);
             var state = Underlying(target);
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
@@ -243,14 +260,14 @@ namespace RailroaderScenePatcher.Core {
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
             return new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage);
         }
-        Modification Effective(string id, Dictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting) {
+        Modification Effective(string id, Dictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting, string owner, HashSet<string> shared) {
             Modification known;
             if (effective.TryGetValue(id, out known)) return known;
             Modification result = null;
             if (visiting.Add(id)) {
                 try {
-                    var parsed = Parse(entries[id]);
-                    if (parsed.Dependencies.All(d => entries.ContainsKey(d) && Effective(d, entries, effective, order, targets, visiting) != null)) {
+                    var parsed = Parse(entries[id], owner);
+                    if (!AdditionIds(entries[id]).Any(shared.Contains) && parsed.Dependencies.All(d => entries.ContainsKey(d) && Effective(d, entries, effective, order, targets, visiting, owner, shared) != null)) {
                         targets[parsed] = ResolveUnique(parsed.Identity);
                         result = parsed; order.Add(parsed);
                     }
@@ -276,7 +293,8 @@ namespace RailroaderScenePatcher.Core {
             return dependencies.Select(x => (string)x).ToArray();
         }
         internal static readonly string[] Known = { "id", "target", "placement", "active", "relationships", "dependsOn" };
-        internal static Modification Parse(JObject item) {
+        // The owner is the key of the document the modification belongs to; it scopes the identities of its additions.
+        internal static Modification Parse(JObject item, string owner = "") {
             if (!Only(item, Known)) throw new InvalidOperationException("Unsupported modification content");
             var dependencies = Dependencies(item);
             var identity = ParseTarget(item["target"] as JObject);
@@ -294,7 +312,7 @@ namespace RailroaderScenePatcher.Core {
                 var relationships = item["relationships"] as JObject;
                 if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
                 if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
-                if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]);
+                if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner);
             }
             if (pose == null && item["active"] == null && marker == null && coverage == null) throw new InvalidOperationException("Unsupported placement");
             return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"], marker, coverage), Dependencies = dependencies };
@@ -333,31 +351,37 @@ namespace RailroaderScenePatcher.Core {
             return MarkerBinding.At(ParseLocation(marker, "relationship"));
         }
         // Explicit crossing coverage: each listed circuit, named by its native island span, gets selected tracks or an explicit
-        // detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every circuit untouched.
+        // detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every circuit untouched. An entry
+        // named by addition is an authored addition: a circuit the patcher adds for its selected tracks, which exists only while
+        // the document lists it.
         static CrossingCoverage ParseCoverage(JToken token) {
             var circuits = token as JArray;
             if (circuits == null || circuits.Count == 0) throw new InvalidOperationException("Invalid relationship: crossingCoverage must list at least one circuit");
             var parsed = new List<KeyValuePair<string, CircuitCoverage>>();
             foreach (var entry in circuits) {
                 var circuit = entry as JObject;
-                if (circuit == null || !RequiredString(circuit, "circuit")) throw new InvalidOperationException("Invalid relationship: each crossingCoverage entry names its circuit by island span ID");
-                var key = (string)circuit["circuit"];
-                if (parsed.Any(p => p.Key == key)) throw new InvalidOperationException("Invalid relationship: circuit " + key + " is listed twice");
+                var addition = circuit?["addition"] != null;
+                if (addition && (circuit["circuit"] != null || !RequiredString(circuit, "addition"))) throw new InvalidOperationException("Invalid relationship: an addition names its own ID and no circuit");
+                if (circuit == null || (!addition && !RequiredString(circuit, "circuit"))) throw new InvalidOperationException("Invalid relationship: each crossingCoverage entry names its circuit by island span ID, or its addition by ID");
+                var key = addition ? DetectionAddition.Key("", (string)circuit["addition"]) : (string)circuit["circuit"];
+                if (!addition && DetectionAddition.Id(key) != null) throw new InvalidOperationException("Invalid relationship: " + key + " is not the ID of an island span");
+                if (parsed.Any(p => p.Key == key)) throw new InvalidOperationException("Invalid relationship: " + (addition ? "addition " + (string)circuit["addition"] : "circuit " + key) + " is listed twice");
+                if (addition && circuit["detach"] != null) throw new InvalidOperationException("Invalid relationship: an addition cannot be detached; omit it to delete it");
                 if (circuit["detach"] != null) {
                     if (!Only(circuit, "circuit", "detach") || circuit["detach"].Type != JTokenType.Boolean || !(bool)circuit["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone with its circuit");
                     parsed.Add(new KeyValuePair<string, CircuitCoverage>(key, CircuitCoverage.Detached));
                     continue;
                 }
-                if (!Only(circuit, "circuit", "approachA", "island", "approachB")) throw new InvalidOperationException("Unsupported relationship content");
+                if (!Only(circuit, addition ? "addition" : "circuit", "approachA", "island", "approachB")) throw new InvalidOperationException("Unsupported relationship content");
                 var ranges = new SpanRange[3];
                 for (var i = 0; i < 3; i++) {
                     var role = CircuitCoverage.Roles[i];
                     var range = circuit[role] as JObject;
-                    if (range == null) throw new InvalidOperationException("Invalid relationship: circuit " + key + " needs approachA, island and approachB, or an explicit detach");
+                    if (range == null) throw new InvalidOperationException("Invalid relationship: " + (addition ? "addition " + (string)circuit["addition"] + " needs approachA, island and approachB" : "circuit " + key + " needs approachA, island and approachB, or an explicit detach"));
                     if (!Only(range, "from", "to")) throw new InvalidOperationException("Unsupported relationship content");
                     ranges[i] = new SpanRange(RangeEnd(range["from"]), RangeEnd(range["to"]));
                 }
-                parsed.Add(new KeyValuePair<string, CircuitCoverage>(key, CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2])));
+                parsed.Add(new KeyValuePair<string, CircuitCoverage>(key, addition ? CircuitCoverage.Added(ranges[0], ranges[1], ranges[2]) : CircuitCoverage.Tracks(ranges[0], ranges[1], ranges[2])));
             }
             return new CrossingCoverage(parsed);
         }

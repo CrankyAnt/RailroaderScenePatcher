@@ -12,7 +12,8 @@ class FakeSpan {
     public string Id; public SpanRange Range; public bool Owned, Destroyed;
 }
 // One circuit set of a crossing controller: approach A, island and approach B.
-class FakeCircuit { public FakeSpan[] Spans; }
+// Addition is the key of the authored addition the patcher built the set for; a native set has none.
+class FakeCircuit { public FakeSpan[] Spans; public string Addition; }
 class FakeCrossing {
     public List<FakeCircuit> Circuits = new List<FakeCircuit>();
     public double[] Position = { 5, 0, 7 }, Rotation = { 0, 0, 0, 1 };
@@ -25,13 +26,13 @@ class FakeCrossingWorld : ICrossingCoverageWorld {
     public IEnumerable<string> MapIds => Maps;
     public Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();
     public Dictionary<string, List<double>> Segments = new Dictionary<string, List<double>> {
-        ["Sold"] = new List<double> { 600 }, ["Snew"] = new List<double> { 600 }, ["Sother"] = new List<double> { 400 }, ["Stwin"] = new List<double> { 100, 100 }
+        ["Sold"] = new List<double> { 600 }, ["Snew"] = new List<double> { 600 }, ["Sother"] = new List<double> { 400 }, ["Sspur"] = new List<double> { 600 }, ["Stwin"] = new List<double> { 100, 100 }
     };
     public readonly Dictionary<string, FakeSpan> Graph = new Dictionary<string, FakeSpan>();
     public int Mutations, Created;
     // Failure injections.
     public int FailCreateAfter = -1;
-    public bool FailSetCircuits, StickyDestroy, FailSetSpansOnce, SkipRegisterOnCreate;
+    public bool FailSetCircuits, StickyDestroy, FailSetSpansOnce, SkipRegisterOnCreate, FailCreateCircuit;
     public FakeSpan Span(string id, string segment, double from, double to) {
         var span = new FakeSpan { Id = id, Range = new SpanRange(new TrackLocation(segment, "a", from), new TrackLocation(segment, "a", to)) };
         Graph[id] = span;
@@ -61,6 +62,11 @@ class FakeCrossingWorld : ICrossingCoverageWorld {
         Graph[id] = span; Created++;
         return span;
     }
+    public object CreateCircuit(object controller, string key) {
+        if (FailCreateCircuit) { FailCreateCircuit = false; throw new Exception("circuit creation injected"); }
+        return new FakeCircuit { Spans = new FakeSpan[3], Addition = key };
+    }
+    public string AdditionKey(object circuit) => ((FakeCircuit)circuit).Addition;
     public void DestroySpan(object span) {
         Mutations++;
         var s = (FakeSpan)span;
@@ -101,7 +107,7 @@ class FakeCrossingInspection : IInspectionScene {
             world.Position(c), world.Rotation(c), bindings, Array.Empty<string>(), Array.Empty<string>(), "coverage");
     }));
 }
-static class CoverageTests {
+static partial class CoverageTests {
     const string CrossingPath = "World/Crossings/Bryson Everett", OtherPath = "World/Crossings/Whittier";
     static readonly TargetIdentity Crossing = new TargetIdentity("BushnellWhittier", CrossingPath, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure);
     static readonly TargetIdentity Other = new TargetIdentity("BushnellWhittier", OtherPath, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure);

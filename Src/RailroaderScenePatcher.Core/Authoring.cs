@@ -154,6 +154,8 @@ namespace RailroaderScenePatcher.Core {
         readonly INativeHistory history;
         readonly IStorage storage;
         readonly string modId;
+        // The key the engine applied this document under at world load; it scopes the identities of the document's additions.
+        readonly string documentKey;
         readonly HistoryIdentity identity;
         readonly PatchDocument document;
         readonly List<string> written = new List<string>();
@@ -163,11 +165,11 @@ namespace RailroaderScenePatcher.Core {
         // Set when native Undo or Redo threw. The native manager then keeps an open partial group, so later
         // native edits reach neither its stack nor its change count. No Save in this session can prove a clean state.
         string unrecovered;
-        public AuthoringSession(PatchEngine engine, INativeHistory history, IStorage storage, string mapId, string modId = "crankyant/scene-patcher") {
+        public AuthoringSession(PatchEngine engine, INativeHistory history, IStorage storage, string mapId, string modId = "crankyant/scene-patcher", string documentKey = "") {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
             this.history = history ?? throw new ArgumentNullException(nameof(history));
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            this.modId = modId; scene = engine.Scene;
+            this.modId = modId; this.documentKey = documentKey ?? ""; scene = engine.Scene;
             identity = new HistoryIdentity(history); savedIdentity = identity.Current;
             try {
                 diskText = storage.ReadPatchDocument();
@@ -339,7 +341,7 @@ namespace RailroaderScenePatcher.Core {
                     if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before it follows the track again");
                     var mapContext = scene.MapIds.ToArray();
                     scene.Preflight(resolved);
-                    var desired = engine.Desired(document.Modifications, resolved);
+                    var desired = engine.Desired(document.Modifications, resolved, documentKey);
                     var prior = scene.Read(resolved);
                     if (Same(prior, desired)) { report = false; continue; }
                     engine.GuardMutation(parsed.Identity, resolved, mapContext, null);
@@ -384,7 +386,26 @@ namespace RailroaderScenePatcher.Core {
         // effective coverage. A null coverage clears the circuit's authored entry: it returns to its effective underlying coverage.
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage) { return Cover(target, circuit, coverage, null); }
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected) {
-            return Change(coverage == null ? "Clear crossing coverage" : "Edit crossing coverage", target, inspected, existing => CoverageValue(target, existing, circuit, coverage));
+            return Change(coverage == null ? "Clear crossing coverage" : "Edit crossing coverage", target, inspected, existing => CoverageValue(target, existing, circuit, coverage, false));
+        }
+        // Adds detection for explicitly selected tracks to the crossing as an authored addition with this ID, or replaces the
+        // tracks of the addition that has it. The ID names one addition in the document. Native circuits keep their coverage.
+        public Outcome AddDetection(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
+            return Change("Add crossing detection", target, inspected, existing => {
+                if (tracks == null || tracks.Kind != CircuitKind.Added) throw new InvalidOperationException("Explicitly select the tracks of the approach A, island and approach B spans for the addition");
+                return CoverageValue(target, existing, id, tracks, true);
+            });
+        }
+        // Deletes the authored addition: its circuit leaves the crossing and its owned spans are removed. Other additions and
+        // the coverage of the native circuits stay as they are.
+        public Outcome DeleteDetection(TargetIdentity target, string id, InspectedTarget inspected = null) {
+            return Change("Delete crossing detection", target, inspected, existing => CoverageValue(target, existing, id, null, true));
+        }
+        // The effect AddDetection, or with null tracks DeleteDetection, would have on every circuit and addition, without
+        // changing the scene, the document or the history.
+        public CoveragePreview PreviewAddition(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
+            if (tracks != null && tracks.Kind != CircuitKind.Added) return new CoveragePreview(Array.Empty<string>(), "Explicitly select the tracks of the approach A, island and approach B spans for the addition");
+            return Preview(target, id, tracks, inspected, true);
         }
         // The crossing's current coverage of every circuit, read from the scene.
         public CrossingCoverage Coverage(TargetIdentity target) {
@@ -393,7 +414,8 @@ namespace RailroaderScenePatcher.Core {
             return scene.Read(resolved).Coverage ?? throw new InvalidOperationException("This object has no crossing coverage");
         }
         // The effect a Cover edit would have on every circuit, without changing the scene, the document or the history.
-        public CoveragePreview PreviewCoverage(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected = null) {
+        public CoveragePreview PreviewCoverage(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected = null) => Preview(target, circuit, coverage, inspected, false);
+        CoveragePreview Preview(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected, bool addition) {
             try {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
@@ -403,26 +425,38 @@ namespace RailroaderScenePatcher.Core {
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside the editor first");
                 var existing = own.FirstOrDefault();
-                var value = CoverageValue(target, existing, circuit, coverage);
-                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value).State);
+                var value = CoverageValue(target, existing, circuit, coverage, addition);
+                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, documentKey).State);
                 var candidate = (JArray)document.Modifications.DeepClone();
                 var index = existing == null ? -1 : document.Modifications.IndexOf(existing);
                 if (index >= 0) { if (value == null) candidate.RemoveAt(index); else candidate[index] = value; }
                 else if (value != null) candidate.Add(value);
                 var current = scene.Read(resolved).Coverage;
-                var desired = engine.Desired(candidate, resolved).Coverage;
+                var desired = engine.Desired(candidate, resolved, documentKey).Coverage;
+                CheckEffectiveCoverage(resolved, desired);
                 return new CoveragePreview(CrossingCoverage.Describe(current, desired), null);
             } catch (Exception e) { return new CoveragePreview(Array.Empty<string>(), e.Message); }
         }
-        JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage) {
-            if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException("Choose a circuit of the crossing");
+        // The effective coverage an edit converges on must itself be valid: removing an entry can leave a crossing without
+        // detection although every remaining entry is valid on its own. Checked before mutation, so a refusal changes nothing.
+        void CheckEffectiveCoverage(object target, CrossingCoverage desired) {
+            if (desired != null) engine.CheckRelationships(target, new ObjectState(null, null, null, desired));
+        }
+        // The modification with one entry of its crossing coverage set, replaced or, for a null coverage, cleared. An entry
+        // names a native circuit by its island span, or an authored addition by its ID.
+        JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage, bool addition) {
+            if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException(addition ? "Give the addition an ID" : "Choose a circuit of the crossing");
             if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the circuit's authored coverage to return it to its native spans");
+            if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "Add detection for extra tracks as an addition; a native circuit takes selected tracks or a detach");
             if (existing != null) PatchEngine.Parse(existing);
+            if (addition && coverage != null && document.Modifications.OfType<JObject>().Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))
+                throw new InvalidOperationException("Addition ID " + circuit + " is already used by another modification of this document; an addition ID names one addition, so choose another ID");
+            var name = addition ? "addition" : "circuit";
             var value = existing == null ? new JObject { ["id"] = NewId(target, "cover-"), ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
             var relationships = value["relationships"] as JObject ?? new JObject();
             var circuits = relationships["crossingCoverage"] as JArray ?? new JArray();
-            var entry = circuits.OfType<JObject>().FirstOrDefault(c => (string)c["circuit"] == circuit);
-            if (coverage == null && entry == null) throw new InvalidOperationException("Circuit " + circuit + " has no authored coverage in the active document");
+            var entry = circuits.OfType<JObject>().FirstOrDefault(c => c[name]?.Type == JTokenType.String && (string)c[name] == circuit);
+            if (coverage == null && entry == null) throw new InvalidOperationException(addition ? "Addition " + circuit + " is not authored in the active document for this crossing" : "Circuit " + circuit + " has no authored coverage in the active document");
             var replacement = coverage == null ? null : CircuitJson(circuit, coverage);
             if (entry != null) { if (replacement == null) entry.Remove(); else entry.Replace(replacement); }
             else circuits.Add(replacement);
@@ -432,7 +466,7 @@ namespace RailroaderScenePatcher.Core {
             return value["placement"] == null && value["active"] == null && value["relationships"] == null ? null : value;
         }
         static JObject CircuitJson(string circuit, CircuitCoverage coverage) {
-            var value = new JObject { ["circuit"] = circuit };
+            var value = new JObject { [coverage.Kind == CircuitKind.Added ? "addition" : "circuit"] = circuit };
             if (coverage.Kind == CircuitKind.Detached) { value["detach"] = true; return value; }
             for (var i = 0; i < 3; i++) value[CircuitCoverage.Roles[i]] = new JObject { ["from"] = LocationJson(coverage.Ranges[i].From), ["to"] = LocationJson(coverage.Ranges[i].To) };
             return value;
@@ -504,9 +538,10 @@ namespace RailroaderScenePatcher.Core {
             index = document.Replace(current, value, index);
             var mutating = false;
             try {
-                var desired = engine.Desired(document.Modifications, target);
+                var desired = engine.Desired(document.Modifications, target, documentKey);
                 // Only the authored relationship needs a resolvable target; the underlying one may be the broken binding being repaired.
-                if (value != null) engine.CheckRelationships(target, PatchEngine.Parse(value).State);
+                if (value != null) engine.CheckRelationships(target, PatchEngine.Parse(value, documentKey).State);
+                CheckEffectiveCoverage(target, desired.Coverage);
                 // Reading state and resolving the document may invoke native callbacks. Never redirect to a new match.
                 engine.GuardMutation(identity, target, mapContext, inspected);
                 validateBeforeMutation?.Invoke();
@@ -539,7 +574,7 @@ namespace RailroaderScenePatcher.Core {
                 outcome.ResolvedTarget = resolved;
                 var mapContext = scene.MapIds.ToArray();
                 scene.Preflight(resolved);
-                var desired = engine.Desired(document.Modifications, resolved);
+                var desired = engine.Desired(document.Modifications, resolved, documentKey);
                 if (!Same(scene.Read(resolved), desired)) {
                     engine.GuardMutation(target, resolved, mapContext, inspected);
                     scene.Apply(resolved, desired);
