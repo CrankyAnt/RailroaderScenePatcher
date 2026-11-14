@@ -105,6 +105,12 @@ _Avoid_: Target owner
 **Active edited MapMod**:
 The supplying MapMod that owns the selected Map definition being edited in the editor. Other packs can supply inherited content without becoming edit targets.
 
+**Load attempt**:
+One pass in which a player's game applies its scene patches to the loaded world. Loading the same map again starts a new load attempt, which checks each patched object again by its identity.
+
+**Retained world**:
+A loaded map whose scene objects a later load attempt in the same map context may find kept or rebuilt. A kept object keeps its state; a rebuilt object receives its modification as new.
+
 **Effective underlying state**:
 The state that remains for an existing object without a particular modification by its supplying MapMod, including the applicable native context and other retained modifications in that editing or runtime context.
 
