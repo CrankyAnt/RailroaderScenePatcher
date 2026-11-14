@@ -50,6 +50,12 @@ namespace RailroaderScenePatcher.Core {
         // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. Authored coverage
         // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
         public CrossingCoverage Coverage { get; }
+        // Tells the two meanings of a null Active apart for an object whose activity follows a track group. True: this is
+        // one modification's own state, and the application leaves the activity as it is, including an explicit disable
+        // that another modification installed. False: this is the complete desired state, and a null Active returns the
+        // object to its group-driven activity, which releases an explicit disable.
+        public bool LeavesActivity { get; private set; }
+        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage) { LeavesActivity = true };
     }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
@@ -263,7 +269,8 @@ namespace RailroaderScenePatcher.Core {
                 if (IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
                 Observe("preflight", documentKey, id, identity.Path);
                 scene.Preflight(resolved);
-                var state = Evaluate(parsed.State);
+                // One modification's own state: an omitted active leaves the activity another modification set.
+                var state = Evaluate(parsed.State.LeavingActivity());
                 CheckRelationships(resolved, state);
                 Observe("capture", documentKey, id, identity.Path);
                 Underlying(resolved);
@@ -373,7 +380,8 @@ namespace RailroaderScenePatcher.Core {
             var following = state?.Placement?.Following;
             if (following == null) return state;
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
-            return new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage);
+            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage);
+            return state.LeavesActivity ? evaluated.LeavingActivity() : evaluated;
         }
         Modification Effective(string id, Dictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting, string owner, HashSet<string> shared) {
             Modification known;

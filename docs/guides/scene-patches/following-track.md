@@ -33,12 +33,12 @@ Track following changes only placement. It does not change a marker's binding, i
 Some Generic marker objects, such as the Alarka speed sign, carry a `Track.TrackRelativePosition` that switches the object on and off with the track group of the marker's bound segment. The inventory shows `Track-relative targetActiveFollowsTrackGroup=True` for them. The **Track group** line under **State** on the **Object** tab then says that the object's activity follows its track group.
 
 - **Disable** in the footer of the **Object** tab writes `active: false`. The patcher holds the object inactive. When the game enables that track group later, the object stays inactive; the hold also prevents a brief activation while the patch is applied again.
-- Without an authored `active` value, the game keeps switching the object with its track group.
+- Without an authored `active` value, the game keeps switching the object with its track group. A modification without `active` never releases a disable that another modification of the same object or another MapMod authored.
 - **Enable** is refused for such an object. Its activity belongs to its track group; use **Clear** instead.
 - **Clear** removes `active` from the modification. The object follows its track group again and takes the group's current state: it is active when the group is enabled and inactive when it is not.
 - **Remove** also releases the hold and returns the binding, the group subscription and group-driven activity of the object without this MapMod's modification.
 
-Rebinding such a marker moves its group subscription with it. The object then follows the new segment's group and no longer reacts to the old one. A detached marker follows no group. An explicit disable stays in place through a rebinding. Undo and Redo restore the binding, the subscription and the hold together.
+Rebinding such a marker moves its group subscription with it. The object then follows the new segment's group and no longer reacts to the old one. A detached marker follows no group. An explicit disable stays in place through a rebinding and through a gizmo drag, including its preview. Undo and Redo restore the binding, the subscription and the hold together.
 
 A document with an `active` value on a track-marker object needs patcher 0.5.0, because an older patcher cannot hold a group follower inactive.
 

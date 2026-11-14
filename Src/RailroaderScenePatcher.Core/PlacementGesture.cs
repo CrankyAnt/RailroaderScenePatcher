@@ -50,7 +50,8 @@ namespace RailroaderScenePatcher.Core {
                 var pose = Copy(PatchEngine.CheckPlacement(placement?.Position, placement?.Rotation));
                 engine.GuardMutation(identity, target, maps, expected);
                 mutated = true; writingPreview = true;
-                scene.Apply(target, new ObjectState(pose, null));
+                // The preview sets the pose alone: activity stays as it is, including an explicit disable.
+                scene.Apply(target, new ObjectState(pose, null).LeavingActivity());
                 if (!SamePose(scene.Read(target).Placement, pose)) throw new InvalidOperationException("Gizmo preview did not verify");
                 expected = Observed();
                 writingPreview = false; desired = pose; result.Applied = true;

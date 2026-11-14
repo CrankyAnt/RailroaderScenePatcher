@@ -43,6 +43,7 @@ static class TrackFollowingTests {
         UnresolvedAnchorChangesNothing();
         CapabilitiesReportTrackPoses();
         EditorFollowKeepsPoseAndFollowsTrackMoves();
+        SmallTrackTurnsAreFollowed();
         PlacementEditsKeepFollowingUntilStopped();
         ReconciliationFailureRestoresAndGuards();
         SaveAndReloadReproduceFollowingOnce();
@@ -156,6 +157,20 @@ static class TrackFollowingTests {
         editor.Redo();
         Assert(Near(box.Position, 103, 7, -95), "Redo follows the track's current pose, not the pose at the time of the edit");
         Assert(!session.Follow(P, TrackAnchor.Endpoint("Nmissing")).Applied && editor.UndoGroups.Count == 1, "An unresolved followed track is refused without history");
+    }
+    // A track that turns by a fraction of a degree, as a slightly reshaped curve does, still turns the following object.
+    static void SmallTrackTurnsAreFollowed() {
+        var (scene, box, session, editor, store) = Session();
+        // The endpoint stands at the object's own map position, so a turn of the endpoint changes the orientation alone.
+        scene.Poses["node:N1"] = new TrackPose(new[] { 105.0, 6, 7 }, new[] { 0.0, 0, 0, 1 });
+        Assert(session.Follow(P, TrackAnchor.Endpoint("N1")).Applied && session.ReconcileTrackFollowing().Count == 0, "The object follows the endpoint");
+        foreach (var degrees in new[] { 0.3, 0.35, 0.05 }) {
+            var half = degrees * Math.PI / 360;
+            scene.Poses["node:N1"] = new TrackPose(new[] { 105.0, 6, 7 }, new[] { 0.0, Math.Sin(half), 0, Math.Cos(half) });
+            var turned = session.ReconcileTrackFollowing();
+            Assert(turned.Count == 1 && turned[0].Value.Applied && Near(box.Rotation, 0, Math.Sin(half), 0, Math.Cos(half)) && Near(box.Position, 5, 6, 7), "A track turned to " + degrees + " degrees turns the following object: " + String.Join(",", box.Rotation));
+            Assert(session.ReconcileTrackFollowing().Count == 0, "The turned object is current afterwards");
+        }
     }
     static void PlacementEditsKeepFollowingUntilStopped() {
         var (scene, box, session, editor, store) = Session();

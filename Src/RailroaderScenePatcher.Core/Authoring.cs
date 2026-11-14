@@ -718,12 +718,15 @@ namespace RailroaderScenePatcher.Core {
             if (target.Structure != null) value["structure"] = target.Structure;
             return value;
         }
+        // The pose tolerances of the scene adapters' own verification. A wider angle here would count a following object
+        // as current after its track turned by less than that angle, and the object would not follow.
+        const double AngleToleranceDegrees = 0.01;
         static bool Same(ObjectState a, ObjectState b) {
             if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }
-            return la > 0 && lb > 0 && Math.Abs(dot) / Math.Sqrt(la * lb) > 0.99999;
+            return la > 0 && lb > 0 && 2 * Math.Acos(Math.Min(1, Math.Abs(dot) / Math.Sqrt(la * lb))) * 180 / Math.PI <= AngleToleranceDegrees;
         }
 
         // History notifications from the editor: around each native Undo or Redo, and after any history change.

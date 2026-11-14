@@ -158,9 +158,9 @@ A marker object whose `Track.TrackRelativePosition` has its activity follow the 
 
 - A `trackMarker` setting also moves that subscription: after the location change the adapter runs the relative position's own unsubscribe and observe steps, so exactly one subscription observes the new segment's group. A detach, or a location that does not resolve, leaves no subscription.
 - `active: false` is an explicit disable. The adapter replaces the relative position's activation callback with a hold that keeps the object inactive, before anything else changes, so a later group activation cannot activate it, not even briefly, including during a repeated application.
-- An omitted `active` keeps the game's group-driven activity: the group activates and deactivates the object.
+- An omitted `active` leaves the object's activity as it is. Without an explicit disable the game's group activates and deactivates the object. An explicit disable from another modification of the same object stays in place, whether that modification is in the same document or in another MapMod's document.
 - `active: true` is refused before mutation, because the object's activity belongs to its track group. Omit `active` to keep group-driven activity.
-- Removing the disable, by clearing `active` or removing the modification, releases the hold and observes the group again, so the object's activity follows the group's current state.
+- Removing the disable in the editor, by clearing `active` or removing the modification, releases the hold and observes the group again, so the object's activity follows the group's current state.
 
 After a change the adapter also verifies the subscription count, the observed group and the activity the group or the hold requires. A difference fails the modification and restores the captured location, registration, subscription, hold, pose and activity; an unverified restoration blocks further operations on the marker for the load.
 

@@ -335,8 +335,10 @@ namespace RailroaderScenePatcher.Core {
             var location = state.Marker == null ? before : state.Marker.Location;
             var follower = world.GroupActivity(target) != null;
             if (follower && state.Active == true) CheckRelationships(target, state);
-            // A follower without an explicit disable returns to group-driven activity.
-            var active = follower ? (state.Active == false ? false : (bool?)null) : state.Active ?? world.Active(target);
+            // A complete state without an explicit disable returns a follower to group-driven activity. One modification's
+            // own state without an activity value leaves an installed disable in place.
+            var disabled = state.Active == false || (follower && state.Active == null && state.LeavesActivity && world.GroupActivity(target).Held);
+            var active = follower ? (disabled ? false : (bool?)null) : state.Active ?? world.Active(target);
             var following = state.Placement?.Following != null;
             var activeBefore = world.Active(target);
             var relationshipWritten = Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location), following, true);

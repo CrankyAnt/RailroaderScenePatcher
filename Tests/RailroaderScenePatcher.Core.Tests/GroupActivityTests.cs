@@ -41,6 +41,9 @@ static class GroupActivityTests {
         FailedApplicationRestoresSubscriptionAndHold();
         TrackFollowingKeepsGroupActivity();
         SaveAndReloadReproduceTheHoldOnce();
+        OmittedActivityKeepsAnotherMapModsDisable();
+        OmittedActivityKeepsADisableInTheSameDocument();
+        GizmoPreviewKeepsTheDisable();
         Console.WriteLine("PASS: group subscriptions, explicit-disable precedence, native group activity and restoration");
     }
     static void RebindingMovesTheGroupSubscription() {
@@ -170,5 +173,69 @@ static class GroupActivityTests {
         Assert(Subscription(freshSign) == "extension|1|held" && freshSign.Activations == 0 && fresh.Buckets.Values.Sum(b => b.Count) == 1, "A repeated world-load callback leaves one subscription and only the unrelated registration");
         var unloaded = Session(store.Patch.Replace(SignPath, "World/Absent"));
         Assert(unloaded.session.MinimumPatcherVersion == "0.5.0", "The version follows the document even when the target is not loaded");
+    }
+    // A modification that omits active leaves the activity untouched: it never releases the disable of another MapMod.
+    static void OmittedActivityKeepsAnotherMapModsDisable() {
+        var (world, sign, other, scene) = Setup();
+        var engine = new PatchEngine(scene);
+        Assert(engine.Apply(Doc(Item("disable", "\"active\":false")), "packA").Outcomes["disable"].Applied && sign.Held && !sign.Active, "The first MapMod disables the follower");
+        var moved = engine.Apply(Doc(Item("move", Moved)), "packB").Outcomes["move"];
+        Assert(moved.Applied && sign.Position[0] == 30, "The later MapMod places the follower: " + moved.Error);
+        Assert(sign.Held && !sign.Active && sign.Activations == 0 && Subscription(sign) == "ela|1|held", "A later MapMod without active leaves the disable and never activates the object: " + Subscription(sign) + " activations " + sign.Activations);
+        world.SetGroupEnabled("ela", false); world.SetGroupEnabled("ela", true);
+        Assert(!sign.Active && sign.Activations == 0, "Group activation after both MapMods keeps the object inactive");
+        var rebound = engine.Apply(Doc(Item("rebind", ToExtension)), "packC").Outcomes["rebind"];
+        Assert(rebound.Applied && Subscription(sign) == "extension|1|held" && !sign.Active && sign.Activations == 0, "A later rebinding without active moves the subscription under the disable: " + rebound.Error + " " + Subscription(sign));
+        for (var i = 0; i < 2; i++) {
+            Assert(engine.Apply(Doc(Item("disable", "\"active\":false")), "packA").Outcomes["disable"].Applied && engine.Apply(Doc(Item("move", Moved)), "packB").Outcomes["move"].Applied, "Repeated application of both MapMods succeeds");
+            Assert(sign.Held && !sign.Active && sign.Activations == 0, "Repeated application keeps the disable without activating the object");
+        }
+    }
+    // Two modifications of one object in one document: the one without active leaves the other's disable, in either order.
+    static void OmittedActivityKeepsADisableInTheSameDocument() {
+        var disable = Item("disable", "\"active\":false"); var move = Item("move", Moved);
+        foreach (var items in new[] { disable + "," + move, move + "," + disable, disable + "," + move.Replace("\"dependsOn\":[]", "\"dependsOn\":[\"disable\"]") }) {
+            var (world, sign, other, scene) = Setup();
+            var engine = new PatchEngine(scene);
+            for (var i = 0; i < 2; i++) {
+                var outcomes = engine.Apply(Doc(items)).Outcomes;
+                Assert(outcomes.Count == 2 && outcomes.Values.All(o => o.Applied) && sign.Position[0] == 30, "Both modifications of the follower apply: " + String.Join("; ", outcomes.Values.Select(o => o.Error)));
+                Assert(sign.Held && !sign.Active && sign.Activations == 0 && Subscription(sign) == "ela|1|held", "A second modification without active keeps the disable and never activates the object: " + Subscription(sign) + " activations " + sign.Activations);
+            }
+            world.SetGroupEnabled("ela", false); world.SetGroupEnabled("ela", true);
+            Assert(!sign.Active && sign.Activations == 0, "Group activation after the document keeps the object inactive");
+        }
+    }
+    // A gizmo drag of an explicitly disabled follower previews the pose only: the hold stays through every preview.
+    static void GizmoPreviewKeepsTheDisable() {
+        var (world, sign, other, markers) = Setup();
+        var capabilities = new SceneCapabilities(() => world.MapIds, new FakeMarkerInspection(world));
+        capabilities.Add(markers);
+        var editor = new Editor(); var engine = new PatchEngine(capabilities);
+        var session = new AuthoringSession(engine, editor, new Store(), "map"); editor.Session = session;
+        var inventory = new SceneInventory(capabilities);
+        PlacementGesture Begin() { inventory.Refresh(); return new PlacementGesture(engine, session, Sign, inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, sign)))); }
+        Assert(session.Edit(Sign, null, false).Applied && sign.Held && !sign.Active && sign.Activations == 0, "The editor disables the follower");
+        var cancelled = Begin();
+        foreach (var x in new[] { 1035.0, 1036, 1037 }) {
+            var preview = cancelled.Preview(new Placement(new[] { x, 1, 2 }, new[] { 0.0, 0, 0, 1 }));
+            Assert(preview.Applied && sign.Position[0] == x - 1000, "The preview moves the disabled follower: " + preview.Error);
+            Assert(sign.Held && !sign.Active && sign.Activations == 0 && Subscription(sign) == "ela|1|held", "A preview keeps the hold and never activates the object: " + Subscription(sign) + " activations " + sign.Activations);
+        }
+        world.SetGroupEnabled("ela", false); world.SetGroupEnabled("ela", true);
+        Assert(!sign.Active && sign.Activations == 0, "Group activation during the drag keeps the object inactive");
+        Assert(cancelled.Cancel().Applied && sign.Position[0] == 20 && sign.Held && !sign.Active && sign.Activations == 0, "Cancel restores the pose under the hold");
+        var completed = Begin();
+        Assert(completed.Preview(new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 })).Applied && sign.Held && sign.Activations == 0, "A second gesture previews under the hold");
+        var outcome = completed.Complete();
+        Assert(outcome.Applied && sign.Position[0] == 40 && sign.Held && !sign.Active && sign.Activations == 0, "The completed gesture places the follower and keeps the disable: " + outcome.Error);
+        Assert((bool?)Only(session)["active"] == false && Only(session)["placement"] != null, "The modification keeps the disable beside the gesture's placement");
+        // Without a disable the preview leaves activity to the group.
+        Assert(session.ClearActivity(Sign).Applied && !sign.Held && sign.Active, "Clearing the disable still releases the hold");
+        var free = Begin();
+        Assert(free.Preview(new Placement(new[] { 1045.0, 1, 2 }, new[] { 0.0, 0, 0, 1 })).Applied && !sign.Held && sign.Active && Subscription(sign) == "ela|1", "A preview of a follower without a disable leaves group-driven activity");
+        Assert(free.Cancel().Applied && sign.Active && !sign.Held, "Cancel leaves the follower to its group");
+        world.SetGroupEnabled("ela", false);
+        Assert(!sign.Active, "The group still deactivates the follower after the gesture");
     }
 }
