@@ -42,12 +42,21 @@ sealed class PeerWorld : IDisposable {
 }
 sealed class LocalPeer : IDisposable {
     readonly LocalWorldBinding<PeerWorld> binding;
+    public int Reentries;
+    public ReentryResult LastReentry;
     public LocalPeer(Func<IScene> createScene) {
-        binding = new LocalWorldBinding<PeerWorld>(() => { var scene = createScene() ?? throw new InvalidOperationException("Scene capability unavailable"); return new PeerWorld { Scene = scene, Engine = new PatchEngine(scene) }; }, w => w.Dispose());
+        binding = new LocalWorldBinding<PeerWorld>(() => { var scene = createScene() ?? throw new InvalidOperationException("Scene capability unavailable"); return new PeerWorld { Scene = scene, Engine = new PatchEngine(scene) }; }, w => w.Dispose(),
+            w => { Reentries++; LastReentry = w.Engine.Reenter(); });
     }
     public IScene Scene => binding.State?.Scene;
+    public PatchEngine Engine => binding.State?.Engine;
     public string Error => binding.Error;
-    public bool Enter(object world) => binding.Enter(world);
+    public string ReentryError => binding.ReentryError;
+    // True when the callback starts a new load attempt; the graph instance is not part of these keys.
+    public bool Enter(object world) => binding.Enter(world, null) != WorldEntry.Repeated;
+    public WorldEntry Enter(object world, object graph) => binding.Enter(world, graph);
+    public PeerWorld Prepare(object world) => binding.Prepare(world);
+    public void Unload() { binding.EndAttempt(); }
     // Null when this world has no engine, so nothing resolves or mutates.
     public DocumentResult Apply(string json, string documentKey) => binding.State?.Engine.Apply(json, documentKey);
     public void Dispose() { binding.Dispose(); }
@@ -259,6 +268,9 @@ class Program {
         CoverageTests.Run();
         CoverageTests.RunAdditions();
         LocalWorldTests.Run();
+        RetainedWorldTests.Run();
+        CoverageTests.RunRetained();
+        SubscriptionTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

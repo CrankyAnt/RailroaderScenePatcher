@@ -9,5 +9,6 @@
     <Compile Include="../../Src/RailroaderScenePatcher/HierarchyDependencies.cs" Link="HierarchyDependencies.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/NativeMarkerLocation.cs" Link="NativeMarkerLocation.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/NativeMarkerWarnings.cs" Link="NativeMarkerWarnings.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/InstanceSubscription.cs" Link="InstanceSubscription.cs" />
   </ItemGroup>
 </Project>

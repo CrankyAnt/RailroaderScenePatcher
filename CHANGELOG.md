@@ -4,6 +4,8 @@ Notable changes to this project are recorded here, newest first.
 
 ## 0.5.0
 
+- When a player's game loads the same map again, for example on reconnect or same-map re-entry, the patcher checks each patched object instead of relying on an applied flag. Applied modifications are not duplicated, an object the game keeps keeps its state, a rebuilt object gets its modification as new, and only the patcher's own leftovers for the old object, such as detection-addition spans, are removed. A cleanup failure is reported on that player's game only and retried at the next load. In single-player, loading the same save again rebuilds the patched objects, and each modification is applied once. Live reconnect has not been tested yet.
+
 - In multiplayer, the host and every client apply the scene patches from their own installed MapMods to their own scene when their world loads, and each checks the map, target and capability locally. A failure on one player's game is reported there only. The patcher adds no synchronization or admission check; Railroader's own pack and version checks still decide who can join. Live host and client sessions with this release have not been tested yet.
 
 - Apply the scene patches of several loaded MapMods in Railroader's load order. A MapMod applies only when it declares the patcher dependency and its source map matches the loaded map or one of its layers. When MapMods change the same existing object, an informational game message names the object and the MapMods; it reports a possible incompatibility, chooses no winner and does not stop application. A failure in one MapMod's document leaves the other MapMods' work in place.

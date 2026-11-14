@@ -14,61 +14,91 @@ using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
     public sealed class EntryPoint : IModEntryPoint, IWorldLifecycle {
-        GameObject host;
+        // Reports a problem while no world state is bound, such as an unreadable world context.
+        GameObject reporter;
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
             context = value; Hooks.Install(); NativeRepairHooks.Install(this);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
         }
+        LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
         public void OnWorldLoad() {
-            if (world == null) world = new LocalWorldBinding<PatcherBehaviour>(StartWorld, _ => ReleaseHost());
-            object key;
-            try { key = WorldIdentity(); }
-            catch (Exception e) { EnsureHost().ReportWorld("Local world context unavailable: " + e.GetBaseException().Message + ". Report to the patcher maintainer."); return; }
-            // An equal key reconciles the retained world; a changed key releases this peer's state and starts a new load attempt.
-            if (!world.Enter(key)) world.State?.ApplyDocuments();
+            object map, attempt;
+            try { map = MapContext(); attempt = AttemptIdentity(); }
+            catch (Exception e) { Unbound("Local world context unavailable: " + e.GetBaseException().Message + ". Report to the patcher maintainer."); return; }
+            // The same map context keeps this peer's retained state; a changed attempt key or an earlier world unload starts a
+            // new load attempt that first reconciles that state with the actual objects. Another map context replaces it.
+            var binding = Binding();
+            binding.Enter(map, attempt);
+            var state = binding.State;
+            if (state == null) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": " + binding.Error); return; }
+            if (binding.ReentryError != null) state.ReportWorld(binding.ReentryError + ". The patcher started over for this world. Report to the patcher maintainer.");
+            if (!state.Initialized) state.Initialize(context); else state.ApplyDocuments();
         }
-        // A host created early by a native marker check during this world load becomes the bound state.
-        PatcherBehaviour StartWorld() {
-            var behaviour = EnsureHost();
-            if (behaviour.Initialized) behaviour.ApplyDocuments(); else behaviour.Initialize(context);
-            return behaviour;
-        }
-        // Scoped implementation key for this peer's local world, not a verified world
-        // identity. An equal key keeps the binding; any changed component is treated as a
-        // new load attempt. Native retained same-map behavior under this key is unverified.
-        static object WorldIdentity() {
-            var maps = String.Join("\n", PackDocuments.MapIds());
+        // The retained state belongs to the active map and layer identifiers in the editor or in play. It is a scoped
+        // implementation key, not a verified world identity; each load attempt checks every object against its identity.
+        static object MapContext() => Tuple.Create(String.Join("\n", PackDocuments.MapIds()), PackDocuments.IsEditor);
+        // A replaced map manager or track graph starts a new load attempt within the same map context. Neither establishes
+        // that the scene objects are new; the reconciliation decides that per object.
+        static object AttemptIdentity() {
             var manager = Native.Read(Native.Type("Map.Runtime.MapManager"), "Instance") ?? throw new InvalidOperationException("Map manager unavailable");
-            return Tuple.Create(maps, manager, CurrentGraph());
+            return Tuple.Create(manager, CurrentGraph());
         }
-        // Including the track graph is an unverified assumption: a replaced graph
-        // reference does not establish a genuinely new world.
         static object CurrentGraph() {
             var graphType = Native.Type("Track.Graph");
             if (graphType == null) return null;
             try { return Native.Read(graphType, "Shared"); } catch (MissingMemberException) { return null; }
         }
-        PatcherBehaviour EnsureHost() {
-            if (host == null) { host = new GameObject("CrankyAnt Scene Patcher"); UnityEngine.Object.DontDestroyOnLoad(host); host.AddComponent<PatcherBehaviour>(); }
-            return host.GetComponent<PatcherBehaviour>();
+        PatcherBehaviour CreateHost() {
+            var host = new GameObject("CrankyAnt Scene Patcher"); UnityEngine.Object.DontDestroyOnLoad(host);
+            var behaviour = host.AddComponent<PatcherBehaviour>();
+            try { behaviour.PrepareRuntime(context); }
+            catch { DestroyHost(behaviour); throw; }
+            return behaviour;
         }
+        static void DestroyHost(PatcherBehaviour behaviour) {
+            if (behaviour == null) return;
+            behaviour.Release();
+            UnityEngine.Object.Destroy(behaviour.gameObject);
+        }
+        void Unbound(string message) {
+            var state = world?.State;
+            if (state == null) {
+                if (reporter == null) { reporter = new GameObject("CrankyAnt Scene Patcher diagnostics"); UnityEngine.Object.DontDestroyOnLoad(reporter); reporter.AddComponent<PatcherBehaviour>(); }
+                state = reporter.GetComponent<PatcherBehaviour>();
+            }
+            state.ReportWorld(message);
+        }
+        // A marker check can run before the world-load callback. It opens the load attempt for the current map context,
+        // which the callback then joins.
         internal string BeforeMarkerCheck(Track.TrackMarker marker) {
-            try { return EnsureHost().BeforeMarkerCheck(context, marker); }
+            try {
+                var binding = Binding();
+                var state = binding.Prepare(MapContext());
+                if (state == null) return "Early capability prerequisites unavailable: " + binding.Error;
+                return state.BeforeMarkerCheck(context, marker);
+            }
             catch (Exception e) { return "Early capability prerequisites unavailable: " + e.GetBaseException().Message; }
         }
-        public void OnWorldUnload() { Cleanup(); }
-        public void OnModUnload() { Cleanup(); Hooks.Remove(); NativeRepairHooks.Remove(); }
-        void Cleanup() {
+        // The world's patcher state stays for a later load attempt over the same map context; the next attempt releases the
+        // state of every object that did not survive. Editor-bound parts end with the world.
+        public void OnWorldUnload() {
+            NativeRepairHooks.Reset();
+            world?.State?.EndAttempt();
+            world?.EndAttempt();
+            ReleaseReporter();
+        }
+        public void OnModUnload() {
             NativeRepairHooks.Reset();
             world?.Release();
-            ReleaseHost();
+            ReleaseReporter();
+            Hooks.Remove(); NativeRepairHooks.Remove();
         }
-        void ReleaseHost() {
-            if (host == null) return;
-            host.GetComponent<PatcherBehaviour>().Release();
-            UnityEngine.Object.Destroy(host); host = null;
+        void ReleaseReporter() {
+            if (reporter == null) return;
+            reporter.GetComponent<PatcherBehaviour>().Release();
+            UnityEngine.Object.Destroy(reporter); reporter = null;
         }
     }
     public sealed class PatcherBehaviour : MonoBehaviour {
@@ -131,7 +161,8 @@ namespace RailroaderScenePatcher {
         readonly string[] coverageFields = new string[12];
         sealed class PreparedCoverage { internal string Circuit, Addition; internal CircuitCoverage Value; internal CoveragePreview Preview; }
         PreparedCoverage preparedCoverage;
-        readonly string loadId = Guid.NewGuid().ToString("N");
+        // Scopes native warning deduplication to one load attempt.
+        string loadId = Guid.NewGuid().ToString("N");
         internal void Initialize(IModContext value) {
             context = value;
             Initialized = true;
@@ -192,7 +223,7 @@ namespace RailroaderScenePatcher {
                 Report("capability", status);
             }
         }
-        void PrepareRuntime(IModContext value) {
+        internal void PrepareRuntime(IModContext value) {
             if (engine != null) return;
             context = value; editor = PackDocuments.IsEditor;
             native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
@@ -221,6 +252,10 @@ namespace RailroaderScenePatcher {
         }
         internal void ApplyDocuments() {
             if (engine == null) return;
+            if (world != null) {
+                try { world.Rebind(); }
+                catch (Exception e) { Report("terrain-rebind", "Terrain completion for independent boards is unavailable in this load: " + e.GetBaseException().Message + ". Reload the map. Report to the patcher maintainer."); }
+            }
             IReadOnlyList<LoadedDocument> documents;
             try { documents = runtime.ApplyLoaded(PackDocuments.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
             catch (Exception e) { Report("discovery", "Loaded MapMod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
@@ -432,6 +467,31 @@ namespace RailroaderScenePatcher {
             if (authoring == null || selected == null || !Editable) return "";
             var output = OutputOf(authoring.Session, selected.Identity, out var problem);
             return problem ?? String.Join("|", String.Join(";", output.Completed), String.Join(";", output.Outstanding), output.Error);
+        }
+        // Starts a new load attempt over the retained world. The engine keeps the captured state and guards of objects that
+        // still stand under their identities and releases the rest; diagnostics, overlap notices and editor views start over.
+        internal void BeginAttempt() {
+            if (engine == null) return;
+            EndAttempt();
+            var reentry = engine.Reenter();
+            runtime = new PatchRuntime(engine, nativeDiagnostics, Version, Application.version);
+            overlapNotices = null;
+            // Warnings not yet delivered belong to the previous load attempt.
+            reported.Clear(); diagnostics.Clear(); pendingWarnings.Clear(); pendingNotices.Clear();
+            loadId = Guid.NewGuid().ToString("N"); presentationErrorLogged = false;
+            if (inventory != null) { inventory = new SceneInventory(native); staleLogged = true; }
+            selected = null; selectionProblem = null; documentInspection = ""; documentStamp = null; definitionsStale = true;
+            preparedCoverage = null; coverageCircuit = null; coverageAddition = null;
+            status = "Load attempt over the retained world";
+            context?.Log.Info("Scene Patcher " + Version + ": load attempt over the retained world; " + reentry.Retained + " objects retained, " + reentry.Released + " released, " + reentry.Failures.Count + " cleanup failures");
+            // Local only: no other peer is told, rolled back or disconnected.
+            foreach (var failure in reentry.Failures)
+                Report("reentry/" + failure, "Retained world cleanup is incomplete on this peer: " + failure + ". The patcher retries at the next load; reload the map to clear it. Report to the patcher maintainer.");
+        }
+        // Ends the load attempt: parts bound to the editor of this world end with it; the world's patcher state stays.
+        internal void EndAttempt() {
+            presentation?.Dispose(); presentation = null; attachedEditor = null; refusedEditor = null;
+            Detach(); selection?.Cancel();
         }
         internal void Release() { ReleaseParts(); }
         void ReleaseParts() {

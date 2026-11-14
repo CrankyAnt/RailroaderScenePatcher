@@ -189,7 +189,7 @@ namespace RailroaderScenePatcher.Core {
     // circuit the patcher owns, with owned spans for explicitly selected extra tracks, evaluated after the native circuits. The native spans stay registered
     // and unchanged, so another consumer keeps them; the crossing simply stops evaluating them. Proximity never assigns
     // coverage, and the crossing object itself is never moved or disabled by this capability.
-    public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene {
+    public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene {
         public const string Structure = "crossing-coverage-v1", RequiredVersion = "0.5.0", ComponentType = "Track.Crossings.GradeCrossingController";
         const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
         sealed class Circuit { internal string Key; internal object Set; internal object[] Original; }
@@ -237,6 +237,17 @@ namespace RailroaderScenePatcher.Core {
             if (baseline.Circuits.Count == 0) throw new InvalidOperationException("The crossing has no circuits");
             baselines.Add(target, baseline);
             return baseline;
+        }
+        // Removes the spans the patcher owns for a crossing that no longer stands under its identity, and forgets the crossing.
+        // Native spans and circuits are never touched. Spans that stay registered remain owned, so the next release retries them.
+        public void Release(object target) {
+            if (!baselines.TryGetValue(target, out var baseline)) return;
+            string problem = null;
+            foreach (var span in baseline.Owned.ToList()) {
+                try { Retire(baseline, span); } catch (Exception e) { problem = problem ?? e.Message; }
+            }
+            if (baseline.Owned.Count > 0) throw new InvalidOperationException("owned span " + String.Join(", ", baseline.Owned.Select(world.SpanId)) + " remains registered" + (problem == null ? "" : ": " + problem));
+            baselines.Remove(target);
         }
         public void Preflight(object target) {
             var problem = world.PatternProblem(target);

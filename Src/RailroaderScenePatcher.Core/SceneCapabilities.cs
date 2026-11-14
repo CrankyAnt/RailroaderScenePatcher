@@ -9,7 +9,7 @@ namespace RailroaderScenePatcher.Core {
     // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
     // the capability that resolved it. A capability that is incompatible with the running game build fails
     // only the modifications that name its structure; unrelated supported work stays available.
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene {
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }
@@ -59,6 +59,12 @@ namespace RailroaderScenePatcher.Core {
             return owner;
         }
         public void Preflight(object target) { Owner(target).Preflight(target); }
+        // The adapter that resolved the object releases its own state for it; the object then has no owner.
+        public void Release(object target) {
+            if (target == null || !owners.TryGetValue(target, out var owner)) return;
+            (owner as IRetainedScene)?.Release(target);
+            owners.Remove(target);
+        }
         // Throws the incompatibility of a capability whose game functions are missing, when the target is its placeholder.
         internal void CheckAvailable(object target) { if (target is Unavailable) Owner(target); }
         public object Capture(object target) => Owner(target).Capture(target);

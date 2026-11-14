@@ -18,9 +18,10 @@ namespace RailroaderScenePatcher {
         internal const string MaskType = "Map.Runtime.MaskComponents.CircleMapMask";
         internal const string Structure = IndependentBoards.Structure;
         readonly Type transformer, culler, mask, maskBase;
-        readonly object terrain;
+        object terrain;
         readonly EventInfo tileEvent;
         readonly Action<Bounds> tileHandler;
+        readonly InstanceSubscription tiles;
         readonly FieldInfo token, keys, spheres, maskStorage, heightStorage, storedModifiers, flatten;
         readonly MethodInfo invalidate, tileOf, held;
         public event Action<double[], double[]> TileBuilt;
@@ -54,7 +55,8 @@ namespace RailroaderScenePatcher {
             Native.Read(terrain, "PendingInvalidationCount");
             Native.Call(terrain, "IsTerrainWorkIdle");
             tileHandler = OnTileBuilt;
-            tileEvent.AddEventHandler(terrain, tileHandler);
+            tiles = new InstanceSubscription(t => tileEvent.AddEventHandler(t, tileHandler), t => tileEvent.RemoveEventHandler(t, tileHandler));
+            tiles.Bind(terrain);
         }
         internal static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
         static GameObject Board(object board) => board as GameObject ?? throw new InvalidOperationException("The board no longer exists");
@@ -135,6 +137,15 @@ namespace RailroaderScenePatcher {
             return value;
         }
         static float CheckedFloat(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("Coordinate exceeds native precision"); return f; }
-        public void Dispose() { tileEvent.RemoveEventHandler(terrain, tileHandler); }
+        // A load attempt over a retained world can find a replaced map manager. Terrain calls and the completion event then
+        // move to the current instance, so the board keeps exactly one subscription. Without a current instance nothing changes.
+        internal void Rebind() {
+            var current = Native.Read(Native.Type("Map.Runtime.MapManager"), "Instance");
+            if ((current as UnityEngine.Object) == null || ReferenceEquals(current, terrain)) return;
+            if (current.GetType().GetEvent("OnTileBuilt", Native.Flags) != tileEvent) throw new MissingMemberException("Terrain completion event unavailable");
+            tiles.Bind(current);
+            terrain = current;
+        }
+        public void Dispose() { tiles.Dispose(); }
     }
 }

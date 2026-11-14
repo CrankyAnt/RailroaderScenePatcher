@@ -70,6 +70,20 @@ namespace RailroaderScenePatcher.Core {
         public bool EditorOnly { get; internal set; }
         public TargetIdentity Target { get; internal set; }
     }
+    // A capability that keeps state for the objects it resolved. Release drops that state for an object that no longer
+    // stands under its identity in a later load attempt, and removes only what the patcher owns for it; native state is
+    // never changed. It throws when owned state remains, and keeps what remains so a later load attempt retries.
+    public interface IRetainedScene { void Release(object target); }
+    // The outcome of reconciling a retained world at the start of a new load attempt.
+    public sealed class ReentryResult {
+        internal ReentryResult(int retained, int released, IReadOnlyList<string> failures) { Retained = retained; Released = released; Failures = failures; }
+        // Targets that still stand under their identities; their captured state and guards carry over.
+        public int Retained { get; }
+        // Targets whose state was released because they no longer stand under their identities.
+        public int Released { get; }
+        // Local cleanup failures. The affected target stays recorded so the next load attempt retries its release.
+        public IReadOnlyList<string> Failures { get; }
+    }
     public sealed class DocumentResult {
         public string Error { get; internal set; }
         public IReadOnlyDictionary<string, Outcome> Outcomes { get; internal set; }
@@ -83,6 +97,14 @@ namespace RailroaderScenePatcher.Core {
         // Restored targets whose dependent output, such as regenerated terrain, has not yet verified.
         readonly HashSet<object> awaitingOutput = new HashSet<object>();
         readonly Dictionary<object, ObjectState> underlying = new Dictionary<object, ObjectState>();
+        // The identity each object was resolved under, in resolution order, so a later load attempt can tell a retained
+        // object from a reconstructed one.
+        readonly Dictionary<object, TargetIdentity> identities = new Dictionary<object, TargetIdentity>(new ByReference());
+        readonly List<object> resolutionOrder = new List<object>();
+        sealed class ByReference : IEqualityComparer<object> {
+            public new bool Equals(object a, object b) => ReferenceEquals(a, b);
+            public int GetHashCode(object value) => RuntimeHelpers.GetHashCode(value);
+        }
         // Addition IDs that more than one modification of the document being applied uses.
         HashSet<string> sharedAdditions = new HashSet<string>(StringComparer.Ordinal);
         internal IScene Scene { get { return scene; } }
@@ -102,6 +124,33 @@ namespace RailroaderScenePatcher.Core {
 #endif
         }
         public PatchEngine(IScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
+        void Track(TargetIdentity identity, object target) {
+            if (target == null || identities.ContainsKey(target)) return;
+            identities.Add(target, identity); resolutionOrder.Add(target);
+        }
+        // Starts a new load attempt over the retained world. An object that still resolves under its recorded identity
+        // keeps its captured underlying state and its unverified-cleanup guard. Any other object is released: the engine
+        // forgets it and an IRetainedScene removes what the patcher owns for it. Failures recorded in the previous attempt
+        // are retried in this one. A failed release is reported and retried by the next load attempt.
+        public ReentryResult Reenter() {
+            failed.Clear();
+            int retained = 0, released = 0;
+            var failures = new List<string>();
+            foreach (var target in resolutionOrder.ToArray()) {
+                var identity = identities[target];
+                bool present;
+                try { present = (scene.Resolve(identity) ?? Array.Empty<object>()).Any(m => ReferenceEquals(m, target)); }
+                catch (Exception e) { failures.Add(Describe(identity) + ": the retained object could not be checked, so its state is kept: " + e.Message); retained++; continue; }
+                if (present) { retained++; continue; }
+                try { (scene as IRetainedScene)?.Release(target); }
+                catch (Exception e) { failures.Add(Describe(identity) + ": owned state of the reconstructed object remains: " + e.Message); continue; }
+                identities.Remove(target); resolutionOrder.Remove(target);
+                underlying.Remove(target); unsafeTargets.Remove(target); awaitingOutput.Remove(target);
+                released++;
+            }
+            return new ReentryResult(retained, released, failures);
+        }
+        static string Describe(TargetIdentity identity) => identity.Scene + "/" + identity.Path + " [" + identity.Component + "]";
         public DocumentResult Apply(string json) { return Apply(json, ""); }
         public DocumentResult Apply(string json, string documentKey) {
             return Apply(json, documentKey, null);
@@ -204,6 +253,7 @@ namespace RailroaderScenePatcher.Core {
                 var matches = scene.Resolve(identity);
                 if (matches == null || matches.Count != 1 || matches[0] == null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException("Target must resolve uniquely"); }
                 var resolved = matches[0];
+                Track(identity, resolved);
                 var mapContext = scene.MapIds.ToArray();
                 InspectedTarget expected = null;
                 if (inspectedTargets != null && (!inspectedTargets.TryGetValue(id, out expected) || expected == null))
@@ -248,6 +298,7 @@ namespace RailroaderScenePatcher.Core {
         internal object ResolveUnique(TargetIdentity identity) {
             var matches = scene.Resolve(identity);
             if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target must resolve uniquely");
+            Track(identity, matches[0]);
             return matches[0];
         }
         // The immediate guard before any mutation: same prerequisites, same unique object, same map context,
