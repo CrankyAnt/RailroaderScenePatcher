@@ -1,0 +1,17 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../Src/RailroaderScenePatcher.Core/RailroaderScenePatcher.Core.csproj" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../Src/RailroaderScenePatcher/InventoryPresentationState.cs" Link="InventoryPresentationState.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/EditFeedback.cs" Link="EditFeedback.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/CommandBand.cs" Link="CommandBand.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/SuppliedDefinitions.cs" Link="SuppliedDefinitions.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/InspectedOutput.cs" Link="InspectedOutput.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/HierarchyDependencies.cs" Link="HierarchyDependencies.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/NativeMarkerLocation.cs" Link="NativeMarkerLocation.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/NativeMarkerWarnings.cs" Link="NativeMarkerWarnings.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/InstanceSubscription.cs" Link="InstanceSubscription.cs" />
+  </ItemGroup>
+</Project>

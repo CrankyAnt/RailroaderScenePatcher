@@ -47,4 +47,4 @@ The hygiene caller may set `zizmor-persona` to `pedantic` or `auditor`, for a st
 
 ## Repository choices
 
-None.
+The product-owned `core-tests.yml` runs complete-document behavioral tests on Ubuntu 24.04 with .NET 10. It selects changes to the engine, tests, the linked native adapter and panel sources the tests compile, common build properties and its own workflow by their fixed paths. Native mod builds require a local Railroader installation and remain a separate local validation command. Hosted timing remains unmeasured until the first published run. The shared catalogue at `v1` lists no reusable .NET test runner.

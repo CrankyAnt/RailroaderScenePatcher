@@ -1,0 +1,23 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+# Select targets in the world
+
+Open **Scene patches** in the map editor. Choose **Select in world** in the command band and click an object marking. The markings use the positions of supported inventory objects, including inactive objects. Check the candidate's name, scene, path, component, and any identifiers in its binding details, under **Details**. The footer's first message slot, under **World choice**, gives a short purpose, such as `Pick an object in the world.`, and shows the candidate as a blue `New: …` line; with several candidates it starts with `N candidates; see Details`. Choose **Confirm** in the footer to select that object for inspection. For an editable object, the fields of **Numeric** mode on the **Placement** tab then show the inspected pose.
+
+You can click the square marking, the outlined object bounds, or a displayed identity label. Labels keep a fixed screen text size on their opaque label backing. Markings and labels stay outside native windows and controls. The colors follow the panel: the inspected object gets a gold frame and an `Object: …` label, with a red rule on the label when it has a detected problem; a blue `New: …` marks the candidate of a choice, other choices are neutral `Choice: …` markings, and a green `Confirmed: …` marks a confirmed target while its object is inspected.
+
+Expanded object bounds come from enabled renderers on active objects. An inactive object remains selectable through its drawn square marker and identity label. During a replacement choice, when the source object is also offered in an overlap, its label reads `Object / Choice: …` until you choose it.
+
+With a scene object inspected, select **Object**, **Segment** or **Node** in the **Replacement targets** section of the **Connections** tab. The gold frame and the `Object: …` label identify the source object the choice belongs to. For a segment, point at its track in the world. For a node, click its marking. The footer's first message slot shows the candidate as a blue `New: …` under **World choice**, and **Details** shows its identity: the segment ID and both endpoint IDs, or the node ID and map position.
+
+Hovering a track shows the selectable ribbon around its curve, covering the rails and ties with a minimum screen width at a distance. Clicking a shared endpoint or overlapping ribbons offers every matching candidate for an explicit choice.
+
+The blue marking labelled `New: …` identifies the candidate under consideration. If several candidates overlap at the pointer, open **Details** and choose one of the **Choose** buttons there, or move the camera and pick again. Use **Focus** in the footer to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source.
+
+Choose **Confirm** in the footer after checking the candidate. The confirmed identity is recorded in the loaded map context and shown in the footer's first message slot, under **World choice**, as a green `Confirmed: …` while the object it was chosen for is inspected. A choice made by **Select in world** alone, without a source object, does not show it there. If the candidate is missing, ambiguous, or has changed since the pick, select it again after checking the world. If the source or loaded map context changed, cancel and start again.
+
+Confirmation is refused for an object that shares its scene, path and component with another object: a patch names its target by those three and cannot tell the two apart. The refusal names the shared identity. Such an object can be inspected, but it cannot be edited or chosen; pick an object whose path is unique. Use **Cancel** in the footer to close a pending choice. A pending choice does not change the scene, patch document, or completed edit history. Confirmation records a choice for an editor operation. The [v1 document reference](scene-patch-document-v1.md) describes the supported patch fields and application behavior.
+
+Confirm or cancel the choice before applying placement or activity changes in **Scene patches**. Completed edits still use the map editor's **Undo**, **Redo**, and **Save** controls. See [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md).
+
+For a one-time physical placement, use **Track** or **Node** in **Snap** mode on the **Placement** tab. Confirmation prepares the result; **Apply** makes the edit. See [snap an object's position to a track](snapping-to-track.md). The replacement choices above confirm identities without changing logical binding.

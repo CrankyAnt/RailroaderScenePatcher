@@ -2,7 +2,7 @@
 
 A Railroader mod that lets map modders use JSON to reposition, rotate, enable or disable existing scene objects unsupported by the map editor, including objects with track markers. Required as a runtime dependency, it applies these changes and repairs supported track-marker references whenever a map loads.
 
-> **Status:** Planning phase. Not yet available for use.
+> **Status:** Under development. Not yet available for use.
 
 Author: CrankyAnt
 
@@ -11,6 +11,10 @@ Author: CrankyAnt
 For map makers whose track changes leave existing signs, bridges or other scene objects in the wrong place, or break their track-marker references.
 
 Players using map mods that depend on Railroader Scene Patcher need to keep it installed and enabled for those changes to take effect.
+
+If a patch fails while loading a map, the game warning identifies the supplying MapMod, its identifier and version, the operation, object and error, plus the patcher and game versions. Send invalid definitions to the MapMod author. Send unknown failures or a demonstrated patcher fault to the patcher maintainer. The warning may include author and website details supplied by the MapMod. The patcher does not provide a separate support channel.
+
+With several such map mods, the patcher applies their changes in Railroader's load order. If two of them change the same object, the game shows an information message that names the object and the map mods. It means the combination might not work as either author intended; it is not an error and does not mean they conflict. The patcher does not choose between them: where both set the same property, the mod loaded later sets its final value. Check the mods' descriptions to decide whether to use them together.
 
 ## License
 

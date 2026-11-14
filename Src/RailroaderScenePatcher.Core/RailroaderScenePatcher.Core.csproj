@@ -1,0 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
+<!-- SPDX-License-Identifier: MIT -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.0</TargetFramework></PropertyGroup>
+  <ItemGroup><PackageReference Include="Newtonsoft.Json" Version="13.0.2" /></ItemGroup>
+</Project>
