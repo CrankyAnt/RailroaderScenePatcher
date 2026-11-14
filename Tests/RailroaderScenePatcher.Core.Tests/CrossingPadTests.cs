@@ -115,6 +115,7 @@ static class CrossingPadTests {
     public static void Run() {
         RebindRegeneratesGeometry();
         RepetitionAndReplacementConverge();
+        ASavedMeshUnderThePadContainerIsOutput();
         UnknownGeneratedSourceIsRegeneratedOnce();
         UnresolvedInputsChangeNothing();
         DetachIsRefusedBeforeMutation();
@@ -163,6 +164,20 @@ static class CrossingPadTests {
     }
     // Geometry the game generated at load has no recorded source: the first application regenerates it once from the
     // authored location, and later applications converge without regeneration.
+    // A pad can carry a mesh object that was saved with the scene under the builder's container. The first generation
+    // destroys it and builds a runtime one. Neither is a dependency, so the pad's dependency lines stay the same.
+    static void ASavedMeshUnderThePadContainerIsOutput() {
+        RailroaderScenePatcher.HierarchyPart Part(string label, bool createdAtRuntime, bool belowContainer) =>
+            new RailroaderScenePatcher.HierarchyPart(label, null, RailroaderScenePatcher.HierarchyDependencies.IsOutput(createdAtRuntime, belowContainer));
+        var before = new[] { Part("pad [Track.TrackMarker]", false, false), Part("pad [Track.TrackCurveMeshBuilder]", false, false), Part("pad/Curve Mesh [UnityEngine.MeshFilter]", false, true), Part("pad/Curve Mesh [UnityEngine.MeshRenderer]", false, true) };
+        var after = new[] { Part("pad [Track.TrackMarker]", false, false), Part("pad [Track.TrackCurveMeshBuilder]", false, false), Part("pad/Curve Mesh [UnityEngine.MeshFilter]", true, true), Part("pad/Curve Mesh [UnityEngine.MeshRenderer]", true, true) };
+        var never = new[] { Part("pad [Track.TrackMarker]", false, false), Part("pad [Track.TrackCurveMeshBuilder]", false, false) };
+        var lines = RailroaderScenePatcher.HierarchyDependencies.Describe(true, before).ToArray();
+        if (!lines.SequenceEqual(RailroaderScenePatcher.HierarchyDependencies.Describe(true, after)) || !lines.SequenceEqual(RailroaderScenePatcher.HierarchyDependencies.Describe(true, never)))
+            throw new Exception("A saved mesh, a generated mesh and no mesh under the pad's container give the same dependency lines: " + String.Join(" | ", lines));
+        if (lines.Any(line => line.Contains("Curve Mesh")) || lines.Length != 3) throw new Exception("The pad's dependencies name no mesh component: " + String.Join(" | ", lines));
+        if (RailroaderScenePatcher.HierarchyDependencies.IsOutput(false, false)) throw new Exception("A saved component outside the container is authored");
+    }
     static void UnknownGeneratedSourceIsRegeneratedOnce() {
         var (world, pad, rear, scene) = Setup();
         var engine = new PatchEngine(scene);

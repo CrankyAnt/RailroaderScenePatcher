@@ -223,10 +223,27 @@ namespace RailroaderScenePatcher.Core {
         public const string TrackFollowingVersion = "0.5.0";
         static string Max(string a, string b) { return DependencyMetadata.Number(b) > DependencyMetadata.Number(a) ? b : a; }
         // Dependent native writes that follow the object's edits, such as terrain output regenerated from a board mask. Save does not write them.
-        public DependentOutput Output(TargetIdentity target) {
-            try { return engine.Output(engine.ResolveUnique(target)); }
-            catch (InvalidOperationException) { return DependentOutput.None; }
+        public DependentOutput Output(TargetIdentity target) { return OutputOf(Resolve(target)); }
+        // Whether the active document holds a modification of this target. Read from the document alone, without
+        // searching the scene, so a list can ask for every row. A target without a structure matches any structure.
+        public bool IsChanged(TargetIdentity target) {
+            if (document == null || target == null) return false;
+            foreach (var item in document.Modifications.OfType<JObject>()) {
+                var other = item["target"] as JObject;
+                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
+                if (structure == null || target.Structure == null || structure == target.Structure) return true;
+            }
+            return false;
         }
+        // The object a target resolves to uniquely, or null. This searches the scene; a caller that reads output every
+        // frame resolves once and reads OutputOf.
+        public object Resolve(TargetIdentity target) {
+            try { return engine.ResolveUnique(target); }
+            catch (InvalidOperationException) { return null; }
+        }
+        // The dependent output of an object already resolved, without searching the scene.
+        public DependentOutput OutputOf(object resolved) { return engine.Output(resolved); }
         // Requests outstanding dependent writes again. The edit and the document are unchanged.
         public Outcome RetryOutput(TargetIdentity target, InspectedTarget inspected = null) {
             var outcome = new Outcome();
@@ -327,7 +344,29 @@ namespace RailroaderScenePatcher.Core {
         // Moves every object of the active document that follows a track to its placement relative to the track's current
         // native pose. Neither the document nor the history changes. Each moved or failed object is reported by its
         // modification ID; a failure restores the object's prior state or guards it until a recheck.
+        // Reconciliation runs several times a second, and it resolves the target of every modification in the document
+        // to compute a followed object's desired state. Resolving searches the whole scene. A resolved target is therefore
+        // kept while the scene confirms it is still that object, and resolved again every fortieth reconciliation, ten
+        // seconds at four a second, so a second object of the same identity is still noticed. A scene without that
+        // confirmation is searched every time. The guard before a mutation always searches afresh.
+        readonly Dictionary<string, KeyValuePair<object, int>> reconciled = new Dictionary<string, KeyValuePair<object, int>>(StringComparer.Ordinal);
+        const int ReconcileResolveInterval = 40;
+        int reconciliations;
+        object ReconcileTarget(TargetIdentity identity) {
+            var key = identity.Scene + "|" + identity.Path + "|" + identity.Component + "|" + identity.Structure;
+            if (scene is ITargetLiveness liveness && reconciled.TryGetValue(key, out var known) && reconciliations - known.Value < ReconcileResolveInterval && liveness.IsLive(known.Key, identity)) return known.Key;
+            reconciled.Remove(key);
+            var resolved = engine.ResolveFresh(identity);
+            reconciled[key] = new KeyValuePair<object, int>(resolved, reconciliations);
+            return resolved;
+        }
         public IReadOnlyList<KeyValuePair<string, Outcome>> ReconcileTrackFollowing() {
+            reconciliations++;
+            engine.ResolveOverride = ReconcileTarget;
+            try { return ReconcileFollowing(); }
+            finally { engine.ResolveOverride = null; }
+        }
+        IReadOnlyList<KeyValuePair<string, Outcome>> ReconcileFollowing() {
             var results = new List<KeyValuePair<string, Outcome>>();
             if (document == null || Blocked != null) return results;
             var items = document.Modifications.OfType<JObject>().ToList();
@@ -582,6 +621,8 @@ namespace RailroaderScenePatcher.Core {
             return outcome;
         }
         // Runs inside native Undo or Redo. It must not throw: an exception there corrupts the native grouping.
+        // Raised after Undo or Redo replayed one of this session's own edits on the target.
+        public Action<TargetIdentity> Replayed;
         void Replay(string name, string slot, TargetIdentity target, JObject value, int index) {
             var current = document.Modifications.OfType<JObject>().FirstOrDefault(m => (string)m["id"] == slot);
             var position = index;
@@ -589,6 +630,8 @@ namespace RailroaderScenePatcher.Core {
                 var resolved = engine.ResolveUnique(target);
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
                 position = Commit(target, resolved, null, current, value, index);
+                // Undo and Redo of this patcher's own step changed this object; the owner observes it again.
+                try { Replayed?.Invoke(target); } catch { }
             } catch (Exception e) {
                 value = current;
                 uncertain = true;

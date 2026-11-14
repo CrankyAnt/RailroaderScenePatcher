@@ -61,7 +61,44 @@ namespace RailroaderScenePatcher {
         internal static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
         static GameObject Board(object board) => board as GameObject ?? throw new InvalidOperationException("The board no longer exists");
         public IReadOnlyList<object> Find(string scene, string path) =>
-            Resources.FindObjectsOfTypeAll<GameObject>().Where(g => g.scene.IsValid() && g.scene.isLoaded && g.scene.name == scene && PathOf(g.transform) == path && g.GetComponent(culler) != null).Cast<object>().ToArray();
+            LoadedAt(scene, path).Where(g => g != null && g.GetComponent(culler) != null).Cast<object>().ToArray();
+        // The loaded objects at a scene and path. The walk goes down from the roots of the scenes of that name and follows
+        // only the children whose name continues the path, so its cost follows the path and not the size of the scene.
+        // A name may hold a slash; each child is therefore matched against the rest of the path, not against a segment.
+        internal static IReadOnlyList<GameObject> LoadedAt(string scene, string path) {
+            var found = new List<GameObject>(); var listed = false;
+            for (var i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++) {
+                var loaded = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+                if (!loaded.IsValid() || !loaded.isLoaded || loaded.name != scene) continue;
+                listed = true;
+                foreach (var root in loaded.GetRootGameObjects()) if (root != null) Descend(root.transform, path, found);
+            }
+            return listed ? found : Everywhere(scene, path);
+        }
+        static void Descend(Transform transform, string rest, List<GameObject> found) {
+            var name = transform.name;
+            if (rest == name) { found.Add(transform.gameObject); return; }
+            if (rest.Length <= name.Length || rest[name.Length] != '/' || !rest.StartsWith(name, StringComparison.Ordinal)) return;
+            var below = rest.Substring(name.Length + 1);
+            for (var i = 0; i < transform.childCount; i++) Descend(transform.GetChild(i), below, found);
+        }
+        // A scene the scene manager does not list, such as the one of objects kept across loads: every loaded object is
+        // walked and its path built, so one walk serves every question asked in the same frame.
+        static Dictionary<string, List<GameObject>> located;
+        static int locatedFrame = -1;
+        static IReadOnlyList<GameObject> Everywhere(string scene, string path) {
+            if (located == null || locatedFrame != Time.frameCount) {
+                located = new Dictionary<string, List<GameObject>>(StringComparer.Ordinal);
+                foreach (var g in Resources.FindObjectsOfTypeAll<GameObject>()) {
+                    if (!g.scene.IsValid() || !g.scene.isLoaded) continue;
+                    var key = g.scene.name + "\n" + PathOf(g.transform);
+                    if (!located.TryGetValue(key, out var list)) located.Add(key, list = new List<GameObject>());
+                    list.Add(g);
+                }
+                locatedFrame = Time.frameCount;
+            }
+            return located.TryGetValue(scene + "\n" + path, out var found) ? found : (IReadOnlyList<GameObject>)Array.Empty<GameObject>();
+        }
         public BoardFacts Facts(object target) {
             var board = Board(target);
             var cull = board.GetComponent(culler) as Behaviour;

@@ -8,21 +8,21 @@ The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `W
 
 ## Move the bridge in the editor
 
-1. Open **Scene patches**, select **Refresh inventory and verify stored target identities**, search for `Ela Bridge` and select its row of the `Bridge` family in the inventory list. **Select scene object in world** with a click on the bridge's marking also selects it, as described in [select world targets](select-world-targets.md). Its identity shows the structure `bridge-colliders-v1`. If the entry lists **Bridge placement unavailable**, the bridge does not match the supported pattern and the reason follows.
-2. Select **Focus inspected object** to see the bridge and the track beside it.
-3. Change the six fields: position in map coordinates and rotation in degrees. Select **Apply placement**.
+1. Open **Scene patches**, select **Refresh** in the command band, search for `Ela Bridge` and select its row in the outliner. **Select in world** with a click on the bridge's marking also selects it, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `bridge-colliders-v1`. If **Detected problems** on the **Object** tab lists **Bridge placement unavailable**, the bridge does not match the supported pattern and the reason follows.
+2. Select **Focus** in the command band to see the bridge and the track beside it.
+3. On the **Placement** tab, in **Numeric** mode, change the six fields: position in map coordinates and rotation in degrees. Select **Apply** in the footer.
 
-The bridge root moves at once, with every collider below it. Save, Undo, Redo and **Remove modification** work as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Removal returns the bridge to the pose the loaded map gives it.
+The bridge root moves at once, with every collider below it. Save, Undo, Redo and **Remove** on the **Changes** tab work as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Removal returns the bridge to the pose the loaded map gives it.
 
 Moving the bridge away from its track leaves the track and the sampled nearby trestles where they were. How trains behave on a moved or disabled bridge has not been tested. Check the result in the world: the patcher does not align the bridge with the track for you.
 
 ## Disable or enable the bridge
 
-Select **Disable object**. The bridge disappears and its colliders stop colliding. The colliders keep their own enabled settings, so **Enable object**, Undo or removal brings back the same collision. In the inspected build, the construction-scenery controller references the bridge's abutments and steel below the root, not the root itself, and the patcher refuses a bridge whose root is a construction target. A later construction-state transition has not been tested, so it is unverified whether an explicit disable holds through one.
+Select **Disable** in the footer of the **Object** tab. The bridge disappears and its colliders stop colliding. The colliders keep their own enabled settings, so **Enable**, Undo or removal brings back the same collision. In the inspected build, the construction-scenery controller references the bridge's abutments and steel below the root, not the root itself, and the patcher refuses a bridge whose root is a construction target. A later construction-state transition has not been tested, so it is unverified whether an explicit disable holds through one.
 
 ## Write the modification by hand
 
-Copy the inspected identity with **Copy inspected identity** and add it to `Data/scene-patches.json` as described in [scene-patch document v1](scene-patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add it to `Data/scene-patches.json` as described in [scene-patch document v1](scene-patch-document-v1.md):
 
 ```json
 {
@@ -54,7 +54,7 @@ Before it touches the bridge, the patcher requires:
 - no construction-scenery entry that switches the bridge root,
 - the same colliders, shapes and positions relative to the root that the bridge had when the patcher first saw it in this load.
 
-After each change it checks that the root has the authored pose and activity, that every collider kept its identity, shape and position relative to the root, that collider activity follows the root, and that the nearby generated trestles and the construction-scenery controller did not change. Any difference fails the modification and restores the bridge. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the bridge until **Recheck after failed edit** succeeds or the world reloads.
+After each change it checks that the root has the authored pose and activity, that every collider kept its identity, shape and position relative to the root, that collider activity follows the root, and that the nearby generated trestles and the construction-scenery controller did not change. Any difference fails the modification and restores the bridge. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the bridge until **Recheck** succeeds or the world reloads.
 
 ## Limits
 

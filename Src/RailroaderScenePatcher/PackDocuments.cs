@@ -20,11 +20,17 @@ namespace RailroaderScenePatcher {
         string InfoPath => Path.Combine(root, "Info.json");
         public string ReadPatchDocument() => File.Exists(PatchPath) ? PackDocuments.ReadUtf8(PatchPath) : null;
         public string ReadPackInfo() => File.Exists(InfoPath) ? PackDocuments.ReadUtf8(InfoPath) : null;
-        public void WritePatchDocument(string text) { Directory.CreateDirectory(Path.GetDirectoryName(PatchPath)); File.WriteAllBytes(PatchPath, PackDocuments.Utf8.GetBytes(text)); }
+        public void WritePatchDocument(string text) {
+            Directory.CreateDirectory(Path.GetDirectoryName(PatchPath)); File.WriteAllBytes(PatchPath, PackDocuments.Utf8.GetBytes(text));
+            // The owner learns the exact text that is on disk now: its own write is no outside change of the document.
+            try { PackDocuments.Written?.Invoke(text); } catch { }
+        }
         public void WritePackInfo(string text) { File.WriteAllBytes(InfoPath, PackDocuments.Utf8.GetBytes(text)); }
     }
     internal static class PackDocuments {
         internal const string ModId = LoadedPack.PatcherId;
+        // Raised after the patcher wrote the active edited MapMod's patch document, with the written text.
+        internal static Action<string> Written;
         internal static readonly Encoding Utf8 = new UTF8Encoding(false, true);
         internal static string ReadUtf8(string path) {
             var bytes = File.ReadAllBytes(path);

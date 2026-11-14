@@ -95,6 +95,22 @@ static class InspectionTests {
         ComponentsLeavingDuringAPass();
         EditFeedbackNamesEveryRefusal();
         StaleNoticePromisesOnlyWhatPinRefuses();
+        ProblemsFilterLimitsTheOutliner();
+        RuntimeStateDoesNotMarkStale();
+        RuntimeReferencesAreNotAuthoredState();
+        AnEditScansTheSceneTwice();
+        AnEditAfterASteppedPassBlocksForOneScan();
+        OriginRoundingDoesNotMarkStale();
+        TheGuardObservesOnlyTheTarget();
+        AnObjectOutsideTheMovingOriginDoesNotMarkStale();
+        CullerDrivenActivityDoesNotMarkStale();
+        AnOwnEditTakesItsRelatedObservations();
+        AComparedSnapshotPinsWithoutAScan();
+        FollowUpsKeepTheActionResultVisible();
+        AutoFitSizesTheOutlinerToMostNames();
+        ResultsBelongToTheInspectedObject();
+        MessagesKeepTheirSourceNewestFirst();
+        RepeatedMessagesCollapse();
         Console.WriteLine("PASS: inventory classification and dependencies");
     }
 
@@ -236,7 +252,7 @@ static class InspectionTests {
         box.X = 8; inventory.CheckFreshness();
         foreach (var definitionsStale in new[] { false, true }) {
             notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, definitionsStale);
-            Check(notice == "Inventory is stale: scene/p [Culler] changed or is missing. Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
+            Check(notice == "Inventory is stale: scene/p [Culler] changed (position). Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
                 "A stale inventory names its own reason and the refusal, whatever the definitions: " + notice);
         }
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(null, false);
@@ -256,7 +272,7 @@ static class InspectionTests {
 
         box.X = 8;
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 0 && box.X == 8, "A stale inventory refuses the edit before it runs");
-        Check(feedback.Place == "placement" && feedback.Result == "Placement refused: Inventory is stale (scene/p [Culler] changed or is missing); refresh and inspect again" && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused: Inventory is stale (scene/p [Culler] changed (position)); refresh and inspect again" && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
         inventory.Refresh(); log.Clear();
         Check(!feedback.Run("binding", "Track binding", "a world selection is pending; confirm or cancel it first", inventory, inventory.Entries.Single(), move) && calls == 0,
             "An edit during a pending interaction does not run");
@@ -434,7 +450,7 @@ static class InspectionTests {
         fixture.Objects[0] = new SceneObservation(new object(), original.Identity, original.Family, original.Active,
             original.Position, original.Rotation, original.Bindings, original.Dependencies, original.Problems, original.Operations);
         inventory.CheckFreshness();
-        Check(!presentation.CanSelect(inventory, current), "A replaced native target cannot be selected from stale rows");
+        Check(inventory.IsStale && presentation.CanSelect(inventory, current), "A stale inventory still lets its rows be inspected; only edits are refused");
         refused = false;
         try { inventory.Pin(current); } catch (InvalidOperationException) { refused = true; }
         Check(refused, "Pin still refuses the replaced native target");
@@ -442,5 +458,458 @@ static class InspectionTests {
         Check(presentation.CurrentSelection(inventory, current) == null, "Refresh does not transfer inspection to a replacement with the same identity");
         fixture.Objects[0] = original;
         inventory.Refresh();
+    }
+
+    // The outliner rows: the search text and the All, Problems and Changed filters narrow the inventory, and none changes it.
+    static void ProblemsFilterLimitsTheOutliner() {
+        SceneObservation Entry(string path, string family, params string[] problems) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), family, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, "Inspection only");
+        var fixture = new Fixture();
+        fixture.Objects.Add(Entry("World/Board", "Independent board"));
+        fixture.Objects.Add(Entry("World/Sign", "Track marker", "Broken binding"));
+        fixture.Objects.Add(Entry("World/Post", "Track marker", "Segment missing"));
+        fixture.Objects.Add(Entry("World/Bridges/Ela", "Bridge"));
+        var inventory = new SceneInventory(fixture); inventory.Refresh();
+        Func<SceneObservation, bool> changed = entry => entry.Identity.Path == "World/Board" || entry.Identity.Path == "World/Post";
+        string[] Paths(string search, RailroaderScenePatcher.OutlinerFilter filter) => RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, changed).Select(e => e.Identity.Path).ToArray();
+        var all = RailroaderScenePatcher.OutlinerFilter.All; var problems = RailroaderScenePatcher.OutlinerFilter.Problems; var modified = RailroaderScenePatcher.OutlinerFilter.Changed;
+        Check(Paths("", problems).SequenceEqual(new[] { "World/Sign", "World/Post" }), "The Problems filter limits the outliner to objects with detected problems");
+        Check(Paths("", modified).SequenceEqual(new[] { "World/Board", "World/Post" }), "The Changed filter limits the outliner to objects this MapMod modifies");
+        Check(Paths("", all).SequenceEqual(new[] { "World/Board", "World/Sign", "World/Post", "World/Bridges/Ela" }), "All shows every inventory entry");
+        Check(Paths("post", problems).SequenceEqual(new[] { "World/Post" }) && Paths("board", problems).Length == 0 && Paths("sign", modified).Length == 0, "Search narrows within a filter");
+        Check(Paths("marker", all).SequenceEqual(new[] { "World/Sign", "World/Post" }), "Search alone keeps its meaning");
+        Check(inventory.Entries.Count == 4 && !inventory.IsStale, "Filtering changes neither the inventory nor its freshness");
+        Check(RailroaderScenePatcher.InventoryPresentationState.Rows(null, "", problems, changed).Count == 0, "A missing inventory has no rows");
+        Check(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", modified, null).Count == 0, "Without a document nothing is changed");
+        Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed) == "2 of 4 objects", "The count line names how many objects the filters show: " + RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed));
+        Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", all, changed) == "4 of 4 objects", "The unfiltered outliner counts every entry");
+        var groups = RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", all, changed));
+        Check(groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))).SequenceEqual(new[] { "Bridge:Ela", "Independent board:Board", "Track marker:Sign,Post" }),
+            "Rows are grouped by family in name order, each row named by its object and kept in inventory order");
+        var presentation = new RailroaderScenePatcher.InventoryPresentationState();
+        Check(presentation.Observe(inventory, null, "", all, "1") && !presentation.Observe(inventory, null, "", all, "1"), "A settled outliner does not rebuild");
+        Check(presentation.Observe(inventory, null, "", problems, "1"), "Switching a filter rebuilds the outliner");
+        Check(!presentation.Observe(inventory, null, "", problems, "1") && presentation.Observe(inventory, null, "", all, "1"), "Returning to All rebuilds the outliner once");
+        Check(presentation.Observe(inventory, null, "", all, "2") && !presentation.Observe(inventory, null, "", all, "2"), "A changed document rebuilds the outliner so its Changed markers follow Undo and Redo");
+    }
+
+    // State the game switches while it runs, such as a culled audio player's enabled flag, is shown but is no part of
+    // what an inspection pins: its change leaves the snapshot fresh, and any other change still marks it stale.
+    static void RuntimeStateDoesNotMarkStale() {
+        var bell = new object();
+        SceneObservation Bell(bool playerEnabled, string dependency = "Component Crossing Bell [Audio.IntegerLoopingPlayer]", bool active = true) => new SceneObservation(bell,
+            new TargetIdentity("scene", "World/Crossing Bell", "Audio.IntegerLoopingPlayer"), "Crossing bell", active, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new[] { dependency }, new string[0], "Inspection only", new[] { "Crossing Bell [Audio.IntegerLoopingPlayer] enabled=" + playerEnabled });
+        var fixture = new Fixture();
+        fixture.Objects.Add(Bell(true));
+        var inventory = new SceneInventory(fixture); inventory.Refresh();
+        var inspected = inventory.Entries.Single();
+        Check(inspected.RuntimeState.Single() == "Crossing Bell [Audio.IntegerLoopingPlayer] enabled=True", "Runtime state is kept for display");
+        fixture.Objects[0] = Bell(false);
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale && inspected.Matches(fixture.Objects[0]) && inventory.Pin(inspected) != null, "A runtime toggle leaves the snapshot fresh and the inspection pinnable");
+        inventory.AdvanceFreshnessCheck(() => true);
+        Check(!inventory.IsStale, "The stepped check ignores a runtime toggle as well");
+        fixture.Objects[0] = Bell(false, "Component Crossing Bell [Audio.OtherPlayer]");
+        inventory.CheckFreshness();
+        Check(inventory.IsStale, "A changed component still marks the snapshot stale");
+        inventory.Refresh();
+        fixture.Objects[0] = Bell(false, "Component Crossing Bell [Audio.OtherPlayer]", active: false);
+        inventory.CheckFreshness();
+        Check(inventory.IsStale, "The object's own activity still marks the snapshot stale");
+    }
+
+    // A reference held in a field Unity serializes is authored state. A reference in any other field, such as a
+    // culling or audio manager's working list, comes and goes while the game runs: inspecting or focusing an object
+    // changes it. Only authored references belong to what an inspection pins.
+    sealed class Holder {
+        public object Authored = null;
+        [UnityEngine.SerializeField] object alsoAuthored = null;
+        object working = null;
+        [NonSerialized] public object Excluded = null;
+        public readonly object Fixed = null;
+        public static object Shared = null;
+        internal object Use() => alsoAuthored ?? working;
+    }
+    static void RuntimeReferencesAreNotAuthoredState() {
+        bool Authored(string name) => ReferenceScan.IsSerialized(typeof(Holder).GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic));
+        Check(Authored("Authored") && Authored("alsoAuthored"), "Public fields and fields marked for serialization hold authored references");
+        Check(!Authored("working") && !Authored("Excluded") && !Authored("Fixed") && !Authored("Shared"), "Private, non-serialized, read-only and static fields hold runtime references");
+        Check(new ReferenceField("f", true, () => null).Authored && !new ReferenceField("f", true, () => null, false).Authored, "A field descriptor carries whether its references are authored");
+        // The inspect-driven change: a manager starts referencing the inspected object. It is runtime state.
+        var bell = new object();
+        SceneObservation Bell(params string[] runtime) => new SceneObservation(bell, new TargetIdentity("scene", "World/Bell", "Audio.Player"), "Crossing bell", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new[] { "Referenced by Crossing [Controller].bell" }, new string[0], "Inspection only", runtime);
+        var fixture = new Fixture(); fixture.Objects.Add(Bell());
+        var inventory = new SceneInventory(fixture); inventory.Refresh();
+        fixture.Objects[0] = Bell("Referenced at runtime by Audio Manager [Audio.Culler].active");
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "A runtime reference that appears after inspecting or focusing leaves the snapshot fresh");
+        // The bell's audio sources come from a pool and are parented under it while it is audible.
+        fixture.Objects[0] = Bell("Runtime object World/Bell/AS07 [UnityEngine.AudioSource]", "Runtime object World/Bell/AS07 [UnityEngine.AudioLowPassFilter]");
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "A pooled child object that the game parents under the bell leaves the snapshot fresh");
+        fixture.Objects[0] = new SceneObservation(bell, new TargetIdentity("scene", "World/Bell", "Audio.Player"), "Crossing bell", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new string[0], new string[0], "Inspection only");
+        inventory.CheckFreshness();
+        Check(inventory.IsStale, "A removed authored reference still marks the snapshot stale");
+    }
+    // An edit from the panel pins the inspection and edits in one call. The pin compares the whole scene, so the edit's
+    // first validation reuses that comparison; the guard immediately before the mutation reads the scene again.
+    static void AnEditScansTheSceneTwice() {
+        var scene = new Scene(); var box = new Box { X = 7 }; var scans = 0;
+        scene.Objects["p"] = new List<object> { box };
+        scene.Observations = () => { scans++; return new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") }; };
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        scans = 0;
+        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinForEdit(inventory.Entries.Single()) });
+        Check(result.Outcomes["move"].Applied && box.X == 12 && scans == 2, "An edit pinned for immediate use scans the scene for the pin and for the guard: " + scans);
+        inventory.Refresh(); scans = 0;
+        result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.Pin(inventory.Entries.Single()) });
+        Check(result.Outcomes["move"].Applied && scans == 3, "A pin kept for later validates at resolution as well: " + scans);
+        // The guard still reads the scene: a change after the pin and before the mutation refuses the edit.
+        inventory.Refresh(); box.X = 12; var mutations = scene.MutationCalls;
+        var token = inventory.PinForEdit(inventory.Entries.Single());
+        scene.BeforeCapture = () => box.Position[1] = 99;
+        result = new PatchEngine(scene).Apply(document.Replace("112", "120"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        scene.BeforeCapture = null;
+        Check(!result.Outcomes["move"].Applied && scene.MutationCalls == mutations, "A change between the pin and the mutation is still refused by the guard: " + result.Outcomes["move"].Error);
+    }
+
+    // The panel spreads the whole-scene comparison of an edit over frames, as the background check does, so it does
+    // not block. When that pass ends without a difference the edit runs at once; its guard still reads the scene in
+    // one piece immediately before the mutation.
+    static void AnEditAfterASteppedPassBlocksForOneScan() {
+        var scene = new Scene(); var box = new Box { X = 7 }; var scans = 0;
+        scene.Objects["p"] = new List<object> { box };
+        scene.Observations = () => { scans++; return new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") }; };
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        var passes = inventory.CompletedPasses;
+        bool refused = false;
+        try { inventory.PinAfterPass(inventory.Entries.Single(), passes); } catch (InvalidOperationException) { refused = true; }
+        Check(refused, "Without a completed pass since the edit was requested there is no pin");
+        while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        Check(inventory.CompletedPasses == passes + 1 && !inventory.IsStale, "A pass over an unchanged scene completes");
+        scans = 0;
+        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinAfterPass(inventory.Entries.Single(), passes) });
+        Check(result.Outcomes["move"].Applied && box.X == 12 && scans == 1, "After a completed pass the edit reads the scene once, in its guard: " + scans);
+        // A difference found by the pass refuses the edit.
+        inventory.Refresh(); passes = inventory.CompletedPasses; box.Position[2] = 50;
+        while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        refused = false;
+        try { inventory.PinAfterPass(inventory.Entries.Single(), passes); } catch (InvalidOperationException e) { refused = e.Message.Contains("stale"); }
+        Check(inventory.IsStale && refused, "A pass that finds a difference marks the inventory stale and the edit is refused");
+        // The guard still refuses a change made after the pass and before the mutation.
+        inventory.Refresh(); passes = inventory.CompletedPasses; var mutations = scene.MutationCalls;
+        while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        var token = inventory.PinAfterPass(inventory.Entries.Single(), passes);
+        scene.BeforeCapture = () => box.Position[1] = 99;
+        result = new PatchEngine(scene).Apply(document.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        scene.BeforeCapture = null;
+        Check(!result.Outcomes["move"].Applied && scene.MutationCalls == mutations, "A change after the pass is still refused by the guard: " + result.Outcomes["move"].Error);
+    }
+
+    // The game keeps positions relative to a moving origin in single precision. After the origin moved, the same map
+    // position reads a few millimetres differently: that is no change. A real move still is, and the stale reason
+    // names what differs.
+    static void OriginRoundingDoesNotMarkStale() {
+        var post = new object();
+        SceneObservation Post(double x, params string[] bindings) => new SceneObservation(post, new TargetIdentity("scene", "World/Mile Posts/T-60", "Helpers.MilePost"), "Milepost", true,
+            new[] { x, 633.25, 441.5 }, new double[] { 0, 0, 0, 1 }, bindings.Length == 0 ? new[] { "Marker segment=S1; end=A; distance=10" } : bindings, new string[0], new string[0], "Inspection only");
+        var fixture = new Fixture(); fixture.Objects.Add(Post(25692.9766));
+        var inventory = new SceneInventory(fixture); inventory.Refresh();
+        fixture.Objects[0] = Post(25692.9785);
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale && inventory.Pin(inventory.Entries.Single()) != null, "A position that differs by the origin's rounding leaves the snapshot fresh and pinnable");
+        inventory.AdvanceFreshnessCheck(() => true);
+        Check(!inventory.IsStale, "The stepped check allows the same rounding");
+        fixture.Objects[0] = Post(25693.0766);
+        inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason == "scene/World/Mile Posts/T-60 [Helpers.MilePost] changed (position)", "A move of ten centimetres marks the snapshot stale and the reason names the position: " + inventory.StaleReason);
+        inventory.Refresh();
+        fixture.Objects[0] = Post(25693.0766, "Marker segment=S2; end=A; distance=10");
+        inventory.AdvanceFreshnessCheck(() => true);
+        Check(inventory.IsStale && inventory.StaleReason.Contains("changed (bindings: Marker segment=S") , "The stepped check names the binding that differs: " + inventory.StaleReason);
+    }
+    // A scene that can observe one object lets the guard read only the target, in the frame of the mutation, and lets
+    // the inventory take the edited object's new observation without discovering the scene again.
+    sealed class TargetedScene : IScene, ITargetedInspectionScene {
+        public readonly Scene Inner = new Scene();
+        public int Discoveries, Observations;
+        public IEnumerable<string> MapIds => Inner.MapIds;
+        public IEnumerable<SceneObservation> Discover() { Discoveries++; return Inner.Discover(); }
+        public SceneObservation Observe(object handle, TargetIdentity identity) { Observations++; return Inner.Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle)); }
+        public Capability Capability => Inner.Capability;
+        public IReadOnlyList<object> Resolve(TargetIdentity identity) => Inner.Resolve(identity);
+        public void Preflight(object target) => Inner.Preflight(target);
+        public object Capture(object target) => Inner.Capture(target);
+        public ObjectState Read(object target) => Inner.Read(target);
+        public void Apply(object target, ObjectState state) => Inner.Apply(target, state);
+        public bool Restore(object target, object snapshot) => Inner.Restore(target, snapshot);
+    }
+    static void TheGuardObservesOnlyTheTarget() {
+        var scene = new TargetedScene(); var box = new Box { X = 7 };
+        scene.Inner.Objects["p"] = new List<object> { box };
+        scene.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        var passes = inventory.CompletedPasses;
+        while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        scene.Discoveries = 0; scene.Observations = 0;
+        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinAfterPass(inventory.Entries.Single(), passes) });
+        Check(result.Outcomes["move"].Applied && box.X == 12 && scene.Discoveries == 0 && scene.Observations == 1, "The guard observes the target once and discovers nothing: " + scene.Discoveries + "/" + scene.Observations);
+        var before = inventory.Entries.Single();
+        var after = inventory.Reobserve(before);
+        Check(after != null && !ReferenceEquals(after, before) && ReferenceEquals(inventory.Entries.Single(), after) && after.Position[0] == 12 && scene.Discoveries == 0 && !inventory.IsStale,
+            "After the edit the inventory takes the object's new observation without a discovery");
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "The inventory with the re-observed entry agrees with the scene");
+        // A change between the pass and the mutation is refused by the targeted guard as well.
+        passes = inventory.CompletedPasses; var mutations = scene.Inner.MutationCalls;
+        while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        var token = inventory.PinAfterPass(inventory.Entries.Single(), passes);
+        scene.Inner.BeforeCapture = () => box.Position[1] = 99;
+        result = new PatchEngine(scene).Apply(document.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        scene.Inner.BeforeCapture = null;
+        Check(!result.Outcomes["move"].Applied && scene.Inner.MutationCalls == mutations, "A change between the pass and the mutation is refused: " + result.Outcomes["move"].Error);
+        Check(inventory.Reobserve(before) == null, "An observation that is no longer an entry is not re-observed");
+    }
+
+    // The game shifts the objects it registered for its moving origin and leaves the others where they are, such as the
+    // markers of an equipment setup. Neither kind changes position when the origin moves; a move of either one does.
+    static void AnObjectOutsideTheMovingOriginDoesNotMarkStale() {
+        var offset = new double[3]; var moved = new double[] { 10, 0, 20 }; var kept = new double[] { 5, 0, 5 };
+        object board = new object(), marker = new object();
+        var scene = new Scene();
+        SceneObservation At(object handle, string path, double[] position, bool movesWithOrigin) => new SceneObservation(handle, new TargetIdentity("scene", path, "Component"), "Family", true,
+            MapOrigin.Position(position, offset, movesWithOrigin), new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Inspection only");
+        scene.Observations = () => new[] { At(board, "World/board", moved, true), At(marker, "Setups/marker", kept, false) };
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        Check(inventory.Entries[0].Position.SequenceEqual(new double[] { 10, 0, 20 }) && inventory.Entries[1].Position.SequenceEqual(new double[] { 5, 0, 5 }), "At the first origin both positions are the scene positions");
+        // The origin moves three tiles one way and one the other: the game shifts what it registered, and its offset.
+        moved[0] -= 1500; offset[0] -= 1500; moved[2] += 500; offset[2] += 500;
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "An origin move marks nothing stale, also not the object the game does not shift: " + inventory.StaleReason);
+        while (inventory.CompletedPasses == 0 && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        Check(!inventory.IsStale && inventory.CompletedPasses == 1, "A stepped pass after the origin move agrees: " + inventory.StaleReason);
+        kept[0] += 1;
+        inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason == "scene/Setups/marker [Component] changed (position)", "A move of the object the game does not shift is detected: " + inventory.StaleReason);
+        inventory.Refresh(); moved[2] += 1;
+        inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason == "scene/World/board [Component] changed (position)", "A move of a shifted object is detected after the origin moved: " + inventory.StaleReason);
+        var refused = false;
+        try { MapOrigin.Position(moved, new double[2], true); } catch (ArgumentException) { refused = true; }
+        Check(refused, "An offset that does not fit the position is refused");
+    }
+
+    // A crossing signal sits under an object that a culler switches off when the camera is far away, as after a camera
+    // jump. That switch marks nothing stale; switching off the signal itself, or an object above the culled one, does.
+    static void CullerDrivenActivityDoesNotMarkStale() {
+        // The chain from the signal upward: the signal, the object the culler switches, the crossing.
+        var on = new[] { true, true, true }; var culled = new[] { false, true, false };
+        object signal = new object();
+        var scene = new Scene();
+        scene.Observations = () => new[] { new SceneObservation(signal, new TargetIdentity("scene", "Crossing/Signal 1/Signal 1", "Lamp"), "Crossing light",
+            AuthoredActivity.Of(on.Select((active, index) => new KeyValuePair<bool, bool>(active, culled[index]))), new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new string[0], new string[0], "Inspection only", new[] { "Culled object active=" + on[1] }) };
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        Check(inventory.Entries[0].Active, "An object under a culled object that is switched on is active");
+        on[1] = false;
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "The culler switching its object off marks nothing stale: " + inventory.StaleReason);
+        while (inventory.CompletedPasses == 0 && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        Check(!inventory.IsStale && inventory.CompletedPasses == 1, "A stepped pass agrees: " + inventory.StaleReason);
+        inventory.Refresh();
+        Check(inventory.Entries[0].Active && inventory.Entries[0].RuntimeState.Single() == "Culled object active=False", "A refresh while the object is culled still observes it as active, and shows the culled state");
+        on[1] = true; on[0] = false;
+        inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason == "scene/Crossing/Signal 1/Signal 1 [Lamp] changed (activity)", "Switching the signal itself off is detected: " + inventory.StaleReason);
+        on[0] = true; inventory.Refresh(); on[2] = false;
+        inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason.EndsWith("changed (activity)", StringComparison.Ordinal), "Switching off an object above the culled one is detected: " + inventory.StaleReason);
+        Check(AuthoredActivity.Of(new KeyValuePair<bool, bool>[0]), "An empty chain is active");
+    }
+
+    // A scene that knows what belongs with an object: its observed parts and the objects the patcher keeps for it.
+    sealed class RelatedScene : IRelatedInspectionScene {
+        public List<SceneObservation> All = new List<SceneObservation>();
+        public Func<object, IEnumerable<SceneObservation>> Related;
+        public int Discoveries;
+        public IEnumerable<string> MapIds => new[] { "map" };
+        public IEnumerable<SceneObservation> Discover() { Discoveries++; return All.ToArray(); }
+        public SceneObservation Observe(object handle, TargetIdentity identity) => All.FirstOrDefault(o => ReferenceEquals(o.Handle, handle));
+        public IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity) => Related(handle);
+        public bool Present(object handle) => All.Any(o => ReferenceEquals(o.Handle, handle));
+    }
+    // An edit of a crossing's coverage changes the crossing, changes the bell that reads its circuits and adds spans the
+    // patcher owns; clearing it removes those spans again. The inventory follows without discovering the scene.
+    static void AnOwnEditTakesItsRelatedObservations() {
+        object crossing = new object(), bell = new object(), other = new object(), span = new object();
+        SceneObservation Of(object handle, string path, string binding) => new SceneObservation(handle, new TargetIdentity("scene", path, "Component"), "Family", true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { binding }, new string[0], new string[0], "Inspection only");
+        var scene = new RelatedScene();
+        scene.All.AddRange(new[] { Of(crossing, "crossing", "native spans"), Of(bell, "crossing/bell", "native spans"), Of(other, "other", "none") });
+        scene.Related = handle => scene.All.Where(o => !ReferenceEquals(o.Handle, other)).ToArray();
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        var unrelated = inventory.Entries[2];
+        scene.All[0] = Of(crossing, "crossing", "selected tracks"); scene.All[1] = Of(bell, "crossing/bell", "selected tracks"); scene.All.Add(Of(span, "owned/span", "span"));
+        var discoveries = scene.Discoveries;
+        var updated = inventory.ReobserveRelated(inventory.Entries[0]);
+        Check(updated != null && updated.Bindings[0] == "selected tracks" && inventory.Entries.Count == 4 && inventory.Entries.Any(e => ReferenceEquals(e, unrelated)) && scene.Discoveries == discoveries,
+            "The edited object, its changed part and the added object are taken without a discovery: " + inventory.Entries.Count);
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "The inventory with the related observations agrees with the scene: " + inventory.StaleReason);
+        while (inventory.CompletedPasses == 0 && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        Check(!inventory.IsStale, "A stepped pass agrees as well: " + inventory.StaleReason);
+        // Clearing removes the owned span and returns the bindings.
+        scene.All.RemoveAt(3); scene.All[0] = Of(crossing, "crossing", "native spans"); scene.All[1] = Of(bell, "crossing/bell", "native spans");
+        updated = inventory.ReobserveRelated(updated);
+        Check(updated != null && inventory.Entries.Count == 3 && inventory.Entries.Any(e => ReferenceEquals(e, unrelated)), "An object the change removed leaves the inventory: " + inventory.Entries.Count);
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "The inventory without the removed object agrees with the scene: " + inventory.StaleReason);
+        // A change of an unrelated object is still found.
+        scene.All[2] = Of(other, "other", "changed");
+        inventory.ReobserveRelated(updated);
+        inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason.StartsWith("scene/other [Component] changed (bindings", StringComparison.Ordinal), "A change of an unrelated object still marks the inventory stale: " + inventory.StaleReason);
+        Check(inventory.ReobserveRelated(Of(crossing, "crossing", "x")) == null, "An observation that is no entry is not re-observed");
+        // A scene that does not know what belongs with an object re-observes the object alone.
+        var targeted = new TargetedScene(); var box = new Box { X = 7 };
+        targeted.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
+        var single = new SceneInventory(targeted); single.Refresh(); box.X = 9;
+        Check(single.ReobserveRelated(single.Entries.Single())?.Position[0] == 9, "Without related observations the object itself is re-observed");
+    }
+
+    // A snapshot that was compared since the last foreign change pins an edit without another whole-scene comparison;
+    // the guard still observes the target and refuses a change.
+    static void AComparedSnapshotPinsWithoutAScan() {
+        var scene = new TargetedScene(); var box = new Box { X = 7 };
+        scene.Inner.Objects["p"] = new List<object> { box };
+        scene.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        scene.Discoveries = 0; scene.Observations = 0;
+        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinCompared(inventory.Entries.Single()) });
+        Check(result.Outcomes["move"].Applied && box.X == 12 && scene.Discoveries == 0 && scene.Observations >= 1, "The edit runs without a discovery and observes the target: " + scene.Discoveries + "/" + scene.Observations);
+        var entry = inventory.Reobserve(inventory.Entries.Single());
+        var token = inventory.PinCompared(entry); var mutations = scene.Inner.MutationCalls;
+        scene.Inner.BeforeCapture = () => box.Position[1] = 99;
+        result = new PatchEngine(scene).Apply(document.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        scene.Inner.BeforeCapture = null;
+        Check(!result.Outcomes["move"].Applied && scene.Inner.MutationCalls == mutations, "A change of the target before the mutation is refused: " + result.Outcomes["move"].Error);
+        // A preview validates once: after a pass, that one validation observes the target when asked to.
+        inventory.Refresh(); var passes = inventory.CompletedPasses;
+        while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        scene.Observations = 0;
+        inventory.PinAfterPass(inventory.Entries.Single(), passes, true).Validate(scene, inventory.Entries.Single().Identity, box);
+        Check(scene.Observations == 1, "A pin that validates every time observes the target at its first validation: " + scene.Observations);
+        box.Position[2] = 50; var refused = false;
+        try { inventory.PinAfterPass(inventory.Entries.Single(), passes, true).Validate(scene, inventory.Entries.Single().Identity, box); } catch (InvalidOperationException) { refused = true; }
+        Check(refused, "Its single validation refuses a changed target");
+        inventory.CheckFreshness(); refused = false;
+        try { inventory.PinCompared(inventory.Entries.Single()); } catch (InvalidOperationException e) { refused = e.Message.Contains("stale"); }
+        Check(inventory.IsStale && refused, "A stale snapshot does not pin");
+        // A scene that cannot observe one object compares the whole scene, as an ordinary pin does.
+        var plain = new Scene(); var discoveries = 0; object handle = new object();
+        plain.Observations = () => { discoveries++; return new[] { new SceneObservation(handle, new TargetIdentity("scene", "p", "Culler"), "Board", true, new double[3], new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Fixed placement") }; };
+        var whole = new SceneInventory(plain); whole.Refresh(); discoveries = 0;
+        whole.PinCompared(whole.Entries.Single());
+        Check(discoveries == 1, "Without single-object observation the pin compares the whole scene: " + discoveries);
+    }
+
+    // The newest message is first. Follow-ups such as terrain output replace one another, so the result they follow stays
+    // among the messages shown.
+    static void FollowUpsKeepTheActionResultVisible() {
+        var log = new List<string>();
+        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        string Line(RailroaderScenePatcher.EditFeedback.Message m) => m.Source + ": " + m.Text;
+        feedback.Follow("Terrain output", "Terrain output complete.");
+        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete." }), "A follow-up without a result is shown");
+        feedback.Report("Placement", "Placement completed.");
+        feedback.Report("Activity", "Enable completed.");
+        feedback.Follow("Terrain output", "Terrain output outstanding.");
+        feedback.Follow("Terrain output", "Terrain output complete.");
+        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete.", "Activity: Enable completed.", "Placement: Placement completed." }),
+            "The newest message is first and the action result stays below the latest follow-up: " + String.Join(" | ", feedback.Messages.Select(Line)));
+        Check(feedback.Messages.Count(m => m.FollowUp) == 1 && log.Count == 5 && feedback.Result == "Terrain output complete.", "Only the latest follow-up is kept, and every message is logged");
+        feedback.Report("Activity", "Disable completed.");
+        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Activity: Disable completed.", "Terrain output: Terrain output complete.", "Activity: Enable completed." }), "A new result goes on top; older messages move down");
+    }
+
+    // Auto-fit sizes the outliner column to most names, relative to the window, within a cap.
+    static void AutoFitSizesTheOutlinerToMostNames() {
+        float Fit(IEnumerable<float> widths, float window) => RailroaderScenePatcher.InventoryPresentationState.FitWidth(widths, 40, window, 140, 320, 6);
+        var few = new float[] { 60, 80, 100 };
+        Check(Fit(few, 1000) == 140, "With few rows the longest name decides, and the column keeps its minimum: " + Fit(few, 1000));
+        Check(Fit(new float[] { 60, 80, 170 }, 1000) == 210, "With few rows the longest name plus the row decoration is the width");
+        var many = Enumerable.Range(1, 100).Select(i => (float)i).ToList(); many[99] = 900;
+        Check(Fit(many, 1000) == 140, "One extreme name among many does not decide: the 95th percentile does");
+        var wide = Enumerable.Range(1, 100).Select(i => 200f + i).ToList();
+        Check(Fit(wide, 1000) == 335, "Most names fit: the 95th percentile of 201 to 300 is 295, plus decoration: " + Fit(wide, 1000));
+        Check(Fit(wide, 600) == 240, "The column takes at most 40 percent of the window: " + Fit(wide, 600));
+        Check(Fit(wide, 500) == 174, "The inspector keeps its minimum beside the divider: " + Fit(wide, 500));
+        Check(Fit(wide, 400) == 140, "A window too narrow for both keeps the outliner minimum");
+        Check(Fit(new float[0], 1000) == 140, "No rows keep the minimum");
+    }
+
+    // The same result twice in a row is one message.
+    static void RepeatedMessagesCollapse() {
+        var log = new List<string>();
+        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        feedback.Refuse("Placement", "Placement", "Inventory is stale");
+        feedback.Refuse("Placement", "Placement", "Inventory is stale");
+        feedback.Report("Enabled", "Activity change completed.");
+        feedback.Refuse("Placement", "Placement", "Inventory is stale");
+        Check(feedback.Messages.Select(m => m.Source).SequenceEqual(new[] { "Placement", "Enabled" }) && log.Count == 4, "An identical message is listed once, at the top, and every report is logged: " + String.Join(", ", feedback.Messages.Select(m => m.Source)));
+        feedback.Refuse("Placement", "Placement", "enter six numbers");
+        feedback.Report("Placement", "Placement completed.");
+        Check(feedback.Messages.Select(m => m.Text).SequenceEqual(new[] { "Placement completed.", "Placement refused: enter six numbers", "Placement refused: Inventory is stale" }), "A success sits above the refusal it corrected: " + String.Join(" | ", feedback.Messages.Select(m => m.Text)));
+        feedback.Withdraw("Placement", "Placement refused: enter six numbers");
+        feedback.Withdraw("Enabled", "Placement completed.");
+        Check(feedback.Messages.Select(m => m.Text).SequenceEqual(new[] { "Placement completed.", "Placement refused: Inventory is stale" }), "A withdrawn message leaves and the others stay: " + String.Join(" | ", feedback.Messages.Select(m => m.Text)));
+    }
+
+    // The message area shows the last results in fixed slots, newest first, each with the action group it came from.
+    static void MessagesKeepTheirSourceNewestFirst() {
+        var log = new List<string>();
+        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        Check(feedback.Messages.Count == 0, "No message before the first result");
+        feedback.Refuse("Track binding", "Track binding", "enter a segment ID");
+        feedback.Report("Placement", "Placement completed.");
+        Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Placement: Placement completed.", "Track binding: Track binding refused: enter a segment ID" }),
+            "The newest message is first and each keeps its source: " + String.Join(" | ", feedback.Messages.Select(m => m.Source + ": " + m.Text)));
+        Check(feedback.Place == "Placement" && feedback.Result == "Placement completed.", "The newest message is the last result");
+        feedback.Report("Gizmo", "Gizmo placement completed.");
+        feedback.Report("Window", "Identity copied.");
+        Check(feedback.Messages.Count == 3 && feedback.Messages[0].Source == "Window" && feedback.Messages[2].Source == "Placement", "The area keeps the three newest messages");
+        Check(log.Count == 4, "Every message is logged once");
+        object first = new object(), second = new object();
+        feedback.Inspecting(first);
+        feedback.Report("Enabled", "Activity change completed.");
+        feedback.Inspecting(second);
+        Check(feedback.Messages.Count == 0 && feedback.Result == "", "Inspecting another object clears every message");
+    }
+
+    // A result or refusal is about the object that was inspected when it was reported.
+    static void ResultsBelongToTheInspectedObject() {
+        var log = new List<string>();
+        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        object first = new object(), second = new object();
+        feedback.Inspecting(first);
+        feedback.Refuse("placement", "Placement", "Target must resolve uniquely");
+        feedback.Inspecting(first);
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused: Target must resolve uniquely", "A result stays while its object stays inspected");
+        feedback.Inspecting(null);
+        Check(feedback.Result == "Placement refused: Target must resolve uniquely", "A result stays when the inspected object is no longer present");
+        feedback.Inspecting(second);
+        Check(feedback.Place == null && feedback.Result == "" && log.Count == 1, "Inspecting another object clears the previous object's result without a log line");
+        feedback.Report("modification", "Recheck completed.");
+        feedback.Inspecting(second);
+        Check(feedback.Result == "Recheck completed.", "A result on the newly inspected object stays");
+        feedback.Inspecting(first);
+        Check(feedback.Result == "", "Returning to the first object does not bring a result back");
     }
 }

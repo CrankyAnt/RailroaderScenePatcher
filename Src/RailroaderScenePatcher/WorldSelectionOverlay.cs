@@ -21,6 +21,7 @@ namespace RailroaderScenePatcher {
             internal Rect Label;
             internal string Text;
             internal Color Color;
+            internal Color? Rule;
             internal bool Detailed;
             internal bool Contains(Vector2 pointer) =>
                 Marker.Contains(pointer) || Objects.Any(r => r.Contains(pointer)) ||
@@ -50,7 +51,12 @@ namespace RailroaderScenePatcher {
             return candidates.Where(c => Project(c, camera, origin)?.Contains(pointer) == true).Select(c => c.Choice).ToArray();
         }
 
-        internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource,
+        // One color scheme with the panel: gold frames the inspected object, blue marks the proposed new target, green a
+        // confirmed relation, red only a broken item. Other choices are neutral. Amber is a panel color and never appears
+        // in the world.
+        internal static readonly Color Gold = new Color(1f, .8f, 0f), Proposed = new Color(.3f, .8f, 1f), ConfirmedRelation = new Color(.498f, .722f, .42f),
+            Broken = new Color(1f, .502f, .502f), Neutral = new Color(.8156863f, .7950737f, .746353f);
+        internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed,
             Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing) {
             covered = uiBounds;
             labels.Clear();
@@ -58,7 +64,7 @@ namespace RailroaderScenePatcher {
                 // Skin labels can carry one-line height/offset constraints. Measure and draw with
                 // an unconstrained style so the opaque backing encloses every wrapped identity line.
                 textStyle = new GUIStyle {
-                    font = GUI.skin.label.font,
+                    font = NativeFont() ?? GUI.skin.label.font,
                     fontSize = 16, wordWrap = true, richText = false,
                     fixedWidth = 0, fixedHeight = 0, contentOffset = Vector2.zero,
                     clipping = TextClipping.Clip,
@@ -73,20 +79,33 @@ namespace RailroaderScenePatcher {
                 if (shape == null) continue;
                 bool offered = pending != null && pending.Offers.Contains(candidate.Choice);
                 bool chosen = pending != null && ReferenceEquals(candidate.Choice, pending.Candidate);
-                shape.Color = chosen ? new Color(.4f, 1f, .55f) : new Color(.46f, .81f, 1f);
+                shape.Color = chosen ? Proposed : Neutral;
                 shape.Detailed = offered || shape.Contains(pointer);
-                if (offered) shape.Text = (chosen ? "Candidate: " : "Choice: ") + candidate.Choice.Label;
+                if (offered) shape.Text = (chosen ? "New: " : "Choice: ") + Short(candidate.Choice.Label);
                 if (shape.Track == null || shape.Detailed) shapes.Add(shape);
             }
             if (source != null && source.Points.Length > 0) {
                 var marked = shapes.FirstOrDefault(s => s.Text != null && s.Candidate.Choice.Matches(source.Choice));
                 var shape = Project(source, camera, origin);
+                var broken = source.Observation != null && source.Observation.Problems.Count != 0;
                 if (marked != null) {
-                    if (hasSource) marked.Text = "Source / " + marked.Text;
+                    if (hasSource) marked.Text = "Object / " + marked.Text;
                 } else if (shape != null) {
-                    shape.Color = new Color(1f, .77f, .25f);
+                    shape.Color = Gold;
                     shape.Detailed = true;
-                    shape.Text = (hasSource ? "Source: " : "Inspected: ") + source.Choice.Label;
+                    shape.Text = "Object: " + Short(source.Choice.Label) + (broken ? " (problem)" : "");
+                    // Red marks only the broken item: the label's rule, not the frame of the inspected object.
+                    if (broken) shape.Rule = Broken;
+                    shapes.Add(shape);
+                }
+            }
+            // A confirmed relation stays marked while its object is inspected.
+            if (confirmed != null && confirmed.Points.Length > 0 && !shapes.Any(s => s.Text != null && s.Candidate.Choice.Matches(confirmed.Choice))) {
+                var shape = Project(confirmed, camera, origin);
+                if (shape != null) {
+                    shape.Color = ConfirmedRelation;
+                    shape.Detailed = true;
+                    shape.Text = "Confirmed: " + Short(confirmed.Choice.Label);
                     shapes.Add(shape);
                 }
             }
@@ -109,7 +128,7 @@ namespace RailroaderScenePatcher {
                             var rect = Offset(label.Label, zone.position);
                             GUI.color = Color.white;
                             GUI.DrawTexture(rect, backing);
-                            GUI.color = label.Color;
+                            GUI.color = label.Rule ?? label.Color;
                             GUI.DrawTexture(new Rect(rect.x, rect.y, 3, rect.height), Texture2D.whiteTexture);
                             GUI.color = Color.white;
                             GUI.Label(rect, label.Text, textStyle);
@@ -139,7 +158,9 @@ namespace RailroaderScenePatcher {
                     shape.Objects.Add(Rect.MinMaxRect(min.x - 4, min.y - 4, max.x + 4, max.y + 4));
                 }
                 if (shape.Objects.Count != 0) {
+                    // One frame per object: the union of its renderers. Picking uses the same rectangle.
                     var rect = shape.Objects.Aggregate(Union);
+                    shape.Objects.Clear(); shape.Objects.Add(rect);
                     anchor = new Vector3(rect.center.x, rect.center.y, camera.nearClipPlane);
                 }
             }
@@ -171,6 +192,24 @@ namespace RailroaderScenePatcher {
             return shape;
         }
 
+        // The font of the native compact text, when its font asset still carries the source font. IMGUI cannot draw the
+        // signed-distance-field asset itself.
+        static Font NativeFont() {
+            try {
+                foreach (var asset in Resources.FindObjectsOfTypeAll<TMPro.TMP_FontAsset>())
+                    if (asset != null && asset.name == "Montserrat-Medium SDF" && asset.sourceFontFile != null) return asset.sourceFontFile;
+            } catch { }
+            return null;
+        }
+        // The name a label shows: the object's own name without its family and path, so a label has one colon. The panel
+        // holds the full identity.
+        static string Short(string label) {
+            var text = label ?? "";
+            var colon = text.IndexOf(": ", StringComparison.Ordinal);
+            if (colon >= 0) text = text.Substring(colon + 2);
+            var slash = text.LastIndexOf('/');
+            return slash >= 0 ? text.Substring(slash + 1) : text;
+        }
         static Vector3 ScreenPoint(Camera camera, Vector3 point, Vector3 origin) {
             var projected = camera.WorldToScreenPoint(point + origin);
             projected.y = Screen.height - projected.y;
@@ -223,6 +262,11 @@ namespace RailroaderScenePatcher {
                     var delta = (position - marker.center).sqrMagnitude;
                     if (delta < distance) { distance = delta; best = rect; }
                 }
+            }
+            // A label lies within the screen, whatever the zone it was placed in.
+            if (best.width > 0) {
+                best.x = Mathf.Clamp(best.x, 0, Mathf.Max(0, Screen.width - best.width));
+                best.y = Mathf.Clamp(best.y, 0, Mathf.Max(0, Screen.height - best.height));
             }
             return best;
         }

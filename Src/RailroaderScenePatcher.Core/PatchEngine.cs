@@ -295,7 +295,10 @@ namespace RailroaderScenePatcher.Core {
             if (!underlying.TryGetValue(target, out state)) underlying.Add(target, state = scene.Read(target));
             return state;
         }
-        internal object ResolveUnique(TargetIdentity identity) {
+        // Set for the duration of a reconciliation that resolves the same targets several times a second.
+        internal Func<TargetIdentity, object> ResolveOverride;
+        internal object ResolveUnique(TargetIdentity identity) { return ResolveOverride != null ? ResolveOverride(identity) : ResolveFresh(identity); }
+        internal object ResolveFresh(TargetIdentity identity) {
             var matches = scene.Resolve(identity);
             if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target must resolve uniquely");
             Track(identity, matches[0]);

@@ -45,7 +45,7 @@ namespace RailroaderScenePatcher {
         internal static bool IsSupported(GameObject g) => Loaded(g) && SupportedPaths.Contains(BoardScene.PathOf(g.transform));
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != BoardScene.CullerType || !SupportedPaths.Contains(identity.Path)) return Array.Empty<object>();
-            return Resources.FindObjectsOfTypeAll<GameObject>().Where(g => Loaded(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path && g.GetComponent(culler) != null).Cast<object>().ToArray();
+            return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(culler) != null).Cast<object>().ToArray();
         }
         public void CheckPattern(object target) {
             var problem = PatternProblem(target as GameObject);

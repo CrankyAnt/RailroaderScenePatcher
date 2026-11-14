@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
+namespace UnityEngine { sealed class SerializeField : Attribute { } }
 class Scene : IScene, IInspectionScene {
     public Func<IEnumerable<SceneObservation>> Observations;
     public IEnumerable<SceneObservation> Discover() => Observations == null ? Array.Empty<SceneObservation>() : Observations();
@@ -255,6 +256,7 @@ class Program {
         SnapTests.Run();
         GizmoTests.Run();
         InspectionTests.Run();
+        CommandBandTests.Run();
         BridgeTests.Run();
         SelectionTests.Run();
         BoardTests.Run();

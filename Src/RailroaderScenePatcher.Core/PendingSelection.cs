@@ -65,6 +65,12 @@ namespace RailroaderScenePatcher.Core {
         IEnumerable<string> MapIds { get; }
         IEnumerable<SelectionCandidate> Discover(SelectionKind kind);
     }
+    // A selection scene that can read the current candidates of one identity without discovering every candidate of
+    // its kind. Confirmation asks whether an identity still resolves to exactly the candidate that was offered; Find
+    // returns every current candidate of that identity, read now, so the answer is the one a discovery would give.
+    public interface ITargetedSelectionScene : ISelectionScene {
+        IEnumerable<SelectionCandidate> Find(SelectionIdentity identity);
+    }
 
     public sealed class ConfirmedSelection {
         public SelectionIdentity Identity { get; }
@@ -118,10 +124,18 @@ namespace RailroaderScenePatcher.Core {
             if (!IsPending || Candidate == null) return false;
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
                 return Reject("The loaded map changed. Cancel and start a new selection.");
-            if (Source != null && !StillUnique(Source))
-                return Reject("The source object changed or no longer resolves uniquely. Cancel and inspect it again.");
-            if (!StillUnique(Candidate))
-                return Reject("The candidate changed or no longer resolves uniquely. Pick again.");
+            // An identity that several objects share cannot be targeted by a patch: a document names its target by that
+            // identity, and nothing in it could tell the objects apart. Inspecting or picking again does not change
+            // that, so the refusal says so instead of asking for it.
+            var sharedSource = false;
+            var difference = Source == null ? null : Difference(Source, out sharedSource);
+            if (difference != null)
+                return Reject(sharedSource ? "The inspected object shares its identity " + Source.Identity + " with another object, so a patch cannot target it. Cancel; a choice for this object cannot be confirmed."
+                    : "The source object changed or no longer resolves uniquely: " + difference + ". Cancel and inspect it again.");
+            difference = Difference(Candidate, out var sharedCandidate);
+            if (difference != null)
+                return Reject(sharedCandidate ? "The candidate shares its identity " + Candidate.Identity + " with another object, so a patch cannot target it. Pick an object whose path is unique."
+                    : "The candidate changed or no longer resolves uniquely: " + difference + ". Pick again.");
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
                 return Reject("The loaded map changed. Cancel and start a new selection.");
             Confirmed = new ConfirmedSelection(Candidate.Identity, Source?.Identity, maps);
@@ -129,9 +143,16 @@ namespace RailroaderScenePatcher.Core {
             return true;
         }
 
-        bool StillUnique(SelectionCandidate candidate) {
-            var matches = scene.Discover(candidate.Identity.Kind).Where(c => c.Identity.Equals(candidate.Identity)).Take(2).ToArray();
-            return matches.Length == 1 && candidate.Matches(matches[0]);
+        // Null when the identity still resolves to exactly the candidate that was offered; otherwise what differs, for
+        // the refusal.
+        string Difference(SelectionCandidate candidate, out bool shared) {
+            shared = false;
+            var current = (scene is ITargetedSelectionScene targeted ? targeted.Find(candidate.Identity) : scene.Discover(candidate.Identity.Kind)).ToArray();
+            var matches = current.Where(c => c.Identity.Equals(candidate.Identity)).Take(2).ToArray();
+            if (matches.Length == 1 && candidate.Matches(matches[0])) return null;
+            if (matches.Length > 1) { shared = true; return "several candidates share its identity"; }
+            if (matches.Length == 1) return ReferenceEquals(matches[0].Handle, candidate.Handle) ? "its observed geometry changed" : "another object has its identity";
+            return current.Any(c => ReferenceEquals(c.Handle, candidate.Handle)) ? "its identity or its supported edits changed" : "it is no longer found";
         }
 
         bool Reject(string problem) {

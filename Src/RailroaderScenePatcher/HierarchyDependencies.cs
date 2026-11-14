@@ -19,6 +19,11 @@ namespace RailroaderScenePatcher {
     // are described by one line instead of per component, and neither changes the observation. UI-independent, shared
     // with controlled replay.
     internal static class HierarchyDependencies {
+        // Whether a component of a hierarchy belongs to runtime output and not to the authored scene: an object the
+        // game created while running, or anything below the container a mesh builder generates into. The builder
+        // destroys every child of its container when it generates, so a mesh object that was saved with the scene
+        // there is replaced the first time the pad comes into view; it is output as well.
+        internal static bool IsOutput(bool createdAtRuntime, bool belowOutputContainer) => createdAtRuntime || belowOutputContainer;
         internal const string GeneratedPad = "Generated pad mesh and culling sphere, rebuilt by native generation from the marker location";
         internal static IEnumerable<string> Describe(bool crossingPad, IEnumerable<HierarchyPart> parts) {
             if (crossingPad) yield return GeneratedPad;

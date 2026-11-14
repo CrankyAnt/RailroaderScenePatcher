@@ -6,7 +6,10 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 
 // A controlled scene whose track segment locations and endpoints have native poses in map coordinates.
-class TrackScene : Scene, ITrackPoseScene {
+class TrackScene : Scene, ITrackPoseScene, ITargetLiveness {
+    // Whether a target resolved earlier is still the object of its identity, answered without searching the scene.
+    public Func<object, TargetIdentity, bool> Live;
+    public bool IsLive(object target, TargetIdentity identity) => Live != null && Live(target, identity);
     public Dictionary<string, TrackPose> Poses = new Dictionary<string, TrackPose>();
     public int PoseQueries;
     public TrackPose TrackPose(TrackAnchor anchor) {
@@ -34,6 +37,7 @@ static class TrackFollowingTests {
         return (scene, box);
     }
     public static void Run() {
+        ReconciliationDoesNotSearchTheSceneEachTime();
         SegmentLocationPlacesRelativeToTrackFrame();
         EndpointAnchorAndRepeatDoNotAccumulate();
         UnresolvedAnchorChangesNothing();
@@ -94,6 +98,31 @@ static class TrackFollowingTests {
         Assert(!new PatchEngine(without).Apply(Doc(Follow("follow", SegmentTrack))).Outcomes["follow"].Applied, "A composed scene without a track source refuses the mode");
     }
     static readonly TargetIdentity P = new TargetIdentity("s", "p", "c");
+    // Following is reconciled several times a second for as long as the editor is open. A scene that can tell whether
+    // a resolved target is still its object is searched once and again only now and then, not on every reconciliation.
+    static void ReconciliationDoesNotSearchTheSceneEachTime() {
+        var (scene, box, session, editor, store) = Session();
+        session.Follow(P, TrackAnchor.At(new TrackLocation("S1", "a", 10)));
+        var searches = scene.ResolveCalls;
+        for (var i = 0; i < 10; i++) session.ReconcileTrackFollowing();
+        Assert(scene.ResolveCalls - searches >= 10, "A scene without a liveness check is searched on every reconciliation");
+        scene.Live = (target, identity) => ReferenceEquals(target, box) && identity.Path == "p";
+        session.ReconcileTrackFollowing();
+        searches = scene.ResolveCalls;
+        for (var i = 0; i < 10; i++) session.ReconcileTrackFollowing();
+        Assert(scene.ResolveCalls == searches, "A live target is not searched for again on each reconciliation: " + (scene.ResolveCalls - searches));
+        scene.Poses["S1|a|10"] = new TrackPose(new[] { 210.0, 1, 0 }, Quarter);
+        Assert(session.ReconcileTrackFollowing().Single().Value.Applied && Near(box.Position, 15, 6, 7) && scene.ResolveCalls > searches, "A moved track still moves the object, and the mutation resolves the target again");
+        searches = scene.ResolveCalls;
+        for (var i = 0; i < 25; i++) session.ReconcileTrackFollowing();
+        Assert(scene.ResolveCalls == searches, "Reconciliations within forty of the last search do not search again: " + (scene.ResolveCalls - searches));
+        for (var i = 0; i < 15; i++) session.ReconcileTrackFollowing();
+        Assert(scene.ResolveCalls > searches && scene.ResolveCalls - searches <= 3, "The scene is searched again every fortieth reconciliation, so a second object of the same identity is noticed: " + (scene.ResolveCalls - searches));
+        scene.Live = (target, identity) => false;
+        searches = scene.ResolveCalls;
+        session.ReconcileTrackFollowing();
+        Assert(scene.ResolveCalls > searches, "A target that is no longer live is searched for again at once");
+    }
     static (TrackScene scene, Box box, AuthoringSession session, Editor editor, Store store) Session(string patch = null) {
         var (scene, box) = Setup();
         var store = new Store { Patch = patch }; var editor = new Editor();

@@ -29,7 +29,7 @@ class FakeBoardWorld : IBoardWorld {
     public readonly List<string> Invalidated = new List<string>();
     public double Clock;
     public bool FailRebuild;
-    public int FailRebuildCount, PoseWrites, Rebuilds;
+    public int FailRebuildCount, PoseWrites, Rebuilds, Finds;
     int nextKey;
     public IEnumerable<string> MapIds => Maps;
     public event Action<double[], double[]> TileBuilt;
@@ -43,7 +43,8 @@ class FakeBoardWorld : IBoardWorld {
     void AddKey(FakeBoard b) { var key = "k" + nextKey++; MaskStore[key] = (double[])b.Position.Clone(); b.Keys.Add(key); Invalidate(b.Position); }
     void RemoveKeys(FakeBoard b) { foreach (var key in b.Keys) { if (MaskStore.TryGetValue(key, out var at)) Invalidate(at); MaskStore.Remove(key); } b.Keys.Clear(); }
     void Invalidate(double[] at) { var tile = TileOf(at); if (!UnloadedTiles.Contains(tile)) PendingTiles.Add(tile); }
-    public IReadOnlyList<object> Find(string scene, string path) => Boards.Where(b => b.Scene == scene && b.Path == path && b.Culler).Cast<object>().ToList();
+    public IReadOnlyList<object> Find(string scene, string path) { Finds++; return Find(Boards, scene, path); }
+    static IReadOnlyList<object> Find(List<FakeBoard> Boards, string scene, string path) => Boards.Where(b => b.Scene == scene && b.Path == path && b.Culler).Cast<object>().ToList();
     public BoardFacts Facts(object board) {
         var b = (FakeBoard)board;
         return new BoardFacts(b.Scene, b.Path, true, b.ParentsActive, b.Culler, b.CullerEnabled, b.Masks, b.MaskEnabled, b.Flattens, b.Unexpected, b.Parent);
@@ -130,6 +131,54 @@ static class BoardTests {
         AuthoredTerrainFailureKeepsEditAndRetries();
         FailedAuthoredEditWaitsForRestoredOutput();
         SaveRaisesMinimumForPatternBoards();
+        InspectedOutputResolvesOncePerInspection();
+        ChangedObjectsAreReadFromTheDocument();
+    }
+    // The outliner marks every row this MapMod modifies. That reads the document alone and never searches the scene.
+    static void ChangedObjectsAreReadFromTheDocument() {
+        var (world, board, boards, session, editor, store) = Authoring();
+        Assert(!session.IsChanged(Sylva), "An untouched object is not changed");
+        Assert(session.Edit(Sylva, Pose(Moved), null).Applied, "The board is placed");
+        var finds = world.Finds;
+        for (var row = 0; row < 825; row++) Assert(session.IsChanged(Sylva) && !session.IsChanged(Whittier), "The placed board is changed, another board is not");
+        Assert(session.IsChanged(new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType)) && !session.IsChanged(new TargetIdentity(Scene, IndependentBoards.SylvaPath, "Other.Component")),
+            "An observation without a structure matches the modification of the same object; another component does not");
+        Assert(world.Finds == finds, "Marking rows does not search the scene: " + (world.Finds - finds));
+        editor.Undo();
+        Assert(!session.IsChanged(Sylva), "Undo of the only edit leaves the object unchanged");
+        editor.Redo();
+        Assert(session.IsChanged(Sylva) && session.Remove(Sylva).Applied && !session.IsChanged(Sylva), "Removing the modification leaves the object unchanged");
+    }
+    // The panel reads the terrain output of the inspected board every frame. The scene is searched once per
+    // inspection; the output still follows the game's rebuild.
+    static void InspectedOutputResolvesOncePerInspection() {
+        var (world, board, boards, session, editor, store) = Authoring();
+        Assert(session.Edit(Sylva, Pose(Far), null).Applied, "The board moves to another terrain tile");
+        SceneObservation Observe() => new SceneObservation(board, Sylva, "Independent board", true, board.Position, board.Rotation, new string[0], new string[0], new string[0], "Fixed placement and activity");
+        var inspected = Observe();
+        var output = new RailroaderScenePatcher.InspectedOutput();
+        var finds = world.Finds;
+        for (var frame = 0; frame < 100; frame++) {
+            var current = output.Of(session, inspected, out var problem);
+            Assert(problem == null && current.Outstanding.Count == 2 && !current.Settled, "Every frame reads the outstanding output of the inspected board");
+        }
+        Assert(world.Finds == finds + 1, "One inspection searches the scene once, not once per frame: " + (world.Finds - finds));
+        world.BuildTiles(); boards.Poll();
+        Assert(output.Of(session, inspected, out _).Settled && world.Finds == finds + 1, "Completion is read without another search");
+        var expected = session.Output(Sylva);
+        var cached = output.Of(session, inspected, out _);
+        Assert(cached.Completed.SequenceEqual(expected.Completed) && cached.Outstanding.SequenceEqual(expected.Outstanding) && cached.Error == expected.Error, "The cached read equals the resolving read");
+        finds = world.Finds;
+        var refreshed = Observe();
+        Assert(output.Of(session, refreshed, out _).Settled && output.Of(session, refreshed, out _).Settled && world.Finds == finds + 1, "A new observation, as every refresh and edit produces, searches once again");
+        var twin = world.Add(new FakeBoard());
+        finds = world.Finds;
+        var ambiguous = Observe();
+        var none = output.Of(session, ambiguous, out var ambiguity);
+        Assert(ambiguity == null && none.Completed.Count == 0 && none.Outstanding.Count == 0 && none.Error == null && session.Output(Sylva).Completed.Count == 0, "A target that does not resolve uniquely has no output, as before");
+        output.Of(session, ambiguous, out _);
+        Assert(world.Finds == finds + 2, "The failed resolution is remembered for that observation: " + (world.Finds - finds));
+        world.Boards.Remove(twin);
     }
     static readonly TargetIdentity Sylva = new TargetIdentity(Scene, IndependentBoards.SylvaPath, IndependentBoards.CullerType, IndependentBoards.Structure);
     static readonly TargetIdentity Whittier = new TargetIdentity(Scene, OtherPath, IndependentBoards.CullerType, IndependentBoards.Structure);

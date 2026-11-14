@@ -41,14 +41,22 @@ namespace RailroaderScenePatcher.Core {
     }
     // One field of a scanned owner. Relevant fields can hold a target, directly or as a list element; Read may throw.
     public sealed class ReferenceField {
-        public ReferenceField(string name, bool relevant, Func<object> read) { Name = name; Relevant = relevant; Read = read ?? throw new ArgumentNullException(nameof(read)); }
+        public ReferenceField(string name, bool relevant, Func<object> read, bool authored = true) { Authored = authored; Name = name; Relevant = relevant; Read = read ?? throw new ArgumentNullException(nameof(read)); }
         public string Name { get; }
         public bool Relevant { get; }
         public Func<object> Read { get; }
+        // Whether Unity serializes the field, so that a reference in it is authored scene state. A reference in any other
+        // field is working state that changes while the game runs.
+        public bool Authored { get; }
     }
     // The direct references from scanned owners to targets. A relevant field that cannot be read, or a list that cannot be
     // enumerated, makes the scan incomplete: an unread field may hold any target, so every target is then refused.
     public sealed class ReferenceScan {
+        // Unity serializes an instance field that is public or marked SerializeField, and never a static, read-only or
+        // NonSerialized one.
+        public static bool IsSerialized(System.Reflection.FieldInfo field) =>
+            field != null && !field.IsStatic && !field.IsInitOnly && !field.IsLiteral && !field.IsNotSerialized &&
+            (field.IsPublic || field.GetCustomAttributes(true).Any(attribute => attribute.GetType().FullName == "UnityEngine.SerializeField"));
         readonly Dictionary<object, List<KeyValuePair<object, string>>> holders = new Dictionary<object, List<KeyValuePair<object, string>>>(new ByReference());
         readonly List<string> unreadable = new List<string>();
         sealed class ByReference : IEqualityComparer<object> {

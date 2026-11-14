@@ -50,6 +50,9 @@ namespace RailroaderScenePatcher {
             handler = Session.HistoryChanged;
             changed.AddEventHandler(Manager, handler);
         }
+        // The editor values every change of the outstanding work passes through: an edit, Undo and Redo move the change
+        // count, a completed Save moves the clean count.
+        internal string ChangeKey => Native.Read(Editor, "_upgradedOnLoad") + "|" + Native.Read(Manager, "ChangeCount") + "|" + Native.Read(Editor, "_cleanChangeCount");
         // The editor's own change-count answer, without the patcher's accounting.
         internal bool NativeDirty => (bool)Native.Read(Editor, "_upgradedOnLoad") || Convert.ToInt32(Native.Read(Manager, "ChangeCount")) != Convert.ToInt32(Native.Read(Editor, "_cleanChangeCount"));
         // The native title and Save button read the dirty state when they are built; rebuild them after the accounting changed.

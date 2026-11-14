@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Update="Info.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Icons/SceneWrench.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="RequireGameAssemblies" BeforeTargets="ResolveReferences" Condition="!Exists('$(GameManaged)/Railroader.Modding.dll')">
     <Error Text="Set GameManaged to the installed Railroader_Data/Managed directory. Game assemblies are not distributed with this repository." />

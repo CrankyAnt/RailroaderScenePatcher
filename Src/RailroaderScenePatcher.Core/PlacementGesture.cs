@@ -52,15 +52,28 @@ namespace RailroaderScenePatcher.Core {
                 mutated = true; writingPreview = true;
                 scene.Apply(target, new ObjectState(pose, null));
                 if (!SamePose(scene.Read(target).Placement, pose)) throw new InvalidOperationException("Gizmo preview did not verify");
-                var inventory = new SceneInventory((IInspectionScene)scene); inventory.Refresh();
-                var observation = inventory.Entries.Single(o => ReferenceEquals(o.Handle, target) && o.Identity.Scene == identity.Scene && o.Identity.Path == identity.Path && o.Identity.Component == identity.Component);
-                expected = inventory.Pin(observation);
+                expected = Observed();
                 writingPreview = false; desired = pose; result.Applied = true;
             } catch (Exception e) {
                 var restored = Cancel();
                 result.Error = e.Message + (restored.Error == null ? "" : "; " + restored.Error);
             }
             return result;
+        }
+        // The token for the target as the preview left it: the next preview, the completion and the cancellation refuse
+        // when the target is no longer what this gesture made of it. A scene that can observe one object reads the
+        // target alone, so a drag reads the scene in proportion to its target and not to the scene. A scene that
+        // cannot is discovered and compared in full.
+        InspectedTarget Observed() {
+            if (scene is ITargetedInspectionScene targeted) {
+                var observed = targeted.Observe(target, identity);
+                if (observed == null || !ReferenceEquals(observed.Handle, target) || observed.Identity.Scene != identity.Scene || observed.Identity.Path != identity.Path || observed.Identity.Component != identity.Component)
+                    throw new InvalidOperationException("The gizmo target is no longer observed");
+                return new InspectedTarget(maps, observed);
+            }
+            var inventory = new SceneInventory((IInspectionScene)scene); inventory.Refresh();
+            var observation = inventory.Entries.Single(o => ReferenceEquals(o.Handle, target) && o.Identity.Scene == identity.Scene && o.Identity.Path == identity.Path && o.Identity.Component == identity.Component);
+            return inventory.Pin(observation);
         }
         public Outcome Complete() {
             if (!active) return new Outcome { Error = "The gizmo gesture has ended" };

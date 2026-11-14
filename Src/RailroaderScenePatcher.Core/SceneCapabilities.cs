@@ -9,7 +9,18 @@ namespace RailroaderScenePatcher.Core {
     // The scene of one load, assembled from independent capabilities. Each resolved object is operated on by
     // the capability that resolved it. A capability that is incompatible with the running game build fails
     // only the modifications that name its structure; unrelated supported work stays available.
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene {
+    // A scene that can tell, without searching, whether an object resolved earlier is still the object of its identity.
+    public interface ITargetLiveness {
+        bool IsLive(object target, TargetIdentity identity);
+    }
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene {
+        // The observation of one object, when the inspection source can make it.
+        public SceneObservation Observe(object handle, TargetIdentity identity) {
+            return inspection is ITargetedInspectionScene targeted ? targeted.Observe(handle, identity) : inspection?.Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle) && o.Identity.Component == identity.Component);
+        }
+        // Supplied by the host: whether the object still exists at the identity's scene and path.
+        public Func<object, TargetIdentity, bool> Live { get; set; }
+        public bool IsLive(object target, TargetIdentity identity) { return Live != null && target != null && Live(target, identity); }
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) { return ReferenceEquals(a, b); }
             public int GetHashCode(object value) { return RuntimeHelpers.GetHashCode(value); }

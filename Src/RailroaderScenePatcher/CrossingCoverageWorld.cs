@@ -58,8 +58,7 @@ namespace RailroaderScenePatcher {
         Component ControllerOf(object target) => ((GameObject)target).GetComponent(controller) ?? throw new InvalidOperationException("The object no longer holds a crossing controller");
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != CrossingCoverageScene.ComponentType) return Array.Empty<object>();
-            return Resources.FindObjectsOfTypeAll(controller).OfType<Component>().Where(c => c != null).Select(c => c.gameObject).Distinct()
-                .Where(g => Loaded(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path).Cast<object>().ToArray();
+            return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(controller) != null).Cast<object>().ToArray();
         }
         public string PatternProblem(object target) => Problem(target as GameObject);
         // Why the object does not conform to the supported crossing pattern, or null. Shared with the inventory.

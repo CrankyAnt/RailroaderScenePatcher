@@ -37,6 +37,64 @@ static class SelectionTests {
         UnresolvedSceneTargets(scene, document.ToString(), candidates, candidate, original, replacement);
         ReplacementChoices(scene, document.ToString(), candidates, candidate, result, original, replacement);
         AuthoringHistory();
+        ConfirmationFindsOneIdentity();
+    }
+    // A scene that can find one identity confirms without discovering every candidate, and still refuses a candidate
+    // that changed, disappeared or became ambiguous.
+    sealed class FindingCandidates : ITargetedSelectionScene {
+        public IEnumerable<string> MapIds => new[] { "map" };
+        public readonly List<SelectionCandidate> Items = new List<SelectionCandidate>();
+        public int Discoveries, Finds;
+        public IEnumerable<SelectionCandidate> Discover(SelectionKind kind) { Discoveries++; return Items.Where(c => c.Identity.Kind == kind); }
+        // As the native scene does: every candidate at the identity's place, whatever its classification reads now.
+        public IEnumerable<SelectionCandidate> Find(SelectionIdentity identity) {
+            Finds++;
+            return Items.Where(c => c.Identity.Kind == identity.Kind && (identity.Target == null ? c.Identity.Identifier == identity.Identifier
+                : c.Identity.Target.Scene == identity.Target.Scene && c.Identity.Target.Path == identity.Target.Path && c.Identity.Target.Component == identity.Target.Component)).ToArray();
+        }
+    }
+    static void ConfirmationFindsOneIdentity() {
+        var scene = new FindingCandidates();
+        object board = new object(), track = new object();
+        var source = new SelectionCandidate(board, SelectionIdentity.SceneObject(new TargetIdentity("scene", "board", "Culler")), "Board");
+        var segment = new SelectionCandidate(track, SelectionIdentity.Graph(SelectionKind.TrackSegment, "S1"), "S1", "geometry A");
+        scene.Items.Add(source); scene.Items.Add(segment);
+        var choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
+        choice.Offer(new[] { segment });
+        Check(choice.Confirm() && scene.Discoveries == 0 && scene.Finds == 2, "Confirmation finds the source and the candidate and discovers nothing: " + scene.Discoveries + "/" + scene.Finds);
+        // The source object is gone.
+        choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
+        choice.Offer(new[] { segment }); scene.Items.Remove(source);
+        Check(!choice.Confirm() && choice.Problem == "The source object changed or no longer resolves uniquely: it is no longer found. Cancel and inspect it again.", "A source that no longer resolves refuses the confirmation and says so: " + choice.Problem);
+        scene.Items.Add(source);
+        // The candidate's geometry changed.
+        choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
+        choice.Offer(new[] { segment });
+        scene.Items.Remove(segment); scene.Items.Add(new SelectionCandidate(track, segment.Identity, "S1", "geometry B"));
+        Check(!choice.Confirm() && choice.Problem == "The candidate changed or no longer resolves uniquely: its observed geometry changed. Pick again.", "A changed candidate refuses the confirmation and names the change: " + choice.Problem);
+        // A second object at the source's identity.
+        scene.Items.Clear(); scene.Items.Add(source); scene.Items.Add(segment);
+        choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
+        choice.Offer(new[] { segment }); scene.Items.Add(new SelectionCandidate(new object(), source.Identity, "Board"));
+        Check(!choice.Confirm() && scene.Discoveries == 0 && choice.Problem == "The inspected object shares its identity scene/board [Culler] with another object, so a patch cannot target it. Cancel; a choice for this object cannot be confirmed.",
+            "A source that shares its identity refuses the confirmation, names the identity and does not ask to inspect again: " + choice.Problem);
+        // A candidate that shares its identity with another object.
+        scene.Items.Clear(); scene.Items.Add(source); scene.Items.Add(new SelectionCandidate(new object(), source.Identity, "Board"));
+        choice = new PendingSelection(scene, SelectionKind.SceneObject, "Select scene object");
+        choice.Offer(new[] { source });
+        Check(!choice.Confirm() && choice.Problem == "The candidate shares its identity scene/board [Culler] with another object, so a patch cannot target it. Pick an object whose path is unique.",
+            "A candidate that shares its identity is refused with what to pick instead: " + choice.Problem);
+        // The same object under another classification, as when its supported edits changed.
+        scene.Items.Clear(); scene.Items.Add(new SelectionCandidate(board, SelectionIdentity.SceneObject(new TargetIdentity("scene", "board", "Culler", "structure")), "Board")); scene.Items.Add(segment);
+        choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
+        choice.Offer(new[] { segment });
+        Check(!choice.Confirm() && choice.Problem.Contains("its identity or its supported edits changed"), "A source whose classification changed is named as such: " + choice.Problem);
+        // An object chosen without a source object, as by Select in world: one find, for the candidate.
+        scene.Items.Clear(); scene.Items.Add(source); scene.Finds = 0; scene.Discoveries = 0;
+        choice = new PendingSelection(scene, SelectionKind.SceneObject, "Select scene object");
+        choice.Offer(new[] { source });
+        Check(choice.Confirm() && scene.Finds == 1 && scene.Discoveries == 0, "Confirming an object without a source finds the candidate once: " + scene.Finds + "/" + scene.Discoveries);
+        Console.WriteLine("PASS: confirmation by finding one identity");
     }
 
     static void AuthoringHistory() {

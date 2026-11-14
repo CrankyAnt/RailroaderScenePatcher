@@ -40,12 +40,46 @@ static class GizmoTests {
         }
         internal PlacementGesture Begin() => new PlacementGesture(Engine, Session, Target, Inventory.Pin(Inventory.Entries[0]));
     }
+    // A scene that can observe one object, counting what a gesture reads.
+    sealed class TargetedGizmoScene : Scene, IScene, IInspectionScene, ITargetedInspectionScene {
+        public int Discoveries, Targeted;
+        IEnumerable<SceneObservation> IInspectionScene.Discover() { Discoveries++; return Discover(); }
+        public SceneObservation Observe(object handle, TargetIdentity identity) { Targeted++; return Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle)); }
+    }
+    // Dragging previews many poses. Each preview reads its target and never the whole scene; the gesture still refuses
+    // a target that changed under it.
+    static void APreviewObservesOnlyTheGestureTarget() {
+        var scene = new TargetedGizmoScene();
+        var box = new Box { Position = new[] { 7.0, 2.0, 3.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
+        scene.Objects["p"] = new List<object> { box };
+        scene.Observations = () => new[] { new SceneObservation(box, Target, "board", box.Active, scene.Read(box).Placement.Position, box.Rotation,
+            new[] { "unchanged-binding" }, Array.Empty<string>(), Array.Empty<string>(), "placement") };
+        var engine = new PatchEngine(scene); var editor = new Editor();
+        var session = new AuthoringSession(engine, editor, new Store(), "map"); editor.Session = session;
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        var gesture = new PlacementGesture(engine, session, Target, inventory.PinCompared(inventory.Entries[0]));
+        scene.Discoveries = 0; scene.Targeted = 0;
+        Assert(gesture.Preview(Pose(112)).Applied && gesture.Preview(Pose(113)).Applied && gesture.Preview(Pose(114)).Applied, "Three previews of one drag apply");
+        Assert(scene.Discoveries == 0 && scene.Targeted >= 3, "A preview observes its target and discovers nothing: " + scene.Discoveries + "/" + scene.Targeted);
+        Assert(box.X == 14, "The last preview is the pose in the scene: " + box.X);
+        var completed = gesture.Complete();
+        Assert(completed.Applied && box.X == 14 && editor.UndoGroups.Count == 1 && scene.Discoveries == 0, "Completion persists the previewed pose without a discovery: " + completed.Error + " " + scene.Discoveries);
+        // A change by another hand between two previews is refused and not overwritten.
+        inventory.Refresh();
+        gesture = new PlacementGesture(engine, session, Target, inventory.PinCompared(inventory.Entries[0]));
+        Assert(gesture.Preview(Pose(120)).Applied, "A preview precedes an independent change");
+        box.X = 55; box.Active = false;
+        var mutations = scene.MutationCalls;
+        var refused = gesture.Preview(Pose(121));
+        Assert(!refused.Applied && box.X == 55 && !box.Active && scene.MutationCalls == mutations, "A preview after an independent change is refused and leaves that change: " + refused.Error);
+    }
     internal static void Run() {
         CompletedGesturePersistsOneFixedOperation();
         CancelAndOriginShiftRestoreMapState();
         StaleAndFailedPreviewsStayGuarded();
         UnsupportedExistingContentRejectsPreview();
         ExternalChangesAreNotOverwrittenByCancellation();
+        APreviewObservesOnlyTheGestureTarget();
         Console.WriteLine("Gizmo tests passed");
     }
     static void ExternalChangesAreNotOverwrittenByCancellation() {

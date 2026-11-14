@@ -26,9 +26,24 @@ namespace RailroaderScenePatcher {
         }
     }
 
-    internal sealed class SpatialSelectionScene : ISelectionScene {
+    internal sealed class SpatialSelectionScene : ITargetedSelectionScene {
         readonly IInspectionScene inventory;
-        internal SpatialSelectionScene(IInspectionScene inventory) { this.inventory = inventory; }
+        // The entries of the inventory snapshot, or null. With them the scene objects offered for a choice are the
+        // snapshot's observations and no discovery runs for a choice; confirming reads the chosen object itself.
+        readonly Func<IReadOnlyList<SceneObservation>> entries;
+        internal SpatialSelectionScene(IInspectionScene inventory, Func<IReadOnlyList<SceneObservation>> entries = null) { this.inventory = inventory; this.entries = entries; }
+        // Every current candidate of one identity. A scene object is resolved by its path and observed now, so two
+        // objects at one path are both returned and an object that is gone or no longer observed is not. A scene that
+        // cannot observe one object, and a track identity, read every candidate of the kind.
+        public IEnumerable<SelectionCandidate> Find(SelectionIdentity identity) {
+            if (identity.Kind != SelectionKind.SceneObject || !(inventory is ITargetedInspectionScene targeted)) return Discover(identity.Kind);
+            var found = new List<SelectionCandidate>();
+            foreach (var target in BoardScene.LoadedAt(identity.Target.Scene, identity.Target.Path)) {
+                var observation = targeted.Observe(target, identity.Target);
+                if (observation != null) found.Add(Observe(observation).Choice);
+            }
+            return found;
+        }
         public IEnumerable<string> MapIds => inventory.MapIds;
         public IEnumerable<SelectionCandidate> Discover(SelectionKind kind) => Scan(kind).Select(c => c.Choice);
 
@@ -43,7 +58,8 @@ namespace RailroaderScenePatcher {
 
         internal IEnumerable<SpatialCandidate> Scan(SelectionKind kind) {
             if (kind == SelectionKind.SceneObject) {
-                foreach (var observation in inventory.Discover()) yield return Observe(observation);
+                var snapshot = entries?.Invoke();
+                foreach (var observation in snapshot != null && snapshot.Count != 0 ? snapshot : inventory.Discover()) yield return Observe(observation);
                 yield break;
             }
 
@@ -107,11 +123,17 @@ namespace RailroaderScenePatcher {
         readonly SelectionSession session;
         SpatialCandidate[] candidates = Array.Empty<SpatialCandidate>();
         SpatialCandidate source;
+        // The confirmed target and the object it was confirmed for, kept for its world marking.
+        SpatialCandidate confirmedMark;
+        object confirmedFor;
         internal PendingSelection Pending => session.Pending;
-        internal ConfirmedSelection Confirmed => session.Confirmed;
+        // The last confirmation, until a later choice is cancelled: after Cancel nothing is chosen, so the panel shows no
+        // earlier target as confirmed beside fields that were cleared.
+        bool withdrawn;
+        internal ConfirmedSelection Confirmed => withdrawn ? null : session.Confirmed;
 
-        internal SpatialSelection(IInspectionScene inventory) {
-            scene = new SpatialSelectionScene(inventory);
+        internal SpatialSelection(IInspectionScene inventory, Func<IReadOnlyList<SceneObservation>> entries = null) {
+            scene = new SpatialSelectionScene(inventory, entries);
             session = new SelectionSession(scene);
         }
 
@@ -128,6 +150,7 @@ namespace RailroaderScenePatcher {
             session.Begin(kind, purpose, newSource?.Choice);
             candidates = current;
             source = newSource;
+            confirmedMark = null; confirmedFor = null;
         }
 
         internal void Pick(Vector2 pointer, IReadOnlyList<Rect> covered) {
@@ -150,11 +173,15 @@ namespace RailroaderScenePatcher {
         internal SpatialCandidate Confirm() {
             var selected = Find(Pending?.Candidate);
             if (selected == null || !session.Confirm()) return null;
+            withdrawn = false;
+            var owner = source?.Choice.Handle;
             ClearMarks();
+            confirmedMark = selected; confirmedFor = owner;
             return selected;
         }
 
         internal void Cancel() {
+            if (session.Pending != null) withdrawn = true;
             session.Cancel();
             ClearMarks();
         }
@@ -174,7 +201,10 @@ namespace RailroaderScenePatcher {
             var camera = Camera.main;
             if (camera == null) return;
             var original = source ?? (inspected == null ? null : SpatialSelectionScene.Observe(inspected));
-            overlay.Draw(candidates, Pending, original, source != null, camera, WorldOffset(), covered, backing);
+            // The confirmed relation belongs to the object it was chosen for, and is not the inspected object itself.
+            var relation = Pending == null && session.Confirmed != null && confirmedMark != null && inspected != null &&
+                (confirmedFor == null || ReferenceEquals(confirmedFor, inspected.Handle)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
+            overlay.Draw(candidates, Pending, original, source != null, relation, camera, WorldOffset(), covered, backing);
         }
 
         static Vector3 WorldOffset() =>

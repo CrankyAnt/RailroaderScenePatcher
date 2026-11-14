@@ -108,13 +108,23 @@ namespace RailroaderScenePatcher {
         }
         protected IReadOnlyList<object> Markers(TargetIdentity identity, Func<GameObject, bool> belongs) {
             if (identity.Component != MarkerType) return Array.Empty<object>();
+            // The walk goes down the identity's path. While a marker is being enabled its scene is not loaded yet and the
+            // scene manager does not list it: then every marker component is searched.
+            if (enablingTarget == null) return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(marker) != null && belongs(g)).Cast<object>().ToArray();
             return Resources.FindObjectsOfTypeAll(marker).OfType<Component>().Where(c => c != null).Select(c => c.gameObject).Distinct()
                 .Where(g => VisibleForCheck(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path && belongs(g)).Cast<object>().ToArray();
         }
+        // The reference scan of a discovery the owner vouches for, or null. The check of a marker reads every field of
+        // every loaded component, which is most of a discovery; the editor panel supplies the scan of the discovery its
+        // snapshot was compared with instead. Runtime application and the check while a marker is enabled never use it.
+        internal Func<ReferenceScan> KnownReferrers;
         public virtual string PatternProblem(object target) =>
             Problem(target as GameObject, CurrentReferrers(), HolderIndex.Lazy(() => SetupPlacementMarkers(VisibleForCheck)), ReferenceEquals(target, enablingTarget));
-        // Direct references to marker components from the objects the current check may see, scanned at most once per frame.
+        // Direct references to marker components from the objects the current check may see: the scan the owner vouches
+        // for, or one of the scene, made at most once per frame.
         protected ReferenceScan CurrentReferrers() {
+            var known = enablingTarget == null ? KnownReferrers?.Invoke() : null;
+            if (known != null) return known;
             if (referrersFrame != Time.frameCount) { referrers = Referrers(Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && VisibleForCheck(c.gameObject))); referrersFrame = Time.frameCount; }
             return referrers;
         }
@@ -144,7 +154,7 @@ namespace RailroaderScenePatcher {
         static IEnumerable<ReferenceField> Fields(object owner) {
             foreach (var descriptor in Descriptors(owner.GetType())) {
                 var f = descriptor.Key;
-                yield return new ReferenceField(f.Name, descriptor.Value, () => f.GetValue(owner));
+                yield return new ReferenceField(f.Name, descriptor.Value, () => f.GetValue(owner), ReferenceScan.IsSerialized(f));
             }
         }
         // The markers that new-game setup car placements hold, walked in the order the per-marker check walked them: each

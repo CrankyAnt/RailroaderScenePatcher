@@ -19,14 +19,14 @@ The patcher rebinds a pad when all of these hold:
 
 A pad inside a protected crossing qualifies too, because the crossing controller does not read the pad's marker. The crossing's own track spans and circuits are a separate operation.
 
-The inventory shows such an object in the `Crossing pad marker` family with the structure `crossing-pad-v1`. Any other pad lists **Pad binding unavailable** with the reason and stays inspection only.
+The inventory shows such an object in the `Crossing pad marker` family with the structure `crossing-pad-v1`. Under **Detected problems**, any other pad lists **Pad binding unavailable** with the reason and stays inspection only.
 
 ## Set or replace the binding in the editor
 
-1. Open **Scene patches**, select **Refresh inventory and verify stored target identities**, and select the pad's row. **Select scene object in world** also selects it, as described in [select world targets](select-world-targets.md).
-2. Under **Crossing pad binding**, check the **Current** lines: the stored segment, end and distance, and each graph registration under the marker ID with its owner.
-3. Enter the target segment ID, the end (`a` or `b`) and the distance in metres, or select **Use confirmed segment** after confirming a track in the world.
-4. Select **Set track binding**.
+1. Open **Scene patches** and select the pad's row in the outliner, in the folder **Crossing pad marker**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
+2. On the **Connections** tab, under **Crossing pad binding**, check the present values: the stored segment, end and distance, and each graph registration under the marker ID with its owner.
+3. Enter the target segment ID in **Segment**, the end (`A` or `B`) in **End (A or B)** and the distance in metres in **Distance (m)**. To take the segment from the world, select **Segment** in the **Replacement targets** section, click the track and choose **Confirm** in the footer: the **Segment** field takes the confirmed segment.
+4. Select **Set** in the footer.
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration and geometry.
 
@@ -36,7 +36,7 @@ The patcher verifies the stored location, the single graph registration, that th
 
 ## Detaching is refused
 
-A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach from track** is not offered for pads, and a document that detaches a pad fails before any change. To hide a pad, disable it.
+A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach** in the footer is unavailable for pads, and its tooltip says why, and a document that detaches a pad fails before any change. To hide a pad, disable it.
 
 ## Placement and activity
 
@@ -46,13 +46,13 @@ A pad can also follow a track, as described in [follow a track](following-track.
 
 ## Undo, clear and remove
 
-Native Undo and Redo reverse and reapply each binding edit together with its registration and a new generation, so the pad returns to the earlier mesh. **Clear authored binding** removes only the relationship from this MapMod's modification. The pad returns to the binding the loaded map gives it, with matching geometry, while an authored placement or activity stays. **Remove modification** returns binding, registration, placement, activity and geometry to the loaded map's values.
+Native Undo and Redo reverse and reapply each binding edit together with its registration and a new generation, so the pad returns to the earlier mesh. **Clear** in the footer removes only the relationship from this MapMod's modification. The pad returns to the binding the loaded map gives it, with matching geometry, while an authored placement or activity stays. **Remove** on the **Changes** tab returns binding, registration, placement, activity and geometry to the loaded map's values.
 
-If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the pad until **Recheck after failed edit** succeeds or the world reloads.
+If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the pad until **Recheck** on the **Changes** tab succeeds or the world reloads.
 
 ## Write the binding by hand
 
-Copy the inspected identity with **Copy inspected identity** and add a modification to `Data/scene-patches.json`, as described in [scene-patch document v1](scene-patch-document-v1.md):
+Copy the inspected identity with **Copy ID** in the command band and add a modification to `Data/scene-patches.json`, as described in [scene-patch document v1](scene-patch-document-v1.md):
 
 ```json
 {
