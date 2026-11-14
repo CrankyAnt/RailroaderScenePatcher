@@ -147,6 +147,7 @@ A detection span that a MapMod's coherent operation constructs and registers for
 
 **Detection addition**:
 A circuit that a MapMod adds at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying MapMod. It adds detection without changing the crossing's native circuits. It is not an Added object.
+_Avoid_: Authored addition
 
 ### Editor terminology
 
