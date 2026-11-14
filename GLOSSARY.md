@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Railroader Scene Patcher
 
-This context covers scene changes supplied by map mods and authored for the Railroader map editor.
+This context covers scene changes supplied by map mods and made in the Railroader map editor.
 
 ## Language
 
@@ -34,7 +34,7 @@ _Avoid_: Source scene
 
 ### Patcher terminology
 
-These are project terms for scene-patch authoring and application, not additional Railroader definition types or Unity object types.
+These are project terms for editing and applying scene patches, not additional Railroader definition types or Unity object types.
 
 **MapMod**:
 An asset pack that supplies a Railroader Map definition or changes to a map. This includes modifications to an existing map and packs that provide a new map.
@@ -56,6 +56,10 @@ _Avoid_: Patch history, movement script
 The document that expresses a MapMod's scene patch.
 _Avoid_: Patch history
 
+**MapMod value**:
+A value that a supplying MapMod's patch document sets for a scene object. Without it, the object keeps its effective underlying state.
+_Avoid_: Authored value, authored state, authored binding, authored activity
+
 **Physical placement**:
 An object's position and rotation in the map.
 _Avoid_: Binding
@@ -70,8 +74,12 @@ Physical placement defined relative to a selected track or one of its endpoints.
 **Existing target**:
 A supported scene object that already exists in the loaded map context and is identified for a scene patch.
 
+**Modded object**:
+An existing scene object that a MapMod's scene patch changes.
+_Avoid_: Authored object
+
 **Supported operation**:
-A scene change that the patcher can author and apply for an applicable object and relationship.
+A scene change that the patcher can edit and apply for an applicable object and relationship.
 
 **Coherent operation**:
 A single user-recognizable scene change with one outcome and one restoration boundary.
@@ -79,8 +87,9 @@ A single user-recognizable scene change with one outcome and one restoration bou
 **Registration**:
 An object's membership in a game-managed graph or other structure that makes it available to related game behavior.
 
-**Authored addition**:
-A scene object added through a MapMod's scene patch rather than an existing object in the loaded map. Native objects that are new to a particular MapMod are not automatically authored additions.
+**Added object**:
+A scene object that a MapMod's scene patch adds, rather than an existing object in the loaded map. Native objects that are new to a particular MapMod are not automatically added objects.
+_Avoid_: Authored addition
 
 **Existing crossing**:
 A protected road crossing already present in the map, whose track coverage or equipment can be extended or corrected.
@@ -94,7 +103,7 @@ The MapMod that owns a scene-patch document, regardless of which source map or p
 _Avoid_: Target owner
 
 **Active edited MapMod**:
-The supplying MapMod that owns the selected Map definition being authored in the editor. Other packs can supply inherited content without becoming edit targets.
+The supplying MapMod that owns the selected Map definition being edited in the editor. Other packs can supply inherited content without becoming edit targets.
 
 **Effective underlying state**:
 The state that remains for an existing object without a particular modification by its supplying MapMod, including the applicable native context and other retained modifications in that editing or runtime context.
@@ -125,21 +134,25 @@ _Avoid_: Group-following object
 An object's dependence on its track group, through which enabling or disabling the group changes the object's activity.
 
 **Explicit disable**:
-A scene patch's authored inactive state for an object, which takes precedence over later track-group activation.
+A MapMod value that holds an object inactive, which takes precedence over later track-group activation.
 
 **Circuit**:
 One detection unit of an existing crossing's controller, whose approach and island spans decide when the crossing's equipment activates.
 
 **Crossing coverage**:
-The tracks each circuit of an existing crossing detects, authored per circuit as omitted, explicitly selected tracks or explicitly detached. Proximity never assigns it.
+The tracks each circuit of an existing crossing detects, set per circuit by a MapMod as omitted, explicitly selected tracks or explicitly detached. Proximity never assigns it.
 
 **Owned span**:
 A detection span that a MapMod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; native spans are never removed.
 
 **Detection addition**:
-An authored extra circuit at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying MapMod. It adds detection without changing the crossing's native circuits.
+A circuit that a MapMod adds at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying MapMod. It adds detection without changing the crossing's native circuits. It is not an Added object.
 
 ### Editor terminology
+
+**Scene patch editing**:
+The work of making and changing scene patches in the map editor, as distinct from application at load. User-facing text uses plain words such as "edit", "editing" or "<thing> change" instead of this term.
+_Avoid_: Authoring, patch authoring
 
 **Outliner**:
 The searchable list of inventory scene objects beside the inspector in the production editor.
