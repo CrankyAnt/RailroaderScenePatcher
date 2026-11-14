@@ -82,7 +82,7 @@ namespace RailroaderScenePatcher.Core {
                 // Reject changed targets before restoring a preview or committing its final result.
                 engine.GuardMutation(identity, target, maps, expected);
                 Restore(); active = false;
-                if (desired == null || SamePose(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, ResolvedTarget = target }; }
+                if (desired == null || Unchanged(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, ResolvedTarget = target }; }
                 var result = session.Edit(identity, desired, null, original);
                 if (!result.Applied) engine.AwaitOutput(target);
                 return result;
@@ -106,12 +106,21 @@ namespace RailroaderScenePatcher.Core {
             mutated = false;
         }
         static Placement Copy(Placement pose) => new Placement((double[])pose.Position.Clone(), (double[])pose.Rotation.Clone());
-        static bool SamePose(Placement a, Placement b) {
-            if (a == null || b == null) return false;
-            if (a.Position.Zip(b.Position, (x, y) => Math.Abs(x - y)).Any(d => d > 0.01)) return false;
+        // Whether a read-back pose is the pose that was written or restored. A native transform can return a rotation
+        // slightly off the one it was given, so this check allows about half a degree; a tighter one would report a
+        // sound restoration as unverified and guard the object.
+        static bool SamePose(Placement a, Placement b) => a != null && b != null && SamePosition(a, b) && Alignment(a, b) > 0.99999;
+        // Whether the gesture ended where it began, so that it records nothing. The angle is the smallest one the scene
+        // adapters verify: any rotation they can tell from the starting one is a change, however small.
+        const double ChangedAngleDegrees = 0.01;
+        static bool Unchanged(Placement before, Placement desired) =>
+            SamePosition(before, desired) && 2 * Math.Acos(Math.Min(1, Alignment(before, desired))) * 180 / Math.PI <= ChangedAngleDegrees;
+        static bool SamePosition(Placement a, Placement b) => !a.Position.Zip(b.Position, (x, y) => Math.Abs(x - y)).Any(d => d > 0.01);
+        // The cosine of half the angle between two rotations, or zero when either quaternion is zero.
+        static double Alignment(Placement a, Placement b) {
             double dot = 0, aa = 0, bb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Rotation[i] * b.Rotation[i]; aa += a.Rotation[i] * a.Rotation[i]; bb += b.Rotation[i] * b.Rotation[i]; }
-            return aa > 0 && bb > 0 && Math.Abs(dot) / Math.Sqrt(aa * bb) > 0.99999;
+            return aa > 0 && bb > 0 ? Math.Abs(dot) / Math.Sqrt(aa * bb) : 0;
         }
     }
 }

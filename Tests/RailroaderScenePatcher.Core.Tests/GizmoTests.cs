@@ -13,11 +13,15 @@ static class GizmoTests {
     sealed class GizmoScene : Scene, IScene {
         // Native capability snapshots retain map coordinates and affected dependent state.
         public string Registration = "original registration";
+        // The rotation a native read-back returns after restoration, when it differs slightly from the captured one.
+        public double[] RestoredRotation;
         object IScene.Capture(object target) => new object[] { Read(target), Registration };
         void IScene.Apply(object target, ObjectState state) { Apply(target, state); Registration = "preview registration"; }
         bool IScene.Restore(object target, object snapshot) {
             var captured = (object[])snapshot;
-            Apply(target, (ObjectState)captured[0]); Registration = (string)captured[1]; return true;
+            Apply(target, (ObjectState)captured[0]); Registration = (string)captured[1];
+            if (RestoredRotation != null) ((Box)target).Rotation = (double[])RestoredRotation.Clone();
+            return true;
         }
     }
     sealed class Fixture {
@@ -75,6 +79,8 @@ static class GizmoTests {
     }
     internal static void Run() {
         CompletedGesturePersistsOneFixedOperation();
+        SmallRotationsCompleteAsOperations();
+        RestorationVerifiesWithinTheReadBackTolerance();
         CancelAndOriginShiftRestoreMapState();
         StaleAndFailedPreviewsStayGuarded();
         UnsupportedExistingContentRejectsPreview();
@@ -146,5 +152,46 @@ static class GizmoTests {
         Assert(applied.Error == null && applied.Outcomes.Values.Single().Applied && loaded.Box.X == 4 && loaded.Box.Rotation[1] == 0.6, "The complete saved document reproduces the pose at a different origin");
         loaded.Engine.Apply(f.Store.Patch);
         Assert(loaded.Box.X == 4, "Repeated load reconciles desired state without accumulated movement");
+    }
+    // A rotation about the vertical axis by the given angle, at the fixture object's own map position.
+    static Placement Turned(double degrees) { var half = degrees * Math.PI / 360; return new Placement(new[] { 107.0, 2.0, 3.0 }, new[] { 0.0, Math.Sin(half), 0.0, Math.Cos(half) }); }
+    static JToken Modifications(Fixture f) => JObject.Parse(f.Session.DocumentText)["modifications"];
+    // A completed gesture is one operation however small its rotation; only a gesture that ends where it began is none.
+    static void SmallRotationsCompleteAsOperations() {
+        foreach (var degrees in new[] { 0.4, 0.1, 0.02 }) {
+            var f = new Fixture(); var gesture = f.Begin(); var pose = Turned(degrees);
+            Assert(gesture.Preview(pose).Applied && f.Box.Rotation[1] == pose.Rotation[1], "The preview turns the object by " + degrees + " degrees");
+            var completed = gesture.Complete();
+            Assert(completed.Applied && f.Editor.UndoGroups.Count == 1 && Modifications(f).Count() == 1, "A rotation of " + degrees + " degrees completes as one operation: " + completed.Error + " history " + f.Editor.UndoGroups.Count);
+            var rotation = Modifications(f)[0]["placement"]["rotation"];
+            Assert((double)rotation[1] == pose.Rotation[1] && (double)rotation[3] == pose.Rotation[3] && f.Box.Rotation[1] == pose.Rotation[1] && f.Box.X == 7, "The document and the world hold the small rotation: " + rotation);
+            f.Editor.Undo();
+            Assert(f.Box.Rotation[1] == 0 && f.Box.Rotation[3] == 1 && Modifications(f).Count() == 0, "Undo restores the prior rotation");
+            f.Editor.Redo();
+            Assert(f.Box.Rotation[1] == pose.Rotation[1] && Modifications(f).Count() == 1, "Redo applies the small rotation again");
+        }
+        var back = new Fixture(); var returned = back.Begin();
+        Assert(returned.Preview(Turned(0.4)).Applied && returned.Preview(Turned(0)).Applied && returned.Complete().Applied, "A gesture dragged back to its start completes");
+        Assert(back.Editor.UndoGroups.Count == 0 && Modifications(back).Count() == 0 && back.Box.Rotation[3] == 1 && back.Scene.Registration == "original registration", "A gesture that ends where it began records no modification or history");
+    }
+    // A restored rotation that reads back slightly off the captured one, as a native transform can, still verifies:
+    // the gesture ends without guarding the object, also when its own rotation was smaller than that difference.
+    static void RestorationVerifiesWithinTheReadBackTolerance() {
+        var f = new Fixture(); f.Scene.RestoredRotation = Turned(0.05).Rotation;
+        var gesture = f.Begin();
+        Assert(gesture.Preview(Turned(0.4)).Applied, "A preview precedes the cancellation");
+        var cancelled = gesture.Cancel();
+        Assert(cancelled.Applied && f.Editor.UndoGroups.Count == 0 && Modifications(f).Count() == 0, "Cancel verifies a restoration within the read-back tolerance: " + cancelled.Error);
+        f.Inventory.Refresh(); gesture = f.Begin();
+        Assert(gesture.Preview(Turned(0.02)).Applied, "The object accepts another gesture after that cancellation");
+        var completed = gesture.Complete();
+        Assert(completed.Applied && f.Editor.UndoGroups.Count == 1 && f.Box.Rotation[1] == Turned(0.02).Rotation[1], "A small rotation completes over such a restoration: " + completed.Error);
+        // A restoration that reads back beyond the tolerance still fails and guards the object.
+        var far = new Fixture(); far.Scene.RestoredRotation = Turned(2).Rotation;
+        gesture = far.Begin();
+        Assert(gesture.Preview(Turned(0.4)).Applied && !gesture.Cancel().Applied, "A restoration that reads back two degrees off is reported");
+        far.Inventory.Refresh(); var refused = false;
+        try { far.Begin(); } catch (InvalidOperationException e) { refused = e.Message.Contains("cleanup"); }
+        Assert(refused, "The unverified restoration guards the next gesture");
     }
 }

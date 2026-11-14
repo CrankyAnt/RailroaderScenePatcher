@@ -6,7 +6,7 @@ Use the map editor's **Scene patches** panel to place an existing object support
 
 1. Refresh the inventory and inspect the object, or confirm it through world selection. Use **Focus** in the command band to bring it into view.
 2. On the **Placement** tab, select **Gizmo**, then **Move** or **Rotate** in the footer. The native gizmo uses world axes. Drag an axis, plane or rotation ring in the world. The object previews the result through its placement adapter.
-3. Release the pointer to complete that gesture. The gizmo closes. Start another gizmo gesture for the next movement or rotation. Each completed gesture is one operation in the editor's native Undo/Redo history.
+3. Release the pointer to complete that gesture. The gizmo closes. Start another gizmo gesture for the next movement or rotation. Each completed gesture is one operation in the editor's native Undo/Redo history, however small its rotation. A gesture that ends where it began, within 0.01 m and 0.01 degrees, changes nothing and records no operation.
 4. Use native **Undo** to restore the prior effective placement, and **Redo** to reapply the result. Refresh the inventory before another edit after using history.
 5. Use the editor's **Save** button. It writes the active edited MapMod's `Data/scene-patches.json`, required patcher dependency metadata and native map data. Check outstanding-write feedback after Save. A partial failure keeps completed writes identified and leaves outstanding writes available for retry.
 
