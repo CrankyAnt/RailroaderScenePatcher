@@ -169,8 +169,11 @@ _Avoid_: Properties panel
 The inspector's title for the inspected scene object.
 
 **Command band**:
-The row of object-level commands and status in the inspector, below the object heading.
+The commands and session status at the top of the production editor, split at the column divider into status lamps over the outliner and object commands over the inspector.
 _Avoid_: Toolbar
+
+**Status lamp**:
+A colored dot with a state word that shows session status as information, not as a command.
 
 **Guided mode**:
 An inspector mode that completes one supported operation for a pinned target through the Target, Values, Review and Apply steps.
