@@ -204,6 +204,10 @@ Fixed placement is the base minimum; other content in the document can raise it 
 
 Duplicate JSON property names are rejected during parsing. Duplicate modification IDs reject the document. A target whose `structure` names a capability that is incompatible with the running game build fails with that reason; other modifications still apply. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
 
+## Application on each peer
+
+Format version 1 has no multiplayer fields. The host and every client read `Data/scene-patches.json` from their own installed copy of the MapMod and apply it to their own scene. `sourceMap.mapId`, target identity and capability prerequisites are checked on each peer. `placement.position` is in map coordinates and is converted through each peer's own world origin. A repeated world load reconciles the stored placement without accumulating offsets or retrying failed modifications only while the game's map manager and track graph stay the same. A replaced map manager or graph starts a new load attempt; the native behavior on reconnect and same-map re-entry has not been checked.
+
 ## Minimal example
 
 ```json

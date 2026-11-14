@@ -35,6 +35,116 @@ class Scene : IScene, IInspectionScene {
     public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var pose = (object[])snapshot; box.Position = (double[])pose[0]; box.Rotation = (double[])pose[1]; box.Active = (bool)pose[2]; return true; }
 }
 class Box { public double[] Position = new double[3], Rotation = new double[4]; public bool Active = true; public double X { get => Position[0]; set => Position[0] = value; } }
+// One peer's world state as the native entry point binds it: an adapter and its engine.
+sealed class PeerWorld : IDisposable {
+    public IScene Scene; public PatchEngine Engine;
+    public void Dispose() { (Scene as IDisposable)?.Dispose(); }
+}
+sealed class LocalPeer : IDisposable {
+    readonly LocalWorldBinding<PeerWorld> binding;
+    public LocalPeer(Func<IScene> createScene) {
+        binding = new LocalWorldBinding<PeerWorld>(() => { var scene = createScene() ?? throw new InvalidOperationException("Scene capability unavailable"); return new PeerWorld { Scene = scene, Engine = new PatchEngine(scene) }; }, w => w.Dispose());
+    }
+    public IScene Scene => binding.State?.Scene;
+    public string Error => binding.Error;
+    public bool Enter(object world) => binding.Enter(world);
+    // Null when this world has no engine, so nothing resolves or mutates.
+    public DocumentResult Apply(string json, string documentKey) => binding.State?.Engine.Apply(json, documentKey);
+    public void Dispose() { binding.Dispose(); }
+}
+class PeerScene : Scene, IDisposable {
+    public bool Disposed;
+    public void Dispose() { Disposed = true; }
+}
+static class LocalWorldTests {
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Item(string id, string path) => "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+    static PeerScene Peer(double origin, out Box board) {
+        board = new Box { Position = new[] { 1.0, 1.0, 1.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
+        var scene = new PeerScene { Origin = origin };
+        scene.Objects["board"] = new List<object> { board };
+        return scene;
+    }
+    public static void Run() {
+        HostAndClientEachApplyTheSameDocumentToTheirOwnScene();
+        EachPeerChecksItsOwnMapContextAndCapability();
+        RetainedWorldReentryReconcilesWithoutRepeatingTheLoad();
+        ChangedWorldStartsAFreshLoadAndReleasesThePrevious();
+        UnavailablePrerequisitesIsolateOnlyThatWorld();
+    }
+    static void EachPeerChecksItsOwnMapContextAndCapability() {
+        var json = Doc(Item("move-board", "board"));
+        var hostScene = Peer(0, out var hostBoard); var clientScene = Peer(0, out var clientBoard);
+        clientScene.Maps = new[] { "another-map" };
+        var host = new LocalPeer(() => hostScene); var client = new LocalPeer(() => clientScene);
+        host.Enter("host"); client.Enter("client");
+        var clientResult = client.Apply(json, "pack");
+        Assert(host.Apply(json, "pack").Outcomes["move-board"].Applied && hostBoard.X == 112, "Host applies in its matching map context");
+        Assert(clientResult.Error != null && clientScene.ResolveCalls == 0 && clientBoard.X == 1, "Client map mismatch rejects before its own target resolution without affecting the host");
+        var uncheckedScene = Peer(0, out var uncheckedBoard); uncheckedScene.Capability = Capability.Unchecked;
+        var incompatibleScene = Peer(0, out var incompatibleBoard); incompatibleScene.Capability = Capability.Incompatible;
+        var uncheckedPeer = new LocalPeer(() => uncheckedScene); var incompatiblePeer = new LocalPeer(() => incompatibleScene);
+        uncheckedPeer.Enter("a"); incompatiblePeer.Enter("b");
+        Assert(uncheckedPeer.Apply(json, "pack").Outcomes["move-board"].Applied && uncheckedBoard.X == 112, "An unchecked build alone does not refuse local application");
+        Assert(incompatiblePeer.Apply(json, "pack").Error != null && incompatibleBoard.X == 1 && incompatibleScene.MutationCalls == 0, "Concrete incompatibility refuses only on the affected peer");
+        var ambiguousScene = Peer(0, out _); ambiguousScene.Objects["board"].Add(new Box());
+        var ambiguousPeer = new LocalPeer(() => ambiguousScene); ambiguousPeer.Enter("c");
+        Assert(!ambiguousPeer.Apply(json, "pack").Outcomes["move-board"].Applied && ambiguousScene.MutationCalls == 0, "Each peer requires its own unique target identity before mutation");
+    }
+    static void RetainedWorldReentryReconcilesWithoutRepeatingTheLoad() {
+        var created = 0;
+        var scene = Peer(100, out var board); var missing = Doc(Item("move-board", "board") + "," + Item("absent", "later"));
+        var peer = new LocalPeer(() => { created++; return scene; });
+        peer.Enter("same-map"); var first = peer.Apply(missing, "pack");
+        Assert(first.Outcomes["move-board"].Applied && !first.Outcomes["absent"].Applied, "Initial load applies available work and isolates a failure");
+        scene.Origin = 140; scene.Objects["later"] = new List<object> { new Box() };
+        Assert(!peer.Enter("same-map") && created == 1 && !scene.Disposed, "A repeated world-load callback for the retained world keeps its binding");
+        var again = peer.Apply(missing, "pack");
+        Assert(again.Outcomes["move-board"].Applied && board.X == -28 && board.Position[1] == 2, "Re-entry reconciles the absolute map placement under the current origin without accumulating an offset");
+        Assert(!again.Outcomes["absent"].Applied && again.Outcomes["absent"].Error.Contains("already failed"), "A failure is not retried automatically within the retained load");
+        var guarded = Peer(0, out var guardedBoard); guarded.FailApply = true; guarded.FailRestore = true;
+        var guardedPeer = new LocalPeer(() => guarded); guardedPeer.Enter("w");
+        guardedPeer.Apply(Doc(Item("move-board", "board")), "pack"); guarded.FailApply = false; guarded.FailRestore = false;
+        guardedPeer.Enter("w");
+        var retry = guardedPeer.Apply(Doc(Item("other", "board")), "pack");
+        Assert(!retry.Outcomes["other"].Applied && retry.Outcomes["other"].Error.Contains("cleanup"), "Unverified cleanup stays guarded through retained-world re-entry");
+    }
+    static void ChangedWorldStartsAFreshLoadAndReleasesThePrevious() {
+        var scenes = new List<PeerScene>(); var boards = new List<Box>();
+        var peer = new LocalPeer(() => { var s = Peer(0, out var b); boards.Add(b); if (scenes.Count == 0) s.Objects.Remove("board"); scenes.Add(s); return s; });
+        peer.Enter("first-world");
+        Assert(!peer.Apply(Doc(Item("move-board", "board")), "pack").Outcomes["move-board"].Applied, "The target is missing in the first world");
+        Assert(peer.Enter("second-world") && scenes[0].Disposed && scenes.Count == 2, "A different world releases the previous world's owned state and binds a new scene");
+        var result = peer.Apply(Doc(Item("move-board", "board")), "pack");
+        Assert(result.Outcomes["move-board"].Applied && boards[1].X == 112 && scenes[1].MutationCalls == 1, "A new world is a new load attempt that applies to its own objects");
+        peer.Dispose();
+        Assert(scenes[1].Disposed && peer.Scene == null, "Releasing the peer releases its current world binding");
+        Assert(peer.Enter("second-world") && scenes.Count == 3 && !scenes[2].Disposed, "After world unload releases the binding, loading the same key again starts a new load attempt");
+    }
+    static void UnavailablePrerequisitesIsolateOnlyThatWorld() {
+        var attempts = 0; var scene = Peer(0, out var board);
+        var peer = new LocalPeer(() => { if (attempts++ == 0) throw new MissingMethodException("WorldToGame"); return scene; });
+        Assert(peer.Enter("early-world") && peer.Error != null && peer.Error.Contains("WorldToGame"), "Missing prerequisites are reported for this world");
+        var refused = peer.Apply(Doc(Item("move-board", "board")), "pack");
+        Assert(refused == null && scene.ResolveCalls == 0, "Without the capability nothing resolves or mutates");
+        Assert(!peer.Enter("early-world") && attempts == 1, "The same retained world does not repeat capability initialization");
+        Assert(peer.Enter("next-world") && peer.Error == null && peer.Apply(Doc(Item("move-board", "board")), "pack").Outcomes["move-board"].Applied && board.X == 112, "A later world rechecks prerequisites and applies");
+    }
+    static void HostAndClientEachApplyTheSameDocumentToTheirOwnScene() {
+        var hostScene = Peer(100, out var hostBoard); var clientScene = Peer(-250, out var clientBoard);
+        var host = new LocalPeer(() => hostScene); var client = new LocalPeer(() => clientScene);
+        Assert(host.Enter("host-world") && client.Enter("client-world"), "Each peer binds its own initial local world");
+        var json = Doc(Item("move-board", "board"));
+        var hostResult = host.Apply(json, "pack"); var clientResult = client.Apply(json, "pack");
+        Assert(hostResult.Error == null && hostResult.Outcomes["move-board"].Applied, "Host applies the document locally");
+        Assert(clientResult.Error == null && clientResult.Outcomes["move-board"].Applied, "Client applies the same document locally");
+        Assert(ReferenceEquals(hostResult.Outcomes["move-board"].ResolvedTarget, hostBoard) && ReferenceEquals(clientResult.Outcomes["move-board"].ResolvedTarget, clientBoard), "Each peer resolves its own scene object");
+        // Each peer's local coordinates differ by its own origin; both express map position 112.
+        Assert(hostBoard.X == 12 && clientBoard.X == 362, "Each peer converts the same map placement through its own local origin");
+        Assert(hostScene.MutationCalls == 1 && clientScene.MutationCalls == 1, "No peer mutates another peer's scene");
+    }
+}
 class Program {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static void AssertWriteProtected(string json) {
@@ -148,6 +258,7 @@ class Program {
         GroupActivityTests.Run();
         CoverageTests.Run();
         CoverageTests.RunAdditions();
+        LocalWorldTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

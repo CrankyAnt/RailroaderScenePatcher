@@ -46,6 +46,14 @@ The target must resolve to exactly one board in the loaded map context that matc
 
 Use a unique, non-empty `id` for each modification. List prerequisite modification IDs in `dependsOn`; leave it empty when there are no prerequisites. A missing, failed, or cyclic dependency prevents the dependent modification from applying.
 
+## Distribute for multiplayer
+
+Every player in a multiplayer session needs your MapMod and Railroader Scene Patcher installed, with the game's DLL mod permission enabled on their own installation. Railroader's required-pack and version checks decide who can join. The patcher adds no admission check of its own and does not compare document contents between players.
+
+Each host and client applies your document to its own scene when its world loads. Each one checks the map context, the target identity and the capability prerequisites locally. A failure on one player's game is reported there and does not undo changes on the others or disconnect anyone. Fixed placement uses map coordinates, so each player's board ends up at the same map position even though their local world origins differ.
+
+When a player's game runs world loading again while the game's map manager and track graph stay the same, the patcher sets the board to the stored map position again without accumulating an offset, and does not retry a modification that failed. If the game replaces either of those while it keeps the map loaded, the patcher treats it as a new load attempt. Whether reconnecting or re-entering the same map does this has not been checked. Live multiplayer behavior with this release has not yet been tested.
+
 ## Check the support boundary
 
 The adapter requires the board's parents, culler, and circle map mask to be active; the board itself may be disabled through `active`. It rejects a height-flattening mask, `Track.*` components and other culling or mask components in the hierarchy, and checks the required map conversion, culling, mask, and terrain hooks. For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md); other object families are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.

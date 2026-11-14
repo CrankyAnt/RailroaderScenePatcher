@@ -4,6 +4,8 @@ Notable changes to this project are recorded here, newest first.
 
 ## 0.5.0
 
+- In multiplayer, the host and every client apply the scene patches from their own installed MapMods to their own scene when their world loads, and each checks the map, target and capability locally. A failure on one player's game is reported there only. The patcher adds no synchronization or admission check; Railroader's own pack and version checks still decide who can join. Live host and client sessions with this release have not been tested yet.
+
 - Apply the scene patches of several loaded MapMods in Railroader's load order. A MapMod applies only when it declares the patcher dependency and its source map matches the loaded map or one of its layers. When MapMods change the same existing object, an informational game message names the object and the MapMods; it reports a possible incompatibility, chooses no winner and does not stop application. A failure in one MapMod's document leaves the other MapMods' work in place.
 
 - Remove a marker repair even when its original track is missing. Restore the captured native reference and warning; Undo and Redo recover the repaired and broken states without changing unrelated warning rows.

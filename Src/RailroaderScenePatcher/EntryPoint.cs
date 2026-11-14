@@ -16,13 +16,39 @@ namespace RailroaderScenePatcher {
     public sealed class EntryPoint : IModEntryPoint, IWorldLifecycle {
         GameObject host;
         IModContext context;
+        LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
             context = value; Hooks.Install(); NativeRepairHooks.Install(this);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
         }
         public void OnWorldLoad() {
+            if (world == null) world = new LocalWorldBinding<PatcherBehaviour>(StartWorld, _ => ReleaseHost());
+            object key;
+            try { key = WorldIdentity(); }
+            catch (Exception e) { EnsureHost().ReportWorld("Local world context unavailable: " + e.GetBaseException().Message + ". Report to the patcher maintainer."); return; }
+            // An equal key reconciles the retained world; a changed key releases this peer's state and starts a new load attempt.
+            if (!world.Enter(key)) world.State?.ApplyDocuments();
+        }
+        // A host created early by a native marker check during this world load becomes the bound state.
+        PatcherBehaviour StartWorld() {
             var behaviour = EnsureHost();
             if (behaviour.Initialized) behaviour.ApplyDocuments(); else behaviour.Initialize(context);
+            return behaviour;
+        }
+        // Scoped implementation key for this peer's local world, not a verified world
+        // identity. An equal key keeps the binding; any changed component is treated as a
+        // new load attempt. Native retained same-map behavior under this key is unverified.
+        static object WorldIdentity() {
+            var maps = String.Join("\n", PackDocuments.MapIds());
+            var manager = Native.Read(Native.Type("Map.Runtime.MapManager"), "Instance") ?? throw new InvalidOperationException("Map manager unavailable");
+            return Tuple.Create(maps, manager, CurrentGraph());
+        }
+        // Including the track graph is an unverified assumption: a replaced graph
+        // reference does not establish a genuinely new world.
+        static object CurrentGraph() {
+            var graphType = Native.Type("Track.Graph");
+            if (graphType == null) return null;
+            try { return Native.Read(graphType, "Shared"); } catch (MissingMemberException) { return null; }
         }
         PatcherBehaviour EnsureHost() {
             if (host == null) { host = new GameObject("CrankyAnt Scene Patcher"); UnityEngine.Object.DontDestroyOnLoad(host); host.AddComponent<PatcherBehaviour>(); }
@@ -36,6 +62,10 @@ namespace RailroaderScenePatcher {
         public void OnModUnload() { Cleanup(); Hooks.Remove(); NativeRepairHooks.Remove(); }
         void Cleanup() {
             NativeRepairHooks.Reset();
+            world?.Release();
+            ReleaseHost();
+        }
+        void ReleaseHost() {
             if (host == null) return;
             host.GetComponent<PatcherBehaviour>().Release();
             UnityEngine.Object.Destroy(host); host = null;
@@ -251,6 +281,7 @@ namespace RailroaderScenePatcher {
             var pack = loaded.Source;
             return (pack.Name ?? pack.Identifier) + " [" + pack.Identifier + " " + pack.Version + "] " + message + ". Patcher " + Version + ". Author: " + (pack.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(pack.Website) ? "" : "; website: " + pack.Website);
         }
+        internal void ReportWorld(string message) { Report("world", message); }
         void EditorDiagnostic(string message) { if (editor && !diagnostics.Contains(message)) diagnostics.Add(message); }
         void Report(string key, string message) {
             if (!reported.Add(key)) return;
