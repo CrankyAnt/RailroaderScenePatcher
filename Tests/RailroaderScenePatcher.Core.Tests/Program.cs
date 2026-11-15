@@ -252,6 +252,7 @@ class Program {
 #endif
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
+        ObjectMarkingGeometryTests.Run();
         AuthoringTests.Run();
         SnapTests.Run();
         GizmoTests.Run();

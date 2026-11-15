@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 using UnityEngine;
@@ -32,11 +33,14 @@ namespace RailroaderScenePatcher {
         GUIStyle textStyle;
         float trackRadius;
         Material trackMaterial;
+        // The outline kind of each renderer seen, read once: its components, shadow mode and level of detail stay.
+        readonly Dictionary<Renderer, ObjectMarkingPartKind> kinds = new Dictionary<Renderer, ObjectMarkingPartKind>();
 
         internal void Release() {
             if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
             trackMaterial = null;
             labels.Clear();
+            kinds.Clear();
         }
 
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
@@ -60,6 +64,10 @@ namespace RailroaderScenePatcher {
             Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing) {
             covered = uiBounds;
             labels.Clear();
+#if ISSUE42_OBSERVATION
+            BeginObservation(pending, source, camera);
+            try {
+#endif
             if (textStyle == null) {
                 // Skin labels can carry one-line height/offset constraints. Measure and draw with
                 // an unconstrained style so the opaque backing encloses every wrapped identity line.
@@ -136,6 +144,9 @@ namespace RailroaderScenePatcher {
                     } finally { GUI.EndGroup(); }
                 }
             } finally { GUI.color = oldColor; GUI.contentColor = oldContent; }
+#if ISSUE42_OBSERVATION
+            } finally { observing = false; }
+#endif
         }
 
         Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin) {
@@ -143,26 +154,53 @@ namespace RailroaderScenePatcher {
             var shape = new Shape { Candidate = candidate };
             var anchor = ScreenPoint(camera, candidate.Position, origin);
             if (candidate.Observation != null && candidate.Choice.Handle is GameObject go && go != null) {
-                foreach (var renderer in go.GetComponentsInChildren<Renderer>(true)) {
-                    if (!renderer.enabled || !renderer.gameObject.activeInHierarchy) continue;
+                var renderers = go.GetComponentsInChildren<Renderer>(true);
+                Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods = null;
+                var parts = new List<ObjectMarkingPart>();
+#if ISSUE42_OBSERVATION
+                var decisions = observing ? new List<string>() : null;
+                var skipped = observing ? new List<string>() : null;
+#else
+                List<string> decisions = null;
+#endif
+                for (int index = 0; index < renderers.Length; index++) {
+                    var renderer = renderers[index];
+                    var name = "#" + index;
                     var bounds = renderer.bounds;
-                    if (bounds.size.sqrMagnitude < .000001f) continue;
-                    var points = new List<Vector3>();
-                    for (int x = -1; x <= 1; x += 2)
-                        for (int y = -1; y <= 1; y += 2)
-                            for (int z = -1; z <= 1; z += 2)
-                                points.Add(camera.WorldToScreenPoint(bounds.center + Vector3.Scale(bounds.extents, new Vector3(x, y, z))));
-                    if (points.Any(p => !InFront(camera, p))) continue;
-                    var min = new Vector2(points.Min(p => p.x), Screen.height - points.Max(p => p.y));
-                    var max = new Vector2(points.Max(p => p.x), Screen.height - points.Min(p => p.y));
-                    shape.Objects.Add(Rect.MinMaxRect(min.x - 4, min.y - 4, max.x + 4, max.y + 4));
+                    if (!renderer.enabled || !renderer.gameObject.activeInHierarchy || bounds.size.sqrMagnitude < .000001f) {
+#if ISSUE42_OBSERVATION
+                        skipped?.Add(name + ": skipped, " + (!renderer.enabled || !renderer.gameObject.activeInHierarchy ? "inactive" : "empty bounds"));
+#endif
+                        continue;
+                    }
+                    // A static batch moves its meshes into one combined mesh, whose bounds are not the renderer's; only
+                    // the world-aligned box stays per renderer.
+                    WorldPoint[] oriented = null;
+                    if (renderer is MeshRenderer && !renderer.isPartOfStaticBatch) {
+                        var local = renderer.localBounds; var matrix = renderer.localToWorldMatrix;
+                        oriented = new WorldPoint[8];
+                        for (int i = 0; i < 8; i++)
+                            oriented[i] = Point(matrix.MultiplyPoint3x4(local.center + Vector3.Scale(local.extents,
+                                new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
+                    }
+                    parts.Add(new ObjectMarkingPart(name, Point(bounds.center), Point(bounds.extents), oriented, Kind(renderer, go, ref lods)));
                 }
-                if (shape.Objects.Count != 0) {
-                    // One frame per object: the union of its renderers. Picking uses the same rectangle.
-                    var rect = shape.Objects.Aggregate(Union);
-                    shape.Objects.Clear(); shape.Objects.Add(rect);
+                var view = camera.pixelRect;
+                var toClip = camera.projectionMatrix * camera.worldToCameraMatrix;
+                // One frame per object, around the piece its marker belongs to. Picking uses the same rectangle.
+                var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), parts, p => {
+                    var clip = toClip * new Vector4((float)p.X, (float)p.Y, (float)p.Z, 1);
+                    return new ClipPoint(clip.x, clip.y, clip.z, clip.w);
+                }, ScreenRect.FromEdges(view.xMin, Screen.height - view.yMax, view.xMax, Screen.height - view.yMin), decisions);
+                if (result.Frame.HasValue) {
+                    var frame = result.Frame.Value;
+                    var rect = Rect.MinMaxRect((float)frame.X, (float)frame.Y, (float)frame.Right, (float)frame.Bottom);
+                    shape.Objects.Add(rect);
                     anchor = new Vector3(rect.center.x, rect.center.y, camera.nearClipPlane);
                 }
+#if ISSUE42_OBSERVATION
+                if (observing && !(result.Distance > ObservationRange)) Observe(candidate, renderers, lods ?? Lods(go), decisions, skipped, result, view);
+#endif
             }
             if (candidate.ControlPoints != null) {
                 if (trackRadius == 0) {
@@ -215,10 +253,71 @@ namespace RailroaderScenePatcher {
             projected.y = Screen.height - projected.y;
             return projected;
         }
+        static WorldPoint Point(Vector3 v) => new WorldPoint(v.x, v.y, v.z);
+        // The level of detail each renderer of an object belongs to, by its LOD group.
+        static Dictionary<Renderer, KeyValuePair<LODGroup, int>> Lods(GameObject go) {
+            var lods = new Dictionary<Renderer, KeyValuePair<LODGroup, int>>();
+            foreach (var group in go.GetComponentsInChildren<LODGroup>(true)) {
+                var levels = group.GetLODs();
+                for (int level = 0; level < levels.Length; level++)
+                    foreach (var renderer in levels[level].renderers)
+                        if (renderer != null && !lods.ContainsKey(renderer)) lods.Add(renderer, new KeyValuePair<LODGroup, int>(group, level));
+            }
+            return lods;
+        }
+        // What the renderer is to the outline (ObjectMarkingGeometry.KindOf), from its type, the component types on its
+        // object with their base types, its shadow mode and its level of detail.
+        ObjectMarkingPartKind Kind(Renderer renderer, GameObject go, ref Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods) {
+            if (kinds.TryGetValue(renderer, out var known)) return known;
+            if (lods == null) lods = Lods(go);
+            var components = new List<string>();
+            foreach (var behaviour in renderer.GetComponents<MonoBehaviour>())
+                for (var type = behaviour == null ? null : behaviour.GetType(); type != null && type != typeof(MonoBehaviour); type = type.BaseType)
+                    components.Add(type.FullName);
+            var kind = ObjectMarkingGeometry.KindOf(renderer.GetType().FullName, components, renderer.shadowCastingMode == ShadowCastingMode.ShadowsOnly,
+                lods.TryGetValue(renderer, out var lod) ? lod.Value : 0);
+            kinds[renderer] = kind;
+            return kind;
+        }
+#if ISSUE42_OBSERVATION
+        // Frame diagnostics: one block per candidate within range when a world choice opens and after each camera step.
+        const float ObservationStep = 25f;
+        const double ObservationRange = 1500;
+        object observedChoice;
+        Vector3 observedCamera;
+        bool observing;
+        void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
+            var choice = (object)pending ?? source;
+            observing = choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
+            if (!observing) return;
+            observedChoice = choice; observedCamera = camera.transform.position;
+            Debug.Log("[Issue42Frames] pass camera=" + Vector(camera.transform.position) + " view=" + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+                camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " near=" + Number(camera.nearClipPlane) + " far=" + Number(camera.farClipPlane) +
+                " frameDistance=" + Number(ObjectMarkingGeometry.FrameDistance));
+        }
+        static void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
+            List<string> skipped, ObjectMarkingFrame result, Rect view) {
+            var text = new System.Text.StringBuilder();
+            text.Append("[Issue42Frames] candidate ").Append(candidate.Choice.Label).Append(" distance=").Append(Number(result.Distance))
+                .Append(result.Frame.HasValue ? " frame=" + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + " of view" : " marker only");
+            var lines = decisions.Concat(skipped).ToList();
+            for (int index = 0; index < renderers.Length; index++) {
+                var renderer = renderers[index];
+                var name = "#" + index;
+                var decision = String.Join(" / ", lines.Where(l => l.StartsWith(name + ":", StringComparison.Ordinal)).Select(l => l.Substring(name.Length + 2)));
+                var lod = lods.TryGetValue(renderer, out var level) ? BoardScene.PathOf(level.Key.transform) + " LOD" + level.Value : "none";
+                text.Append("\n  ").Append(name).Append(' ').Append(BoardScene.PathOf(renderer.transform)).Append(" type=").Append(renderer.GetType().Name)
+                    .Append(" size=").Append(Vector(renderer.bounds.size)).Append(" staticBatch=").Append(renderer.isPartOfStaticBatch)
+                    .Append(" lod=").Append(lod).Append(" active=").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
+                    .Append(" decision=").Append(decision.Length == 0 ? "none" : decision);
+            }
+            Debug.Log(text.ToString());
+        }
+        static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
+        static string Vector(Vector3 v) => Number(v.x) + "/" + Number(v.y) + "/" + Number(v.z);
+#endif
         static bool InFront(Camera camera, Vector3 point) => point.z >= camera.nearClipPlane && point.z <= camera.farClipPlane;
         static Rect Offset(Rect rect, Vector2 origin) => new Rect(rect.position - origin, rect.size);
-        static Rect Union(Rect a, Rect b) => Rect.MinMaxRect(Mathf.Min(a.xMin, b.xMin), Mathf.Min(a.yMin, b.yMin),
-            Mathf.Max(a.xMax, b.xMax), Mathf.Max(a.yMax, b.yMax));
 
         static List<Rect> VisibleWorld(IReadOnlyList<Rect> exclusions) {
             var zones = new List<Rect> { new Rect(0, 0, Screen.width, Screen.height) };

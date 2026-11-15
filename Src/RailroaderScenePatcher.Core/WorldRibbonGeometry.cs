@@ -165,7 +165,7 @@ namespace RailroaderScenePatcher.Core {
         }
         static double Cross(ScreenPoint a, ScreenPoint b, ScreenPoint c) =>
             (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
-        static List<ClipPoint> ClipPolygon(List<ClipPoint> polygon, int plane) {
+        internal static List<ClipPoint> ClipPolygon(List<ClipPoint> polygon, int plane) {
             var output = new List<ClipPoint>();
             if (polygon.Count == 0) return output;
             var previous = polygon[polygon.Count - 1]; double pd = Distance(previous, plane);
