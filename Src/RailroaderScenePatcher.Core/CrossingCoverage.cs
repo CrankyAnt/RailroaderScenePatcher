@@ -156,6 +156,8 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<object> Resolve(TargetIdentity identity);
         // Why the controller does not conform to the supported crossing pattern, or null.
         string PatternProblem(object controller);
+        // The controller still exists, but its scene is not reported as loaded, so it cannot be checked against its identity yet.
+        bool Unsettled(object controller);
         // The circuits the controller currently evaluates, in order.
         IReadOnlyList<object> Circuits(object controller);
         // A circuit's three span references in role order.
@@ -189,7 +191,7 @@ namespace RailroaderScenePatcher.Core {
     // circuit the patcher owns, with owned spans for explicitly selected extra tracks, evaluated after the native circuits. The native spans stay registered
     // and unchanged, so another consumer keeps them; the crossing simply stops evaluating them. Proximity never assigns
     // coverage, and the crossing object itself is never moved or disabled by this capability.
-    public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene {
+    public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene, IDisposable {
         public const string Structure = "crossing-coverage-v1", RequiredVersion = "0.5.0", ComponentType = "Track.Crossings.GradeCrossingController";
         const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
         sealed class Circuit { internal string Key; internal object Set; internal object[] Original; }
@@ -229,6 +231,8 @@ namespace RailroaderScenePatcher.Core {
                     continue;
                 }
                 if (spans.Any(s => !world.Registered(s))) throw new InvalidOperationException("A span of this crossing is not registered in the track graph under its ID. Reload before editing it");
+                // Spans under the patcher's prefix are never native: an earlier patcher state left this circuit patched.
+                if (spans.Any(s => (world.SpanId(s) ?? "").StartsWith(OwnedPrefix, StringComparison.Ordinal))) throw new InvalidOperationException("A circuit of this crossing holds spans an earlier patcher state created, so its native coverage is unknown. Reload before editing it");
                 var key = world.SpanId(spans[1]);
                 if (String.IsNullOrWhiteSpace(key)) throw new InvalidOperationException("The island span of a circuit has no ID; the circuit cannot be identified");
                 if (baseline.Circuits.Any(c => c.Key == key || ReferenceEquals(c.Set, set))) throw new InvalidOperationException("Two circuits of this crossing share island span " + key + "; they cannot be told apart");
@@ -248,6 +252,24 @@ namespace RailroaderScenePatcher.Core {
             }
             if (baseline.Owned.Count > 0) throw new InvalidOperationException("owned span " + String.Join(", ", baseline.Owned.Select(world.SpanId)) + " remains registered" + (problem == null ? "" : ": " + problem));
             baselines.Remove(target);
+        }
+        public bool Unsettled(object target) => world.Unsettled(target);
+        // Ends this state while the scene may stay, as a MapMod reload or unload without a scene unload would: every crossing it changed returns to
+        // its native circuits and spans, and the spans the patcher owns are removed, so a later state records the true native
+        // coverage. A crossing that is gone or no longer conforms has nothing to return to; its owned spans are still removed.
+        // Nothing here throws: what cannot be restored stays, and a later state refuses to take it for native coverage.
+        public void Dispose() {
+            foreach (var entry in baselines.ToArray()) {
+                var target = entry.Key; var baseline = entry.Value;
+                try {
+                    if (world.PatternProblem(target) == null) {
+                        var native = baseline.Circuits.Select(c => new KeyValuePair<string, CircuitCoverage>(c.Key, CircuitCoverage.Native(c.Original.Select(world.SpanId).ToArray())));
+                        Write(target, baseline, new CrossingCoverage(native).AsComplete());
+                    }
+                } catch { /* The remaining patched state stays recognisable by its owned span IDs. */ }
+                foreach (var span in baseline.Owned.ToList()) { try { Retire(baseline, span); } catch { } }
+            }
+            baselines.Clear();
         }
         public void Preflight(object target) {
             var problem = world.PatternProblem(target);

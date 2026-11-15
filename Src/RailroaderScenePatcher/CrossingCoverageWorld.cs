@@ -61,6 +61,8 @@ namespace RailroaderScenePatcher {
             return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(controller) != null).Cast<object>().ToArray();
         }
         public string PatternProblem(object target) => Problem(target as GameObject);
+        // A crossing whose scene is valid but not loaded still exists while the scene loads or unloads; a destroyed one does not.
+        public bool Unsettled(object target) => target is GameObject go && go != null && go.scene.IsValid() && !go.scene.isLoaded;
         // Why the object does not conform to the supported crossing pattern, or null. Shared with the inventory.
         internal static string Problem(GameObject go) {
             if (!Loaded(go)) return "This object has no implemented crossing-coverage capability";

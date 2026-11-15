@@ -18,6 +18,8 @@ class FakeCrossing {
     public List<FakeCircuit> Circuits = new List<FakeCircuit>();
     public double[] Position = { 5, 0, 7 }, Rotation = { 0, 0, 0, 1 };
     public string Pattern;
+    // False while the crossing's scene is not reported as loaded, such as during a scene load that a native check interrupts.
+    public bool SceneLoaded = true;
 }
 // Controlled crossing world: controllers by path, segments by ID and the graph's span lookup by ID, as the native graph keeps them.
 // A train on a track location is detected by the crossing when one of its evaluated circuits holds a span covering that location.
@@ -40,9 +42,10 @@ class FakeCrossingWorld : ICrossingCoverageWorld {
     }
     public IReadOnlyList<object> Resolve(TargetIdentity identity) {
         if (identity.Component != CrossingCoverageScene.ComponentType || (identity.Structure != null && identity.Structure != CrossingCoverageScene.Structure)) return Array.Empty<object>();
-        return Objects.TryGetValue(identity.Path, out var found) ? found : new List<object>();
+        return Objects.TryGetValue(identity.Path, out var found) ? found.Where(o => !(o is FakeCrossing c) || c.SceneLoaded).ToList() : new List<object>();
     }
     public string PatternProblem(object controller) => ((FakeCrossing)controller).Pattern;
+    public bool Unsettled(object controller) => !((FakeCrossing)controller).SceneLoaded;
     public IReadOnlyList<object> Circuits(object controller) => ((FakeCrossing)controller).Circuits.ToArray();
     public IReadOnlyList<object> Spans(object circuit) => ((FakeCircuit)circuit).Spans;
     public string SpanId(object span) => ((FakeSpan)span).Id;

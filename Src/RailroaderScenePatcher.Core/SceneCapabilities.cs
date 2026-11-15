@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IDisposable {
         // The observation of one object, when the inspection source can make it.
         public SceneObservation Observe(object handle, TargetIdentity identity) {
             return inspection is ITargetedInspectionScene targeted ? targeted.Observe(handle, identity) : inspection?.Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle) && o.Identity.Component == identity.Component);
@@ -76,6 +76,12 @@ namespace RailroaderScenePatcher.Core {
             (owner as IRetainedScene)?.Release(target);
             owners.Remove(target);
         }
+        // Ends every capability that holds state over the scene, such as owned crossing spans, when the patcher state ends.
+        public void Dispose() {
+            foreach (var capability in capabilities.OfType<IDisposable>().ToArray()) { try { capability.Dispose(); } catch { } }
+            owners.Clear();
+        }
+        public bool Unsettled(object target) => target != null && owners.TryGetValue(target, out var owner) && owner is IRetainedScene retained && retained.Unsettled(target);
         // Throws the incompatibility of a capability whose game functions are missing, when the target is its placeholder.
         internal void CheckAvailable(object target) { if (target is Unavailable) Owner(target); }
         public object Capture(object target) => Owner(target).Capture(target);

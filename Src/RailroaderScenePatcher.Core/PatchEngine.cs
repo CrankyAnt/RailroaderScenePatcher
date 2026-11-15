@@ -79,11 +79,17 @@ namespace RailroaderScenePatcher.Core {
     // A capability that keeps state for the objects it resolved. Release drops that state for an object that no longer
     // stands under its identity in a later load attempt, and removes only what the patcher owns for it; native state is
     // never changed. It throws when owned state remains, and keeps what remains so a later load attempt retries.
-    public interface IRetainedScene { void Release(object target); }
+    // Unsettled tells an object that still exists but cannot be checked against its identity yet, such as an object whose
+    // scene is not reported as loaded during a native check that runs inside a scene load, from an object that is gone.
+    public interface IRetainedScene {
+        void Release(object target);
+        bool Unsettled(object target);
+    }
     // The outcome of reconciling a retained world at the start of a new load attempt.
     public sealed class ReentryResult {
         internal ReentryResult(int retained, int released, IReadOnlyList<string> failures) { Retained = retained; Released = released; Failures = failures; }
-        // Targets that still stand under their identities; their captured state and guards carry over.
+        // Targets that still stand under their identities, or still exist but cannot be checked yet; their captured state
+        // and guards carry over.
         public int Retained { get; }
         // Targets whose state was released because they no longer stand under their identities.
         public int Released { get; }
@@ -135,8 +141,9 @@ namespace RailroaderScenePatcher.Core {
             identities.Add(target, identity); resolutionOrder.Add(target);
         }
         // Starts a new load attempt over the retained world. An object that still resolves under its recorded identity
-        // keeps its captured underlying state and its unverified-cleanup guard. Any other object is released: the engine
-        // forgets it and an IRetainedScene removes what the patcher owns for it. Failures recorded in the previous attempt
+        // keeps its captured underlying state and its unverified-cleanup guard, and so does an object an IRetainedScene reports
+        // as unsettled: it still exists, so releasing it would strip the patcher's state from a live object. Any other object is
+        // released: the engine forgets it and an IRetainedScene removes what the patcher owns for it. Failures recorded in the previous attempt
         // are retried in this one. A failed release is reported and retried by the next load attempt.
         public ReentryResult Reenter() {
             failed.Clear();
@@ -145,7 +152,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var target in resolutionOrder.ToArray()) {
                 var identity = identities[target];
                 bool present;
-                try { present = (scene.Resolve(identity) ?? Array.Empty<object>()).Any(m => ReferenceEquals(m, target)); }
+                try { present = (scene.Resolve(identity) ?? Array.Empty<object>()).Any(m => ReferenceEquals(m, target)) || (scene as IRetainedScene)?.Unsettled(target) == true; }
                 catch (Exception e) { failures.Add(Describe(identity) + ": the retained object could not be checked, so its state is kept: " + e.Message); retained++; continue; }
                 if (present) { retained++; continue; }
                 try { (scene as IRetainedScene)?.Release(target); }

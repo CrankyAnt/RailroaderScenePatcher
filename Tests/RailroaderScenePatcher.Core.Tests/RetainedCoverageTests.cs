@@ -12,7 +12,10 @@ static partial class CoverageTests {
         RetainedCrossingReconcilesWithoutDuplicates();
         ReconstructedCrossingReleasesOnlyItsOwnedSpans();
         IncompleteReleaseIsReportedLocallyAndRetried();
-        Console.WriteLine("PASS: retained crossing coverage reconciliation, owned cleanup and isolated cleanup failure");
+        EarlyCheckKeepsACrossingWhoseSceneIsNotLoaded();
+        DiscardedStateRestoresNativeCoverageWhileTheSceneStays();
+        FreshStateRefusesPatchedCircuitsAsNative();
+        Console.WriteLine("PASS: retained crossing coverage reconciliation, owned cleanup, isolated cleanup failure, early checks over an unloaded scene and discarded state over a remaining scene");
     }
     static string RetainedDocument => Doc(Cover("reroute", Tracks("Pipr")) + "," + Cover("add", Addition("siding", "Sspur")));
     static readonly string[] NativeSpanIds = { "Pcyi", "Pipr", "Pws9", "Pdlh", "P6id", "P1db", "Qa", "Qi", "Qb" };
@@ -74,5 +77,61 @@ static partial class CoverageTests {
         peer.Unload(); peer.Enter("map", "graph");
         Assert(peer.LastReentry.Released == 1 && peer.LastReentry.Failures.Count == 0 && owned.All(s => !f.World.Registered(s)), "The next load attempt retries the release and removes the remaining owned spans");
         Assert(peer.Engine.Apply(RetainedDocument, "pack").Outcomes.Values.All(o => o.Applied) && f.OwnedRegistered == 6 && NoSuffixedIds(f), "After the completed release the rebuilt crossing gets one owned set");
+    }
+
+    // A native check opens the load attempt while the crossing's scene is not yet reported as loaded. The crossing still
+    // exists, so its state is kept rather than released: detection stays on the selected tracks and re-application succeeds.
+    static void EarlyCheckKeepsACrossingWhoseSceneIsNotLoaded() {
+        var f = new Fixture();
+        var peer = new LocalPeer(() => f.Scene);
+        peer.Enter("map", "graph");
+        var reroute = Doc(Cover("reroute", Tracks("Pipr")));
+        Assert(peer.Engine.Apply(RetainedDocument, "pack").Outcomes.Values.All(o => o.Applied), "The reroute and the addition apply");
+        var owned = f.World.Graph.Values.Where(s => s.Owned).ToArray();
+        peer.Unload();
+        f.Crossing.SceneLoaded = false;
+        peer.Prepare("map");
+        Assert(peer.LastReentry.Released == 0 && peer.LastReentry.Retained == 1 && peer.LastReentry.Failures.Count == 0, "The early check keeps the crossing whose scene is not loaded: released " + peer.LastReentry.Released + ", failures " + String.Join("; ", peer.LastReentry.Failures));
+        f.Crossing.SceneLoaded = true;
+        Assert(peer.Enter("map", "graph") == WorldEntry.Reentered && peer.Reentries == 1, "The world-load callback joins the attempt the early check opened");
+        Assert(owned.All(s => !s.Destroyed && f.World.Registered(s)) && f.NewRouteDetectsBothWays && !f.OldRouteDetects && DetectsBothWays(f, f.Crossing, "Sspur"), "Detection stays on the selected and added tracks");
+        var again = peer.Engine.Apply(RetainedDocument, "pack");
+        Assert(again.Outcomes.Values.All(o => o.Applied) && OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && f.World.Created == 6, "Re-application reuses the owned set: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
+        // A crossing whose scene is loaded but which no longer stands under its identity is still released.
+        var rebuilt = Rebuild(f);
+        peer.Unload(); peer.Prepare("map");
+        Assert(peer.LastReentry.Released == 1 && OwnedAnywhere(f) == 0, "A reconstructed crossing is released by the early check");
+        Assert(peer.Engine.Apply(reroute, "pack").Outcomes["reroute"].Applied && DetectsBothWays(f, rebuilt, "Snew"), "The rebuilt crossing takes the reroute");
+    }
+    // Discarding the patcher state while the scene stays, as a MapMod reload or unload without a scene unload would, returns every crossing to its
+    // native circuits and removes the owned spans, so the next state records the native coverage and applies once.
+    static void DiscardedStateRestoresNativeCoverageWhileTheSceneStays() {
+        var f = new Fixture();
+        var peer = new LocalPeer(() => new CrossingCoverageScene(f.World, Capability.Unchecked));
+        peer.Enter("map", "graph");
+        var doc = Doc(Cover("reroute", Tracks("Pipr") + "," + Detached("P6id")) + "," + Cover("add", Addition("siding", "Sspur")));
+        var first = peer.Engine.Apply(doc, "pack");
+        Assert(first.Outcomes.Values.All(o => o.Applied), "The reroute, the detach and the addition apply: " + String.Join("; ", first.Outcomes.Values.Select(o => o.Error)));
+        peer.Unload();
+        peer.Prepare("another-map");
+        Assert(OwnedAnywhere(f) == 0 && f.World.Graph.Values.All(s => !s.Owned) && f.Native, "Discarding the state restores the native circuits and removes the owned spans: " + f.Spans(f.Rerouted) + " owned " + OwnedAnywhere(f));
+        Assert(f.OldRouteDetects && f.RetainedDetectsBothWays && NativeSpansRegistered(f) && f.Scene.Read(f.Other).Coverage["Qi"].Kind == CircuitKind.Native, "Native detection returns and the unrelated crossing stays native");
+        Assert(peer.Enter("map", "graph") == WorldEntry.Started, "The map starts a new state");
+        var again = peer.Engine.Apply(doc, "pack");
+        Assert(again.Outcomes.Values.All(o => o.Applied), "The new state applies the same document: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
+        Assert(OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && f.NewRouteDetectsBothWays && !f.OldRouteDetects && !f.RetainedDetectsBothWays && DetectsBothWays(f, f.Crossing, "Sspur"), "One owned set under the original span IDs carries the reroute, the detach and the addition");
+        peer.Dispose();
+        Assert(OwnedAnywhere(f) == 0 && f.Native, "Releasing the binding also restores the native coverage");
+    }
+    // A state that starts over a crossing an earlier state patched and did not restore refuses to take the patched circuits for
+    // native ones, and changes nothing.
+    static void FreshStateRefusesPatchedCircuitsAsNative() {
+        var f = new Fixture();
+        Assert(new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr")))).Outcomes["reroute"].Applied, "The reroute applies");
+        var mutations = f.World.Mutations;
+        var fresh = new CrossingCoverageScene(f.World, Capability.Unchecked);
+        var refused = new PatchEngine(fresh).Apply(Doc(Cover("reroute", Tracks("Pipr"))));
+        Assert(!refused.Outcomes["reroute"].Applied && refused.Outcomes["reroute"].Error.Contains("Reload before editing it") && f.World.Mutations == mutations, "The fresh state refuses the patched circuit: " + refused.Outcomes["reroute"].Error);
+        Assert(f.NewRouteDetectsBothWays && f.OwnedRegistered == 3, "The patched coverage stays as it was");
     }
 }

@@ -695,6 +695,8 @@ namespace RailroaderScenePatcher {
             if (worldLabelBacking != null) Destroy(worldLabelBacking); worldLabelBacking = null;
             presentation?.Dispose(); presentation = null; attachedEditor = null;
             Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Release(); selection = null;
+            // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
+            capabilities?.Dispose();
             scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; engine = null; inventory = null; native = null; selected = null;
             runtime = null; markerWorld = null; nativeDiagnostics = null; pendingWarnings.Clear(); pendingNotices.Clear(); overlapNotices = null;
         }
