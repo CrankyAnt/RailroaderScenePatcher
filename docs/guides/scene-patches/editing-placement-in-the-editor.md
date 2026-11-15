@@ -58,7 +58,7 @@ The title star and the Save button follow all three writes. They stay active aft
 
 ## Retry after a failed Save
 
-When a write fails, the editor shows **Save Failed** with the cause, the writes that completed and the writes still outstanding. The session details repeat that report as **Last Save failed**. Completed writes are not reversed, your edits stay in memory and the editor stays unsaved.
+When a write fails, the editor shows **Save Failed** with the cause, the writes that completed and the writes still outstanding. The session details repeat that report as **Last Save failed**. Completed writes are not reversed, your edits stay in memory and the editor stays unsaved. A failed write never damages the file it was replacing: the patcher writes the new content of `Data/scene-patches.json` or `Info.json` completely to a file beside it, ending in `.saving`, and only then puts it in the file's place. A write that stops midway leaves the previous file as it was, or no file at the first Save, and the patcher removes the unfinished `.saving` file. A `.saving` file left by an interrupted Save, for example after a crash, is replaced by the next Save. When another program, such as a virus scanner or a sync client, holds the file open for a moment, Save tries again for up to half a second before it reports the failure.
 
 Correct the cause, for example a locked or read-only file, and select **Save** again. The retry writes only what is outstanding. If `Data/scene-patches.json` changed outside the editor after the patcher read it, the retry refuses to overwrite it; reload the editor to read the file again.
 

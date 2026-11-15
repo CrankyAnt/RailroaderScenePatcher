@@ -18,6 +18,30 @@ class Store : IStorage {
     public void WritePackInfo(string text) { if (FailInfo) throw new IOException("metadata write injected"); Info = text; InfoWrites++; }
 }
 
+// The real files of a MapMod folder, with a write that stops midway after part of its bytes reached the disk,
+// or a failing replacement of a file by new content, for files whose name starts with the given text. With
+// ReplaceFailures set, the replacement fails only that many times and then succeeds, as a file another process
+// holds open for a moment does.
+class FaultyFiles : DiskFiles {
+    public string FailWrite, FailReplace;
+    public int? ReplaceFailures;
+    // Every replacement or move into place, by file name, in order; a pause recorder can add its pauses to the same log.
+    public readonly List<string> Log = new List<string>();
+    static bool Hit(string prefix, string path) => prefix != null && Path.GetFileName(path).StartsWith(prefix, StringComparison.Ordinal);
+    public override void Write(string path, byte[] bytes) {
+        if (!Hit(FailWrite, path)) { base.Write(path, bytes); return; }
+        File.WriteAllBytes(path, bytes.Take(bytes.Length / 2).ToArray());
+        throw new IOException("write interrupted midway");
+    }
+    public override void Replace(string source, string destination) { Fail(destination); base.Replace(source, destination); }
+    public override void Move(string source, string destination) { Fail(destination); base.Move(source, destination); }
+    void Fail(string destination) {
+        Log.Add("place " + Path.GetFileName(destination));
+        if (!Hit(FailReplace, destination)) return;
+        if (ReplaceFailures == null || ReplaceFailures-- > 0) throw new IOException("replace failed");
+    }
+}
+
 // Mirrors the grouping, stack, pruning and change-count rules of the game's undo manager,
 // and the editor's count-based dirty flag, so history accounting meets the real collisions.
 class Editor : INativeHistory {
@@ -95,13 +119,13 @@ static class AuthoringTests {
         public Box Other = new Box { Position = new[] { -50.0, 0.0, 0.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         public Store Store = new Store(); public Editor Editor = new Editor(); public AuthoringSession Session;
         public bool AtUnderlying => Box.X == -93 && Box.Position[1] == 8 && Box.Position[2] == 9 && Box.Rotation.SequenceEqual(new[] { 0.0, 1.0, 0.0, 0.0 }) && Box.Active;
-        public World(string patch = null, string info = null) {
+        public World(string patch = null, string info = null, IStorage files = null) {
             Scene.Objects["p"] = new List<object> { Box }; Scene.Objects["q"] = new List<object> { Other }; Store.Patch = patch;
             if (info != null) Store.Info = info;
             else if (patch != null) Store.Info = Store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.5.0\"");
             var engine = new PatchEngine(Scene);
             if (patch != null) engine.Apply(patch, "author/pack");
-            Session = new AuthoringSession(engine, Editor, Store, "map");
+            Session = new AuthoringSession(engine, Editor, files ?? Store, "map");
             Editor.Session = Session;
         }
         public JObject Saved => JObject.Parse(Store.Patch);
@@ -115,6 +139,8 @@ static class AuthoringTests {
         RemovalRecomputesUnderlyingState();
         SaveWritesEveryParticipant();
         PartialWritesStayIdentifiedAndRetryable();
+        InterruptedFileWritesKeepThePreviousFile();
+        ReplacementIsRetriedOnlyWhileTheFileIsHeld();
         DependencyMinimumRisesOnlyWhenRequired();
         PruningAndHistoryErrorsStayTruthful();
         FailedEditsRestoreAndGuardRetry();
@@ -212,6 +238,131 @@ static class AuthoringTests {
         first.Editor.NativeEdit(1); first.Editor.FailNative = true; first.Editor.Save(); first.Editor.FailNative = false;
         first.Editor.Undo(); first.Editor.NativeEdit(2);
         Assert(first.Editor.IsDirty, "A failed Save records no saved identity for a later equal change count");
+    }
+    // A MapMod folder on disk with the given files; null leaves a file absent.
+    static string Folder(string patch, string info) {
+        var root = Path.Combine(Path.GetTempPath(), "RailroaderScenePatcherTests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "Data"));
+        if (patch != null) File.WriteAllText(Path.Combine(root, "Data", "scene-patches.json"), patch);
+        if (info != null) File.WriteAllText(Path.Combine(root, "Info.json"), info);
+        return root;
+    }
+    static string Listing(string root) => String.Join(",", Directory.GetFiles(root, "*", SearchOption.AllDirectories).Select(f => f.Substring(root.Length + 1).Replace('\\', '/')).OrderBy(f => f, StringComparer.Ordinal));
+    static void InterruptedFileWritesKeepThePreviousFile() {
+        // An older dependency makes Save raise it, so Info.json is written; a satisfied one leaves Info.json unwritten.
+        string Info(string minimum) => new Store().Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=" + minimum + "\"");
+        var saved = Doc(Mod("move-p", "p", Fixed(112)));
+        // Each participant fails while its new content is written, and again while the new content replaces the file,
+        // with an existing file and, for the patch document, at the first Save without one.
+        var cases = new[] {
+            new { Name = AuthoringSession.PatchData, Patch = saved, Fault = "scene-patches.json", Replace = false },
+            new { Name = AuthoringSession.PatchData, Patch = saved, Fault = "scene-patches.json", Replace = true },
+            new { Name = AuthoringSession.PatchData, Patch = (string)null, Fault = "scene-patches.json", Replace = false },
+            new { Name = AuthoringSession.PatchData, Patch = (string)null, Fault = "scene-patches.json", Replace = true },
+            new { Name = AuthoringSession.Metadata, Patch = saved, Fault = "Info.json", Replace = false },
+            new { Name = AuthoringSession.Metadata, Patch = saved, Fault = "Info.json", Replace = true },
+        };
+        foreach (var c in cases) {
+            var label = c.Name + (c.Replace ? " replacement" : " write") + (c.Patch == null ? " at the first Save" : "");
+            var metadata = c.Name == AuthoringSession.Metadata;
+            var info = Info(metadata ? "0.0.1" : "0.5.0");
+            var root = Folder(c.Patch, info);
+            try {
+                var files = new FaultyFiles(); var announced = new List<string>();
+                var storage = new PackStorage(root, files, announced.Add);
+                var w = new World(c.Patch, info, storage);
+                var before = Listing(root);
+                var patchBytes = c.Patch == null ? null : File.ReadAllBytes(storage.PatchPath);
+                var infoBytes = File.ReadAllBytes(storage.InfoPath);
+                w.Session.Edit(P, Pose(130), null);
+                if (c.Replace) files.FailReplace = c.Fault; else files.FailWrite = c.Fault;
+                var message = w.Editor.Save();
+                Assert(message != null && message.Contains(c.Replace ? "replace failed" : "write interrupted midway") && w.Session.LastSave.Outstanding.Contains(c.Name), label + ": the failure names the participant as outstanding: " + message);
+                Assert(c.Patch == null ? !File.Exists(storage.PatchPath) : File.ReadAllBytes(storage.PatchPath).SequenceEqual(patchBytes), label + ": the previous patch document is intact");
+                Assert(File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes), label + ": the previous Info.json is intact");
+                Assert(Listing(root) == before, label + ": no partial file is left beside the MapMod's files: " + Listing(root));
+                Assert(announced.Count == 0, label + ": a failed write is not announced as written");
+                Assert(w.Editor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 130, label + ": the edit stays in memory and the editor stays unsaved");
+                files.FailWrite = files.FailReplace = null;
+                Assert(w.Editor.Save() == null && !w.Editor.IsDirty, label + ": the guarded retry succeeds");
+                var written = JObject.Parse(File.ReadAllText(storage.PatchPath));
+                Assert((double)written["modifications"][0]["placement"]["position"][0] == 130 && (metadata ? JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0") : File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)), label + ": the retry writes both files completely");
+                Assert(announced.Count == 1 && announced[0] == File.ReadAllText(storage.PatchPath), label + ": the completed patch write is announced once with the text on disk");
+                Assert(Listing(root) == "Data/scene-patches.json,Info.json", label + ": the retry leaves only the MapMod's own files: " + Listing(root));
+            } finally { Directory.Delete(root, true); }
+        }
+        // Content left behind by an earlier interrupted Save is never published with the MapMod.
+        var stale = Folder(saved, Info("0.0.1"));
+        try {
+            var storage = new PackStorage(stale);
+            foreach (var leftover in new[] { storage.PatchPath, storage.InfoPath }) File.WriteAllText(leftover + ".saving", "{\"partial");
+            var w = new World(saved, Info("0.0.1"), storage);
+            w.Session.Edit(P, Pose(140), null);
+            Assert(w.Editor.Save() == null && Listing(stale) == "Data/scene-patches.json,Info.json" && (double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"][0]["placement"]["position"][0] == 140, "A Save replaces leftovers of an interrupted Save and leaves only the MapMod's own files: " + Listing(stale));
+        } finally { Directory.Delete(stale, true); }
+    }
+    // Records each pause in the file log and waits it out, so a real hold of a file during the test passes as it would in the editor.
+    static Action<int> Waited(List<string> log) => milliseconds => { log.Add("pause " + milliseconds); System.Threading.Thread.Sleep(milliseconds); };
+    // The attempts to put one file in place and the pauses between them. One file's attempts follow each other with only
+    // their own pauses between them, so the other file's attempts, which the real disk can also delay, stay apart.
+    static int[] Pauses(List<string> log, string file, out int attempts) {
+        var first = log.IndexOf("place " + file); var last = log.LastIndexOf("place " + file);
+        var span = first < 0 ? new List<string>() : log.GetRange(first, last - first + 1);
+        attempts = span.Count(e => e == "place " + file);
+        Assert(span.Count == 2 * attempts - 1 && span.Where((e, i) => i % 2 == 0).All(e => e == "place " + file), "Attempts for " + file + " alternate with their pauses: " + String.Join(", ", log));
+        return span.Where(e => e.StartsWith("pause ", StringComparison.Ordinal)).Select(e => int.Parse(e.Substring(6))).ToArray();
+    }
+    static void ReplacementIsRetriedOnlyWhileTheFileIsHeld() {
+        var saved = Doc(Mod("move-p", "p", Fixed(112)));
+        var info = new Store().Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.0.1\"");
+        foreach (var target in new[] { "scene-patches.json", "Info.json" }) {
+            // A file held open for a moment: the replacement fails twice, then succeeds within the same Save.
+            var root = Folder(saved, info);
+            try {
+                var files = new FaultyFiles { FailReplace = target, ReplaceFailures = 2 };
+                var storage = new PackStorage(root, files, null, Waited(files.Log));
+                var w = new World(saved, info, storage);
+                w.Session.Edit(P, Pose(130), null);
+                Assert(w.Editor.Save() == null && !w.Editor.IsDirty, target + ": a replacement that fails for a moment does not fail the Save");
+                // The real disk can hold the file once more after the injected failures; each further attempt still follows a pause.
+                var pauses = Pauses(files.Log, target, out var attempts);
+                Assert(attempts >= 3 && pauses.Take(2).SequenceEqual(new[] { 50, 100 }), target + ": the replacement is tried again after a short pause until it succeeds");
+                Assert((double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"][0]["placement"]["position"][0] == 130 && JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0"), target + ": both files hold their new content");
+                Assert(Listing(root) == "Data/scene-patches.json,Info.json", target + ": no pending file is left: " + Listing(root));
+            } finally { Directory.Delete(root, true); }
+            // A file that stays held: the replacement is tried a bounded number of times, then the Save fails cleanly.
+            root = Folder(saved, info);
+            try {
+                var files = new FaultyFiles { FailReplace = target };
+                var storage = new PackStorage(root, files, null, Waited(files.Log));
+                var w = new World(saved, info, storage);
+                var patchBytes = File.ReadAllBytes(storage.PatchPath); var infoBytes = File.ReadAllBytes(storage.InfoPath);
+                w.Session.Edit(P, Pose(130), null);
+                var message = w.Editor.Save();
+                var participant = target == "Info.json" ? AuthoringSession.Metadata : AuthoringSession.PatchData;
+                Assert(message != null && message.Contains("replace failed") && w.Session.LastSave.Outstanding.Contains(participant), target + ": a file that stays held fails the Save and names the participant: " + message);
+                var held = Pauses(files.Log, target, out var tries);
+                Assert(tries == PackStorage.ReplaceAttempts && held.SequenceEqual(new[] { 50, 100, 150, 200 }), target + ": the replacement is tried a bounded number of times");
+                // Info.json is written before the patch document, so a held patch document leaves the completed metadata write.
+                Assert(File.ReadAllBytes(storage.PatchPath).SequenceEqual(patchBytes) && (target == "scene-patches.json" || File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)) && Listing(root) == "Data/scene-patches.json,Info.json", target + ": the held file keeps its previous content and no pending file is left");
+                Assert(w.Editor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 130, target + ": the edit stays in memory and the editor stays unsaved");
+                files.FailReplace = null;
+                Assert(w.Editor.Save() == null && !w.Editor.IsDirty, target + ": the retry after the file is released succeeds");
+            } finally { Directory.Delete(root, true); }
+        }
+        // A read-only file is no passing hold: it fails at once, without further attempts.
+        var locked = Folder(saved, info);
+        try {
+            var files = new FaultyFiles();
+            var storage = new PackStorage(locked, files, null, Waited(files.Log));
+            File.SetAttributes(storage.PatchPath, FileAttributes.ReadOnly);
+            var w = new World(saved, info, storage);
+            w.Session.Edit(P, Pose(130), null);
+            var message = w.Editor.Save();
+            Assert(message != null && Pauses(files.Log, "scene-patches.json", out var once).Length == 0 && once == 1 && w.Editor.IsDirty && Listing(locked) == "Data/scene-patches.json,Info.json", "A read-only patch document fails the Save at once and leaves no pending file: " + message);
+            File.SetAttributes(storage.PatchPath, FileAttributes.Normal);
+            Assert(w.Editor.Save() == null && !w.Editor.IsDirty, "Clearing read-only lets the retry succeed");
+        } finally { File.SetAttributes(Path.Combine(locked, "Data", "scene-patches.json"), FileAttributes.Normal); Directory.Delete(locked, true); }
     }
     static void DependencyMinimumRisesOnlyWhenRequired() {
         var legacy = new World();

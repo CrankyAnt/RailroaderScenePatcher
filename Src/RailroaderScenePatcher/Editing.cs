@@ -43,7 +43,7 @@ namespace RailroaderScenePatcher {
             Editor = editor; Manager = Native.Read(editor, "UndoManager");
             if (Manager == null) throw new MissingMemberException("Native undo manager unavailable");
             Native.Read(editor, "_cleanChangeCount"); Native.Read(editor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
-            var storage = new ActiveStorage(); PatchPath = storage.PatchPath;
+            var storage = PackDocuments.ActiveStorage(); PatchPath = storage.PatchPath;
             Session = new AuthoringSession(engine, new NativeHistory(Manager), storage, PackDocuments.ActiveId, PackDocuments.ModId, PackDocuments.ActivePackId());
             changed = Manager.GetType().GetEvent("DidChange", Native.Flags);
             if (changed == null || changed.EventHandlerType != typeof(Action)) throw new MissingMemberException("Native history notification unavailable");

@@ -5,37 +5,19 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    // The two files of the active edited MapMod that the patcher writes. Inherited packs are never a destination.
-    internal sealed class ActiveStorage : IStorage {
-        readonly string root;
-        internal ActiveStorage() {
-            root = PackDocuments.ActiveRoot();
-            if (root == null || !Directory.Exists(root)) throw new InvalidOperationException("The active edited MapMod has no known writable location");
-        }
-        internal string PatchPath => Path.Combine(root, "Data", "scene-patches.json");
-        string InfoPath => Path.Combine(root, "Info.json");
-        public string ReadPatchDocument() => File.Exists(PatchPath) ? PackDocuments.ReadUtf8(PatchPath) : null;
-        public string ReadPackInfo() => File.Exists(InfoPath) ? PackDocuments.ReadUtf8(InfoPath) : null;
-        public void WritePatchDocument(string text) {
-            Directory.CreateDirectory(Path.GetDirectoryName(PatchPath)); File.WriteAllBytes(PatchPath, PackDocuments.Utf8.GetBytes(text));
-            // The owner learns the exact text that is on disk now: its own write is no outside change of the document.
-            try { PackDocuments.Written?.Invoke(text); } catch { }
-        }
-        public void WritePackInfo(string text) { File.WriteAllBytes(InfoPath, PackDocuments.Utf8.GetBytes(text)); }
-    }
     internal static class PackDocuments {
         internal const string ModId = LoadedPack.PatcherId;
         // Raised after the patcher wrote the active edited MapMod's patch document, with the written text.
         internal static Action<string> Written;
-        internal static readonly Encoding Utf8 = new UTF8Encoding(false, true);
-        internal static string ReadUtf8(string path) {
-            var bytes = File.ReadAllBytes(path);
-            var offset = bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf ? 3 : 0;
-            return Utf8.GetString(bytes, offset, bytes.Length - offset);
+        internal static string ReadUtf8(string path) => PackStorage.Decode(File.ReadAllBytes(path));
+        // The storage of the active edited MapMod, the only destination the patcher writes. Inherited packs are never one.
+        internal static PackStorage ActiveStorage() {
+            var root = ActiveRoot();
+            if (root == null || !Directory.Exists(root)) throw new InvalidOperationException("The active edited MapMod has no known writable location");
+            return new PackStorage(root, null, text => Written?.Invoke(text));
         }
         internal static string[] MapIds() {
             var active = Native.Type("Game.ActiveMapDefinition");
