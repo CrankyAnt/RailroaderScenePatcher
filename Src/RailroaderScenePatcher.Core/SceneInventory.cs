@@ -40,6 +40,31 @@ namespace RailroaderScenePatcher.Core {
             if (originOffset == null || originOffset.Count != scenePosition.Count) throw new ArgumentException("The origin offset does not fit the position", nameof(originOffset));
             return scenePosition.Select((value, index) => value - originOffset[index]).ToArray();
         }
+        // The scene position that puts an object at a map position at the current origin: the inverse of Position.
+        public static double[] ScenePosition(IReadOnlyList<double> mapPosition, IReadOnlyList<double> originOffset, bool movesWithOrigin) {
+            if (mapPosition == null) throw new ArgumentNullException(nameof(mapPosition));
+            if (!movesWithOrigin) return mapPosition.ToArray();
+            if (originOffset == null || originOffset.Count != mapPosition.Count) throw new ArgumentException("The origin offset does not fit the position", nameof(originOffset));
+            return mapPosition.Select((value, index) => value + originOffset[index]).ToArray();
+        }
+        // Where an object's marking stands in the scene: its map position at the current origin, as the world marking
+        // and Focus place it, for any object. The transform gizmo stands there too and shifts with every origin change;
+        // for an object the game does not move with the origin that is not the object's own scene position.
+        public static double[] MarkPosition(IReadOnlyList<double> mapPosition, IReadOnlyList<double> originOffset) =>
+            ScenePosition(mapPosition, originOffset, true);
+    }
+    // The map point Focus moves the camera to. A track span is its track locations, not its transform, which can stand
+    // anywhere, such as the scene origin: Focus lands midway between the locations that resolve. Any other object lands
+    // on its map position.
+    public static class FocusTarget {
+        public const string Span = "Track span";
+        public static double[] Point(string family, IReadOnlyList<double> mapPosition, IReadOnlyList<double[]> trackPositions, out string refusal) {
+            refusal = null;
+            if (family != Span) return mapPosition?.ToArray();
+            var found = (trackPositions ?? new double[0][]).Where(p => p != null && p.Length == 3 && p.All(v => !Double.IsNaN(v) && !Double.IsInfinity(v))).ToArray();
+            if (found.Length == 0) { refusal = "the span's track locations do not resolve"; return null; }
+            return Enumerable.Range(0, 3).Select(axis => found.Sum(p => p[axis]) / found.Length).ToArray();
+        }
     }
     // Whether an object is active as the scene was authored. An object is active in the game when it and every object
     // above it is switched on. The game also switches objects on and off while it runs: a culler deactivates the objects

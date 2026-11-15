@@ -884,7 +884,7 @@ namespace RailroaderScenePatcher {
                 gizmo = root.AddComponent<GizmoController>();
                 gizmo.Initialize(engine, capabilities, authoring, selected.Identity, inspection, mode, (outcome, message) => {
                     gizmo = null; gizmoEnded = Time.frameCount;
-                    feedback.Report(GizmoPlace, message ?? (outcome?.Applied == true ? "Gizmo placement completed. Use native Undo, Redo and Save." : "Gizmo placement refused: " + outcome?.Error));
+                    feedback.Report(GizmoPlace, message ?? (outcome?.Applied == true ? (outcome.Unchanged ? "Gizmo released without a move; nothing changed." : "Gizmo placement completed. Use native Undo, Redo and Save.") : "Gizmo placement refused: " + outcome?.Error));
                     OwnChange(); RefreshAfterEdit(); authoring?.RefreshChrome();
                 });
             } catch (Exception e) { gizmo = null; feedback.Report(GizmoPlace, "Gizmo unavailable: " + e.GetBaseException().Message); }
@@ -924,7 +924,11 @@ namespace RailroaderScenePatcher {
         void Focus(SceneObservation entry) {
             try {
                 if (!(entry.Handle is GameObject target) || target == null) throw new InvalidOperationException("the inspected object no longer exists; select Refresh and inspect it again");
-                JumpTo((Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "WorldToGame", target.transform.position));
+                var map = NativeInventory.MapPosition(target.transform);
+                var point = FocusTarget.Point(entry.Family, new double[] { map.x, map.y, map.z },
+                    entry.Family == FocusTarget.Span && trackPoses != null ? trackPoses.SpanPositions(target) : null, out var refusal);
+                if (point == null) throw new InvalidOperationException(refusal);
+                JumpTo(new Vector3((float)point[0], (float)point[1], (float)point[2]));
             } catch (Exception e) { feedback.Report("Focus", "Focus refused: " + e.GetBaseException().Message); }
         }
         static void JumpTo(Vector3 position) {

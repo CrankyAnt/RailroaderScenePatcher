@@ -324,7 +324,13 @@ namespace RailroaderScenePatcher {
             if (!holds.TryGetValue(relative, out var callback)) { callback = new HoldTarget { Target = (GameObject)target }.Keep; holds.Add(relative, callback); }
             setTargetActive.SetValue(relative, callback);
         }
-        public double[] Position(object target) { var p = Origin("WorldToGame", ((GameObject)target).transform.position); return new double[] { p.x, p.y, p.z }; }
+        // A marker the game does not shift with its origin, such as an unused starter marker under Setups, has its scene
+        // position as its map position (MapOrigin); converting it would carry the origin's offset into the placement.
+        public double[] Position(object target) {
+            var transform = ((GameObject)target).transform;
+            var p = Finite(NativeInventory.MapPosition(transform.position, MovesWithOrigin(transform)));
+            return new double[] { p.x, p.y, p.z };
+        }
         public double[] Rotation(object target) { var r = ((GameObject)target).transform.rotation; return new double[] { r.x, r.y, r.z, r.w }; }
         public bool Active(object target) => ((GameObject)target).activeSelf;
         public void SetPose(object target, double[] position, double[] rotation) {
@@ -332,8 +338,9 @@ namespace RailroaderScenePatcher {
             var p = new Vector3(Checked(position[0]), Checked(position[1]), Checked(position[2]));
             var q = new Quaternion(Checked(rotation[0]), Checked(rotation[1]), Checked(rotation[2]), Checked(rotation[3]));
             if (Math.Abs(Quaternion.Dot(q, q) - 1f) > 0.001f) throw new InvalidOperationException("Rotation must be a unit quaternion");
-            var local = Origin("GameToWorld", p);
-            if ((Origin("WorldToGame", local) - p).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
+            var moves = MovesWithOrigin(go.transform);
+            var local = Finite(NativeInventory.ScenePosition(p, moves));
+            if ((NativeInventory.MapPosition(local, moves) - p).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
             go.transform.SetPositionAndRotation(local, q);
             foreach (var c in go.GetComponentsInChildren(culler, true).OfType<Behaviour>().Where(c => c.enabled && c.gameObject.activeInHierarchy))
                 Native.Call(c, "RequestUpdateCullingPosition");
@@ -341,9 +348,12 @@ namespace RailroaderScenePatcher {
         }
         // The native marker lifecycle registers or removes the marker when the object's activity changes.
         public void SetActive(object target, bool active) => ((GameObject)target).SetActive(active);
-        Vector3 Origin(string direction, Vector3 position) {
-            if (Native.Read(transformer, "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");
-            var value = (Vector3)Native.Call(transformer, direction, position);
+        bool MovesWithOrigin(Transform transform) {
+            var moves = NativeInventory.MovesWithOrigin(transform);
+            if (moves && Native.Read(transformer, "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");
+            return moves;
+        }
+        static Vector3 Finite(Vector3 value) {
             if (Single.IsNaN(value.x) || Single.IsNaN(value.y) || Single.IsNaN(value.z) || Single.IsInfinity(value.x) || Single.IsInfinity(value.y) || Single.IsInfinity(value.z)) throw new InvalidOperationException("Invalid origin conversion");
             return value;
         }

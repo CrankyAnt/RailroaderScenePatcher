@@ -153,6 +153,8 @@ namespace RailroaderScenePatcher {
                 } else if (notify) finished?.Invoke(result, result?.Error == null ? "Gizmo cancelled; the prior placement is restored." : "Gizmo cancellation failed: " + result.Error);
             } finally { if (gameObject != null) Destroy(gameObject); }
         }
+        // The gizmo stands at its object's marking (MapOrigin.MarkPosition) and shifts with every origin change, also for
+        // an object the game does not move with the origin. Writes keep the object's own rule through its capability.
         void OriginChanged(WorldDidMoveEvent change) { if (visual != null && Active) visual.ShiftOrigin(change.Offset); }
         void Update() {
             if (!Active) return;
@@ -164,11 +166,10 @@ namespace RailroaderScenePatcher {
         void OnDestroy() { if (!stopping) Stop(true); }
         static Quaternion Rotation(Placement pose) => new Quaternion((float)pose.Rotation[0], (float)pose.Rotation[1], (float)pose.Rotation[2], (float)pose.Rotation[3]);
         static Vector3 MapToWorld(Placement pose) {
-            var transformer = Native.Type("Helpers.WorldTransformer");
-            if (Native.Read(transformer, "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");
+            if (Native.Read(Native.Type("Helpers.WorldTransformer"), "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");
             var map = new Vector3((float)pose.Position[0], (float)pose.Position[1], (float)pose.Position[2]);
-            var world = (Vector3)Native.Call(transformer, "GameToWorld", map);
-            if (((Vector3)Native.Call(transformer, "WorldToGame", world) - map).sqrMagnitude > .0001f) throw new InvalidOperationException("Map/origin conversion did not round trip");
+            var world = NativeInventory.MarkPosition(map);
+            if ((NativeInventory.MapPosition(world, true) - map).sqrMagnitude > .0001f) throw new InvalidOperationException("Map/origin conversion did not round trip");
             return world;
         }
     }

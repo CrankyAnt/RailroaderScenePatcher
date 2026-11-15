@@ -82,7 +82,7 @@ namespace RailroaderScenePatcher.Core {
                 // Reject changed targets before restoring a preview or committing its final result.
                 engine.GuardMutation(identity, target, maps, expected);
                 Restore(); active = false;
-                if (desired == null || Unchanged(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, ResolvedTarget = target }; }
+                if (desired == null || Unchanged(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, Unchanged = true, ResolvedTarget = target }; }
                 var result = session.Edit(identity, desired, null, original);
                 if (!result.Applied) engine.AwaitOutput(target);
                 return result;

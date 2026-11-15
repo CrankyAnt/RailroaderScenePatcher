@@ -48,12 +48,24 @@ namespace RailroaderScenePatcher {
         // targets, with everything below them. A holder of data outside them, such as an equipment setup with its
         // markers, stays where it is in the scene. When no target is registered at all the registration cannot be read,
         // and every object counts as shifted, as the game's own conversion assumes.
-        static bool MovesWithOrigin(Transform transform) {
+        internal static bool MovesWithOrigin(Transform transform) {
             var targets = Helpers.WorldTransformerTargetList.Targets;
             if (targets == null || targets.Count == 0) return true;
             for (var t = transform; t != null; t = t.parent) if (targets.Contains(t)) return true;
             return false;
         }
+        // The object's map position (MapOrigin.Position): the inventory shows it and Focus moves the camera to it.
+        internal static Vector3 MapPosition(Transform transform) => MapPosition(transform.position, MovesWithOrigin(transform));
+        // The MapOrigin rule between scene and map positions, for an object that does or does not move with the origin.
+        // Focus, the inventory, the marker capability and the gizmo use it.
+        internal static Vector3 MapPosition(Vector3 scene, bool movesWithOrigin) =>
+            Vector(MapOrigin.Position(Doubles(scene), movesWithOrigin ? OriginOffset() : null, movesWithOrigin));
+        internal static Vector3 ScenePosition(Vector3 map, bool movesWithOrigin) =>
+            Vector(MapOrigin.ScenePosition(Doubles(map), movesWithOrigin ? OriginOffset() : null, movesWithOrigin));
+        internal static Vector3 MarkPosition(Vector3 map) => Vector(MapOrigin.MarkPosition(Doubles(map), OriginOffset()));
+        static double[] OriginOffset() => Doubles((Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "GameToWorld", Vector3.zero));
+        static double[] Doubles(Vector3 v) => new double[] { v.x, v.y, v.z };
+        static Vector3 Vector(double[] v) => new Vector3((float)v[0], (float)v[1], (float)v[2]);
         const string GameObjectCuller = "Helpers.Culling.GameObjectCuller";
         // The equipment of a crossing whose activity the game switches by camera distance through a culler.
         static readonly HashSet<string> CulledFamilies = new HashSet<string>(StringComparer.Ordinal) { "Crossing light", "Crossing gate", "Crossing bell" };
@@ -299,8 +311,8 @@ namespace RailroaderScenePatcher {
                 // The map position is the scene position less the origin's offset. For an object the game does not shift
                 // with its origin that difference changes with every origin move although nothing moved the object: its
                 // position is the scene position, which is its map position at the first origin.
-                if (MovesWithOrigin(go.transform)) position = (Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "WorldToGame", position);
-                else runtime.Add("Position does not move with the world origin; it is the position in the scene");
+                position = MapPosition(go.transform);
+                if (!MovesWithOrigin(go.transform)) runtime.Add("Position does not move with the world origin; it is the position in the scene");
                 coordinatesAvailable = !Single.IsNaN(position.x) && !Single.IsNaN(position.y) && !Single.IsNaN(position.z) && !Single.IsInfinity(position.x) && !Single.IsInfinity(position.y) && !Single.IsInfinity(position.z);
                 if (!coordinatesAvailable) throw new InvalidOperationException("Map coordinates unavailable");
             });

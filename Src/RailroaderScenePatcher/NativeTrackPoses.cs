@@ -21,6 +21,23 @@ namespace RailroaderScenePatcher {
             if (location.GetConstructor(Native.Flags, null, new[] { segment, typeof(float), end }, null) == null) throw new MissingMethodException(LocationType, ".ctor");
             foreach (var method in new[] { "GetSegment", "GetNode", "GetPositionRotation" }) if (graph.GetMethod(method, Native.Flags) == null) throw new MissingMethodException(GraphType, method);
         }
+        // The map positions of a track span's lower and upper locations that resolve on the loaded graph; a location
+        // that does not resolve is left out.
+        internal double[][] SpanPositions(GameObject go) {
+            var span = go == null ? null : go.GetComponent(Native.Type("Track.TrackSpan"));
+            var found = new System.Collections.Generic.List<double[]>();
+            if (span == null) return found.ToArray();
+            foreach (var name in new[] { "_lower", "_upper" }) {
+                try {
+                    var at = Native.Read(span, name);
+                    var segment = Native.Read(at, "segmentId") as string;
+                    if (String.IsNullOrEmpty(segment)) continue;
+                    var end = Convert.ToString(Native.Read(at, "end")) == "A" ? "a" : "b";
+                    found.Add(TrackPose(TrackAnchor.At(new TrackLocation(segment, end, (float)Native.Read(at, "distance")))).Position);
+                } catch (InvalidOperationException) { }
+            }
+            return found.ToArray();
+        }
         public TrackPose TrackPose(TrackAnchor anchor) {
             var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
             if (anchor.Node != null) {

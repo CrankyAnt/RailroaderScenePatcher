@@ -140,7 +140,8 @@ static class GizmoTests {
         Assert(gesture.Preview(Pose(112)).Applied && f.Box.X == 12, "Dragging previews the checked map pose in the world");
         Assert(gesture.Preview(Pose(114)).Applied && f.Box.X == 14, "Successive previews use absolute desired state without drift");
         Assert(f.Editor.UndoGroups.Count == 0 && !f.Editor.IsDirty && JObject.Parse(f.Session.DocumentText)["modifications"].Count() == 0, "Preview creates no canonical edit or history entry");
-        Assert(gesture.Complete().Applied && f.Editor.UndoGroups.Count == 1, "One completed gesture registers one native operation");
+        var moved = gesture.Complete();
+        Assert(moved.Applied && !moved.Unchanged && f.Editor.UndoGroups.Count == 1, "One completed gesture registers one native operation");
         var placement = JObject.Parse(f.Session.DocumentText)["modifications"][0]["placement"];
         Assert((string)placement["mode"] == "fixed" && (double)placement["position"][0] == 114 && (double)placement["rotation"][1] == 0.6, "Canonical desired state holds map position and complete rotation");
         f.Editor.Undo();
@@ -171,7 +172,11 @@ static class GizmoTests {
             Assert(f.Box.Rotation[1] == pose.Rotation[1] && Modifications(f).Count() == 1, "Redo applies the small rotation again");
         }
         var back = new Fixture(); var returned = back.Begin();
-        Assert(returned.Preview(Turned(0.4)).Applied && returned.Preview(Turned(0)).Applied && returned.Complete().Applied, "A gesture dragged back to its start completes");
+        Assert(returned.Preview(Turned(0.4)).Applied && returned.Preview(Turned(0)).Applied, "A gesture is dragged back to its start");
+        var ended = returned.Complete();
+        Assert(ended.Applied && ended.Unchanged, "A gesture dragged back to its start completes as unchanged, so feedback reports no placement");
+        var still = new Fixture().Begin().Complete();
+        Assert(still.Applied && still.Unchanged, "A release without any drag completes as unchanged");
         Assert(back.Editor.UndoGroups.Count == 0 && Modifications(back).Count() == 0 && back.Box.Rotation[3] == 1 && back.Scene.Registration == "original registration", "A gesture that ends where it began records no modification or history");
     }
     // A restored rotation that reads back slightly off the captured one, as a native transform can, still verifies:

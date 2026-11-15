@@ -103,6 +103,8 @@ static class InspectionTests {
         OriginRoundingDoesNotMarkStale();
         TheGuardObservesOnlyTheTarget();
         AnObjectOutsideTheMovingOriginDoesNotMarkStale();
+        APlacementOutsideTheMovingOriginKeepsItsMapPosition();
+        FocusLandsOnTheObject();
         CullerDrivenActivityDoesNotMarkStale();
         AnOwnEditTakesItsRelatedObservations();
         AComparedSnapshotPinsWithoutAScan();
@@ -703,6 +705,59 @@ static class InspectionTests {
         var refused = false;
         try { MapOrigin.Position(moved, new double[2], true); } catch (ArgumentException) { refused = true; }
         Check(refused, "An offset that does not fit the position is refused");
+    }
+
+    // Focus, the displayed placement and a placement write use one map position. For an object the game does not shift
+    // with its origin, such as a starter marker under Setups, that is its scene position at every origin: converting it
+    // like a shifted object put the camera off the map and would write the origin offset into the scene.
+    static void APlacementOutsideTheMovingOriginKeepsItsMapPosition() {
+        // starter-br-coaling: serialized and scene position 4174.06 / 528.62 / 5327.77, origin offset at the review -4500 / 0 / -5500.
+        var scene = new double[] { 4174.06, 528.62, 5327.77 }; var offset = new double[] { -4500, 0, -5500 };
+        Check(MapOrigin.Position(scene, offset, false).SequenceEqual(scene), "An object outside the moving origin is at its scene position on the map");
+        Check(MapOrigin.ScenePosition(scene, offset, false).SequenceEqual(scene), "A map placement outside the moving origin is written as that scene position");
+        Check(!MapOrigin.ScenePosition(scene, offset, false).SequenceEqual(new double[] { -325.94, 528.62, -172.23 }), "No origin offset enters the scene position of an object the game does not shift");
+        // A board under World at map 1000 / 500 / 2000: the game has shifted it by the offset.
+        var map = new double[] { 1000, 500, 2000 };
+        Check(MapOrigin.ScenePosition(map, offset, true).SequenceEqual(new double[] { -3500, 500, -3500 }), "A shifted object's map placement is written at the scene position of the current origin");
+        Check(MapOrigin.Position(MapOrigin.ScenePosition(map, offset, true), offset, true).SequenceEqual(map), "A shifted object's written placement reads back as its map position");
+        var refused = false;
+        try { MapOrigin.ScenePosition(map, new double[2], true); } catch (ArgumentException) { refused = true; }
+        Check(refused, "A write with an offset that does not fit the position is refused");
+        // The gizmo stands at the object's marking: its map position at the current origin, as the world marking and
+        // Focus place it, whether or not the game moves the object with the origin. Three tiles of origin change shift
+        // the gizmo by the full change, so it stays at the marking; writes still keep the object's own rule.
+        var change = new double[] { -1500, 0, 500 };
+        var moved = offset.Select((v, i) => v + change[i]).ToArray();
+        var before = MapOrigin.MarkPosition(scene, offset);
+        Check(before.Select((v, i) => Math.Abs(v - new double[] { -325.94, 528.62, -172.23 }[i])).Max() < 1e-9,
+            "The gizmo of an object outside the moving origin stands at its marking, not at its scene position");
+        var shifted = before.Select((v, i) => v + change[i]).ToArray();
+        Check(shifted.Select((v, i) => Math.Abs(v - MapOrigin.MarkPosition(scene, moved)[i])).Max() < 1e-9,
+            "After an origin change the gizmo of an object outside the moving origin stands at its marking");
+        Check(MapOrigin.ScenePosition(scene, moved, false).SequenceEqual(scene),
+            "After an origin change the object outside the moving origin is still written at its scene position");
+        // An object inside the moving world: its marking is where the game keeps it, so its gizmo stands on it as before.
+        Check(MapOrigin.MarkPosition(map, offset).SequenceEqual(MapOrigin.ScenePosition(map, offset, true)) &&
+            MapOrigin.MarkPosition(map, moved).SequenceEqual(MapOrigin.ScenePosition(map, moved, true)),
+            "The gizmo of a shifted object stands on the object before and after an origin change");
+    }
+
+    // Focus moves the camera to where the object is on the map. A track span is its track locations, not its transform:
+    // Ops/OpsTrackSpans/Span-wh-e-engine.span-(1) stands at the scene origin, and Focus put the camera at x = 0, z = 0.
+    static void FocusLandsOnTheObject() {
+        var origin = new double[] { 0, 0, 0 };
+        var lower = new double[] { 12700, 560, 4600 }; var upper = new double[] { 12900, 564, 4700 };
+        Check(FocusTarget.Point("Track span", origin, new[] { lower, upper }, out var refusal).SequenceEqual(new double[] { 12800, 562, 4650 }) && refusal == null,
+            "Focus on a track span lands midway between its track locations");
+        Check(FocusTarget.Point("Track span", origin, new[] { upper }, out refusal).SequenceEqual(upper) && refusal == null,
+            "Focus on a track span with one resolved location lands on it");
+        Check(FocusTarget.Point("Track span", origin, new double[0][], out refusal) == null && refusal == "the span's track locations do not resolve",
+            "Focus on a track span without a resolved location is refused with its reason");
+        var board = new double[] { 5306.8, 529.95, 5737.6 };
+        Check(FocusTarget.Point("Independent board", board, new double[0][], out refusal).SequenceEqual(board) && refusal == null,
+            "Focus on any other object lands on its map position");
+        Check(FocusTarget.Point("Track span", origin, new[] { new double[] { double.NaN, 0, 0 } }, out refusal) == null && refusal != null,
+            "a track location without a finite position does not count");
     }
 
     // A crossing signal sits under an object that a culler switches off when the camera is far away, as after a camera
