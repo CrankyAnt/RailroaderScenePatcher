@@ -11,11 +11,13 @@ A binding edit never moves the object. Placement and activity are separate setti
 The patcher edits a marker when all of these hold:
 
 - the object holds exactly one `Track.TrackMarker`, of type `Generic`, with a non-empty marker ID,
-- the object holds no `Helpers.MilePost` and no `Track.TrackCurveMeshBuilder`, and no parent holds a `Track.Crossings.GradeCrossingController`,
+- the object holds no `Helpers.MilePost` and no `Track.TrackCurveMeshBuilder`,
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object whose activity follows a track group activates this object itself, and no other component has replaced its activation callback,
 - no loaded component other than that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it does not know the holders and refuses every marker until the next check,
 - the graph holds one registration of the marker at its current location while the marker is enabled and active, and none otherwise.
+
+A Generic marker inside a grade-crossing setup, such as a whistle sign under a `Track.Crossings.GradeCrossingController`, qualifies like any other: the crossing controller reads its circuits and spans, and the auto engineer's crossing horn reads the crossing pad's `Crossing` marker, not the sign. The crossing pad and the crossing's own `Crossing` markers keep their own operations.
 
 Each of these refusals names a consumer of the marker's location that a binding edit would leave behind. For an object whose activity follows its track group, a binding edit also moves that group subscription to the new segment's group; see [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 

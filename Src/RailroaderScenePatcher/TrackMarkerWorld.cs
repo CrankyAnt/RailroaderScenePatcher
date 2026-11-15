@@ -13,7 +13,8 @@ namespace RailroaderScenePatcher {
     // The serialized location is the relationship; the track graph's named-location bucket for that segment is its
     // registration, which the native marker adds when it is enabled and removes when it is disabled. Setting the
     // location does not change that registration, so this adapter performs the matching remove and add steps.
-    // Crossing pads use CrossingPadWorld; mileposts and crossing markers keep their own later slices; signals are outside scope.
+    // Crossing pads use CrossingPadWorld; mileposts keep their own later slice; Crossing-type and signal markers are outside
+    // this pattern. A Generic marker inside a crossing setup, such as a whistle sign, is an ordinary Generic marker.
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
     // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
@@ -24,7 +25,6 @@ namespace RailroaderScenePatcher {
         const string GraphType = "Track.Graph", SegmentType = "Track.TrackSegment", LocationType = "Track.Location";
         internal const string Relative = "Track.TrackRelativePosition", Milepost = "Helpers.MilePost";
         internal const string PadBuilder = "Track.TrackCurveMeshBuilder";
-        const string Crossing = "Track.Crossings.GradeCrossingController";
         const string MapBuilderType = "UI.Map.MapBuilder", MapLabelType = "UI.Map.MapLabel", SetupType = "Game.Progression.SetupDescriptor";
         readonly Type marker, graph, segment, location, end, transformer, culler, mapBuilder, mapLabel;
         readonly PropertyInfo markerLocation;
@@ -174,14 +174,11 @@ namespace RailroaderScenePatcher {
         internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups, bool enabling = false, bool placementOnly = false) {
             if (!Loaded(go) && !(enabling && go != null && go.scene.IsValid())) return "This object has no implemented track-marker capability";
             var markers = go.GetComponents<Component>().Where(c => c != null && c.GetType().FullName == MarkerType).ToArray();
-            if (markers.Length != 1) return markers.Length == 0 ? "The object holds no track marker" : "The object holds several track markers";
-            var m = markers[0];
-            if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the marker object";
-            if (Get(go, Milepost) != null) return "Milepost markers keep their milepost-specific slice; this binding operation does not apply";
-            if (Get(go, PadBuilder) != null) return "Crossing pad markers use the crossing-pad capability; this Generic-marker operation does not apply";
-            for (var t = go.transform; t != null; t = t.parent) if (Get(t.gameObject, Crossing) != null) return "Markers inside a crossing keep the crossing-specific slice";
-            var type = System.Convert.ToString(Field(m, "type"));
-            if (type != "Generic") return "Only Generic track markers are supported; this marker is " + type;
+            var m = markers.Length == 1 ? markers[0] : null;
+            var shape = new MarkerShape(markers.Length, go.GetComponents<Component>().Any(c => c == null), Get(go, Milepost) != null, Get(go, PadBuilder) != null,
+                m == null ? null : System.Convert.ToString(Field(m, "type")));
+            var refusal = MarkerPattern.Refusal(shape);
+            if (refusal != null) return refusal;
             return Consumers(go, m, references, setups, (owner, field) => owner is Component c && c.gameObject == go && c.GetType().FullName == Relative && field == "_marker", placementOnly);
         }
         // The consumer checks shared by the Generic-marker and crossing-pad patterns: the marker's ID, location listeners,

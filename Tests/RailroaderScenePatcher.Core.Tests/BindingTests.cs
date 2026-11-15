@@ -12,6 +12,8 @@ class FakeMarker {
     public double[] Position = { 20, 1, 2 }, Rotation = { 0, 0, 0, 1 };
     public bool Active = true;
     public string Pattern;
+    // The structural facts the native adapter copies from the object; null leaves only Pattern and the reference scan.
+    public RailroaderScenePatcher.MarkerShape Shape;
     // A consumer cache derived from the bound segment, such as a map label's cached track group.
     public string CachedGroup;
     // A TrackRelativePosition whose target is this object and whose activity follows the bound track group: the group it
@@ -101,8 +103,10 @@ class FakeMarkerWorld : ITrackMarkerWorld {
             new ReferenceField("targetAngle", false, () => throw new InvalidOperationException("irrelevant value field injected")) } });
     }
     public string PatternProblem(object target) =>
-        ((FakeMarker)target).Pattern ?? ReferenceScan.Of(Owners, o => ((FakeOwner)o).Fields, i => i is FakeMarker, o => ((FakeOwner)o).Name)
+        ((FakeMarker)target).Pattern ?? Structure(target) ?? ReferenceScan.Of(Owners, o => ((FakeOwner)o).Fields, i => i is FakeMarker, o => ((FakeOwner)o).Name)
             .Refusal(target, (o, field) => ((FakeOwner)o).Colocated == target && field == "_marker", o => ((FakeOwner)o).Name);
+    // The native adapter's structural rule, applied to the copied facts.
+    protected static string Structure(object target) { var shape = ((FakeMarker)target).Shape; return shape == null ? null : RailroaderScenePatcher.MarkerPattern.Refusal(shape); }
     public TrackLocation Location(object target) {
         var m = (FakeMarker)target;
         return String.IsNullOrEmpty(m.Segment) ? null : new TrackLocation(m.Segment, m.End, m.Distance);
@@ -186,6 +190,13 @@ class FakeMarkerWorld : ITrackMarkerWorld {
     // A group follower present at load, as its Awake observes the group.
     public void LoadFollower(FakeMarker m) { m.Follows = true; ObserveGroup(m); Load(m); Mutations = 0; m.Activations = 0; }
 }
+// A marker world with the native adapter's target confirmation and pose-only check: the structural rule and no consumer scan.
+class PlacementCheckedMarkerWorld : FakeMarkerWorld, ITargetConfirmation, IPlacementPattern {
+    public int PlacementChecks;
+    public bool StillIdentifies(object target, TargetIdentity identity) =>
+        identity.Component == "Track.TrackMarker" && Objects.TryGetValue(identity.Path, out var found) && found.Contains(target) && Structure(target) == null;
+    public string PlacementProblem(object target) { PlacementChecks++; return ((FakeMarker)target).Pattern ?? Structure(target); }
+}
 static class BindingTests {
     const string SignPath = "World/Large Scenery/Ela/Signs/Station Sign (1)", OtherPath = "World/Large Scenery/Alarka Signs/Yard Limit";
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
@@ -231,7 +242,56 @@ static class BindingTests {
         SaveAndReloadReproduceBindingOnce();
         GizmoGestureKeepsTheBinding();
         PhysicalSnapKeepsTheBinding();
+        GenericMarkerInsideCrossingIsEditable();
         Console.WriteLine("PASS: track-marker relationship set, replacement, detachment, omission, refusal, restoration and authoring");
+    }
+    // A whistle sign inside a grade-crossing setup is an ordinary Generic marker: no game logic reads it, and the crossing's
+    // horn comes from its pad. Only the pad and the crossing's own markers stay with the crossing capabilities.
+    const string Crossing = "World/Roads Bryson/Grade Crossing - Allen/", WhistlePath = Crossing + "Whistle Sign W", PadPath = Crossing + "Crossing Pad", CrossingMarkerPath = Crossing + "Crossing Marker";
+    static TargetIdentity InCrossing(string path) => new TargetIdentity("BushnellWhittier", path, "Track.TrackMarker", TrackMarkerScene.Structure);
+    static void GenericMarkerInsideCrossingIsEditable() {
+        var world = new PlacementCheckedMarkerWorld();
+        world.Segments["S377"] = new List<double> { 30 }; world.Groups["S377"] = "bryson";
+        var whistle = new FakeMarker { Id = "M9i8", Segment = "S377", End = "a", Distance = 7.511661, Shape = new RailroaderScenePatcher.MarkerShape(1, false, false, false, "Generic") };
+        var pad = new FakeMarker { Id = "Mpad", Segment = "S377", End = "a", Distance = 9, Position = new double[] { 25, 1, 2 }, Shape = new RailroaderScenePatcher.MarkerShape(1, false, false, true, "Crossing") };
+        var crossingMarker = new FakeMarker { Id = "Mcrs", Segment = "S377", End = "b", Distance = 4, Position = new double[] { 26, 1, 2 }, Shape = new RailroaderScenePatcher.MarkerShape(1, false, false, false, "Crossing") };
+        foreach (var (path, m) in new[] { (WhistlePath, whistle), (PadPath, pad), (CrossingMarkerPath, crossingMarker) }) { world.Objects[path] = new List<object> { m }; world.Load(m); world.Relative(m); }
+        var tracks = new TrackScene();
+        tracks.Poses["node:N1"] = new TrackPose(new[] { 1050.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
+        var capabilities = new SceneCapabilities(() => world.MapIds) { Tracks = tracks };
+        capabilities.Add(new TrackMarkerScene(world, Capability.Unchecked));
+        var store = new Store(); var editor = new Editor();
+        var session = new AuthoringSession(new PatchEngine(capabilities), editor, store, "map"); editor.Session = session;
+        var sign = InCrossing(WhistlePath);
+        var set = session.Bind(sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 4)));
+        Assert(set.Applied && Entry(world, whistle) == "Nnew|b|4" && whistle.CachedGroup == "extension" && whistle.Position[0] == 20, "A whistle sign inside a crossing takes a binding like any Generic marker: " + set.Error);
+        var replaced = session.Bind(sign, MarkerBinding.At(new TrackLocation("S377", "a", 7.511661)));
+        Assert(replaced.Applied && Entry(world, whistle) == "S377|a|7.511661" && whistle.CachedGroup == "bryson", "Its binding can be replaced: " + replaced.Error);
+        var placed = session.Edit(sign, new Placement(new[] { 1045.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
+        Assert(placed.Applied && whistle.Position[0] == 45 && Entry(world, whistle) == "S377|a|7.511661", "Its fixed placement is editable and keeps the binding: " + placed.Error);
+        var disabled = session.Edit(sign, null, false);
+        Assert(disabled.Applied && !whistle.Active && world.Registrations(whistle).Count == 0 && whistle.Segment == "S377" && whistle.Position[0] == 45, "It can be disabled, which withdraws its registration and keeps its binding and pose: " + disabled.Error);
+        Assert(Only(session)["active"] != null && !(bool)Only(session)["active"], "The document records the explicit disable");
+        var enabled = session.Edit(sign, null, true);
+        Assert(enabled.Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661" && whistle.Position[0] == 45, "It can be enabled again, which registers it at its binding: " + enabled.Error);
+        Assert(session.ClearActivity(sign).Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661" && Only(session)["active"] == null, "Clearing the activity returns the native active state");
+        var followed = session.Follow(sign, TrackAnchor.Endpoint("N1"));
+        Assert(followed.Applied && Entry(world, whistle) == "S377|a|7.511661", "It can follow a track: " + followed.Error);
+        Assert(session.ReconcileTrackFollowing().Count == 0, "An unchanged track needs no follow update");
+        var at = whistle.Position[0]; var checks = world.PlacementChecks;
+        tracks.Poses["node:N1"] = new TrackPose(new[] { 1060.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
+        var moved = session.ReconcileTrackFollowing().Single().Value;
+        Assert(moved.Applied && whistle.Position[0] == at + 10 && world.PlacementChecks > checks && Entry(world, whistle) == "S377|a|7.511661", "A track move carries it through the pose-only check: " + moved.Error);
+        var detached = session.Bind(sign, MarkerBinding.Detached);
+        Assert(detached.Applied && whistle.Segment == null && world.Registrations(whistle).Count == 0 && whistle.CachedGroup == null, "Its binding can be detached: " + detached.Error);
+        editor.Undo(); Assert(Entry(world, whistle) == "S377|a|7.511661" && whistle.CachedGroup == "bryson", "Undo restores its binding and registration");
+        var before = world.Mutations;
+        var padEdit = session.Bind(InCrossing(PadPath), MarkerBinding.At(new TrackLocation("Nnew", "a", 3)));
+        Assert(!padEdit.Applied && padEdit.Error.Contains("crossing-pad capability"), "The crossing pad stays with its own capability: " + padEdit.Error);
+        var crossingEdit = session.Bind(InCrossing(CrossingMarkerPath), MarkerBinding.Detached);
+        Assert(!crossingEdit.Applied && crossingEdit.Error.Contains("this marker is Crossing"), "A Crossing-type marker stays outside the Generic pattern: " + crossingEdit.Error);
+        Assert(!session.Edit(InCrossing(PadPath), new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied, "The pad's placement stays outside the Generic pattern");
+        Assert(world.Mutations == before && Entry(world, pad) == "S377|a|9" && pad.Position[0] == 25 && Entry(world, crossingMarker) == "S377|b|4", "The refused crossing markers keep their binding, registration and pose");
     }
     static void SetBindsLocationAndRegistration() {
         var (world, sign, other, scene) = Setup();
