@@ -68,6 +68,9 @@ _Avoid_: Binding
 A relationship from a scene object to another object or track whose meaning is defined by the game.
 _Avoid_: Placement
 
+**Broken binding**:
+A logical binding whose stored reference names something missing from the loaded map, such as a missing segment. It is distinct from a valid but incorrect binding.
+
 **Track-following placement**:
 Physical placement defined relative to a selected track or one of its endpoints.
 
@@ -155,6 +158,83 @@ A detection span that a MapMod's coherent operation constructs and registers for
 A circuit that a MapMod adds at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying MapMod. It adds detection without changing the crossing's native circuits. It is not an Added object.
 _Avoid_: Authored addition
 
+**Modification**:
+An entry in a patch document, identified by its modification ID, that holds a MapMod's desired state for one existing scene object.
+
+**Patcher dependency**:
+A supplying MapMod's declared dependency on the patcher, with the minimum patcher version that the MapMod requires.
+
+**Fixed placement**:
+Physical placement at a fixed pose in map coordinates, independent of any track. It is distinct from track-following placement.
+
+**Owned state**:
+State that a MapMod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.
+
+**Guarded retry**:
+A retry of an operation whose mutation failed, blocked until the cleanup of the failed attempt is verified or the world reloads.
+
+**Capability**:
+An area of patcher behavior whose required game functions and prerequisites are checked per build, so that a demonstrated incompatibility disables only that area.
+
+### Scene object terminology
+
+These are project terms for the scene objects that the patcher lists and edits, not additional Railroader definition types or Unity object types.
+
+**Inventory**:
+The scene objects of the loaded map context that the patcher lists for inspection. Rules that the coverage statement names keep other scene objects out.
+
+**Coverage statement**:
+The development reference outside the editor that names each rule keeping scene objects out of the inventory.
+
+**Family**:
+A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. The outliner groups inventory objects by family.
+
+**Native map data**:
+Map data that the native map editor edits, such as Props, masks, Builtins, spawns, turntables, tracks, industries, track spans and passenger stops. The inventory lists no native map data.
+
+**Baked scenery group**:
+A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces or bridge constructions, which receives placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery.
+
+**Group root**:
+The scene object at the top of a baked scenery group. The inventory lists a baked scenery group as one entry for its root.
+
+**Part**:
+A scene object inside a baked scenery group, other than its group root, that can receive its own placement or activity.
+
+**Scene spawn point**:
+A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a spawn in native map data.
+
+**Station map icon**:
+A scene object that shows a station on the map.
+
+**Station click spot**:
+The invisible part of a station's baked scenery group that opens the station window.
+_Avoid_: Click volume
+
+**Scene marker**:
+A scene object, such as a track marker, that the game registers under a marker id.
+
+**Marker id**:
+The identifier under which the game registers a scene marker. The scene markers that hold the same marker id are its holders.
+
+**Duplicate marker id**:
+A marker id that more than one scene object holds.
+
+**Replacement id**:
+A new, unique marker id that repairs a duplicate marker id by replacing the id of one of its holders.
+
+**Starter placement marker**:
+A scene object that a new-game car placement reads for its track location. Its object position is not used.
+
+**New-game car placement**:
+One placement of a new-game setup that places a cut of starting cars at its starter placement marker's track location.
+
+**Track location**:
+The place on a track that a starter placement marker supplies to a new-game car placement. It is distinct from the marker's object position.
+
+**Wreck setting**:
+The setting of a new-game car placement that decides whether its cars start derailed as a wreck.
+
 ### Editor terminology
 
 **Scene patch editing**:
@@ -165,8 +245,15 @@ _Avoid_: Authoring, patch authoring
 The searchable list of inventory scene objects beside the inspector in the production editor.
 _Avoid_: Object list, tree
 
+**Inspection only group**:
+A group of the outliner that lists inventory objects that no supported family covers and that the native map editor does not edit, with the reason each is not yet supported.
+_Avoid_: Inspection only category
+
 **Problems filter**:
 The outliner filter that limits the list to scene objects with a detected problem.
+
+**Problem**:
+A defect of one scene object that the modder can repair with the patcher for that object, such as a duplicate marker id or a broken binding.
 
 **Inspector**:
 The editor region that shows the inspected scene object's values, dependencies and actions.
@@ -188,3 +275,6 @@ _Avoid_: Wizard
 
 **Guided task**:
 One supported operation carried out in Guided mode, with its own pinned target and draft.
+
+**Helper marker**:
+A world marking that shows an invisible scene object at its pose, so that the modder can place it.
