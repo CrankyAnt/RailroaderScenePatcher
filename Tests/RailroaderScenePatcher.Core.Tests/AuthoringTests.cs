@@ -21,10 +21,12 @@ class Store : IStorage {
 // The real files of a MapMod folder, with a write that stops midway after part of its bytes reached the disk,
 // or a failing replacement of a file by new content, for files whose name starts with the given text. With
 // ReplaceFailures set, the replacement fails only that many times and then succeeds, as a file another process
-// holds open for a moment does.
+// holds open for a moment does. With RefuseReplace set, the replacement is refused as Windows refuses to replace
+// a read-only file.
 class FaultyFiles : DiskFiles {
     public string FailWrite, FailReplace;
     public int? ReplaceFailures;
+    public bool RefuseReplace;
     // Every replacement or move into place, by file name, in order; a pause recorder can add its pauses to the same log.
     public readonly List<string> Log = new List<string>();
     static bool Hit(string prefix, string path) => prefix != null && Path.GetFileName(path).StartsWith(prefix, StringComparison.Ordinal);
@@ -38,6 +40,7 @@ class FaultyFiles : DiskFiles {
     void Fail(string destination) {
         Log.Add("place " + Path.GetFileName(destination));
         if (!Hit(FailReplace, destination)) return;
+        if (RefuseReplace) throw new UnauthorizedAccessException("access to the path is denied");
         if (ReplaceFailures == null || ReplaceFailures-- > 0) throw new IOException("replace failed");
     }
 }
@@ -350,6 +353,22 @@ static class AuthoringTests {
                 Assert(w.Editor.Save() == null && !w.Editor.IsDirty, target + ": the retry after the file is released succeeds");
             } finally { Directory.Delete(root, true); }
         }
+        // A refused replacement is no passing hold: it fails at once, without further attempts. The refusal is injected,
+        // so the rule holds on every platform the tests run on.
+        var refused = Folder(saved, info);
+        try {
+            var files = new FaultyFiles { FailReplace = "scene-patches.json", RefuseReplace = true };
+            var storage = new PackStorage(refused, files, null, Waited(files.Log));
+            var w = new World(saved, info, storage);
+            w.Session.Edit(P, Pose(130), null);
+            var message = w.Editor.Save();
+            Assert(message != null && Pauses(files.Log, "scene-patches.json", out var once).Length == 0 && once == 1 && w.Editor.IsDirty && Listing(refused) == "Data/scene-patches.json,Info.json", "A refused replacement of the patch document fails the Save at once and leaves no pending file: " + message);
+            files.FailReplace = null;
+            Assert(w.Editor.Save() == null && !w.Editor.IsDirty, "The retry after the refusal ends succeeds");
+        } finally { Directory.Delete(refused, true); }
+        // On Windows a read-only file refuses its replacement. Elsewhere the attribute only removes write permission from
+        // the file, which a rename-based replacement does not need, so the check runs only where the refusal is real.
+        if (!OperatingSystem.IsWindows()) return;
         // A read-only file is no passing hold: it fails at once, without further attempts.
         var locked = Folder(saved, info);
         try {
