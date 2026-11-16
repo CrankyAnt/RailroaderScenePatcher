@@ -172,6 +172,7 @@ static partial class CoverageTests {
         EditingPreviewSelectUndoRedoAndRemoval();
         EditingRefusalAndFailureRestore();
         SaveAndReloadReproduceCoverageOnce();
+        DependedCoverageKeepsItsLastEntry();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
     }
     static void DocumentDistinguishesOmittedSelectedAndDetached() {
@@ -390,6 +391,21 @@ static partial class CoverageTests {
         var recheck = session.Recheck(Crossing);
         Assert(recheck.Applied && f.Native && f.OwnedRegistered == 0 && f.World.Graph.Values.Count(s => s.Owned) == 0, "Recheck converges on the document and clears the guard: " + recheck.Error);
         Assert(session.Cover(Crossing, "Pipr", Selected()).Applied && f.OwnedRegistered == 3, "After recheck the edit applies");
+    }
+    // Clearing the last coverage entry would remove the modification; another modification names it in dependsOn, so
+    // the edit is refused with that dependent named and nothing changes.
+    static void DependedCoverageKeepsItsLastEntry() {
+        var other = Cover("other", Detached("Qi").Replace("\"detach\":true", "\"approachA\":" + Range("Sother", 1, 5) + ",\"island\":" + Range("Sother", 5, 6) + ",\"approachB\":" + Range("Sother", 6, 9)), OtherPath, "[\"reroute\"]");
+        var text = Doc(Cover("reroute", Tracks("Pipr")) + "," + other);
+        var f = new Fixture();
+        new PatchEngine(f.Scene).Apply(text, "");
+        var (_, session, mapEditor, store) = Session(text, f);
+        var groups = mapEditor.UndoGroups.Count; var mutations = f.World.Mutations;
+        var cleared = session.Cover(Crossing, "Pipr", null);
+        Assert(!cleared.Applied && cleared.Error.Contains("Modification reroute cannot leave the document because other names it in dependsOn") && f.NewRouteDetectsBothWays
+            && f.World.Mutations == mutations && mapEditor.UndoGroups.Count == groups && JObject.Parse(session.DocumentText)["modifications"]["reroute"]["relationships"]["crossingCoverage"]["circuits"]["Pipr"] != null,
+            "Clearing the last coverage entry of a depended modification is refused and changes nothing: " + cleared.Error);
+        Assert(!session.Remove(Crossing).Applied && f.NewRouteDetectsBothWays, "Removing the depended crossing modification is refused as well");
     }
     static void SaveAndReloadReproduceCoverageOnce() {
         var (f, session, mapEditor, store) = Session();

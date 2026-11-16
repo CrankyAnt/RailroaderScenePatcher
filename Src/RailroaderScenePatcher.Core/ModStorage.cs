@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace RailroaderScenePatcher.Core {
@@ -28,7 +31,7 @@ namespace RailroaderScenePatcher.Core {
         public virtual void CreateDirectory(string path) { Directory.CreateDirectory(path); }
     }
     // The two files of the edited mod that the patcher writes: Data/scene-patches.json and Info.json.
-    public sealed class ModStorage : IStorage {
+    public sealed class ModStorage : IStorage, IRecoveryStorage {
         public static readonly Encoding Utf8 = new UTF8Encoding(false, true);
         readonly IModFiles files;
         readonly Action<string> patchWritten;
@@ -59,6 +62,29 @@ namespace RailroaderScenePatcher.Core {
             try { patchWritten?.Invoke(text); } catch { }
         }
         public void WriteModInfo(string text) { Publish(InfoPath, text); }
+        // The digest of the bytes each backup of this storage secured, by backup path.
+        readonly Dictionary<string, byte[]> backups = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        static byte[] Digest(byte[] bytes) { using (var sha = SHA256.Create()) return sha.ComputeHash(bytes); }
+        // Copies the patch document's exact bytes, also bytes that are not UTF-8, to a new file beside it whose name no
+        // other file has, and reads the copy back before it counts as a backup. A failed copy is removed.
+        public string BackupPatchDocument() {
+            var original = files.Read(PatchPath);
+            var backup = PatchPath + ".backup-" + Guid.NewGuid().ToString("N");
+            if (files.Exists(backup)) throw new IOException("The backup name is already in use: " + backup);
+            try {
+                files.Write(backup, original);
+                if (!files.Read(backup).SequenceEqual(original)) throw new IOException("The backup does not hold the original bytes: " + backup);
+            } catch {
+                try { if (files.Exists(backup)) files.Delete(backup); } catch { }
+                throw;
+            }
+            backups[backup] = Digest(original);
+            return backup;
+        }
+        public bool MatchesPatchBackup(string backup) {
+            if (backup == null || !backups.TryGetValue(backup, out var digest) || !files.Exists(backup) || !files.Exists(PatchPath)) return false;
+            return Digest(files.Read(backup)).SequenceEqual(digest) && Digest(files.Read(PatchPath)).SequenceEqual(digest);
+        }
         // The new content is written completely beside the file first and only then takes the file's place, so a write that
         // stops midway leaves the previous file, or no file, as it was. The beside file has one fixed name per file: a
         // leftover of an interrupted Save is replaced by the next attempt and removed after a failure, never published.

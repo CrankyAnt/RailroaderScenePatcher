@@ -110,9 +110,9 @@ namespace RailroaderScenePatcher {
         PatchEngine engine;
         PatchRuntime runtime;
         NativePatchDiagnostics nativeDiagnostics;
-        readonly Dictionary<string, string> pendingWarnings = new Dictionary<string, string>();
+        readonly Dictionary<string, KeyValuePair<string, string>> pendingWarnings = new Dictionary<string, KeyValuePair<string, string>>();
         // Informational overlap notices by native deduplication key; a newer notice for the same object replaces the pending one.
-        readonly Dictionary<string, string> pendingNotices = new Dictionary<string, string>();
+        readonly Dictionary<string, KeyValuePair<string, string>> pendingNotices = new Dictionary<string, KeyValuePair<string, string>>();
         bool presentationErrorLogged;
         TrackMarkerWorld markerWorld;
         internal bool Initialized { get; private set; }
@@ -289,18 +289,18 @@ namespace RailroaderScenePatcher {
                 try {
                     if (document.PresentationError != null) context?.Log.Info(Describe(mod, document.PresentationError));
                     if (document.Result == null) {
-                        if (mod.Error != null) MapEditorDiagnostic(Describe(mod, mod.Error));
+                        if (mod.Error != null) EditedDocumentDiagnostic(mod, Describe(mod, mod.Error));
                         continue;
                     }
                     var result = document.Result;
                     if (result.Error != null) {
-                        if (result.MapEditorOnly) MapEditorDiagnostic(Describe(mod, result.Error));
+                        if (result.MapEditorOnly) EditedDocumentDiagnostic(mod, Describe(mod, result.Error));
                         continue;
                     }
                     foreach (var item in result.Outcomes) {
                         if (!item.Value.Applied) {
                             var error = Describe(mod, item.Key + ": " + item.Value.Error);
-                            if (item.Value.MapEditorOnly) MapEditorDiagnostic(error);
+                            if (item.Value.MapEditorOnly) EditedDocumentDiagnostic(mod, error);
                         }
                         else ReconcileMarkerWarning(mod, item.Key, item.Value);
                     }
@@ -316,7 +316,7 @@ namespace RailroaderScenePatcher {
             internal NativeOverlapNotices(PatcherBehaviour owner) { this.owner = owner; }
             public void Notice(OverlapNotice notice) {
                 owner.context?.Log.Info("Scene Patcher overlap notice: " + notice.Message);
-                owner.pendingNotices[notice.Key] = notice.Message;
+                owner.pendingNotices[notice.Key] = new KeyValuePair<string, string>(notice.Target.Scene + "/" + notice.Target.Path, notice.Message);
                 owner.FlushWarnings();
             }
         }
@@ -344,11 +344,22 @@ namespace RailroaderScenePatcher {
         }
         internal void ReportWorld(string message) { Report("world", message); }
         void MapEditorDiagnostic(string message) { if (inMapEditor && !diagnostics.Contains(message)) diagnostics.Add(message); }
-        void Report(string key, string message) {
+        // A diagnostic of the edited mod's patch document at world load. Recovery replaces that document in the session,
+        // and then replaces these diagnostics too.
+        void EditedDocumentDiagnostic(LoadedMod mod, string message) {
+            MapEditorDiagnostic(message);
+            if (mod.EditTarget && inMapEditor) editedDiagnostics.Add(message);
+        }
+        // The game's Log window heads a row with its originator, the thing it is about, and its source, the part of the
+        // game that reports it, as native rows name a mod file or definition with their subsystem. The source is this
+        // patcher's one name; the originator is the supplying mod's patch document, the object of an overlap notice, or
+        // the patcher's own mod for a state of the patcher.
+        const string LogSource = "Railroader Scene Patcher";
+        void Report(string key, string message, string originator = LoadedMod.PatcherId) {
             if (!reported.Add(key)) return;
             diagnostics.Add(message); status = message;
             context?.Log.Info(message);
-            pendingWarnings[key] = message;
+            pendingWarnings[key] = new KeyValuePair<string, string>(originator, message);
             FlushWarnings();
         }
         void FlushWarnings() {
@@ -356,7 +367,7 @@ namespace RailroaderScenePatcher {
             if (Game.Diagnostics.MessageCollector.Shared == null) return;
             foreach (var item in pendingWarnings.ToArray()) {
                 try {
-                    Game.Diagnostics.MessageLog.Warning("Railroader Scene Patcher", item.Value, "Scene patches", loadId + item.Key);
+                    Game.Diagnostics.MessageLog.Warning(item.Value.Key, item.Value.Value, LogSource, loadId + item.Key);
                     pendingWarnings.Remove(item.Key);
                 } catch (Exception e) {
                     if (!presentationErrorLogged) { presentationErrorLogged = true; context?.Log.Info("Native structured warning delivery unavailable; delivery remains pending: " + e.GetBaseException().Message); }
@@ -366,7 +377,7 @@ namespace RailroaderScenePatcher {
             // An informational row: it reports possible incompatibility and is never a failure warning.
             foreach (var item in pendingNotices.ToArray()) {
                 try {
-                    Game.Diagnostics.MessageLog.Info("Railroader Scene Patcher", item.Value, "Scene patches", loadId + item.Key);
+                    Game.Diagnostics.MessageLog.Info(item.Value.Key, item.Value.Value, LogSource, loadId + item.Key);
                     pendingNotices.Remove(item.Key);
                 } catch (Exception e) {
                     if (!presentationErrorLogged) { presentationErrorLogged = true; context?.Log.Info("Native structured notice delivery unavailable; delivery remains pending: " + e.GetBaseException().Message); }
@@ -622,7 +633,8 @@ namespace RailroaderScenePatcher {
             if (presentation != null) {
                 // A closed window shows nothing: it computes no snapshot. Opening builds the content anew.
                 if (open) {
-                    var snapshot = PresentationSnapshot();
+                    TrackRecovery();
+            var snapshot = PresentationSnapshot();
                     feedback.Inspecting(selected?.Handle);
                     MarkFollowed();
                     MarkBound();
@@ -681,7 +693,7 @@ namespace RailroaderScenePatcher {
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
                 selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot(),
-                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error);
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot());
         }
         // Computing the outstanding work serializes the document and reads the dependency metadata. Its inputs change
         // with the native map editor's change counts, a Save attempt or an incomplete operation; one recomputation a second covers
@@ -724,7 +736,7 @@ namespace RailroaderScenePatcher {
             runtime = new PatchRuntime(engine, nativeDiagnostics, Version, Application.version);
             overlapNotices = null;
             // Warnings not yet delivered belong to the previous load attempt.
-            reported.Clear(); diagnostics.Clear(); pendingWarnings.Clear(); pendingNotices.Clear();
+            reported.Clear(); diagnostics.Clear(); editedDiagnostics.Clear(); pendingWarnings.Clear(); pendingNotices.Clear();
             loadId = Guid.NewGuid().ToString("N"); presentationErrorLogged = false;
             if (inventory != null) { inventory = new SceneInventory(native); staleLogged = true; }
             selected = null; selectionProblem = null; documentInspection = "";
@@ -980,6 +992,7 @@ namespace RailroaderScenePatcher {
         // tab its object's placement and activity stay disabled with the reason.
         string EditBlock() =>
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
+            : attachment.Session.Blocked != null ? attachment.Session.Blocked + " The recovery choices are in the session details."
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
             : !Editable ? CommandBand.EditReason(selected?.Operations)
@@ -1173,7 +1186,9 @@ namespace RailroaderScenePatcher {
                 foreach (var mod in documents) {
                     if (mod.Error != null) { lines.Add(mod.Source.Identifier + ": " + mod.Error); continue; }
                     foreach (var item in inventory.InspectDocument(mod.Json))
-                        lines.Add(mod.Source.Identifier + "/" + (item.Id ?? "document") + ": " + item.MatchCount + " inspection matches; dependsOn=" + String.Join(", ", item.Dependencies) + "; " + String.Join("; ", item.Problems));
+                                                // A field without a value is left out.
+                        lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "document") + ", " + item.MatchCount + " inspection matches",
+                            item.Dependencies.Count == 0 ? null : "dependsOn=" + String.Join(", ", item.Dependencies) }.Concat(item.Problems).Where(f => !String.IsNullOrEmpty(f))));
                 }
                 documentInspection = String.Join("\n", lines);
                 definitions.Read(documents);

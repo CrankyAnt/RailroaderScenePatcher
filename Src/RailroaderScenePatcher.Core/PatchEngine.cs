@@ -268,11 +268,13 @@ namespace RailroaderScenePatcher.Core {
                 if (unsupported != null) { outcome.MapEditorOnly = true; throw new InvalidOperationException(unsupported); }
                 var shared = AdditionIds(item).FirstOrDefault(sharedAdditions.Contains);
                 if (shared != null) throw new InvalidPatchDefinitionException(SharedAddition(shared));
+                // A failure of the dependencies names the object the modification is for, when its target reads.
+                try { outcome.Target = ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { }
                 string[] dependencies;
                 try { dependencies = Dependencies(item); }
                 catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(e.Message); }
                 foreach (var dep in dependencies) {
-                    if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency failed: " + dep);
+                    if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the document");
                     var dependency = Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets);
                     if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new InvalidOperationException("Dependency failed: " + dep); }
                 }
@@ -433,6 +435,41 @@ namespace RailroaderScenePatcher.Core {
             }
             effective[id] = result;
             return result;
+        }
+        // Why the modification under the key would not take effect because of its dependencies, or null: a dependency is
+        // missing from the document, fails itself, or the dependencies form a cycle. The same rules decide which
+        // modifications Desired overlays.
+        internal string IneffectiveReason(JObject modifications, string key, string owner = "") {
+            var entries = Entries(modifications);
+            if (!entries.ContainsKey(key)) return null;
+            return DependencyProblem(key, entries, SharedAdditionIds(entries.Values), owner, new List<string>());
+        }
+        string DependencyProblem(string id, SortedDictionary<string, JObject> entries, HashSet<string> shared, string owner, List<string> chain) {
+            chain.Add(id);
+            try {
+                string[] dependencies;
+                try { dependencies = Dependencies(entries[id]); } catch (InvalidOperationException) { return "the dependsOn of modification " + id + " is not a list of modification IDs"; }
+                foreach (var dependency in dependencies) {
+                    var loop = chain.IndexOf(dependency);
+                    if (loop >= 0) return "its dependencies form the cycle " + String.Join(" -> ", chain.Skip(loop).Concat(new[] { dependency }));
+                    if (!entries.ContainsKey(dependency)) return "dependency " + dependency + " is missing from the document";
+                    var failure = DependencyFailure(dependency, entries, shared, owner);
+                    if (failure != null) return "dependency " + dependency + " does not take effect (" + PatchDocument.Sentence(failure) + ")";
+                    var deeper = DependencyProblem(dependency, entries, shared, owner, chain);
+                    if (deeper != null) return deeper;
+                }
+                return null;
+            } finally { chain.RemoveAt(chain.Count - 1); }
+        }
+        // Why the dependency itself does not take effect, apart from its own dependencies, or null.
+        string DependencyFailure(string id, SortedDictionary<string, JObject> entries, HashSet<string> shared, string owner) {
+            try {
+                var parsed = Parse(entries[id], owner, id);
+                var addition = AdditionIds(entries[id]).FirstOrDefault(shared.Contains);
+                if (addition != null) return SharedAddition(addition);
+                ResolveUnique(parsed.Identity);
+                return null;
+            } catch (InvalidOperationException e) { return e.Message; }
         }
         internal static TargetIdentity ParseTarget(JObject target) {
             if (target == null || !Only(target, "scene", "path", "component", "structure") || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)) throw new InvalidOperationException("Invalid or unsupported target");

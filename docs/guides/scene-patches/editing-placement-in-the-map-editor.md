@@ -8,7 +8,7 @@ This guide shows how to move, rotate, disable and restore a supported scene obje
 
 Open your mod's map definition from the Editor menu. The patcher edits only the edited mod: it reads and writes `Data/scene-patches.json` and `Info.json` in that mod and never writes to a mod that supplies a map layer or terrain tile set. You do not need to create the document or declare the dependency first; Save does both. A new document names the bottom map layer of your map definition as its target map, or your map definition itself when it has no map layers, so it also applies on a save of the base-game map that your map-changing script changes. An existing document keeps the target map it names; see [the document reference](patch-document-v1.md#document-fields).
 
-Open **Scene patches** and its session details (the page icon in the title bar). The **Editing** section reads **Editing ready for** followed by the document path. If it names a problem instead, the document is protected: an unreadable document, a newer format, or a document for another map is never overwritten. Correct the file outside scene patch editing and reload the native map editor.
+Open **Scene patches** and its session details (the page icon in the title bar). The **Editing** section reads **Editing ready for** followed by the document path. If it names a problem instead, the document is protected: an unreadable document, a newer format, or a document for another map is never overwritten. The **Patch document** section below it shows where the file is wrong and offers to read it again after you correct it, or to start fresh behind a backup; see [Recover a protected patch document](recover-patch-documents.md).
 
 ## Set a numeric placement
 
@@ -40,9 +40,9 @@ If a patcher edit cannot be reversed or reapplied, the session details also show
 
 ## Remove a modification
 
-Select **Remove modification** in the footer to delete this mod's modification of the selected object, whether it is saved or not. The object returns to its effective underlying state: the state the loaded map gives it, with the remaining modifications in your document still applied. It does not return to an earlier patched position. Removal is an edit like any other: Undo restores the modification and Save writes the result.
+Select **Remove modification** in the footer to delete this mod's modification of the selected object, whether it is saved or not. The object returns to its effective underlying state: the state the loaded map gives it, with the remaining modifications in your document still applied. It does not return to an earlier patched position. Removal is an edit like any other: Undo restores the modification and Save writes the result. When another modification in your document names this one in `dependsOn`, removal is refused and names those modifications; change or remove them first. The same holds for **Clear activity** and any other edit that would leave the modification empty.
 
-A modification that holds content this patcher version does not understand is preserved and cannot be edited or removed in the native map editor. When several modifications in a manually written document target the same object, combine them in the file first.
+A modification that holds content this patcher version does not understand is preserved and cannot be edited or removed in the native map editor. A modification that does not take effect because a dependency is missing, fails or forms a cycle cannot be edited either; the refusal names the reason. You can still remove it when no other modification names it in `dependsOn`. In a cycle of two or more modifications every member is named by another, so none can be removed here: break the cycle in the file and reopen the map editor. When several modifications in a manually written document target the same object, combine them in the file first.
 
 ## Save
 

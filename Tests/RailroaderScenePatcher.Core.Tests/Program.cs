@@ -255,6 +255,7 @@ class Program {
         ObjectMarkingGeometryTests.Run();
         ShapeTests.Run();
         PatchEditingTests.Run();
+        RecoveryTests.Run();
         CanonicalSaveTests.Run();
         SnapTests.Run();
         GizmoTests.Run();

@@ -13,9 +13,10 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     internal sealed class NativePatchDiagnostics : NativeCurrentWarnings, IPatchDiagnostics {
-        readonly Action<string, string> report;
-        internal NativePatchDiagnostics(Action<string, string> report) { this.report = report; }
-        public void Warning(PatchFailure failure) => report(failure.DiagnosticKey, failure.Message);
+        readonly Action<string, string, string> report;
+        internal NativePatchDiagnostics(Action<string, string, string> report) { this.report = report; }
+        // The row is about the supplying mod's patch document.
+        public void Warning(PatchFailure failure) => report(failure.DiagnosticKey, failure.Message, failure.ModIdentifier + ":Data/scene-patches.json");
     }
     internal class NativeCurrentWarnings : ICurrentWarnings {
         public IEnumerable<CurrentWarning> Current => MessageCollector.Shared == null ? Enumerable.Empty<CurrentWarning>() : MessageCollector.Shared.Messages.Where(m => !m.IsRemoved && m.Severity == MessageSeverity.Warning).Select(Snapshot).ToArray();

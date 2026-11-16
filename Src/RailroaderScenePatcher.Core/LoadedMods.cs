@@ -46,10 +46,11 @@ namespace RailroaderScenePatcher.Core {
         public string Skipped { get; internal set; }
         // A failure report or overlap notice that could not be delivered; the document's applied work is unaffected.
         public string PresentationError { get; internal set; }
-        // The map this document names as its source, or null when the document cannot be read that far.
+        // The map this document names as its source, or null when the document cannot be read that far. A document of
+        // another format version names no map this patcher can read, so its log line reports the version, not a map.
         public string MapId {
             get {
-                try { return Mod.Json == null ? null : (string)JObject.Parse(Mod.Json)["sourceMap"]?["mapId"]; }
+                try { return Mod.Json == null || PatchDocument.FormatProblem(Mod.Json) != null ? null : (string)JObject.Parse(Mod.Json)["sourceMap"]?["mapId"]; }
                 catch { return null; }
             }
         }

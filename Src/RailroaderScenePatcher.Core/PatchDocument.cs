@@ -18,6 +18,8 @@ namespace RailroaderScenePatcher.Core {
         internal JToken Root { get; private set; }
         // False when the numeric literals could not be matched to their values; such a text must not be rewritten.
         internal bool Exact { get; private set; }
+        // The first number whose source text could not be matched to its value, or null when that place is unknown.
+        internal JValue Inexact { get; private set; }
         internal static PreservingJson Parse(string json) {
             var result = new PreservingJson();
             using (var reader = new JsonTextReader(new StringReader(json))) {
@@ -29,12 +31,17 @@ namespace RailroaderScenePatcher.Core {
                 ? ((JContainer)result.Root).DescendantsAndSelf().OfType<JValue>().Where(IsNumber).ToList()
                 : new List<JValue>();
             var texts = Literals(json);
-            result.Exact = texts.Count == numbers.Count;
+            result.Exact = true;
+            // Walking the numbers in text order, the first one whose literal does not match is the place to correct. With
+            // as many literals as numbers and all matching, the text is exact; a missing literal, such as one for NaN,
+            // shifts the rest and shows at the first number it displaces.
             for (var i = 0; result.Exact && i < numbers.Count; i++) {
                 double parsed;
-                try { result.Exact = Double.TryParse(texts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) && parsed.Equals((double)numbers[i]); }
+                try { result.Exact = i < texts.Count && Double.TryParse(texts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) && parsed.Equals((double)numbers[i]); }
                 catch (Exception e) when (e is InvalidCastException || e is OverflowException || e is FormatException) { result.Exact = false; }
+                if (!result.Exact) result.Inexact = numbers[i];
             }
+            if (result.Exact && texts.Count != numbers.Count) result.Exact = false;
             if (result.Exact) for (var i = 0; i < numbers.Count; i++) SourceLiterals.Add(numbers[i], texts[i]);
             return result;
         }
@@ -188,36 +195,136 @@ namespace RailroaderScenePatcher.Core {
         }
     }
     public sealed class PatchDocument {
+        // The format version this patcher reads and writes.
+        public const int CurrentFormat = 1;
         internal readonly JObject Root;
         readonly string original;
         readonly PreservingJson source;
+        readonly List<DocumentDiagnostic> diagnostics = new List<DocumentDiagnostic>();
         string serialized;
         bool edited;
         public string Error { get; private set; }
         public bool CanWrite { get { return Root != null && Error == null; } }
         // Set when the document is readable but an edit could not preserve all of its content.
         internal string EditError { get; private set; }
+        // What the last read found wrong in the text: why the document is protected, and each modification this
+        // patcher does not execute. Empty for a document without problems.
+        public IReadOnlyList<DocumentDiagnostic> Diagnostics => diagnostics;
         private PatchDocument(PreservingJson source, string error, string original = null) {
             this.source = source; Root = source?.Root as JObject; Error = error; this.original = original;
-            if (source != null && !source.Exact) EditError = "Numeric content of this document cannot be preserved exactly by an edit";
+            if (source != null && !source.Exact) {
+                EditError = "Numeric content of this document cannot be preserved exactly by an edit";
+                var place = source.Inexact;
+                diagnostics.Add(DocumentDiagnostic.Create(original, place?.Path ?? "", EditError, "Numbers written as plain JSON literals; correct values such as NaN or Infinity outside scene patch editing", place ?? (JToken)Root));
+            }
         }
+        static PatchDocument Protected(string json, string message, string path, string expected, JToken token = null, int line = 0) {
+            var rejected = new PatchDocument(null, message, json);
+            rejected.diagnostics.Add(DocumentDiagnostic.Create(json, path, message, expected, token, line));
+            return rejected;
+        }
+        const string VersionExpected = "\"formatVersion\": 1 as the first thing the document declares; a newer document needs the patcher version that wrote it";
         public static PatchDocument Load(string json) {
+            // The declared format version decides how the rest of the text is read, so it is checked before anything
+            // else: a missing, unrecognized or newer version protects the document whatever the rest contains.
+            var version = DeclaredVersion(json);
+            if (version != null && version.Problem != null) return Protected(json, version.Problem, "formatVersion", VersionExpected, null, version.Line);
             try {
                 var source = PreservingJson.Parse(json);
                 var root = source.Root as JObject;
-                if (root == null || root["formatVersion"]?.Type != JTokenType.Integer)
-                    return new PatchDocument(null, "Invalid document envelope or format version");
-                if (root["formatVersion"].ToString(Formatting.None) != "1")
-                    return new PatchDocument(null, "Unsupported format version");
+                if (root == null)
+                    return Protected(json, "Invalid document envelope. The document must be a JSON object", "", "A JSON object with formatVersion, sourceMap and modifications", source.Root);
                 if (!(root["sourceMap"] is JObject targetMap) || targetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)targetMap["mapId"]))
-                    return new PatchDocument(null, "Invalid document map context or modifications");
+                    return Protected(json, "Invalid document map context or modifications. The sourceMap needs a mapId", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the target map>\" } with the ID of the edited map or one of its map layers", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
                 if (!(root["modifications"] is JObject modifications))
-                    return new PatchDocument(null, "Invalid document map context or modifications: modifications must be an object keyed by modification ID");
+                    return Protected(json, "Invalid document map context or modifications. The modifications must be an object keyed by modification ID", "modifications", "\"modifications\": { \"<modification ID>\": { ... } }", root["modifications"]);
                 foreach (var property in modifications.Properties())
                     if (String.IsNullOrWhiteSpace(property.Name) || !(property.Value is JObject))
-                        return new PatchDocument(null, "Every modification must be an object under a key that is not empty");
-                return new PatchDocument(source, null, json);
-            } catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) { return new PatchDocument(null, "Unreadable document: " + e.Message); }
+                        return Protected(json, "Every modification must be an object under a key that is not empty", property.Path, "\"<modification ID>\": { \"target\": { ... }, ... } under a key that is not empty", property);
+                var loaded = new PatchDocument(source, null, json);
+                // A modification this patcher does not execute stays in the document unchanged; its diagnostic says why.
+                foreach (var property in modifications.Properties()) {
+                    try { PatchEngine.Parse((JObject)property.Value, "", property.Name); }
+                    catch (InvalidOperationException e) {
+                        loaded.diagnostics.Add(DocumentDiagnostic.Create(json, property.Path, "Modification " + property.Name + " is not executed. " + Sentence(e.Message),
+                            "A target, a placement and/or active, relationships and a dependsOn list as the format reference describes. Correct known values outside scene patch editing; keep content of a newer patcher unless you mean to remove it", property.Value));
+                    }
+                }
+                return loaded;
+            } catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) {
+                var reader = e as JsonReaderException;
+                return Protected(json, "Unreadable document. " + Sentence(e.Message), reader?.Path ?? "", "Valid JSON with each property name once per object", null, reader?.LineNumber ?? 0);
+            }
+        }
+        // Why the text's declared format version keeps any of its content from being read, or null. Before this answer
+        // is null, no other member of the text, such as its target map, has a meaning.
+        public static string FormatProblem(string json) => DeclaredVersion(json)?.Problem;
+        sealed class Declaration { internal string Problem; internal int Line; }
+        // Reads only the top-level formatVersion of the text, without the checks of the full read, so a document of
+        // another format version is recognised as such even when its content would not read as the current format.
+        // Null when the text cannot be read as far as a decision: the full read then reports it as unreadable.
+        static Declaration DeclaredVersion(string json) {
+            if (json == null) return null;
+            var found = new List<Declaration>();
+            var values = new List<string>();
+            try {
+                using (var reader = new JsonTextReader(new StringReader(json)) { DateParseHandling = DateParseHandling.None }) {
+                    bool Next() { while (reader.Read()) if (reader.TokenType != JsonToken.Comment) return true; return false; }
+                    if (!Next() || reader.TokenType != JsonToken.StartObject) return null;
+                    while (Next() && reader.TokenType == JsonToken.PropertyName) {
+                        var name = (string)reader.Value;
+                        var line = reader.LineNumber;
+                        if (!Next()) return null;
+                        if (name == "formatVersion") {
+                            found.Add(new Declaration { Line = line });
+                            // The reader also accepts forms JSON has no integer for, such as 01 or 0x1, and normalises
+                            // them; the source literal decides, and only a JSON integer literal is a version number.
+                            var literal = reader.TokenType == JsonToken.Integer ? SourceLiteral(json, reader.LineNumber, reader.LinePosition) : null;
+                            // Null stands for a value that is no version number at all.
+                            values.Add(literal != null && JsonInteger.IsMatch(literal) ? literal : null);
+                        }
+                        reader.Skip();
+                    }
+                }
+            } catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException || e is FormatException) {
+                // The text stops being readable: a version declared before that point still decides.
+                var declared = values.FindIndex(v => v != "1");
+                if (declared < 0) return null;
+                return Describe(found[declared], values[declared]);
+            }
+            if (found.Count == 0) return new Declaration { Problem = "Missing format version. The document does not declare formatVersion, so none of its content is read" };
+            var other = values.FindIndex(v => v != "1");
+            return other < 0 ? new Declaration() : Describe(found[other], values[other]);
+        }
+        static readonly System.Text.RegularExpressions.Regex JsonInteger = new System.Text.RegularExpressions.Regex("^-?(0|[1-9][0-9]*)$");
+        // The number literal that ends at the reader's line and position: the characters a number of any form the reader
+        // accepts can hold, read backwards from there over any delimiter the reader already passed.
+        static string SourceLiteral(string json, int line, int position) {
+            var start = 0;
+            for (int i = 0, current = 1; current < line && i < json.Length; i++) {
+                if (json[i] == '\r' && i + 1 < json.Length && json[i + 1] == '\n') i++;
+                if (json[i] == '\n' || json[i] == '\r') { current++; start = i + 1; }
+            }
+            var end = Math.Min(json.Length, start + position) - 1;
+            bool Part(char c) => Char.IsLetterOrDigit(c) || c == '+' || c == '-' || c == '.';
+            while (end >= start && !Part(json[end])) end--;
+            var first = end;
+            while (first > start && Part(json[first - 1])) first--;
+            return end < first ? null : json.Substring(first, end - first + 1);
+        }
+        // A message of another component as one sentence inside ours: without its own final full stop, which ours adds.
+        internal static string Sentence(string message) {
+            var text = (message ?? "").Trim();
+            while (text.EndsWith(".", StringComparison.Ordinal)) text = text.Substring(0, text.Length - 1).TrimEnd();
+            return text;
+        }
+        static Declaration Describe(Declaration version, string value) {
+            // A JSON integer literal without a sign is greater than the current format when it is longer or larger.
+            var digits = value != null && value.All(c => c >= '0' && c <= '9');
+            if (digits && (value.Length > 1 || value[0] - '0' > CurrentFormat))
+                version.Problem = "Newer format version " + value + ". This patcher reads format version " + CurrentFormat + " and applies none of this document's content";
+            else version.Problem = "Unrecognized format version. The formatVersion must be the number " + CurrentFormat + "; none of this document's content is read";
+            return version;
         }
         // Whether two document texts have equal content under the Saved equality: member order, spacing, comments and the
         // literal a number is written in do not count. A text that cannot be parsed equals only the same text; a missing

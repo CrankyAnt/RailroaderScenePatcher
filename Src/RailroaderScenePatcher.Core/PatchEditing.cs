@@ -147,7 +147,7 @@ namespace RailroaderScenePatcher.Core {
     }
     // One scene patch editing session for the edited mod: its patch document, the completed edits in the
     // shared native history, and the truth about which required writes are still outstanding.
-    public sealed class PatchEditingSession {
+    public sealed partial class PatchEditingSession {
         public const string NativeData = "native map data", PatchData = "patch document", Metadata = "dependency metadata";
         readonly PatchEngine engine;
         readonly IScene scene;
@@ -157,7 +157,8 @@ namespace RailroaderScenePatcher.Core {
         // The key the engine applied this document under at world load; it scopes the identities of the document's additions.
         readonly string documentKey;
         readonly HistoryIdentity identity;
-        readonly PatchDocument document;
+        // Replaced only by a confirmed recovery of a protected document.
+        PatchDocument document;
         readonly List<string> written = new List<string>();
         string diskText, info;
         // The content of the text last read or written, or null while no patch document was read or written.
@@ -209,17 +210,19 @@ namespace RailroaderScenePatcher.Core {
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
             this.modId = modId; this.documentKey = documentKey ?? ""; scene = engine.Scene;
             identity = new HistoryIdentity(history); savedIdentity = identity.Current;
-            try {
-                diskText = storage.ReadPatchDocument();
-                info = storage.ReadModInfo();
+            string documentError = null, metadataError = null;
+            try { diskText = storage.ReadPatchDocument(); } catch (Exception e) { documentError = e.Message; }
+            try { info = storage.ReadModInfo(); } catch (Exception e) { metadataError = e.Message; }
+            // Unreadable mod metadata blocks the session whatever the document holds; starting the document fresh would not help.
+            if (metadataError != null) { Blocked = "The edited mod's Info.json cannot be read. " + PatchDocument.Sentence(metadataError) + MetadataSuffix; return; }
+            if (documentError != null) Blocked = "The edited mod's patch document cannot be read. " + PatchDocument.Sentence(documentError);
+            else try {
                 if (diskText == null) { document = PatchDocument.Create(TargetMapFor(scene.MapIds)); return; }
                 var loaded = PatchDocument.Load(diskText);
-                if (!loaded.CanWrite) Blocked = loaded.Error;
-                else if (loaded.EditError != null) Blocked = loaded.EditError;
-                else if (!scene.MapIds.Contains((string)loaded.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) Blocked = "Target map does not match the loaded map context";
-                else { document = loaded; saved = PreservingJson.Parse(diskText).Root; }
-            } catch (Exception e) { Blocked = "Cannot read the edited mod's files: " + e.Message; }
-            if (Blocked != null) Blocked += ". The patch document is protected from overwrite; correct it outside scene patch editing and reload.";
+                Blocked = Refusal(loaded, diskText);
+                if (Blocked == null) { document = loaded; saved = PreservingJson.Parse(diskText).Root; }
+            } catch (Exception e) { Blocked = "The edited mod's patch document cannot be read. " + PatchDocument.Sentence(e.Message); }
+            if (Blocked != null) { documentProblem = true; Blocked += ProtectedSuffix; }
         }
         // Why scene patch editing and patch persistence are unavailable in this session, or null.
         public string Blocked { get; private set; }
@@ -753,6 +756,7 @@ namespace RailroaderScenePatcher.Core {
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside scene patch editing first");
                 var existing = own.FirstOrDefault();
+                var ineffective = existing == null ? null : engine.IneffectiveReason(document.Modifications, PatchDocument.Key(existing), documentKey);
                 JObject value;
                 try { value = next(existing); }
                 catch (InvalidOperationException e) when (existing != null && e.Message.StartsWith("Unsupported", StringComparison.Ordinal)) {
@@ -765,6 +769,16 @@ namespace RailroaderScenePatcher.Core {
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
                 value = normal;
+                // A modification that stays in the document but does not take effect would be reported as applied
+                // without changing the object, so the edit is refused with the reason. Removing it remains possible.
+                if (value != null && ineffective != null)
+                    throw new InvalidOperationException("Modification " + PatchDocument.Key(existing) + " is not effective because " + ineffective + "; correct that first. Nothing was changed");
+                // A modification another modification names in dependsOn cannot leave the document: the dependents would stop taking effect.
+                if (value == null && existing != null) {
+                    var dependents = Dependents(PatchDocument.Key(existing));
+                    if (dependents.Count != 0)
+                        throw new InvalidOperationException("Modification " + PatchDocument.Key(existing) + " cannot leave the document because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name") + " it in dependsOn; change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first. Nothing was changed");
+                }
                 // An axis the edit leaves at the document's value as the game stores it keeps that value.
                 if (value != null && existing != null) {
                     if (value.Parent != null) value = (JObject)value.DeepClone();
@@ -907,6 +921,12 @@ namespace RailroaderScenePatcher.Core {
             } catch (Exception e) { outcome.Error = e.Message; }
             return outcome;
         }
+        // The keys of the other modifications whose dependsOn names the key, in ordinal order.
+        List<string> Dependents(string key) {
+            return document.Modifications.Properties()
+                .Where(p => p.Name != key && (p.Value as JObject)?["dependsOn"] is JArray dependencies && dependencies.Any(d => d.Type == JTokenType.String && (string)d == key))
+                .Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        }
         List<JObject> Own(object target) {
             var own = new List<JObject>();
             foreach (var item in document.Items) {
@@ -956,6 +976,8 @@ namespace RailroaderScenePatcher.Core {
         bool PatchOutstanding {
             get {
                 if (document == null) return false;
+                // A fresh start stays outstanding until Save replaced the original, even without a modification.
+                if (replacementBackup != null) return true;
                 if (saved == null) return document.Modifications.Count != 0;
                 if (comparedVersion != document.Version) { differs = !PreservingJson.SameContent(document.Root, saved); comparedVersion = document.Version; }
                 return differs;
@@ -1007,10 +1029,11 @@ namespace RailroaderScenePatcher.Core {
             }
             if (!PatchOutstanding) return;
             try {
-                if (ChangedOutside(storage.ReadPatchDocument())) throw new InvalidOperationException("the file changed outside scene patch editing after it was read. It is protected from overwrite; reload the native map editor to read it again");
+                if (replacementBackup != null) CheckReplacement();
+                else if (ChangedOutside(storage.ReadPatchDocument())) throw new InvalidOperationException("the file changed outside scene patch editing after it was read. It is protected from overwrite; reload the native map editor to read it again");
                 var text = document.Serialize();
                 storage.WritePatchDocument(text);
-                diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1; written.Add(PatchData);
+                diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1; replacementBackup = null; written.Add(PatchData);
             } catch (Exception e) { throw new InvalidOperationException("The patch document was not written: " + e.Message, e); }
         }
         public void CompleteNativeSave() {

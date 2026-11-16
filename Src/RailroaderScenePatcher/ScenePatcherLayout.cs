@@ -545,6 +545,18 @@ namespace RailroaderScenePatcher {
         static bool IsReader(string line) => line.StartsWith(StarterPlacements.ReaderPrefix, StringComparison.Ordinal);
         // A path wraps after a separator instead of in the middle of a name.
         static string Breakable(string path) => (path ?? "").Replace("/", "/\u200B");
+        // Markup in which a file path or URL wraps only after its separators: each part between separators stays whole,
+        // also a part with a hyphen, which the text would otherwise break at. A closing tag of the markup is no path.
+        static readonly System.Text.RegularExpressions.Regex PathToken = new System.Text.RegularExpressions.Regex(@"(?<!<)[^\s<>""']*[\\/][^\s<>""']+");
+        static string PathBreaks(string markup) => PathToken.Replace(markup ?? "", match => {
+            var parts = System.Text.RegularExpressions.Regex.Split(match.Value, @"([\\/])");
+            var result = new System.Text.StringBuilder();
+            foreach (var part in parts) {
+                if (part == "\\" || part == "/") result.Append(part).Append('\u200B');
+                else if (part.Length != 0) result.Append("<nobr>").Append(part).Append("</nobr>");
+            }
+            return result.ToString();
+        });
         bool FollowsGroup => selected != null && selected.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
 
         // The Placement tab: every way to put the object somewhere. The tab's pinned row holds the actions of the chosen way.
@@ -855,7 +867,7 @@ namespace RailroaderScenePatcher {
                     var message = messages[i]; var older = i > 0;
                     var tone = ToneOf(message.Text);
                     var text = WithoutSource(message);
-                    MessageSlot(lines, message.Source, tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text), older);
+                    MessageSlot(lines, message.Source, PathBreaks(tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text)), older);
                 }
             }, false);
             // The area is three messages high and gives way before the tab body does: in a low window it keeps one
@@ -1188,13 +1200,14 @@ namespace RailroaderScenePatcher {
             PlainLabel(builder, status);
             if (scene != null) PlainLabel(builder, scene.Status);
             Section(builder, "Editing");
-            PlainLabel(builder, String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus);
+            builder.AddLabel(PathBreaks(Literal(String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)));
             if (attachment != null) {
                 var session = attachment.Session;
                 if (session.LastSave != null && session.LastSave.Error != null) builder.AddLabel(Tint(Red, "Last Save failed: " + session.LastSave.Error + " Completed: " + (session.LastSave.Completed.Count == 0 ? "none" : String.Join(", ", session.LastSave.Completed)) + ". Outstanding: " + String.Join(", ", session.LastSave.Outstanding) + ". Edits remain in memory; correct the cause and Save again."));
                 if (session.IncompleteOperation != null) builder.AddLabel(Tint(Red, "Incomplete operation: " + session.IncompleteOperation));
                 if (attachment.Fault != null) builder.AddLabel(Tint(Red, attachment.Fault));
             }
+            DrawDocumentRecovery(builder);
             Section(builder, "Supplied definitions");
             if (String.IsNullOrEmpty(documentInspection)) Line(builder, definitionsStale ? "Not read yet; select Refresh" : "None", null, null);
             else PlainLabel(builder, documentInspection);

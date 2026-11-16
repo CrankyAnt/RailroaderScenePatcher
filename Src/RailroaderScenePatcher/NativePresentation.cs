@@ -32,8 +32,10 @@ namespace RailroaderScenePatcher {
         internal Action<UIPanelBuilder> Build;
         internal const string WindowIdentifier = "crankyant/scene-patcher/session-details";
         internal const int DefaultWidth = 420, DefaultHeight = 420;
+        // The least size at which the patch document section shows a diagnostic beside its buttons without much scrolling.
+        internal const int MinimumWidth = 360, MinimumHeight = 320;
         public override string Identifier => WindowIdentifier;
-        public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(DefaultWidth, DefaultHeight), new Vector2Int(320, 200), Window.Position.UpperLeft);
+        public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(DefaultWidth, DefaultHeight), new Vector2Int(MinimumWidth, MinimumHeight), Window.Position.UpperLeft);
         protected override string Title { get; set; } = "Session details";
         internal Window NativeWindow => Window;
         protected override void BuildContent(UIPanelBuilder builder) { Build?.Invoke(builder); }
@@ -368,6 +370,15 @@ namespace RailroaderScenePatcher {
                     Place((RectTransform)details.transform, new Rect(x, Mathf.Clamp(panel.yMin, 0, Mathf.Max(0, Screen.height - height)), width, height));
                     detailsPlaced = true;
                     SaveBounds(details.NativeWindow);
+                } else {
+                    // Bounds saved smaller than the window's least size, such as by an earlier version with a lower
+                    // minimum, are raised to the default size where they fall short.
+                    var bounds = (RectTransform)details.transform;
+                    if (bounds.rect.width < SessionDetailsWindow.MinimumWidth || bounds.rect.height < SessionDetailsWindow.MinimumHeight) {
+                        if (bounds.rect.width < SessionDetailsWindow.MinimumWidth) bounds.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, SessionDetailsWindow.DefaultWidth);
+                        if (bounds.rect.height < SessionDetailsWindow.MinimumHeight) bounds.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, SessionDetailsWindow.DefaultHeight);
+                        SaveBounds(details.NativeWindow);
+                    }
                 }
                 boundsFrame = -1; dirty = true;
                 DetailsProblem = null;
@@ -388,6 +399,10 @@ namespace RailroaderScenePatcher {
         float nextLayout;
         bool panelPlaced;
         float? restoreScroll;
+        // The distance the session details were scrolled from their top before their last rebuild, restored in a later
+        // frame, once the replaced content is gone.
+        float? restoreDetailsScroll;
+        int restoreDetailsFrame;
         string entryCaption = "Scene Patcher", entryReason = "";
         internal bool IsOpen => !disposed && window != null && window.NativeWindow.IsShown;
         internal Rect PanelBounds => IsOpen ? Bounds((RectTransform)window.transform) : Rect.zero;
@@ -721,7 +736,23 @@ namespace RailroaderScenePatcher {
                 dirty = false; window.Refresh();
                 // The rebuilt scroll views take the native wheel step now and once more after their own start.
                 ApplyScrollStep(); scrollStepFrame = Time.frameCount + 3;
-                if (DetailsOpen) details.Refresh();
+                if (DetailsOpen) {
+                    // The session details rebuild with the panel; they keep the distance scrolled from their top, so
+                    // a button lower in them stays under the pointer.
+                    var detailsScroll = details.GetComponentInChildren<ScrollRect>();
+                    restoreDetailsScroll = detailsScroll == null ? (float?)null : detailsScroll.content.anchoredPosition.y;
+                    restoreDetailsFrame = Time.frameCount;
+                    details.Refresh();
+                }
+            }
+            if (restoreDetailsScroll.HasValue && DetailsOpen && Time.frameCount > restoreDetailsFrame) {
+                var detailsScroll = details.GetComponentInChildren<ScrollRect>();
+                if (detailsScroll != null) {
+                    Canvas.ForceUpdateCanvases();
+                    var body = detailsScroll.content; var view = detailsScroll.viewport != null ? detailsScroll.viewport : (RectTransform)detailsScroll.transform;
+                    body.anchoredPosition = new Vector2(body.anchoredPosition.x, Mathf.Clamp(restoreDetailsScroll.Value, 0, Mathf.Max(0, body.rect.height - view.rect.height)));
+                }
+                restoreDetailsScroll = null;
             }
         }
         void ClearFocus() {
