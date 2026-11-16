@@ -36,9 +36,9 @@ namespace RailroaderScenePatcher {
             if (binding.ReentryError != null) state.ReportWorld(binding.ReentryError + ". The patcher started over for this world. Report to the patcher maintainer.");
             if (!state.Initialized) state.Initialize(context); else state.ApplyDocuments();
         }
-        // The retained state belongs to the active map and layer identifiers in the editor or in play. It is a scoped
+        // The retained state belongs to the active map and layer identifiers in the native map editor or in play. It is a scoped
         // implementation key, not a verified world identity; each load attempt checks every object against its identity.
-        static object MapContext() => Tuple.Create(String.Join("\n", ModDocuments.MapIds()), ModDocuments.IsEditor);
+        static object MapContext() => Tuple.Create(String.Join("\n", ModDocuments.MapIds()), ModDocuments.IsMapEditor);
         // A replaced map manager or track graph starts a new load attempt within the same map context. Neither establishes
         // that the scene objects are new; the reconciliation decides that per object.
         static object AttemptIdentity() {
@@ -82,7 +82,7 @@ namespace RailroaderScenePatcher {
             catch (Exception e) { return "Early capability prerequisites unavailable: " + e.GetBaseException().Message; }
         }
         // The world's patcher state stays for a later load attempt over the same map context; the next attempt releases the
-        // state of every object that did not survive. Editor-bound parts end with the world.
+        // state of every object that did not survive. Parts bound to the native map editor end with the world.
         public void OnWorldUnload() {
             NativeRepairHooks.Reset();
             world?.State?.EndAttempt();
@@ -126,7 +126,7 @@ namespace RailroaderScenePatcher {
         SceneObservation selected;
         string selectionProblem;
         string documentInspection = "";
-        // The patch documents the last refresh read, and whether they changed outside the editor since.
+        // The patch documents the last refresh read, and whether they changed outside scene patch editing since.
         readonly SuppliedDefinitions definitions = new SuppliedDefinitions();
         bool definitionsStale => definitions.Stale;
         float nextInventoryCheck, nextDefinitionCheck;
@@ -134,19 +134,19 @@ namespace RailroaderScenePatcher {
         const double InventoryCheckBudgetMs = 2;
         bool urgentCheck;
         readonly System.Diagnostics.Stopwatch inventoryCheckClock = new System.Diagnostics.Stopwatch();
-        bool editor;
+        bool inMapEditor;
         string status = "Initializing", filter = "";
         readonly HashSet<string> reported = new HashSet<string>();
         readonly List<string> diagnostics = new List<string>();
-        NativeEditorPresentation presentation;
+        NativePresentation presentation;
         Texture2D worldLabelBacking;
-        object attachedEditor;
+        object attachedMapEditor;
         string presentationSnapshot;
         readonly InventoryPresentationState inventoryPresentation = new InventoryPresentationState();
         internal const string Version = "0.5.0";
-        Authoring authoring;
-        object refusedEditor;
-        string authoringStatus = "";
+        MapEditorAttachment attachment;
+        object refusedMapEditor;
+        string editingStatus = "";
         // The last edit results, shown in the message area above the action slots and written to the log. A place is the
         // action group a message came from; the message area shows it as the message's source.
         readonly EditFeedback feedback = NewFeedback();
@@ -163,10 +163,10 @@ namespace RailroaderScenePatcher {
         NativeTrackPoses trackPoses;
         float nextTrackFollow;
         const string FollowPlace = "Follow";
-        readonly string[] pose = { "", "", "", "", "", "" };
+        readonly string[] placementFields = { "", "", "", "", "", "" };
         readonly string[] binding = { "", "a", "" };
         // Crossing coverage being edited: the circuit, four fields per role (segment, end, from, to) and the previewed change.
-        // coverageAddition is the ID of the authored addition being added or edited, or null while a native circuit is edited.
+        // coverageAddition is the ID of the detection addition being added or edited, or null while a native circuit is edited.
         string coverageCircuit, coverageAddition, newAddition = "";
         readonly string[] coverageFields = new string[12];
         sealed class PreparedCoverage { internal string Circuit, Addition; internal CircuitCoverage Value; internal CoveragePreview Preview; }
@@ -179,14 +179,14 @@ namespace RailroaderScenePatcher {
             Initialized = true;
             feedback.Log = message => {
                 var outstanding = "";
-                try { if (authoring != null) outstanding = " Outstanding: " + authoring.Outstanding(); } catch { }
+                try { if (attachment != null) outstanding = " Outstanding: " + attachment.Outstanding(); } catch { }
                 context?.Log.Info(CommandBand.LogLine(feedback.Place, selected?.Identity.Path, message) + outstanding);
             };
 #if ISSUE39_OBSERVATION
             JourneyObservation.Sink = message => Debug.Log("[Issue39Attempt] " + message);
 #endif
             try {
-                editor = ModDocuments.IsEditor;
+                inMapEditor = ModDocuments.IsMapEditor;
                 try {
                     world = new BoardScene();
                     scene = new IndependentBoards(world, () => native.Discover());
@@ -196,11 +196,11 @@ namespace RailroaderScenePatcher {
                     Report("capability", status);
                 }
                 PrepareRuntime(value);
-                if (editor) {
+                if (inMapEditor) {
                     inventory = new SceneInventory(native);
                     selection = new SpatialSelection(native, () => inventory?.Entries);
                 }
-                if (editor) {
+                if (inMapEditor) {
                     try { inputBlocker = gameObject.AddComponent<InspectionInputBlocker>(); inputBlocker.Initialize(); inputBlocker.RefreshRegions = SyncInputRegions; }
                     catch (Exception e) {
                         inputBlocker?.Release(); inputBlocker = null;
@@ -238,7 +238,7 @@ namespace RailroaderScenePatcher {
         }
         internal void PrepareRuntime(IModContext value) {
             if (engine != null) return;
-            context = value; editor = ModDocuments.IsEditor;
+            context = value; inMapEditor = ModDocuments.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
             capabilities = new SceneCapabilities(ModDocuments.MapIds, native);
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
@@ -284,18 +284,18 @@ namespace RailroaderScenePatcher {
                 try {
                     if (document.PresentationError != null) context?.Log.Info(Describe(mod, document.PresentationError));
                     if (document.Result == null) {
-                        if (mod.Error != null) EditorDiagnostic(Describe(mod, mod.Error));
+                        if (mod.Error != null) MapEditorDiagnostic(Describe(mod, mod.Error));
                         continue;
                     }
                     var result = document.Result;
                     if (result.Error != null) {
-                        if (result.EditorOnly) EditorDiagnostic(Describe(mod, result.Error));
+                        if (result.MapEditorOnly) MapEditorDiagnostic(Describe(mod, result.Error));
                         continue;
                     }
                     foreach (var item in result.Outcomes) {
                         if (!item.Value.Applied) {
                             var error = Describe(mod, item.Key + ": " + item.Value.Error);
-                            if (item.Value.EditorOnly) EditorDiagnostic(error);
+                            if (item.Value.MapEditorOnly) MapEditorDiagnostic(error);
                         }
                         else ReconcileMarkerWarning(mod, item.Key, item.Value);
                     }
@@ -338,7 +338,7 @@ namespace RailroaderScenePatcher {
             return (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + " " + mod.Version + "] " + message + ". Patcher " + Version + ". Author: " + (mod.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(mod.Website) ? "" : "; website: " + mod.Website);
         }
         internal void ReportWorld(string message) { Report("world", message); }
-        void EditorDiagnostic(string message) { if (editor && !diagnostics.Contains(message)) diagnostics.Add(message); }
+        void MapEditorDiagnostic(string message) { if (inMapEditor && !diagnostics.Contains(message)) diagnostics.Add(message); }
         void Report(string key, string message) {
             if (!reported.Add(key)) return;
             diagnostics.Add(message); status = message;
@@ -369,19 +369,19 @@ namespace RailroaderScenePatcher {
                 }
             }
         }
-        // The map editor appears after world load and is replaced by an editor reload.
+        // The native map editor appears after world load and is replaced by a native map editor reload.
         void Attach() {
-            if (!editor || engine == null) return;
+            if (!inMapEditor || engine == null) return;
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared");
             var found = controller as UnityEngine.Object == null ? null : Native.Read(controller, "MapEditor");
-            if (ReferenceEquals(found, attachedEditor)) return;
+            if (ReferenceEquals(found, attachedMapEditor)) return;
             presentation?.Dispose(); presentation = null;
             selection?.Cancel(); selectionProblem = null; ClearSnap();
-            Detach(); attachedEditor = found; refusedEditor = null; presentationSnapshot = null;
+            Detach(); attachedMapEditor = found; refusedMapEditor = null; presentationSnapshot = null;
             if (found == null) return;
             if (inputBlocker != null && inputBlocker.Available) {
                 try {
-                    presentation = new NativeEditorPresentation(DrawWindow, () => {
+                    presentation = new NativePresentation(DrawWindow, () => {
                         CancelGizmo(); selection?.Cancel(); selectionProblem = null; ClearSnap();
                         CancelRequest("the panel was closed before the request ran");
                     });
@@ -396,30 +396,30 @@ namespace RailroaderScenePatcher {
                     context?.Log.Info("Inspection UI unavailable: " + e);
                 }
             }
-            if (Hooks.Error != null) { refusedEditor = found; authoringStatus = Hooks.Error; return; }
+            if (Hooks.Error != null) { refusedMapEditor = found; editingStatus = Hooks.Error; return; }
             try {
-                authoring = new Authoring(engine, found); Hooks.Current = authoring;
-                authoring.Session.Replayed = identity => replayed.Add(identity);
+                attachment = new MapEditorAttachment(engine, found); Hooks.Current = attachment;
+                attachment.Session.Replayed = identity => replayed.Add(identity);
                 // The patcher's own Save writes the patch document: that text is what the definitions on disk now are, so it
                 // is no change from outside and the inventory lamp stays Current.
                 ModDocuments.Written = text => { try { definitions.Written(ModDocuments.EditedModId(), text); } catch { } };
                 filled = false;
-                snap = new SnapController(authoring.Session, capabilities, new NativeSnapScene(native));
-                authoring.Log = message => context?.Log.Info(message);
-                authoringStatus = authoring.Session.Blocked ?? "Editing ready for " + authoring.PatchPath;
-                // The editor built its title before this session could account for the document.
-                authoring.RefreshChrome();
-            } catch (Exception e) { refusedEditor = found; authoringStatus = "Editing unavailable: " + e.GetBaseException().Message; }
+                snap = new SnapController(attachment.Session, capabilities, new NativeSnapScene(native));
+                attachment.Log = message => context?.Log.Info(message);
+                editingStatus = attachment.Session.Blocked ?? "Editing ready for " + attachment.PatchPath;
+                // The native map editor built its title before this session could account for the document.
+                attachment.RefreshChrome();
+            } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
         }
         void Detach() {
             ClearSnap(); snap = null;
             CancelGizmo();
-            // A request made in this editor does not run in the next one.
-            CancelRequest("the editor was left before the request ran");
+            // A request made in this native map editor does not run in the next one.
+            CancelRequest("the native map editor was left before the request ran");
             ModDocuments.Written = null;
-            if (authoring == null) return;
-            if (ReferenceEquals(Hooks.Current, authoring)) Hooks.Current = null;
-            authoring.Dispose(); authoring = null;
+            if (attachment == null) return;
+            if (ReferenceEquals(Hooks.Current, attachment)) Hooks.Current = null;
+            attachment.Dispose(); attachment = null;
         }
         void SyncInputRegions() {
             if (inputBlocker == null) return;
@@ -437,15 +437,15 @@ namespace RailroaderScenePatcher {
         readonly List<TargetIdentity> replayed = new List<TargetIdentity>();
         readonly List<object> moved = new List<object>();
         void RefreshAfterEdit() { refreshFrame = Time.frameCount + 2; refreshTarget = selected; inventory?.CancelFreshnessCheck(); }
-        // The snapshot was compared with the whole scene, by a refresh or a completed pass, while the editor's history
+        // The snapshot was compared with the whole scene, by a refresh or a completed pass, while the native map editor's history
         // read comparedKey; comparedAt is when. An edit or a preview that starts while that still holds, and soon
-        // enough, needs no pass of its own: nothing but this patcher changed the scene's authored state since, and the
+        // enough, needs no pass of its own: nothing but this patcher changed the authored scene state since, and the
         // patcher's own changes are observed again as they happen. The edit's guard still observes its target.
         string comparedKey, passKey;
         bool running;
         // The marker reference scan the panel vouches for: the one of the discovery its snapshot was compared with,
         // while a queued request runs or while the snapshot still counts as compared, as when a gizmo is released.
-        ReferenceScan KnownReferrers() => editor && inventory != null && !inventory.IsStale && (running || Compared()) ? NativeInventory.LastReferrers : null;
+        ReferenceScan KnownReferrers() => inMapEditor && inventory != null && !inventory.IsStale && (running || Compared()) ? NativeInventory.LastReferrers : null;
         // Inspects an observation offered by a world choice. The choice offers the snapshot's own entries, so the entry
         // is inspected as it is; an observation that is no entry is looked up by its object, and only when the snapshot
         // does not hold it the inventory is read again.
@@ -466,7 +466,7 @@ namespace RailroaderScenePatcher {
             inventory.AdvanceFreshnessCheck(() => inventoryCheckClock.Elapsed.TotalMilliseconds < budget);
             if (inventory.CompletedPasses != before) { comparedKey = passKey; comparedAt = Time.unscaledTime; }
         }
-        // This patcher changed the editor's history itself, by an edit or by Undo or Redo of its own step. The change is
+        // This patcher changed the native map editor's history itself, by an edit or by Undo or Redo of its own step. The change is
         // no foreign one: it starts no urgent pass, and a compared snapshot stays compared once the changed objects are
         // observed again.
         void OwnChange() {
@@ -510,7 +510,7 @@ namespace RailroaderScenePatcher {
                 var updated = fullRefresh || inventory == null || edited == null ? null : inventory.ReobserveRelated(edited);
                 fullRefresh = false;
                 if (updated != null) KeepSelection(edited, updated); else Inspect();
-                ReadPose(); presentation?.RequestRefresh();
+                ReadPlacement(); presentation?.RequestRefresh();
             }
             // Undo and Redo of this patcher's own steps changed their objects: observe those again, so they do not read
             // as foreign changes. A step can destroy objects, which the game completes at the end of the frame, so the
@@ -525,25 +525,25 @@ namespace RailroaderScenePatcher {
                 if (inventory != null) foreach (var identity in replayed.ToArray()) {
                     var entry = inventory.Entries.FirstOrDefault(e => e.Identity.Scene == identity.Scene && e.Identity.Path == identity.Path && e.Identity.Component == identity.Component);
                     var updated = entry == null ? null : inventory.ReobserveRelated(entry);
-                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) ReadPose(); }
+                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) ReadPlacement(); }
                 }
                 // Objects a follow update moved: every entry of the object takes its new observation, and the fields of
-                // the inspected one take its new pose.
+                // the inspected one take its new placement.
                 if (inventory != null) foreach (var handle in moved.ToArray())
                     foreach (var entry in inventory.Entries.Where(e => ReferenceEquals(e.Handle, handle)).ToArray()) {
                         if (!inventory.Entries.Any(e => ReferenceEquals(e, entry))) continue;
                         var updated = inventory.ReobserveRelated(entry);
-                        if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) ReadPose(); }
+                        if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) ReadPlacement(); }
                     }
                 replayed.Clear(); moved.Clear(); presentation?.RequestRefresh();
             }
             // 1. A panel that is open before the inventory was ever read, as after an automatic open at world load,
             // fills itself once.
-            if (!filled && authoring != null && inventory != null && presentation != null && presentation.IsOpen && inventory.Entries.Count == 0 && refreshFrame == 0) {
+            if (!filled && attachment != null && inventory != null && presentation != null && presentation.IsOpen && inventory.Entries.Count == 0 && refreshFrame == 0) {
                 filled = true; fullRefresh = true; refreshFrame = Time.frameCount + 30;
             }
-            // Escape cancels a pending world choice or an active gizmo and is consumed, as in the native editor modes, so
-            // it does not also open the pause menu. The gizmo also ends through the editor's own Escape route, which
+            // Escape cancels a pending world choice or an active gizmo and is consumed, as in the native map editor modes, so
+            // it does not also open the pause menu. The gizmo also ends through the native map editor's own Escape route, which
             // can run before this handler in the same frame: an Escape in the frame a gizmo ended is consumed as well.
             // While a field of the panel has the keyboard the patcher takes no Escape at all: the handler is not even
             // registered, so the key reaches the field and the game as without the mod.
@@ -564,7 +564,7 @@ namespace RailroaderScenePatcher {
                 escapeHeld = escapable;
             } catch (Exception e) { escapeHeld = escapable; context?.Log.Info("Escape handling for the world choice and the gizmo is unavailable: " + e.GetBaseException().Message); }
             try { Attach(); }
-            catch (Exception e) { authoringStatus = "Editing unavailable: " + e.GetBaseException().Message; }
+            catch (Exception e) { editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
             bool open = presentation != null && presentation.IsOpen;
             if (!open) CancelGizmo();
             SyncInputRegions();
@@ -575,9 +575,9 @@ namespace RailroaderScenePatcher {
                     selectionProblem = "World selection unavailable: " + e.GetBaseException().Message;
                 }
             }
-            if (editor && open && inventory != null) {
+            if (inMapEditor && open && inventory != null) {
                 // The idle comparison only informs the band; an edit runs its own pass. It takes a small step on every
-                // third frame and pauses five seconds after a pass. A change of the editor's history that is not this
+                // third frame and pauses five seconds after a pass. A change of the native map editor's history that is not this
                 // patcher's own is the usual cause of a stale inventory, so it starts a pass at once, at the edit's pace.
                 var key = ChangeStamp();
                 // A history that moved without this patcher's own edit is a native edit, Undo or Redo: what the last
@@ -585,7 +585,7 @@ namespace RailroaderScenePatcher {
                 if (key != idleKey) { idleKey = key; urgentCheck = true; nextInventoryCheck = 0; feedback.HistoryMoved(); }
                 // No pass runs between this patcher's own change and the observation of the changed objects: it would
                 // compare them with what they were before.
-                // While a gizmo is active the pose of its target is this patcher's own preview: a pass would compare it
+                // While a gizmo is active the placement of its target is this patcher's own preview: a pass would compare it
                 // with the snapshot and mark the inventory stale. The pass stops when the gizmo starts and waits until
                 // it ended and its target was observed again, after a release and after a cancellation alike.
                 if (gizmo?.Active == true) inventory.CancelFreshnessCheck();
@@ -604,7 +604,7 @@ namespace RailroaderScenePatcher {
                 if (staleLogged) context?.Log.Info("Scene inventory marked stale: " + inventory.StaleReason);
             }
             FollowTracks();
-            // Every move of the editor's history can change the surface the frames are cut at: a placement edit with
+            // Every move of the native map editor's history can change the surface the frames are cut at: a placement edit with
             // its terrain, a native terrain or track edit, Undo and Redo. A terrain output that completes later
             // clears it again where it is reported.
             var surfaceKey = ChangeStamp();
@@ -622,7 +622,7 @@ namespace RailroaderScenePatcher {
                     MarkFollowed();
                     MarkBound();
                     ArmGizmo();
-                    ShowLivePose();
+                    ShowLivePlacement();
                     LogChoiceProblem();
                     // A result belongs to the tab and placement mode it was reported in.
                     feedback.View(inspectorTab.Value + "/" + (inspectorTab.Value == PlacementTab ? placementMode : 0));
@@ -637,15 +637,15 @@ namespace RailroaderScenePatcher {
         // Objects of the edited document that follow a track move with it, a few times a second. No document or history changes.
         string surfaceStamp;
         void FollowTracks() {
-            if (authoring == null || gizmo?.Active == true || Time.unscaledTime < nextTrackFollow) return;
+            if (attachment == null || gizmo?.Active == true || Time.unscaledTime < nextTrackFollow) return;
             nextTrackFollow = Time.unscaledTime + 0.25f;
             try {
-                if (!authoring.Session.HasTrackFollowing) return;
-                foreach (var item in authoring.Session.ReconcileTrackFollowing())
+                if (!attachment.Session.HasTrackFollowing) return;
+                foreach (var item in attachment.Session.ReconcileTrackFollowing())
                     if (item.Value.Applied) {
                         context?.Log.Info("Scene Patcher: " + item.Key + " followed its track");
                         // The move is this patcher's own: the object is observed again, as after Undo of its own step,
-                        // so the comparison does not read its new pose as a foreign change.
+                        // so the comparison does not read its new placement as a foreign change.
                         // A follow outcome names the object it moved, not an identity.
                         if (item.Value.ResolvedTarget != null && !moved.Any(known => ReferenceEquals(known, item.Value.ResolvedTarget))) moved.Add(item.Value.ResolvedTarget);
                         // A track moved: the ballast is elsewhere.
@@ -658,20 +658,20 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { if (reported.Add("follow/" + e.GetBaseException().Message)) context?.Log.Info("Scene Patcher: track following stopped: " + e.GetBaseException().Message); }
         }
         // Differs whenever the set of objects the document changes can differ.
-        string ChangeStamp() { try { return authoring?.ChangeKey; } catch { return null; } }
+        string ChangeStamp() { try { return attachment?.ChangeKey; } catch { return null; } }
         string PresentationSnapshot() {
             var pending = selection?.Pending;
             string outstanding = "";
             try {
-                if (authoring != null) {
-                    var session = authoring.Session;
+                if (attachment != null) {
+                    var session = attachment.Session;
                     outstanding = OutstandingSnapshot() + "|" +
                         session.LastSave?.Error + "|" + (session.LastSave == null ? "" : String.Join(", ", session.LastSave.Completed)) + "|" +
                         (session.LastSave == null ? "" : String.Join(", ", session.LastSave.Outstanding)) + "|" +
-                        session.IncompleteOperation + "|" + authoring.Fault;
+                        session.IncompleteOperation + "|" + attachment.Fault;
                 }
             } catch (Exception e) { outstanding = e.GetBaseException().Message; }
-            return String.Join("|", inspectorTab.Value, presentation?.HelpRegion, candidateDetails, gizmoTool, Requests.Place, status, scene?.Status, inventory?.IsStale, inventory?.StaleReason, definitionsStale, authoringStatus, feedback.Place, feedback.Result,
+            return String.Join("|", inspectorTab.Value, presentation?.HelpRegion, candidateDetails, gizmoTool, Requests.Place, status, scene?.Status, inventory?.IsStale, inventory?.StaleReason, definitionsStale, editingStatus, feedback.Place, feedback.Result,
                 documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
@@ -679,17 +679,17 @@ namespace RailroaderScenePatcher {
                 coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error);
         }
         // Computing the outstanding work serializes the document and reads the dependency metadata. Its inputs change
-        // with the editor's change counts, a Save attempt or an incomplete operation; one recomputation a second covers
+        // with the native map editor's change counts, a Save attempt or an incomplete operation; one recomputation a second covers
         // a change that passes none of them.
         string outstandingKey, outstandingText;
         object outstandingOwner;
         float outstandingUntil;
         string OutstandingSnapshot() {
-            var session = authoring.Session;
-            var key = authoring.ChangeKey + "|" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(session.LastSave) + "|" + session.IncompleteOperation + "|" + session.Blocked;
-            if (!ReferenceEquals(outstandingOwner, authoring) || key != outstandingKey || Time.unscaledTime >= outstandingUntil) {
-                outstandingText = String.Join(", ", session.Outstanding(authoring.NativeDirty));
-                outstandingOwner = authoring; outstandingKey = key; outstandingUntil = Time.unscaledTime + 1f;
+            var session = attachment.Session;
+            var key = attachment.ChangeKey + "|" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(session.LastSave) + "|" + session.IncompleteOperation + "|" + session.Blocked;
+            if (!ReferenceEquals(outstandingOwner, attachment) || key != outstandingKey || Time.unscaledTime >= outstandingUntil) {
+                outstandingText = String.Join(", ", session.Outstanding(attachment.NativeDirty));
+                outstandingOwner = attachment; outstandingKey = key; outstandingUntil = Time.unscaledTime + 1f;
             }
             return outstandingText;
         }
@@ -697,8 +697,8 @@ namespace RailroaderScenePatcher {
         object terrainFor;
         string terrainState;
         string TerrainSnapshot() {
-            if (authoring == null || selected == null || !Editable) { terrainFor = null; return ""; }
-            var output = inspectedOutput.Of(authoring.Session, selected, out var problem);
+            if (attachment == null || selected == null || !Editable) { terrainFor = null; return ""; }
+            var output = inspectedOutput.Of(attachment.Session, selected, out var problem);
             // A change of the inspected object's terrain output is reported where its Retry control is: the message area.
             var state = problem != null ? "unknown" : output.Error != null ? "stopped" : output.Outstanding.Count != 0 ? "outstanding" : output.Completed.Count != 0 ? "complete" : "none";
             if (!ReferenceEquals(terrainFor, selected.Handle)) { terrainFor = selected.Handle; terrainState = state; }
@@ -711,7 +711,7 @@ namespace RailroaderScenePatcher {
             return problem ?? String.Join("|", String.Join(";", output.Completed), String.Join(";", output.Outstanding), output.Error);
         }
         // Starts a new load attempt over the retained world. The engine keeps the captured state and guards of objects that
-        // still stand under their identities and releases the rest; diagnostics, overlap notices and editor views start over.
+        // still stand under their identities and releases the rest; diagnostics, overlap notices and scene patch editing views start over.
         internal void BeginAttempt() {
             if (engine == null) return;
             EndAttempt();
@@ -724,7 +724,7 @@ namespace RailroaderScenePatcher {
             if (inventory != null) { inventory = new SceneInventory(native); staleLogged = true; }
             selected = null; selectionProblem = null; documentInspection = "";
             // The panel's state belongs to the load attempt as well: what it read, compared, reported and had open. The
-            // next editor session builds a new window and fills it from the scene as it is then.
+            // next native map editor session builds a new window and fills it from the scene as it is then.
             definitions.Reset();
             comparedKey = null; passKey = null; idleKey = null; urgentCheck = false; filled = false; fullRefresh = false;
             terrainFor = null; revealed = null;
@@ -736,13 +736,13 @@ namespace RailroaderScenePatcher {
             foreach (var failure in reentry.Failures)
                 Report("reentry/" + failure, "Retained world cleanup is incomplete on this peer: " + failure + ". The patcher retries at the next load; reload the map to clear it. Report to the patcher maintainer.");
         }
-        // Ends the load attempt: parts bound to the editor of this world end with it; the world's patcher state stays.
+        // Ends the load attempt: parts bound to the native map editor of this world end with it; the world's patcher state stays.
         // The window, its entry icon and its title-bar help button are disposed here and built again by Attach when the
-        // next editor appears. Requests that waited on the scene of this attempt end with it.
+        // next native map editor appears. Requests that waited on the scene of this attempt end with it.
         internal void EndAttempt() {
-            presentation?.Dispose(); presentation = null; attachedEditor = null; refusedEditor = null; presentationSnapshot = null;
+            presentation?.Dispose(); presentation = null; attachedMapEditor = null; refusedMapEditor = null; presentationSnapshot = null;
             Detach(); selection?.Cancel();
-            Requests.Cancel("the editor was left before the request ran"); refreshFrame = 0; replayFrame = 0; refreshTarget = null;
+            Requests.Cancel("the native map editor was left before the request ran"); refreshFrame = 0; replayFrame = 0; refreshTarget = null;
             replayed.Clear(); moved.Clear();
             inventory?.CancelFreshnessCheck();
             if (escapeHeld) { try { UI.GameInput.UnregisterEscapeHandler(UI.GameInput.EscapeHandler.Transient); } catch { } escapeHeld = false; }
@@ -750,7 +750,7 @@ namespace RailroaderScenePatcher {
         internal void Release() { ReleaseParts(); }
         void ReleaseParts() {
             if (worldLabelBacking != null) Destroy(worldLabelBacking); worldLabelBacking = null;
-            presentation?.Dispose(); presentation = null; attachedEditor = null;
+            presentation?.Dispose(); presentation = null; attachedMapEditor = null;
             Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Release(); selection = null;
             // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
             capabilities?.Dispose();
@@ -790,7 +790,7 @@ namespace RailroaderScenePatcher {
             return presentation.PanelBounds.Contains(new Vector2(pointer.x, Screen.height - pointer.y));
         }
         // Nothing is inspected any more: what was prepared, open or reported for the object goes with it. A pending
-        // world choice is cancelled as Cancel does, so the native editor takes the world's clicks again. A request that
+        // world choice is cancelled as Cancel does, so the native map editor takes the world's clicks again. A request that
         // still waited is refused, and that refusal stays to be read.
         void ClearInspection() {
             var waited = Requests.ReleaseInspection(selection?.Pending != null, CancelSelection,
@@ -799,7 +799,7 @@ namespace RailroaderScenePatcher {
             presentation?.RequestRefresh();
         }
         // The world marks the track the inspected object follows in green, as a confirmed relation, also while another
-        // track is being chosen. The followed track is read from the document when the inspection or the editor's
+        // track is being chosen. The followed track is read from the document when the inspection or the native map editor's
         // history changes, not every frame.
         object followedOf, modeOf; string followedKey;
         void MarkFollowed() {
@@ -807,7 +807,7 @@ namespace RailroaderScenePatcher {
             if (ReferenceEquals(followedOf, selected?.Handle) && key == followedKey) return;
             followedOf = selected?.Handle; followedKey = key;
             TrackFollowing following = null;
-            try { if (selected != null && authoring != null) following = authoring.Session.FollowingOf(selected.Identity); } catch { }
+            try { if (selected != null && attachment != null) following = attachment.Session.FollowingOf(selected.Identity); } catch { }
             // An object opens in its own placement mode: Follow for one that follows a track, Numeric otherwise.
             if (selected != null && !ReferenceEquals(modeOf, selected.Handle)) { modeOf = selected.Handle; placementMode = CommandBand.PlacementMode(following != null); }
             if (selected == null) modeOf = null;
@@ -815,7 +815,7 @@ namespace RailroaderScenePatcher {
         }
         // While the Connections tab is open the world marks what the inspected object is bound to now in green, native
         // or set by a patch: the segment of its marker binding, and for a crossing the tracks of its circuits. Read
-        // when the inspection, the tab or the editor's history changes, not every frame.
+        // when the inspection, the tab or the native map editor's history changes, not every frame.
         string boundKey;
         void MarkBound() {
             if (selection == null) return;
@@ -826,8 +826,8 @@ namespace RailroaderScenePatcher {
             var bound = new List<SelectionIdentity>();
             if (shown) try {
                 bound.AddRange(Segments(selected).Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)));
-                if (authoring != null && selected.Identity.Structure == CrossingCoverageScene.Structure)
-                    foreach (var circuit in authoring.Session.Coverage(selected.Identity).Circuits) {
+                if (attachment != null && selected.Identity.Structure == CrossingCoverageScene.Structure)
+                    foreach (var circuit in attachment.Session.Coverage(selected.Identity).Circuits) {
                         if (circuit.Value.Ranges != null) foreach (var range in circuit.Value.Ranges) { bound.Add(SelectionIdentity.Graph(SelectionKind.TrackSegment, range.From.Segment)); bound.Add(SelectionIdentity.Graph(SelectionKind.TrackSegment, range.To.Segment)); }
                         // A native circuit names its spans; each span's two track locations name the tracks.
                         if (circuit.Value.SpanIds != null && inventory != null) foreach (var span in circuit.Value.SpanIds) {
@@ -851,12 +851,12 @@ namespace RailroaderScenePatcher {
         // The gizmo stands on the inspected object for as long as the Gizmo mode is open: it is shown as soon as the mode
         // is chosen, comes back after every completed or cancelled drag, and goes when the mode, the tab or the
         // inspection ends or a world choice starts. It is bound to the inspection it was shown for; when the object is
-        // observed again or the editor's history moves, it is shown again for the new inspection. A start that was
+        // observed again or the native map editor's history moves, it is shown again for the new inspection. A start that was
         // refused is not tried again until something changes.
         string gizmoArmKey;
         void ArmGizmo() {
             if (gizmo != null && gizmo.Closed) gizmo = null;
-            var wanted = selected != null && inspectorTab.Value == PlacementTab && placementMode == CommandBand.GizmoMode && !IsPad && selection?.Pending == null && Editable && authoring != null && (GameObject)selected.Handle != null;
+            var wanted = selected != null && inspectorTab.Value == PlacementTab && placementMode == CommandBand.GizmoMode && !IsPad && selection?.Pending == null && Editable && attachment != null && (GameObject)selected.Handle != null;
             if (!wanted) {
                 if (gizmo != null && !gizmo.Active) CancelGizmo();
                 gizmoArmKey = null;
@@ -878,24 +878,24 @@ namespace RailroaderScenePatcher {
             gizmoArmKey = key; gizmoHandle = selected.Handle;
             BeginGizmo(gizmoTool);
         }
-        // The read-only pose of the Gizmo mode follows the gizmo while it is dragged: the texts are set in place,
+        // The read-only placement of the Gizmo mode follows the gizmo while it is dragged: the texts are set in place,
         // because the panel does not rebuild while a pointer button is down.
-        TMPro.TMP_Text[] gizmoPose;
-        void ShowLivePose() {
-            if (gizmoPose == null || selected == null || placementMode != CommandBand.GizmoMode) return;
+        TMPro.TMP_Text[] gizmoPlacement;
+        void ShowLivePlacement() {
+            if (gizmoPlacement == null || selected == null || placementMode != CommandBand.GizmoMode) return;
             string[] values = null;
             try {
-                if (gizmo != null && gizmo.TryPose(out var map, out var rotation)) { var angles = rotation.eulerAngles; values = new[] { map.x, map.y, map.z, angles.x, angles.y, angles.z }.Select(v => CommandBand.Number(v)).ToArray(); }
+                if (gizmo != null && gizmo.TryPlacement(out var map, out var rotation)) { var angles = rotation.eulerAngles; values = new[] { map.x, map.y, map.z, angles.x, angles.y, angles.z }.Select(v => CommandBand.Number(v)).ToArray(); }
                 else if (selected.Position.Count == 3 && selected.Rotation.Count == 4) {
                     var angles = new Quaternion((float)selected.Rotation[0], (float)selected.Rotation[1], (float)selected.Rotation[2], (float)selected.Rotation[3]).eulerAngles;
-                    values = CurrentPose();
+                    values = CurrentPlacement();
                 }
             } catch { }
             if (values == null) return;
-            // One running line for the position and one for the rotation, as every pose that cannot be edited reads.
-            for (var i = 0; i < gizmoPose.Length && i < 2; i++) {
-                var text = CommandBand.RunningLine(CommandBand.Axes, values.Skip(i * 3).Take(3).ToArray(), CommandBand.PoseUnits[i]);
-                if (gizmoPose[i] != null && gizmoPose[i].text != text) gizmoPose[i].text = text;
+            // One running line for the position and one for the rotation, as every placement that cannot be edited reads.
+            for (var i = 0; i < gizmoPlacement.Length && i < 2; i++) {
+                var text = CommandBand.RunningLine(CommandBand.Axes, values.Skip(i * 3).Take(3).ToArray(), CommandBand.PlacementUnits[i]);
+                if (gizmoPlacement[i] != null && gizmoPlacement[i].text != text) gizmoPlacement[i].text = text;
             }
         }
         // A world choice's refusal or problem goes to the log once, with the object it was for.
@@ -933,7 +933,7 @@ namespace RailroaderScenePatcher {
                 }
                 if (candidate.Observation != null) {
                     InspectObservation(candidate.Observation);
-                    ReadPose();
+                    ReadPlacement();
                 }
                 // A track confirmed on the Connections tab of a track marker is the track for its binding: the Segment
                 // field takes it, so the field and the confirmation name the same track and Set applies what both show.
@@ -951,7 +951,7 @@ namespace RailroaderScenePatcher {
         bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure) && selected.Handle is GameObject;
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
         string EditBlock() =>
-            authoring == null ? (String.IsNullOrEmpty(authoringStatus) ? "Editing is unavailable." : authoringStatus)
+            attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : !Editable ? CommandBand.EditReason(selected?.Operations)
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
@@ -961,19 +961,19 @@ namespace RailroaderScenePatcher {
             BeginSelection(kind, selected);
             choosingSnap = selection?.Pending != null;
         }
-        void ReadPose() {
-            var current = CurrentPose();
+        void ReadPlacement() {
+            var current = CurrentPlacement();
             if (current == null) return;
-            for (var i = 0; i < 6; i++) pose[i] = current[i];
+            for (var i = 0; i < 6; i++) placementFields[i] = current[i];
             ReadBinding();
         }
-        // The inspected pose as the numeric fields show it, or null without one.
-        string[] CurrentPose() {
-            var values = PoseValues();
+        // The inspected placement as the numeric fields show it, or null without one.
+        string[] CurrentPlacement() {
+            var values = PlacementValues();
             return values == null ? null : values.Select(CommandBand.Number).ToArray();
         }
-        // The inspected position and Euler angles as numbers, or null without a pose.
-        double[] PoseValues() {
+        // The inspected position and Euler angles as numbers, or null without a placement.
+        double[] PlacementValues() {
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return null;
             var angles = new Quaternion((float)selected.Rotation[0], (float)selected.Rotation[1], (float)selected.Rotation[2], (float)selected.Rotation[3]).eulerAngles;
             return new[] { selected.Position[0], selected.Position[1], selected.Position[2], angles.x, angles.y, angles.z };
@@ -998,11 +998,11 @@ namespace RailroaderScenePatcher {
         // An edit that does not run names its reason in the panel and the log, like one that is refused.
         // consumes says the edit uses the target confirmed in the world: once it completed, that confirmation is used
         // up, and its "Confirmed" line leaves the message area.
-        void Edit(string place, string action, Func<AuthoringSession, InspectedTarget, Outcome> change, bool consumes = false) {
+        void Edit(string place, string action, Func<PatchEditingSession, InspectedTarget, Outcome> change, bool consumes = false) {
             Queue(place, action, pin => {
                 // A completed edit changed the observed values; observe them again so the next edit binds to them.
                 var truthful = IsPad && (place == PlacementPlace || place == SnapPlace || place == FollowPlace) ? CommandBand.PadPlacement(action) : null;
-                if (feedback.Run(place, action, null, inventory, selected, inspection => change(authoring.Session, inspection), pin, truthful)) {
+                if (feedback.Run(place, action, null, inventory, selected, inspection => change(attachment.Session, inspection), pin, truthful)) {
                     if (consumes) selection?.Consume();
                     OwnChange(); RefreshAfterEdit();
                 }
@@ -1017,7 +1017,7 @@ namespace RailroaderScenePatcher {
         void Queue(string place, string action, Action<Func<SceneObservation, InspectedTarget>> run) {
             var blocked = selection?.Pending != null ? "a world selection is pending; confirm or cancel it first"
                 : gizmo?.Active == true ? "the gizmo is active; complete or cancel it first"
-                : authoring == null ? "editing is unavailable" : Requests.Pending ? "another edit is still running" : null;
+                : attachment == null ? "editing is unavailable" : Requests.Pending ? "another edit is still running" : null;
             if (blocked != null) { feedback.Run(place, action, blocked, inventory, selected, null); return; }
             ClearSnap();
             var inspected = selected;
@@ -1034,7 +1034,7 @@ namespace RailroaderScenePatcher {
             });
         }
         // The preview compares the scene as an edit does: without a blocking scan.
-        void PrepareCoverage(AuthoringSession session, TargetIdentity identity, string circuit, CircuitCoverage value, string addition) {
+        void PrepareCoverage(PatchEditingSession session, TargetIdentity identity, string circuit, CircuitCoverage value, string addition) {
             Queue(CoveragePlace, "Coverage preview", pin => {
                 CoveragePreview preview;
                 try { preview = addition == null ? session.PreviewCoverage(identity, circuit, value, pin(selected)) : session.PreviewAddition(identity, addition, value, pin(selected)); }
@@ -1078,7 +1078,7 @@ namespace RailroaderScenePatcher {
         // The share of one frame the comparison for a requested edit may take: more than the background check, because
         // the user is waiting, and little enough to keep the game moving.
         const double EditCheckBudgetMs = 8;
-        // The one edit or preview that waits for the comparison of the scene. Closing the panel, leaving the editor and
+        // The one edit or preview that waits for the comparison of the scene. Closing the panel, leaving the native map editor and
         // ending the load attempt cancel it with a refusal: Cancel applies to every pending interaction.
         RequestQueue requests;
         RequestQueue Requests => requests ?? (requests = new RequestQueue(feedback));
@@ -1106,17 +1106,17 @@ namespace RailroaderScenePatcher {
         object gizmoHandle;
         void StartGizmo(UI.Gizmos.TransformGizmoMode mode, Func<SceneObservation, InspectedTarget> pin) {
             try {
-                if (!Editable || selection?.Pending != null || authoring == null) throw new InvalidOperationException("Inspect a supported target and finish world selection first");
+                if (!Editable || selection?.Pending != null || attachment == null) throw new InvalidOperationException("Inspect a supported target and finish world selection first");
                 var inspection = pin(selected);
                 var root = new GameObject("CrankyAnt Scene Patcher transform gizmo");
                 root.transform.SetParent(transform, false);
                 gizmo = root.AddComponent<GizmoController>();
-                gizmo.Initialize(engine, capabilities, authoring, selected.Identity, inspection, mode, (outcome, message) => {
+                gizmo.Initialize(engine, capabilities, attachment, selected.Identity, inspection, mode, (outcome, message) => {
                     gizmo = null; gizmoEnded = Time.frameCount;
                     // The gizmo comes back for the next drag once the object was observed again.
                     gizmoArmKey = null;
                     feedback.Report(GizmoPlace, message ?? (outcome?.Applied == true ? (outcome.Unchanged ? "Gizmo released without a move; nothing changed." : IsPad ? CommandBand.PadPlacement("Gizmo placement") : "Gizmo placement completed.") : "Gizmo placement refused: " + outcome?.Error));
-                    OwnChange(); RefreshAfterEdit(); authoring?.RefreshChrome();
+                    OwnChange(); RefreshAfterEdit(); attachment?.RefreshChrome();
                 });
             } catch (Exception e) { gizmo = null; feedback.Report(GizmoPlace, "Gizmo unavailable: " + e.GetBaseException().Message); }
         }
@@ -1126,7 +1126,7 @@ namespace RailroaderScenePatcher {
         void Inspect() {
             ClearSnap();
             try {
-                if (inventory == null) throw new InvalidOperationException("Map-editor inspection is unavailable");
+                if (inventory == null) throw new InvalidOperationException("Inspection is unavailable");
                 inventory.Refresh();
                 // A refresh read the whole scene: the snapshot is compared for the history as it is now.
                 comparedKey = idleKey = ChangeStamp(); comparedAt = Time.unscaledTime;
@@ -1142,7 +1142,7 @@ namespace RailroaderScenePatcher {
                 documentInspection = String.Join("\n", lines);
                 definitions.Read(documents);
                 status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
-            } catch (Exception e) { EditorDiagnostic(e.GetBaseException().Message); }
+            } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
         string Identity(SceneObservation entry) {
             var identity = new JObject {

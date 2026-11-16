@@ -201,7 +201,7 @@ namespace RailroaderScenePatcher {
         // time the panel is asked the field no longer reports the focus it had when the key went down.
         internal const int FocusFrames = 2;
         internal static bool FieldHasFocus(int frame, int lastFocused) => lastFocused >= 0 && frame - lastFocused <= FocusFrames;
-        // What one press of Escape does, first that applies. The native editor's Escape cancels its first armed
+        // What one press of Escape does, first that applies. The native map editor's Escape cancels its first armed
         // interaction, does nothing while a text field has the focus, and otherwise leaves Escape to the pause
         // menu; it never clears a selection. Here: while a field of the panel has the focus Escape is left alone;
         // the list beside the click closes alone, as a native dropdown does, and the choice stays pending; over the
@@ -226,7 +226,7 @@ namespace RailroaderScenePatcher {
         // A group of named values, such as a position, as the native inspectors show one: the group's caption above
         // the row, each value's short label in front of its box. The unit stands once: in the caption while the row
         // can be edited, at the end of the running line while it cannot.
-        internal static readonly string[] PoseGroups = { "Position", "Rotation" }, PoseUnits = { "m", "deg" }, Axes = { "X", "Y", "Z" };
+        internal static readonly string[] PlacementGroups = { "Position", "Rotation" }, PlacementUnits = { "m", "deg" }, Axes = { "X", "Y", "Z" };
         internal static string GroupCaption(string caption, string unit, bool editable) => editable && unit != null ? caption + " (" + unit + ")" : caption;
         // The values of a group that cannot be edited now, as one running line: "X 4361.091  Y 528.405  Z 5380.431 (m)".
         // A value that is not set reads as a dash.
@@ -276,7 +276,7 @@ namespace RailroaderScenePatcher {
         // The caption of a coverage role, in words: the document's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
-        // every mode. An object that cannot be edited keeps Numeric, which shows its pose, and has every other mode
+        // every mode. An object that cannot be edited keeps Numeric, which shows its placement, and has every other mode
         // inactive with the object's own reason.
         internal static string ModeBlock(int mode, bool pad, bool editable, string operations) =>
             pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : null;
@@ -285,8 +285,8 @@ namespace RailroaderScenePatcher {
         internal static bool ShowsCurrentRelations(bool confirmedShown) => !confirmedShown;
         // Why a placement mode cannot move a crossing pad, or null for a mode that can. The pad's geometry is generated
         // along its track binding, so a mode moves the pad only when it changes that binding. None of the four does:
-        // Numeric and Gizmo write the pad object's pose, Snap writes that pose once from a track, and Follow keeps
-        // that pose relative to a track without binding the marker to it. The binding is set under Connections.
+        // Numeric and Gizmo write the pad object's placement, Snap writes that placement once from a track, and Follow keeps
+        // that placement relative to a track without binding the marker to it. The binding is set under Connections.
         internal const string PadFollowsTrack = "A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections.";
         internal static string PadModeBlock(int mode) => mode == NumericMode || mode == GizmoMode || mode == SnapMode || mode == FollowMode ? PadFollowsTrack : null;
         // What a crossing pad's Supported edits says: its binding and its activity, and no placement of its own.
@@ -394,7 +394,7 @@ namespace RailroaderScenePatcher {
         // occupies that corner (topRightBottom: the lower edge of the button strip and the status readout), with the
         // same width. Its height is what remains below that edge, at most the window's default height or what remains
         // below the Map Editor window, whichever is more, and never less than the minimum height.
-        // editorWidth is 0 when the Map Editor window is not shown; the window then keeps its default size at the left.
+        // mapEditorWidth is 0 when the Map Editor window is not shown; the window then keeps its default size at the left.
         // Where a help window stands: beside the panel, never over it, so the region it explains stays in view. To the
         // right of the panel where the screen has room, else to its left; its top at the "?" that opened it, within
         // the screen. Only when neither side has room does it take the side with more of it, at the screen's edge.
@@ -407,13 +407,13 @@ namespace RailroaderScenePatcher {
             var y = Math.Max(0, Math.Min(anchorTop, screenHeight - height));
             return new Area { X = x, Y = y, Width = width, Height = height };
         }
-        internal static Area Default(float screenWidth, float screenHeight, float scale, float editorLeft, float editorWidth, float editorBottom, float topRightBottom,
+        internal static Area Default(float screenWidth, float screenHeight, float scale, float mapEditorLeft, float mapEditorWidth, float mapEditorBottom, float topRightBottom,
             float defaultWidth, float defaultHeight, float minimumHeight) {
             float width = defaultWidth * scale, x = 0, top = screenHeight - defaultHeight * scale;
-            if (editorWidth > 0) { x = editorLeft; width = Math.Max(width, editorWidth); top = editorBottom; }
+            if (mapEditorWidth > 0) { x = mapEditorLeft; width = Math.Max(width, mapEditorWidth); top = mapEditorBottom; }
             width = Math.Min(width, screenWidth);
             var below = screenHeight - top;
-            if (editorWidth > 0 && below < FallbackBelow * scale) {
+            if (mapEditorWidth > 0 && below < FallbackBelow * scale) {
                 var remaining = screenHeight - topRightBottom;
                 var height = Math.Max(minimumHeight * scale, Math.Min(remaining, Math.Max(defaultHeight * scale, below)));
                 height = Math.Min(height, screenHeight);

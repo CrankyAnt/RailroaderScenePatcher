@@ -161,7 +161,7 @@ namespace RailroaderScenePatcher {
             bridge.SetActive(active);
             Physics.SyncTransforms();
         }
-        public void SetPose(object target, Placement placement) {
+        public void SetPlacement(object target, Placement placement) {
             var bridge = (GameObject)target;
             var position = new Vector3(Checked(placement.Position[0]), Checked(placement.Position[1]), Checked(placement.Position[2]));
             var rotation = new Quaternion(Checked(placement.Rotation[0]), Checked(placement.Rotation[1]), Checked(placement.Rotation[2]), Checked(placement.Rotation[3]));
@@ -169,7 +169,7 @@ namespace RailroaderScenePatcher {
             var local = Convert("GameToWorld", position);
             if ((Convert("WorldToGame", local) - position).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
             bridge.transform.SetPositionAndRotation(local, rotation);
-            // An inactive culler holds no culling sphere; it registers at the current pose when it is enabled.
+            // An inactive culler holds no culling sphere; it registers at the current placement when it is enabled.
             foreach (var c in bridge.GetComponentsInChildren(culler, true).OfType<Behaviour>().Where(c => c.enabled && c.gameObject.activeInHierarchy))
                 Native.Call(c, "RequestUpdateCullingPosition");
             // Physics reads moved static colliders at the next simulation step; synchronise now so queries and checks agree.

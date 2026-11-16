@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
             object native = null;
             if (value != null) {
                 if (segment == null) {
-                    // Captured underlying state can deliberately name a missing segment. Authored values are checked
+                    // Captured underlying state can deliberately name a missing segment. Mod values are checked
                     // before mutation; restoration must retain the serialized reference rather than detach or redirect it.
                     var field = Field(marker.GetType(), "_location");
                     var serialized = Activator.CreateInstance(field.FieldType);

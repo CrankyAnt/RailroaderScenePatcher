@@ -218,7 +218,7 @@ namespace RailroaderScenePatcher.Core {
             return new InspectedTarget(maps, entry) { ComparedNow = !validateEvery };
         }
         // A pin without a comparison of the whole scene, for a caller that knows the snapshot was compared after the last
-        // change it cannot account for: a refresh or a completed pass since the editor's history last changed by another
+        // change it cannot account for: a refresh or a completed pass since the native map editor's history last changed by another
         // hand. The snapshot must not be stale, and every validation observes the target now. A scene that cannot
         // observe one object compares the whole scene instead, as Pin does.
         public InspectedTarget PinCompared(SceneObservation entry) {

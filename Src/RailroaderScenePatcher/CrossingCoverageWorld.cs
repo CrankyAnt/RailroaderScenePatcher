@@ -13,9 +13,9 @@ namespace RailroaderScenePatcher {
     // An existing grade crossing: a GradeCrossingController whose circuit sets each name an approach A, island and approach B
     // track span. The controller re-reads the sets and their span references on every pass of its loop, so changing them
     // changes detection from the next pass. A span registers in the track graph under its ID when it is enabled and removes
-    // that ID when it is disabled. The map editor saves neither the controller's references nor runtime spans, so owned spans
+    // that ID when it is disabled. The native map editor saves neither the controller's references nor runtime spans, so owned spans
     // exist only in the load that the patch document builds them in. A circuit set is a plain object the controller's list
-    // refers to; a set the patcher adds for an authored addition is remembered by its own identity, so a later adapter over a
+    // refers to; a set the patcher adds for a detection addition is remembered by its own identity, so a later adapter over a
     // retained world still tells it from the native sets.
     internal sealed class CrossingCoverageWorld : ICrossingCoverageWorld {
         const string GraphType = "Track.Graph", SpanType = "Track.TrackSpan", SegmentType = "Track.TrackSegment", LocationType = "Track.SerializableLocation";

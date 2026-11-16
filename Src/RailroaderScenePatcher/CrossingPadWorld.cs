@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher {
             if (type != "Crossing" && type != "Generic") return "Only Crossing and Generic pad markers are supported; this marker is " + type;
             if (Field(builders[0], "meshContainer") as Transform == null || Field(builders[0], "meshProfile") as UnityEngine.Object == null)
                 return "The pad builder has no mesh container or mesh profile; native generation cannot produce its geometry";
-            // Group-driven activity is supported for Generic markers only; a pad has no observed group-following case.
+            // Group-driven activity is supported for Generic markers only; a pad has no observed group-driven activity case.
             var relative = Get(go, Relative);
             if (relative != null && Field(relative, "targetActiveFollowsTrackGroup") is bool follows && follows)
                 return "The pad's activity follows a track group; the crossing-pad operation does not support group-driven activity";

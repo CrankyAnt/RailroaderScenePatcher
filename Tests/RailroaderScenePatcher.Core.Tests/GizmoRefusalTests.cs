@@ -6,11 +6,11 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 
 // A marker world whose transform reads back a rotation that is not bit-identical to the one it was given, as a native
-// transform can: the read-back is within any pose tolerance, and each write moves it by one more unit in the last place.
+// transform can: the read-back is within any placement tolerance, and each write moves it by one more unit in the last place.
 class DriftingMarkerWorld : FakeMarkerWorld, ITrackMarkerWorld {
     public bool Drift;
-    public new void SetPose(object target, double[] position, double[] rotation) {
-        base.SetPose(target, position, rotation);
+    public new void SetPlacement(object target, double[] position, double[] rotation) {
+        base.SetPlacement(target, position, rotation);
         if (Drift) { var m = (FakeMarker)target; m.Rotation[3] = Math.BitIncrement(m.Rotation[3]); }
     }
 }
@@ -25,8 +25,8 @@ static class GizmoRefusalTests {
         internal readonly FakeMarker Station = new FakeMarker { Id = "Mo0j", Segment = "S9sc", End = "a", Distance = 46.52 };
         internal readonly SceneCapabilities Capabilities;
         internal readonly PatchEngine Engine;
-        internal readonly Editor Editor = new Editor();
-        internal readonly AuthoringSession Session;
+        internal readonly NativeMapEditor MapEditor = new NativeMapEditor();
+        internal readonly PatchEditingSession Session;
         internal readonly SceneInventory Inventory;
         internal Marker() {
             World.Objects[StationPath] = new List<object> { Station };
@@ -34,7 +34,7 @@ static class GizmoRefusalTests {
             Capabilities = new SceneCapabilities(() => World.MapIds, new FakeMarkerInspection(World));
             Capabilities.Add(new TrackMarkerScene(World, Capability.Unchecked));
             Engine = new PatchEngine(Capabilities);
-            Session = new AuthoringSession(Engine, Editor, new Store(), "map"); Editor.Session = Session;
+            Session = new PatchEditingSession(Engine, MapEditor, new Store(), "map"); MapEditor.Session = Session;
             Inventory = new SceneInventory(Capabilities); Inventory.Refresh();
             World.Drift = true;
         }
@@ -52,7 +52,7 @@ static class GizmoRefusalTests {
         if (failures.Count != 0) throw new Exception("Gizmo refusal tests failed:\n" + String.Join("\n", failures));
         Console.WriteLine("Gizmo refusal tests passed");
     }
-    // o01-7b: Complete restores the preview before it commits the final pose. The restoration verifies within the pose
+    // o01-7b: Complete restores the preview before it commits the final placement. The restoration verifies within the placement
     // tolerance while the inspection compares the rotation exactly, so the edit binds to the target as restored, not to
     // the inspection from before the gesture. Every attempt, also after Refresh, completes.
     static void ARestoreThatReadsBackOffInTheLastPlaceCompletes() {
@@ -66,7 +66,7 @@ static class GizmoRefusalTests {
             f.Inventory.Refresh();
         }
     }
-    // o01-7c: a Cancel restores the captured pose with the same restoration; the panel observes the object again
+    // o01-7c: a Cancel restores the captured placement with the same restoration; the panel observes the object again
     // afterwards (GizmoController.Stop invokes finished, and EntryPoint runs RefreshAfterEdit, which reobserves the
     // inspected entry). The next gesture captures that restored state and completes over its own restoration.
     static void AGestureAfterACancelCompletes() {

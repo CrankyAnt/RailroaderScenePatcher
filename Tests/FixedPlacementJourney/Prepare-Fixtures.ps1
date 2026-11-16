@@ -55,12 +55,12 @@ if(@($confirmation.marker.registrations).Count -ne 1 -or !$confirmation.marker.r
 foreach($name in @('mapPosition','worldPosition','rotation')) {
     $count=if($name -eq 'rotation'){4}else{3}
     if (@($b.board.$name).Count -ne $count) {throw "Missing baseline $name"}
-    foreach($value in $b.board.$name) {if ($null -eq $value -or [double]::IsNaN([double]$value) -or [double]::IsInfinity([double]$value)) {throw 'Nonfinite baseline pose'}}
+    foreach($value in $b.board.$name) {if ($null -eq $value -or [double]::IsNaN([double]$value) -or [double]::IsInfinity([double]$value)) {throw 'Nonfinite baseline placement'}}
 }
 foreach($name in @('offset','gameZero','boardMapToWorldRoundtrip')) {if (@($b.origin.$name).Count -ne 3) {throw "Missing origin $name"}}
 for($i=0;$i -lt 3;$i++) {
     if ([math]::Abs($b.board.worldPosition[$i]-$b.origin.boardMapToWorldRoundtrip[$i]) -gt 0.01 -or [math]::Abs(($b.board.mapPosition[$i]-$b.board.worldPosition[$i])-$b.origin.gameZero[$i]) -gt 0.01) {throw 'Measured map/world/origin relationship is inconsistent'}
-    if ([math]::Abs($b.board.mapPosition[$i]-$confirmation.board.mapPosition[$i]) -gt 0.01 -or [math]::Abs($b.board.mapPosition[$i]-$inspector.placement.position[$i]) -gt 0.01){throw 'Unexpected baseline movement or inspector pose mismatch'}
+    if ([math]::Abs($b.board.mapPosition[$i]-$confirmation.board.mapPosition[$i]) -gt 0.01 -or [math]::Abs($b.board.mapPosition[$i]-$inspector.placement.position[$i]) -gt 0.01){throw 'Unexpected baseline movement or inspector placement mismatch'}
 }
 function Rotation-Agrees($a,$other) {
     if(@($other).Count -ne 4){return $false}

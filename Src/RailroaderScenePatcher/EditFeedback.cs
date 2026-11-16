@@ -6,7 +6,7 @@ using RailroaderScenePatcher.Core;
 namespace RailroaderScenePatcher {
     // The result of the last action, for the message area and for the log. An edit that is refused or does not run
     // always leaves its reason here. A result describes the present: it goes when another object is inspected, when a
-    // new action reports its own result, and when the editor's history moves by Undo or Redo, after which "Enable
+    // new action reports its own result, and when the native map editor's history moves by Undo or Redo, after which "Enable
     // completed" would be untrue. A result of a tab's own action also goes when the open tab or placement mode
     // changes; a result of a general action, one that is the same on every tab, stays through that change. A refusal
     // reported after the inspection was cleared stays until an object is inspected again. UI-independent, shared with
@@ -60,7 +60,7 @@ namespace RailroaderScenePatcher {
             if (context != null) messages.RemoveAll(m => !m.General && !m.Kept);
             context = key;
         }
-        // The editor's history moved by Undo or Redo: what the last action completed may be undone. A refusal kept
+        // The native map editor's history moved by Undo or Redo: what the last action completed may be undone. A refusal kept
         // for the next inspection completed nothing and stays.
         internal void HistoryMoved() { messages.RemoveAll(m => !m.Kept); }
         // A world choice starts: it is a new action, so the result or refusal of the action before it goes, as it

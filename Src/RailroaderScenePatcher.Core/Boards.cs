@@ -70,7 +70,7 @@ namespace RailroaderScenePatcher.Core {
         double[] Position(object board);
         double[] Rotation(object board);
         bool Active(object board);
-        void SetPose(object board, double[] position, double[] rotation);
+        void SetPlacement(object board, double[] position, double[] rotation);
         void SetActive(object board, bool active);
         void RefreshCulling(object board);
         void RebuildMask(object board);
@@ -95,7 +95,7 @@ namespace RailroaderScenePatcher.Core {
         // Pattern-based boards share the delivery minimum; the original Sylva target retains its legacy support.
         public const string PatternVersion = "0.5.0";
         public const double OutputTimeout = 30;
-        const double PoseTolerance = 0.01, RegistrationTolerance = 0.1;
+        const double PlacementTolerance = 0.01, RegistrationTolerance = 0.1;
         readonly IBoardWorld world;
         readonly Func<IEnumerable<SceneObservation>> discover;
         readonly Dictionary<object, Work> work = new Dictionary<object, Work>();
@@ -151,13 +151,13 @@ namespace RailroaderScenePatcher.Core {
                 if (Math.Abs(rotation.Sum(x => x * x) - 1) > 0.001) throw new InvalidOperationException("Rotation must be a unit quaternion");
             }
             var active = state.Active ?? world.Active(target);
-            // Enabling registers the culling sphere and mask at the current pose; the pose is refreshed afterwards.
+            // Enabling registers the culling sphere and mask at the current placement; the placement is refreshed afterwards.
             if (active && !world.Active(target)) { Track(target, world.Position(target)); world.SetActive(target, true); }
             if (position != null) {
-                // An inactive board holds no culling sphere or mask; both register at the new pose when it is enabled.
+                // An inactive board holds no culling sphere or mask; both register at the new placement when it is enabled.
                 var registered = world.Active(target);
                 if (registered) { Track(target, world.Position(target)); Track(target, position); }
-                world.SetPose(target, position, rotation);
+                world.SetPlacement(target, position, rotation);
                 if (registered) { world.RefreshCulling(target); world.RebuildMask(target); }
             }
             // Disabling releases the culling sphere and the mask through the components' own lifecycle.
@@ -166,7 +166,7 @@ namespace RailroaderScenePatcher.Core {
         }
         void Verify(object target, double[] position, double[] rotation, bool active) {
             var now = world.Position(target);
-            if (position != null && (Distance(now, position) > PoseTolerance || Angle(world.Rotation(target), rotation) > 0.01)) throw new InvalidOperationException("Applied pose did not verify");
+            if (position != null && (Distance(now, position) > PlacementTolerance || Angle(world.Rotation(target), rotation) > 0.01)) throw new InvalidOperationException("Applied placement did not verify");
             if (world.Active(target) != active) throw new InvalidOperationException("Applied activity did not verify");
             var registration = world.Registration(target);
             if (registration.MissingMaskKeys != 0) throw new InvalidOperationException("The terrain system no longer stores the board's mask registration");

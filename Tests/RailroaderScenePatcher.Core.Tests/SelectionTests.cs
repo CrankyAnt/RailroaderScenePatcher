@@ -56,7 +56,7 @@ static class SelectionTests {
         Console.WriteLine("PASS: confirmed spatial scene-target identity and complete-document application");
         UnresolvedSceneTargets(scene, document.ToString(), candidates, candidate, original, replacement);
         ReplacementChoices(scene, document.ToString(), candidates, candidate, result, original, replacement);
-        AuthoringHistory();
+        PatchEditingHistory();
         ConfirmationFindsOneIdentity();
     }
     // A scene that can find one identity confirms without discovering every candidate, and still refuses a candidate
@@ -130,7 +130,7 @@ static class SelectionTests {
         Console.WriteLine("PASS: confirmation by finding one identity");
     }
 
-    static void AuthoringHistory() {
+    static void PatchEditingHistory() {
         var scene = new Scene();
         var board = new Box { X = 7, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         var target = new TargetIdentity("s", "board", "c");
@@ -141,9 +141,9 @@ static class SelectionTests {
         };
         var inventory = new SceneInventory(scene);
         var store = new Store();
-        var editor = new Editor();
-        var authoring = new AuthoringSession(new PatchEngine(scene), editor, store, "map");
-        editor.Session = authoring;
+        var mapEditor = new NativeMapEditor();
+        var editing = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map");
+        mapEditor.Session = editing;
         var candidates = new Candidates();
         var source = new SelectionCandidate(board, SelectionIdentity.SceneObject(target), "Board");
         var track = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "S-replacement"), "Track segment S-replacement");
@@ -162,30 +162,30 @@ static class SelectionTests {
         var confirmed = choices.Confirmed;
         inventory.Refresh();
         var placement = new Placement(new[] { 112.0, 2.0, 3.0 }, new[] { 0.0, 0.0, 0.0, 1.0 });
-        var edit = authoring.Edit(confirmed.Identity.Target, placement, null, inventory.Pin(inventory.Entries.Single()));
-        Check(edit.Applied && board.X == 12 && editor.CanUndo, "Placement uses the confirmed identity, a fresh inspection and shared history");
-        Check(editor.Save() == null && !editor.IsDirty, "Native Save persists the authored placement");
-        editor.NativeEdit(1);
-        editor.Undo();
-        var undo = editor.UndoGroups.ToArray();
-        var redo = editor.RedoGroups.ToArray();
-        var document = authoring.DocumentText;
+        var edit = editing.Edit(confirmed.Identity.Target, placement, null, inventory.Pin(inventory.Entries.Single()));
+        Check(edit.Applied && board.X == 12 && mapEditor.CanUndo, "Placement uses the confirmed identity, a fresh inspection and shared history");
+        Check(mapEditor.Save() == null && !mapEditor.IsDirty, "Native Save persists this mod's placement");
+        mapEditor.NativeEdit(1);
+        mapEditor.Undo();
+        var undo = mapEditor.UndoGroups.ToArray();
+        var redo = mapEditor.RedoGroups.ToArray();
+        var document = editing.DocumentText;
         var saved = store.Patch;
-        var dirty = editor.IsDirty;
+        var dirty = mapEditor.IsDirty;
         var writes = store.PatchWrites;
         choices.Begin(SelectionKind.TrackSegment, "Replace track segment", source);
         choices.Pending.Offer(new[] { track });
         choices.Cancel();
         Check(ReferenceEquals(confirmed, choices.Confirmed) && choices.Pending == null &&
-            editor.UndoGroups.SequenceEqual(undo) && editor.RedoGroups.SequenceEqual(redo) &&
-            undo.Length > 0 && redo.Length > 0 && editor.IsDirty == dirty &&
-            authoring.DocumentText == document && store.Patch == saved && store.PatchWrites == writes && board.X == 12,
-            "Cancel preserves the earlier confirmation, authored and saved documents, pose, dirty state, and both history stacks");
-        editor.Undo();
+            mapEditor.UndoGroups.SequenceEqual(undo) && mapEditor.RedoGroups.SequenceEqual(redo) &&
+            undo.Length > 0 && redo.Length > 0 && mapEditor.IsDirty == dirty &&
+            editing.DocumentText == document && store.Patch == saved && store.PatchWrites == writes && board.X == 12,
+            "Cancel preserves the earlier confirmation, patch and saved documents, placement, dirty state, and both history stacks");
+        mapEditor.Undo();
         Check(board.X == 7, "The prior placement is still undoable after cancellation");
-        editor.Redo();
+        mapEditor.Redo();
         Check(board.X == 12, "The prior placement is still redoable after cancellation");
-        Console.WriteLine("PASS: confirmed scene target authoring and cancellation with shared history and saved placement");
+        Console.WriteLine("PASS: confirmed scene target scene patch editing and cancellation with shared history and saved placement");
     }
 
     static void UnresolvedSceneTargets(Scene scene, string json, Candidates candidates, SelectionCandidate candidate, Box original, Box replacement) {

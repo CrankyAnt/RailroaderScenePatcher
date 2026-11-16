@@ -12,16 +12,16 @@ using UnityEngine.InputSystem;
 namespace RailroaderScenePatcher {
     // Shows the native gizmo on the inspected object for as long as the Gizmo mode is open, without selecting or editing
     // native map DTOs. The gizmo is shown and waits; it owns input only during a drag. While it is merely shown the
-    // native editor keeps its own input, its own gizmos and its Escape, as it does beside any native gizmo: the native
+    // native map editor keeps its own input, its own gizmos and its Escape, as it does beside any native gizmo: the native
     // gizmo class already tells the game when the pointer is on a handle. Each completed drag is one operation; the
-    // owner then shows the gizmo again on the new pose with a new inspection.
+    // owner then shows the gizmo again on the new placement with a new inspection.
     [DefaultExecutionOrder(-10000)]
     public sealed class GizmoController : MonoBehaviour {
         const string HookId = "CrankyAnt.ScenePatcher.Gizmo";
         static GizmoController current;
         TransformGizmo visual;
         Behaviour controller, picker;
-        Authoring authoring;
+        MapEditorAttachment attachment;
         PatchEngine engine;
         TargetIdentity identity;
         InspectedTarget inspected;
@@ -40,7 +40,7 @@ namespace RailroaderScenePatcher {
         internal bool Closed => stopping;
         internal string State => Active ? "Dragging. Release to apply; Escape restores the prior placement." : holding ? "Reading the object again; the gizmo takes a drag in a moment." : "Drag a gizmo handle in the world.";
         // The object changed under the standing gizmo, as by a native Undo: the gizmo stays on the object, at its
-        // pose now, and takes no drag until Rebind gives it the new inspection.
+        // placement now, and takes no drag until Rebind gives it the new inspection.
         internal bool Holding => holding && Shown;
         internal void Hold() {
             if (!Shown || Active) return;
@@ -58,23 +58,23 @@ namespace RailroaderScenePatcher {
             visual.SetPose(MapToWorld(shown), Rotation(shown));
             holding = false;
         }
-        // The pose the gizmo stands at now, in map coordinates and as a rotation: the preview pose during a drag.
-        internal bool TryPose(out Vector3 map, out Quaternion rotation) {
+        // The placement the gizmo stands at now, in map coordinates and as a rotation: the preview placement during a drag.
+        internal bool TryPlacement(out Vector3 map, out Quaternion rotation) {
             map = default; rotation = Quaternion.identity;
-            var pose = live ?? shown;
-            if (pose?.Position == null || pose.Rotation == null) return false;
-            map = new Vector3((float)pose.Position[0], (float)pose.Position[1], (float)pose.Position[2]);
-            rotation = Rotation(pose);
+            var placement = live ?? shown;
+            if (placement?.Position == null || placement.Rotation == null) return false;
+            map = new Vector3((float)placement.Position[0], (float)placement.Position[1], (float)placement.Position[2]);
+            rotation = Rotation(placement);
             return true;
         }
         Placement shown, live;
 
-        internal void Initialize(PatchEngine engine, IScene scene, Authoring authoring, TargetIdentity identity, InspectedTarget inspected, TransformGizmoMode mode, Action<Outcome, string> finished) {
-            this.engine = engine; this.scene = scene; this.authoring = authoring; this.identity = identity; this.inspected = inspected; this.finished = finished;
+        internal void Initialize(PatchEngine engine, IScene scene, MapEditorAttachment attachment, TargetIdentity identity, InspectedTarget inspected, TransformGizmoMode mode, Action<Outcome, string> finished) {
+            this.engine = engine; this.scene = scene; this.attachment = attachment; this.identity = identity; this.inspected = inspected; this.finished = finished;
             try {
                 if (current != null) throw new InvalidOperationException("Another scene-patch gizmo is shown");
                 controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as Behaviour;
-                if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), authoring.Editor)) throw new InvalidOperationException("The map editor changed");
+                if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new InvalidOperationException("The native map editor changed");
                 var matches = scene.Resolve(identity);
                 if (matches.Count != 1) throw new InvalidOperationException("Target must resolve uniquely");
                 inspected.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
@@ -84,14 +84,14 @@ namespace RailroaderScenePatcher {
                 hooks = new Harmony(HookId);
                 // These hooks act only while a drag is in progress: Escape, Save, Undo and Redo then cancel the drag.
                 Patch(controller.GetType(), "HandleEscapeCancel", nameof(BeforeEscape));
-                Patch(authoring.Editor.GetType(), "Save", nameof(BeforeSaveOrHistory));
-                Patch(authoring.Manager.GetType(), "Undo", nameof(BeforeSaveOrHistory));
-                Patch(authoring.Manager.GetType(), "Redo", nameof(BeforeSaveOrHistory));
+                Patch(attachment.MapEditor.GetType(), "Save", nameof(BeforeSaveOrHistory));
+                Patch(attachment.Manager.GetType(), "Undo", nameof(BeforeSaveOrHistory));
+                Patch(attachment.Manager.GetType(), "Redo", nameof(BeforeSaveOrHistory));
                 current = this;
                 // World click targets, such as a station's click spot, do not react while the gizmo is shown: a click
                 // on a handle that lies over one would open its window. The game's picker is the one that finds
                 // them; while the gizmo stands it finds none, so no target is clicked and none shows its hover
-                // tooltip. The picker itself keeps running, so the native editor works as usual: a right-click on a
+                // tooltip. The picker itself keeps running, so the native map editor works as usual: a right-click on a
                 // track still opens the native track menu, which the picker shows when it finds no target.
                 try {
                     picker = Native.Read(Native.Type("ObjectPicker"), "Shared") as Behaviour;
@@ -103,7 +103,7 @@ namespace RailroaderScenePatcher {
                 } catch { picker = null; }
                 visual = gameObject.AddComponent<TransformGizmo>();
                 visual.Camera = Camera.main;
-                if (visual.Camera == null) throw new InvalidOperationException("The editor camera is unavailable");
+                if (visual.Camera == null) throw new InvalidOperationException("The native map editor camera is unavailable");
                 visual.Space = TransformGizmoSpace.World; visual.Mode = mode; visual.Visible = true;
                 visual.SetPose(position, Rotation(shown));
                 activated = Time.unscaledTime;
@@ -113,9 +113,9 @@ namespace RailroaderScenePatcher {
             } catch { Stop(false); throw; }
         }
         // A drag starts only when no native operation holds the pointer or an edit session: the gizmo does not take
-        // input from the native editor, it waits for it.
+        // input from the native map editor, it waits for it.
         bool CanDrag() {
-            if (!Shown || holding || Time.unscaledTime - activated < 0.2f || authoring.Session.Blocked != null) return false;
+            if (!Shown || holding || Time.unscaledTime - activated < 0.2f || attachment.Session.Blocked != null) return false;
             try {
                 foreach (var name in new[] { "_spanEndpointTool", "_builtinPlacementTool", "_terrainPaintTool", "_terrainTileTool" }) {
                     var tool = Native.Read(controller, name);
@@ -142,25 +142,25 @@ namespace RailroaderScenePatcher {
         static void BeforeSaveOrHistory(object __instance) {
             var owner = current;
             if (owner == null || !owner.Active) return;
-            if (ReferenceEquals(owner.authoring.Editor, __instance) || ReferenceEquals(owner.authoring.Manager, __instance)) owner.Cancel();
+            if (ReferenceEquals(owner.attachment.MapEditor, __instance) || ReferenceEquals(owner.attachment.Manager, __instance)) owner.Cancel();
         }
         void Begin() {
-            try { gesture = new PlacementGesture(engine, authoring.Session, identity, inspected); live = gesture.Initial; }
+            try { gesture = new PlacementGesture(engine, attachment.Session, identity, inspected); live = gesture.Initial; }
             catch (Exception e) { Fail(e.Message); }
         }
         void Preview(TransformGizmoDelta delta) {
             if (!Active) return;
             try {
                 var start = gesture.Initial;
-                Placement pose;
-                if (delta.Kind == GizmoTransformKind.Move) pose = new Placement(new[] {
+                Placement placement;
+                if (delta.Kind == GizmoTransformKind.Move) placement = new Placement(new[] {
                     start.Position[0] + delta.TotalTranslation.x, start.Position[1] + delta.TotalTranslation.y, start.Position[2] + delta.TotalTranslation.z }, start.Rotation);
                 else if (delta.Kind == GizmoTransformKind.Rotate) {
                     var q = delta.TotalRotation * Rotation(start);
-                    pose = new Placement(start.Position, new double[] { q.x, q.y, q.z, q.w });
+                    placement = new Placement(start.Position, new double[] { q.x, q.y, q.z, q.w });
                 } else throw new InvalidOperationException("Scene-patch gizmos support movement and rotation only");
-                var result = gesture.Preview(pose);
-                if (!result.Applied) Fail(result.Error); else live = pose;
+                var result = gesture.Preview(placement);
+                if (!result.Applied) Fail(result.Error); else live = placement;
             } catch (Exception e) { Fail(e.Message); }
         }
         void Complete() {
@@ -198,8 +198,8 @@ namespace RailroaderScenePatcher {
             hooks = null;
             try {
                 if (cleanup.Count != 0) {
-                    var message = "Gizmo cleanup is unverified; reload the editor: " + String.Join("; ", cleanup);
-                    authoring.Fault = message;
+                    var message = "Gizmo cleanup is unverified; reload the native map editor: " + String.Join("; ", cleanup);
+                    attachment.Fault = message;
                     if (notify) finished?.Invoke(result, message);
                 } else if (notify) finished?.Invoke(result, result?.Error == null ? "Gizmo drag cancelled; the prior placement is restored." : "Gizmo cancellation failed: " + result.Error);
             } finally { if (gameObject != null) Destroy(gameObject); }
@@ -234,16 +234,16 @@ namespace RailroaderScenePatcher {
         void Update() {
             if (Shown && picker != null && !pickerHooked) ClearPickTooltip();
             if (!Shown) return;
-            if (controller == null || !controller.isActiveAndEnabled || !ReferenceEquals(Native.Read(controller, "MapEditor"), authoring.Editor) || Camera.main == null || Mouse.current == null) { Close(); return; }
+            if (controller == null || !controller.isActiveAndEnabled || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor) || Camera.main == null || Mouse.current == null) { Close(); return; }
             if (Active && Keyboard.current?.escapeKey.wasPressedThisFrame == true) Cancel();
         }
         void OnApplicationFocus(bool focused) { if (!focused && Active) Cancel(); }
         void OnDisable() { if (!stopping) Close(); }
         void OnDestroy() { if (!stopping) Stop(Active); }
-        static Quaternion Rotation(Placement pose) => new Quaternion((float)pose.Rotation[0], (float)pose.Rotation[1], (float)pose.Rotation[2], (float)pose.Rotation[3]);
-        static Vector3 MapToWorld(Placement pose) {
+        static Quaternion Rotation(Placement placement) => new Quaternion((float)placement.Rotation[0], (float)placement.Rotation[1], (float)placement.Rotation[2], (float)placement.Rotation[3]);
+        static Vector3 MapToWorld(Placement placement) {
             if (Native.Read(Native.Type("Helpers.WorldTransformer"), "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");
-            var map = new Vector3((float)pose.Position[0], (float)pose.Position[1], (float)pose.Position[2]);
+            var map = new Vector3((float)placement.Position[0], (float)placement.Position[1], (float)placement.Position[2]);
             var world = NativeInventory.MarkPosition(map);
             if ((NativeInventory.MapPosition(world, true) - map).sqrMagnitude > .0001f) throw new InvalidOperationException("Map/origin conversion did not round trip");
             return world;

@@ -101,7 +101,7 @@ static class InspectionTests {
         ChangesReadOneLinePerSetting();
         SubgroupsFollowTheGame();
         RuntimeStateDoesNotMarkStale();
-        RuntimeReferencesAreNotAuthoredState();
+        RuntimeReferencesAreNotAuthoredSceneState();
         AnEditScansTheSceneTwice();
         AnEditAfterASteppedPassBlocksForOneScan();
         OriginRoundingDoesNotMarkStale();
@@ -564,7 +564,7 @@ static class InspectionTests {
         Check(inventory.IsStale, "The object's own activity still marks the snapshot stale");
     }
 
-    // A reference held in a field Unity serializes is authored state. A reference in any other field, such as a
+    // A reference held in a field Unity serializes is authored scene state. A reference in any other field, such as a
     // culling or audio manager's working list, comes and goes while the game runs: inspecting or focusing an object
     // changes it. Only authored references belong to what an inspection pins.
     sealed class Holder {
@@ -576,7 +576,7 @@ static class InspectionTests {
         public static object Shared = null;
         internal object Use() => alsoAuthored ?? working;
     }
-    static void RuntimeReferencesAreNotAuthoredState() {
+    static void RuntimeReferencesAreNotAuthoredSceneState() {
         bool Authored(string name) => ReferenceScan.IsSerialized(typeof(Holder).GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic));
         Check(Authored("Authored") && Authored("alsoAuthored"), "Public fields and fields marked for serialization hold authored references");
         Check(!Authored("working") && !Authored("Excluded") && !Authored("Fixed") && !Authored("Shared"), "Private, non-serialized, read-only and static fields hold runtime references");
@@ -1100,7 +1100,7 @@ static class InspectionTests {
     }
     static void ChangesReadOneLinePerSetting() {
         var before = new ObjectState(new Placement(new[] { 10.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }), true, MarkerBinding.At(new TrackLocation("S377", "a", 7.5116)));
-        string Lines(ObjectState state, ObjectState was) => String.Join(" | ", AuthoringSession.ChangeLines(state, was));
+        string Lines(ObjectState state, ObjectState was) => String.Join(" | ", PatchEditingSession.ChangeLines(state, was));
         Check(Lines(new ObjectState(new Placement(new[] { 12.5, 2, 3 }, new[] { 0.0, 0, 0, 1 }), null), before) == "Position: from 10, 2, 3 to 12.5, 2, 3", "A moved object reads its position from and to: " + Lines(new ObjectState(new Placement(new[] { 12.5, 2, 3 }, new[] { 0.0, 0, 0, 1 }), null), before));
         Check(Lines(new ObjectState(new Placement(new[] { 10.0, 2, 3 }, new[] { 0.0, 0.7071, 0, 0.7071 }), null), before) == "Rotation: changed", "A turned object names its rotation alone: its position did not change");
         Check(Lines(new ObjectState(null, false), before) == "Enabled: from Yes to No", "A disabled object reads its activity from and to");
@@ -1108,7 +1108,7 @@ static class InspectionTests {
         Check(Lines(new ObjectState(null, null, MarkerBinding.Detached), before) == "Track binding: from S377 / a / 7.512 to detached", "A detached marker says so");
         Check(Lines(new ObjectState(null, true, MarkerBinding.At(new TrackLocation("Srrh", "b", 3))), before) == "Enabled: from Yes to Yes | Track binding: from S377 / a / 7.512 to Srrh / b / 3", "Every changed setting has its own line");
         var following = new Placement(new[] { 1.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }) { };
-        Check(Lines(new ObjectState(null, null), before) == "" && AuthoringSession.ChangeLines(null, before).Count == 0, "No setting gives no line");
+        Check(Lines(new ObjectState(null, null), before) == "" && PatchEditingSession.ChangeLines(null, before).Count == 0, "No setting gives no line");
         // A target refusal names what differed.
         var sign = new object();
         SceneObservation Marker(double x, bool active, object handle = null) => new SceneObservation(handle ?? sign, new TargetIdentity("scene", "World/Sign", "Marker"), "Track marker", active,
@@ -1134,7 +1134,7 @@ static class InspectionTests {
         Check(Fit(new float[0], 1000) == 140, "No rows keep the minimum");
     }
 
-    // A result describes the present. It goes when a new action reports, when the view changes, and when the editor's
+    // A result describes the present. It goes when a new action reports, when the view changes, and when the native map editor's
     // history moves: after a native Undo, "Enable completed" would be untrue.
     static void RepeatedMessagesCollapse() {
         var log = new List<string>();

@@ -33,7 +33,7 @@ static class DiagnosticTests {
         Check(failure.Cause == FailureCause.Unknown && failure.ReportTo == "patcher maintainer", "An injected native mutation fault must not blame the supplying mod");
         Check(failure.Message.Contains("Example Mod") && failure.Message.Contains("example/mod") && failure.Message.Contains("2.1") && failure.Message.Contains("0.5.0") && failure.Message.Contains("game-build"), "Reports must include supplying identity and relevant versions");
         Check(failure.Message.Contains("Example author") && failure.Message.Contains("https://example.com/mod"), "Reports retain supplied metadata");
-        InvalidDefinitionsAndEditorRecovery();
+        InvalidDefinitionsAndEditingRecovery();
         EarlyCheckUsesCompleteDocumentProtection();
         ExactFallbackRequiresVerifiedRepair();
         DocumentAndOperationDiagnosticsAreDistinct();
@@ -86,24 +86,24 @@ static class DiagnosticTests {
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
         Check(engine.BeforeNativeCheck(json, "fixture", target).Outcomes["repair"].Applied, "The complete document repairs the native marker before its native check");
         Check(engine.Apply(json, "fixture").Outcomes["repair"].Applied, "The later world-load callback retains the same original underlying reference");
-        var editor = new Editor(); var session = new AuthoringSession(engine, editor, new Store { Patch = json }, "map"); editor.Session = session;
+        var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }, "map"); mapEditor.Session = session;
         var removed = session.Remove(target);
         Check(removed.Applied, "Remove must restore the original serialized missing reference instead of refusing it: " + removed.Error);
         Check(world.Native._location.segmentId == "Shuo" && Math.Abs(world.Native._location.distance - 58.69453) < 0.001 && world.Registrations(marker).Count == 0, "Removal restores the original native reference with no graph registration");
         Check(world.Messages.Rows.Count == 2 && world.Messages.Rows.Any(r => r.Key == "M5pp") && world.Native.Invalidations == 2, "Verified removal invalidates the native cache and restores its broken-binding warning alongside the control");
-        editor.Undo();
+        mapEditor.Undo();
         Check(world.Native._location.segmentId == "replacement" && world.Registrations(marker).Count == 1, "Undo removal restores the repaired native binding and its registration");
         Check(world.Messages.Rows.Count == 1 && ReferenceEquals(world.Messages.Rows[0], control), "Undo removes only the warning emitted for the restored broken binding after repair verifies");
-        editor.Redo();
+        mapEditor.Redo();
         Check(world.Native._location.segmentId == "Shuo" && world.Registrations(marker).Count == 0, "Redo removal restores the original broken native binding");
         Check(world.Messages.Rows.Count == 2, "Redo removal restores its native warning");
         var row = world.Messages.Rows.Single(r => r.Key == "M5pp");
         world.Messages.Rows.Remove(row); world.Messages.Rows.Add(new CurrentWarning(row.Token, row.Source, row.Key, row.Originator, "Updated by another native check"));
-        editor.Undo();
+        mapEditor.Undo();
         Check(world.Messages.Rows.Count == 2 && world.Messages.Rows.Any(r => ReferenceEquals(r, control)), "History reconciliation preserves a row changed after attribution and the unrelated control");
         var invalidations = world.Native.Invalidations;
         var invalid = new PatchEngine(new TrackMarkerScene(world, Capability.Checked)).Apply(json.Replace("\"segment\":\"replacement\"", "\"segment\":\"Shuo\""));
-        Check(!invalid.Outcomes["repair"].Applied && world.Native.Invalidations == invalidations, "Supporting captured broken references never permits a newly authored missing replacement through preflight");
+        Check(!invalid.Outcomes["repair"].Applied && world.Native.Invalidations == invalidations, "Supporting captured broken references never permits a newly defined missing replacement through preflight");
     }
     static void GroupActivityRefusalKeepsAccurateDiagnostics() {
         var world = new FakeMarkerWorld(); var marker = new FakeMarker { Id = "sign", Segment = "S9sc", Distance = 20 };
@@ -184,7 +184,7 @@ static class DiagnosticTests {
         runtime.Apply("{broken", source);
         Check(!runtime.Reconcile(source, "move", attribution, warnings, () => true), "A later rejected complete document must invalidate its previous repair permission");
     }
-    static void InvalidDefinitionsAndEditorRecovery() {
+    static void InvalidDefinitionsAndEditingRecovery() {
         var scene = new Scene();
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
@@ -197,7 +197,7 @@ static class DiagnosticTests {
         runtime.Apply("{broken", source);
         runtime.Apply(Document.Replace("\"formatVersion\":1", "\"formatVersion\":2"), source);
         runtime.Apply(Document.Replace("\"mapId\":\"map\"", "\"mapId\":\"other\""), source);
-        Check(messages.Rows.Count == 1 && scene.MutationCalls == 0, "Unknown content, unreadable formats and inapplicable maps remain editor-only and never mutate");
+        Check(messages.Rows.Count == 1 && scene.MutationCalls == 0, "Unknown content, unreadable formats and inapplicable maps are reported only in the native map editor and never mutate");
     }
     static void EarlyCheckUsesCompleteDocumentProtection() {
         var world = new FakeMarkerWorld();
@@ -217,8 +217,8 @@ static class DiagnosticTests {
         Check(messages.Rows.Count == 0, "A successful early repair must not create a patch failure diagnostic");
         runtime.Apply(json, source);
         Check(world.Registrations(marker).Count == 1, "The later world-load callback must converge without duplicate graph registrations");
-        var editor = new Editor(); var session = new AuthoringSession(engine, editor, new Store { Patch = json }, "map"); editor.Session = session;
-        Check(session.Remove(target).Applied && marker.Segment == "missing" && world.Registrations(marker).Count == 0, "Editor removal after early repair restores the original underlying binding and registration");
+        var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }, "map"); mapEditor.Session = session;
+        Check(session.Remove(target).Applied && marker.Segment == "missing" && world.Registrations(marker).Count == 0, "scene patch editing removal after early repair restores the original underlying binding and registration");
         var unresolved = new FakeMarker { Id = "unpatched", Segment = "missing" };
         world.Objects["unpatched"] = new List<object> { unresolved };
         var skipped = runtime.BeforeNativeCheck(json, source, new TargetIdentity("scene", "unpatched", "Track.TrackMarker", "track-marker-v1"));

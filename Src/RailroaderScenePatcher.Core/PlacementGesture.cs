@@ -8,7 +8,7 @@ namespace RailroaderScenePatcher.Core {
     // A temporary checked preview. Only Complete changes the canonical document and native history.
     public sealed class PlacementGesture {
         readonly PatchEngine engine;
-        readonly AuthoringSession session;
+        readonly PatchEditingSession session;
         readonly IScene scene;
         readonly TargetIdentity identity;
         readonly object target;
@@ -22,7 +22,7 @@ namespace RailroaderScenePatcher.Core {
         public bool Active => active;
         public Placement Initial => Copy(before.Placement);
         public Placement Current => Copy(desired ?? before.Placement);
-        public PlacementGesture(PatchEngine engine, AuthoringSession session, TargetIdentity identity, InspectedTarget inspected) {
+        public PlacementGesture(PatchEngine engine, PatchEditingSession session, TargetIdentity identity, InspectedTarget inspected) {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
             this.session = session ?? throw new ArgumentNullException(nameof(session));
             this.identity = identity ?? throw new ArgumentNullException(nameof(identity));
@@ -37,7 +37,7 @@ namespace RailroaderScenePatcher.Core {
                 try { return ReferenceEquals(engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)), target); }
                 catch (InvalidOperationException) { return false; }
             }).ToArray();
-            if (own.Length > 1) throw new InvalidOperationException("Several modifications target this object; combine them outside the editor first");
+            if (own.Length > 1) throw new InvalidOperationException("Several modifications target this object; combine them outside scene patch editing first");
             foreach (var item in own) PatchEngine.Parse(item);
             before = scene.Read(target); snapshot = scene.Capture(target);
             engine.Underlying(target);
@@ -47,14 +47,14 @@ namespace RailroaderScenePatcher.Core {
             var result = new Outcome { ResolvedTarget = target };
             try {
                 if (!active) throw new InvalidOperationException("The gizmo gesture has ended");
-                var pose = Copy(PatchEngine.CheckPlacement(placement?.Position, placement?.Rotation));
+                var checkedPlacement = Copy(PatchEngine.CheckPlacement(placement?.Position, placement?.Rotation));
                 engine.GuardMutation(identity, target, maps, expected);
                 mutated = true; writingPreview = true;
-                // The preview sets the pose alone: activity stays as it is, including an explicit disable.
-                scene.Apply(target, new ObjectState(pose, null).LeavingActivity());
-                if (!SamePose(scene.Read(target).Placement, pose)) throw new InvalidOperationException("Gizmo preview did not verify");
+                // The preview sets the placement alone: activity stays as it is, including an explicit disable.
+                scene.Apply(target, new ObjectState(checkedPlacement, null).LeavingActivity());
+                if (!SamePlacement(scene.Read(target).Placement, checkedPlacement)) throw new InvalidOperationException("Gizmo preview did not verify");
                 expected = Observed();
-                writingPreview = false; desired = pose; result.Applied = true;
+                writingPreview = false; desired = checkedPlacement; result.Applied = true;
             } catch (Exception e) {
                 var restored = Cancel();
                 result.Error = e.Message + (restored.Error == null ? "" : "; " + restored.Error);
@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher.Core {
                 Restore(); active = false;
                 if (desired == null || Unchanged(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, Unchanged = true, ResolvedTarget = target }; }
                 // The guard above checked the target against what the previews made of it, and the restoration verified
-                // the captured pose within the read-back tolerance. A native transform can read that pose back a unit
+                // the captured placement within the read-back tolerance. A native transform can read that placement back a unit
                 // in the last place off, which the inspection compares exactly, so the edit binds to the target as
                 // restored rather than to the inspection from before the gesture.
                 var result = session.Edit(identity, desired, null, restored ? Observed() : original);
@@ -107,14 +107,14 @@ namespace RailroaderScenePatcher.Core {
             engine.GuardMutation(identity, target, maps, writingPreview ? null : expected);
             if (!scene.Restore(target, snapshot)) throw new InvalidOperationException("Captured dependent state did not restore");
             var state = scene.Read(target);
-            if (state.Active != before.Active || !SamePose(state.Placement, before.Placement)) throw new InvalidOperationException("Restored state did not verify");
+            if (state.Active != before.Active || !SamePlacement(state.Placement, before.Placement)) throw new InvalidOperationException("Restored state did not verify");
             mutated = false;
         }
-        static Placement Copy(Placement pose) => new Placement((double[])pose.Position.Clone(), (double[])pose.Rotation.Clone());
-        // Whether a read-back pose is the pose that was written or restored. A native transform can return a rotation
+        static Placement Copy(Placement placement) => new Placement((double[])placement.Position.Clone(), (double[])placement.Rotation.Clone());
+        // Whether a read-back placement is the placement that was written or restored. A native transform can return a rotation
         // slightly off the one it was given, so this check allows about half a degree; a tighter one would report a
         // sound restoration as unverified and guard the object.
-        static bool SamePose(Placement a, Placement b) => a != null && b != null && SamePosition(a, b) && Alignment(a, b) > 0.99999;
+        static bool SamePlacement(Placement a, Placement b) => a != null && b != null && SamePosition(a, b) && Alignment(a, b) > 0.99999;
         // Whether the gesture ended where it began, so that it records nothing. The angle is the smallest one the scene
         // adapters verify: any rotation they can tell from the starting one is a change, however small.
         const double ChangedAngleDegrees = 0.01;

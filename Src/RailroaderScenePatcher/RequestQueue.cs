@@ -4,7 +4,7 @@ using System;
 
 namespace RailroaderScenePatcher {
     // The one edit or preview that waits until the panel knows its snapshot agrees with the scene. A request belongs to
-    // the open panel and the editor it was made in: closing the panel, leaving the editor or ending the load attempt
+    // the open panel and the native map editor it was made in: closing the panel, leaving the native map editor or ending the load attempt
     // cancels it, as Cancel applies to every pending interaction. A cancelled request never runs and leaves a refusal
     // in its place, so nothing changes later without the modder seeing why. UI-independent, shared with controlled
     // replay.
@@ -34,7 +34,7 @@ namespace RailroaderScenePatcher {
             return Cancel(reason);
         }
         // Clears the inspection, by Escape or a click on the inspected row. A pending world choice ends through the
-        // same path as its Cancel, so the world's clicks go back to the native editor; then what was prepared for the
+        // same path as its Cancel, so the world's clicks go back to the native map editor; then what was prepared for the
         // object is restored; last the results go and a waiting request is refused, so that its refusal stays.
         internal bool ReleaseInspection(bool choicePending, Action cancelChoice, Action restore, string reason) {
             if (choicePending) cancelChoice?.Invoke();

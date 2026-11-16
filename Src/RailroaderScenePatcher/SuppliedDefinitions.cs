@@ -7,7 +7,7 @@ using RailroaderScenePatcher.Core;
 namespace RailroaderScenePatcher {
     // Whether the supplied definitions, the patch documents of the loaded mods, are still the ones the last refresh
     // read. Stale says that something other than this panel changed them: a document edited, added or removed outside
-    // the editor. The patcher's own Save is not such a change: what it wrote is what the editor already holds, so the
+    // scene patch editing. The patcher's own Save is not such a change: what it wrote is what scene patch editing already holds, so the
     // written text becomes the text to compare against. UI-independent, shared with controlled replay.
     internal sealed class SuppliedDefinitions {
         // Per mod, the document text and the read error of the last refresh, with the patcher's own writes since.

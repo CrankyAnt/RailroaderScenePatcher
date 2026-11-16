@@ -59,7 +59,7 @@ static class MultipleModTests {
         Check(again.StartsWith("Scene Patcher 0.6.0: load attempt 3, map " + maps[0] + " (layers none): Declared [a/declared] document for " + maps[0] + ": ", StringComparison.Ordinal), "A later attempt is logged with its number, and a map without layers says so: " + again);
         var editTarget = LoadedMod.Read("e/edited", Info("Edited"), Doc(Move("m", "undeclared", 7)), editTarget: true);
         runtime.ApplyLoaded(new[] { editTarget }, null);
-        Check(undeclared.X == 7, "The editor's active document applies before Save has declared the dependency");
+        Check(undeclared.X == 7, "The native map editor's active document applies before Save has declared the dependency");
         var unreadable = LoadedMod.Read("f/broken", "{broken", Doc(Move("m", "declared", 9)));
         Check(unreadable.Error != null && !unreadable.Applicable, "Unreadable supplying metadata protects the mod as a whole");
     }
@@ -98,7 +98,7 @@ static class MultipleModTests {
         var documents = runtime.ApplyLoaded(new[] { baseMod, extension, unrelated }, notices);
         Check(notices.Rows.Count == 1, "Exactly one notice: same-mod repeats, ambiguous targets and different objects establish no overlap");
         var notice = notices.Rows.Single();
-        Check(notice.Target.Path == "sign" && notice.Target.Scene == "s" && notice.Target.Component == "c", "The notice identifies the resolved existing object");
+        Check(notice.Target.Path == "sign" && notice.Target.Scene == "s" && notice.Target.Component == "c", "The notice identifies the resolved existing target");
         Check(notice.Mods.Select(p => p.Identifier).SequenceEqual(new[] { "a/base", "b/extension" }), "The notice names the supplying mods in load order");
         Check(notice.Message.Contains("Layer Base [a/base]") && notice.Message.Contains("Extension [b/extension]") && notice.Message.Contains("s/sign [c]"), "The message names each mod with its identifier and the object");
         Check(notice.Message.Contains("Extension [b/extension] declares a dependency on Layer Base [a/base]"), "A declared dependency between the involved mods is attributed, not used as an exemption");

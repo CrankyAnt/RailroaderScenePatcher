@@ -34,10 +34,10 @@ namespace RailroaderScenePatcher.Core {
 
     // One explicit physical edit, stored through the same fixed-placement and history route as numeric edits.
     public sealed class SnapController {
-        readonly AuthoringSession session;
+        readonly PatchEditingSession session;
         readonly IScene scene;
         readonly ISnapScene tracks;
-        public SnapController(AuthoringSession session, IScene scene, ISnapScene tracks) {
+        public SnapController(PatchEditingSession session, IScene scene, ISnapScene tracks) {
             this.session = session ?? throw new ArgumentNullException(nameof(session));
             this.scene = scene ?? throw new ArgumentNullException(nameof(scene));
             this.tracks = tracks ?? throw new ArgumentNullException(nameof(tracks));
@@ -66,7 +66,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public Outcome Apply(SnapRequest request) {
             try {
-                if (request == null || !ReferenceEquals(request.Owner, this)) throw new InvalidOperationException("Prepare a snap for this editor session first");
+                if (request == null || !ReferenceEquals(request.Owner, this)) throw new InvalidOperationException("Prepare a snap for this scene patch editing session first");
                 Validate(request);
                 return session.Edit(request.Target, request.Desired, null, request.Inspected, () => Validate(request));
             } catch (Exception e) { return new Outcome { Error = e.Message }; }

@@ -17,7 +17,7 @@ namespace RailroaderScenePatcher {
         internal string Type { get; }
     }
     // The structural part of the Generic-marker pattern, before the consumer checks. UI-independent, shared with
-    // controlled replay; the fixed-pose and track-following checks use the same rule as the binding check.
+    // controlled replay; the fixed-placement and track-following checks use the same rule as the binding check.
     // A Generic marker inside a grade-crossing setup, such as a whistle sign, qualifies: the crossing controller reads
     // its circuits and spans, and the auto engineer's crossing horn reads the Crossing-type pad marker, not this one.
     // The pad and the crossing's Crossing-type markers stay outside this pattern.

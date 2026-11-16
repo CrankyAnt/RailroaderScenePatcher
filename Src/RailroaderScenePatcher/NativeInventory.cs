@@ -17,7 +17,7 @@ namespace RailroaderScenePatcher {
         static Func<Component, string, SceneObservation> observer;
         // The marker reference scan of the last discovery whose walk over the fields completed, or null.
         internal static ReferenceScan LastReferrers { get; private set; }
-        // The object itself is read now: its components, pose, activity, bindings and problems. Without a discovery so
+        // The object itself is read now: its components, placement, activity, bindings and problems. Without a discovery so
         // far, or when the object or its component is gone, there is no observation.
         public SceneObservation Observe(object handle, TargetIdentity identity) {
             var target = handle as GameObject;
@@ -120,7 +120,7 @@ namespace RailroaderScenePatcher {
             var type = TypeName(c); var go = c.gameObject;
             if (type == Milepost) return "Milepost";
             if (type == Marker) {
-                // Kinds the inventory does not list: signals, map objects whose track anchor the native editor owns, and
+                // Kinds the inventory does not list: signals, map objects whose track anchor the native map editor owns, and
                 // the builder photo marker.
                 if (!BindingRules.Listed(MarkerKind(c), Get(go, MapObject) != null, PhotoMarkers().Contains(c))) return null;
                 return Get(go, Milepost) != null ? null : Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker";

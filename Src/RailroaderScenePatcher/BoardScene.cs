@@ -122,7 +122,7 @@ namespace RailroaderScenePatcher {
         public double[] Position(object board) { var p = ConvertPosition("WorldToGame", Board(board).transform.position); return new double[] { p.x, p.y, p.z }; }
         public double[] Rotation(object board) { var r = Board(board).transform.rotation; return new double[] { r.x, r.y, r.z, r.w }; }
         public bool Active(object board) => Board(board).activeSelf;
-        public void SetPose(object target, double[] position, double[] rotation) {
+        public void SetPlacement(object target, double[] position, double[] rotation) {
             var board = Board(target);
             var game = new Vector3(CheckedFloat(position[0]), CheckedFloat(position[1]), CheckedFloat(position[2]));
             var local = ConvertPosition("GameToWorld", game);

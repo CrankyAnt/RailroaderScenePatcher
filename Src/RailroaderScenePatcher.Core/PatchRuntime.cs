@@ -72,7 +72,7 @@ namespace RailroaderScenePatcher.Core {
             this.patcherVersion = patcherVersion; this.gameVersion = gameVersion;
         }
         // Applies the documents of loaded mods in the given native load order. Only a mod that declares the patcher
-        // dependency, or the editor's edit target, reaches the engine, which checks whether its target map is in the map context.
+        // dependency, or the native map editor's edit target, reaches the engine, which checks whether its target map is in the map context.
         public IReadOnlyList<LoadedDocument> ApplyLoaded(IEnumerable<LoadedMod> loadOrder, IOverlapNotices notices) {
             if (loadOrder == null) throw new ArgumentNullException(nameof(loadOrder));
             var documents = new List<LoadedDocument>();
@@ -139,9 +139,9 @@ namespace RailroaderScenePatcher.Core {
             foreach (var item in result.Outcomes) latest[Key(source, item.Key)] = item.Value;
             Exception fault = null;
             void Deliver(Action report) { try { report(); } catch (Exception e) { fault = fault ?? e; } }
-            if (result.Error != null && !result.EditorOnly) Deliver(() => Report(source, "document", null, result.Error, FailureCause.Unknown, true));
+            if (result.Error != null && !result.MapEditorOnly) Deliver(() => Report(source, "document", null, result.Error, FailureCause.Unknown, true));
             foreach (var item in result.Outcomes)
-                if (!item.Value.Applied && !item.Value.EditorOnly) Deliver(() => Report(source, item.Key, item.Value.Target, item.Value.Error, item.Value.Cause));
+                if (!item.Value.Applied && !item.Value.MapEditorOnly) Deliver(() => Report(source, item.Key, item.Value.Target, item.Value.Error, item.Value.Cause));
             if (fault != null) throw fault;
         }
         // Removes only the unchanged row attributed at the native check, after a separate observation of repaired state.

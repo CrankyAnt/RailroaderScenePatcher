@@ -68,11 +68,11 @@ static class CommandBandTests {
             new object[] { false, false, true, true, false, false, CommandBand.EscapeStep.Clear, "over the panel with an inspected object: the inspection is cleared" },
             new object[] { false, false, true, false, true, false, CommandBand.EscapeStep.Clear, "over the panel with a pending choice: cleared as Clear does" },
             new object[] { false, false, true, false, false, false, CommandBand.EscapeStep.None, "over the panel with nothing to clear: the pause menu" },
-            new object[] { false, false, false, true, true, false, CommandBand.EscapeStep.CancelChoice, "over the world with a pending choice: the choice is cancelled, as the native editor disarms a tool" },
+            new object[] { false, false, false, true, true, false, CommandBand.EscapeStep.CancelChoice, "over the world with a pending choice: the choice is cancelled, as the native map editor disarms a tool" },
             new object[] { false, false, false, true, false, true, CommandBand.EscapeStep.CancelDrag, "during a gizmo drag: the placement is restored" },
             new object[] { false, true, false, true, true, false, CommandBand.EscapeStep.CloseList, "the list beside the click is open, pointer over the world: only the list closes" },
             new object[] { false, true, true, true, true, false, CommandBand.EscapeStep.CloseList, "the list is open, pointer over the panel: the list closes first, the inspection stays" },
-            new object[] { true, true, true, true, true, true, CommandBand.EscapeStep.None, "a field has the focus: Escape is left alone, as in the native editor" } })
+            new object[] { true, true, true, true, true, true, CommandBand.EscapeStep.None, "a field has the focus: Escape is left alone, as in the native map editor" } })
             Check(CommandBand.Escape((bool)row[0], (bool)row[1], (bool)row[2], (bool)row[3], (bool)row[4], (bool)row[5]) == (CommandBand.EscapeStep)row[6], "Escape " + row[7]);
         // A field that had the focus when Escape went down has given it up by the time the panel is asked: the
         // focus counts for the frame it was last seen in and the two after it.
@@ -113,7 +113,7 @@ static class CommandBandTests {
         Check(added.Text == "+ ADDED" && added.Color == "#7FB86B" && added.Markup == "<color=#7FB86B><b><size=90%>+ ADDED</size></b></color>", "The added badge is + ADDED, green, bold, at 90 percent: " + added.Markup);
         Check(CommandBand.Badges(true, true).Select(b => b.Text).SequenceEqual(new[] { "* CHANGED", "+ ADDED" }), "Both badges keep their order");
     }
-    // The supplied definitions are stale when a patch document changed outside the editor, not when the patcher saved
+    // The supplied definitions are stale when a patch document changed outside scene patch editing, not when the patcher saved
     // it itself, and a refresh makes them current again. The lamp follows: Current, Stale, Current.
     static void OwnSaveKeepsTheDefinitionsCurrent() {
         RailroaderScenePatcher.Core.LoadedMod Loaded(string id, string json, string error = null) =>
@@ -130,9 +130,9 @@ static class CommandBandTests {
         Check(!definitions.Stale, "The patcher's own Save keeps the definitions current");
         definitions.Compare(new[] { Loaded("pack", written) });
         Check(!definitions.Stale, "and they stay current on every later comparison");
-        // The file is changed outside the editor.
+        // The file is changed outside scene patch editing.
         definitions.Compare(new[] { Loaded("pack", outside) });
-        Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "A document changed outside the editor marks the definitions stale");
+        Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "A document changed outside scene patch editing marks the definitions stale");
         definitions.Compare(new[] { Loaded("pack", written) });
         Check(definitions.Stale, "Changing the file back does not clear it: only a refresh does");
         definitions.Read(new[] { Loaded("pack", outside) });
@@ -145,7 +145,7 @@ static class CommandBandTests {
         Check(!fresh.Stale, "A document the patcher's own Save created is current");
         fresh.Compare(new[] { Loaded("pack", written), Loaded("other", before) });
         Check(fresh.Stale, "A document that appears from elsewhere marks them stale");
-        // A document that can no longer be read, and one removed outside the editor.
+        // A document that can no longer be read, and one removed outside scene patch editing.
         definitions.Compare(new[] { Loaded("pack", null, "Cannot read patch document") });
         Check(definitions.Stale, "An unreadable document marks them stale");
         definitions.Read(new[] { Loaded("pack", outside) });
@@ -219,7 +219,7 @@ static class CommandBandTests {
         var onNode = CommandBand.Followed(new TrackFollowing(TrackAnchor.Endpoint("N7"), new double[3], new double[] { 0, 0, 0, 1 }));
         Check(onNode.Kind == SelectionKind.TrackNode && onNode.Identifier == "N7", "An endpoint anchor marks its node");
         // A group of values: caption above, short labels in front of the boxes, the unit once.
-        Check(CommandBand.PoseGroups.SequenceEqual(new[] { "Position", "Rotation" }) && CommandBand.PoseUnits.SequenceEqual(new[] { "m", "deg" }) && CommandBand.Axes.SequenceEqual(new[] { "X", "Y", "Z" }), "A pose is a position and a rotation, each with X, Y and Z");
+        Check(CommandBand.PlacementGroups.SequenceEqual(new[] { "Position", "Rotation" }) && CommandBand.PlacementUnits.SequenceEqual(new[] { "m", "deg" }) && CommandBand.Axes.SequenceEqual(new[] { "X", "Y", "Z" }), "A placement is a position and a rotation, each with X, Y and Z");
         foreach (var row in new[] {
             new[] { "Position", "m", "edit", "Position (m)" }, new[] { "Position", "m", "read", "Position" },
             new[] { "Rotation", "deg", "edit", "Rotation (deg)" }, new[] { "Approach A", null, "edit", "Approach A" } })
@@ -349,7 +349,7 @@ static class CommandBandTests {
         Check(CommandBand.ClearActivityReason(true) == null, "With an activity value Clear activity is enabled");
         Check(CommandBand.ClearActivityReason(false) == "This MapMod sets no activity for this object, so there is nothing to clear.", "Without one it is disabled with that reason");
     }
-    // A request waits for the comparison of the scene. Closing the panel or leaving the editor cancels it: it never
+    // A request waits for the comparison of the scene. Closing the panel or leaving the native map editor cancels it: it never
     // runs, and a refusal says why.
     // The rules that every window, tab and row of the panel shares: one table per rule, over all call sites.
     static void SharedRulesHoldAtEveryCallSite() {
@@ -425,10 +425,10 @@ static class CommandBandTests {
         Check(refused, "A second request is not taken while one waits");
         queue.Run(); queue.Run();
         Check(ran == 1 && !queue.Pending, "A waiting request runs once");
-        // Leaving the editor.
+        // Leaving the native map editor.
         queue.Enqueue("Crossing coverage", "Coverage preview", () => ran++);
-        queue.Cancel("the editor was left before the request ran");
-        Check(ran == 1 && feedback.Result == "Coverage preview refused: the editor was left before the request ran", "Leaving the editor cancels a preview too: " + feedback.Result);
+        queue.Cancel("the native map editor was left before the request ran");
+        Check(ran == 1 && feedback.Result == "Coverage preview refused: the native map editor was left before the request ran", "Leaving the native map editor cancels a preview too: " + feedback.Result);
         // Clearing the inspection drops the object's results and keeps the refusal of the request that waited for it.
         var board = new object(); var other = new object();
         feedback.Inspecting(board);

@@ -41,9 +41,9 @@ static class SnapTests {
         public readonly BoundBox Box = new BoundBox { Position = new[] { 4.0, 8.0, 9.0 }, Rotation = new[] { 0.0, 1.0, 0.0, 0.0 } };
         public readonly Tracks Tracks = new Tracks();
         public readonly Store Store = new Store();
-        public readonly Editor Editor = new Editor();
+        public readonly NativeMapEditor MapEditor = new NativeMapEditor();
         public readonly PatchEngine Engine;
-        public readonly AuthoringSession Session;
+        public readonly PatchEditingSession Session;
         public readonly SnapController Snap;
         public World() {
             Scene.Objects["p"] = new List<object> { Box };
@@ -51,7 +51,7 @@ static class SnapTests {
                 new[] { Box.X + Scene.Origin, Box.Position[1], Box.Position[2] }, Box.Rotation,
                 new[] { "binding-to-other-track" }, Array.Empty<string>(), Array.Empty<string>(), "fixed placement") };
             Engine = new PatchEngine(Scene);
-            Session = new AuthoringSession(Engine, Editor, Store, "map"); Editor.Session = Session;
+            Session = new PatchEditingSession(Engine, MapEditor, Store, "map"); MapEditor.Session = Session;
             Snap = new SnapController(Session, Scene, Tracks);
         }
         public SnapRequest Prepare(SnapGeometry geometry) {
@@ -82,19 +82,19 @@ static class SnapTests {
         var calls = w.Scene.MutationCalls;
         Assert(!w.Snap.Apply(request).Applied && w.Box.X == 16 && w.Scene.MutationCalls == calls && w.Session.DocumentText == document,
             "A snap prepared against the earlier inspection cannot overwrite a changed preview");
-        Assert(gesture.Cancel().Applied && w.Box.X == 4 && w.Editor.UndoGroups.Count == 0 && w.Session.DocumentText == document,
+        Assert(gesture.Cancel().Applied && w.Box.X == 4 && w.MapEditor.UndoGroups.Count == 0 && w.Session.DocumentText == document,
             "Cancelling the preview preserves the original complete document and history");
         Assert(w.Snap.Apply(w.Prepare(node)).Applied && w.Box.X == 20, "A fresh snap follows the cancelled gesture");
         inventory.Refresh();
         gesture = new PlacementGesture(w.Engine, w.Session, ObjectId, inventory.Pin(inventory.Entries.Single()));
         Assert(gesture.Preview(new Placement(new[] { 135.0, 3.0, 5.0 }, w.Box.Rotation)).Applied && gesture.Complete().Applied,
             "A completed gizmo gesture follows the snapped fixed placement");
-        Assert(w.Box.X == 35 && w.Editor.UndoGroups.Count == 2 && ReferenceEquals(binding, w.Box.LogicalTrack),
+        Assert(w.Box.X == 35 && w.MapEditor.UndoGroups.Count == 2 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Snap and completed gesture each add one history operation and retain the logical binding");
-        w.Editor.Undo(); Assert(w.Box.X == 20, "Undoing the gesture recovers the snapped pose");
-        w.Editor.Undo(); Assert(w.Box.X == 4 && JObject.Parse(w.Session.DocumentText)["modifications"].Count() == 0, "Undoing the snap recovers underlying placement and an empty document");
-        w.Editor.Redo(); w.Editor.Redo();
-        Assert(w.Box.X == 35 && w.Editor.Save() == null, "Redo and shared Save persist the final gesture result");
+        w.MapEditor.Undo(); Assert(w.Box.X == 20, "Undoing the gesture recovers the snapped placement");
+        w.MapEditor.Undo(); Assert(w.Box.X == 4 && JObject.Parse(w.Session.DocumentText)["modifications"].Count() == 0, "Undoing the snap recovers underlying placement and an empty document");
+        w.MapEditor.Redo(); w.MapEditor.Redo();
+        Assert(w.Box.X == 35 && w.MapEditor.Save() == null, "Redo and shared Save persist the final gesture result");
         var fresh = new Scene(); var box = new Box(); fresh.Objects["p"] = new List<object> { box }; var engine = new PatchEngine(fresh);
         Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 35,
             "The combined history saves one absolute fixed result that replays without accumulated offsets");
@@ -126,12 +126,12 @@ static class SnapTests {
             var result = w.Snap.Apply(request);
             Assert(!result.Applied && result.Error != null && w.Scene.MutationCalls == calls && w.Box.X == 6,
                 change + " refuses snap without partial mutation or substitution: " + result.Error);
-            Assert(w.Session.DocumentText == document && w.Editor.UndoGroups.Count == 1, change + " preserves earlier work and history");
+            Assert(w.Session.DocumentText == document && w.MapEditor.UndoGroups.Count == 1, change + " preserves earlier work and history");
             // A refused selection is not encoded into a fixed document. Replaying the retained
-            // complete document reproduces prior authored work, without a runtime graph resolver.
+            // complete document reproduces this mod's prior work, without a runtime graph resolver.
             var fresh = new Scene(); var box = new Box(); fresh.Objects["p"] = new List<object> { box };
             Assert(new PatchEngine(fresh).Apply(document).Outcomes.Values.Single().Applied && box.X == 6,
-                change + " leaves the complete document valid with prior authored placement");
+                change + " leaves the complete document valid with this mod's prior placement");
         }
     }
     static void FailedSnapRestoresAndGuardsRetry() {
@@ -141,7 +141,7 @@ static class SnapTests {
         var result = w.Snap.Apply(request);
         Assert(!result.Applied && result.Error.Contains("prior state was restored") && w.Box.X == 4 && w.Box.DependentX == 4 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Failed snap restores captured position and dependent state while retaining the logical reference: " + result.Error);
-        Assert(w.Session.DocumentText == original && w.Editor.UndoGroups.Count == 0, "Failed snap preserves the complete prior document and history");
+        Assert(w.Session.DocumentText == original && w.MapEditor.UndoGroups.Count == 0, "Failed snap preserves the complete prior document and history");
         w.Scene.FailAfterDependentUpdate = 2;
         result = w.Snap.Apply(request);
         Assert(!result.Applied && result.Error.Contains("cleanup is unverified"), "Incomplete restoration is reported");
@@ -154,7 +154,7 @@ static class SnapTests {
         var outcome = new PatchEngine(w.Scene).Apply(document).Outcomes.Values.Single();
         Assert(!outcome.Applied && outcome.Error.Contains("restored") && w.Box.X == 20 && w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Complete-document failed application also restores dependent state and binding");
-        w.Editor.Save();
+        w.MapEditor.Save();
         Assert(w.Store.Patch == document, "Save after recovery writes only the successful snap result");
     }
     static void CurveEndsAndInvalidGeometry() {
@@ -194,7 +194,7 @@ static class SnapTests {
         var result = w.Snap.Apply(request);
         Assert(!result.Applied && result.Error.Contains("Snap target is missing") && w.Scene.MutationCalls == 0 && w.Box.X == 4,
             "The track is rechecked after object callbacks and before mutation: " + result.Error);
-        Assert(w.Session.DocumentText == document && w.Editor.UndoGroups.Count == 0, "Pre-mutation refusal preserves the complete document and history");
+        Assert(w.Session.DocumentText == document && w.MapEditor.UndoGroups.Count == 0, "Pre-mutation refusal preserves the complete document and history");
     }
     static void EndpointPersistsAsFixedPlacement() {
         var w = new World();
@@ -203,7 +203,7 @@ static class SnapTests {
         w.Tracks.Items.Add(node);
         var binding = w.Box.LogicalTrack;
         var request = w.Prepare(node);
-        Assert(w.Box.X == 4 && w.Editor.UndoGroups.Count == 0 && JObject.Parse(w.Session.DocumentText)["modifications"].Count() == 0,
+        Assert(w.Box.X == 4 && w.MapEditor.UndoGroups.Count == 0 && JObject.Parse(w.Session.DocumentText)["modifications"].Count() == 0,
             "Preparing and inspecting a snap has no mutation, persistence or history side effects");
         var result = w.Snap.Apply(request);
         Assert(result.Applied && w.Box.Position.SequenceEqual(new[] { 20.0, 3.0, 5.0 }), "Endpoint snap uses the selected node's map coordinates: " + result.Error);
@@ -211,10 +211,10 @@ static class SnapTests {
         Assert(ReferenceEquals(binding, w.Box.LogicalTrack) && w.Box.DependentX == 20, "Endpoint snap retains the actual logical reference and updates dependent state");
         var item = JObject.Parse(w.Session.DocumentText)["modifications"].Single();
         Assert((string)item["placement"]["mode"] == "fixed" && item["binding"] == null, "The complete canonical document stores fixed placement without a track binding");
-        Assert(w.Editor.UndoGroups.Count == 1, "One snap is one history operation");
-        w.Editor.Undo(); Assert(w.Box.Position.SequenceEqual(new[] { 4.0, 8.0, 9.0 }), "Undo restores the original position");
-        w.Editor.Redo(); Assert(w.Box.X == 20, "Redo restores the authored snap result");
-        Assert(w.Editor.Save() == null && w.Store.Patch == w.Session.DocumentText, "Native Save participants persist the canonical snap document");
+        Assert(w.MapEditor.UndoGroups.Count == 1, "One snap is one history operation");
+        w.MapEditor.Undo(); Assert(w.Box.Position.SequenceEqual(new[] { 4.0, 8.0, 9.0 }), "Undo restores the original position");
+        w.MapEditor.Redo(); Assert(w.Box.X == 20, "Redo restores this mod's snap result");
+        Assert(w.MapEditor.Save() == null && w.Store.Patch == w.Session.DocumentText, "Native Save participants persist the canonical snap document");
         w.Tracks.Items.Clear();
         var fresh = new Scene { Origin = 110 }; var box = new Box(); fresh.Objects["p"] = new List<object> { box };
         var engine = new PatchEngine(fresh);
