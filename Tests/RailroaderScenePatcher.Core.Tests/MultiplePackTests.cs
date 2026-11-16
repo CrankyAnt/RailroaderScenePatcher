@@ -47,6 +47,16 @@ static class MultiplePackTests {
         Check(otherMap.X == 0, "A pack whose source map context does not apply is not applied");
         Check(documents.Single(d => d.Pack.Source.Identifier == "b/undeclared").Result == null, "An undeclared pack is never handed to the engine");
         Check(messages.Rows.Count == 0, "Neither a missing dependency nor a map mismatch is a player-facing application failure");
+        // One log line per document per load attempt names the pack, the document's map and the outcome.
+        var maps = scene.MapIds.ToArray();
+        var start = "Scene Patcher 0.6.0: load attempt 2, map " + maps[0] + " (layers " + String.Join(", ", maps.Skip(1)) + "): ";
+        var lines = documents.ToDictionary(d => d.Pack.Source.Identifier, d => d.LogLine("0.6.0", 2, maps));
+        Check(lines["a/declared"] == start + "Declared [a/declared] document for " + maps[0] + ": 1 of 1 modifications applied, 0 failed, 0 unchanged", "An applied document is logged with its counts: " + lines["a/declared"]);
+        Check(lines["d/layer"] == start + "Layer [d/layer] document for layer: 1 of 1 modifications applied, 0 failed, 0 unchanged", "A document for a map layer is logged as applied: " + lines["d/layer"]);
+        Check(lines["c/other-map"] == start + "Other map [c/other-map] document for elsewhere skipped: not the loaded map or one of its layers", "A document for another map is logged as skipped: " + lines["c/other-map"]);
+        Check(lines["b/undeclared"] == start + "Undeclared [b/undeclared] document for " + maps[0] + " skipped: The pack does not declare a dependency on crankyant/scene-patcher", "A pack without the dependency is logged as skipped with its reason: " + lines["b/undeclared"]);
+        var again = runtime.ApplyLoaded(packs.Take(1), null).Single().LogLine("0.6.0", 3, new[] { maps[0] });
+        Check(again.StartsWith("Scene Patcher 0.6.0: load attempt 3, map " + maps[0] + " (layers none): Declared [a/declared] document for " + maps[0] + ": ", StringComparison.Ordinal), "A later attempt is logged with its number, and a map without layers says so: " + again);
         var editTarget = LoadedPack.Read("e/edited", Info("Edited"), Doc(Move("m", "undeclared", 7)), editTarget: true);
         runtime.ApplyLoaded(new[] { editTarget }, null);
         Check(undeclared.X == 7, "The editor's active document applies before Save has declared the dependency");

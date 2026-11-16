@@ -24,6 +24,11 @@ namespace RailroaderScenePatcher {
         // destroys every child of its container when it generates, so a mesh object that was saved with the scene
         // there is replaced the first time the pad comes into view; it is output as well.
         internal static bool IsOutput(bool createdAtRuntime, bool belowOutputContainer) => createdAtRuntime || belowOutputContainer;
+        // Whether a component is one the game adds to an authored object while it runs. An animator of crossing
+        // equipment, such as a signal's or a gate's KeyValueBoolAnimator, gets a playable-graph adapter beside its
+        // Animator the first time it animates, which is when the camera first comes near. Such a component was not
+        // saved with the scene: it is runtime state, and its arrival changes no observation.
+        internal static bool IsRuntimeComponent(string typeName) => typeName == "Helpers.Animation.PlayableGraphAnimatorAdapter";
         internal const string GeneratedPad = "Generated pad mesh and culling sphere, rebuilt by native generation from the marker location";
         internal static IEnumerable<string> Describe(bool crossingPad, IEnumerable<HierarchyPart> parts) {
             if (crossingPad) yield return GeneratedPad;

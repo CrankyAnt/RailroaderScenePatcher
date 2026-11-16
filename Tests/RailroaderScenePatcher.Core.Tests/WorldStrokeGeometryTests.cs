@@ -55,7 +55,25 @@ static class WorldStrokeGeometryTests {
     }
     static void Near(double actual, double expected, double tolerance, string message) => Check(Math.Abs(actual-expected) <= tolerance, message + ": " + actual + " expected " + expected);
     static void HasVertex(IReadOnlyList<ScreenTriangle> ts, double x, double y) => Check(ts.Any(t => new[] { t.A,t.B,t.C }.Any(p => Math.Abs(p.X-x)<0.02 && Math.Abs(p.Y-y)<0.02)), "expected quad corner");
+    // The spans of overlapping triangles cover each pixel once: a ribbon has one tint however its pieces overlap.
+    static void OverlappingTrianglesCoverEachPixelOnce() {
+        ScreenTriangle T(double ax, double ay, double bx, double by, double cx, double cy) => new ScreenTriangle(new ScreenPoint(ax, ay), new ScreenPoint(bx, by), new ScreenPoint(cx, cy));
+        // Two squares of 10 by 10 that overlap by half, each as two triangles.
+        var first = new[] { T(0, 0, 10, 0, 10, 10), T(0, 0, 10, 10, 0, 10) };
+        var second = new[] { T(5, 0, 15, 0, 15, 10), T(5, 0, 15, 10, 5, 10) };
+        double Area(IEnumerable<ScreenRect> spans) => spans.Sum(span => span.Width * span.Height);
+        var one = WorldStrokeGeometry.Coverage(first); var both = WorldStrokeGeometry.Coverage(first.Concat(second));
+        if (Math.Abs(Area(one) - 100) > 0.001) throw new Exception("One square covers its own area: " + Area(one));
+        if (Math.Abs(Area(both) - 150) > 0.001) throw new Exception("Two overlapping squares cover their union once, not their sum: " + Area(both));
+        if (both.Count != 10 || both.Any(span => span.Height != 1 || span.X != 0 || span.Right != 15)) throw new Exception("Each row has one merged span: " + both.Count);
+        // Rows of a row do not overlap one another, and separate pieces stay separate spans.
+        var apart = WorldStrokeGeometry.Coverage(first.Concat(new[] { T(30, 0, 40, 0, 40, 10), T(30, 0, 40, 10, 30, 10) }));
+        if (apart.Count != 20 || Math.Abs(Area(apart) - 200) > 0.001) throw new Exception("Separate pieces keep separate spans: " + apart.Count);
+        if (WorldStrokeGeometry.Coverage(new ScreenTriangle[0]).Count != 0 || WorldStrokeGeometry.Coverage(null).Count != 0) throw new Exception("No triangles cover nothing");
+        if (WorldStrokeGeometry.Coverage(new[] { T(0, 0, 10, 0, 20, 0) }).Count != 0) throw new Exception("A degenerate triangle covers nothing");
+    }
     public static void Run() {
+        OverlappingTrianglesCoverEachPixelOnce();
         // Each zone is disjoint from the panel interior. Zone containment of all three
         // submitted vertices therefore excludes panel coverage by edges and faces too.
         foreach (var zone in Zones)

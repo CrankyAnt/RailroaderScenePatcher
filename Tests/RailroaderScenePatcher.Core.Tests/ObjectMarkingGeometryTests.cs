@@ -74,6 +74,294 @@ static class ObjectMarkingGeometryTests {
         var behind = Frame(new WorldPoint(0, 0, -50), Box("behind", 0, 0, -50, 2, 2, 2));
         Check(!behind.Frame.HasValue, "an object wholly behind the camera has no frame");
 
+        // A frame is never smaller than its marker with the margin: a small frame grows about its own centre.
+        Check(ObjectMarkingGeometry.MarkerSize == 24 && ObjectMarkingGeometry.MarkerMargin == 4, "the marker is 24 pixels with a margin of 4");
+        foreach (var row in new[] {
+            new double[] { 100, 100, 110, 120, 89, 94, 121, 126 },   // 10 by 20: both grow to 32
+            new double[] { 100, 100, 200, 110, 100, 89, 200, 121 },  // 100 by 10: only the height grows
+            new double[] { 0, 0, 32, 32, 0, 0, 32, 32 },             // exactly the least size: kept
+            new double[] { 10, 20, 310, 220, 10, 20, 310, 220 } }) { // larger: kept
+            var grown = ObjectMarkingGeometry.VisibleFrame(ScreenRect.FromEdges((float)row[0], (float)row[1], (float)row[2], (float)row[3]));
+            Check(grown.X == row[4] && grown.Y == row[5] && grown.Right == row[6] && grown.Bottom == row[7], "a frame of " + (row[2] - row[0]) + " by " + (row[3] - row[1]) + " is drawn as " + grown.Width + " by " + grown.Height + " at " + grown.X + "," + grown.Y);
+        }
+        // A label stands centred under its marker; labels of markers on one spot stack under it; without room below
+        // the label stands above; it stays inside the screen.
+        var screen = ScreenRect.FromEdges(0, 0, 1000, 800);
+        var mark = ScreenRect.FromEdges(488, 388, 512, 412);
+        var none = new ScreenRect[0];
+        var under = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none);
+        Check(under.X == 450 && under.Right == 550 && under.Y == 416 && under.Bottom == 446, "a label is centred under its marker, 4 pixels below it");
+        var second = ObjectMarkingGeometry.LabelUnder(mark, 140, 30, screen, new[] { under });
+        Check(second.X == 430 && second.Y == 448, "the label of a second marker on the same spot stacks under the first, centred on its own marker");
+        var third = ObjectMarkingGeometry.LabelUnder(ScreenRect.FromEdges(500, 392, 524, 416), 100, 30, screen, new[] { under, second });
+        Check(third.X == 462 && third.Y == 480, "a third label goes under both, whatever the order they are listed in");
+        var apart = ObjectMarkingGeometry.LabelUnder(ScreenRect.FromEdges(700, 388, 724, 412), 100, 30, screen, new[] { under, second });
+        Check(apart.X == 662 && apart.Y == 416, "a label whose marker stands apart keeps its own place");
+        var low = ObjectMarkingGeometry.LabelUnder(ScreenRect.FromEdges(488, 770, 512, 794), 100, 30, screen, none);
+        Check(low.Y == 736 && low.Bottom == 766 && low.X == 450, "without room below, the label stands centred above its marker");
+        var lowSecond = ObjectMarkingGeometry.LabelUnder(ScreenRect.FromEdges(488, 770, 512, 794), 100, 30, screen, new[] { low });
+        Check(lowSecond.Bottom == 734, "labels above a marker stack upward");
+        var edge = ObjectMarkingGeometry.LabelUnder(ScreenRect.FromEdges(0, 100, 24, 124), 100, 30, screen, none);
+        Check(edge.X == 0 && edge.Y == 128, "a label at the screen's edge stays inside the screen");
+        var right = ObjectMarkingGeometry.LabelUnder(ScreenRect.FromEdges(980, 100, 1004, 124), 100, 30, screen, none);
+        Check(right.Right == 1000, "also at the right edge");
+
+        // A label covers no native panel and no square marker of another object: it stands at the nearest place that
+        // covers none.
+        var panel = ScreenRect.FromEdges(400, 420, 560, 700);
+        var clear = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, new[] { ScreenRect.FromEdges(0, 0, 50, 50) });
+        Check(clear.X == under.X && clear.Y == under.Y, "a label that covers nothing blocked keeps its place under the marker");
+        var beside = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, new[] { panel });
+        Check(!(beside.X < panel.Right && panel.X < beside.Right && beside.Y < panel.Bottom && panel.Y < beside.Bottom), "a label that would be cut off by a native panel stands clear of it: " + beside.X + "," + beside.Y);
+        Check(beside.Y == 354 && beside.X == 450, "the nearest clear place is centred above the marker here");
+        var neighbour = ScreenRect.FromEdges(520, 414, 544, 438);
+        var aside = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, new[] { neighbour });
+        Check(!(aside.X < neighbour.Right && neighbour.X < aside.Right && aside.Y < neighbour.Bottom && neighbour.Y < aside.Bottom) && aside.Y == 416 && aside.Right == 516, "a label does not cover the square marker of a neighbour: it moves aside under its own marker (" + aside.X + "," + aside.Y + ")");
+        var hemmed = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, ScreenRect.FromEdges(440, 380, 560, 450), none, new[] { ScreenRect.FromEdges(440, 380, 560, 450) });
+        Check(hemmed.Width == 100 && hemmed.Height == 30, "a label that fits nowhere keeps a place");
+
+        // Every inventory object within the frame distance has a frame: one without a part to frame takes the least
+        // frame about its marker.
+        var bare = ObjectMarkingGeometry.MarkerOutline(300, 200);
+        Check(bare.Count == 4 && bare.Min(q => q.X) == 284 && bare.Max(q => q.X) == 316 && bare.Min(q => q.Y) == 184 && bare.Max(q => q.Y) == 216, "an object without parts is framed 32 by 32 about its marker");
+        Check(ObjectMarkingGeometry.Contains(bare, 300, 200) && ObjectMarkingGeometry.Contains(bare, 315, 215) && !ObjectMarkingGeometry.Contains(bare, 317, 200), "that frame is picked like any other");
+        Check(ObjectMarkingGeometry.FramesMarker(0) && ObjectMarkingGeometry.FramesMarker(500) && !ObjectMarkingGeometry.FramesMarker(500.1) && !ObjectMarkingGeometry.FramesMarker(Double.NaN), "it shows within the frame distance of 500 m and not beyond");
+        Check(ReferenceEquals(ObjectMarkingGeometry.VisibleOutline(bare), bare), "it is the least frame already");
+
+        // A neighbour's marker that overlaps the label's own marker in part still blocks the label: the label covers
+        // no part of it. Here the neighbour stands lower right of the marker, where the label under the marker would
+        // cover its lower half.
+        var partly = ScreenRect.FromEdges(506, 404, 530, 428);
+        var kept = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, new[] { partly });
+        Check(!(kept.X < partly.Right && partly.X < kept.Right && kept.Y < partly.Bottom && partly.Y < kept.Bottom), "a label covers no part of a neighbouring marker that overlaps its own: " + kept.X + "," + kept.Y);
+        // Only what lies near the label counts: hundreds of markers elsewhere in the view change nothing and are not
+        // tested against every place.
+        var crowd = new List<ScreenRect> { partly };
+        for (int i = 0; i < 700; i++) crowd.Add(ScreenRect.FromEdges(10 + (i % 35) * 28, 500 + (i / 35) * 14, 34 + (i % 35) * 28, 524 + (i / 35) * 14));
+        var crowded = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, crowd);
+        Check(crowded.X == kept.X && crowded.Y == kept.Y, "markers far from the label do not move it");
+        // The cost does not grow with the square of the markers in view. The bound is generous on purpose: a loaded
+        // runner passes it, and the quadratic search it guards against, about a million overlap tests a label, does not.
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        for (int i = 0; i < 200; i++) ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, crowd);
+        Check(clock.Elapsed.TotalSeconds < 20, "placing a label 200 times among 700 markers stays far under the quadratic cost: " + clock.Elapsed.TotalMilliseconds + " ms");
+        // Every place that is tried is tested against everything that blocks: a place beside the first blocker that
+        // a second blocker covers is not taken, and the search goes on beside that one.
+        var chain = new[] { ScreenRect.FromEdges(506, 404, 530, 428), ScreenRect.FromEdges(380, 410, 400, 450), ScreenRect.FromEdges(430, 300, 580, 386) };
+        var chained = ObjectMarkingGeometry.LabelUnder(mark, 100, 30, screen, none, chain);
+        Check(chain.All(c => !(chained.X < c.Right && c.X < chained.Right && chained.Y < c.Bottom && c.Y < chained.Bottom)), "a label finds a place that none of a chain of blockers covers: " + chained.X + "," + chained.Y);
+        Check(ObjectMarkingGeometry.LabelRounds == 4, "places beside newly found blockers are tried for four rounds");
+
+        // The share of a pass for reads that are made once. Only the reads are timed; a pass starts anew; what was
+        // read is kept by the caller, so the reads come to an end however slow the rest of the pass is.
+        double now = 0;
+        var budget = new ReadBudget(4, () => now);
+        var known = new HashSet<int>();
+        int Pass(int objects, double otherWork) {
+            budget.Begin();
+            var waiting = 0;
+            for (int i = 0; i < objects; i++) {
+                now += otherWork;                       // work on what is known already: not a read
+                if (known.Contains(i)) continue;
+                if (budget.Exhausted) { waiting++; continue; }
+                budget.Read(() => { now += 1.5; known.Add(i); return i; });
+            }
+            return waiting;
+        }
+        Check(!budget.Exhausted && budget.Spent == 0, "a budget starts unused");
+        var first = Pass(20, 0);
+        Check(known.Count == 3 && first == 17 && budget.Exhausted && budget.Spent == 4.5, "a pass reads until its share of 4 ms is used up: three reads of 1.5 ms, the rest waits");
+        var passes = 1;
+        while (known.Count < 20 && passes < 50) { Pass(20, 0); passes++; }
+        Check(known.Count == 20 && passes == 7, "every pass reads further, and the reads come to an end: " + passes + " passes of three reads for 20 reads");
+        Check(Pass(20, 0) == 0 && budget.Spent == 0, "a pass with everything known reads nothing and waits for nothing");
+        // Work that is no read does not use the share: a pass that is slow for another reason still reads.
+        known.Clear();
+        Check(Pass(20, 10) == 17 && known.Count == 3 && budget.Spent == 4.5, "200 ms of other work in the pass takes nothing from the share of the reads");
+        // A value that needs no read, such as a renderer that is switched off and passed over, never waits.
+        budget.Begin(); budget.Read(() => { now += 100; return 0; });
+        var skipped = 0; for (int i = 0; i < 5; i++) { if (i % 2 == 0) { skipped++; continue; } if (budget.Exhausted) continue; }
+        Check(budget.Exhausted && skipped == 3, "with the share used up, what needs no read is still passed over without waiting");
+        budget.Begin();
+        Check(!budget.Exhausted, "the next pass starts with its whole share, whatever the pass before took");
+        Check(new ReadBudget(4, () => now).Read(() => "x") == "x", "a read returns its value");
+
+        // The click rule. Each row: the pointer, the candidates (marker centre x, y, marker shown, pointer inside
+        // its frame or ribbon), and the candidates the click selects, the nearest first.
+        PickTarget T(double x, double y, bool marked = true, bool area = false) => new PickTarget(x, y, marked, area);
+        var picks = new[] {
+            new { Name = "a click on a marker selects its object", X = 100.0, Y = 100.0, Targets = new[] { T(104, 100), T(300, 300) }, Picked = "0" },
+            new { Name = "a marker inside another object's frame wins over that frame", X = 100.0, Y = 100.0, Targets = new[] { T(400, 400, true, true), T(104, 100) }, Picked = "1" },
+            new { Name = "of two markers under the pointer the nearest centre wins", X = 110.0, Y = 100.0, Targets = new[] { T(100, 100), T(118, 100) }, Picked = "1" },
+            new { Name = "and the other one from its own side", X = 106.0, Y = 100.0, Targets = new[] { T(100, 100), T(118, 100) }, Picked = "0" },
+            new { Name = "inside frames but on no marker, the nearest marker on screen wins", X = 200.0, Y = 200.0, Targets = new[] { T(100, 200, true, true), T(260, 200, true, true), T(230, 200, true, false) }, Picked = "1" },
+            new { Name = "screen distance decides, whatever the order", X = 200.0, Y = 200.0, Targets = new[] { T(260, 200, true, true), T(100, 200, true, true) }, Picked = "0" },
+            new { Name = "markers on one spot cannot be told apart", X = 100.0, Y = 100.0, Targets = new[] { T(100, 100), T(100, 100), T(300, 100) }, Picked = "0,1" },
+            new { Name = "markers closer than half a marker are one spot, the nearest first", X = 108.0, Y = 100.0, Targets = new[] { T(100, 100), T(111, 100) }, Picked = "1,0" },
+            new { Name = "markers half a marker apart are two spots", X = 108.0, Y = 100.0, Targets = new[] { T(100, 100), T(112, 100) }, Picked = "1" },
+            new { Name = "a frame click also brings the markers on the winner's spot", X = 200.0, Y = 200.0, Targets = new[] { T(240, 200, true, true), T(244, 203, true, false), T(100, 200, true, true) }, Picked = "0,1" },
+            new { Name = "a small object nested in a large frame wins near its own marker", X = 310.0, Y = 205.0, Targets = new[] { T(500, 300, true, true), T(300, 200, true, true) }, Picked = "1" },
+            new { Name = "and the large object wins where its own marker is nearer", X = 480.0, Y = 300.0, Targets = new[] { T(500, 300, true, true), T(300, 200, true, false) }, Picked = "0" },
+            new { Name = "three nested frames: only the nearest marker is picked, one at a time", X = 210.0, Y = 200.0, Targets = new[] { T(500, 300, true, true), T(200, 200, true, true), T(260, 200, true, true) }, Picked = "1" },
+            new { Name = "a pad without a frame of its own is picked on its marker, inside other frames", X = 405.0, Y = 300.0, Targets = new[] { T(500, 300, true, true), T(400, 300, true, false), T(340, 300, true, true) }, Picked = "1" },
+            new { Name = "and beside its marker the framed neighbour whose marker is nearest wins", X = 380.0, Y = 300.0, Targets = new[] { T(500, 300, true, true), T(400, 300, true, false), T(340, 300, true, true) }, Picked = "2" },
+            new { Name = "a marker that is not shown takes no click", X = 100.0, Y = 100.0, Targets = new[] { T(100, 100, false, false), T(300, 300) }, Picked = "" },
+            new { Name = "a track without a shown marker is picked by its ribbon", X = 100.0, Y = 100.0, Targets = new[] { T(180, 100, false, true), T(120, 100, false, true) }, Picked = "1" },
+            new { Name = "a click on nothing selects nothing", X = 100.0, Y = 100.0, Targets = new[] { T(300, 300), T(500, 500) }, Picked = "" },
+            new { Name = "the marker's edge still counts", X = 112.0, Y = 88.0, Targets = new[] { T(100, 100) }, Picked = "0" },
+            new { Name = "just outside the marker does not", X = 113.0, Y = 100.0, Targets = new[] { T(100, 100) }, Picked = "" },
+        };
+        foreach (var pick in picks) {
+            var picked = String.Join(",", WorldPick.Resolve(pick.X, pick.Y, pick.Targets));
+            Check(picked == pick.Picked, "click rule: " + pick.Name + " (expected " + pick.Picked + ", got " + picked + ")");
+        }
+        Check(WorldPick.SameSpot == 12 && WorldPick.Resolve(0, 0, null).Count == 0, "one spot is half a marker; no candidates select nothing");
+        // The list of one spot stands beside the click.
+        var rowsBeside = WorldPick.ListBeside(500, 300, 200, new[] { 30.0, 30.0, 30.0 }, screen);
+        Check(rowsBeside.Count == 3 && rowsBeside[0].X == 516 && rowsBeside[0].Y == 300 && rowsBeside[1].Y == 332 && rowsBeside[2].Bottom == 394 && rowsBeside[2].Right == 716, "the list opens right of the click, rows under one another");
+        var rowsLeft = WorldPick.ListBeside(900, 300, 200, new[] { 30.0, 30.0 }, screen);
+        Check(rowsLeft[0].Right == 884 && rowsLeft[0].X == 684, "without room on the right the list opens left of the click");
+        var rowsUp = WorldPick.ListBeside(500, 790, 200, new[] { 30.0, 30.0 }, screen);
+        Check(rowsUp[1].Bottom == 800 && rowsUp[0].Y == 738, "a list at the bottom moves up into the screen");
+
+        // The frame is the outline of the object's own box on screen, not a rectangle around it. A slab 20 m long
+        // and 2 m wide, lying flat and turned 45 degrees, seen from above at a slant: the rectangle around it is far
+        // larger than the slab; the outline is not.
+        var slant = Strategy(new WorldPoint(0, 40, -40), 45, 60);
+        WorldPoint[] Turned(double cx, double cy, double cz, double halfLength, double halfWidth, double halfHeight) {
+            var corners = new WorldPoint[8]; double c = Math.Sqrt(.5);
+            for (int i = 0; i < 8; i++) {
+                double a = ((i & 1) == 0 ? -1 : 1) * halfLength, h = ((i & 2) == 0 ? -1 : 1) * halfHeight, b = ((i & 4) == 0 ? -1 : 1) * halfWidth;
+                corners[i] = new WorldPoint(cx + (a - b) * c, cy + h, cz + (a + b) * c);
+            }
+            return corners;
+        }
+        double Area(IReadOnlyList<ScreenPoint> polygon) { double sum = 0; for (int i = 0; i < polygon.Count; i++) { var a = polygon[i]; var b = polygon[(i + 1) % polygon.Count]; sum += a.X * b.Y - b.X * a.Y; } return Math.Abs(sum) / 2; }
+        var slab = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 0), new WorldPoint(0, 40, -40),
+            new[] { new ObjectMarkingPart("slab", new WorldPoint(0, 0, 0), new WorldPoint(7.8, .1, 7.8), Turned(0, 0, 0, 10, 1, .1)) }, slant, View, new List<string>());
+        Check(slab.Frame.HasValue && slab.Outline != null && slab.Outline.Count >= 4, "a framed object has an outline");
+        var slabRect = slab.Frame.Value;
+        Check(Area(slab.Outline) < .4 * slabRect.Width * slabRect.Height, "the outline of a slab that lies at an angle covers far less than the rectangle around it: " + Area(slab.Outline) + " of " + slabRect.Width * slabRect.Height);
+        Check(slab.Outline.All(q => q.X >= slabRect.X - .01 && q.X <= slabRect.Right + .01 && q.Y >= slabRect.Y - .01 && q.Y <= slabRect.Bottom + .01), "the outline lies within its rectangle, which is the rectangle around it");
+        double midX = (slabRect.X + slabRect.Right) / 2, midY = (slabRect.Y + slabRect.Bottom) / 2;
+        Check(ObjectMarkingGeometry.Contains(slab.Outline, midX, midY), "the marker's place, the centre of the rectangle, lies inside the outline");
+        Check(!ObjectMarkingGeometry.Contains(slab.Outline, slabRect.X + 6, slabRect.Y + 6) || !ObjectMarkingGeometry.Contains(slab.Outline, slabRect.Right - 6, slabRect.Y + 6), "a corner of the rectangle that the slab does not reach is outside the outline: a click there does not pick the slab");
+        // Picking and drawing share the outline: the line lies inside it, along every edge.
+        var stroke = ObjectMarkingGeometry.OutlineStroke(slab.Outline, 2);
+        Check(stroke.Count == 2 * slab.Outline.Count && stroke.All(t => new[] { t.A, t.B, t.C }.All(q => q.X >= slabRect.X - .01 && q.X <= slabRect.Right + .01 && q.Y >= slabRect.Y - .01 && q.Y <= slabRect.Bottom + .01)), "the drawn line is two triangles an edge and stays inside the frame");
+        // A square outline: points inside, on and outside it.
+        var square = new[] { new ScreenPoint(0, 0), new ScreenPoint(10, 0), new ScreenPoint(10, 10), new ScreenPoint(0, 10) };
+        foreach (var row in new[] { new[] { 5.0, 5, 1 }, new[] { 0.0, 0, 1 }, new[] { 10.0, 5, 1 }, new[] { 10.1, 5, 0 }, new[] { -1.0, -1, 0 }, new[] { 5.0, 11, 0 } })
+            Check(ObjectMarkingGeometry.Contains(square, row[0], row[1]) == (row[2] == 1), "the point " + row[0] + "," + row[1] + " is " + (row[2] == 1 ? "inside" : "outside") + " the square");
+        Check(!ObjectMarkingGeometry.Contains(null, 0, 0) && !ObjectMarkingGeometry.Contains(new[] { new ScreenPoint(0, 0), new ScreenPoint(1, 1) }, 0, 0), "no outline holds no point");
+        // The least-frame rule holds for an outline: one smaller than the marker with its margin grows about its centre.
+        var tiny = ObjectMarkingGeometry.VisibleOutline(new[] { new ScreenPoint(100, 100), new ScreenPoint(110, 100), new ScreenPoint(110, 120), new ScreenPoint(100, 120) });
+        Check(tiny.Min(q => q.X) == 89 && tiny.Max(q => q.X) == 121 && tiny.Min(q => q.Y) == 94 && tiny.Max(q => q.Y) == 126, "an outline of 10 by 20 is drawn at least 32 by 32 about its centre");
+        Check(ReferenceEquals(ObjectMarkingGeometry.VisibleOutline(square.Select(q => new ScreenPoint(q.X * 10, q.Y * 10)).ToArray()), null) == false && ObjectMarkingGeometry.VisibleOutline(slab.Outline).Count == slab.Outline.Count, "a larger outline is kept");
+        // A post half under the ground: the buried half is not framed. The post stands 100 m ahead, from 5 m below
+        // the camera's height to 5 m above; the ground lies at the camera's height.
+        ObjectMarkingFrame Post(double? ground, double halfWidth = .5) => ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("post", new WorldPoint(0, 0, 100), new WorldPoint(halfWidth, 5, halfWidth), null, ObjectMarkingPartKind.Mesh, ground.HasValue ? (x, z) => ground : (Func<double, double, double?>)null) }, Camera, View, new List<string>());
+        var whole = Post(null).Frame.Value; var cut = Post(0).Frame.Value;
+        Check(Math.Abs((whole.Height - 2 * ObjectMarkingGeometry.Margin) - 2 * (cut.Height - 2 * ObjectMarkingGeometry.Margin)) < 1 && cut.Y == whole.Y && cut.Bottom < whole.Bottom - 20, "a post half under the ground is framed above the ground only: " + whole.Height + " and " + cut.Height);
+        Check(Post(-20).Frame.Value.Height == whole.Height, "ground below the post cuts nothing");
+        Check(Post(20).Frame.Value.Height == whole.Height, "a post wholly under the surface above it, as in a tunnel, is framed whole");
+        // A wide part is cut as well, whatever its width: the 16 m slab half under level ground loses its lower half.
+        var wideWhole = Post(null, 8).Frame.Value; var wideCut = Post(0, 8).Frame.Value;
+        Check(wideCut.Y == wideWhole.Y && wideCut.Bottom < wideWhole.Bottom - 20, "a wide part is cut at the surface like a narrow one");
+        // A platform 40 m long on a slope: the ground rises from 2 m under the camera's height at its left end to 2 m
+        // above it at its right end. The platform reaches from 3 m under to 3 m above. Cut piece by piece, the frame
+        // reaches lower at the left end, where more of the platform stands above the ground, than at the right end.
+        Func<double, double, double?> slope = (x, z) => x / 10;
+        var platform = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("platform", new WorldPoint(0, 0, 100), new WorldPoint(20, 3, 2), null, ObjectMarkingPartKind.Mesh, slope) }, Camera, View, new List<string>());
+        var level = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("platform", new WorldPoint(0, 0, 100), new WorldPoint(20, 3, 2), null, ObjectMarkingPartKind.Mesh, (x, z) => 0) }, Camera, View, new List<string>());
+        double Lowest(ObjectMarkingFrame frame, bool leftHalf) { var mid = (frame.Frame.Value.X + frame.Frame.Value.Right) / 2; return frame.Outline.Where(q => leftHalf ? q.X < mid - 40 : q.X > mid + 40).Max(q => q.Y); }
+        Check(Lowest(platform, true) > Lowest(platform, false) + 10, "a long platform on a slope is cut along the slope: its frame reaches lower at the downhill end (" + Lowest(platform, true) + " and " + Lowest(platform, false) + ")");
+        Check(Math.Abs(Lowest(level, true) - Lowest(level, false)) < 1, "on level ground both ends are cut at one height");
+        Check(Lowest(platform, true) > Lowest(level, true) + 5 && Lowest(platform, false) < Lowest(level, false) - 2, "the downhill end shows more and the uphill end less than on level ground: " + Lowest(platform, true) + " " + Lowest(level, true) + " " + Lowest(platform, false) + " " + Lowest(level, false));
+        // A bridge over a valley: the ground lies far under its middle and at deck height under its ends. Nothing of
+        // the deck above the ground is lost, and the frame is as wide as the whole bridge.
+        Func<double, double, double?> valley = (x, z) => Math.Abs(x) > 15 ? -1 : -30;
+        ObjectMarkingFrame Bridge(Func<double, double, double?> ground) => ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("deck", new WorldPoint(0, 0, 100), new WorldPoint(20, 1, 2), null, ObjectMarkingPartKind.Mesh, ground) }, Camera, View, new List<string>());
+        var open = Bridge(null).Frame.Value; var over = Bridge(valley).Frame.Value;
+        Check(over.X == open.X && over.Right == open.Right && over.Y == open.Y && Math.Abs(over.Bottom - open.Bottom) < .01, "a bridge deck over a valley keeps its whole frame: the ground is under it everywhere");
+        // A grouped object: its frame is the union of its cut parts, one outline.
+        var grouped = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] {
+            new ObjectMarkingPart("post", new WorldPoint(0, 0, 100), new WorldPoint(.5, 5, .5), null, ObjectMarkingPartKind.Mesh, (x, z) => 0),
+            new ObjectMarkingPart("sign", new WorldPoint(0, 4, 100), new WorldPoint(1.5, 1, .2), null, ObjectMarkingPartKind.Mesh, (x, z) => 0) }, Camera, View, new List<string>());
+        Check(grouped.Outline != null && grouped.Frame.Value.Width > cut.Width + 10 && Math.Abs(grouped.Frame.Value.Bottom - cut.Bottom) < .01 && grouped.Frame.Value.Y == cut.Y, "a grouped object has one outline around its cut parts: as wide as the sign, ending at the ground like the post");
+        // A piece wholly under the surface is buried while another piece stands above it.
+        Func<double, double, double?> bank = (x, z) => x > 0 ? 50 : -50;
+        var banked = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("wall", new WorldPoint(0, 0, 100), new WorldPoint(20, 3, 2), null, ObjectMarkingPartKind.Mesh, bank) }, Camera, View, new List<string>());
+        var free = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("wall", new WorldPoint(0, 0, 100), new WorldPoint(20, 3, 2), null, ObjectMarkingPartKind.Mesh, null) }, Camera, View, new List<string>());
+        Check(banked.Frame.Value.X == free.Frame.Value.X && banked.Frame.Value.Right < free.Frame.Value.Right - 50, "the half of a wall that lies inside a bank is not framed; the half that stands free is");
+        Check(ObjectMarkingGeometry.GroundPiece == 10 && ObjectMarkingGeometry.GroundPieces == 5, "a part is read piece by piece, 10 m long, at most 5 along an axis");
+        // The surface an object stands in, from what a ray from above meets: terrain, or the ballast of track that
+        // lies on it. Track carried over the terrain, as on a bridge deck, is no such surface.
+        foreach (var row in new[] {
+            new object[] { 100.0, new double[0], 100.0, "terrain alone" },
+            new object[] { 100.0, new[] { 100.5 }, 100.5, "ballast on the terrain" },
+            new object[] { 100.0, new[] { 101.0 }, 101.0, "ballast at the most 1 m above the terrain" },
+            new object[] { 100.0, new[] { 101.1 }, 100.0, "track carried more than 1 m over the terrain" },
+            new object[] { 70.0, new[] { 101.0 }, 70.0, "track on a bridge deck over a valley" },
+            new object[] { 100.0, new[] { 103.0 }, 100.0, "a collider on the track layer three metres over the ground, which is no ballast" },
+            new object[] { 100.0, new[] { 100.4, 130.0 }, 100.4, "track on the ground under a bridge with track" },
+            new object[] { 100.0, new[] { 99.0 }, 100.0, "track under the terrain, as in a tunnel" },
+            new object[] { null, new[] { 101.0 }, null, "no terrain" } }) {
+            var found = ObjectMarkingGeometry.Surface((double?)row[0], (double[])row[1]);
+            Check(found == (double?)row[2], "the surface with " + row[3] + " is " + (row[2] ?? "none") + ", got " + (found.HasValue ? found.Value.ToString() : "none"));
+        }
+        Check(ObjectMarkingGeometry.BallastDepth == 1 && ObjectMarkingGeometry.Surface(0, null) == 0, "ballast lies at most 1 m above its terrain");
+        // A rail bridge with track on its deck: a truss 40 m long from 2 m under the rail to 6 m above it. The terrain
+        // lies at rail height under its two ends and 30 m lower under the span; the track lies on the deck all along.
+        // A surface that took the track for the ground would cut the truss at rail level. The truss keeps its lower
+        // chords over the valley and is cut only where it meets the terrain at its ends.
+        Func<double, double, double?> underBridge = (x, z) => ObjectMarkingGeometry.Surface(Math.Abs(x) > 12 ? 0 : -30, new[] { 0.3 });
+        Func<double, double, double?> trackAsGround = (x, z) => 0.3;
+        ObjectMarkingFrame Truss(Func<double, double, double?> ground) => ObjectMarkingGeometry.Frame(new WorldPoint(0, 2, 100), Eye,
+            new[] { new ObjectMarkingPart("truss", new WorldPoint(0, 2, 100), new WorldPoint(20, 4, 2), null, ObjectMarkingPartKind.Mesh, ground) }, Camera, View, new List<string>());
+        var trussWhole = Truss(null).Frame.Value; var truss = Truss(underBridge); var trussWrong = Truss(trackAsGround).Frame.Value;
+        Check(Math.Abs(truss.Frame.Value.Bottom - trussWhole.Bottom) < .01 && truss.Frame.Value.X == trussWhole.X && truss.Frame.Value.Right == trussWhole.Right && truss.Frame.Value.Y == trussWhole.Y, "a truss with track on its deck keeps its lower chords over the valley");
+        Check(trussWrong.Bottom < trussWhole.Bottom - 10, "the same truss cut at the track on its deck would lose them, which is what the surface rule prevents");
+        double EndLowest(ObjectMarkingFrame frame, bool leftEnd) => frame.Outline.Where(q => leftEnd ? q.X < frame.Frame.Value.X + 30 : q.X > frame.Frame.Value.Right - 30).Max(q => q.Y);
+        Check(EndLowest(truss, true) < trussWhole.Bottom - 10 && EndLowest(truss, false) < trussWhole.Bottom - 10, "at its two ends the truss is cut where it meets the terrain: " + EndLowest(truss, true) + " and " + EndLowest(truss, false) + " against " + trussWhole.Bottom);
+        // Burial is decided for the object. A sign on a post with a footing that lies wholly under the ground: the
+        // footing is not framed, and the frame ends at the ground.
+        Func<double, double, double?> flat = (x, z) => 0;
+        ObjectMarkingPart Part(string name, double y, double halfHeight, double halfWidth, Func<double, double, double?> ground) =>
+            new ObjectMarkingPart(name, new WorldPoint(0, y, 100), new WorldPoint(halfWidth, halfHeight, halfWidth), null, ObjectMarkingPartKind.Mesh, ground);
+        var decided = new List<string>();
+        var footed = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Part("post", 2, 3, .5, flat), Part("footing", -3, 1, 1.5, flat) }, Camera, View, decided);
+        var postOnly = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Part("post", 2, 3, .5, flat) }, Camera, View, new List<string>());
+        Check(footed.Frame.Value.Bottom == postOnly.Frame.Value.Bottom && footed.Frame.Value.Width == postOnly.Frame.Value.Width && decided.Contains("footing: included, under the surface"), "a wholly buried footing of an object that stands above the ground is not framed");
+        // A wide pier of several pieces, wholly buried, under a deck that stands above the ground.
+        var piered = ObjectMarkingGeometry.Frame(new WorldPoint(0, 2, 100), Eye, new[] { Part("deck", 2, 1, 2, flat), Part("pier", -4, 2, 18, flat) }, Camera, View, new List<string>());
+        var deckOnly = ObjectMarkingGeometry.Frame(new WorldPoint(0, 2, 100), Eye, new[] { Part("deck", 2, 1, 2, flat) }, Camera, View, new List<string>());
+        Check(piered.Frame.Value.Bottom == deckOnly.Frame.Value.Bottom && piered.Frame.Value.Width == deckOnly.Frame.Value.Width, "a wide, wholly buried part of several pieces does not pull the frame under the ground");
+        // An object all of whose parts lie under the surface found from above keeps its whole frame.
+        Func<double, double, double?> roof = (x, z) => 50;
+        var tunnelled = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Part("post", 2, 3, .5, roof), Part("footing", -3, 1, 1.5, roof) }, Camera, View, new List<string>());
+        var uncut = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Part("post", 2, 3, .5, null), Part("footing", -3, 1, 1.5, null) }, Camera, View, new List<string>());
+        Check(tunnelled.Frame.Value.Bottom == uncut.Frame.Value.Bottom && tunnelled.Frame.Value.Y == uncut.Frame.Value.Y && tunnelled.Frame.Value.Width == uncut.Frame.Value.Width, "an object wholly under the surface above it, as in a tunnel, is framed whole with all its parts");
+        // A box turned 45 degrees and 40 m long is divided along its own length, read from its corners: on ground
+        // that rises along that length it is cut along the slope. Read along the world axes instead, its pieces
+        // would not follow it.
+        Func<double, double, double?> diagonal = (x, z) => (x + (z - 100)) / 14.142;
+        ObjectMarkingFrame TurnedBox(Func<double, double, double?> ground) => ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("turned", new WorldPoint(0, 0, 100), new WorldPoint(15.6, 3, 15.6), Turned(0, 0, 100, 20, 2, 3), ObjectMarkingPartKind.Mesh, ground) }, Camera, View, new List<string>());
+        var turnedSlope = TurnedBox(diagonal); var turnedLevel = TurnedBox(flat); var turnedWhole = TurnedBox(null);
+        Check(Lowest(turnedSlope, true) > Lowest(turnedLevel, true) + 3 && Lowest(turnedSlope, false) < Lowest(turnedLevel, false) - 1, "a turned box is cut along the slope under its own length: lower at its low end, higher at its high end (" + Lowest(turnedSlope, true) + ", " + Lowest(turnedLevel, true) + ", " + Lowest(turnedSlope, false) + ", " + Lowest(turnedLevel, false) + ")");
+        Check(turnedLevel.Frame.Value.X == turnedWhole.Frame.Value.X && turnedLevel.Frame.Value.Right == turnedWhole.Frame.Value.Right && turnedLevel.Frame.Value.Y == turnedWhole.Frame.Value.Y && turnedLevel.Frame.Value.Bottom < turnedWhole.Frame.Value.Bottom, "cut on level ground, the turned box keeps its width and top and loses what lies under the ground");
+        // Dividing a box changes nothing where nothing is cut: the outline of the pieces is the outline of the box.
+        var far = TurnedBox((x, z) => -100);
+        Check(Math.Abs(Area(far.Outline) - Area(turnedWhole.Outline)) < .01
+            && Math.Abs(far.Frame.Value.X - turnedWhole.Frame.Value.X) + Math.Abs(far.Frame.Value.Bottom - turnedWhole.Frame.Value.Bottom) + Math.Abs(far.Frame.Value.Right - turnedWhole.Frame.Value.Right) + Math.Abs(far.Frame.Value.Y - turnedWhole.Frame.Value.Y) < .001, "the outline of a box read in pieces equals the outline of the whole box when the ground lies under it");
+
         // Beyond FrameDistance every frame becomes the square marker; the distance is to the bounds, not the centre.
         // Every frame still surrounded only its own object at the 550 m step with the pointer over each; less one 50 m
         // step. That is the native editor's default gizmo distance.

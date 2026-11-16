@@ -111,7 +111,9 @@ static class GroupActivityTests {
         Assert(session.Edit(Sign, null, false).Applied && !sign.Active && sign.Held && sign.Activations == 0, "The editor disables the follower with a hold");
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 5))).Applied && Subscription(sign) == "extension|1|held" && !sign.Active && sign.Activations == 0, "Rebinding a disabled follower moves the subscription and keeps the hold");
         world.SetGroupEnabled("extension", false);
+        Assert(session.HasActivityValue(Sign) && !session.HasActivityValue(Other), "The document sets an activity for the disabled object and none for the other");
         var cleared = session.ClearActivity(Sign);
+        Assert(!session.HasActivityValue(Sign) && session.IsChanged(Sign), "After the clearing the modification stays without an activity value");
         Assert(cleared.Applied && !sign.Held && !sign.Active && Subscription(sign) == "extension|1", "Clearing the disable returns activity to the disabled group: " + cleared.Error);
         Assert(Only(session)["active"] == null && Only(session)["relationships"] != null, "The modification keeps its binding without an activity value");
         world.SetGroupEnabled("extension", true);

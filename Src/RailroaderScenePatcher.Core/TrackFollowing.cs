@@ -21,6 +21,9 @@ namespace RailroaderScenePatcher.Core {
         internal static bool Same(TrackAnchor a, TrackAnchor b) =>
             a == null ? b == null : b != null && a.Node == b.Node && TrackLocation.Same(a.Location, b.Location);
         public override string ToString() => Node != null ? "node:" + Node : Location.ToString();
+        // The anchor as the panel, the log and the Changes tab name it: a node by its ID, a location as every binding
+        // reads, "S9728 / a / 74.436".
+        public string Display => Node != null ? "node " + Node : Location.Display;
     }
     // The native pose of a track anchor in map coordinates: the position and the track direction as a quaternion.
     public sealed class TrackPose {

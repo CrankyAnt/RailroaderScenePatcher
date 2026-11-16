@@ -146,7 +146,7 @@ namespace RailroaderScenePatcher.Core {
             ribbon.AddRange(WorldStrokeGeometry.ClipTriangles(triangles, new[] { viewport }));
         }
 
-        static List<ScreenPoint> Hull(List<ScreenPoint> points) {
+        internal static List<ScreenPoint> Hull(List<ScreenPoint> points) {
             points.Sort((a, b) => a.X == b.X ? a.Y.CompareTo(b.Y) : a.X.CompareTo(b.X));
             if (points.Count < 3) return points;
             var hull = new List<ScreenPoint>();

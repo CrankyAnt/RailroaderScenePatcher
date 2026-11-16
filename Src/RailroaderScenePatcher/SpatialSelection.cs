@@ -67,48 +67,62 @@ namespace RailroaderScenePatcher {
             var members = Native.Read(graph, kind == SelectionKind.TrackSegment ? "AllSegments" : "Nodes") as IEnumerable;
             if (members == null) throw new InvalidOperationException("The loaded track graph is unavailable");
             foreach (var member in members) {
-                if (member == null) continue;
-                var id = Native.Read(member, "id") as string;
-                if (String.IsNullOrWhiteSpace(id)) continue;
-                var identity = SelectionIdentity.Graph(kind, id);
-                if (kind == SelectionKind.TrackNode) {
-                    var point = (Vector3)Native.Read(member, "Position");
-                    yield return new SpatialCandidate(new SelectionCandidate(member, identity, identity.ToString(), Coordinates(point)),
-                        Finite(point) ? new[] { point } : Array.Empty<Vector3>(), "Map position " + Coordinates(point));
-                    continue;
-                }
-
-                var a = Native.Read(member, "a");
-                var b = Native.Read(member, "b");
-                if (a == null || b == null) {
-                    yield return new SpatialCandidate(new SelectionCandidate(member, identity, identity.ToString(), "Missing endpoints"),
-                        Array.Empty<Vector3>(), "Endpoints unavailable");
-                    continue;
-                }
-                var endA = Native.Read(a, "id") as string;
-                var endB = Native.Read(b, "id") as string;
-                var curve = Native.Read(member, "Curve");
-                var p0 = (Vector3)Native.Read(curve, "P0");
-                var p1 = (Vector3)Native.Read(curve, "P1");
-                var p2 = (Vector3)Native.Read(curve, "P2");
-                var p3 = (Vector3)Native.Read(curve, "P3");
-                var points = Array.Empty<Vector3>();
-                bool active = (bool)Native.Read(member, "Available") && (bool)Native.Read(member, "GroupEnabled");
-                if (!String.IsNullOrWhiteSpace(endA) && !String.IsNullOrWhiteSpace(endB) &&
-                    Finite(p0) && Finite(p1) && Finite(p2) && Finite(p3)) {
-                    points = new Vector3[17];
-                    for (int i = 0; i < points.Length; i++) {
-                        float t = (float)i / (points.Length - 1);
-                        float s = 1 - t;
-                        points[i] = s * s * s * p0 + 3 * s * s * t * p1 + 3 * s * t * t * p2 + t * t * t * p3;
-                    }
-                }
-                var ends = "Endpoints: " + endA + " / " + endB;
-                var evidence = String.Join("|", active.ToString(), endA, endB, Coordinates(p0), Coordinates(p1), Coordinates(p2), Coordinates(p3));
-                var label = identity + (active ? "" : " [inactive]");
-                yield return new SpatialCandidate(new SelectionCandidate(member, identity, label, evidence), points, ends,
-                    controlPoints: new[] { p0, p1, p2, p3 });
+                var candidate = Of(kind, member);
+                if (candidate != null) yield return candidate;
             }
+        }
+
+        // The members of the loaded track graph of one kind.
+        static IEnumerable Members(SelectionKind kind) =>
+            Native.Read(Native.Read(Native.Type("Track.Graph"), "Shared"), kind == SelectionKind.TrackSegment ? "AllSegments" : "Nodes") as IEnumerable;
+        // The loaded segment or node with this ID, or null.
+        internal static object Member(SelectionIdentity identity) {
+            var members = Members(identity.Kind);
+            if (members == null) return null;
+            foreach (var member in members) if (member != null && Native.Read(member, "id") as string == identity.Identifier) return member;
+            return null;
+        }
+        // One segment or node of the track graph as a candidate with its current geometry, or null without an ID.
+        internal static SpatialCandidate Of(SelectionKind kind, object member) {
+            if (member == null) return null;
+            var id = Native.Read(member, "id") as string;
+            if (String.IsNullOrWhiteSpace(id)) return null;
+            var identity = SelectionIdentity.Graph(kind, id);
+            if (kind == SelectionKind.TrackNode) {
+                var point = (Vector3)Native.Read(member, "Position");
+                return new SpatialCandidate(new SelectionCandidate(member, identity, identity.ToString(), Coordinates(point)),
+                    Finite(point) ? new[] { point } : Array.Empty<Vector3>(), "Map position " + Coordinates(point));
+            }
+
+            var a = Native.Read(member, "a");
+            var b = Native.Read(member, "b");
+            if (a == null || b == null) {
+                return new SpatialCandidate(new SelectionCandidate(member, identity, identity.ToString(), "Missing endpoints"),
+                    Array.Empty<Vector3>(), "Endpoints unavailable");
+            }
+            var endA = Native.Read(a, "id") as string;
+            var endB = Native.Read(b, "id") as string;
+            var curve = Native.Read(member, "Curve");
+            var p0 = (Vector3)Native.Read(curve, "P0");
+            var p1 = (Vector3)Native.Read(curve, "P1");
+            var p2 = (Vector3)Native.Read(curve, "P2");
+            var p3 = (Vector3)Native.Read(curve, "P3");
+            var points = Array.Empty<Vector3>();
+            bool active = (bool)Native.Read(member, "Available") && (bool)Native.Read(member, "GroupEnabled");
+            if (!String.IsNullOrWhiteSpace(endA) && !String.IsNullOrWhiteSpace(endB) &&
+                Finite(p0) && Finite(p1) && Finite(p2) && Finite(p3)) {
+                points = new Vector3[17];
+                for (int i = 0; i < points.Length; i++) {
+                    float t = (float)i / (points.Length - 1);
+                    float s = 1 - t;
+                    points[i] = s * s * s * p0 + 3 * s * s * t * p1 + 3 * s * t * t * p2 + t * t * t * p3;
+                }
+            }
+            var ends = "Endpoints: " + endA + " / " + endB;
+            var evidence = String.Join("|", active.ToString(), endA, endB, Coordinates(p0), Coordinates(p1), Coordinates(p2), Coordinates(p3));
+            var label = identity + (active ? "" : " [inactive]");
+            return new SpatialCandidate(new SelectionCandidate(member, identity, label, evidence), points, ends,
+                controlPoints: new[] { p0, p1, p2, p3 });
         }
 
         static bool Finite(Vector3 point) => IsFinite(point.x) && IsFinite(point.y) && IsFinite(point.z);
@@ -126,6 +140,49 @@ namespace RailroaderScenePatcher {
         // The confirmed target and the object it was confirmed for, kept for its world marking.
         SpatialCandidate confirmedMark;
         object confirmedFor;
+        // The track element the inspected object follows, and the object. Its marking is rebuilt from the element
+        // itself a few times a second, so it moves with the track; the element is looked up once.
+        SelectionIdentity followed;
+        object followedFor, followedMember;
+        SpatialCandidate followedMark;
+        int followedAt;
+        bool followedMissing;
+        // What the inspected object is bound to now, while its Connections tab is open: the track elements of its
+        // current binding, native or set by a patch. Their markings are rebuilt from the graph elements a few times a
+        // second, as the followed track's is.
+        SelectionIdentity[] bound = new SelectionIdentity[0];
+        object boundFor;
+        object[] boundMembers;
+        SpatialCandidate[] boundMarks = new SpatialCandidate[0];
+        int boundAt;
+        internal void Binds(object owner, SelectionIdentity[] identities) {
+            boundFor = owner; bound = identities ?? new SelectionIdentity[0]; boundMembers = null; boundMarks = new SpatialCandidate[0];
+        }
+        SpatialCandidate[] Bound(SceneObservation inspected) {
+            if (bound.Length == 0 || inspected == null || !ReferenceEquals(boundFor, inspected.Handle)) return new SpatialCandidate[0];
+            if (boundMembers != null && Time.frameCount < boundAt + 20) return boundMarks;
+            try {
+                if (boundMembers == null) boundMembers = bound.Select(SpatialSelectionScene.Member).ToArray();
+                boundMarks = bound.Select((identity, index) => boundMembers[index] == null ? null : SpatialSelectionScene.Of(identity.Kind, boundMembers[index])).Where(mark => mark != null).ToArray();
+            } catch { boundMarks = new SpatialCandidate[0]; boundMembers = new object[bound.Length]; }
+            boundAt = Time.frameCount;
+            return boundMarks;
+        }
+        internal void Follows(object owner, SelectionIdentity identity) {
+            followedFor = owner; followed = identity; followedMember = null; followedMark = null; followedMissing = false;
+        }
+        SpatialCandidate Followed(SceneObservation inspected) {
+            if (followed == null || inspected == null || !ReferenceEquals(followedFor, inspected.Handle) || followedMissing) return null;
+            if (followedMark != null && Time.frameCount < followedAt + 20) return followedMark;
+            try {
+                if (followedMember == null) followedMember = SpatialSelectionScene.Member(followed);
+                followedMark = followedMember == null ? null : SpatialSelectionScene.Of(followed.Kind, followedMember);
+            } catch { followedMark = null; }
+            // An element that is not in the graph is not searched for again until the relation is read again.
+            if (followedMark == null) followedMissing = true;
+            followedAt = Time.frameCount;
+            return followedMark;
+        }
         internal PendingSelection Pending => session.Pending;
         // The last confirmation, until a later choice is cancelled: after Cancel nothing is chosen, so the panel shows no
         // earlier target as confirmed beside fields that were cleared.
@@ -135,22 +192,44 @@ namespace RailroaderScenePatcher {
         internal SpatialSelection(IInspectionScene inventory, Func<IReadOnlyList<SceneObservation>> entries = null) {
             scene = new SpatialSelectionScene(inventory, entries);
             session = new SelectionSession(scene);
+            // The overlay asks which objects are inventory objects; the set follows the inventory snapshot.
+            IReadOnlyList<SceneObservation> known = null; HashSet<object> handles = null; var counted = -1;
+            overlay.IsInventory = go => {
+                var now = entries?.Invoke();
+                if (now == null) return false;
+                // The set is built again when the snapshot is another one or has another number of entries; that
+                // number is kept beside the set, because two entries of one object make the set smaller than the list.
+                if (!ReferenceEquals(now, known) || handles == null || counted != now.Count) { known = now; counted = now.Count; handles = new HashSet<object>(now.Select(e => e.Handle)); }
+                return handles.Contains(go);
+            };
         }
 
-        internal void Begin(SelectionKind kind, SceneObservation origin) {
+        // The candidates a choice shows and offers: every candidate of its kind with a usable position, less those a
+        // patch could not name when the choice is for a document (SelectionOffers).
+        SpatialCandidate[] Offered(SelectionKind kind, bool inspectOnly) {
+            var all = scene.Scan(kind).Where(c => c.Points.Length != 0).ToArray();
+            if (inspectOnly) return all;
+            var offered = new HashSet<SelectionCandidate>(SelectionOffers.For(all.Select(c => c.Choice), false));
+            return all.Where(c => offered.Contains(c.Choice)).ToArray();
+        }
+        bool inspectOnly;
+        internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false) {
             if (Pending != null) return;
             if (Camera.main == null) throw new InvalidOperationException("The editor camera is unavailable");
             WorldOffset();
-            var current = scene.Scan(kind).Where(c => c.Points.Length != 0).ToArray();
+            this.inspectOnly = inspectOnly;
+            var current = Offered(kind, inspectOnly);
             var newSource = origin == null ? null : SpatialSelectionScene.Observe(origin);
             if (current.Length == 0) throw new InvalidOperationException("No candidates with usable world positions were found");
             var purpose = kind == SelectionKind.SceneObject
                 ? (origin == null ? "Select scene object" : "Select replacement scene object")
                 : (kind == SelectionKind.TrackSegment ? "Select replacement track segment" : "Select replacement track node");
-            session.Begin(kind, purpose, newSource?.Choice);
+            session.Begin(kind, purpose, newSource?.Choice, inspectOnly);
             candidates = current;
             source = newSource;
-            confirmedMark = null; confirmedFor = null;
+            // A choice for the same object keeps that object's confirmed relation in view, so the track it follows
+            // stays green beside the blue candidate. A choice for another object starts without one.
+            if (origin == null || !ReferenceEquals(confirmedFor, origin.Handle)) { confirmedMark = null; confirmedFor = null; }
         }
 
         internal void Pick(Vector2 pointer, IReadOnlyList<Rect> covered) {
@@ -162,7 +241,7 @@ namespace RailroaderScenePatcher {
                 Pending.Offer(Array.Empty<SelectionCandidate>());
                 return;
             }
-            var current = scene.Scan(Pending.Kind).Where(c => c.Points.Length != 0).ToArray();
+            var current = Offered(Pending.Kind, inspectOnly);
             var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered);
             candidates = current;
             Pending.Offer(hits);
@@ -181,10 +260,16 @@ namespace RailroaderScenePatcher {
         }
 
         internal void Cancel() {
-            if (session.Pending != null) withdrawn = true;
+            if (session.Pending != null) { withdrawn = true; confirmedMark = null; confirmedFor = null; }
             session.Cancel();
             ClearMarks();
         }
+
+        // An edit used the confirmed target: nothing is confirmed any more, and its marking goes.
+        internal void Consume() { session.Consume(); confirmedMark = null; confirmedFor = null; }
+
+        // The surface under the objects may have changed; their frames are cut at it anew.
+        internal void ClearSurface() { overlay.ClearSurface(); }
 
         internal void Release() {
             Cancel();
@@ -202,9 +287,9 @@ namespace RailroaderScenePatcher {
             if (camera == null) return;
             var original = source ?? (inspected == null ? null : SpatialSelectionScene.Observe(inspected));
             // The confirmed relation belongs to the object it was chosen for, and is not the inspected object itself.
-            var relation = Pending == null && session.Confirmed != null && confirmedMark != null && inspected != null &&
+            var relation = (Pending == null || (source != null && ReferenceEquals(source.Choice.Handle, confirmedFor))) && session.Confirmed != null && confirmedMark != null && inspected != null &&
                 (confirmedFor == null || ReferenceEquals(confirmedFor, inspected.Handle)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
-            overlay.Draw(candidates, Pending, original, source != null, relation, camera, WorldOffset(), covered, backing);
+            overlay.Draw(candidates, Pending, original, source != null, relation, Followed(inspected), Bound(inspected), camera, WorldOffset(), covered, backing);
         }
 
         static Vector3 WorldOffset() =>

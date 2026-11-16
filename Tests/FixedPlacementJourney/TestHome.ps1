@@ -64,7 +64,8 @@ function Receipt {
     return $value
 }
 Plain $homePath;Plain $run
-$processes=@(Get-CimInstance Win32_Process -Filter "Name='Railroader.exe'")
+# A sandbox never touches a running game's home: its result does not depend on which processes run.
+$processes=if($TestSandbox){@()}else{@(Get-CimInstance Win32_Process -Filter "Name='Railroader.exe'")}
 if ($processes.Count) {
     if ($Action -ne 'SelectVariant' -or !$AllowRunning -or $TestSandbox -or $processes.Count -ne 1) {throw 'Railroader must be closed for this action'}
     $matches=[regex]::Matches($processes[0].CommandLine,'(?i)(?:^|\s)-homedir\s+(?:"([^"]+)"|(\S+))')
@@ -84,7 +85,7 @@ if($Action -eq 'Install') {
     if ($initial.entries.Count -ne 0 -or !$initial.preferences.activationNeutral) {throw 'Initial isolated home is not neutral; preserve it and stop'}
     if(!$TestSandbox -and (Test-Path 'D:\SteamLibrary\steamapps\common\Railroader\Mods') -and @(Get-ChildItem 'D:\SteamLibrary\steamapps\common\Railroader\Mods' -Force -ErrorAction Stop).Count){throw 'Install-root Mods is not empty; stop without touching it'}
     $sourceFiles=@{}
-    foreach($name in @('Info.json','RailroaderScenePatcher.dll','RailroaderScenePatcher.Core.dll','0Harmony.dll')) {$sourceFiles['Mods/Issue39ScenePatcher/'+$name]=Join-Path $ProductOutput $name}
+    foreach($name in @('Info.json','RailroaderScenePatcher.dll','RailroaderScenePatcher.Core.dll','0Harmony.dll','Icons/SceneWrench.png')) {$sourceFiles['Mods/Issue39ScenePatcher/'+$name]=Join-Path $ProductOutput $name}
     $sourceFiles['Mods/Issue39Observation/NativeObservation.dll']=$ObserverDll
     $sourceFiles['Mods/Issue39Observation/Info.json']=[IO.Path]::GetFullPath("$PSScriptRoot/../NativeObservation/Info.json")
     foreach($name in @('Info.json','Definitions.json','Data/Map.json','Data/scene-patches.json')) {$sourceFiles['ModDev/Issue39FixedPlacement/'+$name]=Join-Path $FixtureSource $name}
@@ -145,7 +146,10 @@ foreach($relative in $receipt.files.Keys) {
 Write-Json $receipt $receiptPath;Write-Json (Inventory) (Join-Path $run 'before-cleanup.json')
 if($Action -eq 'Collect'){return}
 if($Action -eq 'Cleanup') {
-    $p=Prefs
+    # One read gives both the values and their hash: a change of the file after this read stops the later write.
+    Plain $prefsPath;$prefsBytes=[IO.File]::ReadAllBytes($prefsPath)
+    $prefsHash=[BitConverter]::ToString([Security.Cryptography.SHA256]::HashData($prefsBytes)).Replace('-','')
+    $p=[Text.Encoding]::UTF8.GetString($prefsBytes) | ConvertFrom-Json -AsHashtable
     if(!(Neutral $p)){throw 'Disable the isolated test activations through root first; mods and clientMods must both be empty. No preferences were changed.'}
     $current=Inventory
     foreach($entry in $current.files) {if(!$receipt.files.ContainsKey($entry.path.Replace('\','/'))){throw "Unexpected file preserved before deletion: $($entry.path)"}}
@@ -166,8 +170,8 @@ if($Action -eq 'Cleanup') {
         if(Test-Path -LiteralPath $path){foreach($child in Get-ChildItem -LiteralPath $path -Directory -Recurse -Force | Sort-Object {$_.FullName.Length} -Descending){$null=Inside $child.FullName;[IO.Directory]::Delete($child.FullName,$false)};[IO.Directory]::Delete($path,$false)}
     }
     if($p.settings['mods.allow-dll'] -ne $receipt.initialAllowDll){
-        $hash=(Get-FileHash -LiteralPath $prefsPath).Hash;$p.settings['mods.allow-dll']=$receipt.initialAllowDll
-        if((Get-FileHash -LiteralPath $prefsPath).Hash -cne $hash){throw 'Preferences changed concurrently; stop'}
+        $p.settings['mods.allow-dll']=$receipt.initialAllowDll
+        if((Get-FileHash -LiteralPath $prefsPath -Algorithm SHA256).Hash -cne $prefsHash){throw 'Preferences changed concurrently; stop'}
         Write-Json $p $prefsPath
     }
     $final=Inventory;Write-Json $final (Join-Path $run 'final.json');$receipt.state='cleaned';Write-Json $receipt $receiptPath

@@ -13,23 +13,28 @@ using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
     // Inspector mode of the Scene patches window: a command band, the outliner beside the inspector, four tabs and a
-    // fixed footer. Every region has a fixed height or scrolls inside its own rectangle, so showing or hiding text or
-    // feedback moves no other control.
+    // fixed footer. A control sits where its scope is: a tab's own actions in a pinned row at the bottom of its tab
+    // body, the actions on the inspected object that are the same on every tab in the footer below the messages. Every
+    // region has a fixed height or scrolls inside its own rectangle, so showing or hiding text or feedback moves no
+    // other control.
     public sealed partial class PatcherBehaviour {
         const string ObjectTab = "object", PlacementTab = "placement", ConnectionsTab = "connections", ChangesTab = "changes";
+        static readonly string[] TabIds = { ObjectTab, PlacementTab, ConnectionsTab, ChangesTab };
         // Canvas units.
-        // The outliner is never narrower than its three filter segments at their natural widths.
+        // The outliner is never narrower than its four filter segments at their natural widths, 292.4 units
+        // (CommandBand.FilterSegments), which is also more than its band needs: Refresh and both status lamps with
+        // their words, 251.
         // The inspector's minimum holds the four footer slots, their spacing and the resize grip.
-        // The outliner is also never narrower than its band: Refresh and both status lamps with their words.
-        const float OutlinerDefaultWidth = 252, OutlinerMinimumWidth = 252, InspectorMinimumWidth = 350, SlotWidth = 80, TabBodyMinimumHeight = 80,
+        const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 180, TabGap = 8,
             RowHeight = 24, LineHeight = 20, MessageHeight = 40,
             // What a row adds to its name: the folder and child indent, the two markers and the scroll bar.
             RowDecoration = 80;
         // The changed state reads the same in the state line and on the Changes tab: the native Map Editor's badge.
         static readonly string ChangedBadge = CommandBand.Changed.Markup;
-        // The space the name row keeps free at its right end, under Details, for the Inspector and Guided switch. The
-        // left band's widths are CommandBand's, and the outliner's minimum holds them: 252 against the 251 they need.
-        const float GuidedSwitchSpace = 150;
+        // The left band's widths are CommandBand's, and the outliner's minimum holds them: 296 against the 251 they
+        // need.
+        // How far a lamp's dot stands above the middle of its row, half of this, so that it sits on its word's line.
+        const float LampRaise = 4;
         // The native Map Editor's status colors (MapCompositionStyle and its inspectors), and the proposed-target blue of
         // the world markings.
         const string Red = "#FF8080", Amber = "#E8A33D", Green = "#7FB86B", Blue = "#4DCCFF";
@@ -43,12 +48,16 @@ namespace RailroaderScenePatcher {
         }
         static void StoreOutlinerWidth(float width) { try { Game.GlobalPreferences.SetFloat(OutlinerWidthKey, width); } catch { } }
         static void ForgetOutlinerWidth() { try { Game.GlobalPreferences.DeleteKey(OutlinerWidthKey); } catch { } }
-        enum BodyView { Tabs, TabHelp, MainHelp, Session }
+        // Why a tab's own controls cannot be used while a world choice is pending: the footer holds that choice.
+        const string PendingChoice = "Confirm or cancel the pending world choice first.";
+        string ChoiceBlock => selection?.Pending != null ? PendingChoice : null;
+        // The tool the gizmo starts in, chosen with the Move and Rotate switch of the Gizmo mode.
+        UI.Gizmos.TransformGizmoMode gizmoTool = UI.Gizmos.TransformGizmoMode.Move;
+        // Whether the footer's message area shows the clicked candidate's details during a world choice.
+        bool candidateDetails;
         static readonly string[] PlacementModes = { "Numeric", "Gizmo", "Snap", "Follow" };
         OutlinerFilter outlinerFilter;
         float outlinerWidth = OutlinerDefaultWidth;
-        BodyView bodyView;
-        bool outlinerHelp;
         int placementMode;
         object revealed;
         readonly UIState<string> inspectorTab = new UIState<string>(ObjectTab);
@@ -68,9 +77,9 @@ namespace RailroaderScenePatcher {
         // kind of element has the same size, weight and colour everywhere.
         RectTransform Field(UIPanelBuilder builder, string label, string value) => FieldMarkup(builder, label, Literal(value));
         RectTransform FieldMarkup(UIPanelBuilder builder, string label, string markup) { FieldLabel(builder, label); return builder.AddLabel(markup); }
-        // A section heading: the native section header under a rule. The rule sets a heading apart from a field label,
-        // which has the same small upper-case letters.
-        void Section(UIPanelBuilder builder, string title) { builder.AddHRule(); builder.AddSection(title); }
+        // A section heading: a rule, then the title in bold body text. The native section header has the small upper-case
+        // letters of a field label, so "STATE" over "ENABLED" read as an empty section followed by a second heading.
+        void Section(UIPanelBuilder builder, string title) { builder.AddHRule(); builder.AddLabel("<b>" + Literal(title) + "</b>"); }
         // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.
         void BindingFields(UIPanelBuilder builder, string line) {
@@ -88,29 +97,49 @@ namespace RailroaderScenePatcher {
                 var equals = part.IndexOf('=');
                 // A part without a key continues the value before it.
                 if (equals <= 0) { if (key != null) value += "; " + part; continue; }
-                if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(value));
+                if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(CommandBand.Shown(key, value)));
                 key = part.Substring(0, equals); value = part.Substring(equals + 1);
             }
-            if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(value));
+            if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(CommandBand.Shown(key, value)));
         }
-        // An input field, or its value as text without the input frame when it cannot be edited now. Both are as tall, so
-        // a field that becomes read-only moves nothing.
-        void ValueField(UIPanelBuilder field, string label, string[] values, int index, string block, string tip, bool numeric) {
-            FieldLabel(field, label);
+        // A group of named values in the native inspector's form (DtoInspectorPanel.AddStackedField with AddAxisField):
+        // the group's caption above the row, then each short label in front of its input box, the boxes sharing the
+        // width. While the group cannot be edited it is one running line of text instead, as tall as the row of
+        // boxes, so a group that becomes read-only moves nothing below it. Every group of values in the panel is built
+        // here. Returns the text of the running line, for a caller that keeps it current.
+        // accessory builds a control at the right end of the caption's row, as the native Move button stands beside
+        // the Position caption.
+        TMP_Text ValueRow(UIPanelBuilder builder, string caption, string unit, string[] labels, string[] values, int first, string block, string tip, Func<int, bool> numeric, Action<UIPanelBuilder> accessory = null) {
+            if (accessory == null) FieldLabel(builder, CommandBand.GroupCaption(caption, unit, block == null));
+            else builder.HStack(row => {
+                row.AddLabel("<style=FieldLabel>" + Literal(CommandBand.GroupCaption(caption, unit, block == null)) + "</style>", text => text.verticalAlignment = VerticalAlignmentOptions.Bottom);
+                row.Spacer();
+                accessory(row);
+            }).Height(RowHeight);
             if (block != null) {
-                var text = Line(field, Literal(values[index]), label, block, 30);
-                if (numeric) text.HorizontalTextAlignment(HorizontalAlignmentOptions.Right);
-                return;
+                var line = Line(builder, Literal(CommandBand.RunningLine(labels, values.Skip(first).Take(labels.Length).ToArray(), unit)), caption, block, 30);
+                return line.GetComponentInChildren<TMP_Text>(true);
             }
-            var input = field.AddInputField(values[index], value => values[index] = value);
-            input.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => values[index] = value);
-            if (numeric) AlignNumeric(input);
-            input.Tooltip(label, tip);
-            var layout = input.gameObject.GetComponent<LayoutElement>() ?? input.gameObject.AddComponent<LayoutElement>();
-            layout.minWidth = 0; layout.flexibleWidth = 1;
+            builder.HStack(row => {
+                row.ConfigureLayout(4f);
+                for (var column = 0; column < labels.Length; column++) {
+                    var index = first + column; var label = labels[column];
+                    row.AddLabel("<style=FieldLabel>" + Literal(label) + "</style>", text => text.verticalAlignment = VerticalAlignmentOptions.Middle).MinWidth(0f);
+                    var input = row.AddInputField(values[index], value => values[index] = value);
+                    // Every keystroke stores the value and lets the buttons that depend on it follow.
+                    input.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => { values[index] = value; FieldsChanged(); });
+                    if (numeric(column)) AlignNumeric(input);
+                    input.Tooltip(caption + " " + label, tip);
+                    var layout = input.gameObject.GetComponent<LayoutElement>() ?? input.gameObject.AddComponent<LayoutElement>();
+                    // The boxes share the row's width equally, whatever their content: the box's own preferred
+                    // width, which follows its text, gives way to this element.
+                    layout.minWidth = 0; layout.preferredWidth = 0; layout.flexibleWidth = 1; layout.layoutPriority = 2;
+                }
+            });
+            return null;
         }
         // The label of an input field and the alignment of a number in it, as the native inspectors build them.
-        void FieldLabel(UIPanelBuilder builder, string label) => builder.AddLabel("<style=FieldLabel>" + Literal(label) + "</style>");
+        RectTransform FieldLabel(UIPanelBuilder builder, string label) => builder.AddLabel("<style=FieldLabel>" + Literal(label) + "</style>");
         static void AlignNumeric(RectTransform input) {
             var text = input.GetComponent<TMP_InputField>()?.textComponent;
             if (text != null) text.alignment = TextAlignmentOptions.Right;
@@ -133,6 +162,7 @@ namespace RailroaderScenePatcher {
         const string GuideRoot = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/";
 
         void DrawWindow(UIPanelBuilder builder) {
+            typed.Clear();
             builder.ConfigureLayout(4f);
             // The command band is split at the column divider: each column starts with its own band, so the left band is
             // as wide as the outliner and the right band as wide as the inspector, wherever the divider stands.
@@ -193,17 +223,21 @@ namespace RailroaderScenePatcher {
         static Sprite lampSprite;
         static RectTransform AddLampDot(RectTransform lamp, string color) {
             if (lampSprite == null) {
+                // The row centres the dot's rectangle on its height, and the word's letters sit above that centre, so a
+                // dot in the middle of the row stood below its word. The image is taller than the disc by LampRaise at
+                // its lower edge: its rectangle stays centred and the disc stands that much higher, on the word's line.
                 const int size = 32;
-                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "CrankyAnt Scene Patcher lamp", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
-                var pixels = new Color32[size * size];
-                for (var y = 0; y < size; y++)
+                var height = Mathf.RoundToInt(size * (CommandBand.Dot + LampRaise) / CommandBand.Dot);
+                var texture = new Texture2D(size, height, TextureFormat.RGBA32, false) { name = "CrankyAnt Scene Patcher lamp", hideFlags = HideFlags.DontSave, wrapMode = TextureWrapMode.Clamp };
+                var pixels = new Color32[size * height];
+                for (var y = 0; y < height; y++)
                     for (var x = 0; x < size; x++) {
-                        // One pixel of soft edge around a filled disc.
-                        var distance = Mathf.Sqrt((x + 0.5f - size * 0.5f) * (x + 0.5f - size * 0.5f) + (y + 0.5f - size * 0.5f) * (y + 0.5f - size * 0.5f));
+                        // One pixel of soft edge around a filled disc in the upper part of the image; rows count from the bottom.
+                        var distance = Mathf.Sqrt((x + 0.5f - size * 0.5f) * (x + 0.5f - size * 0.5f) + (y + 0.5f - (height - size * 0.5f)) * (y + 0.5f - (height - size * 0.5f)));
                         pixels[y * size + x] = new Color32(255, 255, 255, (byte)(255 * Mathf.Clamp01(size * 0.5f - 0.5f - distance)));
                     }
                 texture.SetPixels32(pixels); texture.Apply();
-                lampSprite = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+                lampSprite = Sprite.Create(texture, new Rect(0, 0, size, height), new Vector2(0.5f, 0.5f), 100f);
                 lampSprite.name = texture.name; lampSprite.hideFlags = HideFlags.DontSave;
             }
             // The game shows the tooltip of the first object under the pointer that is on the UI layer. A stack the builder
@@ -217,34 +251,44 @@ namespace RailroaderScenePatcher {
             image.sprite = lampSprite; image.preserveAspect = true; image.raycastTarget = true;
             image.color = ColorUtility.TryParseHtmlString(color, out var parsed) ? parsed : Color.white;
             var layout = dot.AddComponent<LayoutElement>();
-            layout.minWidth = layout.preferredWidth = CommandBand.Dot; layout.minHeight = layout.preferredHeight = CommandBand.Dot; layout.flexibleWidth = 0; layout.flexibleHeight = 0;
+            layout.minWidth = layout.preferredWidth = CommandBand.Dot; layout.minHeight = layout.preferredHeight = CommandBand.Dot + LampRaise; layout.flexibleWidth = 0; layout.flexibleHeight = 0;
             return (RectTransform)dot.transform;
         }
-        // The right band, over the inspector: the commands for the object, with Details at the right end. A command that
-        // cannot run stays in place, greyed out, with its reason.
+        // The right band, over the inspector: the commands for the inspection. A command that cannot run stays in
+        // place, greyed out, with its reason. The session details and Reset layout are window commands and stand in
+        // the title bar.
         void DrawRightBand(UIPanelBuilder builder) {
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                var select = CommandBand.SelectInWorld(selection != null, selection?.Pending != null);
-                Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Disable(select != null)
-                    .Tooltip("Select in world", select ?? "Click a marking in the world to choose the object to inspect.");
+                var pending = selection?.Pending != null;
+                var select = CommandBand.SelectInWorld(selection != null, pending);
+                Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
+                    .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
                 var focus = CommandBand.Focus(selected != null);
-                Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Disable(focus != null)
-                    .Tooltip("Focus", focus ?? "Move the camera to the inspected object. Focus selects nothing.");
+                Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Inactive(focus != null)
+                    .Tooltip("Focus", CommandBand.Tooltip("Move the camera to the inspected object. Focus selects nothing.", focus));
+                // Beside Focus, as the native Map Editor has Focus and Clear on its selection row.
+                var clear = CommandBand.Clear(selected != null, pending);
+                Button(row, "Clear", ClearInspection).Inactive(clear != null)
+                    .Tooltip("Clear", CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", clear));
                 var copy = CommandBand.CopyId(selected != null);
-                Button(row, "Copy ID", CopyIdentity).Disable(copy != null)
-                    .Tooltip("Copy ID", copy ?? "Copy the inspected object's map context, target identity and placement as patch-document JSON.");
+                Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
+                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's map context, target identity and placement as patch-document JSON.", copy));
                 row.Spacer();
                 // The window's "?" belongs in the title bar; it stands here only when the title bar could not take it.
-                if (!presentation.TitleHelp) HelpButton(row, bodyView == BodyView.MainHelp, "Window", ToggleWindowHelp);
-                Button(row, "Details", () => bodyView = bodyView == BodyView.Session ? BodyView.Tabs : BodyView.Session).Width(66)
-                    .Tooltip("Session details", "Messages, inventory and save state, supplied definitions and diagnostics.");
+                if (!presentation.TitleHelp) HelpButton(row, NativeEditorPresentation.WindowHelpRegion, "Window");
             }).Height(RowHeight);
         }
-        void ToggleWindowHelp() { bodyView = bodyView == BodyView.MainHelp ? BodyView.Tabs : BodyView.MainHelp; }
-        // A "?" names its scope in its tooltip and shows "x" while its help is open.
-        void HelpButton(UIPanelBuilder row, bool open, string scope, Action toggle) =>
-            Button(row, open ? "x" : "?", toggle).Width(28).Tooltip(scope + " help", open ? "Close the " + scope.ToLowerInvariant() + " help." : "Explain the " + scope.ToLowerInvariant() + ".");
+        // A "?" names its scope in its tooltip and shows "x" while its help is open. It opens its region's help in
+        // the help window beside itself, and closes it again.
+        void HelpButton(UIPanelBuilder row, string region, string scope) {
+            var open = presentation.HelpRegion == region;
+            IConfigurableElement button = null;
+            button = Button(row, open ? "x" : "?", () => presentation.ToggleHelp(region, button.RectTransform));
+            // "?" and "x" change in place: the button has the width of the wider one.
+            if (FitButton(button, "?", "x") == 0) button.Width(28);
+            button.Tooltip(scope + " help", open ? "Close the " + scope.ToLowerInvariant() + " help." : "Explain the " + scope.ToLowerInvariant() + " in a window beside this button.");
+        }
         bool Unsaved(out string text) {
             if (authoring == null) { text = String.IsNullOrEmpty(authoringStatus) ? "Editing is unavailable." : authoringStatus; return false; }
             try {
@@ -273,22 +317,28 @@ namespace RailroaderScenePatcher {
             DrawLeftBand(builder);
             UIPanel results = null;
             builder.HStack(row => {
-                row.AddFilterField(filter, value => { filter = value; results?.SetNeedsRebuild(); }, null, true).FlexibleWidth();
-                HelpButton(row, outlinerHelp, "Outliner", () => outlinerHelp = !outlinerHelp);
+                // The search field takes the width the two buttons leave, whatever it holds: its own least and
+                // preferred widths follow its content, the clear button that comes with text included, and they
+                // moved "?" and Fit and pushed Fit past the column's edge. This element decides instead.
+                var search = row.AddFilterField(filter, value => { filter = value; results?.SetNeedsRebuild(); }, null, true);
+                var searchWidth = search.GetComponent<LayoutElement>() ?? search.gameObject.AddComponent<LayoutElement>();
+                searchWidth.minWidth = 0; searchWidth.preferredWidth = 0; searchWidth.flexibleWidth = 1; searchWidth.layoutPriority = 2;
+                HelpButton(row, "outliner", "Outliner");
                 // Beside the divider, because it sets the column width. The native builder's icon buttons take a sprite
                 // name from the game's assets and none of the known ones means width, so the control is a short text.
                 IConfigurableElement fit = null;
                 fit = Button(row, "Fit", () => FitOutliner(fit.RectTransform.GetComponentInChildren<TMP_Text>(true)));
-                fit.Width(40).Tooltip("Fit names", "Size this column to most names shown. Drag the divider for another width.");
+                fit.Tooltip("Fit names", "Size this column to most names shown. Drag the divider for another width.");
             }).Height(30);
             builder.AddSegmentedControlCompact(segments => {
-                segments.AddSegment("All", outlinerFilter == OutlinerFilter.All, presentation.Action(() => outlinerFilter = OutlinerFilter.All)).Tooltip("All", "Show every observed object.");
-                segments.AddSegment("Problems", outlinerFilter == OutlinerFilter.Problems, presentation.Action(() => outlinerFilter = OutlinerFilter.Problems)).Tooltip("Problems", "Show the objects with a detected problem.");
-                segments.AddSegment("Changed", outlinerFilter == OutlinerFilter.Changed, presentation.Action(() => outlinerFilter = OutlinerFilter.Changed)).Tooltip("Changed", "Show the objects this MapMod changes.");
+                // All first, then the rest by name.
+                segments.AddSegment(CommandBand.AllFilter, outlinerFilter == OutlinerFilter.All, presentation.Action(() => outlinerFilter = OutlinerFilter.All)).Tooltip(CommandBand.AllFilter, "Show every observed object.");
+                segments.AddSegment(CommandBand.ChangedFilter, outlinerFilter == OutlinerFilter.Changed, presentation.Action(() => outlinerFilter = OutlinerFilter.Changed)).Tooltip(CommandBand.ChangedFilter, "Show the objects this MapMod changes.");
+                segments.AddSegment(CommandBand.DisabledFilter, outlinerFilter == OutlinerFilter.Disabled, presentation.Action(() => outlinerFilter = OutlinerFilter.Disabled)).Tooltip(CommandBand.DisabledFilter, "Show the objects that are switched off themselves. A disabled object is never listed as a problem.");
+                segments.AddSegment(CommandBand.ProblemsFilter, outlinerFilter == OutlinerFilter.Problems, presentation.Action(() => outlinerFilter = OutlinerFilter.Problems)).Tooltip(CommandBand.ProblemsFilter, "Show the objects with a detected problem.");
             });
             results = builder.AddRebuildableSection(items => {
                 items.ConfigureLayout(4f);
-                if (outlinerHelp) { presentation.Scroll(items, 120, help => { help.ConfigureLayout(4f); DrawHelp(help, "outliner", () => outlinerHelp = false); }, false); return; }
                 var shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged);
                 var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
                 Line(items, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", summary + ". Inactive loaded objects are included.");
@@ -300,18 +350,30 @@ namespace RailroaderScenePatcher {
                 var indices = new Dictionary<SceneObservation, int>();
                 if (inventory != null) for (var i = 0; i < inventory.Entries.Count; i++) indices[inventory.Entries[i]] = i;
                 foreach (var group in InventoryPresentationState.Groups(shown)) {
-                    var groupKey = "family:" + group.Key;
+                    // The Inspection only group stands after the families and has a key no family can have.
+                    var groupKey = (ReferenceEquals(group.Key, InventoryPresentationState.InspectionOnlyGroup) ? "group:" : "family:") + group.Key;
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
                     var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + group.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(group.Key));
                     var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
+                    // A family whose objects the game itself tells apart shows them under subgroups; a family group
+                    // only, never the Inspection only group.
+                    var subgroups = groupKey.StartsWith("family:", StringComparison.Ordinal) ? InventoryPresentationState.Subgroups(group.Value) : null;
+                    var folders = new Dictionary<SceneObservation, UIOutlineItem>(); var folderKeys = new Dictionary<SceneObservation, string>();
+                    if (subgroups != null) foreach (var subgroup in subgroups) {
+                        var subKey = groupKey + "/" + subgroup.Key;
+                        var folder = new UIOutlineItem(subKey, "<alpha=#99>" + subgroup.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(subgroup.Key));
+                        parent.AddChild(folder);
+                        foreach (var row in subgroup.Value) { folders[row] = folder; folderKeys[row] = subKey; }
+                    }
                     foreach (var item in group.Value) {
+                        var holder = folders.TryGetValue(item, out var inFolder) ? inFolder : parent;
                         var key = indices[item].ToString(CultureInfo.InvariantCulture);
                         byKey[key] = item;
                         if (ReferenceEquals(selected, item)) {
                             selectedKey = key;
                             // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
-                            if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; state.SetExpanded(groupKey, true); }
+                            if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; state.SetExpanded(groupKey, true); if (folderKeys.TryGetValue(item, out var folderKey)) state.SetExpanded(folderKey, true); }
                         }
                         var name = InventoryPresentationState.Name(item);
                         var changed = IsChanged(item); var added = IsAdded(item);
@@ -322,9 +384,11 @@ namespace RailroaderScenePatcher {
                         var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added);
                         var segments = item.Identity.Path.Split('/');
                         var context = repeated.Contains(name) && segments.Length > 1 ? "  <alpha=#99>" + Literal(segments[segments.Length - 2]) + "<alpha=#FF>" : "";
-                        parent.AddChild(new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
+                        // A row of the Inspection only group names its family, which its folder does not.
+                        if (item.InspectionOnly != null) context += "  <alpha=#99>" + Literal(item.Family) + "<alpha=#FF>";
+                        holder.AddChild(new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
                             (item.Active ? Literal(name) : "<i>" + Literal(name) + "</i>") + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (changed ? "\nChanged by this MapMod" : "") + (added ? "\nAdded by this MapMod" : "") +
+                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\nInspection only: " + item.InspectionOnly) + (changed ? "\nChanged by this MapMod" : "") + (added ? "\nAdded by this MapMod" : "") +
                                 (item.Problems.Count == 0 ? "" : "\n" + String.Join("\n", item.Problems))).Replace("<", "\\u003c").Replace(">", "\\u003e")
                         });
                     }
@@ -333,6 +397,8 @@ namespace RailroaderScenePatcher {
                 var outline = items.AddOutlineView(rows, state, new UIState<string>(selectedKey), key => {
                     if (!byKey.TryGetValue(key, out var observation)) return;
                     presentation.Action(() => {
+                        // A click on the row that is inspected already clears the inspection; so does Escape over the panel.
+                        if (CommandBand.ClearsInspection(selected, observation)) { ClearInspection(); return; }
                         if (!inventoryPresentation.CanSelect(inventory, observation)) return;
                         CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPose();
                     })();
@@ -344,7 +410,7 @@ namespace RailroaderScenePatcher {
             // so their tooltips are one line; the window help holds the full explanation.
             builder.AddHRule();
             builder.Spacer(4f);
-            Line(builder, "<style=Footnote>Save in Map Editor</style>", "Save", "Writes map data, patches and Info.json.");
+            Line(builder, "<style=Footnote>Save, Undo, Redo: Map Editor</style>", "Save, Undo and Redo", "Use the Map Editor's own Save, Undo and Redo.");
             Line(builder, "<style=Footnote>Refresh after native edits</style>", "Refresh", "Refresh after Undo, Redo or a native edit.");
             Line(builder, "<style=Footnote>Reload clears Undo history</style>", "Editor reload", "Reloading ends the Undo history.");
             builder.Spacer(4f);
@@ -364,10 +430,11 @@ namespace RailroaderScenePatcher {
             builder.ConfigureLayout(4f);
             DrawRightBand(builder);
             var name = selected == null ? "No Selection" : InventoryPresentationState.Name(selected);
-            // The name row keeps its right end free, under Details, for the Inspector and Guided switch.
+            // The name takes the whole row and is cut only when the row itself is too short; its tooltip holds the
+            // full path. The right end of this row is where the Inspector and Guided switch will stand: no control
+            // stands there, and the name gives way to the switch when it exists.
             builder.HStack(row => {
                 Heading(row, Literal(name), "Object", selected == null ? null : selected.Identity.Path).FlexibleWidth();
-                row.Spacer(GuidedSwitchSpace);
             }).ChildrenKeepHeight();
             var stateLine = Line(builder, StateLine(out var states), "State", states);
             builder.AddTabbedPanels(inspectorTab, tabs => {
@@ -397,6 +464,7 @@ namespace RailroaderScenePatcher {
             foreach (var badge in CommandBand.Badges(IsChanged(selected), IsAdded(selected))) {
                 parts.Add(badge.Markup); text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this MapMod" : "Added by this MapMod");
             }
+            if (selected.InspectionOnly != null) { parts.Add("Inspection only"); text.Add("Inspection only: " + selected.InspectionOnly); }
             if (selected.Problems.Count != 0) {
                 var count = selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
                 parts.Add("<color=" + Red + ">" + count + "</color>"); text.Add(count);
@@ -405,33 +473,51 @@ namespace RailroaderScenePatcher {
             return String.Join("   ", parts);
         }
         // A tab body scrolls inside its own rectangle. Its first row names what the tab is for and holds the tab's own
-        // "?", so that help visibly belongs to the tab. Help and the session details take the place of the content.
-        void Tab(UIPanelBuilder builder, string id, Action<UIPanelBuilder> body) => presentation.Scroll(builder, TabBodyMinimumHeight, content => {
-            content.ConfigureLayout(4f);
-            if (bodyView == BodyView.Session) { DrawSession(content); return; }
-            if (bodyView == BodyView.MainHelp) { DrawHelp(content, "main", () => bodyView = BodyView.Tabs); return; }
-            var help = Help[id];
-            content.HStack(row => {
-                row.AddLabel("<style=Footnote>" + help.Intro + "</style>").TextWrap(TextOverflowModes.Ellipsis, TextWrappingModes.Normal).Height(32).FlexibleWidth();
-                HelpButton(row, bodyView == BodyView.TabHelp, help.Title, () => bodyView = bodyView == BodyView.TabHelp ? BodyView.Tabs : BodyView.TabHelp);
-            }).Height(32);
-            if (bodyView == BodyView.TabHelp) DrawHelp(content, id, () => bodyView = BodyView.Tabs);
-            else if (selected == null) content.AddExpandingVerticalSpacer();
-            else body(content);
-        });
+        // "?", so that help visibly belongs to the tab; the help opens in its own window. Below the scrolling part
+        // the tab's own actions stand in a pinned row of fixed height, inside the tab, so that their place says they
+        // belong to the tab; a gap sets the row apart from the footer, whose row is the same on every tab. The native
+        // editor puts a tool's actions directly under its fields; here they stay in view while the fields scroll.
+        void Tab(UIPanelBuilder builder, string id, Action<UIPanelBuilder> body) {
+            var view = presentation.Scroll(builder, TabBodyMinimumHeight, content => {
+                content.ConfigureLayout(4f);
+                var help = Help[id];
+                content.HStack(row => {
+                    row.AddLabel("<style=Footnote>" + help.Intro + "</style>").TextWrap(TextOverflowModes.Ellipsis, TextWrappingModes.Normal).Height(32).FlexibleWidth();
+                    HelpButton(row, id, help.Title);
+                }).Height(32);
+                if (selected == null) content.AddExpandingVerticalSpacer();
+                else body(content);
+            });
+            // The body takes all free height: its least height shows one role of a coverage form under the tab's
+            // first rows, and the window's least height leaves it that.
+            var fill = view.GetComponent<LayoutElement>();
+            if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
+            ActionRow(builder, TabActs(id), ChoiceBlock);
+            builder.Spacer(TabGap);
+        }
 
         // The Object tab: what the object is, whether it is enabled, and what was detected about it.
         void DrawObject(UIPanelBuilder builder) {
+            // An object of a kind no supported family covers says so first, with the reason it is not yet supported.
+            if (selected.InspectionOnly != null) {
+                Section(builder, "Inspection only");
+                PlainLabel(builder, selected.InspectionOnly);
+            }
             // Problems first: the red count in the state line points at text that is in view.
             Section(builder, "Detected problems");
             if (selected.Problems.Count == 0) Line(builder, "None detected", null, null);
             foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, problem));
+            // What the inspection could not read or check: nothing the modder can repair here, so no problem.
+            if (selected.Notes.Count != 0) {
+                Section(builder, "Inspection notes");
+                foreach (var note in selected.Notes) PlainLabel(builder, Breakable(note));
+            }
             Section(builder, "State");
             var target = selected.Handle as GameObject;
             var own = target != null && target.activeSelf;
             Field(builder, "Enabled", own ? (selected.Active ? "Yes" : "Yes; a parent is inactive") : "No")
                 .Tooltip("Enabled", "Whether this object is active in the scene.");
-            if (FollowsGroup) Field(builder, "Track group", "Activity follows the track group. Disable holds it inactive; Clear returns it to the group; an explicit enable is refused.");
+            if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
             FieldLabel(builder, "Supported edits");
             PlainLabel(builder, selected.Operations);
             Section(builder, "Identity");
@@ -451,40 +537,72 @@ namespace RailroaderScenePatcher {
         static string Breakable(string path) => (path ?? "").Replace("/", "/\u200B");
         bool FollowsGroup => selected != null && selected.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
 
-        // The Placement tab: every way to put the object somewhere. The footer holds the action of the chosen way.
+        // The Placement tab: every way to put the object somewhere. The tab's pinned row holds the actions of the chosen way.
         void DrawPlacement(UIPanelBuilder builder) {
+            // A crossing pad has no placement of its own, and an object that cannot be edited has none to set: the tab
+            // shows the pose, and no other mode is open.
+            if (IsPad || !Editable) placementMode = CommandBand.NumericMode;
             var tips = new[] { "Enter a position in map coordinates and a rotation in degrees.", "Drag the native Move or Rotate gizmo in the world.",
                 "Move the object once onto a chosen track or endpoint.", "Keep the object's pose relative to a chosen track or endpoint." };
             builder.AddSegmentedControlCompact(segments => {
                 for (var i = 0; i < PlacementModes.Length; i++) {
                     var mode = i;
-                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => placementMode = mode)).Tooltip(PlacementModes[i], tips[i]);
+                    // A mode that cannot be used on the inspected object is inactive and says why.
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, selected?.Operations);
+                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) placementMode = mode; })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
-            var block = EditBlock();
+            var block = EditBlock() ?? PadBlock;
             if (placementMode == 0) {
-                var labels = new[] { "X", "Y", "Z", "Rot X", "Rot Y", "Rot Z" };
-                for (var row = 0; row < 2; row++) {
-                    var first = row * 3;
-                    builder.HStack(fields => {
-                        for (var column = 0; column < 3; column++) {
-                            var index = first + column;
-                            fields.VStack(field => ValueField(field, labels[index], pose, index, block, index < 3 ? "Map coordinates, in meters" : "Euler angles, degrees", true)).EqualFlexibleWidth();
-                        }
-                    });
+                for (var group = 0; group < 2; group++) {
+                    if (group != 0) builder.Spacer(6f);
+                    ValueRow(builder, CommandBand.PoseGroups[group], CommandBand.PoseUnits[group], CommandBand.Axes, pose, group * 3, block, group == 0 ? "Map coordinates, in meters" : "Euler angles, degrees", column => true);
                 }
             } else if (placementMode == 1) {
-                Field(builder, "Gizmo", gizmo?.Active == true ? gizmo.State : "Idle");
+                // The tool is a choice, as in the native editor: Move by default. The gizmo stands on the object as
+                // soon as this mode is open and stays until the mode, the tab or the inspection ends; choosing the
+                // other tool changes the gizmo at once. Each completed drag is one operation.
+                builder.AddSegmentedControlCompact(tools => {
+                    foreach (var tool in new[] { UI.Gizmos.TransformGizmoMode.Move, UI.Gizmos.TransformGizmoMode.Rotate }) {
+                        var chosen = tool; var name = tool == UI.Gizmos.TransformGizmoMode.Move ? "Move" : "Rotate";
+                        tools.AddSegment(name, gizmoTool == tool, presentation.Action(() => {
+                            if (selection?.Pending != null) return;
+                            gizmoTool = chosen;
+                            gizmo?.SetMode(chosen);
+                        })).Inactive(ChoiceBlock != null).Tooltip(name, CommandBand.Tooltip(tool == UI.Gizmos.TransformGizmoMode.Move ? "Drag the native Move gizmo in the world." : "Drag the native Rotate gizmo in the world.", ChoiceBlock));
+                    }
+                }, true);
+                // The object's pose as the running lines of Numeric: it follows the gizmo while it is dragged
+                // (ShowLivePose sets the texts in place).
+                var live = new TMP_Text[2];
+                for (var group = 0; group < 2; group++) {
+                    if (group != 0) builder.Spacer(6f);
+                    live[group] = ValueRow(builder, CommandBand.PoseGroups[group], CommandBand.PoseUnits[group], CommandBand.Axes, pose, group * 3, "The object's pose now; it follows the gizmo while you drag.", null, column => true);
+                }
+                gizmoPose = live;
+                Line(builder, "<style=Footnote>" + Literal(block ?? ChoiceBlock ?? (gizmo?.Shown == true ? gizmo.State : "The gizmo appears on the object in the world.")) + "</style>", null, null);
             } else if (placementMode == 2) {
-                Field(builder, "Target", preparedSnap == null ? "None chosen" : preparedSnap.Identity.ToString());
-                Field(builder, "Position", preparedSnap == null ? "None" : String.Join(", ", preparedSnap.Placement.Position.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture))));
+                var offered = choosingSnap && selection?.Pending != null ? selection.Find(selection.Pending.Candidate) : null;
+                Field(builder, "Target", preparedSnap != null ? preparedSnap.Identity.ToString() : offered != null ? "Candidate, not confirmed: " + offered.Choice.Identity : "None chosen");
+                Field(builder, "Position", preparedSnap == null ? "None" : String.Join(", ", preparedSnap.Placement.Position.Select(CommandBand.Number)));
+                // One line names the next step of the sequence: Track or Node, a click in the world, Confirm, Apply.
+                Line(builder, "<style=Footnote>" + (preparedSnap != null ? "Next: Apply moves the object to this position."
+                    : offered != null ? "Next: Confirm takes the candidate; Apply then moves the object."
+                    : choosingSnap ? "Next: click a track or endpoint in the world."
+                    : "Next: Track or Node, then click in the world, Confirm and Apply.") + "</style>", null, null);
             } else {
                 TrackFollowing following = null;
                 if (block == null && trackPoses != null) try { following = authoring.Session.FollowingOf(selected.Identity); } catch { }
-                Field(builder, "Following", following == null ? "Nothing" : following.Anchor.ToString());
-                Field(builder, "Offset", following == null ? "None" : String.Join(", ", following.Offset.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture))));
                 var picked = FollowTarget();
-                Field(builder, "Picked", picked == null ? "None" : picked.Identity.ToString());
+                if (following != null) {
+                    Field(builder, "Following", following.Anchor.Display);
+                    Field(builder, "Offset", String.Join(", ", following.Offset.Select(CommandBand.Number)));
+                }
+                if (picked != null) Field(builder, "Picked", picked.Identity.ToString());
+                if (following == null && picked == null) Field(builder, "Following", "Nothing");
+                Line(builder, "<style=Footnote>" + (picked != null ? "Next: Start keeps the object's pose relative to the picked track."
+                    : following != null ? "Stop ends following. Track or Node picks another track to follow."
+                    : "Next: Track or Node, then click in the world, Confirm and Start.") + "</style>", null, null);
             }
         }
         // The confirmed track or endpoint that belongs to the inspected object, for following.
@@ -496,11 +614,32 @@ namespace RailroaderScenePatcher {
 
         // The Connections tab: what the object is bound to. Track binding is its first section.
         // The crossing's detection coverage by circuit. A change is previewed for every circuit before it is applied; the
-        // crossing object never moves, and proximity never assigns coverage. The footer holds Preview, Detach, Clear and
-        // Apply for the circuit being edited, and Preview, Delete and Apply for a detection addition.
+        // crossing object never moves, and proximity never assigns coverage. The tab's pinned row holds Preview, Detach,
+        // Clear circuit and Apply for the circuit being edited, and Preview, Delete and Apply for a detection addition.
         void DrawCoverage(UIPanelBuilder builder) {
             var identity = selected.Identity;
             var block = EditBlock();
+            // A button in the tab waits for a pending world choice; the fields stay as they are.
+            var wait = ChoiceBlock ?? block;
+            // The open form stands first, directly under the replacement targets it takes its segments from, so its
+            // three roles are in reach without scrolling past the list of circuits.
+            if (coverageCircuit != null) {
+                Section(builder, coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition);
+                var confirmed = selection?.Confirmed?.Identity;
+                var picked = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
+                var labels = new[] { "Segment", "End", "From", "To" };
+                for (var role = 0; role < 3; role++) {
+                    var first = role * 4; var roleName = CommandBand.RoleCaption(CircuitCoverage.Roles[role]);
+                    // The role's Picked button stands in its caption row, so a role takes two rows and all three fit the tab.
+                    ValueRow(builder, roleName, "m", labels, coverageFields, first, block, "End is a or b. Distances are metres from the chosen end. From is the end next to the island for an approach.", column => column >= 2, row =>
+                        Button(row, "Picked", () => { coverageFields[first] = confirmed.Identifier; preparedCoverage = null; }).Inactive(!picked || wait != null)
+                            .Tooltip("Picked segment for " + roleName, CommandBand.Tooltip("Fill this role's segment with the confirmed segment.", wait ?? (picked ? null : "Choose a segment under Replacement targets and confirm it first."))));
+                }
+                Section(builder, "Preview");
+                if (preparedCoverage == null || preparedCoverage.Circuit != coverageCircuit) Line(builder, "None", null, null);
+                else if (preparedCoverage.Preview.Error != null) builder.AddLabel(Tint(Red, "Preview refused: " + preparedCoverage.Preview.Error));
+                else foreach (var line in preparedCoverage.Preview.Lines) PlainLabel(builder, Breakable(line));
+                    }
             Section(builder, "Crossing coverage");
             CrossingCoverage current = null;
             if (authoring != null) try { current = authoring.Session.Coverage(identity); }
@@ -511,10 +650,10 @@ namespace RailroaderScenePatcher {
                     // A native circuit is named by its island span, a detection addition by its ID.
                     var name = DetectionAddition.Id(key) == null ? "Circuit " + key : "Detection addition " + DetectionAddition.Id(key);
                     Field(builder, name, value.ToString());
-                    Button(builder, "Edit " + name, () => { OpenedForm(null); coverageCircuit = key; coverageAddition = DetectionAddition.Id(key); preparedCoverage = null; ReadCoverage(value); }).Disable(block != null)
-                        .Tooltip("Edit " + name, block ?? (DetectionAddition.Id(key) == null ? "Select the tracks this circuit covers, or detach it. Circuits you do not edit keep their coverage." : "Change the tracks of this added detection, or delete it."));
+                    Button(builder, "Edit " + name, () => { OpenedForm(null); coverageCircuit = key; coverageAddition = DetectionAddition.Id(key); preparedCoverage = null; ReadCoverage(value); }).Inactive(wait != null)
+                        .Tooltip("Edit " + name, CommandBand.Tooltip(DetectionAddition.Id(key) == null ? "Select the tracks this circuit covers, or detach it. Circuits you do not edit keep their coverage." : "Change the tracks of this detection addition, or delete it.", wait));
                 }
-                if (current.Residue.Count > 0) builder.AddLabel(Tint(Amber, "Owned spans left by an incomplete cleanup: " + String.Join(", ", current.Residue) + ". Use Recheck on the Changes tab."));
+                if (current.Residue.Count > 0) builder.AddLabel(Tint(Amber, "Owned spans left by an incomplete cleanup: " + String.Join(", ", current.Residue) + ". Use Recheck in the footer."));
                 // An addition starts from an ID the modder chooses and tracks the modder selects; nothing is taken from
                 // nearby track.
                 Section(builder, "Add detection");
@@ -533,36 +672,18 @@ namespace RailroaderScenePatcher {
                         if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "give the addition an ID first"); return; }
                         var existing = circuits.Circuits.FirstOrDefault(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == id);
                         coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value);
-                        OpenedForm("Detection addition " + id + " is open below: select its tracks, then Preview.");
-                    }).Disable(block != null).Tooltip("Add detection with this ID", block ?? "Make the crossing detect an extra track: give the addition an ID that is unique in this MapMod's patch document, then select its tracks.");
+                        OpenedForm("Detection addition " + id + " is open at the top of this tab: select its tracks, then Preview.");
+                    }).Inactive(wait != null).Tooltip("Add detection with this ID", CommandBand.Tooltip("Make the crossing detect an extra track: give the addition an ID that is unique in this MapMod's patch document, then select its tracks.", wait));
                 });
             }
-            if (coverageCircuit == null) return;
-            Section(builder, coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition);
-            var confirmed = selection?.Confirmed?.Identity;
-            var picked = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
-            var labels = new[] { "Segment", "End (A or B)", "From (m)", "To (m)" };
-            for (var role = 0; role < 3; role++) {
-                var first = role * 4; var roleName = CircuitCoverage.Roles[role];
-                builder.HStack(fields => {
-                    for (var column = 0; column < 4; column++) {
-                        var index = first + column; var label = roleName + " " + labels[column];
-                        fields.VStack(field => ValueField(field, label, coverageFields, index, block, "Distances are metres from the chosen end. From is the end next to the island for an approach.", column >= 2)).EqualFlexibleWidth();
-                    }
-                });
-                Button(builder, "Picked for " + roleName, () => { coverageFields[first] = confirmed.Identifier; preparedCoverage = null; }).Disable(!picked || block != null)
-                    .Tooltip("Picked segment", block ?? (picked ? "Fill this role's segment with the confirmed segment." : "Choose a segment under Replacement targets and confirm it first."));
-            }
-            Section(builder, "Preview");
-            if (preparedCoverage == null || preparedCoverage.Circuit != coverageCircuit) Line(builder, "None", null, null);
-            else if (preparedCoverage.Preview.Error != null) builder.AddLabel(Tint(Red, "Preview refused: " + preparedCoverage.Preview.Error));
-            else foreach (var line in preparedCoverage.Preview.Lines) PlainLabel(builder, Breakable(line));
         }
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
         // adapter refuses, such as a milepost's, or that the operation is for markers and pads.
         string BindingUnavailable() {
-            var listed = selected?.Problems.FirstOrDefault(problem => problem.StartsWith("Track binding unavailable", StringComparison.Ordinal) || problem.StartsWith("Pad binding unavailable", StringComparison.Ordinal));
-            if (listed != null) return listed;
+            // A marker or pad the adapter refuses says why under Supported edits.
+            var family = selected?.Family;
+            if ((family == "Track marker" || family == "Crossing pad marker") && CommandBand.Refusal(selected.Operations) is string reason)
+                return (family == "Track marker" ? "Track binding unavailable: " : "Pad binding unavailable: ") + reason;
             // A milepost holds a marker too, but the inventory lists it as a milepost and records no binding problem for
             // it: ask the marker adapter why it refuses this object.
             try {
@@ -581,31 +702,28 @@ namespace RailroaderScenePatcher {
             openedForm = message;
             if (message != null) feedback.Report(CoveragePlace, message);
         }
+        // The tab's order, as in every tab: what can be operated first, what is only read below. Replacement targets
+        // and the fields of the binding come first; the current binding and the other observed bindings follow.
         void DrawConnections(UIPanelBuilder builder) {
             var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
-            if (coverage) DrawCoverage(builder);
             // A crossing pad has the binding of its marker: setting it regenerates the pad along the track there.
             var pad = selected.Identity.Structure == CrossingPadScene.Structure;
             var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure;
             var block = marker ? EditBlock() : BindingUnavailable();
+            Section(builder, "Replacement targets");
+            var busy = !marker && !coverage ? "Replacement targets serve a track binding or a crossing's coverage." : selection == null ? "World selection is unavailable." : ChoiceBlock;
+            builder.HStack(row => {
+                Button(row, "Object", () => BeginSelection(SelectionKind.SceneObject, selected)).Inactive(busy != null).Tooltip("Replacement object", CommandBand.Tooltip("Choose a replacement object in the world and confirm its identity.", busy));
+                Button(row, "Segment", () => BeginSelection(SelectionKind.TrackSegment, selected)).Inactive(busy != null).Tooltip("Replacement segment", CommandBand.Tooltip("Choose a track segment in the world and confirm its identity.", busy));
+                Button(row, "Node", () => BeginSelection(SelectionKind.TrackNode, selected)).Inactive(busy != null).Tooltip("Replacement node", CommandBand.Tooltip("Choose a track node in the world and confirm its identity.", busy));
+            }).Height(RowHeight);
+            if (coverage) DrawCoverage(builder);
             Section(builder, pad ? "Crossing pad binding" : "Track binding");
+            ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, (pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.") + " End is a or b.", column => column == 2);
             var current = selected.Bindings.Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith("Graph registration", StringComparison.Ordinal)).ToArray();
+            FieldLabel(builder, "Current binding");
             if (current.Length == 0) Line(builder, "None", null, null);
             foreach (var line in current) BindingFields(builder, line);
-            var labels = new[] { "Segment", "End (A or B)", "Distance (m)" };
-            builder.HStack(fields => {
-                for (var column = 0; column < 3; column++) {
-                    var index = column;
-                    fields.VStack(field => ValueField(field, labels[index], binding, index, block, pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.", index == 2)).EqualFlexibleWidth();
-                }
-            });
-            Section(builder, "Replacement targets");
-            var busy = !marker && !coverage ? "Replacement targets serve a track binding or a crossing's coverage." : selection == null ? "World selection is unavailable." : selection.Pending != null ? "Confirm or cancel the pending world choice first." : null;
-            builder.HStack(row => {
-                Button(row, "Object", () => BeginSelection(SelectionKind.SceneObject, selected)).Disable(busy != null).Tooltip("Replacement object", busy ?? "Choose a replacement object in the world and confirm its identity.");
-                Button(row, "Segment", () => BeginSelection(SelectionKind.TrackSegment, selected)).Disable(busy != null).Tooltip("Replacement segment", busy ?? "Choose a track segment in the world and confirm its identity.");
-                Button(row, "Node", () => BeginSelection(SelectionKind.TrackNode, selected)).Disable(busy != null).Tooltip("Replacement node", busy ?? "Choose a track node in the world and confirm its identity.");
-            }).Height(RowHeight);
             Section(builder, "Observed bindings");
             var others = selected.Bindings.Where(line => !current.Contains(line)).ToArray();
             if (others.Length == 0) Line(builder, "None observed", null, null);
@@ -615,41 +733,65 @@ namespace RailroaderScenePatcher {
         // The Changes tab: what this MapMod changes about the inspected object, and what that change still awaits.
         void DrawChanges(UIPanelBuilder builder) {
             Section(builder, "This MapMod");
-            FieldMarkup(builder, "Object", IsChanged(selected) ? ChangedBadge : "Unchanged")
+            var changed = IsChanged(selected);
+            FieldMarkup(builder, "Object", changed ? ChangedBadge : "Unchanged")
                 .Tooltip("Changed", "Whether Data/scene-patches.json of the active MapMod holds a modification of this object.");
-            Section(builder, "Terrain output");
+            // One short line per changed setting, with the value the object has without this modification.
+            if (changed && authoring != null) {
+                IReadOnlyList<string> lines = null;
+                try { lines = authoring.Session.Changes(selected.Identity); } catch { }
+                if (lines != null) foreach (var line in lines) PlainLabel(builder, Breakable(line));
+            }
+            // Terrain output exists only for an object with a terrain mask, an independent board: the section is
+            // there only for those, in plain words.
+            if (!HasTerrain) return;
+            Section(builder, "Terrain");
             var problem = (string)null;
             var output = authoring == null || !Editable ? DependentOutput.None : inspectedOutput.Of(authoring.Session, selected, out problem);
-            if (problem != null) builder.AddLabel(Tint(Red, "Terrain output unknown: " + problem));
-            else if (output.Completed.Count == 0 && output.Settled) Line(builder, "None outstanding", null, null);
-            else PlainLabel(builder, output.Error != null ? "Terrain output stopped: " + output.Error + ". Completed: " + Join(output.Completed) + ". Outstanding: " + Join(output.Outstanding) + ". The board edit is kept."
-                : output.Settled ? "Terrain output complete: " + Join(output.Completed) + "."
-                : "Terrain output outstanding; the game is regenerating it: " + Join(output.Outstanding) + ". Completed: " + Join(output.Completed) + ".");
+            var text = CommandBand.Terrain(problem, output.Error, output.Settled, Join(output.Completed), Join(output.Outstanding), output.Completed.Count != 0);
+            if (problem != null) builder.AddLabel(Tint(Red, text)); else PlainLabel(builder, text);
         }
+        // Whether the inspected object has terrain output at all.
+        bool HasTerrain => selected != null && selected.Identity.Structure == IndependentBoards.Structure;
 
-        // The footer: a status line, a target line and four action slots, each of fixed size. The slots hold the actions
-        // of the open tab; a pending world choice or an active gizmo takes them over until it ends.
-        struct Act { internal string Label, Tip, Reason; internal Action Run; }
-        static Act Slot(string label, string tip, string reason, Action run) => new Act { Label = label, Tip = tip, Reason = reason, Run = run };
+        // The footer, the same on every tab: the message area, then one row with the actions on the inspected object
+        // that belong to no tab, Remove modification and Recheck. A pending world choice or an active gizmo takes that
+        // row over until it ends.
+        // Title is the tooltip's title when the label is short for it. Other is the label the button changes to in
+        // place, such as Enable for Disable: the button is as wide as the wider of the two. A button's width follows
+        // its label by the one padding rule (FitButton); span and width are no longer used.
+        // Live, when set, is the reason of a button whose state follows the values typed into fields: it is read
+        // again on every keystroke.
+        struct Act { internal string Label, Tip, Reason, Title, Other; internal Action Run; internal Func<string> Live; }
+        static Act Typed(Act act, Func<string> live) { act.Live = live; act.Reason = live(); return act; }
+        // The buttons of the panel as it is built now whose state follows typing; each entry sets its button's state
+        // in place, because the panel does not rebuild while a field has the focus.
+        readonly List<Action> typed = new List<Action>();
+        void FieldsChanged() { foreach (var update in typed.ToArray()) { try { update(); } catch { } } }
+        static Act Slot(string label, string tip, string reason, Action run, string title = null, int span = 1, float width = 0, string other = null) => new Act { Label = label, Tip = tip, Reason = reason, Run = run, Title = title, Other = other };
         static readonly Act Empty = new Act();
         void DrawFooter(UIPanelBuilder builder) {
             builder.AddHRule();
             // The first slot says what the window is waiting for or why the open tab cannot edit now.
             var pending = selection?.Pending;
             string source = null, state = "";
-            if (queuedPlace != null) { source = queuedPlace; state = "Working..."; }
+            if (pending == null) candidateDetails = false;
+            if (Requests.Place != null) { source = Requests.Place; state = "Working..."; }
             else if (pending != null) {
                 var candidate = selection.Find(pending.Candidate);
                 source = "World choice";
                 // A short purpose with the count on the first line, the candidate on its own line.
                 var purpose = choosingSnap ? "Pick the snap target" : pending.Kind == SelectionKind.SceneObject ? "Pick an object" : pending.Kind == SelectionKind.TrackSegment ? "Pick a track" : "Pick an endpoint";
-                state = (pending.Offers.Count > 1 ? Tint(Blue, pending.Offers.Count + " candidates; see Details") + " " : "") + Literal(purpose + " in the world.") +
-                    (pending.Problem == null ? "" : " " + Tint(Red, pending.Problem)) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
+                // The choice takes the world's clicks: the native editor does not select or drag until it ends.
+                state = (pending.Offers.Count > 1 ? Tint(Blue, pending.Offers.Count + " candidates") + " " : "") + Literal(purpose + " in the world. Native world clicks are suspended; Cancel restores them.") +
+                    (pending.Problem == null ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
                     (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
-                    (candidate == null ? "" : "\n" + Tint(Blue, "New: " + Tail(candidate.Choice.Label, 60)));
+                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag("Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? " Confirm takes it; Apply then moves the object." : " Confirm takes it.")) +
+                    // The footer's Details: the clicked candidate's identity and details, here in the message area.
+                    (candidate == null || !candidateDetails ? "" : "\n" + Literal(candidate.Choice.Identity.ToString()) + (String.IsNullOrEmpty(candidate.Details) ? "" : "\n" + Literal(candidate.Details)));
             } else if (gizmo?.Active == true) { source = GizmoPlace; state = Literal(gizmo.State); }
             else if (selectionProblem != null) { source = "World choice"; state = Tint(Red, selectionProblem); }
-            else if (preparedSnap != null) { source = SnapPlace; state = Tint(Blue, "Snap target: " + preparedSnap.Identity); }
+            else if (preparedSnap != null) { source = SnapPlace; state = Tint(Blue, "Snap target: " + preparedSnap.Identity) + Literal(" Apply moves the object."); }
             // A confirmed target belongs to the object it was chosen for; another object does not show it.
             else if (selected != null && selection?.Confirmed is ConfirmedSelection confirmed && confirmed.Source != null && confirmed.Source.Equals(SelectionIdentity.SceneObject(selected.Identity))) {
                 source = "World choice"; state = Tint(Green, "Confirmed: " + confirmed.Identity + " in " + confirmed.MapIds[0]);
@@ -659,9 +801,9 @@ namespace RailroaderScenePatcher {
             // the action group it came from. The area is a native scroll view: its content takes the height of its
             // entries, so an entry that wraps has its wrapped height, and its viewport cuts off what does not fit. A
             // stack of fixed height would instead squeeze its entries below their text, and the text would overprint.
-            // What lies below the area's edge is reached by scrolling; Details lists every message as well.
+            // What lies below the area's edge is reached by scrolling.
             var messages = feedback.Messages;
-            presentation.Scroll(builder, 3 * MessageHeight, lines => {
+            var messageArea = presentation.Scroll(builder, MessageHeight, lines => {
                 if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
                 for (var i = 0; i < messages.Count; i++) {
                     var message = messages[i]; var older = i > 0;
@@ -669,24 +811,68 @@ namespace RailroaderScenePatcher {
                     var text = WithoutSource(message);
                     MessageSlot(lines, message.Source, tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text), older);
                 }
-            }, false).Height(3 * MessageHeight);
-            var slots = Slots();
+            }, false);
+            // The area is three messages high and gives way before the tab body does: in a low window it keeps one
+            // message in view and scrolls, so the body keeps the height a form needs.
+            var area = messageArea.GetComponent<LayoutElement>();
+            area.minHeight = MessageHeight; area.preferredHeight = 3 * MessageHeight; area.flexibleHeight = 0;
+            ActionRow(builder, FooterActs(), null);
+            // The native resize grip takes the window's lower right corner, 22 units high, and the row would reach 12
+            // units into its height: the row stands that much higher, so the footer and the grip do not overlap.
+            builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
+        }
+        // The native resize grip's height, and the window's padding below its last row, in canvas units.
+        const float GripHeight = 22, RowPadding = 10;
+        // One padding rule for every button of the panel (CommandBand.ButtonWidth): a button is as wide as its label
+        // and the native compact padding on both sides. The native compact button does that by itself for one label.
+        // A button whose label changes in place gets the width of its widest label here, so the change moves no
+        // control. Returns the width, or 0 when the label could not be measured and the button keeps its own size.
+        float FitButton(IConfigurableElement button, params string[] labels) {
+            var text = button.RectTransform.GetComponentInChildren<TMP_Text>(true);
+            if (text == null) return 0;
+            var widths = labels.Where(label => !String.IsNullOrEmpty(label)).Select(label => text.GetPreferredValues(label).x).ToArray();
+            if (widths.Length == 0 || widths.Any(width => !(width > 0))) return 0;
+            var fit = CommandBand.ButtonWidth(widths);
+            var fitter = button.RectTransform.GetComponent<ContentSizeFitter>();
+            if (fitter != null) fitter.enabled = false;
+            var layout = button.RectTransform.GetComponent<LayoutElement>() ?? button.RectTransform.gameObject.AddComponent<LayoutElement>();
+            layout.minWidth = layout.preferredWidth = fit; layout.flexibleWidth = 0;
+            return fit;
+        }
+        // A row of actions, from the left: a tab's pinned row and the footer's row. Every button follows the one
+        // padding rule, with the widest of its labels where the label changes in place. A row that would not fit
+        // the inspector's minimum with its full labels takes the shorter label of each button that has one. blocked
+        // disables every button of the row with one reason. A disabled button's tooltip says what the control does
+        // first, then why it cannot be used.
+        void ActionRow(UIPanelBuilder builder, Act[] acts, string blocked) {
             builder.HStack(row => {
-                foreach (var slot in slots) {
+                row.ConfigureLayout(CommandBand.ActionRowSpacing);
+                var shown = acts.Where(act => act.Label != null).ToArray();
+                var buttons = new List<IConfigurableElement>();
+                var widths = new List<float>();
+                foreach (var slot in shown) {
                     var act = slot;
-                    // Four cells of one fixed width, from the left. A native compact button sizes itself to its text; here
-                    // it takes its cell's width, so another label changes no rectangle. The cells do not stretch with
-                    // the divider or the window, and the space at the right keeps them clear of the resize grip.
-                    row.VStack(cell => {
-                        if (act.Label == null) return;
-                        var button = Button(cell, act.Label, act.Run);
-                        button.Disable(act.Reason != null).Tooltip(act.Label, act.Reason ?? act.Tip);
-                        var fitter = button.RectTransform.GetComponent<ContentSizeFitter>();
-                        if (fitter != null) fitter.enabled = false;
-                        var layout = button.RectTransform.GetComponent<LayoutElement>();
-                        if (layout != null) { layout.minWidth = 0; layout.preferredWidth = -1; layout.flexibleWidth = 1; }
-                    }).Width(SlotWidth);
+                    var reason = blocked ?? act.Reason;
+                    var button = Button(row, act.Label, act.Run);
+                    if (act.Live == null) button.Inactive(reason != null).Tooltip(act.Title ?? act.Label, CommandBand.Tooltip(act.Tip, reason));
+                    else {
+                        // The state and the tooltip's reason are read from the fields as they are typed.
+                        var live = act.Live; var title = act.Title ?? act.Label; var tip = act.Tip;
+                        button.Inactive(reason != null);
+                        var provider = button.RectTransform.GetComponent<UI.Tooltips.UITooltipProvider>() ?? button.RectTransform.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
+                        provider.DynamicTooltipInfo = () => new TooltipInfo(title, CommandBand.Tooltip(tip, blocked ?? live()));
+                        typed.Add(() => { if (button.RectTransform != null) button.Inactive((blocked ?? live()) != null); });
+                    }
+                    buttons.Add(button);
+                    widths.Add(FitButton(button, act.Label, act.Other));
                 }
+                if (widths.Count != 0 && widths.All(width => width > 0) && !CommandBand.RowFits(widths))
+                    for (var i = 0; i < shown.Length; i++) {
+                        var shorter = CommandBand.ShortLabel(shown[i].Label);
+                        if (shorter == shown[i].Label) continue;
+                        foreach (var text in buttons[i].RectTransform.GetComponentsInChildren<TMP_Text>(true)) text.text = shorter;
+                        FitButton(buttons[i], shorter);
+                    }
                 row.Spacer();
             }).Height(RowHeight);
         }
@@ -703,13 +889,15 @@ namespace RailroaderScenePatcher {
         static string ToneOf(string text) {
             foreach (var word in new[] { " refused", " failed", "unavailable", "could not", " stopped" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Red;
             foreach (var word in new[] { " completed", " complete.", " copied", "requested again" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Green;
-            if (text.IndexOf("outstanding", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("the column stops", StringComparison.OrdinalIgnoreCase) >= 0) return Amber;
+            foreach (var word in new[] { "Terrain updated" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Green;
+            if (text.IndexOf("outstanding", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("Terrain pending", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("the column stops", StringComparison.OrdinalIgnoreCase) >= 0) return Amber;
             return null;
         }
         // The end of a long text, with a leading ellipsis.
         static string Tail(string text, int length) => text == null || text.Length <= length ? text : "..." + text.Substring(text.Length - length);
         void CancelSelection() { selection.Cancel(); selectionProblem = null; ClearSnap(); }
-        Act[] Slots() {
+        // The footer's row: the same on every tab. A pending world choice and an active gizmo take it over.
+        Act[] FooterActs() {
             var pending = selection?.Pending;
             if (pending != null) {
                 var candidate = selection.Find(pending.Candidate);
@@ -721,20 +909,42 @@ namespace RailroaderScenePatcher {
                         try { if (candidate != null) JumpTo(candidate.Position); }
                         catch (Exception e) { selectionProblem = "Camera focus unavailable: " + e.GetBaseException().Message; }
                     }),
-                    Slot("Details", "Show the candidate's identity and the other candidates at this point.", null, () => bodyView = BodyView.Session)
+                    // Only the clicked candidate's details, in the message area; nothing to show until a click. The
+                    // session details open from the band's Details alone.
+                    Slot("Details", "Show or hide the clicked candidate's identity and details in the message area.", CommandBand.CandidateDetailsReason(pending.Offers.Count), () => candidateDetails = !candidateDetails, "Candidate details")
                 };
             }
-            if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the gizmo and restore the placement.", null, CancelGizmo), Empty, Empty, Empty };
+            // The gizmo owns the row only during a drag, when Escape cancels; while it stands, the row is the general one.
+            if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the drag and restore the placement.", null, () => gizmo?.Cancel(), "Cancel gizmo drag") };
             var block = selected == null ? "Inspect an object first." : EditBlock();
             var identity = selected?.Identity;
-            switch (inspectorTab.Value) {
+            var unchanged = block ?? (IsChanged(selected) ? null : "This MapMod does not change this object.");
+            return new[] {
+                // The whole modification goes: the control says so in full and takes two cells.
+                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this MapMod's modification. Every circuit returns to its coverage without it, and its detection additions are deleted." : "Remove this MapMod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
+                    var removed = current.Remove(identity, inspection);
+                    // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
+                    if (removed?.Applied == true) CloseCoverageForm();
+                    return removed;
+                }), null, 2),
+                Slot("Recheck", "Recheck the object after a failed edit.", block, () => Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection))),
+                Empty };
+        }
+        // The actions of one tab, for its pinned row. They belong to the open tab and mode only.
+        Act[] TabActs(string id) {
+            var block = selected == null ? "Inspect an object first." : EditBlock();
+            var identity = selected?.Identity;
+            switch (id) {
                 case PlacementTab:
-                    if (placementMode == 0) return new[] {
-                        Slot("Apply", "Apply the entered position and rotation. Placement does not change a track binding.", block, ApplyPlacement),
+                    block = block ?? PadBlock;
+                    // Without fields there is nothing to apply or to read: an object whose pose stands as running
+                    // lines has no value controls.
+                    if ((placementMode == 0 || IsPad) && block != null) return new Act[0];
+                    if (placementMode == 0 || IsPad) return new[] {
+                        Typed(Slot("Apply", "Apply the entered position and rotation. Placement does not change a track binding.", null, ApplyPlacement), () => CommandBand.FieldReason(block, pose, CurrentPose(), CommandBand.SamePlacement)),
                         Slot("Read", "Fill the fields with the inspected values.", block, ReadPose), Empty, Empty };
-                    if (placementMode == 1) return new[] {
-                        Slot("Move", "Move the object with the native gizmo.", block, () => BeginGizmo(UI.Gizmos.TransformGizmoMode.Move)),
-                        Slot("Rotate", "Rotate the object with the native gizmo.", block, () => BeginGizmo(UI.Gizmos.TransformGizmoMode.Rotate)), Empty, Empty };
+                    // The Gizmo mode has no action: the gizmo stands on the object while the mode is open.
+                    if (placementMode == 1) return new Act[0];
                     if (placementMode == 2) {
                         var unavailable = block ?? (snap == null ? "Snapping is unavailable." : null);
                         var unprepared = unavailable ?? (preparedSnap == null ? "Choose a track or endpoint and confirm it first." : null);
@@ -743,9 +953,9 @@ namespace RailroaderScenePatcher {
                             Slot("Node", "Choose the track node, an endpoint, to snap to.", unavailable, () => BeginSnap(SelectionKind.TrackNode)),
                             Slot("Apply", "Move the object once to the snap position. Rotation and binding stay.", unprepared, () => {
                                 var request = preparedSnap;
-                                Edit(SnapPlace, "Physical snap", (session, inspection) => snap.Apply(request));
+                                Edit(SnapPlace, "Physical snap", (session, inspection) => snap.Apply(request), true);
                             }),
-                            Slot("Clear", "Discard the prepared snap.", unprepared, ClearSnap) };
+                            Slot(CommandBand.DiscardPrepared, "Discard the prepared snap. The object stays where it is.", unprepared, ClearSnap, "Discard prepared snap") };
                     } else {
                         var unavailable = block ?? (trackPoses == null ? "Track-following placement is unavailable in this game build." : null);
                         var picked = FollowTarget();
@@ -754,20 +964,21 @@ namespace RailroaderScenePatcher {
                         return new[] {
                             Slot("Track", "Choose the track to follow.", unavailable, () => BeginSelection(SelectionKind.TrackSegment, selected)),
                             Slot("Node", "Choose the track node, an endpoint, to follow.", unavailable, () => BeginSelection(SelectionKind.TrackNode, selected)),
-                            Slot("Follow", "Keep the current pose relative to the picked track or endpoint.", unavailable ?? (picked == null ? "Choose a track or endpoint and confirm it first." : null), () => {
+                            Slot("Start", "Start following: keep the current pose relative to the picked track or endpoint.", unavailable ?? (picked == null ? "Choose a track or endpoint and confirm it first." : null), () => {
                                 var maps = picked.MapIds.ToArray();
                                 Edit(FollowPlace, "Track following", (current, inspection) => {
                                     if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("Map context changed; select the track again");
                                     var anchor = picked.Identity.Kind == SelectionKind.TrackNode ? TrackAnchor.Endpoint(picked.Identity.Identifier)
                                         : TrackAnchor.At(trackPoses.Nearest(picked.Identity.Identifier, ((GameObject)selected.Handle).transform.position));
                                     return current.Follow(identity, anchor, inspection);
-                                });
-                            }),
+                                }, true);
+                            }, "Start following"),
                             Slot("Stop", "Stop following and keep the current pose.", unavailable ?? (following == null ? "This object does not follow a track." : null),
-                                () => Edit(FollowPlace, "Stop following", (current, inspection) => current.StopFollowing(identity, inspection))) };
+                                () => Edit(FollowPlace, "Stop following", (current, inspection) => current.StopFollowing(identity, inspection)), "Stop following") };
                     }
                 case ConnectionsTab: {
-                    if (block == null && identity.Structure == CrossingCoverageScene.Structure) {
+                    var structure = identity?.Structure;
+                    if (block == null && structure == CrossingCoverageScene.Structure) {
                         var session = authoring.Session;
                         var circuitKey = coverageCircuit; var additionId = coverageAddition;
                         var none = circuitKey == null ? "Select Edit circuit or Add detection first." : null;
@@ -783,7 +994,7 @@ namespace RailroaderScenePatcher {
                             // The deleted addition's form closes with it.
                             if (deleted?.Applied == true) CloseCoverageForm();
                             return deleted;
-                        });
+                        }, true);
                         var preview = Slot("Preview", "Preview the selected tracks for every circuit.", none, () => {
                             var value = ParseCoverage(out var problem, additionId != null);
                             if (value == null) feedback.Refuse(CoveragePlace, "Coverage preview", problem); else PrepareCoverage(session, identity, circuitKey, value, additionId);
@@ -797,55 +1008,60 @@ namespace RailroaderScenePatcher {
                                 Slot("Apply", "Apply the previewed coverage.", prepared == null ? "Preview a change first." : null, apply) };
                         }
                         return new[] { preview,
-                            Slot("Detach", "Preview detaching this circuit.", none ?? (last ? "This is the crossing's last covered circuit; detaching it would leave the crossing without detection." : null), () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null)),
-                            Slot("Clear", "Preview clearing this MapMod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null)),
-                            Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Preview a change first." : null), apply) };
+                            Slot("Detach", "Preview detaching this circuit.", none ?? (last ? "This is the crossing's last covered circuit; detaching it would leave the crossing without detection." : null), () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null), null, 1, 72),
+                            // Every Clear in a tab names what it clears.
+                            Slot(CommandBand.ClearCircuit, "Preview clearing this MapMod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
+                            Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Preview a change first." : null), apply, null, 1, 62) };
                     }
-                    var pad = identity.Structure == CrossingPadScene.Structure;
+                    var pad = structure == CrossingPadScene.Structure;
                     // An object without a binding names that first; why it cannot be edited in general comes second.
-                    var unavailable = pad || identity.Structure == TrackMarkerScene.Structure ? block : BindingUnavailable();
+                    var unavailable = pad || structure == TrackMarkerScene.Structure ? block : selected == null ? block : BindingUnavailable();
                     var confirmed = selection?.Confirmed?.Identity;
                     var segment = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
                     return new[] {
-                        Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", unavailable, ApplyBinding),
-                        Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection))),
-                        Slot("Clear", "Clear this MapMod's value for the binding; the marker returns to its underlying binding.", unavailable, () => Edit(BindingPlace, "Clearing the binding's MapMod value", (current, inspection) => current.Bind(identity, null, inspection))),
-                        Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }) };
+                        Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding", 1, 56), () => CommandBand.FieldReason(unavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds)),
+                        Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : CurrentBinding()[0].Length == 0 ? CommandBand.AlreadyDetached : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)), "Detach binding", 1, 72),
+                        Slot(CommandBand.ClearBinding, "Clear this MapMod's value for the binding; the marker returns to its underlying binding.", unavailable, () => Edit(BindingPlace, "Clearing the binding's MapMod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
+                        Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70) };
                 }
                 case ChangesTab: {
-                    var unchanged = block ?? (IsChanged(selected) ? null : "This MapMod does not change this object.");
+                    // Retry belongs to terrain output: an object without it has no action on this tab.
+                    if (selected != null && !HasTerrain) return new Act[0];
                     var idle = block;
-                    if (idle == null) { var output = inspectedOutput.Of(authoring.Session, selected, out _); if (output.Outstanding.Count == 0) idle = "No terrain output is outstanding."; }
+                    if (idle == null) { var output = inspectedOutput.Of(authoring.Session, selected, out _); if (output.Outstanding.Count == 0) idle = "No terrain is pending."; }
                     return new[] {
-                        Slot("Remove", selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this MapMod's modification. Every circuit returns to its coverage without it, and its added detection is deleted." : "Remove this MapMod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
-                            var removed = current.Remove(identity, inspection);
-                            // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
-                            if (removed?.Applied == true) CloseCoverageForm();
-                            return removed;
-                        })),
-                        Slot("Recheck", "Recheck the object after a failed edit.", block, () => Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection))),
-                        Slot("Retry", "Ask the game to rebuild the outstanding terrain output again.", idle, () => {
+                        Slot("Retry", "Ask the game to rebuild the pending terrain again.", idle, () => {
                             var outcome = authoring.Session.RetryOutput(identity);
-                            feedback.Report(TerrainPlace, outcome.Applied ? "Terrain output requested again." : "Terrain output retry refused: " + outcome.Error);
-                        }), Empty };
+                            feedback.Report(TerrainPlace, outcome.Applied ? "Terrain requested again." : "Terrain retry refused: " + outcome.Error);
+                        }, "Retry terrain output") };
                 }
                 default: {
                     var target = selected?.Handle as GameObject;
                     var enabled = target != null && target.activeSelf;
                     return new[] {
-                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }),
-                        Slot("Clear", "Clear this MapMod's value for the activity; the object returns to its underlying activity.", block, () => Edit(ActivityPlace, "Clearing the activity's MapMod value", (current, inspection) => current.ClearActivity(identity, inspection))),
-                        Empty, Empty };
+                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
+                        // Named by what it takes back, over two cells; disabled while this MapMod sets no activity.
+                        Slot(CommandBand.ClearActivity, "Clear this MapMod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
+                            () => Edit(ActivityPlace, "Clearing the activity's MapMod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
                 }
             }
         }
+        // Why no placement mode edits the inspected object when it is a crossing pad; null for any other object.
+        string PadBlock => IsPad ? CommandBand.PadFollowsTrack : null;
+        bool HasActivityValue(TargetIdentity identity) {
+            try { return authoring != null && identity != null && authoring.Session.HasActivityValue(identity); } catch { return false; }
+        }
         void ApplyPlacement() {
             var identity = selected.Identity;
-            var values = new float[6]; var valid = true;
-            for (var i = 0; i < 6; i++) valid &= Single.TryParse(pose[i], NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]);
+            // A field that still shows the object's value stands for that exact value, so its rounding moves
+            // nothing; a rotation whose three fields were not touched stays the object's own rotation.
+            var own = PoseValues();
+            var values = new double[6]; var valid = own != null;
+            for (var i = 0; valid && i < 6; i++) valid &= CommandBand.Entered(pose[i], own[i], out values[i]);
             if (!valid) { feedback.Refuse(PlacementPlace, "Placement", "enter six numbers with a decimal point"); return; }
-            var rotation = Quaternion.Euler(values[3], values[4], values[5]);
-            var placement = new Placement(new double[] { values[0], values[1], values[2] }, new double[] { rotation.x, rotation.y, rotation.z, rotation.w });
+            var turned = values[3] != own[3] || values[4] != own[4] || values[5] != own[5];
+            var rotation = Quaternion.Euler((float)values[3], (float)values[4], (float)values[5]);
+            var placement = new Placement(new[] { values[0], values[1], values[2] }, turned ? new double[] { rotation.x, rotation.y, rotation.z, rotation.w } : selected.Rotation.ToArray());
             Edit(PlacementPlace, "Placement", (current, inspection) => current.Edit(identity, placement, null, inspection));
         }
         void ApplyBinding() {
@@ -856,53 +1072,52 @@ namespace RailroaderScenePatcher {
                 return;
             }
             var value = MarkerBinding.At(new TrackLocation(binding[0].Trim(), end, distance));
-            Edit(BindingPlace, "Track binding", (current, inspection) => current.Bind(identity, value, inspection));
+            Edit(BindingPlace, CommandBand.BindingAction(binding[0].Trim(), end, distance), (current, inspection) => current.Bind(identity, value, inspection), true);
         }
 
-        // The session details, behind the band's state buttons: everything that does not belong to one object.
-        void DrawSession(UIPanelBuilder builder) {
-            builder.HStack(row => {
-                Button(row, "Back", () => bodyView = BodyView.Tabs).Tooltip("Back", "Return to the tab.");
-                Heading(row, "Session details", null, null).FlexibleWidth();
-            }).ChildrenKeepHeight().Height(RowHeight);
+        // The World choice section of the session details window: what the choice is for, the candidate that was clicked, and
+        // the other candidates at that point, each named by what tells it apart from the others.
+        void DrawChoice(UIPanelBuilder builder) {
             var pending = selection?.Pending;
-            if (pending != null) {
-                Section(builder, "World choice");
-                PlainLabel(builder, (choosingSnap ? "Select physical snap target" : pending.Purpose) + ".");
-                if (pending.Source != null) PlainLabel(builder, "Object: " + pending.Source.Label);
-                if (pending.Problem != null) builder.AddLabel(Tint(Red, pending.Problem));
-                var candidate = selection.Find(pending.Candidate);
-                if (candidate != null) {
-                    builder.AddLabel(Tint(Blue, "New: " + candidate.Choice.Label));
-                    PlainLabel(builder, candidate.Choice.Identity.ToString());
-                    PlainLabel(builder, candidate.Details);
-                    Button(builder, "Inspect candidate", () => {
-                        if (candidate.Observation == null) return;
-                        CancelGizmo(); InspectObservation(candidate.Observation); ReadPose();
-                    }).Disable(candidate.Observation == null).Tooltip("Inspect candidate", candidate.Observation == null ? "Only a scene object can be inspected." : "Inspect the candidate without confirming it.");
-                }
-                foreach (var offer in pending.Offers) {
-                    if (ReferenceEquals(offer, pending.Candidate)) continue;
-                    var choice = offer;
-                    Button(builder, "Choose " + Tail(choice.Label, 34), () => pending.Choose(choice)).Tooltip("Choose", choice.Label);
-                }
+            if (pending == null) return;
+            Section(builder, "World choice");
+            PlainLabel(builder, (choosingSnap ? "Select physical snap target" : pending.Purpose) + ".");
+            if (pending.Source != null) PlainLabel(builder, "Object: " + pending.Source.Label);
+            if (pending.Problem != null) builder.AddLabel(PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem));
+            var candidate = selection.Find(pending.Candidate);
+            if (candidate == null && pending.Offers.Count == 0) Line(builder, "Nothing clicked yet. Click a marking or track in the world.", null, null);
+            if (candidate != null) {
+                builder.AddLabel(Tint(Blue, CommandBand.ChoiceTag("Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + candidate.Choice.Label));
+                PlainLabel(builder, candidate.Choice.Identity.ToString());
+                PlainLabel(builder, candidate.Details);
+                Button(builder, "Inspect candidate", () => {
+                    if (candidate.Observation == null) return;
+                    CancelGizmo(); InspectObservation(candidate.Observation); ReadPose();
+                }).Inactive(candidate.Observation == null).Tooltip("Inspect candidate", CommandBand.Tooltip("Inspect the candidate without confirming it.", candidate.Observation == null ? "Only a scene object can be inspected." : null));
             }
-            if (feedback.Messages.Count != 0) {
-                Section(builder, "Messages");
-                foreach (var message in feedback.Messages) {
-                    var tone = ToneOf(message.Text);
-                    builder.AddLabel("<b>" + Literal(message.Source) + "</b> " + (tone == null ? Literal(WithoutSource(message)) : Tint(tone, WithoutSource(message))));
-                }
+            var labels = pending.Offers.Select(offer => offer.Label).ToArray();
+            foreach (var offer in pending.Offers) {
+                if (ReferenceEquals(offer, pending.Candidate)) continue;
+                var choice = offer;
+                // The label leads with the name that tells this candidate from the others, and is cut at its end.
+                // and carries the number of the candidate's label in the world. With the pointer over the button the
+                // world marks that candidate as it marks one under the pointer, so the name and the object meet.
+                var button = Button(builder, CommandBand.ChoiceTag("Choose", pending.Number(choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(choice.Label, labels), () => pending.Choose(choice));
+                button.Tooltip("Choose this candidate", choice.Label);
+                button.RectTransform.gameObject.AddComponent<HoverReport>().Changed = over => {
+                    if (over) pending.Highlight = choice; else if (ReferenceEquals(pending.Highlight, choice)) pending.Highlight = null;
+                };
             }
+        }
+        // The session details, in their own window: session state that the panel shows nowhere else. The messages are
+        // in the footer and the reasons of the two lamps in their tooltips, so they are not repeated here.
+        void DrawSession(UIPanelBuilder builder) {
+            DrawChoice(builder);
             Section(builder, "Inventory");
             PlainLabel(builder, status);
-            var notice = InventoryPresentationState.Notice(inventory, definitionsStale);
-            if (inventory == null || inventory.IsStale || definitionsStale) builder.AddLabel(Tint(Amber, notice)); else PlainLabel(builder, notice);
             if (scene != null) PlainLabel(builder, scene.Status);
-            Section(builder, "Save");
-            Unsaved(out var saveText);
-            PlainLabel(builder, saveText);
-            if (!String.IsNullOrEmpty(authoringStatus)) PlainLabel(builder, authoringStatus);
+            Section(builder, "Editing");
+            PlainLabel(builder, String.IsNullOrEmpty(authoringStatus) ? "Editing is unavailable." : authoringStatus);
             if (authoring != null) {
                 var session = authoring.Session;
                 if (session.LastSave != null && session.LastSave.Error != null) builder.AddLabel(Tint(Red, "Last Save failed: " + session.LastSave.Error + " Completed: " + (session.LastSave.Completed.Count == 0 ? "none" : String.Join(", ", session.LastSave.Completed)) + ". Outstanding: " + String.Join(", ", session.LastSave.Outstanding) + ". Edits remain in memory; correct the cause and Save again."));
@@ -918,8 +1133,8 @@ namespace RailroaderScenePatcher {
             foreach (var diagnostic in diagnostics) PlainLabel(builder, diagnostic);
         }
 
-        // Context help of one region: an introduction, short terms and the guides. It takes the place of that region's
-        // content; nothing else moves.
+        // Context help of one region: an introduction, short terms and the guides. It opens in the help window beside
+        // the region's "?" and replaces nothing in the panel.
         sealed class HelpText {
             internal string Title, Intro;
             internal string[][] Terms, Guides;
@@ -928,26 +1143,33 @@ namespace RailroaderScenePatcher {
             ["main"] = new HelpText { Title = "Scene patches", Intro = "This help applies to the whole Scene patches window. Edit scene objects of the active MapMod here, then save through the Map Editor.",
                 Terms = new[] {
                     new[] { "Save", "The editor's Save button writes map data, Data/scene-patches.json and the patcher dependency in Info.json. Save never reloads." },
+                    new[] { "Title bar", "The ? opens this help. The round arrow beside it puts the window at its default place and restores the outliner width. The page beside that opens the session details in their own window." },
+                    new[] { "Help", "Every ? opens its help in a window beside it and shows x while that help is open. Close the help with the x or with its own close button." },
+                    new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo or snap. A click on the inspected row, or Escape with the pointer over this window, does the same. With the pointer over the world, Escape cancels only a pending world choice or the gizmo. Changes that were made stay." },
                     new[] { "Undo and Redo", "Every completed edit here is one step in the editor's own history: use the editor's Undo and Redo." },
                     new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after a native edit, Undo or Redo; a stale inventory refuses edits." },
                     new[] { "Editor reload", "Reloading the editor ends the Undo and Redo history. Leaving the editor discards unsaved work." },
-                    new[] { "Current, Stale, Saved, Unsaved", "The two lamps above the outliner show the inventory and save state: green when good, amber otherwise. They are not buttons. Select Details for the reasons, the messages and the diagnostics." },
+                    new[] { "Current, Stale, Saved, Unsaved", "The two lamps above the outliner show the inventory and save state: green when good, amber otherwise. They are not buttons; their tooltips give the reasons." },
                     new[] { "* and +", "Before a name, * marks an object this MapMod changes and + an object it adds; the state line shows the same as CHANGED and ADDED. Neither means unsaved: only the Unsaved lamp does." },
+                    new[] { "Footer", "Below the messages, Remove modification and Recheck are the same on every tab. A tab's own actions stand in the row at the bottom of the tab." },
                     new[] { "Failed edit", "A failed edit restores the object. If that cannot be verified, the object is blocked until Recheck succeeds or the editor reloads." } },
                 Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-editor.md" }, new[] { "Document reference", "scene-patch-document-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
-                    new[] { "Problems", "Objects with a detected problem, marked !. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Changed", "Objects this MapMod changes, marked *." },
+                    new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
+                    new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
+                    new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
                     new[] { "Dimmed rows", "Loaded objects that are inactive." },
                     new[] { "Focus", "Moves the camera. It selects nothing." },
                     new[] { "Fit names", "Sizes the column to most names. Drag the divider for another width." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ObjectTab] = new HelpText { Title = "Object", Intro = "Check the object's state, problems and dependencies before choosing an edit.",
                 Terms = new[] {
-                    new[] { "Supported edits", "What this patcher can change on this object. Other objects are inspection only." },
-                    new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear returns it to its underlying activity." },
+                    new[] { "Supported edits", "What this patcher can change on this object, or why it cannot be edited. That reason is not a problem." },
+                    new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },
+                    new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear activity returns it to its underlying activity." },
                     new[] { "Track group", "Some markers switch with their track group. For those, an explicit enable is refused." },
                     new[] { "Dependencies", "Culling, masks, graph registration and other state that follows an edit. Indirect references are not inspected." },
                     new[] { "Runtime state", "Enabled flags the game switches while it runs. They are shown and do not make the inventory stale." },
@@ -956,9 +1178,9 @@ namespace RailroaderScenePatcher {
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {
                     new[] { "Numeric", "Position in map coordinates, rotation in degrees." },
-                    new[] { "Gizmo", "Drag the native Move or Rotate gizmo. Release applies; Escape or Cancel restores." },
-                    new[] { "Snap", "Moves the object once onto a chosen track or endpoint. Rotation and binding stay; Save records fixed coordinates." },
-                    new[] { "Follow", "Keeps the current pose relative to a chosen track or endpoint, and moves the object when that track moves." },
+                    new[] { "Gizmo", "The native gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the pose and follow the drag." },
+                    new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
+                    new[] { "Follow", "Keeps the current pose relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." } },
                 Guides = new[] { new[] { "Fixed placement", "authoring-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" } } },
@@ -966,7 +1188,7 @@ namespace RailroaderScenePatcher {
                 Terms = new[] {
                     new[] { "Track binding", "The track location a marker is registered at. Changing it does not move the object." },
                     new[] { "Replacement targets", "Choose a target in the world, check its ID and confirm it. Confirming changes nothing." },
-                    new[] { "Set, Detach, Clear", "Set registers the marker at the entered location. Detach removes it from the track. Clear returns it to its underlying binding." },
+                    new[] { "Set, Detach, Clear binding", "Set registers the marker at the entered location. Detach removes it from the track. Clear binding returns it to its underlying binding." },
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island and an approach B. Select the tracks a circuit covers, or detach it; proximity never assigns coverage. Preview shows the result for every circuit before Apply." },
                     new[] { "Detection addition", "Makes the crossing detect an extra track: a circuit of its own with three spans on tracks you select, under an ID you give it. Delete removes it again." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
@@ -974,21 +1196,22 @@ namespace RailroaderScenePatcher {
                 Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this MapMod changes on the object and complete outstanding work.",
                 Terms = new[] {
-                    new[] { "Remove", "Deletes this MapMod's modification. The object returns to its underlying state, not to an earlier patched position." },
-                    new[] { "Recheck", "After a failed edit, compares the object with the document and unblocks it once they agree." },
+                    new[] { "Remove modification", "In the footer on every tab. Deletes this MapMod's modification. The object returns to its underlying state, not to an earlier patched position." },
+                    new[] { "Recheck", "In the footer on every tab. After a failed edit, compares the object with the document and unblocks it once they agree." },
                     new[] { "Terrain output", "The game regenerates terrain after a board move. Save does not write that output. Retry asks for it again." } },
                 Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
         };
-        void DrawHelp(UIPanelBuilder builder, string region, Action back) {
-            var help = Help[region];
-            builder.HStack(row => {
-                Button(row, "Back", back).Tooltip("Back", "Close this help.");
-                if (region == "main") Button(row, "Reset layout", () => { outlinerWidth = OutlinerDefaultWidth; ForgetOutlinerWidth(); presentation.ResetLayout(); })
-                    .Tooltip("Reset layout", "Put the window below the Map Editor window again and restore the outliner width.");
+        void DrawHelp(UIPanelBuilder builder, string region) {
+            if (!Help.TryGetValue(region, out var help)) return;
+            // The window commands stand in the title bar; where it could not take one, the window's help holds it.
+            if (region == NativeEditorPresentation.WindowHelpRegion && (!presentation.TitleReset || !presentation.TitleDetails)) builder.HStack(row => {
+                if (!presentation.TitleReset) Button(row, "Reset layout", ResetLayout).Tooltip("Reset layout", "Put the window at its default place again and restore the outliner width.");
+                if (!presentation.TitleDetails) Button(row, "Session details", () => presentation.ToggleDetails()).Tooltip("Session details", "Open or close the session details in their own window.");
             }).Height(RowHeight);
             builder.AddLabel("<style=H3>" + help.Title + "</style>");
             builder.AddLabel(help.Intro);
-            foreach (var term in help.Terms) builder.AddLabel("<b>" + term[0] + "</b> " + term[1]);
+            // Each term is a caption above its explanation, as a named value is in the tabs.
+            foreach (var term in help.Terms) { builder.Spacer(2f); FieldLabel(builder, term[0]); builder.AddLabel(term[1]); }
             Section(builder, "Guides");
             foreach (var guide in help.Guides) {
                 var document = guide[1];

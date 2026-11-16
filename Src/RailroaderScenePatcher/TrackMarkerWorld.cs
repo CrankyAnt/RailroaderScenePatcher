@@ -160,6 +160,9 @@ namespace RailroaderScenePatcher {
         // The markers that new-game setup car placements hold, walked in the order the per-marker check walked them: each
         // setup's placements, then each placement's marker. The walk runs once, at the first marker that reaches the check.
         internal static HolderIndex SetupHolders() => HolderIndex.Lazy(() => SetupPlacementMarkers(Loaded));
+        // The markers of the setups the game reads at a new game: it takes an active setup descriptor, so a setup that
+        // is switched off does not count.
+        internal static HolderIndex ActiveSetupHolders() => HolderIndex.Lazy(() => SetupPlacementMarkers(g => Loaded(g) && g.activeInHierarchy));
         static IEnumerable<object> SetupPlacementMarkers(Func<GameObject, bool> include) {
             foreach (var setup in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && include(c.gameObject) && c.GetType().FullName == SetupType))
                 if (Field(setup, "placements") is IEnumerable placements)

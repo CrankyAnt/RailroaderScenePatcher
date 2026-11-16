@@ -12,7 +12,7 @@ An independent board is a scene object with these parts:
 - exactly one `Map.Runtime.MaskComponents.CircleMapMask` on the same object, which keeps generated trees and other masked terrain output away from it,
 - no track relationship: no `Track.*` component anywhere in its hierarchy.
 
-In the map editor, open **Scene patches**, select **Refresh** in the command band and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** says **Inspection only until corrected**, it also names the reason. The patcher refuses a board in these cases:
+In the map editor, open **Scene patches**, select **Refresh** in the command band and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** starts with **Not editable:**, it names the reason after that. The patcher refuses a board in these cases:
 
 - its culler or mask is disabled, or it carries more than one circle mask,
 - a parent object is inactive (the board itself may be disabled),
@@ -25,21 +25,21 @@ A board placement holds a position and a rotation only. It never names a track, 
 
 1. Inspect the board in **Scene patches**.
 2. On the **Placement** tab, in **Numeric** mode, enter the position in map coordinates and the rotation in degrees.
-3. Select **Apply** in the footer.
+3. Select **Apply** at the bottom of the tab.
 
 The patcher moves the board, asks the culler to update its culling position and rebuilds the circle mask. It then checks that the culling sphere and every mask registration sit at the new position. If they do not, the edit fails and the board returns to its previous state.
 
-The game then regenerates the terrain at the old and the new position: trees return where the board stood and disappear where it now stands. This takes a moment. The **Terrain output** section of the **Changes** tab shows **Terrain output outstanding**, with the affected positions, until the game has rebuilt each loaded terrain tile and its terrain work is idle. While the board is inspected, the message area reports each change under the source **Terrain output**: outstanding, then complete, or stopped when the game does not finish in time. It then shows **Terrain output complete**. A position whose tile is not built needs no rebuild; the game builds that tile from the board's current mask when it loads, and the section counts that position as complete.
+The game then regenerates the terrain at the old and the new position: trees return where the board stood and disappear where it now stands. This takes a moment. The **Terrain** section of the **Changes** tab shows **Terrain output outstanding**, with the affected positions, until the game has rebuilt each loaded terrain tile and its terrain work is idle. While the board is inspected, the message area reports each change under the source **Terrain output**: outstanding, then complete, or stopped when the game does not finish in time. It then shows **Terrain output complete**. A position whose tile is not built needs no rebuild; the game builds that tile from the board's current mask when it loads, and the section counts that position as complete.
 
 ## Disable or enable the board
 
-Select **Disable** in the footer of the **Object** tab. The culler and the mask release their registrations through the game's own component lifecycle, and the terrain at the board's position regenerates without the mask. **Enable** registers both again at the board's current position. A disabled board can still be moved; it registers at its new position when you enable it.
+Select **Disable** at the bottom of the tab of the **Object** tab. The culler and the mask release their registrations through the game's own component lifecycle, and the terrain at the board's position regenerates without the mask. **Enable** registers both again at the board's current position. A disabled board can still be moved; it registers at its new position when you enable it.
 
 An explicit `"active": false` in the document is applied on every load, so a later activation by the game does not keep a disabled board visible.
 
 ## Undo, Redo and removal
 
-The editor's **Undo** and **Redo** return the board to the earlier or later pose and activity, with its culling and mask registrations, and the terrain regenerates again. **Remove** on the **Changes** tab returns the board to its effective underlying state: its position in the loaded map, with any other modifications in your document still applied. None of these steps leaves an extra culling sphere or mask registration behind.
+The editor's **Undo** and **Redo** return the board to the earlier or later pose and activity, with its culling and mask registrations, and the terrain regenerates again. **Remove modification** in the footer returns the board to its effective underlying state: its position in the loaded map, with any other modifications in your document still applied. None of these steps leaves an extra culling sphere or mask registration behind.
 
 ## Save and reload
 
@@ -59,7 +59,7 @@ In ordinary play, a terrain output that does not complete produces a warning in 
 
 ## When an edit fails
 
-A failed edit restores the board's previous pose, activity, culling sphere and mask registration. The restored terrain then regenerates. Until it has, the patcher refuses further edits of that board and says so; the next edit is accepted once the restored terrain output completes. If the patcher cannot verify the restoration, or the restored terrain output stops, it blocks the board until you select **Recheck** on the **Changes** tab and the check succeeds. Recheck applies the document's state again if the board differs, requests the stopped terrain output again, and accepts edits once that output completes. Reloading the editor also clears the block.
+A failed edit restores the board's previous pose, activity, culling sphere and mask registration. The restored terrain then regenerates. Until it has, the patcher refuses further edits of that board and says so; the next edit is accepted once the restored terrain output completes. If the patcher cannot verify the restoration, or the restored terrain output stops, it blocks the board until you select **Recheck** in the footer and the check succeeds. Recheck applies the document's state again if the board differs, requests the stopped terrain output again, and accepts edits once that output completes. Reloading the editor also clears the block.
 
 ## Limits
 

@@ -1,6 +1,6 @@
 {
   "identifier": "crankyant/scene-patcher",
-  "name": "CrankyAnt",
+  "name": "Scene Patcher",
   "author": "CrankyAnt",
   "version": "0.5.0",
   "assemblies": ["RailroaderScenePatcher.dll"],

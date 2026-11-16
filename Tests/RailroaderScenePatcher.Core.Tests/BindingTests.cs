@@ -274,7 +274,8 @@ static class BindingTests {
         Assert(Only(session)["active"] != null && !(bool)Only(session)["active"], "The document records the explicit disable");
         var enabled = session.Edit(sign, null, true);
         Assert(enabled.Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661" && whistle.Position[0] == 45, "It can be enabled again, which registers it at its binding: " + enabled.Error);
-        Assert(session.ClearActivity(sign).Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661" && Only(session)["active"] == null, "Clearing the activity returns the native active state");
+        Assert(enabled.Reverted && Only(session)["active"] == null, "Enabling it again equals its native activity, so the modification no longer sets the activity");
+        Assert(!session.ClearActivity(sign).Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661", "Nothing is left for Clear activity to clear");
         var followed = session.Follow(sign, TrackAnchor.Endpoint("N1"));
         Assert(followed.Applied && Entry(world, whistle) == "S377|a|7.511661", "It can follow a track: " + followed.Error);
         Assert(session.ReconcileTrackFollowing().Count == 0, "An unchanged track needs no follow update");

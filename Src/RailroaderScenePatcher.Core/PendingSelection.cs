@@ -106,12 +106,40 @@ namespace RailroaderScenePatcher.Core {
                 throw new InvalidOperationException("The loaded map context is unavailable");
         }
 
+        // The choice only inspects its result, as Select in world does: no patch document will name it.
+        public bool InspectOnly { get; set; }
         public void Offer(IEnumerable<SelectionCandidate> hits) {
             if (!IsPending) return;
             Offers = Array.AsReadOnly(hits.Where(c => c != null && c.Identity.Kind == Kind).ToArray());
             Candidate = Offers.Count == 1 ? Offers[0] : null;
-            Problem = Offers.Count == 0 ? "No candidate at this point" :
-                Offers.Count > 1 ? "Several candidates overlap. Choose one by its identity." : null;
+            Problem = Offers.Count == 0 ? NoOffer :
+                Offers.Count > 1 ? SeveralOffers : null;
+        }
+        // Several candidates stand on one spot, where a click cannot tell them apart. The world lists them beside the
+        // click, numbered, and the same number names each wherever the panel lists it.
+        public const string SeveralOffers = "Several candidates stand on one spot. Choose one from the list beside the click.";
+        // A click that met no candidate.
+        public const string NoOffer = "No candidate at this point";
+        // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks
+        // only what is broken. Several candidates on one spot and a click that met none are nothing broken.
+        public static bool IsInstruction(string problem) => problem == SeveralOffers || problem == NoOffer;
+        // The number a candidate carries among the offers, from 1; 0 for one that is not offered.
+        public int Number(SelectionCandidate candidate) {
+            for (var i = 0; i < Offers.Count; i++) if (ReferenceEquals(Offers[i], candidate)) return i + 1;
+            return 0;
+        }
+        // The candidate the panel points at, such as the one whose row the pointer is over: the world marks it as it
+        // marks a candidate under the pointer. It changes nothing about the choice.
+        public SelectionCandidate Highlight { get; set; }
+
+        // The list of the candidates of one spot is open: several are offered and none is chosen yet.
+        public bool ListOpen => IsPending && Offers.Count > 1 && Candidate == null;
+        // Closes that list without a choice, as Escape closes a native dropdown: the choice stays pending and
+        // nothing is offered, as before the click.
+        public void CloseList() {
+            if (!ListOpen) return;
+            Offers = Array.Empty<SelectionCandidate>();
+            Candidate = null; Highlight = null; Problem = null;
         }
 
         public void Choose(SelectionCandidate candidate) {
@@ -133,6 +161,10 @@ namespace RailroaderScenePatcher.Core {
                 return Reject(sharedSource ? "The inspected object shares its identity " + Source.Identity + " with another object, so a patch cannot target it. Cancel; a choice for this object cannot be confirmed."
                     : "The source object changed or no longer resolves uniquely: " + difference + ". Cancel and inspect it again.");
             difference = Difference(Candidate, out var sharedCandidate);
+            // An object chosen only to be inspected (InspectOnly) needs no identity a patch could name: it is
+            // confirmed by itself when it is still there, and it then says under its supported edits why it cannot
+            // be edited. As a replacement target it is refused, since the document would have to name it.
+            if (difference != null && sharedCandidate && InspectOnly && Source == null && Kind == SelectionKind.SceneObject && StillOffered(Candidate)) difference = null;
             if (difference != null)
                 return Reject(sharedCandidate ? "The candidate shares its identity " + Candidate.Identity + " with another object, so a patch cannot target it. Pick an object whose path is unique."
                     : "The candidate changed or no longer resolves uniquely: " + difference + ". Pick again.");
@@ -155,6 +187,12 @@ namespace RailroaderScenePatcher.Core {
             return current.Any(c => ReferenceEquals(c.Handle, candidate.Handle)) ? "its identity or its supported edits changed" : "it is no longer found";
         }
 
+        // Whether the candidate itself, by handle and observed values, is still among the objects of its identity.
+        bool StillOffered(SelectionCandidate candidate) {
+            var current = scene is ITargetedSelectionScene targeted ? targeted.Find(candidate.Identity) : scene.Discover(candidate.Identity.Kind);
+            return current.Any(c => ReferenceEquals(c.Handle, candidate.Handle) && candidate.Matches(c));
+        }
+
         bool Reject(string problem) {
             Offers = Array.Empty<SelectionCandidate>();
             Candidate = null;
@@ -172,6 +210,18 @@ namespace RailroaderScenePatcher.Core {
         }
     }
 
+    // Which candidates a world choice offers. A choice that only inspects offers every candidate. A choice whose result
+    // a patch document has to name, such as a replacement object, offers no candidate whose identity another candidate
+    // shares: the document could not tell them apart, so offering one would only lead to a refusal.
+    public static class SelectionOffers {
+        public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly) {
+            var all = (candidates ?? Enumerable.Empty<SelectionCandidate>()).Where(c => c != null).ToArray();
+            if (inspectOnly) return all;
+            var shared = new HashSet<SelectionIdentity>(all.GroupBy(c => c.Identity).Where(group => group.Count() > 1).Select(group => group.Key));
+            return all.Where(c => !shared.Contains(c.Identity)).ToArray();
+        }
+    }
+
     public sealed class SelectionSession {
         readonly ISelectionScene scene;
         public PendingSelection Pending { get; private set; }
@@ -179,9 +229,10 @@ namespace RailroaderScenePatcher.Core {
 
         public SelectionSession(ISelectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
 
-        public void Begin(SelectionKind kind, string purpose, SelectionCandidate source = null) {
+        // inspectOnly says the choice only inspects its result: no patch document will name it.
+        public void Begin(SelectionKind kind, string purpose, SelectionCandidate source = null, bool inspectOnly = false) {
             if (Pending != null) throw new InvalidOperationException("A selection is already pending");
-            Pending = new PendingSelection(scene, kind, purpose, source);
+            Pending = new PendingSelection(scene, kind, purpose, source) { InspectOnly = inspectOnly };
         }
 
         public bool Confirm() {
@@ -195,5 +246,7 @@ namespace RailroaderScenePatcher.Core {
             Pending?.Cancel();
             Pending = null;
         }
+        // The confirmed identity was used by an edit: it is no longer something that waits to be used.
+        public void Consume() { Confirmed = null; }
     }
 }

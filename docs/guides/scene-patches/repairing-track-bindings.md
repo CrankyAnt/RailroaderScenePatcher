@@ -21,14 +21,14 @@ A Generic marker inside a grade-crossing setup, such as a whistle sign under a `
 
 Each of these refusals names a consumer of the marker's location that a binding edit would leave behind. For an object whose activity follows its track group, a binding edit also moves that group subscription to the new segment's group; see [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
-The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. Under **Detected problems**, any other marker lists **Track binding unavailable** with the reason and stays inspection only. Crossing pads have their own operation, described in [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md). Mileposts have their own later operation; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
+The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. For any other marker, **Supported edits** on the **Object** tab reads **Not editable:** with the reason. A marker of another type than Generic, and a starter placement marker that a new-game setup uses, stand in the **Inspection only** group of the outliner instead. Crossing pads have their own operation, described in [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md). Mileposts have their own later operation; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
 
 ## Set or replace the binding in the editor
 
 1. Open **Scene patches**, select **Refresh** in the command band, and select the marker's row in the outliner. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
-2. In the **Track binding** section of the **Connections** tab, check the **Current** lines. They show the stored segment, end and distance, and each graph registration under the marker ID with its owner. A missing segment appears under **Detected problems** on the **Object** tab as a broken binding.
-3. Enter the target segment ID in **Segment**, the end (`A` or `B`, case does not matter) in **End (A or B)** and the distance in metres in **Distance (m)**. To take the segment from the world, select **Segment** in the **Replacement targets** section, click the track and choose **Confirm** in the footer: the **Segment** field takes the confirmed segment. **Picked** fills it again after you changed the field.
-4. Select **Set** in the footer.
+2. On the **Connections** tab, **Replacement targets** and the fields of the binding come first, and **Current binding** below them shows what the marker is bound to now; the world marks that track in green while the tab is open. Check the **Current binding** lines. They show the stored segment, end and distance, and each graph registration under the marker ID with its owner. For an enabled marker, a stored segment that no longer exists appears under **Detected problems** on the **Object** tab as a broken binding; for a disabled one, and for an empty binding, a **Marker binding note** says what the state means.
+3. Enter the target segment ID in **Segment**, the end (`a` or `b`; it reads in lower case everywhere, and its case does not matter when you type it) in **End** and the distance in metres in **Distance**, on the row **Track location (m)**. The segment ID is taken as you write it: the game tells `S377` from `s377`. To take the segment from the world, select **Segment** in the **Replacement targets** section, click the track and choose **Confirm** in the footer: the **Segment** field takes the confirmed segment. **Picked** fills it again after you changed the field.
+4. Select **Set** at the bottom of the tab.
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit, and the marker keeps its binding and registration. The patcher never picks a nearby segment instead.
 
@@ -36,13 +36,13 @@ After the check it removes the marker's graph registration, writes the new locat
 
 ## Detach the marker
 
-Select **Detach** in the footer. The stored location becomes empty and the graph holds no registration for the marker, so a lookup by its ID no longer finds it. The object stays where it is and keeps its activity. The document records an explicit `"detach": true`; leaving the relationship out of the document would leave the binding untouched.
+Select **Detach** at the bottom of the tab. The stored location becomes empty and the graph holds no registration for the marker, so a lookup by its ID no longer finds it. The object stays where it is and keeps its activity. The document records an explicit `"detach": true`; leaving the relationship out of the document would leave the binding untouched.
 
 ## Undo, clear and remove
 
-Native Undo and Redo reverse and reapply each binding edit together with its registration. **Clear** in the **Connections** footer removes only the relationship from this MapMod's modification: the marker returns to the binding the loaded map gives it, while any authored placement or activity stays. **Remove** on the **Changes** tab removes the whole modification and returns binding, registration, placement and activity to the loaded map's values. Other objects' modifications stay applied.
+Native Undo and Redo reverse and reapply each binding edit together with its registration. **Clear binding** at the bottom of the **Connections** tab removes only the relationship from this MapMod's modification: the marker returns to the binding the loaded map gives it, while any authored placement or activity stays. **Remove modification** in the footer removes the whole modification and returns binding, registration, placement and activity to the loaded map's values. Other objects' modifications stay applied.
 
-If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the marker until **Recheck** on the **Changes** tab succeeds or the world reloads. Recheck refuses while the graph registration does not match the stored location.
+If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the marker until **Recheck** in the footer succeeds or the world reloads. Recheck refuses while the graph registration does not match the stored location.
 
 ## Activity and registration
 
@@ -78,7 +78,7 @@ Some markers can emit a game warning before the patcher can apply a MapMod repai
 
 Recover unknown content or document-format problems in the map editor. Players should not create or edit JSON to resolve these reports.
 
-Remove a repair with **Remove** on the **Changes** tab. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same document target the object, combine them into one before editing or removing it in the editor.
+Remove a repair with **Remove modification** in the footer. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same document target the object, combine them into one before editing or removing it in the editor.
 
 ## Limits
 

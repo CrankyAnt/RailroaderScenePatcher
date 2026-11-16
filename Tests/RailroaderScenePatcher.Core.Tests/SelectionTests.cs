@@ -24,6 +24,26 @@ static class SelectionTests {
         candidates.Items.Add(candidate);
         var choice = new PendingSelection(candidates, SelectionKind.SceneObject, "Replace scene target");
         choice.Offer(new[] { candidate });
+        // Several candidates under one click are numbered in the order they are offered; the panel can point at one.
+        var several = new PendingSelection(candidates, SelectionKind.SceneObject, "Replace scene target");
+        var twin = new SelectionCandidate(original, SelectionIdentity.SceneObject(new TargetIdentity("scene", "original", "Culler")), "Original board");
+        several.Offer(new[] { candidate, twin });
+        Check(several.Candidate == null && several.Problem == PendingSelection.SeveralOffers && several.Problem.Contains("list beside the click") && !several.Problem.Contains("identity"), "Several offers say where to click, not to choose by identity");
+        Check(several.Number(candidate) == 1 && several.Number(twin) == 2 && several.Number(new SelectionCandidate(original, twin.Identity, "Other")) == 0, "Offers carry their numbers from 1; a candidate that is not offered has none");
+        // The list of one spot closes without a choice, as a dropdown does on Escape: the choice stays pending.
+        Check(several.ListOpen, "Several offers without a choice are an open list");
+        several.CloseList();
+        Check(several.IsPending && !several.ListOpen && several.Offers.Count == 0 && several.Candidate == null && several.Problem == null, "Closing the list offers nothing and keeps the choice pending");
+        several.CloseList();
+        Check(several.IsPending, "Closing a list that is not open changes nothing");
+        several.Offer(new[] { candidate, twin });
+        several.Highlight = twin;
+        Check(several.Candidate == null && several.Problem == PendingSelection.SeveralOffers, "Pointing at an offer chooses nothing");
+        several.Choose(twin);
+        Check(ReferenceEquals(several.Candidate, twin) && several.Problem == null && several.Number(twin) == 2, "A chosen offer keeps its number");
+        Check(!several.ListOpen, "With a candidate chosen no list is open");
+        several.CloseList();
+        Check(ReferenceEquals(several.Candidate, twin) && several.Offers.Count == 2, "Closing the list after a choice keeps the choice");
         Check(choice.Confirmed == null && choice.IsPending, "A spatial hit remains pending until its visible identity is explicitly confirmed");
         Check(choice.Confirm(), "One explicitly offered unique identity can be confirmed");
         Check(choice.Confirmed.Identity.Target.Path == "replacement" && !choice.IsPending, "Confirmation records the explicitly chosen scene identity");
@@ -80,10 +100,23 @@ static class SelectionTests {
             "A source that shares its identity refuses the confirmation, names the identity and does not ask to inspect again: " + choice.Problem);
         // A candidate that shares its identity with another object.
         scene.Items.Clear(); scene.Items.Add(source); scene.Items.Add(new SelectionCandidate(new object(), source.Identity, "Board"));
-        choice = new PendingSelection(scene, SelectionKind.SceneObject, "Select scene object");
+        choice = new PendingSelection(scene, SelectionKind.SceneObject, "Select replacement scene object", segment);
+        scene.Items.Add(segment);
         choice.Offer(new[] { source });
         Check(!choice.Confirm() && choice.Problem == "The candidate shares its identity scene/board [Culler] with another object, so a patch cannot target it. Pick an object whose path is unique.",
-            "A candidate that shares its identity is refused with what to pick instead: " + choice.Problem);
+            "A replacement candidate that shares its identity is refused with what to pick instead: " + choice.Problem);
+        // The same object chosen only to be inspected, as by Select in world: it is confirmed by itself, and its
+        // supported edits then say why it cannot be edited.
+        choice = new PendingSelection(scene, SelectionKind.SceneObject, "Select scene object") { InspectOnly = true };
+        choice.Offer(new[] { source });
+        Check(choice.Confirm() && choice.Problem == null, "An object that shares its identity can be chosen for inspection: " + choice.Problem);
+        choice = new PendingSelection(scene, SelectionKind.SceneObject, "Replace scene target");
+        choice.Offer(new[] { source });
+        Check(!choice.Confirm(), "A choice a document will name refuses the shared identity also without a source object");
+        // A choice a document must name offers no candidate with a shared identity; an inspecting choice offers all.
+        var twin = new SelectionCandidate(new object(), source.Identity, "Board");
+        Check(SelectionOffers.For(new[] { source, twin, segment }, false).SequenceEqual(new[] { segment }) && SelectionOffers.For(new[] { source, twin, segment }, true).Count == 3
+            && SelectionOffers.For(new[] { source, segment }, false).Count == 2 && SelectionOffers.For(null, false).Count == 0, "A replacement choice offers only candidates a patch can name");
         // The same object under another classification, as when its supported edits changed.
         scene.Items.Clear(); scene.Items.Add(new SelectionCandidate(board, SelectionIdentity.SceneObject(new TargetIdentity("scene", "board", "Culler", "structure")), "Board")); scene.Items.Add(segment);
         choice = new PendingSelection(scene, SelectionKind.TrackSegment, "Select replacement track segment", source);
@@ -115,6 +148,13 @@ static class SelectionTests {
         var source = new SelectionCandidate(board, SelectionIdentity.SceneObject(target), "Board");
         var track = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "S-replacement"), "Track segment S-replacement");
         candidates.Items.AddRange(new[] { source, track });
+        // A confirmation that an edit used is no longer confirmed.
+        var used = new SelectionSession(candidates);
+        used.Begin(SelectionKind.SceneObject, "Select scene object");
+        used.Pending.Offer(new[] { source });
+        Check(used.Confirm() && used.Confirmed != null, "A confirmed identity waits to be used");
+        used.Consume();
+        Check(used.Confirmed == null && used.Pending == null, "Once an edit used it, nothing is confirmed any more");
         var choices = new SelectionSession(candidates);
         choices.Begin(SelectionKind.SceneObject, "Select scene object");
         choices.Pending.Offer(new[] { source });

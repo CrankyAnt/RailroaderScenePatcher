@@ -7,6 +7,7 @@
     <Compile Include="../../Src/RailroaderScenePatcher/InventoryPresentationState.cs" Link="InventoryPresentationState.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/EditFeedback.cs" Link="EditFeedback.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/CommandBand.cs" Link="CommandBand.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/RequestQueue.cs" Link="RequestQueue.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/SuppliedDefinitions.cs" Link="SuppliedDefinitions.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/InspectedOutput.cs" Link="InspectedOutput.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/HierarchyDependencies.cs" Link="HierarchyDependencies.cs" />

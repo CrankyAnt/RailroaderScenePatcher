@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Rebind a crossing pad and regenerate its geometry
 
-This guide shows how to set or replace the track location of a crossing pad, and what changes with it. A crossing pad is the road surface laid across the rails at a grade crossing. Its object holds a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding decides where the pad lies on the track.
+This guide shows how to set or replace the track location of a crossing pad, and what changes with it. The binding is the only way to move a pad in the editor: the **Placement** tab shows the pad's pose, and its modes **Numeric**, **Gizmo**, **Snap** and **Follow** are inactive for a pad, because none of them changes the binding the pad's geometry is generated along. A crossing pad is the road surface laid across the rails at a grade crossing. Its object holds a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding decides where the pad lies on the track.
 
 The game generates a pad once, when the pad first comes into view or close to the camera, and does not generate it again by itself. Writing a new location alone leaves the old mesh where it was. The patcher therefore runs the game's own pad generation after every binding change, so the visible pad and its culling follow the authored location. A document with a crossing-pad modification needs patcher version 0.5.0 or later; the editor's Save writes that dependency.
 
@@ -19,14 +19,14 @@ The patcher rebinds a pad when all of these hold:
 
 A pad inside a protected crossing qualifies too, because the crossing controller does not read the pad's marker. The crossing's own track spans and circuits are a separate operation.
 
-The inventory shows such an object in the `Crossing pad marker` family with the structure `crossing-pad-v1`. Under **Detected problems**, any other pad lists **Pad binding unavailable** with the reason and stays inspection only.
+The inventory shows such an object in the `Crossing pad marker` family with the structure `crossing-pad-v1`. For any other pad, **Supported edits** on the **Object** tab reads **Not editable:** with the reason. An enabled pad without a usable binding is listed under the **Problems** filter; a disabled one is not.
 
 ## Set or replace the binding in the editor
 
 1. Open **Scene patches** and select the pad's row in the outliner, in the folder **Crossing pad marker**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
 2. On the **Connections** tab, under **Crossing pad binding**, check the present values: the stored segment, end and distance, and each graph registration under the marker ID with its owner.
-3. Enter the target segment ID in **Segment**, the end (`A` or `B`) in **End (A or B)** and the distance in metres in **Distance (m)**. To take the segment from the world, select **Segment** in the **Replacement targets** section, click the track and choose **Confirm** in the footer: the **Segment** field takes the confirmed segment.
-4. Select **Set** in the footer.
+3. Enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**, on the row **Track location (m)**. To take the segment from the world, select **Segment** in the **Replacement targets** section, click the track and choose **Confirm** in the footer: the **Segment** field takes the confirmed segment.
+4. Select **Set** at the bottom of the tab.
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration and geometry.
 
@@ -36,7 +36,7 @@ The patcher verifies the stored location, the single graph registration, that th
 
 ## Detaching is refused
 
-A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach** in the footer is unavailable for pads, and its tooltip says why, and a document that detaches a pad fails before any change. To hide a pad, disable it.
+A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach** at the bottom of the tab is unavailable for pads, and its tooltip says why, and a document that detaches a pad fails before any change. To hide a pad, disable it.
 
 ## Placement and activity
 
@@ -46,9 +46,9 @@ A pad can also follow a track, as described in [follow a track](following-track.
 
 ## Undo, clear and remove
 
-Native Undo and Redo reverse and reapply each binding edit together with its registration and a new generation, so the pad returns to the earlier mesh. **Clear** in the footer removes only the relationship from this MapMod's modification. The pad returns to the binding the loaded map gives it, with matching geometry, while an authored placement or activity stays. **Remove** on the **Changes** tab returns binding, registration, placement, activity and geometry to the loaded map's values.
+Native Undo and Redo reverse and reapply each binding edit together with its registration and a new generation, so the pad returns to the earlier mesh. **Clear binding** at the bottom of the tab removes only the relationship from this MapMod's modification. The pad returns to the binding the loaded map gives it, with matching geometry, while an authored placement or activity stays. **Remove modification** in the footer returns binding, registration, placement, activity and geometry to the loaded map's values.
 
-If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the pad until **Recheck** on the **Changes** tab succeeds or the world reloads.
+If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the pad until **Recheck** in the footer succeeds or the world reloads.
 
 ## Write the binding by hand
 

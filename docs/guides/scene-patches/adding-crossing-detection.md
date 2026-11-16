@@ -28,19 +28,19 @@ The patcher never takes tracks or an area from nearby track. A track gets detect
 
 1. Open the Scene Patcher panel and inspect the crossing controller, either from the outliner (folder **Crossing controller**) or with **Select in world**.
 2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Addition ID** and select **Add detection** beside it.
-3. For each of approach A, island and approach B, enter the segment ID, the end (`a` or `b`) the distances are measured from, and the from and to distances in metres. To take the segment from the world, select **Segment** under **Replacement targets**, click the track, confirm its identity and select **Picked for** that role. **From** is the end next to the island for each approach, and the island's lower end for the island.
-4. Select **Preview** in the footer. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
-5. Select **Apply** in the footer. Apply uses the previewed tracks; preview again after you change a field.
+3. For each of approach A, island and approach B, enter the segment ID, the end (`a` or `b`) the distances are measured from, and the from and to distances in metres. To take the segment from the world, select **Segment** under **Replacement targets**, click the track, confirm its identity and select **Picked** in that role's caption row. The form of the open circuit or addition stands first on the tab, with the roles **Approach A**, **Island** and **Approach B**. **From** is the end next to the island for each approach, and the island's lower end for the island.
+4. Select **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
+5. Select **Apply** at the bottom of the tab. Apply uses the previewed tracks; preview again after you change a field.
 
 To change the tracks of an addition, select **Edit Detection addition** with its ID, change the fields, preview and apply. The patcher replaces the addition's spans and keeps its circuit.
 
-To delete an addition, select **Edit Detection addition** with its ID, then **Delete** in the footer and apply. Its circuit leaves the crossing, and the patcher unregisters and removes its spans. Other additions and the native circuits keep their coverage. **Remove** on the **Changes** tab deletes every addition of the crossing and returns its native circuits to their coverage without your MapMod.
+To delete an addition, select **Edit Detection addition** with its ID, then **Delete** at the bottom of the tab and apply. Its circuit leaves the crossing, and the patcher unregisters and removes its spans. Other additions and the native circuits keep their coverage. **Remove modification** in the footer deletes every addition of the crossing and returns its native circuits to their coverage without your MapMod.
 
 Native Undo and Redo reverse and repeat each applied change. Undo of an addition removes its circuit and spans. Undo of a deletion builds them again.
 
 Save writes the addition to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the added circuit or its spans in map data. The patcher builds them from the document on every load, and a repeated load reuses what it already built.
 
-If an edit fails, the panel reports whether the prior state was restored. When the patcher cannot remove a span it built, the crossing refuses further edits until **Recheck** on the **Changes** tab succeeds or the editor reloads.
+If an edit fails, the panel reports whether the prior state was restored. When the patcher cannot remove a span it built, the crossing refuses further edits until **Recheck** in the footer succeeds or the editor reloads.
 
 ## Write an addition in the document
 

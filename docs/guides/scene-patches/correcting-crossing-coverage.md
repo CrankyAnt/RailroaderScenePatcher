@@ -29,15 +29,15 @@ The patcher never assigns coverage by proximity. A track near the crossing gets 
 
 1. Open the Scene Patcher panel and inspect the crossing controller, either from the outliner (folder **Crossing controller**) or with **Select in world**.
 2. On the **Connections** tab, under **Crossing coverage**, read the current coverage of each circuit, then select **Edit circuit** for the circuit to change.
-3. For each of approach A, island and approach B, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the from and to distances in metres. To take the segment from the world, select **Segment** under **Replacement targets**, click the track, confirm its identity and select **Picked for** that role. **From** is the end next to the island for each approach, and the island's lower end for the island.
-4. Select **Preview** in the footer. The panel shows the intended relationship for every circuit: the selected tracks, which native spans stop triggering the crossing, and which circuits are retained. Nothing changes yet.
-5. Select **Apply** in the footer. Apply uses the previewed tracks; preview again after you change a field.
+3. For each of approach A, island and approach B, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the from and to distances in metres. To take the segment from the world, select **Segment** under **Replacement targets**, click the track, confirm its identity and select **Picked** in that role's caption row. The form of the open circuit or addition stands first on the tab, with the roles **Approach A**, **Island** and **Approach B**. **From** is the end next to the island for each approach, and the island's lower end for the island.
+4. Select **Preview** at the bottom of the tab. The panel shows the intended relationship for every circuit: the selected tracks, which native spans stop triggering the crossing, and which circuits are retained. Nothing changes yet.
+5. Select **Apply** at the bottom of the tab. Apply uses the previewed tracks; preview again after you change a field.
 
-To detach a circuit, select **Detach** in the footer and apply it. To return a circuit to its coverage without this MapMod, select **Clear** in the footer and apply it. **Remove** on the **Changes** tab returns every circuit of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including the spans the patcher created.
+To detach a circuit, select **Detach** at the bottom of the tab and apply it. To return a circuit to its coverage without this MapMod, select **Clear circuit** at the bottom of the tab and apply it. **Remove modification** in the footer returns every circuit of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including the spans the patcher created.
 
 Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the document on every load, so a reload never duplicates them.
 
-If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** on the **Changes** tab succeeds or the editor reloads.
+If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the editor reloads.
 
 ## Write coverage in the document
 

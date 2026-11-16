@@ -76,6 +76,11 @@ namespace RailroaderScenePatcher.Core {
             if (chain == null) throw new ArgumentNullException(nameof(chain));
             return chain.All(link => link.Value || link.Key);
         }
+        // Whether an object's own active flag counts as on. A culler switches the objects on its list off while the
+        // camera is far away and on again when it is near. So an object that is off while its culler shows its objects
+        // was switched off by someone: authored off, or disabled by a patch. Off while its culler hides them, it may be
+        // off through the culler alone and counts as on. Without a culler the flag is what it says.
+        public static bool Enabled(bool activeSelf, bool listedByCuller, bool cullerShows) => activeSelf || (listedByCuller && !cullerShows);
     }
     public interface ISteppedInspectionScene : IInspectionScene {
         IEnumerable<SceneObservation> DiscoverInSteps();
@@ -123,9 +128,26 @@ namespace RailroaderScenePatcher.Core {
         // State the game switches while it runs, such as the enabled flag of a culled child behaviour. It is shown, and
         // it is no part of what an inspection pins: a change here alone does not mark a snapshot stale.
         public IReadOnlyList<string> RuntimeState { get; }
+        // The object's own active flag, as the scene authored it. Active also needs every parent to be active; an object
+        // can be enabled itself and inactive through a parent. Without a value it is the same as Active. It is shown and
+        // filtered on, and it is no part of what an inspection pins: for an object on a culler's list its reading
+        // depends on whether the culler shows its objects now, which changes with the camera.
+        public bool Enabled { get; }
+        // What the inspection could not read or check. The modder cannot repair these with the patcher, so they are no
+        // problems: they are shown without the problem marker.
+        public IReadOnlyList<string> Notes { get; }
+        // Why this object is inspection only, or null: the inventory finds it, no supported family covers its kind and
+        // the native map editor does not edit it. Such an object is listed in the Inspection only group, shows no
+        // problem and offers no edit; what would be a problem for a supported kind is a note here.
+        public string InspectionOnly { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null) {
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null) {
+            Enabled = enabled ?? active;
+            InspectionOnly = inspectionOnly;
+            var noted = (notes ?? Array.Empty<string>()).ToArray();
+            if (inspectionOnly != null) { noted = noted.Concat(problems).ToArray(); problems = Array.Empty<string>(); }
+            Notes = Array.AsReadOnly(noted);
             Handle = handle ?? throw new ArgumentNullException(nameof(handle));
             Identity = identity ?? throw new ArgumentNullException(nameof(identity)); Family = family; Active = active;
             Position = Array.AsReadOnly(position.ToArray()); Rotation = Array.AsReadOnly(rotation.ToArray());
@@ -150,9 +172,11 @@ namespace RailroaderScenePatcher.Core {
             if (!Rotation.SequenceEqual(other.Rotation)) return "rotation";
             if (Family != other.Family) return "family";
             if (Operations != other.Operations) return "supported edits";
+            if (InspectionOnly != other.InspectionOnly) return "inspection only";
             foreach (var part in new[] { new KeyValuePair<string, IReadOnlyList<string>[]>("bindings", new[] { Bindings, other.Bindings }),
                 new KeyValuePair<string, IReadOnlyList<string>[]>("dependencies", new[] { Dependencies, other.Dependencies }),
-                new KeyValuePair<string, IReadOnlyList<string>[]>("problems", new[] { Problems, other.Problems }) }) {
+                new KeyValuePair<string, IReadOnlyList<string>[]>("problems", new[] { Problems, other.Problems }),
+                new KeyValuePair<string, IReadOnlyList<string>[]>("notes", new[] { Notes, other.Notes }) }) {
                 if (part.Value[0].SequenceEqual(part.Value[1])) continue;
                 var line = part.Value[0].Except(part.Value[1]).Concat(part.Value[1].Except(part.Value[0])).FirstOrDefault() ?? "order";
                 return part.Key + ": " + (line.Length > 160 ? line.Substring(0, 160) + "..." : line);
@@ -160,10 +184,10 @@ namespace RailroaderScenePatcher.Core {
             return "identity";
         }
         internal string Fingerprint => new JArray(Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Active,
-            new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations).ToString(Newtonsoft.Json.Formatting.None);
+            new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly).ToString(Newtonsoft.Json.Formatting.None);
         public bool Matches(SceneObservation current) => current != null && ReferenceEquals(Handle, current.Handle) && Fingerprint == current.Fingerprint && SamePosition(current);
         internal string SearchText => String.Join(" ", new[] { Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family,
-            Active ? "active" : "inactive", Operations }.Concat(Bindings).Concat(Dependencies).Concat(Problems));
+            Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes));
     }
     public sealed class SceneInventory {
         readonly IInspectionScene scene;
@@ -368,14 +392,18 @@ namespace RailroaderScenePatcher.Core {
             // guard checks beside this that the identity still resolves to this one object.
             if (inspection is ITargetedInspectionScene targeted) {
                 var current = targeted.Observe(observed.Handle, identity);
-                if (!observed.Matches(current)) throw Changed(current == null ? "missing" : !ReferenceEquals(current.Handle, observed.Handle) ? "another object" : observed.Difference(current));
+                if (!observed.Matches(current)) throw new InvalidOperationException(Changed(observed, current));
                 return;
             }
             var matches = inspection.Discover().Where(e => e.Identity.Scene == identity.Scene && e.Identity.Path == identity.Path && e.Identity.Component == identity.Component).ToArray();
-            if (matches.Length != 1) throw Changed(matches.Length == 0 ? "missing" : matches.Length + " objects hold its identity");
-            if (!observed.Matches(matches[0])) throw Changed(!ReferenceEquals(matches[0].Handle, observed.Handle) ? "another object" : observed.Difference(matches[0]));
+            if (matches.Length != 1) throw new InvalidOperationException(Changed(matches.Length == 0 ? "missing" : matches.Length + " objects hold its identity"));
+            if (!observed.Matches(matches[0])) throw new InvalidOperationException(Changed(observed, matches[0]));
         }
-        // The refusal names what differs, as a stale reason does: the first differing part of the observation.
-        static InvalidOperationException Changed(string difference) => new InvalidOperationException("Inspected target changed (" + difference + "); refresh and inspect again");
+        // The refusal of a target that no longer reads as it was inspected. It names what differs, as a stale reason
+        // does: that the object is gone, that another object has its place, or the first differing part of the
+        // observation. One path for every caller.
+        public static string Changed(SceneObservation observed, SceneObservation now) =>
+            Changed(now == null ? "missing" : !ReferenceEquals(now.Handle, observed.Handle) ? "another object" : observed.Difference(now));
+        static string Changed(string difference) => "Inspected target changed (" + difference + "); refresh and inspect again";
     }
 }

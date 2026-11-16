@@ -71,20 +71,7 @@ namespace RailroaderScenePatcher {
         static readonly HashSet<string> CulledFamilies = new HashSet<string>(StringComparer.Ordinal) { "Crossing light", "Crossing gate", "Crossing bell" };
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
-        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery";
-        internal static readonly string[] Coverage = {
-            "Generic track markers, such as yard limits and station signs: set, replace or detach the marker's track location with its graph registration, and place or enable the object. A marker whose activity follows its own track group keeps that subscription coherent through rebinding and accepts an explicit disable that holds through later group activation. Markers with other location consumers are inspection only.",
-            "Crossing pads: set or replace the pad marker's track location with its graph registration; the game's pad generation then rebuilds the pad geometry and culling at the new location. Placement and activity stay separate settings; a pad cannot be detached.",
-            "Mileposts: marker, origin and display dependencies; model and mileage remain unchanged.",
-            "Crossings: controllers, spans, pads, lights, gates and bells; relationships are explicit, never inferred from proximity.",
-            "Independent boards: renderer culler with one circle map mask and no track relationship; placement and activity refresh culling, mask registration and generated terrain output.",
-            "Bridges: only the retained Ela bridge has the fixed-placement adapter; it moves the bridge root with its colliders and culling.",
-            "Construction scenery exposes segment and target relationships and is inspected separately. Generated track-owned trestles remain owned by native track geometry and are never moved by bridge placement.",
-            "Passenger stops and map-object anchors: native operations/map-data editing; historical FUSE warning is outside current scope.",
-            "Player-created signs: native sign editing; this does not establish inherited scene-sign editing.",
-            "Signals, CTC and interlocking edits are outside the supported operation boundary.",
-            "Dependencies show components, serialized relationships and direct loaded-scene references; indirect consumers can remain unknown."
-        };
+        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile";
         public IEnumerable<string> MapIds => PackDocuments.MapIds();
         // Why a board candidate cannot be edited, from the board capability; null when that capability is unavailable.
         readonly Func<GameObject, string> boardRefusal;
@@ -112,12 +99,37 @@ namespace RailroaderScenePatcher {
             if (value is UnityEngine.Object obj) { if (obj != null) yield return obj; }
             else if (value is IList list) foreach (var item in list) if (item is UnityEngine.Object element && element != null) yield return element;
         }
+        // A map object the game spawns carries this component; its track anchor is edited in the native Map Editor.
+        const string MapObject = "Game.MapObjectActivation", PhotoController = "RollingStock.BuilderPhotoController";
+        static string MarkerKind(Component marker) { try { return Text(Field(marker, "type")); } catch { return null; } }
+        // The markers a builder photo rig holds, read once per discovery.
+        static HashSet<object> photoMarkers;
+        static HashSet<object> PhotoMarkers(bool again = false) {
+            if (photoMarkers != null && !again) return photoMarkers;
+            var found = new HashSet<object>();
+            try {
+                var type = Native.Type(PhotoController);
+                if (type != null) foreach (var rig in Resources.FindObjectsOfTypeAll(type)) {
+                    var held = rig == null ? null : Field(rig, "marker") as Component;
+                    if (held != null) found.Add(held);
+                }
+            } catch { }
+            return photoMarkers = found;
+        }
         static string Family(Component c) {
             var type = TypeName(c); var go = c.gameObject;
             if (type == Milepost) return "Milepost";
-            if (type == Marker) return Get(go, Milepost) != null ? null : Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker";
+            if (type == Marker) {
+                // Kinds the inventory does not list: signals, map objects whose track anchor the native editor owns, and
+                // the builder photo marker.
+                if (!BindingRules.Listed(MarkerKind(c), Get(go, MapObject) != null, PhotoMarkers().Contains(c))) return null;
+                return Get(go, Milepost) != null ? null : Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker";
+            }
             if (type == Relative && Get(go, Marker) == null) return "Track-relative scene object";
             if (type == Span) return "Track span";
+            // A storage pile of an industry is a scene object the patcher will place; until then it is listed without
+            // an edit, in the Inspection only group, instead of being left out.
+            if (type == Pile) return "Storage pile";
             if (type == Crossing) return "Crossing controller";
             if ((type == "Track.KeyValueLampMaterialController" || type == "RollingStock.Controls.KeyValueBoolAnimator" || type == "Audio.IntegerLoopingPlayer") && Parent(c, Crossing) != null)
                 return type == "Track.KeyValueLampMaterialController" ? "Crossing light" : type == "Audio.IntegerLoopingPlayer" ? "Crossing bell" : "Crossing gate";
@@ -149,6 +161,8 @@ namespace RailroaderScenePatcher {
             ReferenceScan markerReferrers = null;
             string referrerError = null;
             var culled = new Dictionary<GameObject, string>();
+            // The listed objects of cullers that hide their objects now, or whose state is not known yet.
+            var hidden = new HashSet<GameObject>();
             var walk = TrackMarkerWorld.ReferrerWalk((owner, field, value, error) => {
                 if (error != null) { scanErrors++; return; }
                 // What this patcher's own components hold, such as the object the panel revealed last, is working state
@@ -156,7 +170,11 @@ namespace RailroaderScenePatcher {
                 if (owner.GetType().Assembly == typeof(NativeInventory).Assembly) return;
                 // The objects a culler switches on and off by camera distance, read from the same walk over the fields.
                 if (field.Name == "gameObjects" && owner.GetType().FullName == GameObjectCuller && value is IList switched)
-                    foreach (var item in switched) if (item is GameObject listed && listed != null) culled[listed] = Label((Component)owner);
+                {
+                    var shows = false;
+                    try { shows = Text(Field(owner, "_cullingState")) == "Visible"; } catch { }
+                    foreach (var item in switched) if (item is GameObject listed && listed != null) { culled[listed] = Label((Component)owner); if (!shows) hidden.Add(listed); }
+                }
                 try {
                     foreach (var target in References(value)) {
                         var held = field.Authored ? incoming : working;
@@ -165,8 +183,9 @@ namespace RailroaderScenePatcher {
                     }
                 } catch { scanErrors++; }
             });
-            HolderIndex setups = null;
+            HolderIndex setups = null, activeSetups = null;
             HashSet<string> segmentIds = null;
+            PhotoMarkers(true);
             string graphError = null;
             var steps = DiscoveryWalk.Steps<MonoBehaviour>(() => Resources.FindObjectsOfTypeAll<MonoBehaviour>(), Loaded,
                 owner => {
@@ -181,6 +200,7 @@ namespace RailroaderScenePatcher {
                     if (walk != null) markerReferrers = walk.Finish();
                     LastReferrers = referrerError == null ? markerReferrers : null;
                     setups = TrackMarkerWorld.SetupHolders();
+                    activeSetups = TrackMarkerWorld.ActiveSetupHolders();
                 },
                 Family,
                 () => {
@@ -190,9 +210,9 @@ namespace RailroaderScenePatcher {
                         if (lookup == null) throw new InvalidOperationException("Track segment lookup unavailable");
                         segmentIds = new HashSet<string>(lookup.Keys.Cast<object>().Select(Text), StringComparer.Ordinal);
                     } catch (Exception e) { graphError = e.GetBaseException().Message; }
-                    if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled);
+                    if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, activeSetups, hidden);
                 },
-                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled));
+                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, activeSetups, hidden));
             foreach (var step in steps) yield return step;
         }
         static bool Transient(Transform child, Transform root) {
@@ -200,8 +220,13 @@ namespace RailroaderScenePatcher {
             return false;
         }
         static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, Dictionary<UnityEngine.Object, List<string>> working, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal,
-            ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled) {
+            ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HolderIndex activeSetups, HashSet<GameObject> hidden) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>();
+            // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
+            // that is off while its culler shows its objects was switched off by the scene or by a patch.
+            var enabled = AuthoredActivity.Enabled(go.activeSelf, culled.ContainsKey(go), !hidden.Contains(go));
+            // What the game reads whatever the object's activity: listed as a problem also for a disabled object.
+            var anyway = new List<string>();
             // The game enables and disables child behaviours while it runs, for example a crossing bell's audio player
             // by distance. Which components exist is a dependency; whether each is enabled is runtime state.
             var runtime = new List<string>();
@@ -221,6 +246,7 @@ namespace RailroaderScenePatcher {
                     runtime.Add((below ? "Generated pad object " : "Runtime object ") + Label(child));
                     continue;
                 }
+                if (HierarchyDependencies.IsRuntimeComponent(TypeName(child))) { runtime.Add("Runtime component " + Label(child)); continue; }
                 // Which components exist, and who references them from an authored field, is a dependency; whether a
                 // behaviour is enabled is runtime state, so the part carries no enabled value.
                 parts.Add(new HierarchyPart(Label(child), null, false, incoming.TryGetValue(child, out var refs) ? refs : null));
@@ -234,8 +260,17 @@ namespace RailroaderScenePatcher {
             void Read(Action action) { try { action(); } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); } }
             var marker = TypeName(c) == Marker ? c : Get(go, Marker);
             if (marker != null) Read(() => {
-                bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + Text(Field(marker, "type")));
-                Location(Field(marker, "_location"), "Marker", bindings, problems, segmentIds, graphError);
+                var kind = Text(Field(marker, "type"));
+                bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + kind);
+                // What the game needs from this kind's binding decides whether its state is a problem.
+                var read = false;
+                try { read = activeSetups != null && activeSetups.Holds(marker); } catch { }
+                var follower = Get(go, Relative);
+                var follows = follower != null && Field(follower, "targetActiveFollowsTrackGroup") is bool flag && flag;
+                var need = BindingRules.Need(kind, family == "Crossing pad marker", read);
+                var before = problems.Count;
+                MarkerLocation(Field(marker, "_location"), need, enabled, follows, bindings, problems, segmentIds, graphError);
+                if (need == BindingNeed.ReadAnyway) anyway.AddRange(problems.Skip(before));
                 Registrations(marker, bindings);
             });
             if (TypeName(c) == Span) Read(() => {
@@ -320,39 +355,70 @@ namespace RailroaderScenePatcher {
             var board = family == "Independent board";
             string refusal = board ? "the board capability is unavailable" : null;
             if (board && boardRefusal != null) Read(() => refusal = boardRefusal(go));
-            if (refusal != null) problems.Add("Fixed placement unavailable: " + refusal);
+            // Why an object of a supported family cannot be edited is no detected problem: it stands under Supported
+            // edits.
             var bridge = family == "Bridge";
-            if (bridge) Read(() => { var problem = BridgeWorld.PatternProblem(go); if (problem != null) problems.Add("Bridge placement unavailable: " + problem); });
+            string bridgeRefusal = null;
+            if (bridge) Read(() => bridgeRefusal = BridgeWorld.PatternProblem(go));
             var marked = family == "Track marker";
             string markerRefusal = marked ? "the track-marker capability is unavailable" : null;
             if (marked) Read(() => markerRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : TrackMarkerWorld.Problem(go, markerReferrers, setups));
-            if (markerRefusal != null) problems.Add("Track binding unavailable: " + markerRefusal);
             var markerEditable = marked && markerRefusal == null;
             var pad = family == "Crossing pad marker";
             string padRefusal = pad ? "the crossing-pad capability is unavailable" : null;
             if (pad) Read(() => padRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : CrossingPadWorld.PadProblem(go, markerReferrers, setups));
-            if (padRefusal != null) problems.Add("Pad binding unavailable: " + padRefusal);
             var padEditable = pad && padRefusal == null;
             var crossing = family == "Crossing controller";
             string coverageRefusal = crossing ? "the crossing-coverage capability is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
-            if (coverageRefusal != null) problems.Add("Crossing coverage unavailable: " + coverageRefusal);
             var coverageEditable = crossing && coverageRefusal == null;
-            var structure = board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
-            var operations = board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : "Inspection only until corrected: " + refusal)
-                : bridge ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight"
+            // A kind no supported family covers is inspection only, which is another state than an object of a supported
+            // family that cannot be edited: a marker of another type than Generic, a starter placement marker that a
+            // new-game setup uses, and every family without an edit.
+            string only = null;
+            if (marked) Read(() => {
+                var type = MarkerKind(marker);
+                if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
+                else if (setups != null && setups.Holds(marker)) only = CommandBand.NotYetSupported("starter placement markers that a new-game setup uses");
+            });
+            else if (!board && !bridge && !pad && !crossing) only = CommandBand.NotYetSupported("the " + family + " family");
+            if (only != null) markerEditable = false;
+            var structure = only != null ? null : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
+            var operations = only != null ? only : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
+                : bridge ? (bridgeRefusal == null ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight" : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
-                : marked ? "Inspection only until corrected: " + markerRefusal
-                : padEditable ? "Pad binding: set or replace the marker location with its graph registration and regenerate the pad geometry and culling; fixed placement and activity stay separate settings"
-                : pad ? "Inspection only until corrected: " + padRefusal
+                : marked ? CommandBand.NotEditable(markerRefusal)
+                : padEditable ? CommandBand.PadOperations
+                : pad ? CommandBand.NotEditable(padRefusal)
                 : coverageEditable ? "Crossing coverage: select tracks for, or detach, each circuit explicitly, or add detection for explicitly selected extra tracks; native spans stay registered and the crossing itself does not move"
-                : crossing ? "Inspection only until corrected: " + coverageRefusal
-                : "Inspection only; no mutation adapter for this pattern";
+                : CommandBand.NotEditable(coverageRefusal);
+            // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
+            // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
+            if (only == null && structure != null) Read(() => {
+                var holders = BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
+                var shared = CommandBand.SharedPath(holders);
+                if (shared != null) { structure = null; operations = CommandBand.NotEditable(shared); }
+            });
+            // What the inspection could not read or check is a note, whatever the object's activity. Of the rest, a
+            // disabled object keeps only what the game reads anyway.
+            var notes = problems.Where(BindingRules.IsNote).ToArray();
+            var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
-                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), problems, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal));
+                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only);
+        }
+        // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.
+        static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
+            var segment = Text(Field(location, "segmentId"));
+            bindings.Add("Marker segment=" + segment + "; end=" + Text(Field(location, "end")) + "; distance=" + Text(Field(location, "distance")));
+            var resolves = String.IsNullOrWhiteSpace(segment) ? false : segmentIds == null ? (bool?)null : segmentIds.Contains(segment);
+            var problem = BindingRules.Problem(need, enabled, "Marker", segment, resolves) ?? BindingRules.Unknown(need, enabled, "Marker", segment, resolves, graphError);
+            if (problem != null) problems.Add(problem);
+            var note = BindingRules.Note(need, enabled, segment, resolves, followsGroup);
+            if (note != null) bindings.Add("Marker binding note: " + note);
+            // Existence is not proof that the binding names the intended track.
         }
         static void Location(object location, string role, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
             var segment = Text(Field(location, "segmentId"));

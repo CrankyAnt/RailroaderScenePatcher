@@ -46,6 +46,30 @@ namespace RailroaderScenePatcher.Core {
         public string Skipped { get; internal set; }
         // A failure report or overlap notice that could not be delivered; the document's applied work is unaffected.
         public string PresentationError { get; internal set; }
+        // The map this document names as its source, or null when the document cannot be read that far.
+        public string MapId {
+            get {
+                try { return Pack.Json == null ? null : (string)JObject.Parse(Pack.Json)["sourceMap"]?["mapId"]; }
+                catch { return null; }
+            }
+        }
+        // What happened to this document in one load attempt, as one line for the log: the pack, the map the document
+        // is for, and the outcome. mapIds is the loaded map followed by its layers. A document for another map is
+        // skipped without a failure, so this line is the only trace of it.
+        public string LogLine(string patcherVersion, int attempt, IReadOnlyList<string> mapIds) {
+            var maps = mapIds ?? Array.Empty<string>();
+            var source = Pack.Source;
+            var start = "Scene Patcher " + patcherVersion + ": load attempt " + attempt + ", map " + (maps.Count == 0 ? "unknown" : maps[0]) +
+                " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] document";
+            var map = MapId;
+            var named = start + (map == null ? "" : " for " + map);
+            if (Result == null) return named + " skipped: " + (Skipped ?? "not handed to the patch engine");
+            if (map != null && maps.Count != 0 && !maps.Contains(map, StringComparer.Ordinal)) return named + " skipped: not the loaded map or one of its layers";
+            if (Result.Error != null) return named + " not applied: " + Result.Error;
+            var outcomes = Result.Outcomes?.Values.ToArray() ?? Array.Empty<Outcome>();
+            int failed = outcomes.Count(o => !o.Applied), unchanged = outcomes.Count(o => o.Applied && o.Unchanged);
+            return named + ": " + (outcomes.Length - failed - unchanged) + " of " + outcomes.Length + " modifications applied, " + failed + " failed, " + unchanged + " unchanged";
+        }
     }
     // Receives informational notices for the structured native collector. A notice with a known Key replaces that row.
     public interface IOverlapNotices { void Notice(OverlapNotice notice); }

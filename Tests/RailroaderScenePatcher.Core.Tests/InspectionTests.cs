@@ -96,6 +96,10 @@ static class InspectionTests {
         EditFeedbackNamesEveryRefusal();
         StaleNoticePromisesOnlyWhatPinRefuses();
         ProblemsFilterLimitsTheOutliner();
+        BindingProblemsFollowTheGame();
+        InspectionOnlyObjectsHaveTheirOwnGroup();
+        ChangesReadOneLinePerSetting();
+        SubgroupsFollowTheGame();
         RuntimeStateDoesNotMarkStale();
         RuntimeReferencesAreNotAuthoredState();
         AnEditScansTheSceneTwice();
@@ -109,6 +113,7 @@ static class InspectionTests {
         AnOwnEditTakesItsRelatedObservations();
         AComparedSnapshotPinsWithoutAScan();
         FollowUpsKeepTheActionResultVisible();
+        MessagesFollowTheirScope();
         AutoFitSizesTheOutlinerToMostNames();
         ResultsBelongToTheInspectedObject();
         MessagesKeepTheirSourceNewestFirst();
@@ -482,6 +487,44 @@ static class InspectionTests {
         Check(Paths("marker", all).SequenceEqual(new[] { "World/Sign", "World/Post" }), "Search alone keeps its meaning");
         Check(inventory.Entries.Count == 4 && !inventory.IsStale, "Filtering changes neither the inventory nor its freshness");
         Check(RailroaderScenePatcher.InventoryPresentationState.Rows(null, "", problems, changed).Count == 0, "A missing inventory has no rows");
+        // The Disabled filter lists the objects whose own active flag is off: not one that is inactive through a parent.
+        var switched = new Fixture();
+        SceneObservation Flagged(string path, bool active, bool? enabled) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), "Track marker", active,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Inspection only", null, enabled);
+        switched.Objects.Add(Flagged("World/On", true, null));
+        switched.Objects.Add(Flagged("World/Off", false, null));
+        switched.Objects.Add(Flagged("World/Parent off", false, true));
+        switched.Objects.Add(Flagged("World/Own off", false, false));
+        var flags = new SceneInventory(switched); flags.Refresh();
+        Check(RailroaderScenePatcher.InventoryPresentationState.Rows(flags, "", RailroaderScenePatcher.OutlinerFilter.Disabled, null).Select(e => e.Identity.Path).SequenceEqual(new[] { "World/Off", "World/Own off" }),
+            "The Disabled filter lists objects that are switched off themselves");
+        Check(flags.Entries[0].Enabled && !flags.Entries[1].Enabled && flags.Entries[2].Enabled && !flags.Entries[2].Active, "Without a value the own flag is the activity; an object can be enabled under an inactive parent");
+        Check(RailroaderScenePatcher.InventoryPresentationState.Summary(flags, "", RailroaderScenePatcher.OutlinerFilter.Disabled, null) == "2 of 4 objects", "The count line counts the disabled objects");
+        Check(Flagged("World/X", false, true).Difference(Flagged("World/X", false, false)) == "identity",
+            "The own flag is no part of what an inspection pins: for a culler-listed object its reading follows the camera");
+        Check(RailroaderScenePatcher.CommandBand.AllFilter == "All" && RailroaderScenePatcher.CommandBand.ChangedFilter == "Changed" && RailroaderScenePatcher.CommandBand.DisabledFilter == "Disabled"
+            && RailroaderScenePatcher.CommandBand.ProblemsFilter == "Problems", "The four filters are All, Changed, Disabled and Problems");
+        var names = new[] { RailroaderScenePatcher.CommandBand.ChangedFilter, RailroaderScenePatcher.CommandBand.DisabledFilter, RailroaderScenePatcher.CommandBand.ProblemsFilter };
+        Check(names.SequenceEqual(names.OrderBy(name => name, StringComparer.Ordinal)), "After All the filters stand by name");
+        // Four native segments, each its word and 12 units of padding, need 292.4 units; the outliner column holds them
+        // and its band at its default and least width.
+        var segments = RailroaderScenePatcher.CommandBand.FilterSegments;
+        Check(segments.Length == 4 && Math.Abs(segments.Sum() - 292.39f) < 0.01f, "The four filter segments need 292.4 units: " + segments.Sum());
+        Check(segments.Sum() <= RailroaderScenePatcher.CommandBand.OutlinerWidth && RailroaderScenePatcher.CommandBand.OutlinerWidth == 296, "The outliner column holds the four filters without cutting a word");
+        Check(segments.Sum() > 252 && segments.Sum() - (77.88f + 12) + (49.56f + 12) > 252, "At the earlier width of 252 neither Problems nor the shorter Issues fits beside the other three");
+        Check(RailroaderScenePatcher.CommandBand.WordsFit(RailroaderScenePatcher.CommandBand.OutlinerWidth), "The lamps' words fit the band at that width");
+        // A disabled object triggers no problem of any kind, and stays reachable through the Disabled filter.
+        var every = new[] { "Marker broken binding: missing segment Sgone", "Missing script in inspected hierarchy", "Lower broken binding: missing segment S9", "Inspection unavailable: no graph" };
+        Check(BindingRules.Problems(true, every, new string[0]).SequenceEqual(every), "An enabled object keeps every problem");
+        Check(BindingRules.Problems(false, every, new string[0]).Count == 0 && BindingRules.Problems(false, every, null).Count == 0, "A disabled object triggers no problem of any kind");
+        Check(BindingRules.Problems(false, every, new[] { every[0] }).SequenceEqual(new[] { every[0] }), "What the game reads whatever the activity stays listed for a disabled object");
+        Check(BindingRules.Problems(true, null, null).Count == 0, "No problems give an empty list");
+        // An object on a culler's list: off while its culler shows its objects is disabled; off while the culler hides
+        // them is the culler's doing.
+        Check(AuthoredActivity.Enabled(true, false, false) && !AuthoredActivity.Enabled(false, false, false), "Without a culler the own flag is what it says");
+        Check(AuthoredActivity.Enabled(true, true, true) && AuthoredActivity.Enabled(true, true, false), "An object that is on is enabled, whatever its culler does");
+        Check(AuthoredActivity.Enabled(false, true, false), "Off while its culler hides its objects: camera culling does not disable an object");
+        Check(!AuthoredActivity.Enabled(false, true, true), "Off while its culler shows its objects: authored off or disabled by a patch");
         Check(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", modified, null).Count == 0, "Without a document nothing is changed");
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed) == "2 of 4 objects", "The count line names how many objects the filters show: " + RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed));
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", all, changed) == "4 of 4 objects", "The unfiltered outliner counts every entry");
@@ -875,8 +918,7 @@ static class InspectionTests {
         Check(discoveries == 1, "Without single-object observation the pin compares the whole scene: " + discoveries);
     }
 
-    // The newest message is first. Follow-ups such as terrain output replace one another, so the result they follow stays
-    // among the messages shown.
+    // The message area shows the result of the last action and the latest follow-up of that action above it.
     static void FollowUpsKeepTheActionResultVisible() {
         var log = new List<string>();
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
@@ -884,14 +926,196 @@ static class InspectionTests {
         feedback.Follow("Terrain output", "Terrain output complete.");
         Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete." }), "A follow-up without a result is shown");
         feedback.Report("Placement", "Placement completed.");
+        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Placement: Placement completed." }), "A result takes the place of what was shown before it");
         feedback.Report("Activity", "Enable completed.");
         feedback.Follow("Terrain output", "Terrain output outstanding.");
         feedback.Follow("Terrain output", "Terrain output complete.");
-        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete.", "Activity: Enable completed.", "Placement: Placement completed." }),
-            "The newest message is first and the action result stays below the latest follow-up: " + String.Join(" | ", feedback.Messages.Select(Line)));
+        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete.", "Activity: Enable completed." }),
+            "The latest follow-up stands above the result it follows; the result of the action before is gone: " + String.Join(" | ", feedback.Messages.Select(Line)));
         Check(feedback.Messages.Count(m => m.FollowUp) == 1 && log.Count == 5 && feedback.Result == "Terrain output complete.", "Only the latest follow-up is kept, and every message is logged");
         feedback.Report("Activity", "Disable completed.");
-        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Activity: Disable completed.", "Terrain output: Terrain output complete.", "Activity: Enable completed." }), "A new result goes on top; older messages move down");
+        Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Activity: Disable completed." }), "A new result also removes the follow-up of the action before");
+    }
+
+    // A result of a tab's own action leaves the message area with its tab or mode; a result of a general action, such as
+    // the footer's Remove modification and Recheck, stays through a tab switch. Both go with their object, on a new
+    // action and on a history move.
+    static void MessagesFollowTheirScope() {
+        var feedback = new RailroaderScenePatcher.EditFeedback();
+        feedback.GeneralPlaces.Add("Modification");
+        object board = new object(), sign = new object();
+        feedback.Inspecting(board);
+        feedback.View("object/0");
+        feedback.Report("Activity", "Disable completed.");
+        Check(!feedback.Messages[0].General, "A tab's action is tab-scoped");
+        feedback.View("changes/0");
+        Check(feedback.Messages.Count == 0, "A tab's result leaves with its tab");
+        feedback.Report("Modification", "Removal completed.");
+        Check(feedback.Messages[0].General, "The footer's action is general");
+        feedback.View("placement/0"); feedback.View("placement/2"); feedback.View("object/0");
+        Check(feedback.Result == "Removal completed.", "A general result stays through tab and mode changes");
+        // A follow-up of a tab-scoped place leaves with the tab, and the general result below it stays.
+        feedback.Follow("Terrain output", "Terrain output complete.");
+        feedback.View("connections/0");
+        Check(feedback.Messages.Count == 1 && feedback.Result == "Removal completed.", "A tab-scoped follow-up leaves and the general result stays: " + feedback.Messages.Count);
+        feedback.Report("Activity", "Enable completed.");
+        Check(feedback.Messages.Count == 1 && feedback.Result == "Enable completed.", "A new action replaces a general result too");
+        feedback.Report("Modification", "Recheck completed.");
+        feedback.HistoryMoved();
+        Check(feedback.Messages.Count == 0, "A history move removes a general result");
+        feedback.Report("Modification", "Recheck completed.");
+        feedback.Inspecting(sign);
+        Check(feedback.Messages.Count == 0, "Another object removes a general result");
+    }
+
+    // Whether a track binding is a problem follows what the game needs from the kind of object: the game warns only for
+    // an enabled marker, and reads a pad's and a referenced starter marker's binding.
+    static void BindingProblemsFollowTheGame() {
+        // The kinds.
+        Check(BindingRules.Need("Generic", true, false) == BindingNeed.Required && BindingRules.Need("Crossing", false, false) == BindingNeed.Required, "A crossing pad needs its binding");
+        Check(BindingRules.Need("Generic", false, true) == BindingNeed.ReadAnyway && BindingRules.Need("Crossing", true, true) == BindingNeed.ReadAnyway, "A starter marker of an active setup is read whatever its activity");
+        Check(BindingRules.Need("Generic", false, false) == BindingNeed.Optional && BindingRules.Need("PassengerStop", false, false) == BindingNeed.Optional, "A sign, a milepost and an unreferenced starter marker need no binding");
+        Check(BindingRules.Need("Flare", false, false) == BindingNeed.Never, "A flare marker has no binding problem");
+        Check(!BindingRules.Listed("Signal", false, false) && !BindingRules.Listed("Generic", true, false) && !BindingRules.Listed("Generic", false, true) && BindingRules.Listed("Generic", false, false) && BindingRules.Listed("Crossing", false, false),
+            "Signals, native map objects and the builder photo marker are not listed");
+        string Problem(BindingNeed need, bool enabled, string segment, bool? resolves) => BindingRules.Problem(need, enabled, "Marker", segment, resolves);
+        // An inactive object is never a problem.
+        foreach (var need in new[] { BindingNeed.Never, BindingNeed.Optional, BindingNeed.Required })
+            Check(Problem(need, false, "", false) == null && Problem(need, false, "Sgone", false) == null && BindingRules.Unknown(need, false, "Marker", "S1", null, "no graph") == null,
+                "A disabled object has no binding problem: " + need);
+        // A required binding: a problem when enabled and empty or dangling.
+        Check(Problem(BindingNeed.Required, true, "", false) == "Marker has an empty segment binding" && Problem(BindingNeed.Required, true, " ", false) == "Marker has an empty segment binding", "An enabled pad without a binding is a problem");
+        Check(Problem(BindingNeed.Required, true, "Sgone", false) == "Marker broken binding: missing segment Sgone", "An enabled pad whose segment is gone is a problem");
+        Check(Problem(BindingNeed.Required, true, "S1", true) == null, "A resolving binding is no problem");
+        // A referenced starter marker: a problem whatever its own activity.
+        foreach (var enabled in new[] { true, false }) {
+            Check(Problem(BindingNeed.ReadAnyway, enabled, "", false) == "Marker has an empty segment binding; a new-game setup reads this marker whatever its activity", "A referenced starter marker without a binding is a problem, enabled " + enabled);
+            Check(Problem(BindingNeed.ReadAnyway, enabled, "Sgone", false) == "Marker broken binding: missing segment Sgone; a new-game setup reads this marker whatever its activity", "A referenced starter marker with a missing segment is a problem, enabled " + enabled);
+            Check(Problem(BindingNeed.ReadAnyway, enabled, "S1", true) == null, "A referenced starter marker with a resolving binding is no problem");
+        }
+        // An optional binding: empty is information, dangling is a problem when enabled.
+        Check(Problem(BindingNeed.Optional, true, "", false) == null, "An enabled sign without a binding is no problem");
+        Check(Problem(BindingNeed.Optional, true, "Sgone", false) == "Marker broken binding: missing segment Sgone", "An enabled sign whose stored segment is gone is a problem");
+        Check(Problem(BindingNeed.Never, true, "", false) == null && Problem(BindingNeed.Never, true, "Sgone", false) == null, "A kind without a binding has no binding problem");
+        // An unreadable graph is reported only where a missing segment would be a problem.
+        Check(BindingRules.Unknown(BindingNeed.Optional, true, "Marker", "S1", null, "no graph") == "Marker binding validity unknown: no graph" && Problem(BindingNeed.Optional, true, "S1", null) == null, "An unreadable graph is an inspection failure, not a broken binding");
+        Check(BindingRules.Unknown(BindingNeed.Optional, true, "Marker", "", false, "no graph") == null && BindingRules.Unknown(BindingNeed.Never, true, "Marker", "S1", null, "no graph") == null
+            && BindingRules.Unknown(BindingNeed.ReadAnyway, false, "Marker", "S1", null, "no graph") != null, "The failure is reported where the binding is read");
+        // What is no problem still says what it is.
+        Check(BindingRules.Note(BindingNeed.Optional, true, "", false, false) == "Empty; this kind needs no track binding", "An empty optional binding is information");
+        Check(BindingRules.Note(BindingNeed.Optional, false, "", false, true) == "Empty; this kind needs no track binding, but it does not follow a track group while unbound", "The note names the one effect an unbound sign loses");
+        Check(BindingRules.Note(BindingNeed.Required, false, "", false, false) == "Empty; a problem once the object is enabled" && BindingRules.Note(BindingNeed.Optional, false, "Sgone", false, false) == "Names missing segment Sgone; a problem once the object is enabled",
+            "A disabled object says what enabling it would make a problem");
+        Check(BindingRules.Note(BindingNeed.Required, true, "", false, false) == null && BindingRules.Note(BindingNeed.Optional, true, "Sgone", false, false) == null && BindingRules.Note(BindingNeed.Optional, true, "S1", true, true) == null
+            && BindingRules.Note(BindingNeed.Never, true, "", false, false) == null && BindingRules.Note(BindingNeed.ReadAnyway, false, "", false, false) == null, "A problem and a sound binding have no note");
+        // The reason an object is inspection only is no problem; the layout reads it from the supported-edits text.
+        Check(RailroaderScenePatcher.CommandBand.Refusal("Not editable: the marker is inside a crossing") == "the marker is inside a crossing" && RailroaderScenePatcher.CommandBand.Refusal("Inspection only: x") == null && RailroaderScenePatcher.CommandBand.Refusal("Fixed placement and activity") == null
+            && RailroaderScenePatcher.CommandBand.Refusal(null) == null, "The refusal is read from the supported-edits text");
+    }
+
+    // An object of a kind no supported family covers is listed in one Inspection only group after the family groups,
+    // without a problem marker. Problems are only defects the modder can repair with the patcher: what the inspection
+    // could not read or check is a note.
+    static void InspectionOnlyObjectsHaveTheirOwnGroup() {
+        SceneObservation Entry(string path, string family, string[] problems, string only = null, bool active = true, string[] notes = null) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), family, active,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, only ?? "Track binding", null, null, notes, only);
+        var none = new string[0];
+        const string reason = "Not yet supported: the patcher has no edit for the Milepost family yet";
+        var fixture = new Fixture();
+        fixture.Objects.Add(Entry("World/Sign", "Track marker", new[] { "Marker broken binding: missing segment Sgone" }));
+        fixture.Objects.Add(Entry("World/Post 1", "Milepost", new[] { "Marker broken binding: missing segment S9" }, reason));
+        fixture.Objects.Add(Entry("World/Board", "Independent board", none, null, true, new[] { "Direct-reference scan incomplete: 2 unreadable fields" }));
+        fixture.Objects.Add(Entry("World/Span", "Track span", none, "Not yet supported: the patcher has no edit for the Track span family yet", false));
+        fixture.Objects.Add(Entry("World/Refused", "Track marker", none));
+        var inventory = new SceneInventory(fixture); inventory.Refresh();
+        string[] Paths(RailroaderScenePatcher.OutlinerFilter filter, string search = "") => RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, null).Select(e => e.Identity.Path).ToArray();
+        string Shape(RailroaderScenePatcher.OutlinerFilter filter, string search = "") => String.Join(" | ", RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, null))
+            .Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))));
+        var all = RailroaderScenePatcher.OutlinerFilter.All;
+        // One group, after the family groups, whatever the families of its entries.
+        Check(Shape(all) == "Independent board:Board | Track marker:Sign,Refused | Inspection only:Post 1,Span", "Inspection only entries leave their families for one group after the family groups: " + Shape(all));
+        Check(RailroaderScenePatcher.InventoryPresentationState.InspectionOnlyGroup == "Inspection only", "The group is named Inspection only");
+        // The group is not shown while it holds no entry.
+        Check(Shape(all, "sign") == "Track marker:Sign" && Shape(RailroaderScenePatcher.OutlinerFilter.Problems) == "Track marker:Sign", "The group is absent while it holds no entry: " + Shape(all, "sign"));
+        var empty = new Fixture(); empty.Objects.Add(Entry("World/Sign", "Track marker", none));
+        var plain = new SceneInventory(empty); plain.Refresh();
+        Check(RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(plain, "", all, null)).Select(g => g.Key).SequenceEqual(new[] { "Track marker" }), "An inventory without such objects has no Inspection only group");
+        // Search and the All and Disabled filters apply to the group.
+        Check(Shape(all, "span") == "Inspection only:Span" && Shape(all, "not yet supported") == "Inspection only:Post 1,Span", "Search finds the group's entries, also by their reason: " + Shape(all, "not yet supported"));
+        Check(Paths(RailroaderScenePatcher.OutlinerFilter.Disabled).SequenceEqual(new[] { "World/Span" }) && Shape(RailroaderScenePatcher.OutlinerFilter.Disabled) == "Inspection only:Span", "The Disabled filter lists a disabled Inspection only object, in its group");
+        Check(Paths(all).Length == 5, "All lists the group's entries with the rest");
+        // No problem and no problem marker on an Inspection only entry: what would be a problem is a note.
+        var post = inventory.Entries.Single(e => e.Identity.Path == "World/Post 1");
+        Check(post.InspectionOnly == reason && post.Problems.Count == 0 && post.Notes.SequenceEqual(new[] { "Marker broken binding: missing segment S9" }), "An Inspection only entry has no problem; what was found is kept as a note");
+        Check(RailroaderScenePatcher.CommandBand.RowMarkers(post.Problems.Count != 0, false, false) == "", "Its row has no problem marker");
+        // The Problems filter excludes the group and excludes inspection notes.
+        Check(Paths(RailroaderScenePatcher.OutlinerFilter.Problems).SequenceEqual(new[] { "World/Sign" }), "The Problems filter lists only the repairable defect: " + String.Join(",", Paths(RailroaderScenePatcher.OutlinerFilter.Problems)));
+        var board = inventory.Entries.Single(e => e.Identity.Path == "World/Board");
+        Check(board.Problems.Count == 0 && board.Notes.Count == 1 && RailroaderScenePatcher.CommandBand.RowMarkers(board.Problems.Count != 0, false, false) == "", "An inspection note is no problem and gives no marker");
+        // Which lines are notes: what the inspection could not read or check.
+        foreach (var line in new[] { "Direct-reference scan incomplete: 3 unreadable fields", "Inspection unavailable: no graph", "Marker binding validity unknown: no graph", "Lower binding validity unknown: no graph", "Construction segment validity unknown: no graph", "Missing script in inspected hierarchy" })
+            Check(BindingRules.IsNote(line), "An inspection failure is a note: " + line);
+        foreach (var line in new[] { "Marker broken binding: missing segment Sgone", "Marker has an empty segment binding", "Lower broken binding: missing segment S9", "Missing circuit 0 island", "Construction scenery has a missing segment binding: S4", "Missing construction-scenery target" })
+            Check(!BindingRules.IsNote(line), "A defect of the object is a problem: " + line);
+        Check(!BindingRules.IsNote(null), "No line is no note");
+        // A refused object of a supported family stays in its family, with its reason and without a problem.
+        var refused = inventory.Entries.Single(e => e.Identity.Path == "World/Refused");
+        Check(refused.InspectionOnly == null && refused.Problems.Count == 0, "A refused object of a supported family is not inspection only and has no problem");
+        // Two observations of one object with the same identity, as an object with two components of one type gives:
+        // each row stays inspectable, and the inspected one is found again after a refresh.
+        var twin = new object();
+        SceneObservation Twin(string binding) => new SceneObservation(twin, new TargetIdentity("scene", "CTC/Module/BC-E/BC-E", "Track.TrackSpan"), "Track span", true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { binding }, none, none, reason, null, null, null, reason);
+        var twins = new Fixture(); twins.Objects.Add(Twin("Span id=A")); twins.Objects.Add(Twin("Span id=B"));
+        var doubled = new SceneInventory(twins); doubled.Refresh();
+        var state = new RailroaderScenePatcher.InventoryPresentationState();
+        var first = doubled.Entries[0]; var second = doubled.Entries[1];
+        Check(state.CanSelect(doubled, first) && state.CanSelect(doubled, second), "Both rows of a shared identity can be selected");
+        Check(ReferenceEquals(state.CurrentSelection(doubled, first), first) && ReferenceEquals(state.CurrentSelection(doubled, second), second), "A row of a shared identity selects itself, not nothing");
+        twins.Objects[0] = Twin("Span id=A"); twins.Objects[1] = Twin("Span id=B");
+        doubled.Refresh();
+        Check(ReferenceEquals(state.CurrentSelection(doubled, second), doubled.Entries[1]) && ReferenceEquals(state.CurrentSelection(doubled, first), doubled.Entries[0]), "After a refresh the inspected one of the two is found again by what it reads");
+        // The state is part of what an inspection pins and of the stale reason.
+        Check(Entry("World/X", "Milepost", none, reason).Difference(Entry("World/X", "Milepost", none, "Not yet supported: other")) == "supported edits"
+            && Entry("World/X", "Track marker", none, null, true, new[] { "a" }).Difference(Entry("World/X", "Track marker", none, null, true, new[] { "b" })).StartsWith("notes: ", StringComparison.Ordinal), "A changed note names itself in the stale reason");
+    }
+
+    // The Changes tab lists what a modification changes, one line per setting, with the value without it.
+    // A family shows subgroups only by what the game tells apart: a track marker by its marker type, never by a name.
+    static void SubgroupsFollowTheGame() {
+        SceneObservation Row(string family, string path, params string[] bindings) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), family, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "Track binding");
+        var station = Row("Track marker", "World/Bryson Station Sign", "Marker id=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
+        var whistle = Row("Track marker", "World/Whistle Sign E", "Marker id=M2; type=Generic");
+        var stop = Row("Track marker", "World/Stop", "Marker id=M3; type=PassengerStop");
+        var starter = Row("Track marker", "World/Setups/starter-ewh-coaling", "Marker id=M4; type=Generic");
+        var board = Row("Board", "World/Board", "Culler");
+        var bare = Row("Track marker", "World/Bare");
+        foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { stop, "Type PassengerStop" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
+            Check(RailroaderScenePatcher.InventoryPresentationState.Subgroup((SceneObservation)row[0]) == (string)row[1], "The subgroup of a row is its marker type or none: " + row[1]);
+        Check(RailroaderScenePatcher.InventoryPresentationState.Subgroups(new[] { station, whistle, starter }).Count == 0, "Markers of one type form no subgroups: a station sign, a whistle sign and a starter marker are one kind to the game");
+        var two = RailroaderScenePatcher.InventoryPresentationState.Subgroups(new[] { stop, station, whistle });
+        Check(two.Count == 2 && two[0].Key == "Type Generic" && two[0].Value.SequenceEqual(new[] { station, whistle }) && two[1].Key == "Type PassengerStop" && two[1].Value.Single() == stop, "Markers of two types stand under their types, in name order, rows in the order given");
+        Check(RailroaderScenePatcher.InventoryPresentationState.Subgroups(new[] { board, Row("Board", "World/Other") }).Count == 0, "A family the game does not divide has no subgroups");
+    }
+    static void ChangesReadOneLinePerSetting() {
+        var before = new ObjectState(new Placement(new[] { 10.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }), true, MarkerBinding.At(new TrackLocation("S377", "a", 7.5116)));
+        string Lines(ObjectState state, ObjectState was) => String.Join(" | ", AuthoringSession.ChangeLines(state, was));
+        Check(Lines(new ObjectState(new Placement(new[] { 12.5, 2, 3 }, new[] { 0.0, 0, 0, 1 }), null), before) == "Position: from 10, 2, 3 to 12.5, 2, 3", "A moved object reads its position from and to: " + Lines(new ObjectState(new Placement(new[] { 12.5, 2, 3 }, new[] { 0.0, 0, 0, 1 }), null), before));
+        Check(Lines(new ObjectState(new Placement(new[] { 10.0, 2, 3 }, new[] { 0.0, 0.7071, 0, 0.7071 }), null), before) == "Rotation: changed", "A turned object names its rotation alone: its position did not change");
+        Check(Lines(new ObjectState(null, false), before) == "Enabled: from Yes to No", "A disabled object reads its activity from and to");
+        Check(Lines(new ObjectState(null, null, MarkerBinding.At(new TrackLocation("Srrh", "b", 3))), before) == "Track binding: from S377 / a / 7.512 to Srrh / b / 3", "A rebound marker reads its binding from and to");
+        Check(Lines(new ObjectState(null, null, MarkerBinding.Detached), before) == "Track binding: from S377 / a / 7.512 to detached", "A detached marker says so");
+        Check(Lines(new ObjectState(null, true, MarkerBinding.At(new TrackLocation("Srrh", "b", 3))), before) == "Enabled: from Yes to Yes | Track binding: from S377 / a / 7.512 to Srrh / b / 3", "Every changed setting has its own line");
+        var following = new Placement(new[] { 1.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }) { };
+        Check(Lines(new ObjectState(null, null), before) == "" && AuthoringSession.ChangeLines(null, before).Count == 0, "No setting gives no line");
+        // A target refusal names what differed.
+        var sign = new object();
+        SceneObservation Marker(double x, bool active, object handle = null) => new SceneObservation(handle ?? sign, new TargetIdentity("scene", "World/Sign", "Marker"), "Track marker", active,
+            new double[] { x, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Track binding");
+        Check(InspectedTarget.Changed(Marker(1, true), Marker(5, true)) == "Inspected target changed (position); refresh and inspect again" && InspectedTarget.Changed(Marker(1, true), Marker(1, false)) == "Inspected target changed (activity); refresh and inspect again"
+            && InspectedTarget.Changed(Marker(1, true), null) == "Inspected target changed (missing); refresh and inspect again"
+            && InspectedTarget.Changed(Marker(1, true), Marker(1, true, new object())) == "Inspected target changed (another object); refresh and inspect again", "The refusal of a changed target names what differed");
     }
 
     // Auto-fit sizes the outliner column to most names, relative to the window, within a cap.
@@ -910,37 +1134,56 @@ static class InspectionTests {
         Check(Fit(new float[0], 1000) == 140, "No rows keep the minimum");
     }
 
-    // The same result twice in a row is one message.
+    // A result describes the present. It goes when a new action reports, when the view changes, and when the editor's
+    // history moves: after a native Undo, "Enable completed" would be untrue.
     static void RepeatedMessagesCollapse() {
         var log = new List<string>();
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
         feedback.Refuse("Placement", "Placement", "Inventory is stale");
         feedback.Refuse("Placement", "Placement", "Inventory is stale");
-        feedback.Report("Enabled", "Activity change completed.");
-        feedback.Refuse("Placement", "Placement", "Inventory is stale");
-        Check(feedback.Messages.Select(m => m.Source).SequenceEqual(new[] { "Placement", "Enabled" }) && log.Count == 4, "An identical message is listed once, at the top, and every report is logged: " + String.Join(", ", feedback.Messages.Select(m => m.Source)));
+        Check(feedback.Messages.Count == 1 && log.Count == 2, "The same refusal again is one message, and both are logged");
         feedback.Refuse("Placement", "Placement", "enter six numbers");
         feedback.Report("Placement", "Placement completed.");
-        Check(feedback.Messages.Select(m => m.Text).SequenceEqual(new[] { "Placement completed.", "Placement refused: enter six numbers", "Placement refused: Inventory is stale" }), "A success sits above the refusal it corrected: " + String.Join(" | ", feedback.Messages.Select(m => m.Text)));
-        feedback.Withdraw("Placement", "Placement refused: enter six numbers");
-        feedback.Withdraw("Enabled", "Placement completed.");
-        Check(feedback.Messages.Select(m => m.Text).SequenceEqual(new[] { "Placement completed.", "Placement refused: Inventory is stale" }), "A withdrawn message leaves and the others stay: " + String.Join(" | ", feedback.Messages.Select(m => m.Text)));
+        Check(feedback.Messages.Select(m => m.Text).SequenceEqual(new[] { "Placement completed." }), "The success of the corrected action replaces the refusal: " + String.Join(" | ", feedback.Messages.Select(m => m.Text)));
+        // The view: the open tab and the placement mode.
+        feedback.View("placement/0");
+        feedback.Report("Placement", "Placement completed.");
+        feedback.View("placement/0");
+        Check(feedback.Messages.Count == 1, "The same view keeps its result");
+        feedback.View("placement/2");
+        Check(feedback.Messages.Count == 0 && feedback.Result == "", "Another placement mode clears the result of the mode before");
+        feedback.Report("Snap", "Physical snap completed.");
+        feedback.View("object");
+        Check(feedback.Messages.Count == 0, "Another tab clears it as well");
+        // Undo or Redo.
+        feedback.Report("Activity", "Enable completed.");
+        feedback.Follow("Terrain output", "Terrain output complete.");
+        feedback.HistoryMoved();
+        Check(feedback.Messages.Count == 0 && feedback.Result == "", "After Undo or Redo the result and its follow-up are gone");
+        // A world choice that starts is a new action: the refusal of the action before it goes.
+        feedback.Refuse("Track binding", "Track binding to SE2E / a / 7.5", "Relationship target segment SE2E is missing");
+        Check(feedback.Messages.Count == 1 && feedback.Result.Contains("refused"), "A refused Set stands in the message area");
+        feedback.ChoiceStarted();
+        Check(feedback.Messages.Count == 0, "The refusal of an earlier Set does not stand beside a new world choice");
+        feedback.Released(); feedback.Refuse("Activity", "Enable", "the panel was closed before the request ran"); feedback.ChoiceStarted();
+        Check(feedback.Messages.Count == 1, "A refusal kept for the next inspection stays when a choice starts");
+        feedback.Clear();
+        // An announcement that is withdrawn.
+        feedback.Report("Crossing coverage", "Detection addition a7 is open at the top of this tab: select its tracks, then Preview.");
+        feedback.Withdraw("Crossing coverage", "Detection addition a7 is open at the top of this tab: select its tracks, then Preview.");
+        Check(feedback.Messages.Count == 0, "A withdrawn announcement leaves");
     }
 
-    // The message area shows the last results in fixed slots, newest first, each with the action group it came from.
+    // Each message keeps the action group it came from, and inspecting another object clears the messages.
     static void MessagesKeepTheirSourceNewestFirst() {
         var log = new List<string>();
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
         Check(feedback.Messages.Count == 0, "No message before the first result");
         feedback.Refuse("Track binding", "Track binding", "enter a segment ID");
+        Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Track binding: Track binding refused: enter a segment ID" }), "A message keeps its source");
         feedback.Report("Placement", "Placement completed.");
-        Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Placement: Placement completed.", "Track binding: Track binding refused: enter a segment ID" }),
-            "The newest message is first and each keeps its source: " + String.Join(" | ", feedback.Messages.Select(m => m.Source + ": " + m.Text)));
-        Check(feedback.Place == "Placement" && feedback.Result == "Placement completed.", "The newest message is the last result");
-        feedback.Report("Gizmo", "Gizmo placement completed.");
-        feedback.Report("Window", "Identity copied.");
-        Check(feedback.Messages.Count == 3 && feedback.Messages[0].Source == "Window" && feedback.Messages[2].Source == "Placement", "The area keeps the three newest messages");
-        Check(log.Count == 4, "Every message is logged once");
+        Check(feedback.Place == "Placement" && feedback.Result == "Placement completed." && feedback.Messages.Count == 1, "The newest result is the one shown");
+        Check(log.Count == 2, "Every message is logged once");
         object first = new object(), second = new object();
         feedback.Inspecting(first);
         feedback.Report("Enabled", "Activity change completed.");

@@ -10,6 +10,7 @@ try {
     $product=Join-Path $sandbox 'Product';[IO.Directory]::CreateDirectory($product)|Out-Null
     foreach($name in @('RailroaderScenePatcher.dll','RailroaderScenePatcher.Core.dll','0Harmony.dll')){[IO.File]::WriteAllText((Join-Path $product $name),'Synthetic test bytes, never loaded')}
     [IO.File]::WriteAllText((Join-Path $product 'Info.json'),'{"identifier":"crankyant/scene-patcher"}')
+    [IO.Directory]::CreateDirectory((Join-Path $product 'Icons'))|Out-Null;[IO.File]::WriteAllText((Join-Path $product 'Icons/SceneWrench.png'),'Synthetic icon bytes, never loaded')
     $observer=Join-Path $sandbox 'NativeObservation.dll';[IO.File]::WriteAllText($observer,'Synthetic observer bytes, never loaded')
     $fixtures=Join-Path $sandbox 'Fixtures'
     & "$PSScriptRoot/Prepare-Fixtures.ps1" -Bootstrap -OutputRoot $fixtures
@@ -17,6 +18,8 @@ try {
     & "$PSScriptRoot/TestHome.ps1" @common -Action Install -ProductOutput $product -ObserverDll $observer -FixtureSource (Join-Path $fixtures 'Baseline')
     $ownedDll=Join-Path $homePath 'Mods/Issue39ScenePatcher/RailroaderScenePatcher.dll'
     Check (Test-Path $ownedDll) 'Owned DLL must be installed'
+    $ownedIcon=Join-Path $homePath 'Mods/Issue39ScenePatcher/Icons/SceneWrench.png'
+    Check (Test-Path $ownedIcon) 'The entry icon must be installed beside the product assembly'
     $stopped=$false
     try {& "$PSScriptRoot/TestHome.ps1" @common -Action Install -ProductOutput $product -ObserverDll $observer -FixtureSource (Join-Path $fixtures 'Baseline')} catch {$stopped=$true}
     Check $stopped 'Existing receipt must stop another install'
@@ -35,7 +38,7 @@ try {
     & "$PSScriptRoot/TestHome.ps1" @common -Action SelectVariant -FixtureSource (Join-Path $fixtures 'Baseline')
     & "$PSScriptRoot/TestHome.ps1" @common -Action Cleanup
     & "$PSScriptRoot/TestHome.ps1" @common -Action Cleanup
-    Check (!(Test-Path $ownedDll) -and !(Test-Path $save)) 'Only owned copies should be removed'
+    Check (!(Test-Path $ownedDll) -and !(Test-Path $ownedIcon) -and !(Test-Path $save)) 'Only owned copies should be removed'
     $p=Get-Content (Join-Path $homePath 'Preferences.json') -Raw | ConvertFrom-Json -AsHashtable
     Check ($p.settings.untouched -ceq 'keep' -and $p.settings['mods.allow-dll'] -eq 1 -and @($p.mods).Count -eq 0 -and @($p.clientMods).Count -eq 0) 'Isolated preference values must remain neutral and unrelated settings unchanged'
     Check (Test-Path (Join-Path $sandbox 'Evidence/Offline/final.json')) 'Retained end inventory must exist'

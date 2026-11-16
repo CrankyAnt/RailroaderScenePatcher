@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
     public readonly struct ScreenPoint {
@@ -126,6 +127,45 @@ namespace RailroaderScenePatcher.Core {
                 previous = current;
                 previousCoordinate = coordinate;
                 previousInside = inside;
+            }
+            return result;
+        }
+
+        // The area a set of triangles covers, as horizontal spans one pixel high, each pixel once. The pieces of a
+        // track ribbon overlap one another by construction; drawn one by one with a translucent colour, the overlaps
+        // blend twice and show as darker patches that move with the camera. Drawn as these spans, the ribbon has one
+        // tint whatever the angle. A span covers a row when the row's centre line crosses a triangle.
+        public static IReadOnlyList<ScreenRect> Coverage(IEnumerable<ScreenTriangle> triangles) {
+            var rows = new SortedDictionary<int, List<double[]>>();
+            foreach (var t in triangles ?? Enumerable.Empty<ScreenTriangle>()) {
+                double minY = Math.Min(t.A.Y, Math.Min(t.B.Y, t.C.Y)), maxY = Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y));
+                if (Double.IsNaN(minY) || Double.IsNaN(maxY) || Double.IsInfinity(minY) || Double.IsInfinity(maxY) || maxY - minY > 100000) continue;
+                var edges = new[] { new[] { t.A, t.B }, new[] { t.B, t.C }, new[] { t.C, t.A } };
+                for (int row = (int)Math.Floor(minY); row <= (int)Math.Floor(maxY); row++) {
+                    double y = row + 0.5, left = Double.PositiveInfinity, right = Double.NegativeInfinity;
+                    if (y < minY || y > maxY) continue;
+                    foreach (var edge in edges) {
+                        double y0 = edge[0].Y, y1 = edge[1].Y;
+                        if ((y < y0 && y < y1) || (y > y0 && y > y1) || y0 == y1) continue;
+                        var x = edge[0].X + (edge[1].X - edge[0].X) * (y - y0) / (y1 - y0);
+                        if (x < left) left = x;
+                        if (x > right) right = x;
+                    }
+                    if (!(right > left)) continue;
+                    if (!rows.TryGetValue(row, out var spans)) rows.Add(row, spans = new List<double[]>());
+                    spans.Add(new[] { left, right });
+                }
+            }
+            var result = new List<ScreenRect>();
+            foreach (var row in rows) {
+                row.Value.Sort((a, b) => a[0].CompareTo(b[0]));
+                double start = row.Value[0][0], end = row.Value[0][1];
+                foreach (var span in row.Value) {
+                    if (span[0] <= end) { if (span[1] > end) end = span[1]; continue; }
+                    result.Add(ScreenRect.FromEdges((float)start, row.Key, (float)end, row.Key + 1));
+                    start = span[0]; end = span[1];
+                }
+                result.Add(ScreenRect.FromEdges((float)start, row.Key, (float)end, row.Key + 1));
             }
             return result;
         }

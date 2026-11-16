@@ -77,6 +77,9 @@ namespace RailroaderScenePatcher.Core {
         public TargetIdentity Target { get; internal set; }
         // Applied without a change: the operation found nothing to do and recorded nothing.
         public bool Unchanged { get; internal set; }
+        // An editor edit whose value equals the object's value without this MapMod: the modification no longer holds
+        // that setting, so the edit acted as a revert of it.
+        public bool Reverted { get; internal set; }
     }
     // A capability that keeps state for the objects it resolved. Release drops that state for an object that no longer
     // stands under its identity in a later load attempt, and removes only what the patcher owns for it; native state is

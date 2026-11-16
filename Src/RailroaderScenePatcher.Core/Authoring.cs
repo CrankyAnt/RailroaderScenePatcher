@@ -224,6 +224,18 @@ namespace RailroaderScenePatcher.Core {
         static string Max(string a, string b) { return DependencyMetadata.Number(b) > DependencyMetadata.Number(a) ? b : a; }
         // Dependent native writes that follow the object's edits, such as terrain output regenerated from a board mask. Save does not write them.
         public DependentOutput Output(TargetIdentity target) { return OutputOf(Resolve(target)); }
+        // Whether the active document's modification of this target sets its activity. Read from the document alone, as
+        // IsChanged is. Clearing the activity value has something to clear only then.
+        public bool HasActivityValue(TargetIdentity target) {
+            if (document == null || target == null) return false;
+            foreach (var item in document.Modifications.OfType<JObject>()) {
+                var other = item["target"] as JObject;
+                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
+                if ((structure == null || target.Structure == null || structure == target.Structure) && item["active"] != null && item["active"].Type != JTokenType.Null) return true;
+            }
+            return false;
+        }
         // Whether the active document holds a modification of this target. Read from the document alone, without
         // searching the scene, so a list can ask for every row. A target without a structure matches any structure.
         public bool IsChanged(TargetIdentity target) {
@@ -298,6 +310,42 @@ namespace RailroaderScenePatcher.Core {
                 var following = TrackFollowing.Relative(anchor, TrackPose(anchor), current.Position, current.Rotation);
                 return WithPlacement(target, existing, PlacementJson(following));
             }, validateBeforeMutation);
+        }
+        // What the active document changes on the object: one short line per changed setting, each with the value the
+        // object has without this modification. Empty when the document holds no modification of it.
+        public IReadOnlyList<string> Changes(TargetIdentity target) {
+            if (document == null || target == null) return new string[0];
+            try {
+                var resolved = engine.ResolveUnique(target);
+                var own = Own(resolved);
+                return own.Count == 1 ? ChangeLines(PatchEngine.Parse(own[0]).State, engine.Underlying(resolved)) : new string[0];
+            } catch (InvalidOperationException) { return new string[0]; }
+        }
+        // The lines for one modification's state against the underlying state.
+        public static IReadOnlyList<string> ChangeLines(ObjectState state, ObjectState before) {
+            var lines = new List<string>();
+            if (state == null) return lines;
+            string Numbers(double[] values) => values == null ? "unknown" : String.Join(", ", values.Select(v => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+            string Location(MarkerBinding binding) => binding == null ? "unknown" : binding.IsDetached ? "detached" : binding.Location.Display;
+            var placement = state.Placement;
+            if (placement != null) {
+                var was = before?.Placement;
+                if (placement.Following != null) lines.Add("Placement: follows track " + placement.Following.Anchor.Display + (was?.Position == null ? "" : "; was fixed at " + Numbers(was.Position)));
+                else {
+                    // A setting counts as changed beyond the tolerance of the equal-value rule: a rotation that
+                    // went through the fields unchanged differs by rounding only.
+                    var moved = placement.Position != null && !SamePosition(placement.Position, was?.Position);
+                    var turned = placement.Rotation != null && !SameRotation(placement.Rotation, was?.Rotation);
+                    if (moved) lines.Add("Position: from " + Numbers(was?.Position) + " to " + Numbers(placement.Position));
+                    if (turned) lines.Add("Rotation: changed");
+                    if (!moved && !turned) lines.Add("Placement: set to the placement the object has without this MapMod");
+                }
+            }
+            if (state.Active.HasValue) lines.Add("Enabled: from " + (before?.Active == null ? "unknown" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
+            if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
+            if (state.Coverage != null) foreach (var circuit in state.Coverage.Circuits)
+                lines.Add((DetectionAddition.Id(circuit.Key) == null ? "Circuit " + circuit.Key : "Detection addition " + DetectionAddition.Id(circuit.Key)) + ": " + circuit.Value);
+            return lines;
         }
         // The track-following placement of the object in the active document, or null.
         public TrackFollowing FollowingOf(TargetIdentity target) {
@@ -613,12 +661,57 @@ namespace RailroaderScenePatcher.Core {
                 catch (InvalidOperationException e) when (existing != null && e.Message.StartsWith("Unsupported", StringComparison.Ordinal)) {
                     throw new InvalidOperationException("The existing modification holds content this patcher version does not understand; it is preserved and cannot be edited or removed here");
                 }
+                // An editor edit stores what it changes. A setting whose new value equals the object's value without
+                // this MapMod leaves the modification: the edit is a revert of that setting. An edit that leaves the
+                // document as it is changes nothing and adds no step to the native history, as a native field ignores
+                // a value equal to the one it shows.
+                var normal = Normalised(existing, value, engine.Underlying(resolved));
+                outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !JToken.DeepEquals(normal, value));
+                value = normal;
+                if (value == null ? existing == null : existing != null && JToken.DeepEquals(existing, value)) { outcome.Reverted = false; outcome.Applied = true; outcome.Unchanged = true; return outcome; }
                 var index = Commit(target, resolved, inspected, existing, value, document.Modifications.Count, validateBeforeMutation);
                 var slot = (string)(value ?? existing)["id"];
                 history.Register(() => Replay(name, slot, target, existing, index), name);
                 outcome.Applied = true;
             } catch (Exception e) { outcome.Error = e.Message; }
             return outcome;
+        }
+        // The modification an edit stores: each setting the edit changed whose value equals the underlying value is
+        // left out, and a modification that then sets nothing is no modification. Settings the edit did not touch stay
+        // as they are, so an equal value written by hand in a document is kept. A position is equal within half a
+        // millimetre and a rotation within about a hundredth of a degree: what the numeric fields can tell apart.
+        static JObject Normalised(JObject existing, JObject value, ObjectState under) {
+            if (value == null || under == null) return value;
+            ObjectState state;
+            try { state = PatchEngine.Parse(value).State; } catch (InvalidOperationException) { return value; }
+            var result = (JObject)value.DeepClone();
+            bool Changed(JToken was, JToken now) => now != null && !JToken.DeepEquals(was, now);
+            if (Changed(existing?["active"], value["active"]) && state.Active.HasValue && under.Active == state.Active) result.Remove("active");
+            if (Changed(existing?["placement"], value["placement"]) && state.Placement != null && state.Placement.Following == null && SamePlacement(state.Placement, under.Placement)) result.Remove("placement");
+            var relationships = result["relationships"] as JObject;
+            if (relationships != null && Changed(existing?["relationships"]?["trackMarker"], relationships["trackMarker"]) && state.Marker != null && under.Marker != null && MarkerBinding.Same(state.Marker, under.Marker)) {
+                relationships.Remove("trackMarker");
+                if (!relationships.HasValues) result.Remove("relationships");
+            }
+            if (JToken.DeepEquals(result, value)) return value;
+            return result["placement"] == null && result["active"] == null && result["relationships"] == null ? null : result;
+        }
+        static bool SamePlacement(Placement a, Placement b) {
+            if (a == null || b == null || (a.Position == null && a.Rotation == null)) return false;
+            return (a.Position == null || SamePosition(a.Position, b.Position)) && (a.Rotation == null || SameRotation(a.Rotation, b.Rotation));
+        }
+        // The tolerance within which two poses are the same setting, for the equal-value rule and for the lines of the
+        // Changes tab alike: half a millimetre on each axis, and about a hundredth of a degree.
+        public static bool SamePosition(IReadOnlyList<double> a, IReadOnlyList<double> b) {
+            if (a == null || b == null || a.Count != b.Count) return false;
+            for (var i = 0; i < a.Count; i++) if (Math.Abs(a[i] - b[i]) > .0005) return false;
+            return true;
+        }
+        public static bool SameRotation(IReadOnlyList<double> a, IReadOnlyList<double> b) {
+            if (a == null || b == null || a.Count != 4 || b.Count != 4) return false;
+            double dot = 0, la = 0, lb = 0;
+            for (var i = 0; i < 4; i++) { dot += a[i] * b[i]; la += a[i] * a[i]; lb += b[i] * b[i]; }
+            return la > 0 && lb > 0 && Math.Abs(dot) / Math.Sqrt(la * lb) >= 1 - 1e-8;
         }
         // Runs inside native Undo or Redo. It must not throw: an exception there corrupts the native grouping.
         // Raised after Undo or Redo replayed one of this session's own edits on the target.

@@ -150,6 +150,50 @@ static class AuthoringTests {
         UnknownContentAndProtectedDocumentsSurvive();
         ExitIdentifiesOutstandingWork();
         InspectedEditsBindToTheirObservation();
+        EqualValuesAreNotStored();
+    }
+    // An editor edit stores only what it changes: a value equal to the object's own is no change, a value equal to
+    // the value without this MapMod takes the setting out of the modification, and a hand-written equal value stays.
+    static void EqualValuesAreNotStored() {
+        var w = new World();
+        var enable = w.Session.Edit(P, null, true);
+        Assert(enable.Applied && enable.Unchanged && !enable.Reverted && w.Document["modifications"].Count() == 0 && !w.Editor.CanUndo && !w.Session.IsChanged(P), "Enabling an enabled object stores nothing and adds no Undo step");
+        Assert(w.Session.Edit(P, null, false).Applied && !w.Box.Active && w.Session.IsChanged(P), "A disable is stored");
+        var groups = w.Editor.UndoGroups.Count;
+        var again = w.Session.Edit(P, null, false);
+        Assert(again.Applied && again.Unchanged && w.Editor.UndoGroups.Count == groups, "The same value again changes nothing and adds no Undo step");
+        var back = w.Session.Edit(P, null, true);
+        Assert(back.Applied && back.Reverted && !back.Unchanged && w.Box.Active && w.Document["modifications"].Count() == 0 && !w.Session.IsChanged(P), "Enabling it again removes the modification: the object is not changed by this MapMod");
+        Assert(w.Editor.UndoGroups.Count == groups + 1, "The revert is one Undo step, as setting a native value back is");
+        w.Editor.Undo(); Assert(!w.Box.Active && w.Session.IsChanged(P), "Undo of the revert restores the disable");
+        w.Editor.Redo(); Assert(w.Box.Active && !w.Session.IsChanged(P), "Redo reverts again");
+
+        // A revert of one setting keeps the others.
+        Assert(w.Session.Edit(P, Pose(112), null).Applied && w.Session.Edit(P, null, false).Applied, "A placement and a disable");
+        var kept = w.Session.Edit(P, null, true);
+        var item = (JObject)w.Document["modifications"][0];
+        Assert(kept.Reverted && item["active"] == null && item["placement"] != null && w.Box.Active && w.Box.X == 12, "Enabling removes the activity value and keeps the placement");
+        // The underlying pose in map coordinates, as the numeric fields show it.
+        var home = new Placement(new[] { 7.0002, 8, 9 }, new[] { 0.0, 1.0, 0.0, 0.0 });
+        var returned = w.Session.Edit(P, home, null);
+        Assert(returned.Applied && returned.Reverted && w.Document["modifications"].Count() == 0 && Math.Abs(w.Box.X + 93) < .001, "A placement equal to the unpatched pose within the fields' precision removes the modification: " + returned.Error + " x=" + w.Box.X);
+        var moved = w.Session.Edit(P, new Placement(new[] { 7.002, 8, 9 }, new[] { 0.0, 1.0, 0.0, 0.0 }), null);
+        Assert(moved.Applied && !moved.Reverted && w.Document["modifications"].Count() == 1, "Two millimetres away is a placement of its own");
+
+        // The lines of a change use the same tolerance: a rotation that differs by rounding only is no change.
+        var before = new ObjectState(new Placement(new[] { 1.0, 2, 3 }, new[] { 0.0, 0.7071068, 0, 0.7071068 }), true);
+        string Lines(double x, double[] rotation) => String.Join(" | ", AuthoringSession.ChangeLines(new ObjectState(new Placement(new[] { x, 2, 3 }, rotation), null), before));
+        Assert(Lines(5, new[] { 0.0, 0.70710677, 0, 0.70710679 }) == "Position: from 1, 2, 3 to 5, 2, 3", "An X-only change with a rotation that drifted by rounding has no Rotation line: " + Lines(5, new[] { 0.0, 0.70710677, 0, 0.70710679 }));
+        Assert(Lines(1.0003, new[] { 0.0, 1.0, 0, 0 }) == "Rotation: changed", "A position within half a millimetre has no Position line: " + Lines(1.0003, new[] { 0.0, 1.0, 0, 0 }));
+        Assert(Lines(1, new[] { 0.0, 0.7071068, 0, 0.7071068 }) == "Placement: set to the placement the object has without this MapMod", "A stored placement equal to the object's own says so");
+        Assert(AuthoringSession.SameRotation(new[] { 0.0, 1, 0, 0 }, new[] { 0.0, -1, 0, 0 }) && !AuthoringSession.SameRotation(new[] { 0.0, 1, 0, 0 }, new[] { 0.0, 0.9999, 0, 0.01414 }), "A rotation and its negated quaternion are the same; under a degree apart is not");
+        Assert(AuthoringSession.SamePosition(new[] { 1.0, 2, 3 }, new[] { 1.0005, 2, 3 }) && !AuthoringSession.SamePosition(new[] { 1.0, 2, 3 }, new[] { 1.0006, 2, 3 }) && !AuthoringSession.SamePosition(new[] { 1.0 }, null), "A position is the same within half a millimetre");
+        // A document written by hand may hold a value equal to the object's own; an edit of another setting keeps it.
+        var hand = new World(Doc(Mod("m", "p", "\"active\":true")));
+        Assert(hand.Session.IsChanged(P) && hand.Box.Active, "A hand-written equal value is legal and counts as a modification");
+        Assert(hand.Session.Edit(P, Pose(112), null).Applied && (bool)hand.Document["modifications"][0]["active"], "An edit of the placement keeps the hand-written activity value");
+        var same = hand.Session.Edit(P, null, true);
+        Assert(same.Applied && same.Unchanged && (bool)hand.Document["modifications"][0]["active"], "Setting the hand-written value again changes nothing");
     }
     static string[] Required(World w) => JObject.Parse(w.Store.Info)["dependencies"]["required"].Select(x => (string)x).ToArray();
     static void ActivityFollowsTheSameRoute() {
