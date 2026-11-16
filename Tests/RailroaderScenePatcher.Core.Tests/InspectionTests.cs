@@ -481,7 +481,7 @@ static class InspectionTests {
         string[] Paths(string search, RailroaderScenePatcher.OutlinerFilter filter) => RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, changed).Select(e => e.Identity.Path).ToArray();
         var all = RailroaderScenePatcher.OutlinerFilter.All; var problems = RailroaderScenePatcher.OutlinerFilter.Problems; var modified = RailroaderScenePatcher.OutlinerFilter.Changed;
         Check(Paths("", problems).SequenceEqual(new[] { "World/Sign", "World/Post" }), "The Problems filter limits the outliner to objects with detected problems");
-        Check(Paths("", modified).SequenceEqual(new[] { "World/Board", "World/Post" }), "The Changed filter limits the outliner to objects this MapMod modifies");
+        Check(Paths("", modified).SequenceEqual(new[] { "World/Board", "World/Post" }), "The Changed filter limits the outliner to objects this mod modifies");
         Check(Paths("", all).SequenceEqual(new[] { "World/Board", "World/Sign", "World/Post", "World/Bridges/Ela" }), "All shows every inventory entry");
         Check(Paths("post", problems).SequenceEqual(new[] { "World/Post" }) && Paths("board", problems).Length == 0 && Paths("sign", modified).Length == 0, "Search narrows within a filter");
         Check(Paths("marker", all).SequenceEqual(new[] { "World/Sign", "World/Post" }), "Search alone keeps its meaning");

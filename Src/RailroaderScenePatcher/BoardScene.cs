@@ -25,9 +25,9 @@ namespace RailroaderScenePatcher {
         readonly FieldInfo token, keys, spheres, maskStorage, heightStorage, storedModifiers, flatten;
         readonly MethodInfo invalidate, tileOf, held;
         public event Action<double[], double[]> TileBuilt;
-        public IEnumerable<string> MapIds => PackDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModDocuments.MapIds();
         internal BoardScene() {
-            _ = PackDocuments.MapIds();
+            _ = ModDocuments.MapIds();
             transformer = Native.Type("Helpers.WorldTransformer");
             culler = Native.Type(CullerType); mask = Native.Type(MaskType); maskBase = Native.Type("Map.Runtime.MaskComponents.MaskComponentBase");
             var manager = Native.Type("Map.Runtime.MapManager");

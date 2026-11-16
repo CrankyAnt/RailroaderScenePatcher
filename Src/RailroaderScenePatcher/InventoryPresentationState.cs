@@ -7,8 +7,8 @@ using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
     // Which inventory entries the outliner shows: every entry, those with a detected problem, or those the active
-    // MapMod modifies.
-    // Problems: objects with a detected problem. Changed: objects the active MapMod modifies. Disabled: objects whose
+    // mod modifies.
+    // Problems: objects with a detected problem. Changed: objects the edited mod modifies. Disabled: objects whose
     // own active flag is off.
     internal enum OutlinerFilter { All, Problems, Changed, Disabled }
     // UI-independent state shared by the native adapter and controlled inventory replay.
@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher {
         }
 
         // The outliner rows in inventory order. The search text and the filter each narrow them; neither changes the
-        // inventory. changed tells whether the active MapMod modifies an entry; without it nothing is changed.
+        // inventory. changed tells whether the edited mod modifies an entry; without it nothing is changed.
         internal static IReadOnlyList<SceneObservation> Rows(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             inventory == null ? Array.Empty<SceneObservation>() : inventory.Search(search).Where(entry =>
                 filter == OutlinerFilter.All || (filter == OutlinerFilter.Problems ? entry.Problems.Count != 0 : filter == OutlinerFilter.Disabled ? !entry.Enabled : changed != null && changed(entry))).ToArray();

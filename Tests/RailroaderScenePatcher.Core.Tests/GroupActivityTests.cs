@@ -41,7 +41,7 @@ static class GroupActivityTests {
         FailedApplicationRestoresSubscriptionAndHold();
         TrackFollowingKeepsGroupActivity();
         SaveAndReloadReproduceTheHoldOnce();
-        OmittedActivityKeepsAnotherMapModsDisable();
+        OmittedActivityKeepsAnotherModsDisable();
         OmittedActivityKeepsADisableInTheSameDocument();
         GizmoPreviewKeepsTheDisable();
         Console.WriteLine("PASS: group subscriptions, explicit-disable precedence, native group activity and restoration");
@@ -176,20 +176,20 @@ static class GroupActivityTests {
         var unloaded = Session(store.Patch.Replace(SignPath, "World/Absent"));
         Assert(unloaded.session.MinimumPatcherVersion == "0.5.0", "The version follows the document even when the target is not loaded");
     }
-    // A modification that omits active leaves the activity untouched: it never releases the disable of another MapMod.
-    static void OmittedActivityKeepsAnotherMapModsDisable() {
+    // A modification that omits active leaves the activity untouched: it never releases the disable of another mod.
+    static void OmittedActivityKeepsAnotherModsDisable() {
         var (world, sign, other, scene) = Setup();
         var engine = new PatchEngine(scene);
-        Assert(engine.Apply(Doc(Item("disable", "\"active\":false")), "packA").Outcomes["disable"].Applied && sign.Held && !sign.Active, "The first MapMod disables the follower");
+        Assert(engine.Apply(Doc(Item("disable", "\"active\":false")), "packA").Outcomes["disable"].Applied && sign.Held && !sign.Active, "The first mod disables the follower");
         var moved = engine.Apply(Doc(Item("move", Moved)), "packB").Outcomes["move"];
-        Assert(moved.Applied && sign.Position[0] == 30, "The later MapMod places the follower: " + moved.Error);
-        Assert(sign.Held && !sign.Active && sign.Activations == 0 && Subscription(sign) == "ela|1|held", "A later MapMod without active leaves the disable and never activates the object: " + Subscription(sign) + " activations " + sign.Activations);
+        Assert(moved.Applied && sign.Position[0] == 30, "The later mod places the follower: " + moved.Error);
+        Assert(sign.Held && !sign.Active && sign.Activations == 0 && Subscription(sign) == "ela|1|held", "A later mod without active leaves the disable and never activates the object: " + Subscription(sign) + " activations " + sign.Activations);
         world.SetGroupEnabled("ela", false); world.SetGroupEnabled("ela", true);
-        Assert(!sign.Active && sign.Activations == 0, "Group activation after both MapMods keeps the object inactive");
+        Assert(!sign.Active && sign.Activations == 0, "Group activation after both mods keeps the object inactive");
         var rebound = engine.Apply(Doc(Item("rebind", ToExtension)), "packC").Outcomes["rebind"];
         Assert(rebound.Applied && Subscription(sign) == "extension|1|held" && !sign.Active && sign.Activations == 0, "A later rebinding without active moves the subscription under the disable: " + rebound.Error + " " + Subscription(sign));
         for (var i = 0; i < 2; i++) {
-            Assert(engine.Apply(Doc(Item("disable", "\"active\":false")), "packA").Outcomes["disable"].Applied && engine.Apply(Doc(Item("move", Moved)), "packB").Outcomes["move"].Applied, "Repeated application of both MapMods succeeds");
+            Assert(engine.Apply(Doc(Item("disable", "\"active\":false")), "packA").Outcomes["disable"].Applied && engine.Apply(Doc(Item("move", Moved)), "packB").Outcomes["move"].Applied, "Repeated application of both mods succeeds");
             Assert(sign.Held && !sign.Active && sign.Activations == 0, "Repeated application keeps the disable without activating the object");
         }
     }

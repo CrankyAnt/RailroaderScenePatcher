@@ -59,10 +59,10 @@ namespace RailroaderScenePatcher {
         // description, so two disabled controls with one reason still say what each would do.
         internal static string Tooltip(string description, string reason) =>
             String.IsNullOrEmpty(reason) ? description : String.IsNullOrEmpty(description) ? reason : description + "\nUnavailable: " + reason;
-        // The three controls that take something back are named by what they take back. Object: this MapMod's activity
+        // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit";
-        // Why Clear activity cannot run for an object this MapMod sets no activity for, or null.
+        // Why Clear activity cannot run for an object this mod sets no activity for, or null.
         internal static string ClearActivityReason(bool hasValue) => hasValue ? null : "This MapMod sets no activity for this object, so there is nothing to clear.";
         // Why the footer's Details of a world choice cannot show anything, or null: it shows the clicked candidate.
         internal static string CandidateDetailsReason(int offered) => offered == 0 ? "Click a marking or track in the world first." : null;
@@ -317,7 +317,7 @@ namespace RailroaderScenePatcher {
             block ?? (SameFields(entered, current, exact) ? same : null);
         internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.";
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the
-        // object's value without this MapMod says that the modification no longer sets it; completed replaces the
+        // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.
         internal static string EditResult(string action, bool unchanged, bool reverted, string completed) =>
             unchanged ? action + ": nothing changed; the object has this value already."

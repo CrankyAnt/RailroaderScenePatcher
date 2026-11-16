@@ -104,7 +104,7 @@ namespace RailroaderScenePatcher.Core {
                     return new PatchDocument(null, "Invalid document envelope or format version");
                 if (root["formatVersion"].ToString(Formatting.None) != "1")
                     return new PatchDocument(null, "Unsupported format version");
-                if (!(root["sourceMap"] is JObject sourceMap) || sourceMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)sourceMap["mapId"]) || root["modifications"]?.Type != JTokenType.Array)
+                if (!(root["sourceMap"] is JObject targetMap) || targetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)targetMap["mapId"]) || root["modifications"]?.Type != JTokenType.Array)
                     return new PatchDocument(null, "Invalid document map context or modifications");
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var item in (JArray)root["modifications"]) {

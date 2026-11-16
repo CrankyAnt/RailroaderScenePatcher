@@ -52,7 +52,7 @@ namespace RailroaderScenePatcher {
             newLocation = location.GetConstructor(Native.Flags, null, new[] { typeof(string), typeof(float), end }, null) ?? throw new MissingMethodException(LocationType, ".ctor(string, float, End)");
             foreach (var field in new[] { "segmentId", "distance", "end" }) if (location.GetField(field, Native.Flags) == null) throw new MissingFieldException(LocationType, field);
         }
-        public IEnumerable<string> MapIds => PackDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModDocuments.MapIds();
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         static object Graph() => Native.Read(Native.Type(GraphType), "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
         Component ControllerOf(object target) => ((GameObject)target).GetComponent(controller) ?? throw new InvalidOperationException("The object no longer holds a crossing controller");

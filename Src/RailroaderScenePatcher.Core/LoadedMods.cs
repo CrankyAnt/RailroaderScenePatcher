@@ -6,42 +6,42 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // One loaded asset pack that carries a patch document, with the supplying metadata of its Info.json.
-    public sealed class LoadedPack {
+    // One loaded mod that carries a patch document, with the supplying metadata of its Info.json.
+    public sealed class LoadedMod {
         public const string PatcherId = "crankyant/scene-patcher";
-        public LoadedPack(PatchSource source, string json, IEnumerable<string> dependencies, bool editTarget = false, string error = null) {
+        public LoadedMod(PatchSource source, string json, IEnumerable<string> dependencies, bool editTarget = false, string error = null) {
             Source = source ?? throw new ArgumentNullException(nameof(source)); Json = json; EditTarget = editTarget; Error = error;
             Dependencies = (dependencies ?? Enumerable.Empty<string>()).Where(d => !String.IsNullOrWhiteSpace(d)).Distinct(StringComparer.Ordinal).ToArray();
         }
         public PatchSource Source { get; }
         public string Json { get; }
-        // Identifiers the pack lists under dependencies.required, without their version constraints.
+        // Identifiers the mod lists under dependencies.required, without their version constraints.
         public IReadOnlyList<string> Dependencies { get; }
-        // The editor's active edited MapMod, applied before Save has declared the patcher dependency.
+        // The editor's edited mod, applied before Save has declared the patcher dependency.
         public bool EditTarget { get; }
-        // Set when the document or supplying metadata cannot be read; the pack is skipped as a whole.
+        // Set when the document or supplying metadata cannot be read; the mod is skipped as a whole.
         public string Error { get; }
         public bool DeclaresPatcher => Dependencies.Contains(PatcherId, StringComparer.Ordinal);
         public bool Applicable => Error == null && (EditTarget || DeclaresPatcher);
-        public static LoadedPack Read(string identifier, string info, string json, bool editTarget = false) {
-            if (String.IsNullOrWhiteSpace(identifier)) throw new ArgumentException("A loaded pack needs its identifier", nameof(identifier));
+        public static LoadedMod Read(string identifier, string info, string json, bool editTarget = false) {
+            if (String.IsNullOrWhiteSpace(identifier)) throw new ArgumentException("A loaded mod needs its identifier", nameof(identifier));
             try {
                 var metadata = JObject.Parse(info);
                 var required = metadata["dependencies"]?["required"] as JArray;
                 var dependencies = required?.Where(d => d.Type == JTokenType.String).Select(d => ((string)d).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()) ?? Enumerable.Empty<string>();
                 var source = new PatchSource(identifier, Text(metadata, "name") ?? identifier, Text(metadata, "version"), Text(metadata, "author"), Text(metadata, "website"));
-                return new LoadedPack(source, json, dependencies, editTarget, json == null ? "Cannot read patch document" : null);
+                return new LoadedMod(source, json, dependencies, editTarget, json == null ? "Cannot read patch document" : null);
             } catch (Exception e) when (!(e is OutOfMemoryException)) {
-                return new LoadedPack(new PatchSource(identifier, identifier, null), json, null, editTarget, "Cannot read patch document or supplying metadata: " + e.GetType().Name);
+                return new LoadedMod(new PatchSource(identifier, identifier, null), json, null, editTarget, "Cannot read patch document or supplying metadata: " + e.GetType().Name);
             }
         }
         static string Text(JObject obj, string name) => obj[name]?.Type == JTokenType.String ? (string)obj[name] : null;
     }
-    // What happened to one loaded pack during a load-order pass.
+    // What happened to one loaded mod during a load-order pass.
     public sealed class LoadedDocument {
-        internal LoadedDocument(LoadedPack pack) { Pack = pack; }
-        public LoadedPack Pack { get; }
-        // Null when the pack was not handed to the engine: unreadable or not applicable.
+        internal LoadedDocument(LoadedMod mod) { Mod = mod; }
+        public LoadedMod Mod { get; }
+        // Null when the mod was not handed to the engine: unreadable or not applicable.
         public DocumentResult Result { get; internal set; }
         public string Skipped { get; internal set; }
         // A failure report or overlap notice that could not be delivered; the document's applied work is unaffected.
@@ -49,16 +49,16 @@ namespace RailroaderScenePatcher.Core {
         // The map this document names as its source, or null when the document cannot be read that far.
         public string MapId {
             get {
-                try { return Pack.Json == null ? null : (string)JObject.Parse(Pack.Json)["sourceMap"]?["mapId"]; }
+                try { return Mod.Json == null ? null : (string)JObject.Parse(Mod.Json)["sourceMap"]?["mapId"]; }
                 catch { return null; }
             }
         }
-        // What happened to this document in one load attempt, as one line for the log: the pack, the map the document
+        // What happened to this document in one load attempt, as one line for the log: the mod, the map the document
         // is for, and the outcome. mapIds is the loaded map followed by its layers. A document for another map is
         // skipped without a failure, so this line is the only trace of it.
         public string LogLine(string patcherVersion, int attempt, IReadOnlyList<string> mapIds) {
             var maps = mapIds ?? Array.Empty<string>();
-            var source = Pack.Source;
+            var source = Mod.Source;
             var start = "Scene Patcher " + patcherVersion + ": load attempt " + attempt + ", map " + (maps.Count == 0 ? "unknown" : maps[0]) +
                 " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] document";
             var map = MapId;
@@ -73,28 +73,28 @@ namespace RailroaderScenePatcher.Core {
     }
     // Receives informational notices for the structured native collector. A notice with a known Key replaces that row.
     public interface IOverlapNotices { void Notice(OverlapNotice notice); }
-    // Different supplying MapMods attempt to modify the same uniquely resolved existing object. It reports possible
+    // Different supplying mods attempt to modify the same uniquely resolved existing object. It reports possible
     // incompatibility only: it is not a failure, chooses no winner and does not stop application.
     public sealed class OverlapNotice {
-        internal OverlapNotice(string key, TargetIdentity target, IReadOnlyList<LoadedPack> packs) {
-            Key = key; Target = target; Packs = packs.Select(p => p.Source).ToArray();
+        internal OverlapNotice(string key, TargetIdentity target, IReadOnlyList<LoadedMod> mods) {
+            Key = key; Target = target; Mods = mods.Select(p => p.Source).ToArray();
             var dependencies = new List<string>();
-            foreach (var dependent in packs)
-                foreach (var prerequisite in packs)
+            foreach (var dependent in mods)
+                foreach (var prerequisite in mods)
                     if (!ReferenceEquals(dependent, prerequisite) && dependent.Dependencies.Contains(prerequisite.Source.Identifier, StringComparer.Ordinal))
                         dependencies.Add(Name(dependent.Source) + " declares a dependency on " + Name(prerequisite.Source));
             Dependencies = dependencies;
-            Message = "Supplying MapMods " + String.Join(", ", Packs.Select(Name)) + " each modify the existing object " + target.Scene + "/" + target.Path + " [" + target.Component + "]. " +
+            Message = "Supplying mods " + String.Join(", ", Mods.Select(Name)) + " each modify the existing object " + target.Scene + "/" + target.Path + " [" + target.Component + "]. " +
                 "This indicates a possible incompatibility, not a confirmed conflict. " + (dependencies.Count == 0 ? "" : String.Join("; ", dependencies) + "; a dependency does not establish that the changes are compatible. ") +
-                "Application continued in load order; no change was undone and no winner was chosen. Check the MapMods' descriptions if the result looks wrong.";
+                "Application continued in load order; no change was undone and no winner was chosen. Check the mods' descriptions if the result looks wrong.";
         }
         static string Name(PatchSource source) => (source.Name ?? source.Identifier) + " [" + source.Identifier + "]";
         public string Source => "Railroader Scene Patcher";
         public string Key { get; }
         public TargetIdentity Target { get; }
-        // The supplying MapMods in load order.
-        public IReadOnlyList<PatchSource> Packs { get; }
-        // Declared dependencies among those MapMods, one description each.
+        // The supplying mods in load order.
+        public IReadOnlyList<PatchSource> Mods { get; }
+        // Declared dependencies among those mods, one description each.
         public IReadOnlyList<string> Dependencies { get; }
         public string Message { get; }
     }

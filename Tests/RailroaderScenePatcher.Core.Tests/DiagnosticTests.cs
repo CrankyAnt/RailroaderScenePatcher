@@ -23,16 +23,16 @@ static class DiagnosticTests {
         scene.FailApply = true;
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1", "Example author", "https://example.com/mapmod");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1", "Example author", "https://example.com/mod");
         runtime.Apply(Document, source);
         runtime.Apply(Document, source);
         Check(messages.Rows.Count == 1, "Repeated callbacks must retain one attributed failure per operation within a load");
         var failure = messages.Rows.Single();
         Check(failure.Source == "Railroader Scene Patcher" && failure.Operation == "move" && failure.ObjectPath == "sign", "Diagnostic source, operation and affected object must identify the failure");
-        Check(failure.Message.StartsWith("Example MapMod [example/mapmod; version 2.1].", StringComparison.Ordinal), "The description starts with the supplying MapMod; its separate originator supplies the diagnostic source once");
-        Check(failure.Cause == FailureCause.Unknown && failure.ReportTo == "patcher maintainer", "An injected native mutation fault must not blame the supplying MapMod");
-        Check(failure.Message.Contains("Example MapMod") && failure.Message.Contains("example/mapmod") && failure.Message.Contains("2.1") && failure.Message.Contains("0.5.0") && failure.Message.Contains("game-build"), "Reports must include supplying identity and relevant versions");
-        Check(failure.Message.Contains("Example author") && failure.Message.Contains("https://example.com/mapmod"), "Reports retain supplied metadata");
+        Check(failure.Message.StartsWith("Example Mod [example/mod; version 2.1].", StringComparison.Ordinal), "The description starts with the supplying mod; its separate originator supplies the diagnostic source once");
+        Check(failure.Cause == FailureCause.Unknown && failure.ReportTo == "patcher maintainer", "An injected native mutation fault must not blame the supplying mod");
+        Check(failure.Message.Contains("Example Mod") && failure.Message.Contains("example/mod") && failure.Message.Contains("2.1") && failure.Message.Contains("0.5.0") && failure.Message.Contains("game-build"), "Reports must include supplying identity and relevant versions");
+        Check(failure.Message.Contains("Example author") && failure.Message.Contains("https://example.com/mod"), "Reports retain supplied metadata");
         InvalidDefinitionsAndEditorRecovery();
         EarlyCheckUsesCompleteDocumentProtection();
         ExactFallbackRequiresVerifiedRepair();
@@ -110,10 +110,10 @@ static class DiagnosticTests {
         world.Objects["sign"] = new List<object> { marker }; world.Relative(marker); world.LoadFollower(marker);
         var capabilities = new SceneCapabilities(() => world.MapIds); capabilities.Add(new TrackMarkerScene(world, Capability.Checked));
         var messages = new Messages(); var runtime = new PatchRuntime(new PatchEngine(capabilities), messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var json = Document.Replace("\"component\":\"board\"", "\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"").Replace("\"active\":false", "\"active\":true");
         var result = runtime.Apply(json, source);
-        Check(!result.Outcomes["move"].Applied && world.Mutations == 0 && messages.Rows.Single().Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "MapMod author", "A state without a relationship still enforces group activity rules and reports the invalid supplied value accurately");
+        Check(!result.Outcomes["move"].Applied && world.Mutations == 0 && messages.Rows.Single().Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "mod author", "A state without a relationship still enforces group activity rules and reports the invalid supplied value accurately");
         runtime.Apply(json, source);
         Check(messages.Rows.Count == 1, "Repeated group-activity refusal does not duplicate its attributed diagnostic");
         runtime = new PatchRuntime(new PatchEngine(capabilities), messages, "0.5.0", "game-build");
@@ -126,7 +126,7 @@ static class DiagnosticTests {
         world.Objects["sign"] = new List<object> { marker };
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(new TrackMarkerScene(world, Capability.Checked)), messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"repair\",\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"late-track\",\"end\":\"a\",\"distance\":10}}}]}";
         var early = runtime.BeforeNativeCheck(json, source, new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1"));
         Check(early.Outcomes.Count == 0 && early.EarlyRouteUnavailable.Contains("late-track") && messages.Rows.Count == 0 && marker.Segment == "missing", "Unavailable early prerequisites defer without consuming the runtime attempt or silencing the native check");
@@ -141,7 +141,7 @@ static class DiagnosticTests {
         var json = JObject.Parse(Document); var entries = (JArray)json["modifications"];
         var second = (JObject)entries[0].DeepClone(); second["id"] = "independent"; second["target"]["path"] = "other"; entries.Add(second);
         var messages = new Messages(); var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var result = runtime.Apply(json.ToString(), source);
         Check(!result.Outcomes["move"].Applied && broken.Active && result.Outcomes["independent"].Applied && !independent.Active, "A failed operation restores its object while independent document work continues");
         runtime.Apply(json.ToString(), source);
@@ -151,7 +151,7 @@ static class DiagnosticTests {
         var scene = new Scene { Capability = Capability.Incompatible };
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         runtime.Apply(Document, source);
         scene.Capability = Capability.Checked;
         runtime.Apply(Document.Replace("\"id\":\"move\"", "\"id\":\"document\""), source);
@@ -160,7 +160,7 @@ static class DiagnosticTests {
     static void ExactFallbackRequiresVerifiedRepair() {
         var scene = new Scene(); var box = new Box(); scene.Objects["sign"] = new List<object> { box };
         var runtime = new PatchRuntime(new PatchEngine(scene), new Messages(), "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var warnings = new Warnings();
         var row = new CurrentWarning(new object(), "System", "marker-id", "Sign", "Original invalid binding");
         var other = new CurrentWarning(new object(), "System", "other-id", "Other sign", "Unrelated warning");
@@ -188,9 +188,9 @@ static class DiagnosticTests {
         var scene = new Scene();
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         runtime.Apply(Document.Replace("\"active\":false", "\"active\":42"), source);
-        Check(messages.Rows.Count == 1 && messages.Rows[0].Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "MapMod author", "A demonstrably invalid supplied value directs reports to its MapMod author");
+        Check(messages.Rows.Count == 1 && messages.Rows[0].Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "mod author", "A demonstrably invalid supplied value directs reports to its mod author");
         Check(!messages.Rows[0].Message.Contains("Supplied author") && !messages.Rows[0].Message.Contains("Published website"), "Absent optional metadata must not be invented");
         runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         runtime.Apply(Document.Replace("\"active\":false", "\"futureOperation\":true"), source);
@@ -206,7 +206,7 @@ static class DiagnosticTests {
         var messages = new Messages();
         var engine = new PatchEngine(new TrackMarkerScene(world, Capability.Checked));
         var runtime = new PatchRuntime(engine, messages, "0.5.0", "game-build");
-        var source = new PatchSource("example/mapmod", "Example MapMod", "2.1");
+        var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"repair\",\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"replacement\",\"end\":\"a\",\"distance\":10}}}]}";
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
         runtime.BeforeNativeCheck(json.Substring(0, json.Length - 2) + ",{}]}", source, target);

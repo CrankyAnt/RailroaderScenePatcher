@@ -116,53 +116,53 @@ static class CommandBandTests {
     // The supplied definitions are stale when a patch document changed outside the editor, not when the patcher saved
     // it itself, and a refresh makes them current again. The lamp follows: Current, Stale, Current.
     static void OwnSaveKeepsTheDefinitionsCurrent() {
-        RailroaderScenePatcher.Core.LoadedPack Pack(string id, string json, string error = null) =>
-            new RailroaderScenePatcher.Core.LoadedPack(new RailroaderScenePatcher.Core.PatchSource(id, id, "1.0"), json, null, true, error);
+        RailroaderScenePatcher.Core.LoadedMod Loaded(string id, string json, string error = null) =>
+            new RailroaderScenePatcher.Core.LoadedMod(new RailroaderScenePatcher.Core.PatchSource(id, id, "1.0"), json, null, true, error);
         const string before = "{\"modifications\":[]}", written = "{\"modifications\":[{\"id\":\"board\",\"active\":false}]}", outside = "{\"modifications\":[{\"id\":\"board\",\"active\":true}]}";
         var definitions = new SuppliedDefinitions();
         Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "Before the first refresh the definitions are not read");
-        definitions.Read(new[] { Pack("pack", before) });
-        definitions.Compare(new[] { Pack("pack", before) });
+        definitions.Read(new[] { Loaded("pack", before) });
+        definitions.Compare(new[] { Loaded("pack", before) });
         Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "After a refresh the unchanged document is current");
         // The patcher saves: the file now holds what it wrote.
         definitions.Written("pack", written);
-        definitions.Compare(new[] { Pack("pack", written) });
+        definitions.Compare(new[] { Loaded("pack", written) });
         Check(!definitions.Stale, "The patcher's own Save keeps the definitions current");
-        definitions.Compare(new[] { Pack("pack", written) });
+        definitions.Compare(new[] { Loaded("pack", written) });
         Check(!definitions.Stale, "and they stay current on every later comparison");
         // The file is changed outside the editor.
-        definitions.Compare(new[] { Pack("pack", outside) });
+        definitions.Compare(new[] { Loaded("pack", outside) });
         Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "A document changed outside the editor marks the definitions stale");
-        definitions.Compare(new[] { Pack("pack", written) });
+        definitions.Compare(new[] { Loaded("pack", written) });
         Check(definitions.Stale, "Changing the file back does not clear it: only a refresh does");
-        definitions.Read(new[] { Pack("pack", outside) });
+        definitions.Read(new[] { Loaded("pack", outside) });
         Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "Refresh returns Current");
-        // The first Save creates the document: no pack carried one at the refresh.
+        // The first Save creates the document: no mod carried one at the refresh.
         var fresh = new SuppliedDefinitions();
-        fresh.Read(new RailroaderScenePatcher.Core.LoadedPack[0]);
+        fresh.Read(new RailroaderScenePatcher.Core.LoadedMod[0]);
         fresh.Written("pack", written);
-        fresh.Compare(new[] { Pack("pack", written) });
+        fresh.Compare(new[] { Loaded("pack", written) });
         Check(!fresh.Stale, "A document the patcher's own Save created is current");
-        fresh.Compare(new[] { Pack("pack", written), Pack("other", before) });
+        fresh.Compare(new[] { Loaded("pack", written), Loaded("other", before) });
         Check(fresh.Stale, "A document that appears from elsewhere marks them stale");
         // A document that can no longer be read, and one removed outside the editor.
-        definitions.Compare(new[] { Pack("pack", null, "Cannot read patch document") });
+        definitions.Compare(new[] { Loaded("pack", null, "Cannot read patch document") });
         Check(definitions.Stale, "An unreadable document marks them stale");
-        definitions.Read(new[] { Pack("pack", outside) });
-        definitions.Compare(new RailroaderScenePatcher.Core.LoadedPack[0]);
+        definitions.Read(new[] { Loaded("pack", outside) });
+        definitions.Compare(new RailroaderScenePatcher.Core.LoadedMod[0]);
         Check(definitions.Stale, "A removed document marks them stale");
         // A write while already stale does not vouch for what else changed.
-        definitions.Read(new[] { Pack("pack", before) });
-        definitions.Compare(new[] { Pack("pack", outside) });
+        definitions.Read(new[] { Loaded("pack", before) });
+        definitions.Compare(new[] { Loaded("pack", outside) });
         definitions.Written("pack", written);
-        definitions.Compare(new[] { Pack("pack", written) });
+        definitions.Compare(new[] { Loaded("pack", written) });
         Check(definitions.Stale, "A Save after an outside change leaves the definitions stale until Refresh");
         // A new load attempt starts over, as before the first refresh.
-        definitions.Read(new[] { Pack("pack", before) });
+        definitions.Read(new[] { Loaded("pack", before) });
         definitions.Reset();
         Check(definitions.Stale, "After a reset the definitions are not read");
         definitions.Written("pack", written);
-        definitions.Compare(new[] { Pack("pack", written) });
+        definitions.Compare(new[] { Loaded("pack", written) });
         Check(definitions.Stale, "A write does not stand in for the refresh a new load attempt needs");
         var messages = new EditFeedback();
         messages.Report("Placement", "Placement completed."); messages.Follow("Terrain output", "Terrain output complete.");
