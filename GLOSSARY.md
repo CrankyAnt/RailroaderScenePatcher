@@ -102,6 +102,12 @@ _Avoid_: Clean, unchanged on disk
 **Canonical order**:
 The fixed order of keys and members that a Save produces when it writes a patch document. Reading a document never changes its order.
 
+**Protected patch document**:
+A patch document that scene patch editing will not overwrite: one that is unreadable, in a format this version does not understand, for another map, unsafe to convert, or changed outside scene patch editing since it was read. Its content is kept until it is corrected outside scene patch editing or replaced by a fresh start.
+
+**Fresh start**:
+Replacing a protected patch document with a new document for the edited mod, only after explicit confirmation and a backup of the original.
+
 **Mod value**:
 A value that a supplying mod's patch document sets for a scene object. Without it, the scene object keeps its effective underlying state.
 _Avoid_: MapMod value, authored value, authored state, authored binding, authored activity
@@ -226,6 +232,17 @@ Physical placement fixed in map coordinates, independent of any track. It is dis
 **Owned state**:
 State that a supplying mod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.
 
+**Refusal**:
+An edit that the patcher refuses before it changes anything, with the reason stated. Nothing needs restoring after a refusal.
+_Avoid_: Rejection
+
+**Restored failure**:
+An edit that failed after it began to change the scene, and whose captured prior state the patcher restored and verified. It is distinct from a refusal and from incomplete cleanup.
+
+**Incomplete cleanup**:
+A failed edit whose restoration the patcher could not verify. Its remaining state, such as an owned span that stays registered, is uncertain until the cleanup is verified or the world reloads.
+_Avoid_: Unverified restoration
+
 **Guarded retry**:
 A retry of an operation whose mutation failed, blocked until the cleanup of the failed attempt is verified or the world reloads.
 
@@ -288,8 +305,17 @@ A scene object that a new-game car placement reads for its track location. Its o
 **New-game car placement**:
 One placement of a new-game setup that places a cut of starting cars at its starter placement marker's track location.
 
+**Car cut**:
+The cars that one new-game car placement places together. Its front stands at the track point, and the rest extends along the track in the direction that the track location names.
+
+**Placement rule**:
+The game's own rule for whether a setup's car cuts fit on the track at their track locations.
+
 **Track location**:
-The place on a track that a starter placement marker supplies to a new-game car placement. It is distinct from the marker's object position.
+The place on a track that a track binding names, as a segment, an end and a distance along it. A starter placement marker's track location is the one its new-game car placement reads. It is distinct from the marker's object position.
+
+**Track point**:
+The map position on the loaded track where a track location lies. A track location that does not resolve on the loaded track has no track point. For a starter placement marker, it is where the front of the car cut stands, not the marker's object position.
 
 **Wreck setting**:
 The setting of a new-game car placement that decides whether its cars start derailed as a wreck.
@@ -325,6 +351,9 @@ The outliner filter that limits the list to scene objects with a detected proble
 
 **Problem**:
 A defect of one scene object that the modder can repair with the patcher for that object, such as a duplicate marker id or a broken binding.
+
+**Recheck**:
+The explicit action that compares an inspected scene object with the patch document again, applies the document's state where they differ, and lifts the block of an incomplete cleanup once they agree. A refresh of the inventory alone applies nothing.
 
 **Inspector**:
 The region of scene patch editing that shows the inspected scene object's values, dependencies and actions.
