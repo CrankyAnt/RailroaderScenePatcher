@@ -279,23 +279,23 @@ static class InspectionTests {
 
         box.X = 8;
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 0 && box.X == 8, "A stale inventory refuses the edit before it runs");
-        Check(feedback.Place == "placement" && feedback.Result == "Placement refused: Inventory is stale (scene/p [Culler] changed (position)); refresh and inspect again" && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. Inventory is stale (scene/p [Culler] changed (position)); refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
         inventory.Refresh(); log.Clear();
         Check(!feedback.Run("binding", "Track binding", "a world selection is pending; confirm or cancel it first", inventory, inventory.Entries.Single(), move) && calls == 0,
             "An edit during a pending interaction does not run");
-        Check(feedback.Place == "binding" && feedback.Result == "Track binding refused: a world selection is pending; confirm or cancel it first" && log.Single() == feedback.Result, "The ignored edit names the pending interaction: " + feedback.Result);
+        Check(feedback.Place == "binding" && feedback.Result == "Track binding refused. A world selection is pending; confirm or cancel it first." && log.Single() == feedback.Result, "The ignored edit names the pending interaction: " + feedback.Result);
         log.Clear();
-        Check(!feedback.Run("placement", "Placement", null, null, null, move) && feedback.Result.StartsWith("Placement refused: ", StringComparison.Ordinal) && log.Count == 1 && calls == 0, "An edit without an inspected object names that: " + feedback.Result);
+        Check(!feedback.Run("placement", "Placement", null, null, null, move) && feedback.Result.StartsWith("Placement refused. ", StringComparison.Ordinal) && log.Count == 1 && calls == 0, "An edit without an inspected object names that: " + feedback.Result);
         log.Clear();
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), inspection => throw new InvalidOperationException("injected edit failure")) &&
-            feedback.Result == "Placement refused: injected edit failure" && log.Single() == feedback.Result, "A failing edit names its failure: " + feedback.Result);
+            feedback.Result == "Placement refused. Injected edit failure." && log.Single() == feedback.Result, "A failing edit names its failure: " + feedback.Result);
         log.Clear();
         scene.FailApply = true;
-        Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 1 && feedback.Result.StartsWith("Placement refused: ", StringComparison.Ordinal) && feedback.Result.Length > "Placement refused: ".Length && log.Single() == feedback.Result,
+        Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 1 && feedback.Result.StartsWith("Placement refused. ", StringComparison.Ordinal) && feedback.Result.Length > "Placement refused. ".Length && log.Single() == feedback.Result,
             "A refused outcome names the engine's reason: " + feedback.Result);
         scene.FailApply = false; log.Clear(); inventory.Refresh();
         feedback.Refuse("binding", "Track binding", "enter a segment ID");
-        Check(feedback.Place == "binding" && feedback.Result == "Track binding refused: enter a segment ID" && log.Single() == feedback.Result, "A refusal of entered values is logged like any other");
+        Check(feedback.Place == "binding" && feedback.Result == "Track binding refused. Enter a segment ID." && log.Single() == feedback.Result, "A refusal of entered values is logged like any other");
         log.Clear();
         Check(feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && box.X == 12 && feedback.Result.StartsWith("Placement completed", StringComparison.Ordinal) && log.Single() == feedback.Result,
             "A completed edit reports completion in the same place: " + feedback.Result);
@@ -1180,7 +1180,7 @@ static class InspectionTests {
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
         Check(feedback.Messages.Count == 0, "No message before the first result");
         feedback.Refuse("Track binding", "Track binding", "enter a segment ID");
-        Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Track binding: Track binding refused: enter a segment ID" }), "A message keeps its source");
+        Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Track binding: Track binding refused. Enter a segment ID." }), "A message keeps its source");
         feedback.Report("Placement", "Placement completed.");
         Check(feedback.Place == "Placement" && feedback.Result == "Placement completed." && feedback.Messages.Count == 1, "The newest result is the one shown");
         Check(log.Count == 2, "Every message is logged once");
@@ -1199,9 +1199,9 @@ static class InspectionTests {
         feedback.Inspecting(first);
         feedback.Refuse("placement", "Placement", "Target must resolve uniquely");
         feedback.Inspecting(first);
-        Check(feedback.Place == "placement" && feedback.Result == "Placement refused: Target must resolve uniquely", "A result stays while its object stays inspected");
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. Target must resolve uniquely.", "A result stays while its object stays inspected");
         feedback.Inspecting(null);
-        Check(feedback.Result == "Placement refused: Target must resolve uniquely", "A result stays when the inspected object is no longer present");
+        Check(feedback.Result == "Placement refused. Target must resolve uniquely.", "A result stays when the inspected object is no longer present");
         feedback.Inspecting(second);
         Check(feedback.Place == null && feedback.Result == "" && log.Count == 1, "Inspecting another object clears the previous object's result without a log line");
         feedback.Report("modification", "Recheck completed.");

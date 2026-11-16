@@ -268,6 +268,7 @@ class Program {
         CompositionTests.Run();
         BindingTests.Run();
         CrossingPadTests.Run();
+        DuplicateMarkerIdTests.Run();
         DiagnosticTests.Run();
         MultipleModTests.Run();
         TrackFollowingTests.Run();

@@ -15,7 +15,7 @@ The patcher edits a marker when all of these hold:
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object whose activity follows a track group activates this object itself, and no other component has replaced its activation callback,
 - no loaded component other than that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it does not know the holders and refuses every marker until the next check,
-- the graph holds one registration of the marker at its current location while the marker is enabled and active, and none otherwise.
+- the graph holds one registration of the marker at its current location while the marker is enabled and active, and none otherwise. A registration that another scene marker with the same marker id holds is not a registration of this marker.
 
 A Generic marker inside a grade-crossing setup, such as a whistle sign under a `Track.Crossings.GradeCrossingController`, qualifies like any other: the crossing controller reads its circuits and spans, and the auto engineer's crossing horn reads the crossing pad's `Crossing` marker, not the sign. The crossing pad and the crossing's own `Crossing` markers keep their own operations.
 
@@ -47,6 +47,20 @@ If an edit fails and the patcher cannot verify the restoration, it reports incom
 ## Activity and registration
 
 A disabled marker keeps its binding without a registration. When it is enabled, the game registers it at the bound location. An explicit `"active": false` in the same modification removes the registration and keeps the binding.
+
+## Markers with a duplicate marker id
+
+Some scene markers hold a duplicate marker id: another scene marker holds the same marker id. In the base map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`, and six `Whistle Sign W` markers hold `Mkft`. The game removes a marker's graph registration by its marker id, and it removes that marker id from every segment. Disabling or rebinding one holder would therefore also remove the registration of the others.
+
+The **Dependencies** section on the **Object** tab of such a marker starts with the duplicate marker id, the number of scene markers that hold it and why their edits are refused. One sentence per holder follows: first the inspected marker, as **This marker**, then the active holders and the inactive ones last, each with its scene and path, whether it is active, and where it has a registration under the marker id, or that it has none. A registration under the marker id that no scene marker holds gets a sentence of its own. A scene marker that is not loaded but still owns a registration under the marker id also counts as a holder.
+
+Until the duplicate marker id is repaired, the patcher refuses these edits of every holder, a Generic marker or a crossing pad:
+
+- an activity change, such as **Enable** or **Disable**,
+- a binding change: a new location or a detach,
+- track following.
+
+The refusal stands in the message area of the footer, under the action group it came from, such as **Activity**: first the refused action, such as `Enable refused.`, then the duplicate marker id and every scene marker that holds it, with each one's activity, the edited marker first and inactive holders last. The patcher changes nothing: the scene, the patch document and every holder's registration stay as they were. Reloading the map does not help, because it registers the same markers under the same marker id again. Choosing another track does not help either, because the edit still removes the registrations under that marker id. A fixed placement of a holder stays editable, since it does not touch the registration, unless a map label below the marker caches another track group than its location: correcting that cache would register the marker again, so that edit is refused too. A value equal to the marker's current one, such as `"active": false` on an inactive marker, changes nothing and is accepted.
 
 ## Write the binding by hand
 
@@ -81,7 +95,7 @@ Remove a repair with **Remove modification** in the footer. This restores the un
 
 ## Limits
 
-The automated tests check set, replacement, detachment, omission, refusal of missing, ambiguous and out-of-range targets, dependency isolation, failure restoration, guarded retry, Undo, Redo, removal and reload against a controlled track graph. They do not load Railroader.
+The automated tests check set, replacement, detachment, omission, refusal of missing, ambiguous and out-of-range targets, dependency isolation, failure restoration, guarded retry, Undo, Redo, removal and reload against a controlled track graph. They also check the dependency lines and refusals for a pair and a group of three holders of a duplicate marker id, a holder whose activity follows its track group, crossing pads, and a holder that is not loaded, and that no holder loses its registration. They do not load Railroader. One native journey on Railroader with patcher commit `c4b6cb9` inspected the `Mg6m` pair and the six `Mkft` holders, one of them inactive through an inactive parent, and saw Enable and a rebind of the yard limit and a Disable of a whistle sign refused while every holder's registration stayed the same. That journey used the earlier wording of the explanation.
 
 The supported pattern comes from the game's source: setting a marker's location does not change its graph registration, so the patcher repeats the registration steps the marker performs when it is enabled and disabled.
 

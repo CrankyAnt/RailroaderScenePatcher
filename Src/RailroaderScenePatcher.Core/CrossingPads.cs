@@ -82,10 +82,12 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
         public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure ? RequiredVersion : null;
         public void Preflight(object target) => relationship.Preflight(target);
+        // The shared relationship checks first, so the refusal of an edit of a pad that holds a duplicate marker id
+        // names that marker id.
         public void CheckRelationships(object target, ObjectState state) {
+            relationship.CheckRelationships(target, state);
             if (state?.Marker != null && state.Marker.IsDetached)
                 throw new InvalidPatchDefinitionException("A crossing pad cannot be detached: its geometry is generated from its track location. Bind it to a location, or disable the pad to hide it");
-            relationship.CheckRelationships(target, state);
         }
         public object Capture(object target) => relationship.Capture(target);
         public ObjectState Read(object target) => relationship.Read(target);

@@ -35,12 +35,86 @@ namespace RailroaderScenePatcher.Core {
     }
     // One entry of the track graph's named-location registration for a marker's ID.
     public sealed class MarkerRegistration {
-        public MarkerRegistration(string bucket, TrackLocation location, bool holdsMarker) { Bucket = bucket; Location = location; HoldsMarker = holdsMarker; }
+        public MarkerRegistration(string bucket, TrackLocation location, bool holdsMarker, object owner = null, string ownerName = null) {
+            Bucket = bucket; Location = location; HoldsMarker = holdsMarker; Owner = owner; OwnerName = ownerName;
+        }
         // The segment ID under which the graph files the entry.
         public string Bucket { get; }
         public TrackLocation Location { get; }
         // The entry refers to this marker rather than another object registered under the same ID.
         public bool HoldsMarker { get; }
+        // The scene marker that holds the entry, as the world's handle of that object, wherever its scene is; null when
+        // the entry belongs to an object that is not a scene marker.
+        public object Owner { get; }
+        // The name of that scene marker, by scene and path; null when it is unknown.
+        public string OwnerName { get; }
+    }
+    // One scene marker that holds a marker id: the world's handle of the object, its name and whether the native marker
+    // lifecycle keeps it registered.
+    public sealed class MarkerIdHolder {
+        public MarkerIdHolder(object handle, string name, bool registers) { Handle = handle ?? throw new ArgumentNullException(nameof(handle)); Name = name; Registers = registers; }
+        public object Handle { get; }
+        public string Name { get; }
+        public bool Registers { get; }
+    }
+    // The scene markers that hold one marker id. The game removes a marker's graph registration by marker id from every
+    // holder, so while the marker id is a duplicate marker id, an edit of one holder's activity, binding or
+    // track-following placement would remove the registration of the others. Such an edit is refused until the
+    // duplicate marker id is repaired.
+    public sealed class MarkerIdHolders {
+        readonly MarkerRegistration[] registrations;
+        public MarkerIdHolders(string id, IEnumerable<MarkerIdHolder> holders) : this(id, holders, null) { }
+        MarkerIdHolders(string id, IEnumerable<MarkerIdHolder> holders, MarkerRegistration[] registrations) {
+            Id = id;
+            Holders = Array.AsReadOnly((holders ?? Enumerable.Empty<MarkerIdHolder>()).Where(h => h != null).GroupBy(h => h.Handle).Select(g => g.First())
+                .OrderBy(h => h.Name ?? "", StringComparer.Ordinal).ToArray());
+            this.registrations = registrations ?? new MarkerRegistration[0];
+        }
+        // The one holder set of the guard and the inspector: these holders, completed by the owner of every registration
+        // under the marker id that is not among them, such as a scene marker in a scene that is not loaded. Such an owner
+        // holds a registration, so it counts as registered.
+        public MarkerIdHolders With(IEnumerable<MarkerRegistration> entries) {
+            var all = (entries ?? Enumerable.Empty<MarkerRegistration>()).Where(e => e != null).ToArray();
+            var owners = all.Where(e => e.Owner != null && !Holders.Any(h => ReferenceEquals(h.Handle, e.Owner)))
+                .Select(e => new MarkerIdHolder(e.Owner, e.OwnerName ?? "a scene marker that is not loaded", true));
+            return new MarkerIdHolders(Id, Holders.Concat(owners), all);
+        }
+        public string Id { get; }
+        // Every scene marker that holds the marker id, by name.
+        public IReadOnlyList<MarkerIdHolder> Holders { get; }
+        public bool Duplicate => Holders.Count > 1;
+        // The holders as a refusal or the inspector names them: the inspected marker first, then the active holders,
+        // whose registration is at stake, and the inactive ones last; by name within each.
+        public IReadOnlyList<MarkerIdHolder> Ordered(object self) =>
+            Holders.OrderBy(h => ReferenceEquals(h.Handle, self) ? 0 : h.Registers ? 1 : 2).ToArray();
+        static string Activity(MarkerIdHolder holder) => holder.Registers ? "active" : "inactive";
+        string Names(object self) {
+            var names = Ordered(self).Select(h => h.Name + " (" + Activity(h) + ")").ToArray();
+            return names.Length < 2 ? String.Join("", names) : String.Join(", ", names.Take(names.Length - 1)) + " and " + names[names.Length - 1];
+        }
+        // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
+        // sentences that follow the label of the action they refuse.
+        public string Refusal(object self) => "Duplicate marker id " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
+        const string Reason = "The game removes a marker's graph registration by marker id from every scene marker that holds it, so an activity, binding or track-following edit of one of them is refused until the duplicate marker id is repaired. Reloading or choosing another track does not change the duplicate marker id.";
+        // The state of a holder that does not match its location and activity, such as its registration or a dependent
+        // cache, which only a rewrite of its registration would correct. Loading the scene again registers the holders
+        // under the same marker id, so it gives no advice to reload.
+        public string Mismatch(object self, string difference) => "The marker's state does not match its location and activity (" + difference + "). " + Refusal(self);
+        // The dependency lines of the inspector for one holder, as plain sentences: the duplicate marker id first, then
+        // every holder with its activity and the registrations it owns under the marker id, and the registrations that
+        // no scene marker owns. Empty for a marker id that one scene marker holds.
+        public IReadOnlyList<string> Dependencies(object self) {
+            if (!Duplicate) return Array.Empty<string>();
+            var lines = new List<string> { "Duplicate marker id " + Id + " is held by " + Holders.Count + " scene markers. " + Reason };
+            foreach (var holder in Ordered(self)) {
+                var own = registrations.Where(e => ReferenceEquals(e.Owner, holder.Handle)).Select(e => e.Location?.Display ?? e.Bucket).ToArray();
+                lines.Add((ReferenceEquals(holder.Handle, self) ? "This marker" : holder.Name) + " is " + Activity(holder) + " and "
+                    + (own.Length == 0 ? "has no registration under " + Id + "." : "has the registration under " + Id + " at " + String.Join(" and ", own) + "."));
+            }
+            foreach (var entry in registrations.Where(e => e.Owner == null))
+                lines.Add("An object that is not a scene marker has the registration under " + Id + " at " + (entry.Location?.Display ?? entry.Bucket) + ".");
+            return lines;
+        }
     }
     // One field of a scanned owner. Relevant fields can hold a target, directly or as a list element; Read may throw.
     public sealed class ReferenceField {
@@ -208,6 +282,9 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<double> SegmentLengths(string segment);
         // Every graph entry registered under the marker's ID.
         IReadOnlyList<MarkerRegistration> Registrations(object marker);
+        // Every scene marker the world can see that holds the marker's ID, the marker itself included. The relationship
+        // completes it with the owners of the registrations under the ID.
+        MarkerIdHolders IdHolders(object marker);
         // Whether the native marker lifecycle keeps the marker registered: the component is enabled and active.
         bool Registers(object marker);
         // Writes the serialized location and the native dependent caches; does not change the graph registration.
@@ -297,16 +374,33 @@ namespace RailroaderScenePatcher.Core {
             var problem = world is IPlacementPattern placement ? placement.PlacementProblem(target) : world.PatternProblem(target);
             if (problem != null) throw new InvalidOperationException(problem);
             var difference = Coherence(target);
-            if (difference != null) throw new InvalidOperationException("The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it");
+            if (difference != null) throw new InvalidOperationException(Incoherent(target, difference));
         }
         internal void Preflight(object target) {
             var problem = world.PatternProblem(target);
             if (problem != null) throw new InvalidOperationException(problem);
             var difference = Coherence(target);
-            if (difference != null) throw new InvalidOperationException("The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it");
+            if (difference != null) throw new InvalidOperationException(Incoherent(target, difference));
+        }
+        // The refusal of a registration that does not match the location and activity. A holder of a duplicate marker id
+        // gets its explanation instead of advice to reload, which registers the holders under the same marker id again.
+        string Incoherent(object target, string difference) {
+            var holders = Holders(target);
+            return holders != null && holders.Duplicate ? holders.Mismatch(target, difference)
+                : "The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it";
         }
         internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            // Before mutation, what the write would refuse for a holder of a duplicate marker id: a change of its activity,
+            // binding or track-following placement, and a dependent cache the write would correct by re-registering it.
+            var dependent = Changes(target, state) ? null : world.DependentProblem(target);
+            if (Changes(target, state) || dependent != null) {
+                var holders = Holders(target);
+                if (holders != null && holders.Duplicate) {
+                    if (dependent != null) throw new InvalidOperationException(holders.Mismatch(target, dependent));
+                    throw new InvalidPatchDefinitionException(holders.Refusal(target));
+                }
+            }
             var group = world.GroupActivity(target);
             if (group != null && state?.Active == true)
                 throw new InvalidPatchDefinitionException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");
@@ -326,6 +420,21 @@ namespace RailroaderScenePatcher.Core {
             return null;
         }
         bool Resolvable(TrackLocation location) => location != null && Unresolved(location) == null;
+        // The scene markers that hold the marker's id, completed by the owners of its registrations wherever they are.
+        MarkerIdHolders Holders(object target) => world.IdHolders(target)?.With(world.Registrations(target));
+        // Whether one modification's state changes the marker's activity, binding or track-following placement: what
+        // removes or adds the registration under the marker's id. A value equal to the current one changes nothing.
+        bool Changes(object target, ObjectState state) {
+            if (state == null) return false;
+            if (state.Placement?.Following != null) return true;
+            if (state.Marker != null && !MarkerBinding.Same(state.Marker, MarkerBinding.Of(world.Location(target)))) return true;
+            return state.Active.HasValue && ActivityChanges(target, state.Active, world.GroupActivity(target));
+        }
+        // Whether writing this activity switches the object or its explicit-disable hold. A group follower's null releases an installed hold.
+        bool ActivityChanges(object target, bool? active, GroupActivity group) {
+            if (group == null) return active.HasValue && active.Value != world.Active(target);
+            return active == false ? !group.Held || world.Active(target) : group.Held;
+        }
         internal object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true, Consumer = consumer?.Capture(target) };
         // The activity of a group follower is group-driven (null) unless the explicit-disable hold is installed.
         internal ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target)));
@@ -358,7 +467,7 @@ namespace RailroaderScenePatcher.Core {
             var captured = (Snapshot)snapshot;
             try {
                 var active = world.GroupActivity(target) == null ? captured.Active : (captured.Held ? false : (bool?)null);
-                Write(target, captured.Location, captured.Position, captured.Rotation, active, true, false, false);
+                Write(target, captured.Location, captured.Position, captured.Rotation, active, !TrackLocation.Same(world.Location(target), captured.Location), false, false);
                 var verified = Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active, false, false) == null
                     && (consumer == null || consumer.Restored(target, captured.Consumer) == null);
                 if (verified) (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
@@ -370,8 +479,14 @@ namespace RailroaderScenePatcher.Core {
         // relationship; its subscription is observed again for the current location; without the hold the group sets activity.
         // The consumer follows the final location and placement.
         // True when the relationship and its registration were written.
+        // A write that would touch the registration of a holder of a duplicate marker id stops before any mutation: removing it by id
+        // would remove the registration of every holder.
         bool Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind, bool following, bool explicitApply) {
             var group = world.GroupActivity(target);
+            if (rebind || ActivityChanges(target, active, group) || Coherence(target) != null || world.DependentProblem(target) != null) {
+                var holders = Holders(target);
+                if (holders != null && holders.Duplicate) throw new InvalidOperationException(holders.Refusal(target));
+            }
             if (group != null && active == false) {
                 if (!group.Held) world.HoldDisabled(target, true);
                 if (world.Active(target)) world.SetActive(target, false);
@@ -418,7 +533,8 @@ namespace RailroaderScenePatcher.Core {
         // at a resolvable location of an active marker, none otherwise. Null when it agrees.
         string Coherence(object target) {
             var location = world.Location(target);
-            var entries = world.Registrations(target) ?? Array.Empty<MarkerRegistration>();
+            // Another holder's registration under the same marker id is never a registration of this marker.
+            var entries = (world.Registrations(target) ?? Array.Empty<MarkerRegistration>()).Where(e => e.Owner == null || ReferenceEquals(e.Owner, target)).ToList();
             var expected = world.Registers(target) && Resolvable(location);
             if (!expected) return entries.Count == 0 ? null : entries.Count + " graph registrations remain for an unregistered marker";
             if (entries.Count != 1) return entries.Count + " graph registrations instead of one";

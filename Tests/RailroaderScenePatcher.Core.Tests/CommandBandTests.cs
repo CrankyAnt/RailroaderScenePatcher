@@ -463,7 +463,7 @@ static class CommandBandTests {
         queue.Enqueue("Activity", "Disable", () => ran++);
         Check(queue.Pending && queue.Place == "Activity", "A request waits under its action group");
         Check(queue.Cancel("the panel was closed before the request ran") && !queue.Pending && queue.Place == null, "Closing the panel cancels it");
-        Check(ran == 0 && feedback.Result == "Disable refused: the panel was closed before the request ran" && feedback.Place == "Activity", "The cancelled request did not run and left its refusal: " + feedback.Result);
+        Check(ran == 0 && feedback.Result == "Disable refused. The panel was closed before the request ran." && feedback.Place == "Activity", "The cancelled request did not run and left its refusal: " + feedback.Result);
         queue.Run();
         Check(ran == 0, "Running after the cancellation runs nothing");
         // A request that is not cancelled runs once.
@@ -476,14 +476,14 @@ static class CommandBandTests {
         // Leaving the native map editor.
         queue.Enqueue("Crossing coverage", "Coverage preview", () => ran++);
         queue.Cancel("the native map editor was left before the request ran");
-        Check(ran == 1 && feedback.Result == "Coverage preview refused: the native map editor was left before the request ran", "Leaving the native map editor cancels a preview too: " + feedback.Result);
+        Check(ran == 1 && feedback.Result == "Coverage preview refused. The native map editor was left before the request ran.", "Leaving the native map editor cancels a preview too: " + feedback.Result);
         // Clearing the inspection drops the object's results and keeps the refusal of the request that waited for it.
         var board = new object(); var other = new object();
         feedback.Inspecting(board);
         feedback.Report("Activity", "Disable completed.");
         queue.Enqueue("Activity", "Enable", () => ran++);
         Check(queue.Release("the inspection was cleared before the request ran") && !queue.Pending, "Clearing the inspection cancels the waiting request");
-        Check(ran == 1 && feedback.Messages.Count == 1 && feedback.Result == "Enable refused: the inspection was cleared before the request ran",
+        Check(ran == 1 && feedback.Messages.Count == 1 && feedback.Result == "Enable refused. The inspection was cleared before the request ran.",
             "Only the refusal is left after the inspection was cleared: " + String.Join(" / ", feedback.Messages.Select(m => m.Text)));
         feedback.Inspecting(null);
         Check(feedback.Messages.Count == 1, "The refusal stays while nothing is inspected");
@@ -501,7 +501,7 @@ static class CommandBandTests {
         queue.Enqueue("Activity", "Disable", () => ran++);
         Check(queue.ReleaseInspection(true, () => steps.Add("cancel choice"), () => steps.Add("restore"), "the inspection was cleared before the request ran"), "A waiting request is reported as cancelled");
         Check(steps.SequenceEqual(new[] { "cancel choice", "restore" }), "A pending world choice is cancelled before the rest is restored: " + String.Join(", ", steps));
-        Check(ran == 1 && feedback.Messages.Count == 1 && feedback.Result == "Disable refused: the inspection was cleared before the request ran", "The refusal is reported after the choice was cancelled: " + feedback.Result);
+        Check(ran == 1 && feedback.Messages.Count == 1 && feedback.Result == "Disable refused. The inspection was cleared before the request ran.", "The refusal is reported after the choice was cancelled: " + feedback.Result);
         // The kept refusal stays through a tab switch and a history move, until an object is inspected.
         feedback.View("object/0"); feedback.View("placement/1"); feedback.HistoryMoved();
         Check(feedback.Messages.Count == 1 && feedback.Messages[0].Kept, "The refusal stays readable until the next inspection");

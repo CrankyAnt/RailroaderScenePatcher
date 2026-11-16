@@ -236,8 +236,11 @@ namespace RailroaderScenePatcher {
             var found = Segment(id);
             return found == null ? Array.Empty<double>() : new double[] { (float)Native.Call(found, "GetLength") };
         }
-        public IReadOnlyList<MarkerRegistration> Registrations(object target) {
-            var m = MarkerOf(target);
+        public IReadOnlyList<MarkerRegistration> Registrations(object target) => RegistrationsOf(MarkerOf(target));
+        // Every graph entry under the marker's ID. An entry that a scene marker holding the ID registered names that
+        // marker's object as its owner, in a loaded scene or not, so the entry of another holder of a duplicate marker id
+        // is told apart from this marker's.
+        internal static IReadOnlyList<MarkerRegistration> RegistrationsOf(Component m) {
             var id = (string)Field(m, "id");
             var result = new List<MarkerRegistration>();
             foreach (DictionaryEntry bucket in (IDictionary)Field(Graph(), "_namedLocationsBySegmentId")) {
@@ -247,9 +250,38 @@ namespace RailroaderScenePatcher {
                 var at = Field(named, "Location");
                 var owner = Field(named, "ObjectValue");
                 var seg = Field(at, "segment");
-                result.Add(new MarkerRegistration((string)bucket.Key, new TrackLocation(seg == null ? null : (string)Field(seg, "id"), End(Field(at, "end")), (float)Field(at, "distance")), ReferenceEquals(owner, m)));
+                var holder = owner as Component;
+                var ownerObject = holder != null && holder.GetType().FullName == MarkerType && Field(holder, "id") as string == id ? holder.gameObject : null;
+                result.Add(new MarkerRegistration((string)bucket.Key, new TrackLocation(seg == null ? null : (string)Field(seg, "id"), End(Field(at, "end")), (float)Field(at, "distance")), ReferenceEquals(owner, m),
+                    ownerObject, ownerObject == null ? null : Name(ownerObject)));
             }
             return result;
+        }
+        // Every scene marker the current check may see that holds the marker's ID: the game removes a registration by ID
+        // from all of them. Outside the check of a marker being enabled, these are the loaded markers, as the inventory
+        // sees them. The relationship completes the set with the owners of the registrations under the ID.
+        public MarkerIdHolders IdHolders(object target) =>
+            HoldersOf((string)Field(MarkerOf(target), "id"), Resources.FindObjectsOfTypeAll(marker).OfType<Component>().Where(c => c != null && VisibleForCheck(c.gameObject)));
+        static string Name(GameObject g) => g.scene.name + "/" + BoardScene.PathOf(g.transform);
+        // The holders of an ID among these marker components: one holder per object, however many of its markers hold
+        // the ID, each named by its scene and path.
+        internal static MarkerIdHolders HoldersOf(string id, IEnumerable<Component> markers) =>
+            new MarkerIdHolders(id, markers.Where(c => c != null && Field(c, "id") as string == id).GroupBy(c => c.gameObject)
+                .Select(g => new MarkerIdHolder(g.Key, Name(g.Key), g.Any(c => ((Behaviour)c).isActiveAndEnabled))));
+        // The holder set of the guard for the inventory: the holders of the marker's ID among the discovery's loaded
+        // markers, completed by the owners of its registrations, as the relationship completes IdHolders.
+        internal static MarkerIdHolders HolderSet(Component m, IEnumerable<Component> markers) => HoldersOf((string)Field(m, "id"), markers).With(RegistrationsOf(m));
+        // The loaded marker components by ID, read once per discovery.
+        internal static Dictionary<string, List<Component>> MarkerIds() {
+            var ids = new Dictionary<string, List<Component>>(StringComparer.Ordinal);
+            var type = Native.Type(MarkerType);
+            if (type == null) return ids;
+            foreach (var c in Resources.FindObjectsOfTypeAll(type).OfType<Component>()) {
+                if (c == null || !Loaded(c.gameObject) || !(Field(c, "id") is string id) || String.IsNullOrEmpty(id)) continue;
+                if (!ids.TryGetValue(id, out var holders)) ids.Add(id, holders = new List<Component>());
+                holders.Add(c);
+            }
+            return ids;
         }
         public bool Registers(object target) { var m = MarkerOf(target); return ((Behaviour)m).isActiveAndEnabled; }
         public void SetLocation(object target, TrackLocation value) {

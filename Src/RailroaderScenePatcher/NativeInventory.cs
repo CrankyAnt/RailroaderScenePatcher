@@ -196,6 +196,9 @@ namespace RailroaderScenePatcher {
                 } catch { scanErrors++; }
             });
             HolderIndex setups = null;
+            // The loaded marker components by id, read once per discovery at the first marker that needs them. A failed
+            // read is not repeated: it is logged once and each marker shows it as an inspection note.
+            Func<Dictionary<string, List<Component>>> markerIds = null;
             HashSet<string> segmentIds = null;
             PhotoMarkers(true);
             string graphError = null;
@@ -214,6 +217,15 @@ namespace RailroaderScenePatcher {
                     ReadStarters();
                     LastReferrers = referrerError == null ? markerReferrers : null;
                     setups = TrackMarkerWorld.SetupHolders();
+                    Dictionary<string, List<Component>> ids = null; string idsError = null;
+                    markerIds = () => {
+                        if (ids != null) return ids;
+                        if (idsError == null) {
+                            try { return ids = TrackMarkerWorld.MarkerIds(); }
+                            catch (Exception e) { idsError = "the marker ids of the scene could not be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
+                        }
+                        throw new InvalidOperationException(idsError);
+                    };
                 },
                 Family,
                 () => {
@@ -223,9 +235,9 @@ namespace RailroaderScenePatcher {
                         if (lookup == null) throw new InvalidOperationException("Track segment lookup unavailable");
                         segmentIds = new HashSet<string>(lookup.Keys.Cast<object>().Select(Text), StringComparer.Ordinal);
                     } catch (Exception e) { graphError = e.GetBaseException().Message; }
-                    if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden);
+                    if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden, markerIds);
                 },
-                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden));
+                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden, markerIds));
             foreach (var step in steps) yield return step;
         }
         static bool Transient(Transform child, Transform root) {
@@ -233,8 +245,8 @@ namespace RailroaderScenePatcher {
             return false;
         }
         static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, Dictionary<UnityEngine.Object, List<string>> working, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal,
-            ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HashSet<GameObject> hidden) {
-            var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>();
+            ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HashSet<GameObject> hidden, Func<Dictionary<string, List<Component>>> markerIds) {
+            var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>(); var duplicate = new List<string>();
             // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
             // that is off while its culler shows its objects was switched off by the scene or by a patch.
             var enabled = AuthoredActivity.Enabled(go.activeSelf, culled.ContainsKey(go), !hidden.Contains(go));
@@ -287,6 +299,13 @@ namespace RailroaderScenePatcher {
                 // Every setup and car placement that reads a starter placement marker, with its cars and wreck setting.
                 bindings.AddRange(reading.Readers);
                 Registrations(marker, bindings);
+                // A duplicate marker id: every holder with its activity, and the owner of each registration under the
+                // marker id, with the guard's holder set. Which components hold the marker id is the discovery's; the rest
+                // is read now. These lines lead the dependencies: the first one says why the holders are listed.
+                if (markerIds != null) {
+                    markerIds().TryGetValue(Text(Field(marker, "id")), out var holders);
+                    duplicate.AddRange(TrackMarkerWorld.HolderSet(marker, (holders ?? new List<Component>()).Where(Loaded)).Dependencies(go));
+                }
             });
             if (TypeName(c) == Span) Read(() => {
                 bindings.Add("Span id=" + Text(Field(c, "id")));
@@ -422,7 +441,7 @@ namespace RailroaderScenePatcher {
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
-                bindings, dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only);
+                bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only);
         }
         // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.
         static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {

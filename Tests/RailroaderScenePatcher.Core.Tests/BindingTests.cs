@@ -112,9 +112,22 @@ class FakeMarkerWorld : ITrackMarkerWorld {
         return String.IsNullOrEmpty(m.Segment) ? null : new TrackLocation(m.Segment, m.End, m.Distance);
     }
     public IReadOnlyList<double> SegmentLengths(string segment) => Segments.TryGetValue(segment, out var lengths) ? lengths : new List<double>();
+    // An entry names its owner when a scene marker that holds the ID owns it, as the native graph keeps the marker it registered.
     public IReadOnlyList<MarkerRegistration> Registrations(object target) {
         var m = (FakeMarker)target;
-        return Buckets.Where(b => b.Value.ContainsKey(m.Id)).Select(b => new MarkerRegistration(b.Key, new TrackLocation(b.Key, b.Value[m.Id].end, b.Value[m.Id].distance), ReferenceEquals(b.Value[m.Id].owner, m))).ToList();
+        return Buckets.Where(b => b.Value.ContainsKey(m.Id)).Select(b => new MarkerRegistration(b.Key, new TrackLocation(b.Key, b.Value[m.Id].end, b.Value[m.Id].distance), ReferenceEquals(b.Value[m.Id].owner, m),
+            b.Value[m.Id].owner is FakeMarker owner && owner.Id == m.Id ? owner : null, b.Value[m.Id].owner is FakeMarker named && named.Id == m.Id ? NameOf(named) : null)).ToList();
+    }
+    // A marker's name: its path, or for a marker outside the loaded objects, such as one in a scene that is not loaded, its name there.
+    public Dictionary<FakeMarker, string> Unloaded = new Dictionary<FakeMarker, string>();
+    string NameOf(FakeMarker m) {
+        var path = Objects.FirstOrDefault(o => o.Value.Contains(m)).Key;
+        return path ?? (Unloaded.TryGetValue(m, out var name) ? name : null);
+    }
+    // Every scene marker with the marker's ID, named by its path.
+    public MarkerIdHolders IdHolders(object target) {
+        var id = ((FakeMarker)target).Id;
+        return new MarkerIdHolders(id, Objects.SelectMany(o => o.Value.Cast<FakeMarker>().Where(m => m.Id == id).Select(m => new MarkerIdHolder(m, o.Key, Registers(m)))));
     }
     public bool Registers(object target) => ((FakeMarker)target).Active;
     public void SetLocation(object target, TrackLocation location) {
