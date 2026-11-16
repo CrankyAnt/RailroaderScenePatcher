@@ -281,7 +281,8 @@ namespace RailroaderScenePatcher {
             candidates = Array.Empty<SpatialCandidate>();
         }
 
-        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing) {
+        // trackPoint is the inspected starter placement marker's track point in map coordinates, or null.
+        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null) {
             if (Event.current.type != EventType.Repaint || (Pending == null && inspected == null)) return;
             var camera = Camera.main;
             if (camera == null) return;
@@ -289,7 +290,13 @@ namespace RailroaderScenePatcher {
             // The confirmed relation belongs to the object it was chosen for, and is not the inspected object itself.
             var relation = (Pending == null || (source != null && ReferenceEquals(source.Choice.Handle, confirmedFor))) && session.Confirmed != null && confirmedMark != null && inspected != null &&
                 (confirmedFor == null || ReferenceEquals(confirmedFor, inspected.Handle)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
-            overlay.Draw(candidates, Pending, original, source != null, relation, Followed(inspected), Bound(inspected), camera, WorldOffset(), covered, backing);
+            // The track point is its own marking, apart from the object's: a car placement reads that point, not the
+            // object position. Its evidence tells it from the object's own candidate.
+            var point = inspected != null && trackPoint != null && trackPoint.Length == 3
+                ? new SpatialCandidate(new SelectionCandidate(inspected.Handle, SelectionIdentity.SceneObject(inspected.Identity), inspected.Family + ": " + inspected.Identity.Path, "track point"),
+                    new[] { new Vector3((float)trackPoint[0], (float)trackPoint[1], (float)trackPoint[2]) }, null)
+                : null;
+            overlay.Draw(candidates, Pending, original, source != null, relation, Followed(inspected), Bound(inspected), camera, WorldOffset(), covered, backing, point);
         }
 
         static Vector3 WorldOffset() =>

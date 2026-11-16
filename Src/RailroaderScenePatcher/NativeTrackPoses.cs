@@ -38,6 +38,23 @@ namespace RailroaderScenePatcher {
             }
             return found.ToArray();
         }
+        // The map position of a marker's serialized track location on the loaded graph: where a new-game car placement
+        // puts the front of its cut. Null for an empty location or one that does not resolve. The marker's object
+        // position plays no part.
+        internal double[] MarkerPoint(GameObject go) {
+            var marker = go == null ? null : go.GetComponent(Native.Type("Track.TrackMarker"));
+            if (marker == null) return null;
+            try {
+                var at = Native.Read(marker, "_location");
+                var segment = Native.Read(at, "segmentId") as string;
+                if (String.IsNullOrEmpty(segment)) return null;
+                var end = Convert.ToString(Native.Read(at, "end")) == "A" ? "a" : "b";
+                return TrackPose(TrackAnchor.At(new TrackLocation(segment, end, (float)Native.Read(at, "distance")))).Position;
+            } catch (Exception) {
+                // An unreadable location, a missing segment or a distance beyond the segment: no track point.
+                return null;
+            }
+        }
         public TrackPose TrackPose(TrackAnchor anchor) {
             var shared = Native.Read(graph, "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
             if (anchor.Node != null) {

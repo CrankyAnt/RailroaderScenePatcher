@@ -117,7 +117,7 @@ namespace RailroaderScenePatcher {
                 accessory(row);
             }).Height(RowHeight);
             if (block != null) {
-                var line = Line(builder, Literal(CommandBand.RunningLine(labels, values.Skip(first).Take(labels.Length).ToArray(), unit)), caption, block, 30);
+                var line = Line(builder, Literal(CommandBand.RunningLine(labels, values.Skip(first).Take(labels.Length).ToArray(), unit)), caption, CommandBand.Sentence(block), 30);
                 return line.GetComponentInChildren<TMP_Text>(true);
             }
             builder.HStack(row => {
@@ -264,9 +264,10 @@ namespace RailroaderScenePatcher {
                 var select = CommandBand.SelectInWorld(selection != null, pending);
                 Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
                     .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
-                var focus = CommandBand.Focus(selected != null);
+                var focus = CommandBand.Focus(selected != null, FocusUnavailable());
+                var starter = selected != null && selected.Family == StarterPlacements.Family;
                 Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Inactive(focus != null)
-                    .Tooltip("Focus", CommandBand.Tooltip("Move the camera to the inspected object. Focus selects nothing.", focus));
+                    .Tooltip("Focus", CommandBand.Tooltip(starter ? "Move the camera to the marker's track point, where the start setup places its cars. Focus selects nothing." : "Move the camera to the inspected object. Focus selects nothing.", focus));
                 // Beside Focus, as the native Map Editor has Focus and Clear on its selection row.
                 var clear = CommandBand.Clear(selected != null, pending);
                 Button(row, "Clear", ClearInspection).Inactive(clear != null)
@@ -520,6 +521,14 @@ namespace RailroaderScenePatcher {
             if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
             FieldLabel(builder, "Supported edits");
             PlainLabel(builder, selected.Operations);
+            // A starter placement marker names every setup and car placement that reads it, with the cars and the wreck
+            // setting of each.
+            if (selected.Family == StarterPlacements.Family) {
+                Section(builder, "Read by");
+                var readers = selected.Bindings.Where(IsReader).ToArray();
+                if (readers.Length == 0) Line(builder, "No active setup", null, null);
+                foreach (var line in readers) PlainLabel(builder, line.Substring("Read by ".Length));
+            }
             Section(builder, "Identity");
             Field(builder, "Scene", selected.Identity.Scene);
             Field(builder, "Component", selected.Identity.Component);
@@ -533,6 +542,7 @@ namespace RailroaderScenePatcher {
             if (selected.RuntimeState.Count == 0) Line(builder, "None observed", null, null);
             foreach (var line in selected.RuntimeState) PlainLabel(builder, Breakable(line));
         }
+        static bool IsReader(string line) => line.StartsWith(StarterPlacements.ReaderPrefix, StringComparison.Ordinal);
         // A path wraps after a separator instead of in the middle of a name.
         static string Breakable(string path) => (path ?? "").Replace("/", "/\u200B");
         bool FollowsGroup => selected != null && selected.Bindings.Any(b => b.IndexOf("follows track group", StringComparison.OrdinalIgnoreCase) >= 0 || b.IndexOf("targetActiveFollowsTrackGroup=True", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -542,6 +552,13 @@ namespace RailroaderScenePatcher {
             // A crossing pad has no placement of its own, and an object that cannot be edited has none to set: the tab
             // shows the placement, and no other mode is open.
             if (IsPad || !Editable) placementMode = CommandBand.NumericMode;
+            // A new-game car placement puts its cars at the marker's track point, which the world marks in gold; the
+            // object position below plays no part in it.
+            if (selected.Family == StarterPlacements.Family) {
+                var point = InspectedTrackPoint();
+                Field(builder, "Track point", point == null ? "None: " + (FocusUnavailable() ?? StarterPlacements.NoTrackPoint) : String.Join(", ", point.Select(CommandBand.Number)))
+                    .Tooltip("Track point", "Where the start setup places the front of this marker's car cut, in map coordinates. Focus goes here.");
+            }
             var tips = new[] { "Enter a position in map coordinates and a rotation in degrees.", "Drag the native Move or Rotate gizmo in the world.",
                 "Move the object once onto a chosen track or endpoint.", "Keep the object's pose relative to a chosen track or endpoint." };
             builder.AddSegmentedControlCompact(segments => {
@@ -678,18 +695,19 @@ namespace RailroaderScenePatcher {
             }
         }
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
-        // adapter refuses, such as a milepost's, or that the operation is for markers and pads.
+        // adapter refuses, such as a milepost's, or that the operation is for markers and pads. It is one plain sentence
+        // (CommandBand.Sentence): the tooltip's Unavailable: and the section it stands in name what is unavailable.
         string BindingUnavailable() {
-            // A marker or pad the adapter refuses says why under Supported edits.
+            // A marker or pad the adapter refuses says why under Supported edits; so does a starter placement marker.
             var family = selected?.Family;
-            if ((family == "Track marker" || family == "Crossing pad marker") && CommandBand.Refusal(selected.Operations) is string reason)
-                return (family == "Track marker" ? "Track binding unavailable: " : "Pad binding unavailable: ") + reason;
+            if ((family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker") && CommandBand.Refusal(selected.Operations) is string reason)
+                return CommandBand.Sentence(reason);
             // A milepost holds a marker too, but the inventory lists it as a milepost and records no binding problem for
             // it: ask the marker adapter why it refuses this object.
             try {
                 if (selected?.Handle is GameObject target && target != null && target.GetComponents<Component>().Any(c => c != null && c.GetType().FullName == TrackMarkerWorld.MarkerType)) {
                     var refusal = TrackMarkerWorld.Problem(target, NativeInventory.LastReferrers, null);
-                    if (refusal != null) return "Track binding unavailable: " + refusal;
+                    if (refusal != null) return CommandBand.Sentence(refusal);
                 }
             } catch { }
             return "Track binding applies to Generic track markers and crossing pads.";
@@ -711,7 +729,9 @@ namespace RailroaderScenePatcher {
             var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure;
             var block = marker ? EditBlock() : BindingUnavailable();
             Section(builder, "Replacement targets");
-            var busy = !marker && !coverage ? "Replacement targets serve a track binding or a crossing's coverage." : selection == null ? "World selection is unavailable." : ChoiceBlock;
+            // A starter placement marker gives its own reason: its track location belongs to the starter placement workflow.
+            var busy = selected.Family == StarterPlacements.Family ? CommandBand.EditReason(selected.Operations)
+                : !marker && !coverage ? "Replacement targets serve a track binding or a crossing's coverage." : selection == null ? "World selection is unavailable." : ChoiceBlock;
             builder.HStack(row => {
                 Button(row, "Object", () => BeginSelection(SelectionKind.SceneObject, selected)).Inactive(busy != null).Tooltip("Replacement object", CommandBand.Tooltip("Choose a replacement object in the world and confirm its identity.", busy));
                 Button(row, "Segment", () => BeginSelection(SelectionKind.TrackSegment, selected)).Inactive(busy != null).Tooltip("Replacement segment", CommandBand.Tooltip("Choose a track segment in the world and confirm its identity.", busy));
@@ -725,7 +745,7 @@ namespace RailroaderScenePatcher {
             if (current.Length == 0) Line(builder, "None", null, null);
             foreach (var line in current) BindingFields(builder, line);
             Section(builder, "Observed bindings");
-            var others = selected.Bindings.Where(line => !current.Contains(line)).ToArray();
+            var others = selected.Bindings.Where(line => !current.Contains(line) && !IsReader(line)).ToArray();
             if (others.Length == 0) Line(builder, "None observed", null, null);
             foreach (var line in others) BindingFields(builder, line);
         }

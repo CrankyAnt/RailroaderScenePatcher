@@ -216,7 +216,7 @@ namespace RailroaderScenePatcher {
             shapes.Add(shape);
         }
         internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed, SpatialCandidate followed,
-            IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing) {
+            IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing, SpatialCandidate trackPoint = null) {
             covered = uiBounds;
             labels.Clear();
             budget.Begin();
@@ -280,6 +280,17 @@ namespace RailroaderScenePatcher {
                     // Red marks only the broken item: the label's rule, not the frame of the inspected object.
                     if (broken) shape.Rule = Broken;
                     shapes.Add(shape);
+                }
+            }
+            // The inspected starter placement marker's track point: gold as the inspected object, on the track, where the
+            // start setup places the front of the marker's car cut.
+            if (trackPoint != null) {
+                var point = Project(trackPoint, camera, origin);
+                if (point != null) {
+                    point.Color = Gold;
+                    point.Detailed = true;
+                    point.Text = "Track point: " + Short(trackPoint.Choice.Label);
+                    shapes.Add(point);
                 }
             }
             // The current relations of the inspected object stay marked in green while it is inspected: a target

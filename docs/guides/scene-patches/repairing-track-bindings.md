@@ -21,7 +21,7 @@ A Generic marker inside a grade-crossing setup, such as a whistle sign under a `
 
 Each of these refusals names a consumer of the marker's location that a binding edit would leave behind. For an object whose activity follows its track group, a binding edit also moves that group subscription to the new segment's group; see [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
-The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. For any other marker, **Supported edits** on the **Object** tab reads **Not editable:** with the reason. A marker of another type than Generic, and a starter placement marker that a new-game setup uses, stand in the **Inspection only** group of the outliner instead. Crossing pads have their own operation, described in [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md). Mileposts have their own later operation; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
+The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. For any other marker, **Supported edits** on the **Object** tab reads **Not editable:** with the reason. A marker of another type than Generic stands in the **Inspection only** group of the outliner instead, and a starter placement marker stands in its own **Starter placement** family, described in [inspect scene objects](inspect-scene-objects.md#starter-placement-markers). Crossing pads have their own operation, described in [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md). Mileposts have their own later operation; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
 
 ## Set or replace the binding in the native map editor
 
@@ -91,7 +91,7 @@ The game reads a Generic marker's binding in these places:
 
 - Track scripts look a marker up by ID in the graph registration, and fall back to the marker's stored location.
 - The map dims a label below a marker by the track group of the marker's location, cached when the label registers. The patcher refreshes that cache.
-- A new-game car placement reads its marker's location when the setup runs. The patcher refuses such a marker.
+- A new-game car placement reads its marker's location when the setup runs. Such a marker is a starter placement marker with its own family; see [starter placement markers](inspect-scene-objects.md#starter-placement-markers).
 - The flare and planner queries read registrations of their own marker types, not of Generic markers.
 - `Track.TrackRelativePosition` moves its object only when its relative placement is configured again. In the game, map objects do that, not the inherited scene signs.
 

@@ -116,14 +116,26 @@ namespace RailroaderScenePatcher {
             } catch { }
             return photoMarkers = found;
         }
+        // The car placements of the loaded setups as the last discovery read them. A single object observed later is
+        // classified by them, as it takes the reference scan of that discovery. Setups that could not be read classify
+        // no marker as a starter placement marker; every marker then carries a note that says so.
+        static StarterSetups starters = new StarterSetups(null);
+        // Why the last discovery could not read the setups, or null: the Refresh reports it.
+        internal static string StartersError => starters.Error;
+        static void ReadStarters() {
+            try { starters = TrackMarkerWorld.StarterSetups(); }
+            catch (Exception e) { starters = StarterSetups.Unreadable(e.GetBaseException().Message); }
+        }
         static string Family(Component c) {
             var type = TypeName(c); var go = c.gameObject;
             if (type == Milepost) return "Milepost";
             if (type == Marker) {
                 // Kinds the inventory does not list: signals, map objects whose track anchor the native map editor owns, and
-                // the builder photo marker.
-                if (!BindingRules.Listed(MarkerKind(c), Get(go, MapObject) != null, PhotoMarkers().Contains(c))) return null;
-                return Get(go, Milepost) != null ? null : Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker";
+                // the builder photo marker. A milepost's marker is part of the Milepost row.
+                if (!BindingRules.Listed(MarkerKind(c), Get(go, MapObject) != null, PhotoMarkers().Contains(c)) || Get(go, Milepost) != null) return null;
+                // A marker an active setup's car placement holds is a starter placement marker; one only inactive
+                // setups hold is never read and stays out of the inventory. A marker no setup holds keeps its kind.
+                return starters.Family(c, Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker");
             }
             if (type == Relative && Get(go, Marker) == null) return "Track-relative scene object";
             if (type == Span) return "Track span";
@@ -183,7 +195,7 @@ namespace RailroaderScenePatcher {
                     }
                 } catch { scanErrors++; }
             });
-            HolderIndex setups = null, activeSetups = null;
+            HolderIndex setups = null;
             HashSet<string> segmentIds = null;
             PhotoMarkers(true);
             string graphError = null;
@@ -198,9 +210,10 @@ namespace RailroaderScenePatcher {
                 },
                 () => {
                     if (walk != null) markerReferrers = walk.Finish();
+                    // The setups first, so the classification below never uses those of an earlier discovery.
+                    ReadStarters();
                     LastReferrers = referrerError == null ? markerReferrers : null;
                     setups = TrackMarkerWorld.SetupHolders();
-                    activeSetups = TrackMarkerWorld.ActiveSetupHolders();
                 },
                 Family,
                 () => {
@@ -210,9 +223,9 @@ namespace RailroaderScenePatcher {
                         if (lookup == null) throw new InvalidOperationException("Track segment lookup unavailable");
                         segmentIds = new HashSet<string>(lookup.Keys.Cast<object>().Select(Text), StringComparer.Ordinal);
                     } catch (Exception e) { graphError = e.GetBaseException().Message; }
-                    if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, activeSetups, hidden);
+                    if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden);
                 },
-                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, activeSetups, hidden));
+                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden));
             foreach (var step in steps) yield return step;
         }
         static bool Transient(Transform child, Transform root) {
@@ -220,7 +233,7 @@ namespace RailroaderScenePatcher {
             return false;
         }
         static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, Dictionary<UnityEngine.Object, List<string>> working, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal,
-            ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HolderIndex activeSetups, HashSet<GameObject> hidden) {
+            ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HashSet<GameObject> hidden) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>();
             // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
             // that is off while its culler shows its objects was switched off by the scene or by a patch.
@@ -262,15 +275,17 @@ namespace RailroaderScenePatcher {
             if (marker != null) Read(() => {
                 var kind = Text(Field(marker, "type"));
                 bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + kind);
-                // What the game needs from this kind's binding decides whether its state is a problem.
-                var read = false;
-                try { read = activeSetups != null && activeSetups.Holds(marker); } catch { }
+                // What the game needs from this kind's binding decides whether its state is a problem; the setups say
+                // whether a new-game car placement reads it whatever its activity, and which ones do.
+                var reading = starters.Reading(marker, kind, family == "Crossing pad marker");
+                if (reading.Note != null) problems.Add(reading.Note);
                 var follower = Get(go, Relative);
                 var follows = follower != null && Field(follower, "targetActiveFollowsTrackGroup") is bool flag && flag;
-                var need = BindingRules.Need(kind, family == "Crossing pad marker", read);
                 var before = problems.Count;
-                MarkerLocation(Field(marker, "_location"), need, enabled, follows, bindings, problems, segmentIds, graphError);
-                if (need == BindingNeed.ReadAnyway) anyway.AddRange(problems.Skip(before));
+                MarkerLocation(Field(marker, "_location"), reading.Need, enabled, follows, bindings, problems, segmentIds, graphError);
+                if (reading.Need == BindingNeed.ReadAnyway) anyway.AddRange(problems.Skip(before));
+                // Every setup and car placement that reads a starter placement marker, with its cars and wreck setting.
+                bindings.AddRange(reading.Readers);
                 Registrations(marker, bindings);
             });
             if (TypeName(c) == Span) Read(() => {
@@ -375,18 +390,18 @@ namespace RailroaderScenePatcher {
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
             var coverageEditable = crossing && coverageRefusal == null;
             // A kind no supported family covers is inspection only, which is another state than an object of a supported
-            // family that cannot be edited: a marker of another type than Generic, a starter placement marker that a
-            // new-game setup uses, and every family without an edit.
+            // family that cannot be edited: a marker of another type than Generic, and every family without an edit.
+            // A starter placement marker is a supported kind with its own workflow.
+            var starter = family == StarterPlacements.Family;
             string only = null;
             if (marked) Read(() => {
                 var type = MarkerKind(marker);
                 if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
-                else if (setups != null && setups.Holds(marker)) only = CommandBand.NotYetSupported("starter placement markers that a new-game setup uses");
             });
-            else if (!board && !bridge && !pad && !crossing) only = CommandBand.NotYetSupported("the " + family + " family");
+            else if (!board && !bridge && !pad && !crossing && !starter) only = CommandBand.NotYetSupported("the " + family + " family");
             if (only != null) markerEditable = false;
             var structure = only != null ? null : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
-            var operations = only != null ? only : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
+            var operations = only != null ? only : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight" : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
                 : marked ? CommandBand.NotEditable(markerRefusal)

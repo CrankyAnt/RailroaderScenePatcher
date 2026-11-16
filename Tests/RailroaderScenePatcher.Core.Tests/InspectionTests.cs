@@ -529,8 +529,8 @@ static class InspectionTests {
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed) == "2 of 4 objects", "The count line names how many objects the filters show: " + RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed));
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", all, changed) == "4 of 4 objects", "The unfiltered outliner counts every entry");
         var groups = RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", all, changed));
-        Check(groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))).SequenceEqual(new[] { "Bridge:Ela", "Independent board:Board", "Track marker:Sign,Post" }),
-            "Rows are grouped by family in name order, each row named by its object and kept in inventory order");
+        Check(groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))).SequenceEqual(new[] { "Bridge:Ela", "Independent board:Board", "Track marker:Post,Sign" }),
+            "Rows are grouped by family in name order, each row named by its object, rows in name order");
         var presentation = new RailroaderScenePatcher.InventoryPresentationState();
         Check(presentation.Observe(inventory, null, "", all, "1") && !presentation.Observe(inventory, null, "", all, "1"), "A settled outliner does not rebuild");
         Check(presentation.Observe(inventory, null, "", problems, "1"), "Switching a filter rebuilds the outliner");
@@ -1033,7 +1033,7 @@ static class InspectionTests {
             .Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))));
         var all = RailroaderScenePatcher.OutlinerFilter.All;
         // One group, after the family groups, whatever the families of its entries.
-        Check(Shape(all) == "Independent board:Board | Track marker:Sign,Refused | Inspection only:Post 1,Span", "Inspection only entries leave their families for one group after the family groups: " + Shape(all));
+        Check(Shape(all) == "Independent board:Board | Track marker:Refused,Sign | Inspection only:Post 1,Span", "Inspection only entries leave their families for one group after the family groups, rows in name order: " + Shape(all));
         Check(RailroaderScenePatcher.InventoryPresentationState.InspectionOnlyGroup == "Inspection only", "The group is named Inspection only");
         // The group is not shown while it holds no entry.
         Check(Shape(all, "sign") == "Track marker:Sign" && Shape(RailroaderScenePatcher.OutlinerFilter.Problems) == "Track marker:Sign", "The group is absent while it holds no entry: " + Shape(all, "sign"));

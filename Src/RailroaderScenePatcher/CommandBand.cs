@@ -51,15 +51,34 @@ namespace RailroaderScenePatcher {
         // selection that could not be set up at all has nothing to start.
         internal static string SelectInWorld(bool available, bool pending) =>
             !available ? "World selection is unavailable." : pending ? "Confirm or cancel the pending world choice first." : null;
-        internal static string Focus(bool inspected) => inspected ? null : "Inspect an object first.";
+        // Focus is also disabled, with its reason, when the inspected object has no point to go to, such as a starter
+        // placement marker whose track location does not resolve.
+        internal static string Focus(bool inspected, string noTarget = null) => !inspected ? "Inspect an object first." : String.IsNullOrEmpty(noTarget) ? null : noTarget;
         // Copy ID is also disabled, with the editing session's refusal, while the edited mod's patch document cannot be read.
         internal static string CopyId(bool inspected, string refusal = null) => inspected ? refusal : "Inspect an object first.";
         // Clear ends the inspection and cancels a pending world choice: it is disabled only when there is neither.
         internal static string Clear(bool inspected, bool pending) => inspected || pending ? null : "Nothing is inspected and no world choice is pending.";
         // The tooltip of a control: what it does, and when it cannot be used now, also why. A disabled control keeps its
         // description, so two disabled controls with one reason still say what each would do.
+        // The reason follows the one label Unavailable: as a plain sentence (Sentence), without a label of its own.
         internal static string Tooltip(string description, string reason) =>
-            String.IsNullOrEmpty(reason) ? description : String.IsNullOrEmpty(description) ? reason : description + "\nUnavailable: " + reason;
+            String.IsNullOrEmpty(reason) ? description : String.IsNullOrEmpty(description) ? Sentence(reason) : description + "\nUnavailable: " + Sentence(reason);
+        // The labels a reason can carry where it is stored or shown on its own: under Supported edits, or in the
+        // reason of a binding that cannot be set.
+        static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Track binding unavailable: ", "Pad binding unavailable: " };
+        // A reason as one plain sentence after a label such as "Unavailable:", without a label of its own, starting with a
+        // capital and ending with a full stop.
+        internal static string Sentence(string reason) {
+            var text = (reason ?? "").Trim();
+            for (var stripped = true; stripped;) {
+                stripped = false;
+                foreach (var label in ReasonLabels)
+                    if (text.StartsWith(label, StringComparison.Ordinal)) { text = text.Substring(label.Length).TrimStart(); stripped = true; }
+            }
+            if (text.Length == 0) return text;
+            text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
+            return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
+        }
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit";
@@ -234,11 +253,12 @@ namespace RailroaderScenePatcher {
         internal static string RunningLine(IReadOnlyList<string> labels, IReadOnlyList<string> values, string unit) =>
             String.Join("  ", labels.Select((label, i) => label + " " + (i < values.Count && !String.IsNullOrWhiteSpace(values[i]) ? values[i].Trim() : "-"))) + (unit == null ? "" : " (" + unit + ")");
         // Why the inspected object cannot be edited, as the yellow message and every "Unavailable:" tooltip give it:
-        // the object's own reason, which the Object tab shows under Supported edits, and not a pointer to that tab.
+        // the object's own reason, which the Object tab shows under Supported edits, and not a pointer to that tab. It is
+        // one plain sentence: the message's source and the tooltip's Unavailable: are its only label.
         internal static string EditReason(string operations) {
             var own = operations?.Trim();
             if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
-            return own.EndsWith(".", StringComparison.Ordinal) ? own : own + ".";
+            return Sentence(own);
         }
         const string NotYetSupportedPrefix = "Not yet supported: ";
         // Every number the panel shows or fills a field with: metres and degrees to three decimals, without trailing

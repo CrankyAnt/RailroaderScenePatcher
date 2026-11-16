@@ -766,7 +766,7 @@ namespace RailroaderScenePatcher {
                     worldLabelBacking = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
                     worldLabelBacking.SetPixel(0, 0, new Color(.106f, .098f, .086f, 1)); worldLabelBacking.Apply();
                 }
-                selection.Draw(selected, presentation.WorldUiBounds(), worldLabelBacking);
+                selection.Draw(selected, presentation.WorldUiBounds(), worldLabelBacking, InspectedTrackPoint());
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
@@ -1141,6 +1141,9 @@ namespace RailroaderScenePatcher {
                 }
                 documentInspection = String.Join("\n", lines);
                 definitions.Read(documents);
+                // Setups that could not be read leave every marker in its own family; each marker notes it, and the
+                // diagnostics say it once for the inventory.
+                if (NativeInventory.StartersError != null) MapEditorDiagnostic(StarterPlacements.Unreadable(NativeInventory.StartersError));
                 status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
@@ -1153,11 +1156,41 @@ namespace RailroaderScenePatcher {
             try {
                 if (!(entry.Handle is GameObject target) || target == null) throw new InvalidOperationException("the inspected object no longer exists; select Refresh and inspect it again");
                 var map = NativeInventory.MapPosition(target.transform);
-                var point = FocusTarget.Point(entry.Family, new double[] { map.x, map.y, map.z },
-                    entry.Family == FocusTarget.Span && trackPoses != null ? trackPoses.SpanPositions(target) : null, out var refusal);
+                var point = FocusTarget.Point(entry.Family, new double[] { map.x, map.y, map.z }, TrackPoints(entry), out var refusal);
                 if (point == null) throw new InvalidOperationException(refusal);
                 JumpTo(new Vector3((float)point[0], (float)point[1], (float)point[2]));
             } catch (Exception e) { feedback.Report("Focus", "Focus refused: " + e.GetBaseException().Message); }
+        }
+        // The track points of an object whose Focus target is on the track, in map coordinates: a track span's locations,
+        // a starter placement marker's track point. Null for any other object.
+        double[][] TrackPoints(SceneObservation entry) {
+            if (trackPoses == null || !(entry?.Handle is GameObject target) || target == null) return null;
+            if (entry.Family == FocusTarget.Span) return trackPoses.SpanPositions(target);
+            if (entry.Family != StarterPlacements.Family) return null;
+            var point = trackPoses.MarkerPoint(target);
+            return point == null ? new double[0][] : new[] { point };
+        }
+        // The starter placement marker's track point while it is inspected, and why there is none, read once per frame:
+        // the world marks it in gold, the Placement tab shows it and Focus is disabled without it.
+        int trackPointFrame = -1; object trackPointOf; double[] trackPoint; string trackPointMissing;
+        internal double[] InspectedTrackPoint() {
+            if (selected == null || selected.Family != StarterPlacements.Family) return null;
+            if (trackPointFrame != Time.frameCount || !ReferenceEquals(trackPointOf, selected.Handle)) {
+                trackPointFrame = Time.frameCount; trackPointOf = selected.Handle;
+                trackPoint = null;
+                if (trackPoses == null) trackPointMissing = "the track graph is unavailable in this game build";
+                else if (!(selected.Handle is GameObject target) || target == null) trackPointMissing = "the inspected object no longer exists; select Refresh and inspect it again";
+                else {
+                    try { trackPoint = TrackPoints(selected)?.FirstOrDefault(); } catch { trackPoint = null; }
+                    trackPointMissing = trackPoint == null ? StarterPlacements.NoTrackPoint : null;
+                }
+            }
+            return trackPoint;
+        }
+        // Why Focus has no target for the inspected object, or null: a starter placement marker without a track point.
+        string FocusUnavailable() {
+            if (selected == null || selected.Family != StarterPlacements.Family) return null;
+            return InspectedTrackPoint() == null ? trackPointMissing : null;
         }
         static void JumpTo(Vector3 position) {
             var type = Native.Type("CameraSelector");

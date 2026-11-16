@@ -160,14 +160,29 @@ namespace RailroaderScenePatcher {
         // The markers that new-game setup car placements hold, walked in the order the per-marker check walked them: each
         // setup's placements, then each placement's marker. The walk runs once, at the first marker that reaches the check.
         internal static HolderIndex SetupHolders() => HolderIndex.Lazy(() => SetupPlacementMarkers(Loaded));
-        // The markers of the setups the game reads at a new game: it takes an active setup descriptor, so a setup that
-        // is switched off does not count.
-        internal static HolderIndex ActiveSetupHolders() => HolderIndex.Lazy(() => SetupPlacementMarkers(g => Loaded(g) && g.activeInHierarchy));
         static IEnumerable<object> SetupPlacementMarkers(Func<GameObject, bool> include) {
             foreach (var setup in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && include(c.gameObject) && c.GetType().FullName == SetupType))
                 if (Field(setup, "placements") is IEnumerable placements)
                     foreach (var placement in placements)
                         if (placement != null) yield return Field(placement, "marker");
+        }
+        // Every car placement of every loaded setup, with the setup's identifier and activity, the cars of the cut and
+        // the wreck setting, in the order the setups and their placements are read. An unreadable setup throws, so a
+        // discovery never classifies markers by part of the setups.
+        internal static StarterSetups StarterSetups() {
+            var found = new List<StarterCarPlacement>();
+            foreach (var setup in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && Loaded(c.gameObject) && c.GetType().FullName == SetupType)) {
+                var name = Field(setup, "identifier") as string;
+                var active = setup.gameObject.activeInHierarchy;
+                var placements = (Field(setup, "placements") as IEnumerable)?.Cast<object>().ToArray() ?? new object[0];
+                for (var i = 0; i < placements.Length; i++) {
+                    var placement = placements[i];
+                    if (placement == null) continue;
+                    var cars = Field(placement, "carIdentifier") as string[];
+                    found.Add(new StarterCarPlacement(String.IsNullOrEmpty(name) ? setup.gameObject.name : name, active, i, placements.Length, Field(placement, "marker"), cars, Field(placement, "wreck") is bool wreck && wreck));
+                }
+            }
+            return new StarterSetups(found);
         }
         static string Describe(object owner) => owner is Component c && c != null ? c.GetType().FullName + " on " + BoardScene.PathOf(c.transform) : System.Convert.ToString(owner);
         // Why the object does not conform to the supported Generic-marker pattern, or null. Shared with the inventory,
@@ -198,9 +213,10 @@ namespace RailroaderScenePatcher {
                 if (!ReferenceEquals(Field(relative, "targetTransform"), go.transform)) return "The object's activity follows a track group through another object; only a follower that activates itself is supported";
                 if (Field(relative, "_setTargetActive") is Delegate callback && !(callback.Target is HoldTarget)) return "Another component replaced the track-group activation of this object; that consumer is not supported";
             }
-            // A new-game setup car placement reads its marker's location when the setup runs; its timing relative to patch application is unverified.
+            // A new-game setup car placement reads its marker's location when the setup runs: the starter placement
+            // workflow edits that location with the whole car cut, so this capability leaves the marker alone.
             if (placementOnly) return null;
-            if ((setups ?? SetupHolders()).Holds(m)) return "A new-game car placement reads this marker's location; that consumer is not supported";
+            if ((setups ?? SetupHolders()).Holds(m)) return StarterPlacements.MarkerCapabilityRefusal;
             // The colocated relative position holds its marker; any other holder of the component may cache what it read.
             if (references == null) return "The direct-reference scan is unavailable; other holders of this marker are unknown";
             return references.Refusal(m, allowed, Describe);

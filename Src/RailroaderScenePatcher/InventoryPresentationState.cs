@@ -46,10 +46,11 @@ namespace RailroaderScenePatcher {
         // The group of the objects that are inspection only: outside the family groups, after them, and absent while
         // it holds no entry.
         internal const string InspectionOnlyGroup = "Inspection only";
-        // The rows under their family, families in name order, rows in the order given. The rows that are inspection
-        // only leave their families for the one Inspection only group at the end, whatever their family.
+        // The rows under their family, families in name order, rows in the order of their names and then their paths, so
+        // two lists of one family compare row by row. The rows that are inspection only leave their families for the one
+        // Inspection only group at the end, whatever their family, in the same order.
         internal static IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>> Groups(IEnumerable<SceneObservation> rows) {
-            var listed = (rows ?? Array.Empty<SceneObservation>()).ToArray();
+            var listed = (rows ?? Array.Empty<SceneObservation>()).OrderBy(Name, StringComparer.OrdinalIgnoreCase).ThenBy(row => row.Identity.Path, StringComparer.Ordinal).ToArray();
             var groups = listed.Where(row => row.InspectionOnly == null).GroupBy(row => row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(group.Key, group.ToArray())).ToList();
             var only = listed.Where(row => row.InspectionOnly != null).ToArray();

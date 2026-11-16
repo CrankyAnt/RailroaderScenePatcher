@@ -21,7 +21,34 @@ static class CommandBandTests {
         ClearActivityNeedsAnActivityValue();
         AClosedPanelCancelsTheWaitingRequest();
         SharedRulesHoldAtEveryCallSite();
+        ReasonsReadAsOnePlainSentence();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
+    // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
+    static void ReasonsReadAsOnePlainSentence() {
+        var starter = "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; editing the track location and the wreck setting is not available in this version.";
+        foreach (var row in new[] {
+            new[] { StarterPlacements.Operations, starter },
+            new[] { CommandBand.EditReason(StarterPlacements.Operations), starter },
+            new[] { CommandBand.ModeBlock(CommandBand.GizmoMode, false, false, StarterPlacements.Operations), starter },
+            new[] { "Track binding unavailable: " + CommandBand.Refusal(StarterPlacements.Operations), starter },
+            new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "The patcher has no edit for the Milepost family yet." },
+            new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The patcher has no edit for the Track span family yet." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects share this hierarchy path and component, so a patch cannot name one of them." },
+            new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
+            new[] { "Inspect an object first.", "Inspect an object first." },
+            new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
+        }) {
+            var tooltip = CommandBand.Tooltip("Does something.", row[0]);
+            var lines = tooltip.Split('\n');
+            Check(lines.Length == 2 && lines[0] == "Does something." && lines[1] == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
+            var reason = lines[1].Substring("Unavailable: ".Length);
+            Check(new[] { "Not editable:", "Not yet supported:", "binding unavailable:", "Unavailable:" }.All(label => reason.IndexOf(label, StringComparison.OrdinalIgnoreCase) < 0)
+                && (Char.IsUpper(reason[0]) || Char.IsDigit(reason[0])) && reason.EndsWith(".", StringComparison.Ordinal), "One label per tooltip, the reason a sentence: " + tooltip);
+            Check(CommandBand.Tooltip(null, row[0]) == row[1], "Without a description the tooltip is the sentence alone: " + CommandBand.Tooltip(null, row[0]));
+        }
     }
     // A lamp shows green for Current and Saved and amber for Stale and Unsaved, and reserves its longer word.
     static void LampsShowOneWordAndColourPerState() {
@@ -249,11 +276,11 @@ static class CommandBandTests {
         Check(CommandBand.RunningLine(CommandBand.Axes, new[] { "0", "70.041", "0" }, "deg") == "X 0  Y 70.041  Z 0 (deg)", "A rotation reads the same way, in degrees");
         Check(CommandBand.RunningLine(new[] { "Segment", "End", "Distance" }, new[] { "S377", " a ", "" }, "m") == "Segment S377  End a  Distance - (m)", "A binding reads the same way; a value that is not set is a dash");
         Check(CommandBand.RunningLine(new[] { "A", "B" }, new[] { "1" }, null) == "A 1  B -", "A line without a unit ends with its last value");
-        // The reason an object cannot be edited is its own, wherever it is given.
+        // The reason an object cannot be edited is its own, wherever it is given, as one plain sentence.
         foreach (var row in new[] {
-            new[] { CommandBand.NotYetSupported("the Milepost family"), "Not yet supported: the patcher has no edit for the Milepost family yet." },
-            new[] { CommandBand.NotEditable("the marker is inside a crossing"), "Not editable: the marker is inside a crossing." },
-            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", CommandBand.NotEditable(CommandBand.SharedPath(2)).TrimEnd('.') + "." },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "The patcher has no edit for the Milepost family yet." },
+            new[] { CommandBand.NotEditable("the marker is inside a crossing"), "The marker is inside a crossing." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", "2 objects share this hierarchy path and component, so a patch cannot name one of them." },
             new[] { "Fixed placement and activity", "This object cannot be edited here." }, new[] { null, "This object cannot be edited here." }, new[] { " ", "This object cannot be edited here." } })
             Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
         Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");
@@ -334,7 +361,7 @@ static class CommandBandTests {
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
             Check(CommandBand.ModeBlock(mode, false, true, "Fixed placement") == null, "Mode " + mode + " is open for an object that can be edited");
             Check(CommandBand.ModeBlock(mode, true, true, "x") == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
-            Check(CommandBand.ModeBlock(mode, false, false, why) == (mode == CommandBand.NumericMode ? null : why + "."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
+            Check(CommandBand.ModeBlock(mode, false, false, why) == (mode == CommandBand.NumericMode ? null : "The patcher has no edit for the Milepost family yet."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
         }
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.
