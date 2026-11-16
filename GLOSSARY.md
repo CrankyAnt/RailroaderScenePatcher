@@ -172,8 +172,14 @@ A Railroader build for which the patcher's relevant game functions and prerequis
 **Track group**:
 A named set of track that the map enables or makes available as a whole, for example through map features.
 
+**Progression**:
+The game's unlocking of stations and industries as play advances. A progression controller switches the scene objects of a station on or off from the station's progression state.
+
+**Map feature**:
+A part of the map that the game unlocks as a whole, such as a branch, a facility or a signal system, switching on the track groups and scene objects it names.
+
 **Group-driven activity**:
-A scene object's activity as the game sets it from whether its track group is enabled.
+A scene object's activity as the game sets it from whether its track group is enabled, or as the game's progression or a map feature switches that object.
 _Avoid_: Group-following object
 
 **Group subscription**:
@@ -251,6 +257,9 @@ A scene object that shows a station on the map.
 The invisible part of a station's baked scenery group that opens the station window.
 _Avoid_: Click volume
 
+**Industry storage display**:
+The storage piles or log pond whose fill shows one industry's storage.
+
 **Scene marker**:
 A scene object, such as a track marker, that the game registers under a marker id.
 
@@ -274,6 +283,18 @@ The place on a track that a starter placement marker supplies to a new-game car 
 
 **Wreck setting**:
 The setting of a new-game car placement that decides whether its cars start derailed as a wreck.
+
+**Grade-crossing setup**:
+An existing crossing's controller with the scene objects below its root other than its whistle signs, such as crossing masts, the bell, detection spans and crossing pads.
+
+**Crossing mast**:
+One post of an existing crossing that carries its crossing light and, on a child at the same place, its gate. It is one inventory entry.
+
+**Unprotected crossing**:
+A road crossing without a crossing controller, whose root holds one or more crossing pads with whistle signs and crossbucks. It is distinct from an existing crossing.
+
+**Crossbuck**:
+The X-shaped road sign beside an unprotected crossing.
 
 ### Editor terminology
 
@@ -317,4 +338,24 @@ _Avoid_: Wizard
 One supported operation carried out in Guided mode, with its own pinned target and draft.
 
 **Helper marker**:
-A world marking that shows an invisible scene object at its physical placement, so that the modder can place it.
+A world marking that shows an invisible scene object at its physical placement, so that the modder can place it. A helper marker is the square marker of an invisible scene object.
+
+**Square marker**:
+The marker, a square with a plus, of a scene object in the world, or of a game-defined group beyond 125 metres. A click on a scene object's square marker makes that object the candidate; a click that picks a group's square marker opens the group's choice list.
+
+**Object frame**:
+The outline around a scene object in the world, or around a game-defined group beyond 125 metres, which shows within the frame distance.
+
+**Frame distance**:
+The camera distance beyond which a scene object or a game-defined group shows only its square marker.
+
+**Candidate**:
+The scene object that a click or a choice from the choice list proposes, framed in blue, before Confirm makes it the inspected object. A candidate in a game-defined group beyond 125 metres shows its own square marker and object frame. No operation uses a candidate.
+
+**Choice list**:
+The native dropdown beside the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a game-defined group's objects in place of its square marker, or the objects of a game-defined group that the click picks. A choice from it makes the candidate.
+_Avoid_: Picker, popup
+
+**Game-defined group**:
+Scene objects that a game component holds together, which the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a station, a rail bridge construction or an industry storage display. Each of its objects keeps its own inventory entry and edits.
+_Avoid_: Cluster, marker group
