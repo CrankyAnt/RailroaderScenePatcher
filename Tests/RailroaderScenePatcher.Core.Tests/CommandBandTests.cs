@@ -27,12 +27,13 @@ static class CommandBandTests {
     // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
     // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
     static void ReasonsReadAsOnePlainSentence() {
-        var starter = "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; editing the track location and the wreck setting is not available in this version.";
+        var starter = StarterPlacements.ObjectSettings + ".";
+        var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
         foreach (var row in new[] {
-            new[] { StarterPlacements.Operations, starter },
-            new[] { CommandBand.EditReason(StarterPlacements.Operations), starter },
-            new[] { CommandBand.ModeBlock(CommandBand.GizmoMode, false, false, StarterPlacements.Operations), starter },
-            new[] { "Track binding unavailable: " + CommandBand.Refusal(StarterPlacements.Operations), starter },
+            new[] { blocked, starter },
+            new[] { CommandBand.EditReason(blocked), starter },
+            new[] { CommandBand.ModeBlock(CommandBand.GizmoMode, false, false, blocked), starter },
+            new[] { StarterPlacements.NoDetach, StarterPlacements.NoDetach + "." },
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The patcher has no edit for the Milepost family yet." },
             new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The patcher has no edit for the Track span family yet." },

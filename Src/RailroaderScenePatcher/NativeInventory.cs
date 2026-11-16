@@ -419,7 +419,7 @@ namespace RailroaderScenePatcher {
             });
             else if (!board && !bridge && !pad && !crossing && !starter) only = CommandBand.NotYetSupported("the " + family + " family");
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
+            var structure = only != null ? null : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
             var operations = only != null ? only : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight" : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"

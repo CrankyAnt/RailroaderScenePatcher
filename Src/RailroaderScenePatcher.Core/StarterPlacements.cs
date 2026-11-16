@@ -57,8 +57,162 @@ namespace RailroaderScenePatcher.Core {
         }
         // Every car placement of an active setup that reads the marker, one line each, in the order they were read:
         // the setup, the placement's place in it, its cars and its wreck setting.
-        public IReadOnlyList<string> Readers(object marker) =>
-            marker == null ? Array.Empty<string>() : placements.Where(p => p.SetupActive && ReferenceEquals(p.Marker, marker)).Select(StarterPlacements.Reader).ToArray();
+        public IReadOnlyList<string> Readers(object marker) => Reading(marker).Select(StarterPlacements.Reader).ToArray();
+        // Every car placement of an active setup that reads the marker, in the order they were read.
+        public IReadOnlyList<StarterCarPlacement> Reading(object marker) =>
+            marker == null ? Array.Empty<StarterCarPlacement>() : placements.Where(p => p.SetupActive && ReferenceEquals(p.Marker, marker)).ToArray();
+        // The car placements of an active setup, in the order the game places them.
+        public IReadOnlyList<StarterCarPlacement> Placements(string setup) =>
+            placements.Where(p => p.SetupActive && p.Setup == setup).OrderBy(p => p.Index).ToArray();
+        // The one car placement that reads the marker, or why there is not exactly one. A starter placement changes one
+        // car placement, so a marker that no car placement or several read cannot be placed.
+        public StarterCarPlacement Reader(object marker, out string refusal) {
+            refusal = null;
+            if (Error != null) { refusal = StarterPlacements.Unreadable(Error); return null; }
+            var readers = Reading(marker);
+            if (readers.Count == 1) return readers[0];
+            refusal = readers.Count == 0 ? StarterPlacements.NoReader
+                : readers.Count + " new-game car placements read this marker (" + String.Join("; ", readers.Select(StarterPlacements.Place)) + "); a starter placement changes the one car placement that reads its marker, so this marker cannot be placed";
+            return null;
+        }
+    }
+    // A starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, and the
+    // marker's track location, the front of that placement's car cut. A null track leaves the location untouched; a
+    // detached track is refused, because the game reads a used marker's track location.
+    public sealed class StarterSetting {
+        public StarterSetting(string setup, MarkerBinding track) { Setup = setup; Track = track; }
+        public string Setup { get; }
+        public MarkerBinding Track { get; }
+        // The modification's values laid over the complete state below.
+        internal static StarterSetting Overlay(StarterSetting under, StarterSetting mod) =>
+            mod == null ? under : under == null ? mod : new StarterSetting(mod.Setup ?? under.Setup, mod.Track ?? under.Track);
+        // Two states agree when the track location agrees; the setup identifies the car placement and is no state.
+        internal static bool Same(StarterSetting a, StarterSetting b) => a == null ? b == null : b != null && MarkerBinding.Same(a.Track, b.Track);
+    }
+    // Why the game could not move along the track or place a car: the game's own reason, such as "Not enough track."
+    public sealed class StarterTrackException : Exception {
+        public StarterTrackException(string reason) : base(reason) { }
+    }
+    // A scene that judges one modification together with the other modifications of its document: before a document's
+    // modifications are checked, the engine and the session give it the desired state of every object the document's
+    // other modifications set, and null afterwards.
+    public interface IPlannedStateScene {
+        void Plan(IReadOnlyDictionary<object, ObjectState> desired);
+    }
+    // The track as the game's car placement rule walks it. Positions are map coordinates.
+    public interface IStarterTrack {
+        // The location reached by moving the distance along the track from a location: a positive distance moves away from
+        // the location's end, a negative one towards it and on through the node at that end. A switch lined against the
+        // movement or the end of the track throws StarterTrackException with the game's reason.
+        TrackLocation Move(TrackLocation from, double distance);
+        // Why the game cannot place a car at the location, such as "Track not available.", or null.
+        string Unplaceable(TrackLocation at);
+        double[] Position(TrackLocation at);
+    }
+    // One car placement's cut as the game places it: its front at the marker's track location and its length, the length
+    // of its cars with the gaps between them. A null front is a marker whose track location does not resolve.
+    public sealed class StarterCut {
+        public StarterCut(StarterCarPlacement placement, TrackLocation front, double length) { Placement = placement; Front = front; Length = length; }
+        public StarterCarPlacement Placement { get; }
+        public TrackLocation Front { get; }
+        public double Length { get; }
+    }
+    // The game's placement rule for a new-game car cut (TrainController.CanPlaceAt): from the front, every 1.5 m back
+    // over the cut's length and then at its back end, the location must be on available track and clear of every car
+    // within 0.75 m. Moving back stops at the end of the track or a switch lined against the movement. The setup places
+    // its cuts in order, so a cut must clear the cuts placed before it. A cut that fails stops the whole setup.
+    public static class StarterCutRule {
+        public const double Step = 1.5, CarRadius = 0.75, CarHalfWidth = 1.0, MaxVerticalSeparation = 4.0, BodyStep = 0.5;
+        // The locations the game checks for a cut, front first. Throws StarterTrackException where moving back fails.
+        // This is TrainController.CanPlaceAt(Location, float, ...) of Railroader 0.6.2 build 26335745 step by step, in
+        // single precision as the game computes it: the remainder is the length less its whole 1.5 m steps; the loop
+        // checks the location and moves 1.5 m back while the walked distance plus a step stays below the length; the
+        // last location moves back by the remainder and is checked again. For a length of whole steps the remainder is 0,
+        // so the game checks its last step twice and never the back end; this rule does the same.
+        public static IReadOnlyList<TrackLocation> Checked(IStarterTrack track, TrackLocation front, double length) {
+            var found = new List<TrackLocation>();
+            var at = front;
+            var distance = (float)length;
+            var rest = distance - (float)Math.Floor(distance / 1.5f) * 1.5f;
+            for (var done = 0f; done < distance; done += 1.5f) {
+                found.Add(at);
+                if (done + 1.5f < distance) at = track.Move(at, -1.5f);
+            }
+            found.Add(track.Move(at, -rest));
+            return found;
+        }
+        // The positions along a cut from its front to its back, every half metre: where its cars stand once placed. A
+        // path that cannot be walked to its end stops there, and the error says why; it is null for a whole path.
+        public static IReadOnlyList<double[]> Body(IStarterTrack track, TrackLocation front, double length, out string error) {
+            var points = new List<double[]>();
+            error = null;
+            if (front == null) { error = "the marker's track location does not resolve to a track point."; return points; }
+            try {
+                var at = front;
+                points.Add(track.Position(at));
+                for (var done = 0.0; done < length; done += BodyStep) {
+                    at = track.Move(at, -Math.Min(BodyStep, length - done));
+                    points.Add(track.Position(at));
+                }
+            } catch (StarterTrackException e) { error = e.Message; }
+            return points;
+        }
+        public static IReadOnlyList<double[]> Body(IStarterTrack track, TrackLocation front, double length) => Body(track, front, length, out _);
+        // Whether a car of a placed cut stands within the game's check radius of the point: within half a car's width
+        // plus the radius beside the cut's path, or within the radius of its ends, and at most 4 m above or below.
+        static bool Blocks(IReadOnlyList<double[]> body, double[] point) {
+            for (var i = 0; i < body.Count; i++) {
+                var a = body[i];
+                if (Math.Abs(point[1] - a[1]) > MaxVerticalSeparation) continue;
+                if (Horizontal(point, a) <= CarRadius) return true;
+                if (i + 1 == body.Count) continue;
+                var b = body[i + 1];
+                double dx = b[0] - a[0], dz = b[2] - a[2], length = dx * dx + dz * dz;
+                if (length <= 0) continue;
+                var t = ((point[0] - a[0]) * dx + (point[2] - a[2]) * dz) / length;
+                if (t < 0 || t > 1) continue;
+                double px = a[0] + t * dx - point[0], pz = a[2] + t * dz - point[2];
+                if (Math.Sqrt(px * px + pz * pz) <= CarHalfWidth + CarRadius) return true;
+            }
+            return false;
+        }
+        static double Horizontal(double[] a, double[] b) { double dx = a[0] - b[0], dz = a[2] - b[2]; return Math.Sqrt(dx * dx + dz * dz); }
+        // Why the cut fails the rule, or null: the game's reason, or the earlier cut it runs into.
+        static string Failure(IStarterTrack track, StarterCut cut, IReadOnlyList<KeyValuePair<StarterCut, IReadOnlyList<double[]>>> placed, out StarterCut blocker) {
+            blocker = null;
+            if (cut.Front == null) return "the marker's track location does not resolve to a track point.";
+            try {
+                foreach (var at in Checked(track, cut.Front, cut.Length)) {
+                    var unplaceable = track.Unplaceable(at);
+                    if (unplaceable != null) return unplaceable;
+                    var point = track.Position(at);
+                    foreach (var other in placed)
+                        if (Blocks(other.Value, point)) { blocker = other.Key; return "Blocked by the cut of " + StarterPlacements.Place(other.Key.Placement) + "."; }
+                }
+            } catch (StarterTrackException e) { return e.Message; }
+            return null;
+        }
+        // Why the setup's cuts fail the rule where the marker's cut takes part, or null: the marker's own cut fails, or
+        // another cut runs into it. A failure of another cut that the marker's cut does not cause belongs to that cut's
+        // own marker. Each cut is checked against the cuts before it that passed.
+        public static string Problem(IStarterTrack track, IReadOnlyList<StarterCut> cuts, object marker) {
+            var placed = new List<KeyValuePair<StarterCut, IReadOnlyList<double[]>>>();
+            foreach (var cut in cuts) {
+                var failure = Failure(track, cut, placed, out var blocker);
+                if (failure == null) {
+                    // A cut that passed has a body the later cuts must clear; one that cannot be followed cannot be judged.
+                    var body = Body(track, cut.Front, cut.Length, out var unwalked);
+                    if (unwalked == null) { placed.Add(new KeyValuePair<StarterCut, IReadOnlyList<double[]>>(cut, body)); continue; }
+                    failure = "the track under the cut cannot be followed: " + unwalked;
+                }
+                if (ReferenceEquals(cut.Placement.Marker, marker))
+                    return "The car cut of " + StarterPlacements.Place(cut.Placement) + " (" + Cars(cut) + ") does not fit with its front at " + cut.Front?.Display + ": " + failure;
+                if (blocker != null && ReferenceEquals(blocker.Placement.Marker, marker))
+                    return "This car cut blocks the cut of " + StarterPlacements.Place(cut.Placement) + " (" + Cars(cut) + "), which the setup places after it with its front at " + cut.Front?.Display + ": " + failure;
+            }
+            return null;
+        }
+        static string Cars(StarterCut cut) => (cut.Placement.Cars.Count == 0 ? "no cars" : String.Join(", ", cut.Placement.Cars)) + ", " + cut.Length.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " m";
     }
     public sealed class StarterReading {
         public BindingNeed Need { get; }
@@ -75,12 +229,23 @@ namespace RailroaderScenePatcher.Core {
         public const string ReaderPrefix = "Read by setup ";
         // Why a starter placement marker has no Focus target: its track location does not resolve on the loaded track.
         public const string NoTrackPoint = "the marker's track location does not resolve to a track point";
-        // What Supported edits says for a used marker. The track location and the wreck setting are the starter
-        // placement workflow's own edits; the object's placement and activity do not reach the car placement.
-        public const string Operations = "Not editable: a new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; editing the track location and the wreck setting is not available in this version";
+        // What Supported edits says for a used marker. The track location is the starter placement workflow's own edit;
+        // the object's placement and activity do not reach the car placement.
+        public const string Operations = "Track location: place the marker on the track under Connections; the start setup puts the front of its car cut there, after the game's placement rule passes for the whole cut. The object's placement and activity do not change where its cars start, and editing the wreck setting is not available in this version";
+        // Why the object's placement and activity cannot be edited: what the Placement tab's modes and the activity
+        // buttons say, and what a starter placement modification with placement or active fails with.
+        public const string ObjectSettings = "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections";
+        public const string OtherRelationships = "A starter placement marker's track location is set through starterPlacement, not through relationships";
+        // Why the track location of a used marker cannot be detached: the game reads it to place the cut.
+        public const string NoDetach = "The track location of a starter placement marker cannot be detached: the new-game car placement reads it to place its cars, and a missing location stops the whole setup";
         // Why the Generic track-marker capability leaves a used marker alone: its track location is edited in the
         // starter placement workflow, together with the whole car cut.
         public const string MarkerCapabilityRefusal = "This is a starter placement marker: a new-game car placement reads its track location, which belongs to the starter placement workflow";
+        // A car placement as a refusal names it: its setup and its place in it.
+        public static string Place(StarterCarPlacement placement) => "setup " + placement.Setup + ", car placement " + (placement.Index + 1) + " of " + placement.Count;
+        public const string NoReader = "No new-game car placement of an active setup reads this marker, so it is no starter placement marker";
+        // Why another capability's object takes no starter placement.
+        public const string NotAStarter = "This object is no starter placement marker; a starter placement applies to a marker that a new-game car placement reads";
         public static string Reader(StarterCarPlacement placement) =>
             ReaderPrefix + placement.Setup + ", car placement " + (placement.Index + 1) + " of " + placement.Count + ": cars "
             + (placement.Cars.Count == 0 ? "none" : String.Join(", ", placement.Cars)) + "; wreck: " + (placement.Wreck ? "yes" : "no");

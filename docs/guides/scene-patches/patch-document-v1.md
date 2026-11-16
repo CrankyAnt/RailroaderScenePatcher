@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Patch document v1
 
-This reference defines the v1 JSON fields accepted by the core engine for fixed and track-following placement, activity, track-marker relationships and crossing coverage. Each supplying mod keeps one document at `Data/scene-patches.json` in its own mod, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The native map editor's Save writes it for the edited mod, as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), Generic track markers, described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md), and the detection of existing crossings, described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) and [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
+This reference defines the v1 JSON fields accepted by the core engine for fixed and track-following placement, activity, track-marker relationships, crossing coverage and starter placements. Each supplying mod keeps one document at `Data/scene-patches.json` in its own mod, as strict UTF-8; a leading byte-order mark is accepted. The runtime reads it and never writes it. The native map editor's Save writes it for the edited mod, as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Current native target support covers independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), Generic track markers, described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md), the detection of existing crossings, described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) and [add detection for extra tracks at an existing crossing](adding-crossing-detection.md), and starter placement markers, described in [place a starter placement marker on the track](placing-starter-markers.md). The native observations and their limits are described under Current native targets below. The runtime capability classification remains `Unchecked`.
 
 ## Document fields
 
@@ -29,13 +29,14 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | `placement` | object | Optional. A fixed placement contains `mode`, `position` and `rotation`; a track-following placement contains `mode`, `track`, `offset` and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
 | `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.5.0 or later. |
+| `starterPlacement` | object | Optional. The track location of a starter placement marker; see Starter placement below. Requires patcher 0.5.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same document. |
 
 The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
 
 The order of the keys in `modifications` has no meaning, and neither has the order of the members of any object or of the values of `dependsOn`. The engine applies each modification after every modification its `dependsOn` names. Modifications that `dependsOn` does not order are applied in the ordinal order of their keys, defined under Canonical order below, so a document applies the same way whatever the order of its text. A value that `dependsOn` repeats counts once. A modification whose dependency fails is not applied; modifications that do not depend on it still apply.
 
-A modification holds the desired state of one object and must contain `placement`, `active`, `relationships`, or a combination. An omitted member leaves that part of the object untouched by this mod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a document that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
+A modification holds the desired state of one object and must contain `placement`, `active`, `relationships`, `starterPlacement`, or a combination. An omitted member leaves that part of the object untouched by this mod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a document that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
 
 The [scene patch editing inventory](inspect-scene-objects.md) supplies observed identifiers and placement without changing this format. An inspection-only entry does not enable a new v1 operation. The engine rechecks the resolved object and map context immediately before mutation. A missing, ambiguous or replaced target fails rather than redirecting the operation. Scene patch editing integrations can bind a complete-document edit to its inspected observations through an in-memory token; that token is not serialized or distributed.
 
@@ -122,6 +123,19 @@ For each addition the engine builds one circuit with three owned spans, register
 
 [Explicit snapping](snapping-to-track.md) writes a fixed placement. Scene patch editing computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to editing preflight and are not serialized. Runtime application and reload use the resulting absolute placement without querying a snap target. Snapping adds no dependency minimum; later track movement does not change the saved placement. Track-following placement is the separate mode above.
 
+## Starter placement
+
+`starterPlacement` sets the track location of a starter placement marker: the place on the track where a new-game car placement puts the front of its car cut. The target names the marker with `component` `Track.TrackMarker` and `structure` `starter-placement-v1`. The member accepts only these fields:
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `setup` | string | Required and non-empty. The identifier of the setup whose car placement reads the marker. |
+| `track` | object | Required. A track location with exactly `segment`, `end` and `distance`, with the same rules as a `trackMarker` reference. `{ "detach": true }` is read and refused. |
+
+The cut extends from the track location towards the end that `distance` counts from: for `end` `a` towards end `a`, for `end` `b` towards end `b`. Omitting `starterPlacement` leaves the marker's track location untouched by this mod. A starter placement marker accepts no `placement`, `active` or `relationships`: the object's placement and activity do not change where the cars start, and its track location belongs to `starterPlacement`.
+
+Before mutation the engine refuses, as an invalid definition, a track location whose segment is missing or ambiguous, naming the segment, and one whose distance lies outside the segment, with the distance and the segment's length; no other segment is used instead. It refuses a detach, a `setup` other than the setup whose car placement reads the marker, and a marker that no car placement of an active setup reads, or that more than one reads, with the reason. It also refuses a location at which the whole car cut, together with the cuts of the setup's other placements, fails the game's placement rule, naming the car placement, its cars and length, and the game's reason. The other cuts stand at the track locations that the document's other starter placements set, and at their current locations otherwise, so the result does not depend on the order in which the modifications apply; see [place a starter placement marker on the track](placing-starter-markers.md#what-the-patcher-checks-first). A refused modification leaves the marker as it was, and the other modifications still apply.
+
 ## Several mods
 
 During ordinary play the runtime considers each loaded mod that has `Data/scene-patches.json` and lists `crankyant/scene-patcher` under `dependencies.required` in its `Info.json`. It processes those documents in Railroader's load order, the order of the game's loaded mod list. Map-layer order plays no part, and the document has no priority field. A document whose `sourceMap.mapId` matches neither the selected map definition nor one of its resolved map layers is skipped without a warning. The Player log has one line per document for each load attempt, such as `... map rr/bushnell-whittier (layers none): My mod [me/my-mod] document for rr/bushnell-whittier: 2 of 2 modifications applied, 0 failed, 0 unchanged`, or `... document for me/my-map skipped: not the loaded map or one of its layers`. In the native map editor only the edited mod's document is applied, as described above.
@@ -148,7 +162,7 @@ After a failed mutation whose restoration verified, later modifications of the s
 
 An isolated native test on Railroader 0.6.2 build 26335745 observed the rendered Sylva board, updated culling sphere and registered mask at the desired placement, with settled terrain output; its sampled tree regions were empty. A separate research trial on the same build moved the Sylva board's mask onto one generated tree, observed the tree leave the generated tile output and return after restoration. Other boards qualify through the component pattern without individual trials.
 
-The bridge, track-marker, crossing-pad and crossing targets below have their own adapters; other object families are not implemented.
+The bridge, track-marker, crossing-pad, crossing and starter placement targets below have their own adapters; other object families are not implemented.
 
 ### Bridge
 
@@ -194,9 +208,17 @@ The adapter records the crossing's circuits and their native spans at its first 
 
 Before mutation the adapter requires that the controller evaluates only its native circuits in native order followed by the circuits it added, that each native circuit holds its native spans or owned spans, and that every native span stays registered. After a change it verifies each circuit's coverage, each addition's tracks, that no other added circuit remains, those rules, and that exactly the owned spans in use are registered and cover track. A difference fails the modification and restores the captured coverage, which removes a partly built addition and returns the captured additions; owned spans that stay registered after restoration make cleanup unverified and block further operations on the crossing for the load. The native map editor's Save writes neither the controller's references nor the added circuits nor the owned spans, so each load rebuilds them from the document. See [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) and [add detection for extra tracks at an existing crossing](adding-crossing-detection.md) for the scene patch editing route and limits.
 
+### Starter placement marker
+
+The starter placement adapter recognizes an object holding one Generic `Track.TrackMarker` that a car placement of an active new-game setup (`Game.Progression.SetupDescriptor`) holds. The target `component` is `Track.TrackMarker`; set `structure` to `starter-placement-v1`. The object must not be a milepost or a crossing pad, the marker must have an ID, no other component may listen to its location changes, its activity must not follow a track group, and no loaded component other than a colocated `Track.TrackRelativePosition` may hold a direct reference to it. Such a marker never resolves as `track-marker-v1`. A modification may set only `starterPlacement`.
+
+A `starterPlacement` track location writes the marker's serialized location and its registration in the track graph as for a Generic marker: the adapter removes the registration under the marker ID, writes the location, and registers the marker at the new location when the marker is enabled and active. A disabled marker keeps no registration; the game reads its location at a new company game all the same. The object's placement and activity stay as they are. Before mutation the adapter requires the registration rule of the track-marker adapter and refuses a marker whose marker id another scene marker holds, as the track-marker adapter does. After a change it verifies the location and that rule. A difference fails the modification and restores the captured location and registration; an unverified restoration blocks further operations on the marker for the load.
+
+The game reads the location in `Game.State.CompanyModeSetup.Setup`, which runs when a new company game becomes active, after the world-load callback in which the patcher applies its documents. The whole-cut check walks the track with the graph's own `LocationByMoving`, reads the segments' availability, and takes each cut's length from `StateManager.DescriptorsForIdentifiers` and `ConsistLength.OfDescriptors`, as the game's `TrainController.HandlePlaceTrain` does before `CanPlaceAt`. See [place a starter placement marker on the track](placing-starter-markers.md) for the scene patch editing route and limits.
+
 ## Writing by the native map editor
 
-The native map editor's Save writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark, in the canonical order below. It writes one modification per edited object and gives a new modification the key `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
+The native map editor's Save writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark, in the canonical order below. It writes one modification per edited object and gives a new modification the key `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, `starter-<object name>` when it is a starter placement, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. A prefix that the object name already starts with is written once, so the marker `starter-ewh-int2` gets the key `starter-ewh-int2`. Whitespace and comments of the source are not kept.
 
 Reading a document never reorders it. Only a Save that writes the patch document produces the canonical order, and a Save writes it only when the patch document has an outstanding change.
 
@@ -213,13 +235,14 @@ A Save that writes the patch document writes its content in this order:
 - Document root: `formatVersion`, `sourceMap`, `modifications`, then unknown members.
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions` and `crossingEquipment` are in ordinal order.
-- A modification: `target`, `relationships`, `placement`, `dependsOn`, `active`, then unknown members.
+- A modification: `target`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
 - `target`: `scene`, `path`, `component`, `structure`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`.
 - `crossingCoverage`: `circuits`, `additions`.
+- `starterPlacement`: `setup`, `track`.
 - An entry under `circuits` or `additions`: `approachA`, `island`, `approachB`, `detach`.
 - A span: `from`, `to`.
-- A track location, including a `trackMarker` reference: `segment`, `end`, `distance`. A track-following `track` that names an endpoint holds only `node`, and a detach object holds only `detach`.
+- A track location, including a `trackMarker` reference and a `starterPlacement` track: `segment`, `end`, `distance`. A track-following `track` that names an endpoint holds only `node`, and a detach object holds only `detach`.
 - `placement`: `mode`, `position`, `track`, `offset`, `rotation`. A fixed placement uses `mode`, `position`, `rotation`; a track-following placement uses `mode`, `track`, `offset`, `rotation`.
 - The values of a modification's `dependsOn` are in ordinal order, duplicates kept, when `dependsOn` is an array of strings; otherwise `dependsOn` keeps its source form, including the member order inside its items.
 - Every other array keeps its source order.
@@ -243,6 +266,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
 | Any modification with `relationships.crossingCoverage`, including a detection addition, a `Track.Crossings.GradeCrossingController` target component, or target `structure` `crossing-coverage-v1` | `0.5.0` |
 | Any modification whose target `structure` is `crossing-pad-v1` | `0.5.0` |
+| Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |
 
 Fixed placement is the base minimum; other content in the document can raise it according to the table. The minimum follows the document content, whether or not the target is loaded or its capability is available on this build. The legacy Sylva location sign does not raise the pattern-based board dependency minimum. Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry. Runtime reporting adds no document, schema or capability requirement.
 

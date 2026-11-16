@@ -565,7 +565,9 @@ namespace RailroaderScenePatcher {
                 for (var i = 0; i < PlacementModes.Length; i++) {
                     var mode = i;
                     // A mode that cannot be used on the inspected object is inactive and says why.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, selected?.Operations);
+                    // A starter placement marker's object does not change where its cars start: every mode but Numeric,
+                    // which shows the object's placement, says so.
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) placementMode = mode; })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
@@ -723,6 +725,7 @@ namespace RailroaderScenePatcher {
         // The tab's order, as in every tab: what can be operated first, what is only read below. Replacement targets
         // and the fields of the binding come first; the current binding and the other observed bindings follow.
         void DrawConnections(UIPanelBuilder builder) {
+            if (IsStarter) { DrawStarterLocation(builder); return; }
             var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
             // A crossing pad has the binding of its marker: setting it regenerates the pad along the track there.
             var pad = selected.Identity.Structure == CrossingPadScene.Structure;
@@ -750,6 +753,29 @@ namespace RailroaderScenePatcher {
             foreach (var line in others) BindingFields(builder, line);
         }
 
+        // The Connections tab of a starter placement marker: on-track placement of its track location, which the start setup
+        // reads as the front of the car cut. Segment chooses the track in the world, and the click on it gives the
+        // distance; the fields can also be typed. The current location follows, with the setups that read it.
+        void DrawStarterLocation(UIPanelBuilder builder) {
+            var block = EditBlock();
+            Section(builder, "Place on the track");
+            var busy = block ?? (selection == null ? "World selection is unavailable." : ChoiceBlock);
+            builder.HStack(row => {
+                Button(row, "Segment", () => BeginSelection(SelectionKind.TrackSegment, selected)).Inactive(busy != null)
+                    .Tooltip("Place on a segment", CommandBand.Tooltip("Click the track where the front of the car cut belongs and confirm the segment. The fields take the segment and the distance of the click from end a.", busy));
+            }).Height(RowHeight);
+            Section(builder, "Track location");
+            ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block,
+                "Where the start setup places the front of this marker's car cut; the cut extends from there towards the end the distance counts from. Set checks the whole cut with the setup's other cuts by the game's placement rule. End is a or b.", column => column == 2);
+            var current = selected.Bindings.Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith("Graph registration", StringComparison.Ordinal)).ToArray();
+            FieldLabel(builder, "Current track location");
+            if (current.Length == 0) Line(builder, "None", null, null);
+            foreach (var line in current) BindingFields(builder, line);
+            Section(builder, "Read by");
+            var readers = selected.Bindings.Where(IsReader).ToArray();
+            if (readers.Length == 0) Line(builder, "No active setup", null, null);
+            foreach (var line in readers) PlainLabel(builder, line.Substring("Read by ".Length));
+        }
         // The Changes tab: what this mod changes about the inspected object, and what that change still awaits.
         void DrawChanges(UIPanelBuilder builder) {
             Section(builder, "This MapMod");
@@ -936,7 +962,8 @@ namespace RailroaderScenePatcher {
             }
             // The gizmo owns the row only during a drag, when Escape cancels; while it stands, the row is the general one.
             if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the drag and restore the placement.", null, () => gizmo?.Cancel(), "Cancel gizmo drag") };
-            var block = selected == null ? "Inspect an object first." : EditBlock();
+            // A starter placement marker's modification is removed or rechecked from every tab.
+            var block = selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : EditBlock();
             var identity = selected?.Identity;
             var unchanged = block ?? (IsChanged(selected) ? null : "This MapMod does not change this object.");
             return new[] {
@@ -1033,6 +1060,17 @@ namespace RailroaderScenePatcher {
                             Slot(CommandBand.ClearCircuit, "Preview clearing this MapMod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
                             Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Preview a change first." : null), apply, null, 1, 62) };
                     }
+                    if (structure == StarterPlacementScene.Structure) {
+                        var confirmedTrack = selection?.Confirmed?.Identity;
+                        var picked = confirmedTrack != null && confirmedTrack.Kind == SelectionKind.TrackSegment;
+                        return new[] {
+                            Typed(Slot("Set", "Place the front of the car cut at the entered track location. The whole cut is checked first; the object does not move.", null, ApplyStarterLocation, "Set track location", 1, 56),
+                                () => CommandBand.FieldReason(block, binding, CurrentBinding(), CommandBand.SameLocation, CommandBand.BindingIds)),
+                            Slot("Detach", "Detach the marker from its track.", block ?? StarterPlacements.NoDetach, () => { }, "Detach track location", 1, 72),
+                            Slot(CommandBand.ClearLocation, "Clear this MapMod's value for the track location; the marker returns to its underlying track location.", block ?? CommandBand.ClearLocationReason(HasStarterTrack(identity)),
+                                () => Edit(BindingPlace, "Clearing the track location's MapMod value", (current, inspection) => current.ClearStarterTrack(identity, inspection)), null, 1, 124),
+                            Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment", 1, 70) };
+                    }
                     var pad = structure == CrossingPadScene.Structure;
                     // An object without a binding names that first; why it cannot be edited in general comes second.
                     var unavailable = pad || structure == TrackMarkerScene.Structure ? block : selected == null ? block : BindingUnavailable();
@@ -1068,6 +1106,19 @@ namespace RailroaderScenePatcher {
         }
         // Why no placement mode edits the inspected object when it is a crossing pad; null for any other object.
         string PadBlock => IsPad ? CommandBand.PadFollowsTrack : null;
+        bool HasStarterTrack(TargetIdentity identity) {
+            try { return attachment != null && identity != null && attachment.Session.HasStarterTrack(identity); } catch { return false; }
+        }
+        void ApplyStarterLocation() {
+            var identity = selected.Identity;
+            var end = binding[1].Trim().ToLowerInvariant();
+            if (String.IsNullOrWhiteSpace(binding[0]) || (end != "a" && end != "b") || !Double.TryParse(binding[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var distance)) {
+                feedback.Refuse(BindingPlace, "Track location", "enter a segment ID, end a or b, and a distance with a decimal point");
+                return;
+            }
+            var location = new TrackLocation(binding[0].Trim(), end, distance);
+            Edit(BindingPlace, CommandBand.StarterAction(location.Segment, end, distance), (current, inspection) => current.PlaceStarter(identity, location, inspection), true);
+        }
         bool HasActivityValue(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasActivityValue(identity); } catch { return false; }
         }

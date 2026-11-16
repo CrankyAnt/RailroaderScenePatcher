@@ -54,6 +54,22 @@ namespace RailroaderScenePatcher.Core {
             return new ProjectedWorldRibbon(ribbon, centerline);
         }
 
+        // A path of straight pieces as one ribbon, such as the track a car cut stands on: each piece is a straight cubic
+        // from one point to the next, projected as a curve is.
+        public static ProjectedWorldRibbon ProjectPath(IReadOnlyList<WorldPoint> points, double worldRadius,
+            Func<WorldPoint, ClipPoint> project, ScreenRect viewport, double minimumRadius = 10) {
+            if (points == null) throw new ArgumentNullException(nameof(points));
+            if (points.Count < 2) throw new ArgumentException("A path requires two points", nameof(points));
+            var ribbon = new List<ScreenTriangle>();
+            var centerline = new List<ScreenTriangle>();
+            for (var i = 0; i + 1 < points.Count; i++) {
+                WorldPoint a = points[i], b = points[i + 1];
+                WorldPoint At(double t) => new WorldPoint(a.X + (b.X - a.X) * t, a.Y + (b.Y - a.Y) * t, a.Z + (b.Z - a.Z) * t);
+                var piece = ProjectCurve(new[] { a, At(1.0 / 3), At(2.0 / 3), b }, worldRadius, project, viewport, minimumRadius);
+                ribbon.AddRange(piece.Ribbon); centerline.AddRange(piece.Centerline);
+            }
+            return new ProjectedWorldRibbon(ribbon, centerline);
+        }
         static void Subdivide(WorldPoint a, WorldPoint b, WorldPoint c, WorldPoint d, int depth,
             double radius, double minimum, Func<WorldPoint, ClipPoint> project, ScreenRect viewport,
             List<ScreenTriangle> ribbon, List<ScreenTriangle> centerline) {

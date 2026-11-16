@@ -48,6 +48,12 @@ static class WorldRibbonGeometryTests {
         Check(actual.Ribbon.Count>0 && actual.Centerline.Count>0,"captured exposed track remains marked");
         Valid(actual.Ribbon,new[]{view}); Valid(actual.Centerline,new[]{view});
         Check(actual.Contains(new ScreenPoint(1472.42126,501.5962)),"captured track center is pickable");
+        // A path of straight pieces along the same track, such as a car cut, marks the same track as one ribbon.
+        var path=WorldRibbonGeometry.ProjectPath(new[]{Controls[0],new WorldPoint((Controls[0].X+Controls[3].X)/2,Controls[0].Y,(Controls[0].Z+Controls[3].Z)/2),Controls[3]},2,Camera,view);
+        Check(path.Ribbon.Count>0 && path.Centerline.Count>0,"a path is marked"); Valid(path.Ribbon,new[]{view});
+        Check(path.Contains(new ScreenPoint(1472.42126,501.5962)),"a path along the track covers the track's centre");
+        foreach(var p in new[]{new ScreenPoint(800,1000),new ScreenPoint(1280,100),new ScreenPoint(2500,100)}) Check(!path.Contains(p),"a path paints nothing off its track");
+        try { WorldRibbonGeometry.ProjectPath(new[]{Controls[0]},2,Camera,view); Check(false,"a path of one point is refused"); } catch(ArgumentException) { }
         // Exposed-world witnesses away from this track in the actual image. The
         // captured old fourth stroke covered all of them, for both role colors.
         foreach(var p in new[]{new ScreenPoint(800,1000),new ScreenPoint(1280,100),new ScreenPoint(2500,100)})

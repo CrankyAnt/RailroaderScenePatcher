@@ -261,6 +261,7 @@ class Program {
         GizmoRefusalTests.Run();
         InspectionTests.Run();
         StarterPlacementTests.Run();
+        StarterTrackLocationTests.Run();
         CommandBandTests.Run();
         BridgeTests.Run();
         SelectionTests.Run();

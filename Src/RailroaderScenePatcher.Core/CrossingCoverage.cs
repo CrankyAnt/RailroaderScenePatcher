@@ -281,6 +281,7 @@ namespace RailroaderScenePatcher.Core {
             if (state == null) return;
             if (state.Placement != null || state.Active != null) throw new InvalidOperationException("A crossing-coverage target accepts only relationships.crossingCoverage; placement and activity of the crossing are not supported");
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
+            if (state.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state.Coverage == null) return;
             // A complete coverage is an effective state, which may hold circuits on their native spans.
             Validate(target, BaselineOf(target), state.Coverage, state.Coverage.Complete);

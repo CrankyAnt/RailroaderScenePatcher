@@ -14,15 +14,19 @@ namespace RailroaderScenePatcher {
         internal SceneObservation Observation { get; }
         internal Vector3[] Points { get; }
         internal Vector3[] ControlPoints { get; }
+        // A path of straight pieces in map coordinates that the marking draws as a ribbon, such as the track a car cut
+        // stands on; null for every other candidate.
+        internal Vector3[] Path { get; }
         internal string Details { get; }
         internal Vector3 Position => Points[Points.Length / 2];
 
-        internal SpatialCandidate(SelectionCandidate choice, Vector3[] points, string details, SceneObservation observation = null, Vector3[] controlPoints = null) {
+        internal SpatialCandidate(SelectionCandidate choice, Vector3[] points, string details, SceneObservation observation = null, Vector3[] controlPoints = null, Vector3[] path = null) {
             Choice = choice;
             Points = points;
             Details = details;
             Observation = observation;
             ControlPoints = controlPoints;
+            Path = path;
         }
     }
 
@@ -244,7 +248,30 @@ namespace RailroaderScenePatcher {
             var current = Offered(Pending.Kind, inspectOnly);
             var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered);
             candidates = current;
+            lastPointer = pointer;
             Pending.Offer(hits);
+        }
+        // The pointer of the last click that offered candidates, in GUI coordinates.
+        Vector2? lastPointer;
+        // The point of a confirmed track segment nearest to the click that offered it, in map coordinates: where on the
+        // track the click was. Null for a candidate without a curve or without a click.
+        internal Vector3? ClickedPoint(SpatialCandidate candidate) {
+            var camera = Camera.main;
+            if (candidate?.ControlPoints == null || candidate.ControlPoints.Length != 4 || lastPointer == null || camera == null) return null;
+            var origin = WorldOffset();
+            Vector3 p0 = candidate.ControlPoints[0], p1 = candidate.ControlPoints[1], p2 = candidate.ControlPoints[2], p3 = candidate.ControlPoints[3];
+            Vector3? best = null; var nearest = float.PositiveInfinity;
+            for (var i = 0; i <= 400; i++) {
+                float t = i / 400f, s = 1 - t;
+                var point = s * s * s * p0 + 3 * s * s * t * p1 + 3 * s * t * t * p2 + t * t * t * p3;
+                var screen = camera.WorldToScreenPoint(point + origin);
+                if (screen.z <= 0) continue;
+                // GUI coordinates run down from the top of the screen.
+                var gui = new Vector2(screen.x, Screen.height - screen.y);
+                var distance = (gui - lastPointer.Value).sqrMagnitude;
+                if (distance < nearest) { nearest = distance; best = point; }
+            }
+            return best;
         }
 
         internal SpatialCandidate Find(SelectionCandidate candidate) => candidates.FirstOrDefault(c => ReferenceEquals(c.Choice, candidate));
@@ -281,8 +308,9 @@ namespace RailroaderScenePatcher {
             candidates = Array.Empty<SpatialCandidate>();
         }
 
-        // trackPoint is the inspected starter placement marker's track point in map coordinates, or null.
-        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null) {
+        // trackPoint is the inspected starter placement marker's track point in map coordinates, or null; cut is the track
+        // its car cut stands on from that point back, in map coordinates, or null.
+        internal void Draw(SceneObservation inspected, IReadOnlyList<Rect> covered, Texture2D backing, double[] trackPoint = null, IReadOnlyList<double[]> cut = null) {
             if (Event.current.type != EventType.Repaint || (Pending == null && inspected == null)) return;
             var camera = Camera.main;
             if (camera == null) return;
@@ -294,7 +322,8 @@ namespace RailroaderScenePatcher {
             // object position. Its evidence tells it from the object's own candidate.
             var point = inspected != null && trackPoint != null && trackPoint.Length == 3
                 ? new SpatialCandidate(new SelectionCandidate(inspected.Handle, SelectionIdentity.SceneObject(inspected.Identity), inspected.Family + ": " + inspected.Identity.Path, "track point"),
-                    new[] { new Vector3((float)trackPoint[0], (float)trackPoint[1], (float)trackPoint[2]) }, null)
+                    new[] { new Vector3((float)trackPoint[0], (float)trackPoint[1], (float)trackPoint[2]) }, null,
+                    path: cut != null && cut.Count >= 2 ? cut.Select(p => new Vector3((float)p[0], (float)p[1], (float)p[2])).ToArray() : null)
                 : null;
             overlay.Draw(candidates, Pending, original, source != null, relation, Followed(inspected), Bound(inspected), camera, WorldOffset(), covered, backing, point);
         }

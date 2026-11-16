@@ -283,13 +283,14 @@ namespace RailroaderScenePatcher {
                 }
             }
             // The inspected starter placement marker's track point: gold as the inspected object, on the track, where the
-            // start setup places the front of the marker's car cut.
+            // start setup places the front of the marker's car cut, and the track the cut stands on from there, which shows
+            // the direction the cut extends.
             if (trackPoint != null) {
                 var point = Project(trackPoint, camera, origin);
                 if (point != null) {
                     point.Color = Gold;
                     point.Detailed = true;
-                    point.Text = "Track point: " + Short(trackPoint.Choice.Label);
+                    point.Text = (trackPoint.Path == null ? "Track point: " : "Front of the car cut: ") + Short(trackPoint.Choice.Label);
                     shapes.Add(point);
                 }
             }
@@ -445,6 +446,15 @@ namespace RailroaderScenePatcher {
                         var clip = matrix * new Vector4((float)(p.X + origin.x), (float)(p.Y + origin.y), (float)(p.Z + origin.z), 1);
                         return new ClipPoint(clip.x, clip.y, clip.z, clip.w);
                     }, ScreenRect.FromEdges(viewport.xMin, Screen.height - viewport.yMax, viewport.xMax, Screen.height - viewport.yMin), TrackMinimumRadius);
+            }
+            // A path, such as the track a car cut stands on, is a ribbon half a car wide.
+            if (candidate.Path != null && candidate.Path.Length >= 2) {
+                var matrix = camera.projectionMatrix * camera.worldToCameraMatrix;
+                var viewport = camera.pixelRect;
+                shape.Track = WorldRibbonGeometry.ProjectPath(candidate.Path.Select(p => new WorldPoint(p.x, p.y, p.z)).ToArray(), StarterCutRule.CarHalfWidth, p => {
+                    var clip = matrix * new Vector4((float)(p.X + origin.x), (float)(p.Y + origin.y), (float)(p.Z + origin.z), 1);
+                    return new ClipPoint(clip.x, clip.y, clip.z, clip.w);
+                }, ScreenRect.FromEdges(viewport.xMin, Screen.height - viewport.yMax, viewport.xMax, Screen.height - viewport.yMin), 2);
             }
             if (!InFront(camera, anchor)) {
                 if (shape.Track == null || shape.Track.Ribbon.Count == 0) return null;

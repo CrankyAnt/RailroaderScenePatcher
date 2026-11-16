@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IDisposable {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, IDisposable {
         // The observation of one object, when the inspection source can make it.
         public SceneObservation Observe(object handle, TargetIdentity identity) {
             return inspection is ITargetedInspectionScene targeted ? targeted.Observe(handle, identity) : inspection?.Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle) && o.Identity.Component == identity.Component);
@@ -94,6 +94,7 @@ namespace RailroaderScenePatcher.Core {
             if (owner is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
         }
         // Only the adapter that resolved the object can confirm it; an object no adapter resolved is not confirmed.
         public bool StillIdentifies(object target, TargetIdentity identity) =>
@@ -110,6 +111,14 @@ namespace RailroaderScenePatcher.Core {
             return dependent.Output(target) ?? DependentOutput.None;
         }
         public void RetryOutput(object target) { if (Owner(target) is IDependentOutputScene dependent) dependent.RetryOutput(target); }
+        // Every adapter that judges a modification with its document receives the desired states of the objects it resolved.
+        public void Plan(IReadOnlyDictionary<object, ObjectState> desired) {
+            foreach (var adapter in capabilities.OfType<IPlannedStateScene>())
+                adapter.Plan(desired?.Where(pair => pair.Key != null && owners.TryGetValue(pair.Key, out var owner) && ReferenceEquals(owner, adapter)).ToDictionary(pair => pair.Key, pair => pair.Value, new ByReference()));
+        }
+        // The cut the starter placement capability that resolved the object would place at the location; empty for any other object.
+        public IReadOnlyList<double[]> StarterCut(object target, TrackLocation location) =>
+            Owner(target) is StarterPlacementScene starter ? starter.CutPath(target, location) : Array.Empty<double[]>();
         // The highest version any adapter requires for the target.
         public string MinimumPatcherVersion(TargetIdentity target) {
             string minimum = null;

@@ -222,6 +222,11 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(CrossingPadScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": crossing-pad capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
+                try { capabilities.Add(new StarterPlacementScene(new StarterPlacementWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(StarterPlacementScene.Structure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": starter placement capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
                 try { capabilities.Add(new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
@@ -766,7 +771,7 @@ namespace RailroaderScenePatcher {
                     worldLabelBacking = new Texture2D(1, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
                     worldLabelBacking.SetPixel(0, 0, new Color(.106f, .098f, .086f, 1)); worldLabelBacking.Apply();
                 }
-                selection.Draw(selected, presentation.WorldUiBounds(), worldLabelBacking, InspectedTrackPoint());
+                selection.Draw(selected, presentation.WorldUiBounds(), worldLabelBacking, InspectedTrackPoint(), InspectedCut());
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
@@ -942,20 +947,51 @@ namespace RailroaderScenePatcher {
                 if (!snapping && candidate.Observation == null && picked != null && picked.Identity.Kind == SelectionKind.TrackSegment && inspectorTab.Value == ConnectionsTab &&
                     selected != null && (selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure) && picked.Source != null && picked.Source.Equals(SelectionIdentity.SceneObject(selected.Identity)))
                     binding[0] = picked.Identity.Identifier;
+                // A starter placement marker is placed on the track where the confirmed click was: the fields take the
+                // segment and the distance of that point from end a, so Set places the front of the cut there.
+                if (!snapping && candidate.Observation == null && picked != null && picked.Identity.Kind == SelectionKind.TrackSegment && inspectorTab.Value == ConnectionsTab &&
+                    IsStarter && picked.Source != null && picked.Source.Equals(SelectionIdentity.SceneObject(selected.Identity))) {
+                    binding[0] = picked.Identity.Identifier;
+                    PlaceAtClick(candidate, picked.Identity.Identifier);
+                }
             } catch (Exception e) {
                 selection.Pending?.Offer(Array.Empty<SelectionCandidate>());
                 selectionProblem = "Identity could not be confirmed: " + e.GetBaseException().Message;
             }
         }
+        // Fills the distance of a starter placement marker from where the confirmed segment was clicked. The segment is
+        // confirmed either way; a click point that cannot be read leaves end and distance as they were and says why, so
+        // they can be entered by hand.
+        void PlaceAtClick(SpatialCandidate candidate, string segment) {
+            const string action = "Track location from the click";
+            if (trackPoses == null) { feedback.Refuse(BindingPlace, action, "the track graph is unavailable in this game build, so the click cannot give a distance; enter end and distance by hand"); return; }
+            try {
+                var point = selection.ClickedPoint(candidate);
+                if (point == null) { feedback.Refuse(BindingPlace, action, "the click on the track could not be found on the segment's curve; enter end and distance by hand"); return; }
+                var offset = (Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "GameToWorld", Vector3.zero);
+                var at = trackPoses.Nearest(segment, point.Value + offset);
+                binding[1] = at.End; binding[2] = CommandBand.Number(at.Distance);
+            } catch (Exception e) { feedback.Refuse(BindingPlace, action, e.GetBaseException().Message + "; enter end and distance by hand"); }
+        }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
         bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure) && selected.Handle is GameObject;
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
+        // A starter placement marker is edited on the Connections tab only, where it is placed on the track; on every other
+        // tab its object's placement and activity stay disabled with the reason.
         string EditBlock() =>
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
+            : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
             : !Editable ? CommandBand.EditReason(selected?.Operations)
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
             : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the inventory." : null;
+        // Why the inspected starter placement marker's modification cannot be changed now, whatever the tab, or null: what
+        // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
+        string StarterBlock() =>
+            attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
+            : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
+            : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
+            : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the inventory." : null;
         void ClearSnap() { preparedSnap = null; choosingSnap = false; preparedCoverage = null; }
         void BeginSnap(SelectionKind kind) {
             BeginSelection(kind, selected);
@@ -1173,6 +1209,20 @@ namespace RailroaderScenePatcher {
         // The starter placement marker's track point while it is inspected, and why there is none, read once per frame:
         // the world marks it in gold, the Placement tab shows it and Focus is disabled without it.
         int trackPointFrame = -1; object trackPointOf; double[] trackPoint; string trackPointMissing;
+        internal bool IsStarter => selected != null && selected.Identity.Structure == StarterPlacementScene.Structure;
+        // The track the inspected starter placement marker's car cut stands on, from its track point back, in map
+        // coordinates, every 3 m: the world draws it so the direction the cut extends shows. Read a few times a second.
+        int cutFrame = -100; object cutOf; IReadOnlyList<double[]> cut;
+        internal IReadOnlyList<double[]> InspectedCut() {
+            if (!IsStarter || attachment == null) return null;
+            if (Time.frameCount < cutFrame + 15 && ReferenceEquals(cutOf, selected.Handle)) return cut;
+            cutFrame = Time.frameCount; cutOf = selected.Handle;
+            try {
+                var body = attachment.Session.StarterCut(selected.Identity, null);
+                cut = body.Where((p, i) => i % 6 == 0 || i == body.Count - 1).ToArray();
+            } catch { cut = null; }
+            return cut;
+        }
         internal double[] InspectedTrackPoint() {
             if (selected == null || selected.Family != StarterPlacements.Family) return null;
             if (trackPointFrame != Time.frameCount || !ReferenceEquals(trackPointOf, selected.Handle)) {

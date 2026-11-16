@@ -120,17 +120,18 @@ static class StarterPlacementTests {
         Check(RailroaderScenePatcher.InventoryPresentationState.Subgroups(groups[0].Value).Count == 0, "The family has no subgroups");
     }
 
-    // The refusal that named setup consumption as unsupported is gone. The object's placement, activity and ordinary
-    // marker binding stay disabled, with the reason that a car placement reads only the track location.
+    // The refusal that named setup consumption as unsupported is gone. Supported edits names the track location as the
+    // marker's edit; the object's placement, activity and ordinary marker binding stay disabled, with the reason that a
+    // car placement reads only the track location.
     static void EditsOutsideTheWorkflowSayWhy() {
-        var reason = RailroaderScenePatcher.CommandBand.Refusal(StarterPlacements.Operations);
-        Check(reason != null && reason.Contains("track location") && reason.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) < 0, "Supported edits gives the reason without calling the setup unsupported: " + StarterPlacements.Operations);
-        Check(RailroaderScenePatcher.CommandBand.ModeBlock(RailroaderScenePatcher.CommandBand.GizmoMode, false, false, StarterPlacements.Operations) == RailroaderScenePatcher.CommandBand.EditReason(StarterPlacements.Operations)
-            && RailroaderScenePatcher.CommandBand.EditReason(StarterPlacements.Operations).StartsWith("A new-game car placement reads only", StringComparison.Ordinal), "A disabled placement mode gives that reason: " + RailroaderScenePatcher.CommandBand.EditReason(StarterPlacements.Operations));
+        Check(RailroaderScenePatcher.CommandBand.Refusal(StarterPlacements.Operations) == null && StarterPlacements.Operations.StartsWith("Track location:", StringComparison.Ordinal)
+            && StarterPlacements.Operations.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) < 0, "Supported edits names the track location as the edit: " + StarterPlacements.Operations);
+        var blocked = RailroaderScenePatcher.CommandBand.NotEditable(StarterPlacements.ObjectSettings);
+        Check(RailroaderScenePatcher.CommandBand.ModeBlock(RailroaderScenePatcher.CommandBand.GizmoMode, false, false, blocked) == RailroaderScenePatcher.CommandBand.EditReason(blocked)
+            && RailroaderScenePatcher.CommandBand.EditReason(blocked).StartsWith("A new-game car placement reads only", StringComparison.Ordinal), "A disabled placement mode gives that reason: " + RailroaderScenePatcher.CommandBand.EditReason(blocked));
         Check(StarterPlacements.MarkerCapabilityRefusal.IndexOf("not supported", StringComparison.OrdinalIgnoreCase) < 0 && StarterPlacements.MarkerCapabilityRefusal.Contains("starter placement"),
             "The marker capability names the starter placement workflow, not an unsupported consumer: " + StarterPlacements.MarkerCapabilityRefusal);
     }
-
     // The problems a marker is listed with, as the inventory decides them: what the game needs from its binding,
     // judged against the marker's own activity.
     static IReadOnlyList<string> Problems(StarterSetups setups, object marker, bool enabled, string segment, bool? resolves) {

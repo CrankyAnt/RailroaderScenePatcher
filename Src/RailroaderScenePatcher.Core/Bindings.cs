@@ -391,6 +391,7 @@ namespace RailroaderScenePatcher.Core {
         }
         internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             // Before mutation, what the write would refuse for a holder of a duplicate marker id: a change of its activity,
             // binding or track-following placement, and a dependent cache the write would correct by re-registering it.
             var dependent = Changes(target, state) ? null : world.DependentProblem(target);

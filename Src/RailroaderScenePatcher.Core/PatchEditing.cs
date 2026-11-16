@@ -244,6 +244,8 @@ namespace RailroaderScenePatcher.Core {
                     if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.5.0");
+                    // A starter placement needs its capability whether or not it is available on this build.
+                    if (item["starterPlacement"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == StarterPlacementScene.Structure)) minimum = Max(minimum, StarterPlacementScene.RequiredVersion);
                     // Crossing-pad rebinding needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingPadScene.Structure) minimum = Max(minimum, CrossingPadScene.RequiredVersion);
                     TargetIdentity target;
@@ -332,6 +334,7 @@ namespace RailroaderScenePatcher.Core {
                 if (active != null) value["active"] = active.Value;
                 else if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
                 if (existing?["relationships"] != null) value["relationships"] = existing["relationships"].DeepClone();
+                if (existing?["starterPlacement"] != null) value["starterPlacement"] = existing["starterPlacement"].DeepClone();
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
             }, validateBeforeMutation);
@@ -380,6 +383,7 @@ namespace RailroaderScenePatcher.Core {
             }
             if (state.Active.HasValue) lines.Add("Enabled: from " + (before?.Active == null ? "unknown" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
             if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
+            if (state.Starter?.Track != null) lines.Add("Track location: from " + Location(before?.Starter?.Track) + " to " + Location(state.Starter.Track));
             if (state.Coverage != null) foreach (var circuit in state.Coverage.Circuits)
                 lines.Add((DetectionAddition.Id(circuit.Key) == null ? "Circuit " + circuit.Key : "Detection addition " + DetectionAddition.Id(circuit.Key)) + ": " + circuit.Value);
             return lines;
@@ -507,7 +511,7 @@ namespace RailroaderScenePatcher.Core {
                 var key = TargetKey(item);
                 if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return false;
                 var underlying = engine.Underlying(held.Target);
-                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage)));
+                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)));
                 if (!Same(scene.Read(held.Target), desired)) return false;
                 return !(scene is IDerivedStateScene derived) || derived.DerivedProblem(held.Target, desired) == null;
             } catch (Exception) { return false; }
@@ -525,9 +529,9 @@ namespace RailroaderScenePatcher.Core {
                 var key = TargetKey(item);
                 if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return null;
                 var underlying = engine.Underlying(target);
-                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage)));
+                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)));
                 prior = scene.Read(target);
-                if (prior.Active != desired.Active || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage)) return null;
+                if (prior.Active != desired.Active || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage) || !StarterSetting.Same(prior.Starter, desired.Starter)) return null;
                 placement.PreflightPlacement(target);
             } catch (Exception) { return null; }
             var outcome = new Outcome { ResolvedTarget = target };
@@ -558,11 +562,12 @@ namespace RailroaderScenePatcher.Core {
                     if (existing?["relationships"] == null) throw new InvalidOperationException("This object has no relationship set by this mod in the active document");
                     var rest = (JObject)existing.DeepClone();
                     rest.Remove("relationships");
-                    return rest["placement"] == null && rest["active"] == null ? null : rest;
+                    return Empty(rest) ? null : rest;
                 }
                 var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
                 if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
                 if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
+                if (existing?["starterPlacement"] != null) value["starterPlacement"] = existing["starterPlacement"].DeepClone();
                 value["relationships"] = new JObject { ["trackMarker"] = binding.IsDetached ? new JObject { ["detach"] = true }
                     : new JObject { ["segment"] = binding.Location.Segment, ["end"] = binding.Location.End, ["distance"] = binding.Location.Distance } };
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
@@ -649,7 +654,7 @@ namespace RailroaderScenePatcher.Core {
             if (crossing.Count == 0) relationships.Remove("crossingCoverage"); else if (crossing.Parent == null) relationships["crossingCoverage"] = crossing;
             if (!relationships.HasValues) value.Remove("relationships"); else if (relationships.Parent == null) value["relationships"] = relationships;
             if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
-            return value["placement"] == null && value["active"] == null && value["relationships"] == null ? null : value;
+            return Empty(value) ? null : value;
         }
         // An entry of circuits or additions; its key names the circuit or the addition.
         static JObject CircuitJson(CircuitCoverage coverage) {
@@ -667,8 +672,64 @@ namespace RailroaderScenePatcher.Core {
                 PatchEngine.Parse(existing);
                 var rest = (JObject)existing.DeepClone();
                 rest.Remove("active");
-                return rest["placement"] == null && rest["relationships"] == null ? null : rest;
+                return Empty(rest) ? null : rest;
             });
+        }
+        // A modification that sets nothing the patcher executes is no modification.
+        static bool Empty(JObject value) => value["placement"] == null && value["active"] == null && value["relationships"] == null && value["starterPlacement"] == null;
+        // Places a starter placement marker on the track: the document records the setup whose car placement reads the
+        // marker and the new track location. The capability checks the location and the whole car cut before anything changes.
+        public Outcome PlaceStarter(TargetIdentity target, TrackLocation location, InspectedTarget inspected = null) {
+            return Change("Place starter marker", target, inspected, existing => {
+                if (location == null) throw new InvalidOperationException("Choose a track location on the track");
+                if (existing != null) PatchEngine.Parse(existing);
+                var setup = scene.Read(engine.ResolveUnique(target)).Starter?.Setup;
+                if (setup == null) {
+                    // The capability names why no single car placement reads the marker.
+                    engine.CheckRelationships(engine.ResolveUnique(target), new ObjectState(null, null, null, null, new StarterSetting("", null)));
+                    throw new InvalidOperationException(StarterPlacements.NoReader);
+                }
+                var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+                var starter = value["starterPlacement"] as JObject ?? new JObject();
+                starter["setup"] = setup;
+                starter["track"] = LocationJson(location);
+                if (starter.Parent == null) value["starterPlacement"] = starter;
+                if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
+                return value;
+            }, null, "starter-");
+        }
+        // Clears this mod's track location of a starter placement marker: the marker returns to its effective underlying
+        // track location. A modification left without a setting leaves the document.
+        public Outcome ClearStarterTrack(TargetIdentity target, InspectedTarget inspected = null) {
+            return Change("Clear starter track location", target, inspected, existing => {
+                if (existing?["starterPlacement"]?["track"] == null) throw new InvalidOperationException("This MapMod sets no track location for this marker, so there is nothing to clear");
+                PatchEngine.Parse(existing);
+                var rest = (JObject)existing.DeepClone();
+                var starter = (JObject)rest["starterPlacement"];
+                starter.Remove("track");
+                if (!starter.Properties().Any(p => p.Name != "setup")) rest.Remove("starterPlacement");
+                return Empty(rest) ? null : rest;
+            });
+        }
+        // Whether the active document sets the track location of this starter placement marker. Read from the document alone.
+        public bool HasStarterTrack(TargetIdentity target) {
+            if (document == null || target == null) return false;
+            foreach (var item in document.Items) {
+                var other = item["target"] as JObject;
+                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (item["starterPlacement"]?["track"] != null) return true;
+            }
+            return false;
+        }
+        // The positions of the cut the marker's car placement would place at the location, or at its current track location
+        // without one, front first: what the world shows.
+        public IReadOnlyList<double[]> StarterCut(TargetIdentity target, TrackLocation location) {
+            try {
+                var resolved = engine.ResolveUnique(target);
+                location = location ?? scene.Read(resolved).Starter?.Track?.Location;
+                return scene is StarterPlacementScene starter ? starter.CutPath(resolved, location)
+                    : scene is SceneCapabilities capabilities ? capabilities.StarterCut(resolved, location) : Array.Empty<double[]>();
+            } catch (Exception) { return Array.Empty<double[]>(); }
         }
         // Removes this mod's saved or unsaved modification of the object; the object returns to its effective underlying state.
         public Outcome Remove(TargetIdentity target) { return Remove(target, null); }
@@ -740,8 +801,13 @@ namespace RailroaderScenePatcher.Core {
                 relationships.Remove("trackMarker");
                 if (!relationships.HasValues) result.Remove("relationships");
             }
+            var starter = result["starterPlacement"] as JObject;
+            if (starter != null && Changed(existing?["starterPlacement"]?["track"], starter["track"]) && state.Starter?.Track != null && under.Starter?.Track != null && MarkerBinding.Same(state.Starter.Track, under.Starter.Track)) {
+                starter.Remove("track");
+                if (!starter.Properties().Any(p => p.Name != "setup")) result.Remove("starterPlacement");
+            }
             if (PreservingJson.SameModification(result, value)) return value;
-            return result["placement"] == null && result["active"] == null && result["relationships"] == null ? null : result;
+            return Empty(result) ? null : result;
         }
         static bool SamePlacement(Placement a, Placement b) {
             if (a == null || b == null || (a.Position == null && a.Rotation == null)) return false;
@@ -788,7 +854,12 @@ namespace RailroaderScenePatcher.Core {
             try {
                 var desired = engine.Desired(document.Modifications, target, documentKey);
                 // Only the mod's relationship needs a resolvable target; the underlying one may be the broken binding being repaired.
-                if (value != null) engine.CheckRelationships(target, PatchEngine.Parse(value, documentKey).State);
+                // A starter placement is judged with the document's other starter placements, as at load.
+                if (value != null) {
+                    engine.Plan(document.Modifications, documentKey);
+                    try { engine.CheckRelationships(target, PatchEngine.Parse(value, documentKey).State); }
+                    finally { engine.Unplan(); }
+                }
                 CheckEffectiveCoverage(target, desired.Coverage);
                 // Reading state and resolving the document may invoke native callbacks. Never redirect to a new match.
                 engine.GuardMutation(identity, target, mapContext, inspected);
@@ -846,7 +917,8 @@ namespace RailroaderScenePatcher.Core {
         }
         string NewId(TargetIdentity target, string prefix = "place-") {
             var name = new string(target.Path.Substring(target.Path.LastIndexOf('/') + 1).ToLowerInvariant().Select(c => Char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
-            var stem = prefix + (name.Length == 0 ? "object" : name);
+            // A name that already starts with the prefix, such as the starter placement marker starter-ewh-int2, keeps it once.
+            var stem = name.Length == 0 ? prefix + "object" : name.StartsWith(prefix, StringComparison.Ordinal) ? name : prefix + name;
             var used = new HashSet<string>(document.Modifications.Properties().Select(m => m.Name), StringComparer.Ordinal);
             var id = stem;
             for (var n = 2; used.Contains(id); n++) id = stem + "-" + n;
@@ -861,7 +933,7 @@ namespace RailroaderScenePatcher.Core {
         // as current after its track turned by less than that angle, and the object would not follow.
         const double AngleToleranceDegrees = 0.01;
         static bool Same(ObjectState a, ObjectState b) {
-            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage)) return false;
+            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !StarterSetting.Same(a.Starter, b.Starter)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }

@@ -81,7 +81,9 @@ namespace RailroaderScenePatcher {
         }
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
-        internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit";
+        internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
+        // Why Clear location has nothing to clear: this mod sets no track location for the starter placement marker.
+        internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This MapMod sets no track location for this marker, so there is nothing to clear.";
         // Why Clear activity cannot run for an object this mod sets no activity for, or null.
         internal static string ClearActivityReason(bool hasValue) => hasValue ? null : "This MapMod sets no activity for this object, so there is nothing to clear.";
         // Why the footer's Details of a world choice cannot show anything, or null: it shows the clicked candidate.
@@ -138,6 +140,7 @@ namespace RailroaderScenePatcher {
             new[] { new[] { "Track" }, new[] { "Node" }, new[] { "Apply" }, new[] { DiscardPrepared } },
             new[] { new[] { "Track" }, new[] { "Node" }, new[] { "Start" }, new[] { "Stop" } },
             new[] { new[] { "Set" }, new[] { "Detach" }, new[] { ClearBinding }, new[] { "Picked" } },
+            new[] { new[] { "Set" }, new[] { "Detach" }, new[] { ClearLocation }, new[] { "Picked" } },
             new[] { new[] { "Preview" }, new[] { "Detach" }, new[] { ClearCircuit }, new[] { "Apply" } },
             new[] { new[] { "Preview" }, new[] { "Delete" }, new[] { "Apply" } },
             new[] { new[] { "Retry" } },
@@ -147,12 +150,12 @@ namespace RailroaderScenePatcher {
             new[] { new[] { "Fit" } },
         };
         // The widths of those labels in the native compact button's text, Montserrat-Medium 16, as the UI probe measured
-        // them in the game; Discard and Start from the glyph advances fitted to the measured labels. The panel
+        // them in the game; Discard, Start and Clear location from the glyph advances fitted to the measured labels. The panel
         // measures its labels itself; this table lets the rule be checked without the game.
         internal static readonly Dictionary<string, float> LabelWidths = new Dictionary<string, float>(StringComparer.Ordinal) {
             { "Remove modification", 174.47f }, { "Remove", 66.76f }, { "Recheck", 70.02f }, { "Confirm", 65.75f }, { "Cancel", 55.19f }, { "Focus", 48.04f }, { "Details", 56.15f },
             { "Disable", 60.44f }, { "Enable", 56.36f }, { "Clear activity", 104.74f }, { "Apply", 46.95f }, { "Read", 41.67f }, { "Track", 43.46f }, { "Node", 43.86f },
-            { "Discard", 61.5f }, { "Start", 39f }, { "Stop", 37.35f }, { "Set", 26.36f }, { "Detach", 59.13f }, { "Clear binding", 109.6f }, { "Picked", 55.25f },
+            { "Discard", 61.5f }, { "Start", 39f }, { "Stop", 37.35f }, { "Set", 26.36f }, { "Detach", 59.13f }, { "Clear binding", 109.6f }, { "Clear location", 112.5f }, { "Picked", 55.25f },
             { "Preview", 64.68f }, { "Clear circuit", 96.93f }, { "Delete", 53.4f }, { "Retry", 43.8f }, { "Refresh", 62.15f }, { "Select in world", 119.96f }, { "Clear", 41.71f },
             { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f } };
         // One colour table for every world marking. Gold frames the inspected object. A candidate of a pick mode is
@@ -195,6 +198,9 @@ namespace RailroaderScenePatcher {
         // A log line names the action group, the object and what happened.
         internal static string LogLine(string place, string objectPath, string message) =>
             (String.IsNullOrEmpty(place) ? "" : "[" + place + "] ") + (String.IsNullOrEmpty(objectPath) ? "" : objectPath + ": ") + message;
+        // The name of a starter placement edit, with the track location it sets.
+        internal static string StarterAction(string segment, string end, double distance) =>
+            "Track location to " + segment + " / " + (end ?? "").ToLowerInvariant() + " / " + Number(distance);
         // The name of a binding edit, with the track location it sets.
         internal static string BindingAction(string segment, string end, double distance) =>
             "Track binding to " + segment + " / " + (end ?? "").ToLowerInvariant() + " / " + Number(distance);
@@ -336,7 +342,8 @@ namespace RailroaderScenePatcher {
         // without leaving the field.
         internal static string FieldReason(string block, IReadOnlyList<string> entered, IReadOnlyList<string> current, string same, params int[] exact) =>
             block ?? (SameFields(entered, current, exact) ? same : null);
-        internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.";
+        internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.",
+            SameLocation = "The fields hold the marker's current track location.";
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the
         // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.

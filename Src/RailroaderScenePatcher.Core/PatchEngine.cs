@@ -42,7 +42,8 @@ namespace RailroaderScenePatcher.Core {
     public sealed class ObjectState {
         public ObjectState(Placement placement, bool? active) : this(placement, active, null) { }
         public ObjectState(Placement placement, bool? active, MarkerBinding marker) : this(placement, active, marker, null) { }
-        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage) { Placement = placement; Active = active; Marker = marker; Coverage = coverage; }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage) : this(placement, active, marker, coverage, null) { }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, StarterSetting starter) { Placement = placement; Active = active; Marker = marker; Coverage = coverage; Starter = starter; }
         public Placement Placement { get; }
         public bool? Active { get; }
         // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
@@ -50,12 +51,15 @@ namespace RailroaderScenePatcher.Core {
         // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. This mod's coverage
         // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
         public CrossingCoverage Coverage { get; }
+        // The starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, and
+        // the marker's track location. Null leaves it untouched, and any other object reads null.
+        public StarterSetting Starter { get; }
         // Tells the two meanings of a null Active apart for an object whose activity follows a track group. True: this is
         // one modification's own state, and the application leaves the activity as it is, including an explicit disable
         // that another modification installed. False: this is the complete desired state, and a null Active returns the
         // object to its group-driven activity, which releases an explicit disable.
         public bool LeavesActivity { get; private set; }
-        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage) { LeavesActivity = true };
+        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Starter) { LeavesActivity = true };
     }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
@@ -193,6 +197,7 @@ namespace RailroaderScenePatcher.Core {
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var entries = Entries(document.Modifications);
                 sharedAdditions = SharedAdditionIds(entries.Values);
+                Plan(document.Modifications, documentKey);
                 var visiting = new HashSet<string>();
                 // Modifications that dependsOn does not order run in ordinal key order, whatever the order of the text.
                 foreach (var id in entries.Keys) {
@@ -203,8 +208,25 @@ namespace RailroaderScenePatcher.Core {
                     Execute(id, entries, outcomes, visiting, documentKey, inspectedTargets);
                 }
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
+            finally { Unplan(); }
             return result;
         }
+        // Gives a scene that judges modifications with their document the desired state of every object that a starter
+        // placement of the document sets. A modification that cannot be read or resolved is left out.
+        internal void Plan(JObject modifications, string owner) {
+            if (!(scene is IPlannedStateScene planned)) return;
+            var desired = new Dictionary<object, ObjectState>(new ByReference());
+            foreach (var entry in Entries(modifications)) {
+                if (entry.Value["starterPlacement"] == null) continue;
+                try {
+                    var parsed = Parse(entry.Value, owner, entry.Key);
+                    var target = ResolveUnique(parsed.Identity);
+                    desired[target] = desired.TryGetValue(target, out var before) ? Overlay(before, parsed.State) : parsed.State;
+                } catch (InvalidOperationException) { }
+            }
+            planned.Plan(desired);
+        }
+        internal void Unplan() { (scene as IPlannedStateScene)?.Plan(null); }
         bool EarlyRepair(string id, JObject entry, TargetIdentity target, out string unavailable) {
             unavailable = null;
             try {
@@ -336,6 +358,7 @@ namespace RailroaderScenePatcher.Core {
             if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
         }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
         internal bool IsUnsafe(object target) {
@@ -378,17 +401,20 @@ namespace RailroaderScenePatcher.Core {
             var state = Underlying(target);
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
-                state = new ObjectState(item.State.Placement ?? state.Placement, item.State.Active ?? state.Active, item.State.Marker ?? state.Marker, CrossingCoverage.Overlay(state.Coverage, item.State.Coverage));
+                state = Overlay(state, item.State);
             }
             return Evaluate(state);
         }
+        // One modification's state laid over a complete state: every value the modification sets replaces the one below.
+        internal static ObjectState Overlay(ObjectState under, ObjectState mod) =>
+            new ObjectState(mod.Placement ?? under.Placement, mod.Active ?? under.Active, mod.Marker ?? under.Marker, CrossingCoverage.Overlay(under.Coverage, mod.Coverage), StarterSetting.Overlay(under.Starter, mod.Starter));
         // The state with a track-following placement evaluated at its anchor's current native pose. Throws before any
         // mutation when the anchor does not resolve.
         internal ObjectState Evaluate(ObjectState state) {
             var following = state?.Placement?.Following;
             if (following == null) return state;
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
-            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage);
+            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Starter);
             return state.LeavesActivity ? evaluated.LeavingActivity() : evaluated;
         }
         Modification Effective(string id, SortedDictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting, string owner, HashSet<string> shared) {
@@ -423,7 +449,7 @@ namespace RailroaderScenePatcher.Core {
             if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
             return dependencies.Select(x => (string)x).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
-        internal static readonly string[] Known = { "target", "placement", "active", "relationships", "dependsOn" };
+        internal static readonly string[] Known = { "target", "placement", "active", "relationships", "starterPlacement", "dependsOn" };
         // The modifications of a document by key, in ordinal key order.
         internal static SortedDictionary<string, JObject> Entries(JObject modifications) {
             var entries = new SortedDictionary<string, JObject>(StringComparer.Ordinal);
@@ -460,8 +486,9 @@ namespace RailroaderScenePatcher.Core {
                 if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
                 if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner);
             }
-            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage), Dependencies = dependencies };
+            var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
+            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && starter == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, starter), Dependencies = dependencies };
         }
         public const string TrackFollowingMode = "trackFollowing";
         // A placement relative to an explicitly selected segment location or endpoint node.
@@ -495,6 +522,23 @@ namespace RailroaderScenePatcher.Core {
                 return MarkerBinding.Detached;
             }
             return MarkerBinding.At(ParseLocation(marker, "relationship"));
+        }
+        // The starter placement of a starter placement marker: setup names the setup whose new-game car placement reads the
+        // marker, and track sets the marker's track location. A detach object is read so the capability can refuse it with
+        // its reason: the game reads a used marker's track location whatever else holds.
+        static StarterSetting ParseStarter(JToken token) {
+            var starter = token as JObject;
+            if (starter == null) throw new InvalidOperationException("Invalid starter placement: starterPlacement must be an object with setup and track");
+            if (!Only(starter, "setup", "track")) throw new InvalidOperationException("Unsupported starter placement content");
+            if (!RequiredString(starter, "setup")) throw new InvalidOperationException("Invalid starter placement: setup must name the setup whose car placement reads the marker");
+            if (starter["track"] == null) throw new InvalidOperationException("Invalid starter placement: track must set the marker's track location");
+            var track = starter["track"] as JObject;
+            if (track == null) throw new InvalidOperationException("Invalid starter placement: track must be a track location with segment, end and distance");
+            if (track["detach"] != null) {
+                if (!Only(track, "detach") || track["detach"].Type != JTokenType.Boolean || !(bool)track["detach"]) throw new InvalidOperationException("Invalid starter placement: detach must be true and stand alone");
+                return new StarterSetting((string)starter["setup"], MarkerBinding.Detached);
+            }
+            return new StarterSetting((string)starter["setup"], MarkerBinding.At(ParseLocation(track, "starter placement")));
         }
         // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by its native island span, with selected
         // tracks or an explicit detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every
