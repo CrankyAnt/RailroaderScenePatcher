@@ -56,7 +56,9 @@ One line per validation or test command and per CI workflow the repository runs.
 - `reuse --no-multiprocessing lint`: validates file-level copyright and license information
 - `git diff --check`: checks changes for whitespace errors
 - `actionlint`: validates GitHub Actions workflow definitions
-- `repository-hygiene` (shared, `v1`): the convention checks of branch names, commit subjects and pull-request titles, the credential scan, workflow validation, Dependabot coverage and the Markdown link check, and `reuse lint`
+- `ci` (shared, `v1`): runs repository hygiene and the configured CI parts and reports the one required check `ci / verdict`
+- `automation` (shared, `v1`): runs the configured parts that write, including Dependabot auto-merge, additions, full recording and issue-title normalisation
+- `release` (shared, `v1`): runs the configured release part on a pushed tag or a start by hand and publishes nothing without release configuration
 
 ## Code style
 
