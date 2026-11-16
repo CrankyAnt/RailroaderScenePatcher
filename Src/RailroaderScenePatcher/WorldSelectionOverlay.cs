@@ -140,7 +140,7 @@ namespace RailroaderScenePatcher {
         }
         // The surface may have changed: an edit, a terrain output that completed, or a track change. The heights are
         // read again.
-        internal void ClearSurface() { grounds.Clear(); listed.Clear(); controlled.Clear(); }
+        internal void ClearSurface() { grounds.Clear(); listed.Clear(); controlled.Clear(); groupedFrom = null; }
         // What is kept per object and per renderer loses the entries of objects the game destroyed, now and then.
         int prunedAt;
         void Prune() {
@@ -163,38 +163,207 @@ namespace RailroaderScenePatcher {
         }
 
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
-            IReadOnlyList<Rect> uiBounds) {
+            IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen) {
             // Native windows can move between the last repaint and this click.
             covered = uiBounds;
             budget.Begin();
             if (covered.Any(r => r.Contains(pointer))) return Array.Empty<SelectionCandidate>();
             lastPick = pointer;
             var labelHits = labels.Where(s => s.Label.Contains(pointer) && !covered.Any(r => r.Overlaps(s.Label))).ToArray();
-            var shapes = candidates.Select(c => Project(c, camera, origin)).ToArray();
+            var shapes = ProjectAll(candidates, camera, origin, out var measured);
+            var groups = Groups(candidates, measured, camera, origin, chosen, inspectedMark);
+            OwnFrames(candidates, shapes, measured, groups, camera, origin);
             // A row of the list beside the click owns its click. Otherwise a click on a shown square marker reaches
             // that marker, also where the label of another candidate lies over it. Any other opaque identity label
             // owns its click; geometry hidden behind it is never selected.
             var rows = labelHits.Where(s => s.Listed).ToArray();
             if (rows.Length != 0) labelHits = rows;
-            else if (CommandBand.MarkerBeforeLabel(Enumerable.Range(0, shapes.Length).Any(i => shapes[i] != null && Marked(shapes[i], candidates[i], camera, origin) && shapes[i].Marker.Contains(pointer)))) labelHits = new Shape[0];
+            else if (CommandBand.MarkerBeforeLabel(Enumerable.Range(0, shapes.Length).Any(i => shapes[i] != null && !groups.Hidden[i] && Marked(shapes[i], candidates[i], camera, origin) && shapes[i].Marker.Contains(pointer))
+                || groups.Shown.Any(group => group.Shape != null && group.Shape.Marker.Contains(pointer)))) labelHits = new Shape[0];
             if (labelHits.Length != 0)
                 return candidates.Where(c => labelHits.Any(s => s.Candidate.Choice.Matches(c.Choice))).Select(c => c.Choice).ToArray();
-            return Resolve(candidates, shapes, camera, origin, pointer).Select(i => candidates[i].Choice).ToArray();
+            return Resolve(candidates, shapes, groups, camera, origin, pointer).Objects.Select(i => candidates[i].Choice).ToArray();
         }
         // Where the last click fell: the list of the candidates of one spot opens beside it.
         Vector2 lastPick;
         // The candidates a click at the pointer selects (WorldPick.Resolve): the rule of the click and of the hover.
-        int[] Resolve(SpatialCandidate[] candidates, Shape[] shapes, Camera camera, Vector3 origin, Vector2 pointer) {
-            var indices = new List<int>(); var targets = new List<PickTarget>();
-            for (var i = 0; i < shapes.Length; i++) {
-                var shape = shapes[i];
-                if (shape == null) continue;
-                var area = shape.InFrame(pointer) || (shape.Track != null && shape.Track.Contains(new MarkingPoint(pointer.x, pointer.y)));
-                indices.Add(i);
-                targets.Add(new PickTarget(shape.Marker.center.x, shape.Marker.center.y, Marked(shape, candidates[i], camera, origin), area));
-            }
-            return WorldPick.Resolve(pointer.x, pointer.y, targets).Select(i => indices[i]).ToArray();
+        // A game-defined group that shows as one takes part with its square marker and frame as one object, and
+        // stands for its objects. A candidate that is not in view has no marker and no frame to meet the pointer.
+        WorldPickResult Resolve(SpatialCandidate[] candidates, Shape[] shapes, GroupLayout groups, Camera camera, Vector3 origin, Vector2 pointer) {
+            PickTarget Target(Shape shape, bool marked) => shape == null ? new PickTarget(0, 0, false, false)
+                : new PickTarget(shape.Marker.center.x, shape.Marker.center.y, marked, shape.InFrame(pointer) || (shape.Track != null && shape.Track.Contains(new MarkingPoint(pointer.x, pointer.y))));
+            var targets = new PickTarget[shapes.Length];
+            for (var i = 0; i < shapes.Length; i++) targets[i] = Target(shapes[i], shapes[i] != null && Marked(shapes[i], candidates[i], camera, origin));
+            return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own)).ToArray());
         }
+
+        // A game-defined group that shows as one square marker: its objects among the candidates, as indices, those
+        // of them that show on their own, what the group shows and its one marking, or null when it is not in view.
+        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal GroupShows Shows; internal Shape Shape; }
+        // The groups that show as one from this camera, for each candidate whether its group stands for it, the
+        // candidates that show their own frame at their group's frame distance, and the frame distance of the
+        // inspected object (GameDefinedGroups.OwnFrameDistance).
+        sealed class GroupLayout {
+            internal ShownGroup[] Shown = new ShownGroup[0]; internal bool[] Hidden; internal readonly List<int> OwnAtGroupDistance = new List<int>();
+            internal double InspectedFrameDistance = ObjectMarkingGeometry.FrameDistance;
+        }
+        // What one pass measured of a scene object: its frame, with the bounds and the parts of its framed piece. A
+        // group takes its bounds and its one box from these, without reading the object again.
+        sealed class Measured { internal ObjectMarkingFrame Frame; }
+        // The component facts of a group, read from the family the inventory gave an object: a crossing controller
+        // anchors a grade-crossing setup, and a track marker that is no crossing pad is, below that controller's
+        // root, a whistle sign.
+        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker";
+        // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
+        // Select in world and a choice for a document show one crossing the same way.
+        internal Func<IReadOnlyList<SceneObservation>> Inventory;
+        // One group of the inventory: its objects that have a usable position, and the scene object of the game
+        // component that anchors it, whose orientation the group's one box takes.
+        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal GameObject Root; }
+        // The groups are decided once per inventory snapshot, and again when the snapshot is another one or has
+        // another number of entries, and after the scene may have changed (ClearSurface, on every move of the
+        // native map editor's history). Without a snapshot they are decided from the candidates of the choice.
+        object groupedFrom;
+        int groupedCount;
+        InventoryGroup[] inventoryGroups = new InventoryGroup[0];
+        // For each group, the index among the candidates of each of its objects, or -1 for one the choice does not
+        // offer; kept per list of candidates.
+        SpatialCandidate[] mappedFor;
+        int[][] mapped = new int[0][];
+        static IEnumerable<object> Above(GameObject go) {
+            for (var parent = go == null ? null : go.transform.parent; parent != null; parent = parent.parent) yield return parent.gameObject;
+        }
+        InventoryGroup[] GroupsOf(SpatialCandidate[] candidates) {
+            var snapshot = Inventory?.Invoke();
+            var listed = snapshot != null && snapshot.Count != 0;
+            object from = listed ? (object)snapshot : candidates;
+            var count = listed ? snapshot.Count : candidates.Length;
+            if (ReferenceEquals(from, groupedFrom) && count == groupedCount) return inventoryGroups;
+            groupedFrom = from; groupedCount = count; mappedFor = null; inventoryGroups = new InventoryGroup[0];
+            try {
+                var all = listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray();
+                if (all.Any(o => o.Family == ControllerFamily))
+                    inventoryGroups = GameDefinedGroups.Of(all.Select(o => o.Handle is GameObject go && go != null
+                            ? new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily) : null).ToArray())
+                        .Select(group => new InventoryGroup { Root = group.Anchor as GameObject, Objects = group.Members.Select(i => SpatialSelectionScene.Observe(all[i])).Where(c => c.Points.Length != 0).ToArray() }).ToArray();
+            } catch (Exception e) { Debug.LogWarning("Scene Patcher: game-defined groups could not be read; every object shows on its own. " + e.GetBaseException().Message); }
+            return inventoryGroups;
+        }
+        int[][] Mapped(SpatialCandidate[] candidates, InventoryGroup[] groups) {
+            if (ReferenceEquals(candidates, mappedFor)) return mapped;
+            var byHandle = new Dictionary<object, List<int>>();
+            for (var i = 0; i < candidates.Length; i++) {
+                if (candidates[i].Observation == null) continue;
+                if (!byHandle.TryGetValue(candidates[i].Choice.Handle, out var list)) byHandle[candidates[i].Choice.Handle] = list = new List<int>();
+                list.Add(i);
+            }
+            mapped = groups.Select(group => group.Objects.Select(member => {
+                if (byHandle.TryGetValue(member.Choice.Handle, out var list)) foreach (var i in list) if (Same(candidates[i], member.Choice)) return i;
+                return -1;
+            }).ToArray()).ToArray();
+            mappedFor = candidates;
+            return mapped;
+        }
+        static bool Same(SpatialCandidate candidate, SelectionCandidate other) =>
+            other != null && ReferenceEquals(candidate.Choice.Handle, other.Handle) && candidate.Choice.Identity.Equals(other.Identity);
+        // How the groups of the inventory show from this camera (ObjectMarkingGeometry.GroupFrame). A group at 125
+        // metres or less from its bounds shows its objects and is not listed here, and neither is a group none of
+        // whose objects the choice offers. measured holds what this pass measured of each candidate. chosen is the
+        // candidate of the pending choice and inspected the inspected object: each shows its own marker and frame.
+        GroupLayout Groups(SpatialCandidate[] candidates, Measured[] measured, Camera camera, Vector3 origin, SelectionCandidate chosen, SpatialCandidate inspected) {
+            var layout = new GroupLayout { Hidden = new bool[candidates.Length] };
+            var groups = GroupsOf(candidates);
+            if (groups.Length == 0) return layout;
+            var map = Mapped(candidates, groups);
+            var shown = new List<ShownGroup>();
+            var eye = Point(camera.transform.position);
+            for (var g = 0; g < groups.Length; g++) {
+                var objects = groups[g].Objects; var indices = map[g];
+                var members = indices.Where(i => i >= 0).ToArray();
+                if (members.Length == 0) continue;
+                // A candidate was measured when it was projected. An object of the group that the choice does not
+                // offer is measured here, once per pass: it bounds the group and outlines it like the others.
+                var parts = new Measured[objects.Length];
+                for (var k = 0; k < objects.Length; k++) {
+                    if (indices[k] >= 0) parts[k] = measured[indices[k]];
+                    else Project(objects[k], camera, origin, ObjectMarkingGeometry.FrameDistance, out parts[k]);
+                }
+                var anchors = objects.Select(member => Point(member.Position + origin)).ToArray();
+                var frames = parts.Select(part => part?.Frame).ToArray();
+                // The group's one box stands in the orientation of the scene object that anchors it, the crossing
+                // controller's root, around where its objects stand and around the parts of their pieces, and is cut
+                // at the surface like the box of an object.
+                var root = groups[g].Root;
+                var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera));
+                if (marking.Shows == GroupShows.Objects) continue;
+                bool Inspected(SpatialCandidate member) => inspected != null && Same(member, inspected.Choice);
+                var own = members.Where(m => Same(candidates[m], chosen) || Inspected(candidates[m])).ToArray();
+                foreach (var m in members) layout.Hidden[m] = !GameDefinedGroups.ShowsOwn(marking.Shows, Same(candidates[m], chosen), Inspected(candidates[m]));
+                var ownDistance = GameDefinedGroups.OwnFrameDistance(marking.Shows);
+                if (ownDistance > ObjectMarkingGeometry.FrameDistance) {
+                    layout.OwnAtGroupDistance.AddRange(own);
+                    if (objects.Any(Inspected)) layout.InspectedFrameDistance = ownDistance;
+                }
+                shown.Add(new ShownGroup { Members = members, Own = own, Shows = marking.Shows, Shape = GroupShape(marking, camera) });
+            }
+            layout.Shown = shown.ToArray();
+            return layout;
+        }
+        // Every candidate projected once, with what was measured of each.
+        Shape[] ProjectAll(SpatialCandidate[] candidates, Camera camera, Vector3 origin, out Measured[] measured) {
+            var shapes = new Shape[candidates.Length]; measured = new Measured[candidates.Length];
+            for (var i = 0; i < candidates.Length; i++) shapes[i] = Project(candidates[i], camera, origin, ObjectMarkingGeometry.FrameDistance, out measured[i]);
+            return shapes;
+        }
+        // A candidate that shows on its own in a group within the group's frame distance has its own frame, although
+        // its own bounds, or without parts its marker, may lie beyond the frame distance: it is projected again at
+        // the group's frame distance. That is the candidate of the choice and the inspected object, at most.
+        void OwnFrames(SpatialCandidate[] candidates, Shape[] shapes, Measured[] measured, GroupLayout layout, Camera camera, Vector3 origin) {
+            foreach (var m in layout.OwnAtGroupDistance) {
+                var frame = measured[m]?.Frame;
+                if (frame == null || frame.Frame.HasValue) continue;
+                var distance = Double.IsNaN(frame.Distance) ? (camera.transform.position - (candidates[m].Position + origin)).magnitude : frame.Distance;
+                if (distance > ObjectMarkingGeometry.FrameDistance) shapes[m] = Project(candidates[m], camera, origin, Double.PositiveInfinity, out _);
+            }
+        }
+        // The camera's projection of a world point to clip coordinates, and its view in top-left screen pixels.
+        static Func<WorldPoint, ClipPoint> Projection(Camera camera) {
+            var toClip = camera.projectionMatrix * camera.worldToCameraMatrix;
+            return p => {
+                var clip = toClip * new Vector4((float)p.X, (float)p.Y, (float)p.Z, 1);
+                return new ClipPoint(clip.x, clip.y, clip.z, clip.w);
+            };
+        }
+        static ScreenRect ViewOf(Camera camera) {
+            var view = camera.pixelRect;
+            return ScreenRect.FromEdges(view.xMin, Screen.height - view.yMax, view.xMax, Screen.height - view.yMin);
+        }
+        // An object's own right, up and forward: the directions of the one box that frames it.
+        static WorldBasis Basis(Transform transform) => new WorldBasis(Point(transform.right), Point(transform.up), Point(transform.forward));
+        // The one marking of a group: its square marker at the centre of its frame, or, beyond the frame distance,
+        // at the middle of its bounds. Null when neither is in view.
+        Shape GroupShape(GroupMarking marking, Camera camera) {
+            var shape = new Shape();
+            var anchor = ScreenPoint(camera, new Vector3((float)marking.Center.X, (float)marking.Center.Y, (float)marking.Center.Z), Vector3.zero);
+            if (marking.Frame.HasValue) {
+                var frame = ObjectMarkingGeometry.VisibleFrame(marking.Frame.Value);
+                var rect = Rect.MinMaxRect((float)frame.X, (float)frame.Y, (float)frame.Right, (float)frame.Bottom);
+                shape.Objects.Add(rect);
+                shape.Outline = ObjectMarkingGeometry.VisibleOutline(marking.Outline);
+                anchor = new Vector3(rect.center.x, rect.center.y, camera.nearClipPlane);
+            } else if (!InFront(camera, anchor)) return null;
+            else if (marking.Shows == GroupShows.MarkerAndFrame) {
+                // None of its objects has an outline in view: the least frame about the group's marker.
+                shape.Outline = ObjectMarkingGeometry.MarkerOutline(anchor.x, anchor.y);
+                var half = (float)(ObjectMarkingGeometry.MarkerSize / 2 + ObjectMarkingGeometry.MarkerMargin);
+                shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
+            }
+            shape.Marker = new Rect(anchor.x - MarkerSize / 2, anchor.y - MarkerSize / 2, MarkerSize, MarkerSize);
+            var screen = new Rect(0, 0, Screen.width, Screen.height);
+            return screen.Overlaps(shape.Marker) || shape.Objects.Any(screen.Overlaps) ? shape : null;
+        }
+        // The inspected object of the last repaint: in a group that shows as one it keeps its own marker and frame.
+        SpatialCandidate inspectedMark;
         // Whether a candidate carries its "+" without the pointer over it: a track only within a distance of the camera.
         static bool Marked(Shape shape, SpatialCandidate candidate, Camera camera, Vector3 origin) =>
             CommandBand.ShowsMarker(shape.Track != null, shape.Track == null ? 0 : (camera.transform.position - (candidate.Position + origin)).magnitude, false);
@@ -218,6 +387,7 @@ namespace RailroaderScenePatcher {
         internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed, SpatialCandidate followed,
             IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing, SpatialCandidate trackPoint = null) {
             covered = uiBounds;
+            inspectedMark = source;
             labels.Clear();
             budget.Begin();
             Prune();
@@ -241,16 +411,26 @@ namespace RailroaderScenePatcher {
             var pointer = Event.current.mousePosition;
             // The pointer marks what a click there would select, by the click's own rule: one candidate, or the
             // candidates of one spot. Over a window or a label it marks nothing by that rule; a label marks its own.
-            var projected = candidates.Select(c => Project(c, camera, origin)).ToArray();
+            var projected = ProjectAll(candidates, camera, origin, out var measured);
             var overUi = covered.Any(r => r.Contains(pointer));
             var labelled = overUi ? null : previousLabels.FirstOrDefault(l => l.Value.Contains(pointer)).Key;
-            var under = pending == null || overUi || labelled != null ? new int[0] : Resolve(candidates, projected, camera, origin, pointer);
+            var groups = Groups(candidates, measured, camera, origin, pending?.Candidate, source);
+            OwnFrames(candidates, projected, measured, groups, camera, origin);
+            var pointed = pending == null || overUi || labelled != null ? null : Resolve(candidates, projected, groups, camera, origin, pointer);
+            var under = pointed == null ? new int[0] : pointed.Objects.ToArray();
             var several = pending != null && pending.Offers.Count > 1;
             var offerLabels = several ? pending.Offers.Select(o => o.Label).ToArray() : null;
             for (var index = 0; index < candidates.Length; index++) {
                 var candidate = candidates[index]; var shape = projected[index];
-                if (shape == null) continue;
                 bool offered = pending != null && pending.Offers.Contains(candidate.Choice);
+                // An object of a group that shows as one has no marker and no frame of its own. Offered, it is a
+                // row of the choice list, in view or not.
+                if (groups.Hidden[index]) {
+                    if (offered && several) shapes.Add(new Shape { Candidate = candidate, Listed = true, Color = Tone(CommandBand.CandidateMark(true, false)),
+                        Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60) });
+                    continue;
+                }
+                if (shape == null) continue;
                 bool chosen = pending != null && ReferenceEquals(candidate.Choice, pending.Candidate);
                 // A candidate the panel points at, or whose label the pointer is over, is marked as one under the pointer.
                 bool hovered = Array.IndexOf(under, index) >= 0 || (pending != null && ReferenceEquals(candidate.Choice, pending.Highlight)) || (labelled != null && ReferenceEquals(labelled, candidate.Choice));
@@ -267,9 +447,20 @@ namespace RailroaderScenePatcher {
                 // distance of the camera, so that a wide view is not filled with them.
                 if (shape.Detailed || Marked(shape, candidate, camera, origin)) shapes.Add(shape);
             }
+            // A group that shows as one: its square marker, and its frame in blue while the pointer is where a click
+            // would pick the group, and lighter while its choice list is open.
+            for (var index = 0; index < groups.Shown.Length; index++) {
+                var group = groups.Shown[index];
+                if (group.Shape == null) continue;
+                bool hovered = pointed != null && pointed.Groups.Contains(index);
+                bool open = pending != null && several && group.Members.Any(m => groups.Hidden[m] && pending.Offers.Contains(candidates[m].Choice));
+                group.Shape.Color = Tone(CommandBand.CandidateMark(open && !hovered, hovered));
+                group.Shape.Detailed = open || hovered;
+                shapes.Add(group.Shape);
+            }
             if (source != null && source.Points.Length > 0) {
                 var marked = shapes.FirstOrDefault(s => s.Text != null && s.Candidate.Choice.Matches(source.Choice));
-                var shape = Project(source, camera, origin);
+                var shape = Project(source, camera, origin, groups.InspectedFrameDistance, out _);
                 var broken = source.Observation != null && source.Observation.Problems.Count != 0;
                 if (marked != null) {
                     if (hasSource) marked.Text = "Object / " + marked.Text;
@@ -356,7 +547,11 @@ namespace RailroaderScenePatcher {
 #endif
         }
 
-        Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin) {
+        Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin) => Project(candidate, camera, origin, ObjectMarkingGeometry.FrameDistance, out _);
+        // frameDistance is the distance beyond which the object has no frame (ObjectMarkingGeometry.Frame); measured
+        // is what was measured of a scene object, also when the object is not in view and has no shape.
+        Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin, double frameDistance, out Measured measured) {
+            measured = null;
             if (candidate.Points.Length == 0) return null;
             // The surface heights are kept by world place: an origin move makes every place another one.
             if (origin != groundOrigin) { grounds.Clear(); groundOrigin = origin; }
@@ -407,12 +602,11 @@ namespace RailroaderScenePatcher {
                 }
                 if (waits) parts.Clear();
                 var view = camera.pixelRect;
-                var toClip = camera.projectionMatrix * camera.worldToCameraMatrix;
                 // One frame per object, around the piece its marker belongs to. Picking uses the same rectangle.
-                var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), parts, p => {
-                    var clip = toClip * new Vector4((float)p.X, (float)p.Y, (float)p.Z, 1);
-                    return new ClipPoint(clip.x, clip.y, clip.z, clip.w);
-                }, ScreenRect.FromEdges(view.xMin, Screen.height - view.yMax, view.xMax, Screen.height - view.yMin), decisions);
+                // The box of an object of several parts stands in the object's own orientation.
+                var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), parts, Projection(camera), ViewOf(camera), decisions, frameDistance, Basis(go.transform),
+                    ObjectMarkingGeometry.FramesWhole(candidate.Observation.Family));
+                measured = new Measured { Frame = result };
                 if (result.Frame.HasValue) {
                     var frame = result.Frame.Value;
                     // The marker stands on the frame's centre; the frame is never smaller than the marker with its margin.
@@ -421,8 +615,9 @@ namespace RailroaderScenePatcher {
                     shape.Objects.Add(rect);
                     shape.Outline = ObjectMarkingGeometry.VisibleOutline(result.Outline);
                     anchor = new Vector3(rect.center.x, rect.center.y, camera.nearClipPlane);
-                } else if (InFront(camera, anchor) && ObjectMarkingGeometry.FramesMarker((camera.transform.position - (candidate.Position + origin)).magnitude)) {
-                    // No part to frame: the object still has a frame within the frame distance, about its marker.
+                } else if (InFront(camera, anchor) && (frameDistance > ObjectMarkingGeometry.FrameDistance || ObjectMarkingGeometry.FramesMarker((camera.transform.position - (candidate.Position + origin)).magnitude))) {
+                    // No part to frame: the object still has a frame within the frame distance, about its marker. An
+                    // object that is asked for at its group's frame distance has it wherever its marker stands.
                     shape.Outline = ObjectMarkingGeometry.MarkerOutline(anchor.x, anchor.y);
                     var half = (float)(ObjectMarkingGeometry.MarkerSize / 2 + ObjectMarkingGeometry.MarkerMargin);
                     shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
@@ -616,7 +811,9 @@ namespace RailroaderScenePatcher {
         // The frames of the hovered, clicked and related objects and of the inspected one: each the line of its
         // outline, clipped to where the world shows. A candidate a row points at is drawn last and heavier.
         void DrawOutlines(List<Shape> shapes, List<Rect> zones) {
-            var framed = shapes.Where(shape => shape.Detailed && shape.Outline != null && shape.Outline.Count >= 3).OrderBy(shape => shape.Strong ? 1 : 0).ToArray();
+            // An outline with a point that is not finite is not drawn: one such point would spoil the batch.
+            var framed = shapes.Where(shape => shape.Detailed && shape.Outline != null && shape.Outline.Count >= 3 && shape.Outline.All(q => !Double.IsNaN(q.X) && !Double.IsInfinity(q.X) && !Double.IsNaN(q.Y) && !Double.IsInfinity(q.Y)))
+                .OrderBy(shape => shape.Strong ? 1 : 0).ToArray();
             if (zones.Count == 0 || framed.Length == 0) return;
             var material = StrokeMaterial();
             var visible = zones.Select(zone => ScreenRect.FromEdges(zone.xMin, zone.yMin, zone.xMax, zone.yMax)).ToArray();

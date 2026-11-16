@@ -185,6 +185,36 @@ static class SelectionTests {
         Check(board.X == 7, "The prior placement is still undoable after cancellation");
         mapEditor.Redo();
         Check(board.X == 12, "The prior placement is still redoable after cancellation");
+
+        // The choice list of a game-defined group. Beyond 125 metres a grade-crossing setup shows one square marker;
+        // the click rule picks the group there, and its objects are the offers of the list.
+        var parts = new[] { "controller", "light", "gate" }.Select(name => new Box { X = 40 }).ToArray();
+        var members = parts.Select((part, index) => new SelectionCandidate(part, SelectionIdentity.SceneObject(new TargetIdentity("s", "crossing/" + index, "c")), "Crossing part " + index)).ToArray();
+        candidates.Items.AddRange(members);
+        var offered = new[] { source }.Concat(members).ToArray();
+        var marker = new PickTarget(300, 300, true, false);
+        var picked = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { new PickGroup(marker, new[] { 1, 2, 3 }) });
+        undo = mapEditor.UndoGroups.ToArray(); redo = mapEditor.RedoGroups.ToArray(); document = editing.DocumentText; saved = store.Patch; dirty = mapEditor.IsDirty; writes = store.PatchWrites;
+        var mutations = scene.MutationCalls;
+        bool Unchanged() => mapEditor.UndoGroups.SequenceEqual(undo) && mapEditor.RedoGroups.SequenceEqual(redo) && mapEditor.IsDirty == dirty && editing.DocumentText == document &&
+            store.Patch == saved && store.PatchWrites == writes && scene.MutationCalls == mutations && board.X == 12 && parts.All(part => part.X == 40 && part.Active);
+        choices.Begin(SelectionKind.SceneObject, "Select scene object", inspectOnly: true);
+        choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
+        Check(choices.Pending.ListOpen && choices.Pending.Offers.SequenceEqual(members) && choices.Pending.Candidate == null && Unchanged(),
+            "A click that picks a group opens the choice list of the group's objects and changes nothing");
+        choices.Pending.Highlight = members[2];
+        choices.Pending.Choose(members[1]);
+        Check(ReferenceEquals(choices.Pending.Candidate, members[1]) && choices.Pending.IsPending && Unchanged(), "Choosing an entry makes that object the candidate and changes nothing");
+        choices.Cancel();
+        Check(choices.Pending == null && ReferenceEquals(confirmed, choices.Confirmed) && Unchanged(), "Cancelling a group's choice list changes no scene object, patch data or completed edit history");
+        choices.Begin(SelectionKind.SceneObject, "Select scene object", inspectOnly: true);
+        choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
+        choices.Pending.CloseList();
+        Check(choices.Pending != null && choices.Pending.Offers.Count == 0 && Unchanged(), "Closing a group's choice list keeps the choice pending and changes nothing");
+        choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
+        Check(!choices.Confirm() && choices.Pending.ListOpen, "A group's open choice list cannot be confirmed without a choice");
+        choices.Pending.Choose(members[2]);
+        Check(choices.Confirm() && choices.Confirmed.Identity.Equals(members[2].Identity) && Unchanged(), "Confirm makes the chosen object of the group the confirmed one, and no object of the group changed");
         Console.WriteLine("PASS: confirmed scene target scene patch editing and cancellation with shared history and saved placement");
     }
 

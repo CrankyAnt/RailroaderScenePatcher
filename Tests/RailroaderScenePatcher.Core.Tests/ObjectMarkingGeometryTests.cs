@@ -427,4 +427,102 @@ static class ObjectMarkingGeometryTests {
         Check(!Frame(new WorldPoint(0, 0, 100)).Frame.HasValue, "an object without parts has no frame");
         Console.WriteLine("PASS: object marking frames identify their object at near and far zoom");
     }
+
+    static double Shoelace(IReadOnlyList<ScreenPoint> outline) {
+        double sum = 0;
+        for (int i = 0; i < outline.Count; i++) { ScreenPoint p = outline[i], q = outline[(i + 1) % outline.Count]; sum += p.X * q.Y - q.X * p.Y; }
+        return Math.Abs(sum) / 2;
+    }
+    static ScreenPoint OnScreen(Func<WorldPoint, ClipPoint> camera, double x, double y, double z) {
+        var clip = camera(new WorldPoint(x, y, z));
+        return new ScreenPoint(View.X + (clip.X / clip.W + 1) * View.Width / 2, View.Y + (1 - clip.Y / clip.W) * View.Height / 2);
+    }
+    // An object frame is one box: an object of several parts is framed by one box around all its parts, in the
+    // object's orientation, and not by the outline of its parts.
+    public static void RunBoxes() {
+        // A low wall 10 m wide and 2 m high with a tower 2 m wide and 8 m high on its left end, 100 m ahead.
+        var wall = Box("wall", 0, 1, 100, 5, 1, 1); var tower = Box("tower", -4, 6, 100, 1, 4, 1);
+        var anchor = new WorldPoint(0, 0, 100);
+        var decisions = new List<string>();
+        var both = ObjectMarkingGeometry.Frame(anchor, Eye, new[] { wall, tower }, Camera, View, decisions);
+        var whole = Frame(anchor, Box("whole", 0, 5, 100, 5, 5, 1));
+        Check(decisions.Contains("wall: included") && decisions.Contains("tower: included"), "both parts belong to the framed piece: " + String.Join("; ", decisions));
+        Check(Math.Abs(both.Frame.Value.X - whole.Frame.Value.X) < 1e-6 && Math.Abs(both.Frame.Value.Right - whole.Frame.Value.Right) < 1e-6 && Math.Abs(both.Frame.Value.Y - whole.Frame.Value.Y) < 1e-6 && Math.Abs(both.Frame.Value.Bottom - whole.Frame.Value.Bottom) < 1e-6,
+            "an object of several parts is framed by one box around all its parts");
+        Check(Math.Abs(Shoelace(both.Outline) - Shoelace(whole.Outline)) < 1e-3, "the outline of that box is the outline of one part of its size");
+        // The corner above the wall's right end, which neither part reaches, lies inside the frame.
+        var corner = OnScreen(Camera, 4, 9, 99);
+        Check(ObjectMarkingGeometry.Contains(both.Outline, corner.X, corner.Y), "the frame is a box: it holds the corner that no part reaches");
+        Check(Math.Abs(Shoelace(both.Outline) - both.Frame.Value.Width * both.Frame.Value.Height) < 1e-4 * Shoelace(both.Outline), "seen head-on, the outline of the box is the rectangle around it");
+        Check(Math.Abs(both.Distance - 99) < 1e-9 && both.Bounds.HasValue, "the distance still runs to the bounds of the parts");
+
+        // The box is cut at the surface the object stands in: with the ground 1 m up, the frame ends at it.
+        Func<double, double, double?> ground = (x, z) => 1;
+        var cut = ObjectMarkingGeometry.Frame(anchor, Eye, new[] {
+            new ObjectMarkingPart("wall", new WorldPoint(0, 1, 100), new WorldPoint(5, 1, 1), null, ObjectMarkingPartKind.Mesh, ground),
+            new ObjectMarkingPart("tower", new WorldPoint(-4, 6, 100), new WorldPoint(1, 4, 1), null, ObjectMarkingPartKind.Mesh, ground) }, Camera, View, null);
+        // Seen from the height of the wall's foot, the far edge of the cut is the lowest on screen.
+        var surface = OnScreen(Camera, 0, 1, 101);
+        Check(Math.Abs(cut.Frame.Value.Y - both.Frame.Value.Y) < 1e-6 && Math.Abs(cut.Frame.Value.Bottom - (surface.Y + ObjectMarkingGeometry.Margin)) < 1e-3 && cut.Frame.Value.Bottom < both.Frame.Value.Bottom - 2,
+            "the one box of several parts is cut off at the ground");
+
+        // The box stands in the object's orientation. Two slabs, each 10 m long and 1 m wide, lie end to end along
+        // a diagonal, seen from above at a slant. Along the object's own directions the box is 20 m by 1 m; in the
+        // world's directions it would be a square of about 15 m.
+        double h = Math.Sqrt(.5);
+        WorldPoint[] Slab(double cx, double cz) {
+            var corners = new WorldPoint[8];
+            for (int i = 0; i < 8; i++) {
+                double along = (i & 1) == 0 ? -5 : 5, up = (i & 2) == 0 ? -.5 : .5, across = (i & 4) == 0 ? -.5 : .5;
+                corners[i] = new WorldPoint(cx + along * h - across * h, up, cz + along * h + across * h);
+            }
+            return corners;
+        }
+        ObjectMarkingPart Part(string name, double cx, double cz) => new ObjectMarkingPart(name, new WorldPoint(cx, 0, cz), new WorldPoint(5.5 * h, .5, 5.5 * h), Slab(cx, cz));
+        var slabs = new[] { Part("first", 0, 100), Part("second", 10 * h, 100 + 10 * h) };
+        var eye = new WorldPoint(0, 40, 60); var slant = Strategy(eye, 45, 60);
+        var own = new WorldBasis(new WorldPoint(1, 0, 1), new WorldPoint(0, 1, 0), new WorldPoint(-1, 0, 1));
+        var along = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null, ObjectMarkingGeometry.FrameDistance, own);
+        var world = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null, ObjectMarkingGeometry.FrameDistance, WorldBasis.World);
+        var unknown = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null);
+        Check(along.Frame.HasValue && world.Frame.HasValue && Shoelace(along.Outline) < .35 * Shoelace(world.Outline), "the box of several parts stands in the object's orientation: " + Shoelace(along.Outline) + " against " + Shoelace(world.Outline));
+        Check(Math.Abs(Shoelace(unknown.Outline) - Shoelace(along.Outline)) < 1e-3, "without an orientation the box takes the directions of the part at the marker");
+        // Both ends of both slabs lie inside the frame.
+        foreach (var slab in slabs) foreach (var point in slab.Oriented) {
+            var seen = OnScreen(slant, point.X, point.Y, point.Z);
+            Check(ObjectMarkingGeometry.Contains(along.Outline, seen.X, seen.Y), "the box holds every corner of every part");
+        }
+        // One part keeps its own box, whatever the object's orientation.
+        var single = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { slabs[0] }, slant, View, null, ObjectMarkingGeometry.FrameDistance, WorldBasis.World);
+        var alone = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { slabs[0] }, slant, View, null);
+        Check(Math.Abs(Shoelace(single.Outline) - Shoelace(alone.Outline)) < 1e-9, "an object of one part is framed by that part's own box");
+        // A baked scenery group is one inventory object for everything below its root. Andrews Depot: the root
+        // stands at the east end of the building, where a lamp half a metre wide is the nearest part. The hall is
+        // 40 m long and the platform 44 m: far larger than the lamp, and the far end of the platform is apart from
+        // it. Framed as an object whose marker belongs to one of its parts, only the lamp is framed.
+        var root = new WorldPoint(20.5, 0, 100);
+        ObjectMarkingPart[] Depot() => new[] {
+            Box("lamp", 20.5, 1, 100, .25, 1, .25), Box("hall", 0, 3, 100, 20, 3, 5), Box("platform", 0, .25, 108, 22, .25, 2),
+            Box("smoke", 0, 20, 100, 30, 30, 30, ObjectMarkingPartKind.Effect), Box("far sign", -60, 2, 100, .5, 2, .1)
+        };
+        var partly = new List<string>();
+        var lampOnly = ObjectMarkingGeometry.Frame(root, Eye, Depot(), Camera, View, partly);
+        Check(lampOnly.Frame.HasValue && lampOnly.Frame.Value.Width < 40 && partly.Contains("hall: excluded, far larger than the part at the marker"),
+            "an object framed by the piece at its marker leaves a far larger part out: " + String.Join("; ", partly));
+        // Framed whole, the box surrounds every part of the group, the far sign included; effects stay out.
+        var all = new List<string>();
+        var depot = ObjectMarkingGeometry.Frame(root, Eye, Depot(), Camera, View, all, ObjectMarkingGeometry.FrameDistance, null, true);
+        var hull = Frame(root, Box("all", -19.25, 3, 102.5, 41.25, 3, 7.5));
+        Check(depot.Frame.HasValue && Math.Abs(depot.Frame.Value.X - hull.Frame.Value.X) < 1e-6 && Math.Abs(depot.Frame.Value.Right - hull.Frame.Value.Right) < 1e-6 &&
+            Math.Abs(depot.Frame.Value.Y - hull.Frame.Value.Y) < 1e-6 && Math.Abs(depot.Frame.Value.Bottom - hull.Frame.Value.Bottom) < 1e-6,
+            "an object that stands for everything below it is framed by one box around all its parts");
+        foreach (var expected in new[] { "lamp: included", "hall: included", "platform: included", "far sign: included", "smoke: excluded, effect" })
+            Check(all.Contains(expected), "framed whole, decision recorded: " + expected + " in " + String.Join("; ", all));
+        Check(Math.Abs(depot.Distance - 95) < 1e-9 && depot.Bounds.Value.Min.X == -60.5 && depot.Bounds.Value.Max.X == 22, "its distance runs to the bounds of all its parts");
+        Check(depot.Frame.Value.Width > 10 * lampOnly.Frame.Value.Width, "the whole frame is the building's, not the lamp's");
+        // Which inventory objects stand for everything below them: the root of a baked scenery group.
+        Check(ObjectMarkingGeometry.FramesWhole("Baked scenery group") && !ObjectMarkingGeometry.FramesWhole("Crossing controller") && !ObjectMarkingGeometry.FramesWhole("Track marker") && !ObjectMarkingGeometry.FramesWhole(null),
+            "a baked scenery group is framed whole; an object of another family by the piece at its marker");
+        Console.WriteLine("PASS: one box around the parts of an object, in its orientation, cut at the ground");
+    }
 }

@@ -196,6 +196,8 @@ namespace RailroaderScenePatcher {
         internal SpatialSelection(IInspectionScene inventory, Func<IReadOnlyList<SceneObservation>> entries = null) {
             scene = new SpatialSelectionScene(inventory, entries);
             session = new SelectionSession(scene);
+            // The overlay decides the game-defined groups from the inventory snapshot.
+            overlay.Inventory = entries;
             // The overlay asks which objects are inventory objects; the set follows the inventory snapshot.
             IReadOnlyList<SceneObservation> known = null; HashSet<object> handles = null; var counted = -1;
             overlay.IsInventory = go => {
@@ -246,7 +248,7 @@ namespace RailroaderScenePatcher {
                 return;
             }
             var current = Offered(Pending.Kind, inspectOnly);
-            var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered);
+            var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered, Pending.Candidate);
             candidates = current;
             lastPointer = pointer;
             Pending.Offer(hits);

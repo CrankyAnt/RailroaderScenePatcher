@@ -253,6 +253,7 @@ class Program {
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();
+        ObjectMarkingGeometryTests.RunBoxes();
         ShapeTests.Run();
         PatchEditingTests.Run();
         RecoveryTests.Run();
@@ -266,6 +267,7 @@ class Program {
         CommandBandTests.Run();
         BridgeTests.Run();
         SelectionTests.Run();
+        GameDefinedGroupTests.Run();
         BoardTests.Run();
         CompositionTests.Run();
         BindingTests.Run();
