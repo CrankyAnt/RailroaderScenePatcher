@@ -1,4 +1,4 @@
-# Publication policy
+# Publication Policy
 
 **Repository visibility:** public
 

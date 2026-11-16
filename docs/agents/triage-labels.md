@@ -1,10 +1,10 @@
-# Tracker labels
+# Tracker Labels
 
-## Type
+Map these semantic roles to existing tracker labels where possible. The shown names are the defaults.
 
-Use at most one Type label.
+## Type — at most one
 
-| Label | Colour | Meaning |
+| Default label | Colour | Meaning |
 | --- | --- | --- |
 | `type:bug` | `d73a4a` | Existing behaviour is broken |
 | `type:feature` | `1d76db` | A substantial new capability |
@@ -14,37 +14,31 @@ Use at most one Type label.
 
 Type may remain absent until the request is understood. A question that later proves to be a bug or change request replaces `type:question` with the correct type.
 
-## Triage
+## Triage — temporary
 
-Triage labels are temporary.
-
-| Label | Colour | Meaning |
+| Default label | Colour | Meaning |
 | --- | --- | --- |
 | `triage:pending` | `fbca04` | Evaluation is in progress |
 | `triage:needs-info` | `fef2c0` | Specific information is required from the reporter |
 
-## Ready
+## Ready — at most one
 
-Use at most one Ready label.
-
-| Label | Colour | Meaning |
+| Default label | Colour | Meaning |
 | --- | --- | --- |
 | `ready:independent` | `0e8a16` | The contract is sufficient for independent execution |
 | `ready:interactive` | `5319e7` | Execution requires live user judgement or access |
 
-Both Ready labels require a complete contract, whether a Work Brief, spec or ticket. `ready:interactive` describes an execution need, not an unresolved decision.
+Both Ready labels require a complete contract (Work Brief, spec or ticket). `ready:interactive` describes an execution need, not an unresolved decision.
 
 ## Status
 
-| Label | Colour | Meaning |
+| Default label | Colour | Meaning |
 | --- | --- | --- |
 | `status:deferred` | `cfd3d7` | Valid work intentionally postponed for future consideration |
 
-## Resolution
+## Resolution — at most one on closure
 
-Use at most one Resolution label on closure.
-
-| Label | Colour | Meaning |
+| Default label | Colour | Meaning |
 | --- | --- | --- |
 | `resolution:not-planned` | `6e7781` | Deliberately outside current product scope |
 | `resolution:duplicate` | `cfd3d7` | Already represented by another request |
