@@ -22,11 +22,10 @@ Select **Disable** at the bottom of the tab of the **Object** tab. The bridge di
 
 ## Write the modification by hand
 
-Copy the identity with **Copy ID** in the command band and add it to `Data/scene-patches.json` as described in [patch document v1](patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
 
 ```json
-{
-  "id": "place-ela-bridge",
+"place-ela-bridge": {
   "target": {
     "scene": "<scene from the inspected identity>",
     "path": "World/Large Scenery/Ela/Ela Bridge",

@@ -50,11 +50,10 @@ A disabled marker keeps its binding without a registration. When it is enabled, 
 
 ## Write the binding by hand
 
-Copy the identity with **Copy ID** in the command band and add a modification to `Data/scene-patches.json`, as described in [patch document v1](patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
 
 ```json
-{
-  "id": "bind-station-1",
+"bind-station-1": {
   "target": {
     "scene": "<scene from the inspected identity>",
     "path": "World/Large Scenery/Ela/Signs/Station Sign (1)",

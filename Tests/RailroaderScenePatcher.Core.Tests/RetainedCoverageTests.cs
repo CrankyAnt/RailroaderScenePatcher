@@ -17,7 +17,7 @@ static partial class CoverageTests {
         FreshStateRefusesPatchedCircuitsAsNative();
         Console.WriteLine("PASS: retained crossing coverage reconciliation, owned cleanup, isolated cleanup failure, early checks over an unloaded scene and discarded state over a remaining scene");
     }
-    static string RetainedDocument => Doc(Cover("reroute", Tracks("Pipr")) + "," + Cover("add", Addition("siding", "Sspur")));
+    static string RetainedDocument => Doc(Cover("reroute", Tracks("Pipr")) + "," + Add("add", Addition("siding", "Sspur")));
     static readonly string[] NativeSpanIds = { "Pcyi", "Pipr", "Pws9", "Pdlh", "P6id", "P1db", "Qa", "Qi", "Qb" };
     static bool NativeSpansRegistered(Fixture f) => NativeSpanIds.All(id => f.World.Graph.TryGetValue(id, out var s) && !s.Owned && !s.Destroyed);
     static bool NoSuffixedIds(Fixture f) => f.World.Graph.Keys.All(id => !id.EndsWith(".2", StringComparison.Ordinal));
@@ -70,7 +70,7 @@ static partial class CoverageTests {
         var report = peer.LastReentry;
         Assert(report.Released == 0 && report.Failures.Count == 1 && report.Failures[0].Contains(CrossingPath) && report.Failures[0].Contains("remains"), "A release that leaves owned spans registered is reported for its crossing: " + String.Join("; ", report.Failures));
         Assert(peer.ReentryError == null && peer.Engine != null, "A local cleanup failure keeps the world and its patcher state available");
-        var otherTracks = "{\"circuit\":\"Qi\",\"approachA\":" + Range("Sother", 1, 5) + ",\"island\":" + Range("Sother", 5, 6) + ",\"approachB\":" + Range("Sother", 6, 9) + "}";
+        var otherTracks = "\"Qi\":{\"approachA\":" + Range("Sother", 1, 5) + ",\"island\":" + Range("Sother", 5, 6) + ",\"approachB\":" + Range("Sother", 6, 9) + "}";
         var independent = peer.Engine.Apply(Doc(Cover("other", otherTracks, OtherPath)), "pack");
         Assert(independent.Outcomes["other"].Applied, "Unrelated work keeps applying after the cleanup failure: " + independent.Outcomes["other"].Error);
         f.World.StickyDestroy = false;
@@ -109,7 +109,7 @@ static partial class CoverageTests {
         var f = new Fixture();
         var peer = new LocalPeer(() => new CrossingCoverageScene(f.World, Capability.Unchecked));
         peer.Enter("map", "graph");
-        var doc = Doc(Cover("reroute", Tracks("Pipr") + "," + Detached("P6id")) + "," + Cover("add", Addition("siding", "Sspur")));
+        var doc = Doc(Cover("reroute", Tracks("Pipr") + "," + Detached("P6id")) + "," + Add("add", Addition("siding", "Sspur")));
         var first = peer.Engine.Apply(doc, "pack");
         Assert(first.Outcomes.Values.All(o => o.Applied), "The reroute, the detach and the addition apply: " + String.Join("; ", first.Outcomes.Values.Select(o => o.Error)));
         peer.Unload();

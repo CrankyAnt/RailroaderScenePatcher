@@ -103,8 +103,8 @@ static class BoardTests {
     static string Target(string path = IndependentBoards.SylvaPath, string structure = ",\"structure\":\"independent-board-v1\"") =>
         "\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\"" + structure + "}";
     static string Place(double[] p, double[] r = null) => "\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", p.Select(Num)) + "],\"rotation\":[" + String.Join(",", (r ?? Turned).Select(Num)) + "]}";
-    static string Mod(string id, string body, string deps = "[]", string path = IndependentBoards.SylvaPath) => "{\"id\":\"" + id + "\"," + Target(path) + "," + body + ",\"dependsOn\":" + deps + "}";
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Mod(string id, string body, string deps = "[]", string path = IndependentBoards.SylvaPath) => "\"" + id + "\":{" + Target(path) + "," + body + ",\"dependsOn\":" + deps + "}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static bool Near(double[] a, double[] b, double tolerance = 0.001) => a != null && b != null && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d <= tolerance);
     // The registrations the native components hold agree with the board's own placement and activity.
     static bool Consistent(FakeBoardWorld world, FakeBoard board) {
@@ -236,7 +236,7 @@ static class BoardTests {
         result = engine.Apply(Doc(Mod("move", Place(Moved)), "elsewhere"), "author/pack");
         Assert(result.Error != null && result.Outcomes.Count == 0 && !Near(board.Position, Moved) && world.PlacementWrites == 0, "A map mismatch rejects the document before resolution");
         (world, board, boards, engine) = Setup();
-        result = engine.Apply(Doc("{\"id\":\"wrong\",\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + IndependentBoards.SylvaPath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-v1\"}," + Place(Moved) + ",\"dependsOn\":[]}"), "author/pack");
+        result = engine.Apply(Doc("\"wrong\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + IndependentBoards.SylvaPath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-v1\"}," + Place(Moved) + ",\"dependsOn\":[]}"), "author/pack");
         Assert(!result.Outcomes["wrong"].Applied && world.PlacementWrites == 0, "Another structure identity does not resolve to a board");
     }
     static void RepeatAndOrderDoNotAccumulate() {
@@ -329,7 +329,7 @@ static class BoardTests {
         var original = (double[])board.Position.Clone();
         Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied && Near(board.Position, Moved) && Consistent(world, board) && world.Registrations == 1, "This mod's board placement moves the board and its registrations");
         var document = JObject.Parse(session.DocumentText);
-        var modification = (JObject)((JArray)document["modifications"])[0];
+        var modification = (JObject)document["modifications"].First.First;
         Assert((string)modification["target"]["structure"] == IndependentBoards.Structure && modification["placement"] != null && modification.Properties().All(p => p.Name != "binding"), "The document records the board placement without a track binding");
         mapEditor.Undo();
         Assert(Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Undo restores the captured placement and registrations without an owned leftover");

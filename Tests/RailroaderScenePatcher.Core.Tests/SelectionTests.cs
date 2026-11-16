@@ -47,9 +47,9 @@ static class SelectionTests {
         Check(choice.Confirmed == null && choice.IsPending, "A spatial hit remains pending until its visible identity is explicitly confirmed");
         Check(choice.Confirm(), "One explicitly offered unique identity can be confirmed");
         Check(choice.Confirmed.Identity.Target.Path == "replacement" && !choice.IsPending, "Confirmation records the explicitly chosen scene identity");
-        var document = JObject.Parse("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"original\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}");
+        var document = JObject.Parse("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"original\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}");
         var target = choice.Confirmed.Identity.Target;
-        document["modifications"][0]["target"] = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
+        document["modifications"].First.First["target"] = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
         var result = new PatchEngine(scene).Apply(document.ToString());
         Check(result.Outcomes["move"].Applied && ReferenceEquals(result.Outcomes["move"].ResolvedTarget, replacement) && original.X == 7 && replacement.X == 12,
             "Complete-document application uses the confirmed replacement identity and preserves the previous target");

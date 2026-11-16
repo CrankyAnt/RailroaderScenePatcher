@@ -239,10 +239,10 @@ namespace RailroaderScenePatcher.Core {
             if (!document.CanWrite) return new[] { new DefinitionInspection(null, 0, Array.Empty<string>(), new[] { document.Error }) };
             if (!maps.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal))
                 return new[] { new DefinitionInspection(null, 0, Array.Empty<string>(), new[] { "Map context mismatch; targets were not resolved" }) };
-            var entries = ((JArray)document.Root["modifications"]).Cast<JObject>().ToDictionary(e => (string)e["id"], StringComparer.Ordinal);
+            var entries = PatchEngine.Entries(document.Modifications);
             var results = new List<DefinitionInspection>();
-            foreach (var item in entries.Values) {
-                var problems = new List<string>(); var matches = 0; var id = (string)item["id"];
+            foreach (var entry in entries) {
+                var problems = new List<string>(); var matches = 0; var id = entry.Key; var item = entry.Value;
                 var deps = item["dependsOn"] as JArray;
                 if (deps == null || deps.Any(d => d.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)d))) problems.Add("Invalid modification dependencies");
                 var dependencies = deps == null ? Array.Empty<string>() : deps.Where(d => d.Type == JTokenType.String).Select(d => (string)d).ToArray();

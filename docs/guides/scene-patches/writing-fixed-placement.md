@@ -14,7 +14,7 @@ Save the document as strict UTF-8 JSON. Use the `mapId` of the selected map defi
 
 In the native map editor, open **Scene patches**, select **Refresh** in the command band, find the board in the outliner under the **Independent board** folder, and select its row to display its identity and dependencies on the **Object** tab. Select **Copy ID** in the command band to copy that JSON. **Focus** moves the native map editor camera without changing the inspected selection. Refresh only inspects; it does not apply patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
 
-Add one entry to `modifications` for each desired placement. The following example shows the v1 field shape and the supported target identity. Replace the sample map ID and coordinates with values for the selected map.
+Add one member to the `modifications` object for each desired placement. Its key is the ID of the modification. The following example shows the v1 field shape and the supported target identity. Replace the sample map ID and coordinates with values for the selected map.
 
 ```json
 {
@@ -22,9 +22,8 @@ Add one entry to `modifications` for each desired placement. The following examp
   "sourceMap": {
     "mapId": "example-map-id"
   },
-  "modifications": [
-    {
-      "id": "move-example-object",
+  "modifications": {
+    "move-example-object": {
       "target": {
         "scene": "BushnellWhittier-MapManager",
         "path": "World/Signs/Loc: Sylva Int",
@@ -38,13 +37,13 @@ Add one entry to `modifications` for each desired placement. The following examp
       },
       "dependsOn": []
     }
-  ]
+  }
 }
 ```
 
 The target must resolve to exactly one board in the loaded map context that matches the board pattern. The position has three finite numbers in map coordinates. The rotation has four finite numbers in quaternion order and must be a unit quaternion. The adapter converts map coordinates through the game's world transformer. It updates the culling position and rebuilds the circle map mask after moving the board.
 
-Use a unique, non-empty `id` for each modification. List prerequisite modification IDs in `dependsOn`; leave it empty when there are no prerequisites. A missing, failed, or cyclic dependency prevents the dependent modification from applying.
+Give each modification a unique, non-empty key; a modification has no `id` member. The order of the keys has no meaning. List prerequisite modification IDs in `dependsOn`; leave it empty when there are no prerequisites. A missing, failed, or cyclic dependency prevents the dependent modification from applying.
 
 ## Distribute for multiplayer
 

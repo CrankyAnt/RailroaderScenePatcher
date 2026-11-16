@@ -12,12 +12,12 @@ static class CompositionTests {
     static readonly double[] Moved = { 25772.99, 633.4856, 393.795837 };
     static string Num(double v) => v.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
     static string Board(string id, double[] p, string path = IndependentBoards.SylvaPath, string structure = ",\"structure\":\"independent-board-v1\"", string extra = "") =>
-        "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\"" + structure + "}," +
+        "\"" + id + "\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\"" + structure + "}," +
         "\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", p.Select(Num)) + "],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
     static string Bridge(string id, double x = 1055, string deps = "[]") =>
-        "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + BridgePath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-colliders-v1\"}," +
+        "\"" + id + "\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + BridgePath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-colliders-v1\"}," +
         "\"placement\":{\"mode\":\"fixed\",\"position\":[" + Num(x) + ",5,7],\"rotation\":[0,0,0,1]},\"dependsOn\":" + deps + "}";
-    static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[" + items + "]}";
+    static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + items + "}}";
     sealed class World {
         public FakeBoardWorld Boards = new FakeBoardWorld(); public FakeBoard Board;
         public FakeBridgeWorld Bridges = new FakeBridgeWorld(); public FakeBridge Bridge = new FakeBridge();
@@ -52,7 +52,7 @@ static class CompositionTests {
         Assert(Math.Abs(w.Bridge.Position[0] - 55) < 0.001 && w.Bridges.TrestlePosition[0] == 60, "The bridge moves and its separate trestle stays");
         result = new PatchEngine(w.Scene).Apply(Doc(Board("untyped", Moved, structure: "")), "author/pack");
         Assert(result.Outcomes["untyped"].Applied, "A board target without structure resolves only to the board: " + result.Outcomes["untyped"].Error);
-        result = new PatchEngine(w.Scene).Apply(Doc("{\"id\":\"bridge-untyped\",\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + BridgePath + "\",\"component\":\"Helpers.Culling.RendererCuller\"},\"placement\":{\"mode\":\"fixed\",\"position\":[1060,5,7],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"), "author/pack");
+        result = new PatchEngine(w.Scene).Apply(Doc("\"bridge-untyped\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + BridgePath + "\",\"component\":\"Helpers.Culling.RendererCuller\"},\"placement\":{\"mode\":\"fixed\",\"position\":[1060,5,7],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"), "author/pack");
         Assert(result.Outcomes["bridge-untyped"].Applied && Math.Abs(w.Bridge.Position[0] - 60) < 0.001, "The bridge root, a culler without a circle mask, is not claimed by the board capability: " + result.Outcomes["bridge-untyped"].Error);
     }
     static void DependentOutputReachesTheOwningCapability() {
@@ -105,7 +105,7 @@ static class CompositionTests {
             Assert(session.MinimumPatcherVersion == c.Expected, c.Name + ": the minimum is the highest requirement of the document, got " + session.MinimumPatcherVersion);
         }
         foreach (var component in new[] { "Track.TrackMarker", CrossingCoverageScene.ComponentType }) {
-            var content = "{\"id\":\"disable\",\"target\":{\"scene\":\"scene\",\"path\":\"unavailable\",\"component\":\"" + component + "\"},\"active\":false,\"dependsOn\":[]}";
+            var content = "\"disable\":{\"target\":{\"scene\":\"scene\",\"path\":\"unavailable\",\"component\":\"" + component + "\"},\"active\":false,\"dependsOn\":[]}";
             var session = Session(new World(false, false), new Store { Patch = Doc(content) });
             Assert(session.MinimumPatcherVersion == "0.5.0", "A known newer target component requires 0.5.0 even without optional structure or an available adapter: " + component);
         }

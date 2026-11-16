@@ -13,10 +13,10 @@ static class GroupActivityTests {
     static readonly TargetIdentity Other = new TargetIdentity("BushnellWhittier", OtherPath, "Track.TrackMarker", TrackMarkerScene.Structure);
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static string Target(string path = SignPath) => "\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"}";
-    static string Item(string id, string content, string path = SignPath) => "{\"id\":\"" + id + "\"," + Target(path) + "," + content + ",\"dependsOn\":[]}";
+    static string Item(string id, string content, string path = SignPath) => "\"" + id + "\":{" + Target(path) + "," + content + ",\"dependsOn\":[]}";
     const string ToExtension = "\"relationships\":{\"trackMarker\":{\"segment\":\"Nnew\",\"end\":\"a\",\"distance\":5}}";
     const string Moved = "\"placement\":{\"mode\":\"fixed\",\"position\":[1030,1,2],\"rotation\":[0,0,0,1]}";
-    static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[" + items + "]}";
+    static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + items + "}}";
     static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, TrackMarkerScene scene) Setup() {
         var world = new FakeMarkerWorld();
         var sign = new FakeMarker { Id = "Mwp1", Segment = "S9sc", End = "a", Distance = 120 };
@@ -104,7 +104,7 @@ static class GroupActivityTests {
         var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
         return (world, sign, other, session, mapEditor, store);
     }
-    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single();
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
     static void RemovingTheDisableReturnsActivityToTheGroup() {
         var (world, sign, other, session, mapEditor, store) = Session();
         Assert(!session.Edit(Sign, null, true).Applied && mapEditor.UndoGroups.Count == 0, "Scene patch editing refuses an explicit enable of a follower");

@@ -209,7 +209,7 @@ static class SnapTests {
         Assert(result.Applied && w.Box.Position.SequenceEqual(new[] { 20.0, 3.0, 5.0 }), "Endpoint snap uses the selected node's map coordinates: " + result.Error);
         Assert(w.Box.Rotation.SequenceEqual(new[] { 0.0, 1.0, 0.0, 0.0 }), "Snap preserves the object's rotation");
         Assert(ReferenceEquals(binding, w.Box.LogicalTrack) && w.Box.DependentX == 20, "Endpoint snap retains the actual logical reference and updates dependent state");
-        var item = JObject.Parse(w.Session.DocumentText)["modifications"].Single();
+        var item = JObject.Parse(w.Session.DocumentText)["modifications"].Single().First;
         Assert((string)item["placement"]["mode"] == "fixed" && item["binding"] == null, "The complete canonical document stores fixed placement without a track binding");
         Assert(w.MapEditor.UndoGroups.Count == 1, "One snap is one history operation");
         w.MapEditor.Undo(); Assert(w.Box.Position.SequenceEqual(new[] { 4.0, 8.0, 9.0 }), "Undo restores the original position");

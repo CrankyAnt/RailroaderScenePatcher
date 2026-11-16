@@ -118,7 +118,7 @@ static class CommandBandTests {
     static void OwnSaveKeepsTheDefinitionsCurrent() {
         RailroaderScenePatcher.Core.LoadedMod Loaded(string id, string json, string error = null) =>
             new RailroaderScenePatcher.Core.LoadedMod(new RailroaderScenePatcher.Core.PatchSource(id, id, "1.0"), json, null, true, error);
-        const string before = "{\"modifications\":[]}", written = "{\"modifications\":[{\"id\":\"board\",\"active\":false}]}", outside = "{\"modifications\":[{\"id\":\"board\",\"active\":true}]}";
+        const string before = "{\"modifications\":{}}", written = "{\"modifications\":{\"board\":{\"active\":false}}}", outside = "{\"modifications\":{\"board\":{\"active\":true}}}";
         var definitions = new SuppliedDefinitions();
         Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "Before the first refresh the definitions are not read");
         definitions.Read(new[] { Loaded("pack", before) });
@@ -137,6 +137,25 @@ static class CommandBandTests {
         Check(definitions.Stale, "Changing the file back does not clear it: only a refresh does");
         definitions.Read(new[] { Loaded("pack", outside) });
         Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "Refresh returns Current");
+        // A document reordered or re-spaced outside scene patch editing has equal content: it is not reported as changed.
+        const string keyed = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"a\":{\"active\":false,\"dependsOn\":[\"b\",\"c\"],\"x\":12},\"b\":{\"active\":true}}}";
+        const string reordered = "{\n  \"modifications\": {\n    \"b\": { \"active\": true },\n    \"a\": { \"x\": 12.0, \"dependsOn\": [\"c\", \"b\"], \"active\": false }\n  },\n  \"sourceMap\": { \"mapId\": \"map\" },\n  \"formatVersion\": 1\n}\n";
+        var form = new SuppliedDefinitions();
+        form.Read(new[] { Loaded("pack", keyed) });
+        form.Compare(new[] { Loaded("pack", reordered) });
+        Check(!form.Stale && CommandBand.Inventory(form.Stale).Word == "Current", "A reordered and re-spaced document with another number literal is not reported as changed");
+        form.Compare(new[] { Loaded("pack", keyed) });
+        Check(!form.Stale, "and neither is the first form when it returns");
+        form.Compare(new[] { Loaded("pack", reordered.Replace("12.0", "13")) });
+        Check(form.Stale, "A changed value in the reordered document marks the definitions stale");
+        form.Read(new[] { Loaded("pack", keyed) });
+        form.Compare(new[] { Loaded("pack", keyed.Replace("[\"b\",\"c\"]", "[\"b\",\"b\",\"c\"]")) });
+        Check(form.Stale, "A repeated dependency is other content");
+        form.Read(new[] { Loaded("pack", "{broken") });
+        form.Compare(new[] { Loaded("pack", "{broken") });
+        Check(!form.Stale, "The same unparseable text is unchanged");
+        form.Compare(new[] { Loaded("pack", "{ broken") });
+        Check(form.Stale, "Another unparseable text marks them stale");
         // The first Save creates the document: no mod carried one at the refresh.
         var fresh = new SuppliedDefinitions();
         fresh.Read(new RailroaderScenePatcher.Core.LoadedMod[0]);

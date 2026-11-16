@@ -159,7 +159,12 @@ namespace RailroaderScenePatcher.Core {
         readonly HistoryIdentity identity;
         readonly PatchDocument document;
         readonly List<string> written = new List<string>();
-        string diskText, savedText, info;
+        string diskText, info;
+        // The content of the text last read or written, or null while no patch document was read or written.
+        JToken saved;
+        // The answer of the Saved comparison for the document version it was made for.
+        int comparedVersion = -1;
+        bool differs;
         long savedIdentity;
         bool uncertain;
         // Set when native Undo or Redo threw. The native manager then keeps an open partial group, so later
@@ -179,7 +184,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!loaded.CanWrite) Blocked = loaded.Error;
                 else if (loaded.EditError != null) Blocked = loaded.EditError;
                 else if (!scene.MapIds.Contains((string)loaded.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) Blocked = "Target map does not match the loaded map context";
-                else { document = loaded; savedText = loaded.Serialize(); }
+                else { document = loaded; saved = PreservingJson.Parse(diskText).Root; }
             } catch (Exception e) { Blocked = "Cannot read the edited mod's files: " + e.Message; }
             if (Blocked != null) Blocked += ". The patch document is protected from overwrite; correct it outside scene patch editing and reload.";
         }
@@ -194,7 +199,7 @@ namespace RailroaderScenePatcher.Core {
             get {
                 var minimum = "0.1.0";
                 if (document == null) return minimum;
-                foreach (var item in document.Modifications.OfType<JObject>()) {
+                foreach (var item in document.Items) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
@@ -228,7 +233,7 @@ namespace RailroaderScenePatcher.Core {
         // IsChanged is. Clearing the activity value has something to clear only then.
         public bool HasActivityValue(TargetIdentity target) {
             if (document == null || target == null) return false;
-            foreach (var item in document.Modifications.OfType<JObject>()) {
+            foreach (var item in document.Items) {
                 var other = item["target"] as JObject;
                 if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
                 var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
@@ -240,7 +245,7 @@ namespace RailroaderScenePatcher.Core {
         // searching the scene, so a list can ask for every row. A target without a structure matches any structure.
         public bool IsChanged(TargetIdentity target) {
             if (document == null || target == null) return false;
-            foreach (var item in document.Modifications.OfType<JObject>()) {
+            foreach (var item in document.Items) {
                 var other = item["target"] as JObject;
                 if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
                 var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
@@ -285,8 +290,7 @@ namespace RailroaderScenePatcher.Core {
                 if (placement == null && active == null) throw new InvalidOperationException("Nothing to change");
                 if (placement != null) PatchEngine.CheckPlacement(placement.Position, placement.Rotation);
                 if (existing != null) PatchEngine.Parse(existing);
-                var value = new JObject { ["id"] = existing?["id"] ?? NewId(target) };
-                value["target"] = existing?["target"] ?? TargetJson(target);
+                var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
                 // A placement edit of a track-following object keeps following the same track at the new relative placement.
                 var following = existing == null ? null : PatchEngine.Parse(existing).State.Placement?.Following;
                 if (placement != null && following != null) value["placement"] = PlacementJson(TrackFollowing.Relative(following.Anchor, TrackPose(following.Anchor), placement.Position, placement.Rotation));
@@ -309,7 +313,7 @@ namespace RailroaderScenePatcher.Core {
                 PatchEngine.CheckPlacement(current?.Position, current?.Rotation);
                 var following = TrackFollowing.Relative(anchor, TrackPose(anchor), current.Position, current.Rotation);
                 return WithPlacement(target, existing, PlacementJson(following));
-            }, validateBeforeMutation);
+            }, validateBeforeMutation, "follow-");
         }
         // What the active document changes on the object: one short line per changed setting, each with the value the
         // object has without this modification. Empty when the document holds no modification of it.
@@ -357,7 +361,7 @@ namespace RailroaderScenePatcher.Core {
             } catch (InvalidOperationException) { return null; }
         }
         // Whether any modification of the active document follows a track, read from the document alone.
-        public bool HasTrackFollowing => document != null && Blocked == null && document.Modifications.OfType<JObject>()
+        public bool HasTrackFollowing => document != null && Blocked == null && document.Items
             .Any(m => (m["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)m["placement"]["mode"] == PatchEngine.TrackFollowingMode);
         // Ends track following: the object keeps its current placement as fixed placement.
         public Outcome StopFollowing(TargetIdentity target, InspectedTarget inspected = null) {
@@ -368,8 +372,7 @@ namespace RailroaderScenePatcher.Core {
             });
         }
         JObject WithPlacement(TargetIdentity target, JObject existing, JObject placement) {
-            var value = new JObject { ["id"] = existing?["id"] ?? NewId(target, "follow-") };
-            value["target"] = existing?["target"] ?? TargetJson(target);
+            var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
             value["placement"] = placement;
             if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
             if (existing?["relationships"] != null) value["relationships"] = existing["relationships"].DeepClone();
@@ -417,7 +420,7 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<KeyValuePair<string, Outcome>> ReconcileFollowing() {
             var results = new List<KeyValuePair<string, Outcome>>();
             if (document == null || Blocked != null) return results;
-            var items = document.Modifications.OfType<JObject>().ToList();
+            var items = document.Items.ToList();
             foreach (var stale in heldTargets.Keys.Where(k => !items.Any(i => ReferenceEquals(i, heldTargets[k].Item))).ToList()) heldTargets.Remove(stale);
             foreach (var item in items) {
                 PatchEngine.Modification parsed;
@@ -524,21 +527,20 @@ namespace RailroaderScenePatcher.Core {
                     rest.Remove("relationships");
                     return rest["placement"] == null && rest["active"] == null ? null : rest;
                 }
-                var value = new JObject { ["id"] = existing?["id"] ?? NewId(target, "bind-") };
-                value["target"] = existing?["target"] ?? TargetJson(target);
+                var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
                 if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
                 if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
                 value["relationships"] = new JObject { ["trackMarker"] = binding.IsDetached ? new JObject { ["detach"] = true }
                     : new JObject { ["segment"] = binding.Location.Segment, ["end"] = binding.Location.End, ["distance"] = binding.Location.Distance } };
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
-            });
+            }, null, "bind-");
         }
         // Selects tracks for, or detaches, one circuit of this mod's crossing coverage. Other circuits keep their mod values or
         // effective coverage. A null coverage clears the entry set by this mod for the circuit: it returns to its effective underlying coverage.
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage) { return Cover(target, circuit, coverage, null); }
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected) {
-            return Change(coverage == null ? "Clear crossing coverage" : "Edit crossing coverage", target, inspected, existing => CoverageValue(target, existing, circuit, coverage, false));
+            return Change(coverage == null ? "Clear crossing coverage" : "Edit crossing coverage", target, inspected, existing => CoverageValue(target, existing, circuit, coverage, false), null, "cover-");
         }
         // Adds detection for explicitly selected tracks to the crossing as a detection addition with this ID, or replaces the
         // tracks of the addition that has it. The ID names one addition in the document. Native circuits keep their coverage.
@@ -546,12 +548,12 @@ namespace RailroaderScenePatcher.Core {
             return Change("Add crossing detection", target, inspected, existing => {
                 if (tracks == null || tracks.Kind != CircuitKind.Added) throw new InvalidOperationException("Explicitly select the tracks of the approach A, island and approach B spans for the addition");
                 return CoverageValue(target, existing, id, tracks, true);
-            });
+            }, null, "cover-");
         }
         // Deletes the detection addition: its circuit leaves the crossing and its owned spans are removed. Other additions and
         // the coverage of the native circuits stay as they are.
         public Outcome DeleteDetection(TargetIdentity target, string id, InspectedTarget inspected = null) {
-            return Change("Delete crossing detection", target, inspected, existing => CoverageValue(target, existing, id, null, true));
+            return Change("Delete crossing detection", target, inspected, existing => CoverageValue(target, existing, id, null, true), null, "cover-");
         }
         // The effect AddDetection, or with null tracks DeleteDetection, would have on every circuit and addition, without
         // changing the scene, the document or the history.
@@ -579,10 +581,9 @@ namespace RailroaderScenePatcher.Core {
                 var existing = own.FirstOrDefault();
                 var value = CoverageValue(target, existing, circuit, coverage, addition);
                 if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, documentKey).State);
-                var candidate = (JArray)document.Modifications.DeepClone();
-                var index = existing == null ? -1 : document.Modifications.IndexOf(existing);
-                if (index >= 0) { if (value == null) candidate.RemoveAt(index); else candidate[index] = value; }
-                else if (value != null) candidate.Add(value);
+                var key = existing == null ? NewId(target, "cover-") : PatchDocument.Key(existing);
+                var candidate = (JObject)document.Modifications.DeepClone();
+                if (value == null) candidate.Remove(key); else candidate[key] = value;
                 var current = scene.Read(resolved).Coverage;
                 var desired = engine.Desired(candidate, resolved, documentKey).Coverage;
                 CheckEffectiveCoverage(resolved, desired);
@@ -601,24 +602,25 @@ namespace RailroaderScenePatcher.Core {
             if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to its native spans");
             if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "Add detection for extra tracks as an addition; a native circuit takes selected tracks or a detach");
             if (existing != null) PatchEngine.Parse(existing);
-            if (addition && coverage != null && document.Modifications.OfType<JObject>().Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))
+            if (addition && coverage != null && document.Items.Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))
                 throw new InvalidOperationException("Addition ID " + circuit + " is already used by another modification of this document; an addition ID names one addition, so choose another ID");
-            var name = addition ? "addition" : "circuit";
-            var value = existing == null ? new JObject { ["id"] = NewId(target, "cover-"), ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+            var name = addition ? "additions" : "circuits";
+            var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
             var relationships = value["relationships"] as JObject ?? new JObject();
-            var circuits = relationships["crossingCoverage"] as JArray ?? new JArray();
-            var entry = circuits.OfType<JObject>().FirstOrDefault(c => c[name]?.Type == JTokenType.String && (string)c[name] == circuit);
-            if (coverage == null && entry == null) throw new InvalidOperationException(addition ? "Addition " + circuit + " is not set in the active document for this crossing" : "Circuit " + circuit + " has no coverage set by this mod in the active document");
-            var replacement = coverage == null ? null : CircuitJson(circuit, coverage);
-            if (entry != null) { if (replacement == null) entry.Remove(); else entry.Replace(replacement); }
-            else circuits.Add(replacement);
-            if (circuits.Count == 0) relationships.Remove("crossingCoverage"); else relationships["crossingCoverage"] = circuits;
-            if (relationships.HasValues) value["relationships"] = relationships; else value.Remove("relationships");
+            var crossing = relationships["crossingCoverage"] as JObject ?? new JObject();
+            var entries = crossing[name] as JObject ?? new JObject();
+            if (coverage == null && entries.Property(circuit) == null) throw new InvalidOperationException(addition ? "Addition " + circuit + " is not set in the active document for this crossing" : "Circuit " + circuit + " has no coverage set by this mod in the active document");
+            if (coverage == null) entries.Remove(circuit); else entries[circuit] = CircuitJson(coverage);
+            // An object that lost its last entry leaves the document: circuits, additions and crossingCoverage are never written empty.
+            if (entries.Count == 0) crossing.Remove(name); else if (entries.Parent == null) crossing[name] = entries;
+            if (crossing.Count == 0) relationships.Remove("crossingCoverage"); else if (crossing.Parent == null) relationships["crossingCoverage"] = crossing;
+            if (!relationships.HasValues) value.Remove("relationships"); else if (relationships.Parent == null) value["relationships"] = relationships;
             if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
             return value["placement"] == null && value["active"] == null && value["relationships"] == null ? null : value;
         }
-        static JObject CircuitJson(string circuit, CircuitCoverage coverage) {
-            var value = new JObject { [coverage.Kind == CircuitKind.Added ? "addition" : "circuit"] = circuit };
+        // An entry of circuits or additions; its key names the circuit or the addition.
+        static JObject CircuitJson(CircuitCoverage coverage) {
+            var value = new JObject();
             if (coverage.Kind == CircuitKind.Detached) { value["detach"] = true; return value; }
             for (var i = 0; i < 3; i++) value[CircuitCoverage.Roles[i]] = new JObject { ["from"] = LocationJson(coverage.Ranges[i].From), ["to"] = LocationJson(coverage.Ranges[i].To) };
             return value;
@@ -644,7 +646,8 @@ namespace RailroaderScenePatcher.Core {
                 return null;
             });
         }
-        Outcome Change(string name, TargetIdentity target, InspectedTarget inspected, Func<JObject, JObject> next, Action validateBeforeMutation = null) {
+        // The prefix starts the key of a modification the edit adds; an existing modification keeps its key.
+        Outcome Change(string name, TargetIdentity target, InspectedTarget inspected, Func<JObject, JObject> next, Action validateBeforeMutation = null, string prefix = "place-") {
             var outcome = new Outcome();
             try {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
@@ -666,12 +669,18 @@ namespace RailroaderScenePatcher.Core {
                 // document as it is changes nothing and adds no step to the native history, as a native field ignores
                 // a value equal to the one it shows.
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
-                outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !JToken.DeepEquals(normal, value));
+                outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
                 value = normal;
-                if (value == null ? existing == null : existing != null && JToken.DeepEquals(existing, value)) { outcome.Reverted = false; outcome.Applied = true; outcome.Unchanged = true; return outcome; }
-                var index = Commit(target, resolved, inspected, existing, value, document.Modifications.Count, validateBeforeMutation);
-                var slot = (string)(value ?? existing)["id"];
-                history.Register(() => Replay(name, slot, target, existing, index), name);
+                // Equal content is no change: a number written in another literal, or dependencies in another order, leave the document as it is.
+                if (value == null ? existing == null : existing != null && PreservingJson.SameModification(existing, value)) { outcome.Reverted = false; outcome.Applied = true; outcome.Unchanged = true; return outcome; }
+                var slot = existing == null ? NewId(target, prefix) : PatchDocument.Key(existing);
+                if (value != null) {
+                    if (value.Parent != null) value = (JObject)value.DeepClone();
+                    // A number the edit leaves at its value keeps its source literal.
+                    PreservingJson.KeepLiterals(existing, value);
+                }
+                Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation);
+                history.Register(() => Replay(name, slot, target, existing), name);
                 outcome.Applied = true;
             } catch (Exception e) { outcome.Error = e.Message; }
             return outcome;
@@ -685,7 +694,7 @@ namespace RailroaderScenePatcher.Core {
             ObjectState state;
             try { state = PatchEngine.Parse(value).State; } catch (InvalidOperationException) { return value; }
             var result = (JObject)value.DeepClone();
-            bool Changed(JToken was, JToken now) => now != null && !JToken.DeepEquals(was, now);
+            bool Changed(JToken was, JToken now) => now != null && !PreservingJson.SameValue(was, now);
             if (Changed(existing?["active"], value["active"]) && state.Active.HasValue && under.Active == state.Active) result.Remove("active");
             if (Changed(existing?["placement"], value["placement"]) && state.Placement != null && state.Placement.Following == null && SamePlacement(state.Placement, under.Placement)) result.Remove("placement");
             var relationships = result["relationships"] as JObject;
@@ -693,7 +702,7 @@ namespace RailroaderScenePatcher.Core {
                 relationships.Remove("trackMarker");
                 if (!relationships.HasValues) result.Remove("relationships");
             }
-            if (JToken.DeepEquals(result, value)) return value;
+            if (PreservingJson.SameModification(result, value)) return value;
             return result["placement"] == null && result["active"] == null && result["relationships"] == null ? null : result;
         }
         static bool SamePlacement(Placement a, Placement b) {
@@ -716,13 +725,13 @@ namespace RailroaderScenePatcher.Core {
         // Runs inside native Undo or Redo. It must not throw: an exception there corrupts the native grouping.
         // Raised after Undo or Redo replayed one of this session's own edits on the target.
         public Action<TargetIdentity> Replayed;
-        void Replay(string name, string slot, TargetIdentity target, JObject value, int index) {
-            var current = document.Modifications.OfType<JObject>().FirstOrDefault(m => (string)m["id"] == slot);
-            var position = index;
+        // Undo and Redo restore the modification under its key.
+        void Replay(string name, string slot, TargetIdentity target, JObject value) {
+            var current = document.Modifications[slot] as JObject;
             try {
                 var resolved = engine.ResolveUnique(target);
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
-                position = Commit(target, resolved, null, current, value, index);
+                Commit(target, resolved, null, slot, current, value);
                 // Undo and Redo of this patcher's own step changed this object; the owner observes it again.
                 try { Replayed?.Invoke(target); } catch { }
             } catch (Exception e) {
@@ -730,13 +739,13 @@ namespace RailroaderScenePatcher.Core {
                 uncertain = true;
                 IncompleteOperation = name + " could not be reversed or reapplied: " + e.Message + ". The document keeps the state shown; Save remains available.";
             }
-            history.Register(() => Replay(name, slot, target, current, position), name);
+            history.Register(() => Replay(name, slot, target, current), name);
         }
-        int Commit(TargetIdentity identity, object target, InspectedTarget inspected, JObject current, JObject value, int index, Action validateBeforeMutation = null) {
+        void Commit(TargetIdentity identity, object target, InspectedTarget inspected, string key, JObject current, JObject value, Action validateBeforeMutation = null) {
             var mapContext = scene.MapIds.ToArray();
             var prior = scene.Read(target);
             engine.Underlying(target);
-            index = document.Replace(current, value, index);
+            document.Replace(key, value);
             var mutating = false;
             try {
                 var desired = engine.Desired(document.Modifications, target, documentKey);
@@ -753,7 +762,7 @@ namespace RailroaderScenePatcher.Core {
                 scene.Apply(target, desired);
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
             } catch (Exception e) {
-                document.Replace(value, current, index);
+                document.Replace(key, current);
                 // A rejection before the mutation started changed nothing in the scene and needs no restoration.
                 if (!mutating) throw;
                 var restored = false;
@@ -762,7 +771,6 @@ namespace RailroaderScenePatcher.Core {
                 else if (engine.AwaitOutput(target)) throw new InvalidOperationException("Edit failed and the prior state was restored; its dependent output is still being regenerated, and the object accepts edits once it verifies: " + e.Message);
                 throw new InvalidOperationException(restored ? "Edit failed and the prior state was restored: " + e.Message : "Edit failed; cleanup is unverified: " + e.Message);
             }
-            return index;
         }
         // Explicit retry after unverified cleanup: rechecks the actual state against the document before unblocking.
         public Outcome Recheck(TargetIdentity target) { return Recheck(target, null); }
@@ -792,7 +800,7 @@ namespace RailroaderScenePatcher.Core {
         }
         List<JObject> Own(object target) {
             var own = new List<JObject>();
-            foreach (var item in document.Modifications.OfType<JObject>()) {
+            foreach (var item in document.Items) {
                 try { if (ReferenceEquals(engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)), target)) own.Add(item); }
                 catch (InvalidOperationException) { }
             }
@@ -801,7 +809,7 @@ namespace RailroaderScenePatcher.Core {
         string NewId(TargetIdentity target, string prefix = "place-") {
             var name = new string(target.Path.Substring(target.Path.LastIndexOf('/') + 1).ToLowerInvariant().Select(c => Char.IsLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
             var stem = prefix + (name.Length == 0 ? "object" : name);
-            var used = new HashSet<string>(document.Modifications.OfType<JObject>().Select(m => (string)m["id"]), StringComparer.Ordinal);
+            var used = new HashSet<string>(document.Modifications.Properties().Select(m => m.Name), StringComparer.Ordinal);
             var id = stem;
             for (var n = 2; used.Contains(id); n++) id = stem + "-" + n;
             return id;
@@ -832,7 +840,25 @@ namespace RailroaderScenePatcher.Core {
         }
         public void HistoryChanged() { identity.Observe(); }
 
-        bool PatchOutstanding { get { return document != null && (savedText == null ? document.Modifications.Count != 0 : document.Serialize() != savedText); } }
+        // The patch document is Saved exactly when its content equals the content of the text last read or written; member
+        // order, spacing and the literal a number is written in do not count. Without such a text it is Saved while it has
+        // no modification.
+        bool PatchOutstanding {
+            get {
+                if (document == null) return false;
+                if (saved == null) return document.Modifications.Count != 0;
+                if (comparedVersion != document.Version) { differs = !PreservingJson.SameContent(document.Root, saved); comparedVersion = document.Version; }
+                return differs;
+            }
+        }
+        // Whether the file differs from the text last read or written under the Saved equality. A reorder or other spacing
+        // made outside scene patch editing is no change; another value, an unreadable file, a deleted file and a file that
+        // appeared after a load that found none are.
+        bool ChangedOutside(string current) {
+            if (saved == null || current == null) return saved != null || current != null;
+            try { return !PreservingJson.SameContent(PreservingJson.Parse(current).Root, saved); }
+            catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) { return true; }
+        }
         bool MetadataOutstanding {
             get {
                 if (document == null || document.Modifications.Count == 0) return false;
@@ -871,10 +897,10 @@ namespace RailroaderScenePatcher.Core {
             }
             if (!PatchOutstanding) return;
             try {
-                if (storage.ReadPatchDocument() != diskText) throw new InvalidOperationException("the file changed outside scene patch editing after it was read. It is protected from overwrite; reload the native map editor to read it again");
+                if (ChangedOutside(storage.ReadPatchDocument())) throw new InvalidOperationException("the file changed outside scene patch editing after it was read. It is protected from overwrite; reload the native map editor to read it again");
                 var text = document.Serialize();
                 storage.WritePatchDocument(text);
-                diskText = text; savedText = text; written.Add(PatchData);
+                diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1; written.Add(PatchData);
             } catch (Exception e) { throw new InvalidOperationException("The patch document was not written: " + e.Message, e); }
         }
         public void CompleteNativeSave() {

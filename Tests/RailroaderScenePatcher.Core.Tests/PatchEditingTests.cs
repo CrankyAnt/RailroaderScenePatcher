@@ -114,9 +114,9 @@ static class PatchEditingTests {
     static Placement PlacementAt(double x, double y = 2, double z = 3) => new Placement(new[] { x, y, z }, new[] { 0.0, 0.0, 0.0, 1.0 });
     static readonly TargetIdentity Q = new TargetIdentity("s", "q", "c");
     const string Tail = "; outstanding: ";
-    static string Mod(string id, string path, string body) => "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"}," + body + ",\"dependsOn\":[]}";
+    static string Mod(string id, string path, string body) => "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"}," + body + ",\"dependsOn\":[]}";
     static string Fixed(double x) => "\"placement\":{\"mode\":\"fixed\",\"position\":[" + x.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",2,3],\"rotation\":[0,0,0,1]}";
-    static string Doc(string items, string extra = "") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"}," + extra + "\"modifications\":[" + items + "]}";
+    static string Doc(string items, string extra = "") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"}," + extra + "\"modifications\":{" + items + "}}";
     sealed class World {
         public Scene Scene = new Scene(); public Box Box = new Box { Position = new[] { -93.0, 8.0, 9.0 }, Rotation = new[] { 0.0, 1.0, 0.0, 0.0 } };
         public Box Other = new Box { Position = new[] { -50.0, 0.0, 0.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
@@ -171,7 +171,7 @@ static class PatchEditingTests {
         // A revert of one setting keeps the others.
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied && w.Session.Edit(P, null, false).Applied, "A placement and a disable");
         var kept = w.Session.Edit(P, null, true);
-        var item = (JObject)w.Document["modifications"][0];
+        var item = (JObject)w.Document["modifications"].First.First;
         Assert(kept.Reverted && item["active"] == null && item["placement"] != null && w.Box.Active && w.Box.X == 12, "Enabling removes the activity value and keeps the placement");
         // The underlying placement in map coordinates, as the numeric fields show it.
         var home = new Placement(new[] { 7.0002, 8, 9 }, new[] { 0.0, 1.0, 0.0, 0.0 });
@@ -191,15 +191,15 @@ static class PatchEditingTests {
         // A document written by hand may hold a value equal to the object's own; an edit of another setting keeps it.
         var hand = new World(Doc(Mod("m", "p", "\"active\":true")));
         Assert(hand.Session.IsChanged(P) && hand.Box.Active, "A hand-written equal value is legal and counts as a modification");
-        Assert(hand.Session.Edit(P, PlacementAt(112), null).Applied && (bool)hand.Document["modifications"][0]["active"], "An edit of the placement keeps the hand-written activity value");
+        Assert(hand.Session.Edit(P, PlacementAt(112), null).Applied && (bool)hand.Document["modifications"].First.First["active"], "An edit of the placement keeps the hand-written activity value");
         var same = hand.Session.Edit(P, null, true);
-        Assert(same.Applied && same.Unchanged && (bool)hand.Document["modifications"][0]["active"], "Setting the hand-written value again changes nothing");
+        Assert(same.Applied && same.Unchanged && (bool)hand.Document["modifications"].First.First["active"], "Setting the hand-written value again changes nothing");
     }
     static string[] Required(World w) => JObject.Parse(w.Store.Info)["dependencies"]["required"].Select(x => (string)x).ToArray();
     static void ActivityFollowsTheSameRoute() {
         var w = new World();
         Assert(w.Session.Edit(P, null, false).Applied && !w.Box.Active && w.Box.X == -93, "An explicit disable takes effect without moving the object");
-        var item = (JObject)w.Document["modifications"][0];
+        var item = (JObject)w.Document["modifications"].First.First;
         Assert(item["active"].Type == JTokenType.Boolean && !(bool)item["active"] && item["placement"] == null, "The document represents the activity change alone");
         var replay = new Scene(); var fresh = new Box(); replay.Objects["p"] = new List<object> { fresh };
         var engine = new PatchEngine(replay);
@@ -209,7 +209,7 @@ static class PatchEditingTests {
         w.MapEditor.Undo(); Assert(w.Box.Active && w.Document["modifications"].Count() == 0, "Native Undo reverses the activity change");
         w.MapEditor.Redo(); Assert(!w.Box.Active, "Native Redo reapplies the activity change");
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied && !w.Box.Active && w.Box.X == 12 && w.Document["modifications"].Count() == 1, "Placement and activity group in one desired state per object");
-        Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && !(bool)w.Saved["modifications"][0]["active"], "The activity change persists through the same Save");
+        Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && !(bool)w.Saved["modifications"].First.First["active"], "The activity change persists through the same Save");
         Assert(!new PatchEngine(new Scene()).Apply(Doc(Mod("a", "p", "\"active\":\"no\""))).Outcomes["a"].Applied, "A non-boolean activity value is rejected");
     }
     static void UndoAndRedoAreOneCoherentChange() {
@@ -222,7 +222,7 @@ static class PatchEditingTests {
         Assert(w.Box.X == 12 && !w.Box.Active && w.Document["modifications"].Count() == 1 && w.MapEditor.IsDirty, "Redo reapplies the complete edit");
         w.Session.Edit(P, PlacementAt(140), null);
         w.MapEditor.Undo();
-        Assert(w.Box.X == 12 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 112, "Undo of a second edit returns to the first desired state, not to the underlying state");
+        Assert(w.Box.X == 12 && (double)w.Document["modifications"].First.First["placement"]["position"][0] == 112, "Undo of a second edit returns to the first desired state, not to the underlying state");
         w.Scene.Origin = 110; w.MapEditor.Redo(); Assert(w.Box.X == 30, "Redo applies the map placement through a changed origin"); w.Scene.Origin = 100;
     }
     static void MixedHistoryKeepsSavedIdentity() {
@@ -238,15 +238,15 @@ static class PatchEditingTests {
         Assert(w.Session.Outstanding(w.MapEditor.NativeDirty).SequenceEqual(new[] { PatchEditingSession.NativeData }), "The divergent native state is the outstanding participant");
         w.MapEditor.Undo(); w.Session.Edit(P, PlacementAt(150), null);
         Assert(!w.MapEditor.NativeDirty && w.MapEditor.IsDirty && w.Session.Outstanding(false).Contains(PatchEditingSession.PatchData), "A different patcher edit at the saved change count is outstanding patch work");
-        Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && (double)w.Saved["modifications"][0]["placement"]["position"][0] == 150, "Saving the branch records its own saved identity");
+        Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && (double)w.Saved["modifications"].First.First["placement"]["position"][0] == 150, "Saving the branch records its own saved identity");
     }
     static void RemovalRecomputesUnderlyingState() {
         var w = new World(Doc(Mod("move-p", "p", Fixed(112)) + "," + Mod("move-q", "q", Fixed(160)), "\"future\":{\"keep\":true},"));
         Assert(w.Box.X == 12 && w.Other.X == 60 && !w.MapEditor.IsDirty, "The saved document is applied and clean at load");
         w.Session.Edit(Q, PlacementAt(170), null); w.Session.Edit(P, PlacementAt(130), null);
         Assert(w.Session.Remove(P).Applied && w.AtUnderlying, "Removal returns the object to the state the native context gives it, not to an earlier patched snapshot");
-        Assert(w.Other.X == 70 && w.Document["modifications"].Count() == 1 && (string)w.Document["modifications"][0]["id"] == "move-q" && (bool)w.Document["future"]["keep"], "Removal keeps this mod's remaining work and unknown content");
-        w.MapEditor.Undo(); Assert(w.Box.X == 30 && (string)w.Document["modifications"][0]["id"] == "move-p", "Undo of a removal restores the modification at its place in the document");
+        Assert(w.Other.X == 70 && w.Document["modifications"].Count() == 1 && w.Document["modifications"]["move-q"] != null && (bool)w.Document["future"]["keep"], "Removal keeps this mod's remaining work and unknown content");
+        w.MapEditor.Undo(); Assert(w.Box.X == 30 && w.Document["modifications"].Count() == 2 && (double)w.Document["modifications"]["move-p"]["placement"]["position"][0] == 130, "Undo of a removal restores the modification under its key");
         w.MapEditor.Redo(); Assert(w.AtUnderlying && w.MapEditor.Save() == null && w.Saved["modifications"].Count() == 1, "A saved removal leaves only the remaining modification on disk");
         Assert(!w.Session.Remove(P).Applied, "An object without a modification has nothing to remove");
         var two = new World(Doc(Mod("pose", "p", Fixed(112)) + "," + Mod("off", "p", "\"active\":false")));
@@ -329,11 +329,11 @@ static class PatchEditingTests {
                 Assert(File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes), label + ": the previous Info.json is intact");
                 Assert(Listing(root) == before, label + ": no partial file is left beside the mod's files: " + Listing(root));
                 Assert(announced.Count == 0, label + ": a failed write is not announced as written");
-                Assert(w.MapEditor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 130, label + ": the edit stays in memory and the native map editor stays unsaved");
+                Assert(w.MapEditor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"].First.First["placement"]["position"][0] == 130, label + ": the edit stays in memory and the native map editor stays unsaved");
                 files.FailWrite = files.FailReplace = null;
                 Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty, label + ": the guarded retry succeeds");
                 var written = JObject.Parse(File.ReadAllText(storage.PatchPath));
-                Assert((double)written["modifications"][0]["placement"]["position"][0] == 130 && (metadata ? JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0") : File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)), label + ": the retry writes both files completely");
+                Assert((double)written["modifications"].First.First["placement"]["position"][0] == 130 && (metadata ? JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0") : File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)), label + ": the retry writes both files completely");
                 Assert(announced.Count == 1 && announced[0] == File.ReadAllText(storage.PatchPath), label + ": the completed patch write is announced once with the text on disk");
                 Assert(Listing(root) == "Data/scene-patches.json,Info.json", label + ": the retry leaves only the mod's own files: " + Listing(root));
             } finally { Directory.Delete(root, true); }
@@ -345,7 +345,7 @@ static class PatchEditingTests {
             foreach (var leftover in new[] { storage.PatchPath, storage.InfoPath }) File.WriteAllText(leftover + ".saving", "{\"partial");
             var w = new World(saved, Info("0.0.1"), storage);
             w.Session.Edit(P, PlacementAt(140), null);
-            Assert(w.MapEditor.Save() == null && Listing(stale) == "Data/scene-patches.json,Info.json" && (double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"][0]["placement"]["position"][0] == 140, "A Save replaces leftovers of an interrupted Save and leaves only the mod's own files: " + Listing(stale));
+            Assert(w.MapEditor.Save() == null && Listing(stale) == "Data/scene-patches.json,Info.json" && (double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"].First.First["placement"]["position"][0] == 140, "A Save replaces leftovers of an interrupted Save and leaves only the mod's own files: " + Listing(stale));
         } finally { Directory.Delete(stale, true); }
     }
     // Records each pause in the file log and waits it out, so a real hold of a file during the test passes as it would in the native map editor.
@@ -374,7 +374,7 @@ static class PatchEditingTests {
                 // The real disk can hold the file once more after the injected failures; each further attempt still follows a pause.
                 var pauses = Pauses(files.Log, target, out var attempts);
                 Assert(attempts >= 3 && pauses.Take(2).SequenceEqual(new[] { 50, 100 }), target + ": the replacement is tried again after a short pause until it succeeds");
-                Assert((double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"][0]["placement"]["position"][0] == 130 && JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0"), target + ": both files hold their new content");
+                Assert((double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"].First.First["placement"]["position"][0] == 130 && JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0"), target + ": both files hold their new content");
                 Assert(Listing(root) == "Data/scene-patches.json,Info.json", target + ": no pending file is left: " + Listing(root));
             } finally { Directory.Delete(root, true); }
             // A file that stays held: the replacement is tried a bounded number of times, then the Save fails cleanly.
@@ -392,7 +392,7 @@ static class PatchEditingTests {
                 Assert(tries == ModStorage.ReplaceAttempts && held.SequenceEqual(new[] { 50, 100, 150, 200 }), target + ": the replacement is tried a bounded number of times");
                 // Info.json is written before the patch document, so a held patch document leaves the completed metadata write.
                 Assert(File.ReadAllBytes(storage.PatchPath).SequenceEqual(patchBytes) && (target == "scene-patches.json" || File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)) && Listing(root) == "Data/scene-patches.json,Info.json", target + ": the held file keeps its previous content and no pending file is left");
-                Assert(w.MapEditor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 130, target + ": the edit stays in memory and the native map editor stays unsaved");
+                Assert(w.MapEditor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"].First.First["placement"]["position"][0] == 130, target + ": the edit stays in memory and the native map editor stays unsaved");
                 files.FailReplace = null;
                 Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty, target + ": the retry after the file is released succeeds");
             } finally { Directory.Delete(root, true); }
@@ -487,11 +487,11 @@ static class PatchEditingTests {
         own.Session.Edit(P, PlacementAt(112), null); own.MapEditor.Save();
         own.Session.Edit(P, PlacementAt(130), null);
         own.Scene.FailApply = true; own.MapEditor.Undo(); own.Scene.FailApply = false;
-        Assert(own.Session.IncompleteOperation.Contains("could not be reversed") && (double)own.Document["modifications"][0]["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "A patcher edit that cannot be reversed keeps its document state and reports the incomplete operation");
+        Assert(own.Session.IncompleteOperation.Contains("could not be reversed") && (double)own.Document["modifications"].First.First["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "A patcher edit that cannot be reversed keeps its document state and reports the incomplete operation");
         Assert(own.MapEditor.CanRedo && own.MapEditor.UndoGroups.Count == 1, "The failure leaves the native history grouping intact");
         own.MapEditor.Redo();
-        Assert((double)own.Document["modifications"][0]["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "History execution after the failure stays consistent with the document");
-        Assert(own.MapEditor.Save() == null && !own.MapEditor.IsDirty && own.Session.IncompleteOperation == null && (double)own.Saved["modifications"][0]["placement"]["position"][0] == 130, "A contained patcher failure leaves the native grouping intact, so a complete Save of the shown state is clean");
+        Assert((double)own.Document["modifications"].First.First["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "History execution after the failure stays consistent with the document");
+        Assert(own.MapEditor.Save() == null && !own.MapEditor.IsDirty && own.Session.IncompleteOperation == null && (double)own.Saved["modifications"].First.First["placement"]["position"][0] == 130, "A contained patcher failure leaves the native grouping intact, so a complete Save of the shown state is clean");
     }
     static void FailedEditsRestoreAndGuardRetry() {
         var w = new World();
@@ -500,7 +500,7 @@ static class PatchEditingTests {
         Assert(!outcome.Applied && outcome.Error.Contains("prior state was restored") && w.AtUnderlying && w.Document["modifications"].Count() == 0 && w.MapEditor.UndoGroups.Count == 0 && !w.MapEditor.IsDirty, "A failed edit restores world and document and leaves no history or dirty state");
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied, "A verified restoration permits a new edit");
         w.Scene.FailApply = true; outcome = w.Session.Edit(P, PlacementAt(140), null); w.Scene.FailApply = false;
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified") && (double)w.Document["modifications"][0]["placement"]["position"][0] == 112, "Unverified cleanup is reported and the document keeps the prior desired state");
+        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified") && (double)w.Document["modifications"].First.First["placement"]["position"][0] == 112, "Unverified cleanup is reported and the document keeps the prior desired state");
         Assert(!w.Session.Edit(P, PlacementAt(150), null).Applied && !w.Session.Remove(P).Applied, "Further mutation of that object is blocked until it is rechecked");
         Assert(w.Session.Edit(Q, PlacementAt(160), null).Applied && w.Other.X == 60, "Independent objects remain editable");
         Assert(w.Session.Recheck(P).Applied && w.Box.X == 12 && w.Session.Edit(P, PlacementAt(150), null).Applied && w.Box.X == 50, "The guarded retry reconciles the actual state with the document before unblocking");
@@ -510,12 +510,12 @@ static class PatchEditingTests {
         Assert(!w.Session.Edit(P, new Placement(new[] { 1.0, 2.0, Double.NaN }, new[] { 0.0, 0.0, 0.0, 1.0 }), null).Applied && !w.Session.Edit(P, new Placement(new[] { 1.0, 2.0, 3.0 }, new[] { 0.0, 0.0, 0.0, 0.0 }), null).Applied && w.Box.X == 50, "Invalid numeric input is refused before mutation");
     }
     static void UnknownContentAndProtectedDocumentsSurvive() {
-        var future = "{\"id\":\"later\",\"target\":{\"scene\":\"s\",\"path\":\"q\",\"component\":\"c\"},\"futureOperation\":{\"ratio\":1.50},\"dependsOn\":[]}";
+        var future = "\"later\":{\"target\":{\"scene\":\"s\",\"path\":\"q\",\"component\":\"c\"},\"futureOperation\":{\"ratio\":1.50},\"dependsOn\":[]}";
         var w = new World(Doc(future + "," + Mod("move-p", "p", Fixed(112)), "\"futureNumber\":0.123456789012345678901234567890123456789,\"stamp\":\"2020-01-01T00:00:00Z\","));
         Assert(w.Other.X == -50 && w.Session.Blocked == null && !w.MapEditor.IsDirty, "Unknown content is not executed and does not make the session dirty");
         Assert(w.Session.Edit(P, PlacementAt(130), null).Applied && w.MapEditor.Save() == null, "A known modification beside unknown content can be edited and saved");
         Assert(w.Store.Patch.Contains("0.123456789012345678901234567890123456789") && w.Store.Patch.Contains("2020-01-01T00:00:00Z") && w.Store.Patch.Contains("1.50"), "Unknown numbers and strings keep their exact content through edit and Save");
-        Assert(JToken.DeepEquals(w.Saved["modifications"][0], JObject.Parse(future)) && (double)w.Saved["modifications"][1]["placement"]["position"][0] == 130, "The unknown modification is written back unchanged, in place");
+        Assert(JToken.DeepEquals(w.Saved["modifications"]["later"], JObject.Parse("{" + future + "}")["later"]) && (double)w.Saved["modifications"]["move-p"]["placement"]["position"][0] == 130, "The unknown modification is written back unchanged under its key");
         var reread = new World(w.Store.Patch);
         Assert(reread.Session.Blocked == null && !reread.MapEditor.IsDirty && reread.Box.X == 30, "The saved document reads back clean and applies");
         Assert(!w.Session.Edit(Q, PlacementAt(1), null).Applied && !w.Session.Remove(Q).Applied && w.Other.X == -50, "A modification with unknown content is neither edited nor deleted");
@@ -535,7 +535,7 @@ static class PatchEditingTests {
         Assert(w.Session.Edit(P, PlacementAt(112), null, inspected).Applied && w.Box.X == 12, "An edit bound to the current inspection applies");
         var mutations = w.Scene.MutationCalls;
         var outcome = w.Session.Edit(P, PlacementAt(130), null, inspected);
-        Assert(!outcome.Applied && outcome.Error.Contains("refresh and inspect again") && w.Box.X == 12 && w.Scene.MutationCalls == mutations && w.MapEditor.UndoGroups.Count == 1 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 112,
+        Assert(!outcome.Applied && outcome.Error.Contains("refresh and inspect again") && w.Box.X == 12 && w.Scene.MutationCalls == mutations && w.MapEditor.UndoGroups.Count == 1 && (double)w.Document["modifications"].First.First["placement"]["position"][0] == 112,
             "An edit bound to an outdated inspection is refused before mutation, document change or history: " + outcome.Error);
         Assert(!w.Session.Remove(P, inspected).Applied && !w.Session.Recheck(P, inspected).Applied && w.Box.X == 12, "Removal and recheck are bound to the inspection in the same way");
         try { inventory.Pin(inventory.Entries.Single()); throw new Exception("A stale inventory issued a token"); } catch (InvalidOperationException) { }
@@ -547,7 +547,7 @@ static class PatchEditingTests {
         outcome = w.Session.Edit(P, PlacementAt(150), null, inspected);
         Assert(!outcome.Applied && outcome.Error.Contains("Target changed before mutation") && w.Box.X == 30 && replacement.X == 0 && w.Scene.MutationCalls == mutations,
             "A target replaced while its state is read is rejected without moving either object or requesting restoration: " + outcome.Error);
-        Assert((double)w.Document["modifications"][0]["placement"]["position"][0] == 130 && w.MapEditor.UndoGroups.Count == 2, "The rejected edit leaves document and history as they were");
+        Assert((double)w.Document["modifications"].First.First["placement"]["position"][0] == 130 && w.MapEditor.UndoGroups.Count == 2, "The rejected edit leaves document and history as they were");
         w.Scene.Objects["p"] = new List<object> { w.Box };
         Assert(w.Session.Edit(P, PlacementAt(150), null, inspected).Applied, "The pre-mutation rejection does not block the object");
         w.Scene.BeforeRead = () => w.Scene.Maps = new[] { "elsewhere" };
@@ -574,7 +574,7 @@ static class PatchEditingTests {
         var outcome = w.Session.Edit(P, PlacementAt(112), null);
         Assert(outcome.Applied && outcome.Error == null, "A numeric placement edit completes");
         Assert(w.Box.X == 12 && w.Box.Position[1] == 2 && w.Box.Position[2] == 3 && w.Box.Rotation.SequenceEqual(new[] { 0.0, 0.0, 0.0, 1.0 }), "The edit moves the object to the fixed map placement through the current origin");
-        var item = (JObject)w.Document["modifications"][0];
+        var item = (JObject)w.Document["modifications"].First.First;
         Assert((int)w.Document["formatVersion"] == 1 && (string)w.Document["sourceMap"]["mapId"] == "map", "A new document carries the format and the active map context");
         Assert((string)item["target"]["path"] == "p" && (string)item["placement"]["mode"] == "fixed" && (double)item["placement"]["position"][0] == 112 && (double)item["placement"]["rotation"][3] == 1, "The canonical document holds the desired fixed placement");
         var replay = new Scene(); var fresh = new Box(); replay.Objects["p"] = new List<object> { fresh };

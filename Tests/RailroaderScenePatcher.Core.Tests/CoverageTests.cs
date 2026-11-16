@@ -120,11 +120,14 @@ static partial class CoverageTests {
     static string Loc(string segment, double distance) => "{\"segment\":\"" + segment + "\",\"end\":\"a\",\"distance\":" + N(distance) + "}";
     static string Range(string segment, double from, double to) => "{\"from\":" + Loc(segment, from) + ",\"to\":" + Loc(segment, to) + "}";
     // The reroute fixture: approach A 308-550, island 292-308, approach B 292-50 on one segment.
-    static string Tracks(string circuit, string segment = "Snew") => "{\"circuit\":\"" + circuit + "\",\"approachA\":" + Range(segment, 308, 550) + ",\"island\":" + Range(segment, 292, 308) + ",\"approachB\":" + Range(segment, 292, 50) + "}";
-    static string Detached(string circuit) => "{\"circuit\":\"" + circuit + "\",\"detach\":true}";
-    static string Cover(string id, string circuits, string path = CrossingPath, string deps = "[]", string extra = "") =>
-        "{\"id\":\"" + id + "\"," + Target(path) + ",\"relationships\":{\"crossingCoverage\":[" + circuits + "]}" + extra + ",\"dependsOn\":" + deps + "}";
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Tracks(string circuit, string segment = "Snew") => "\"" + circuit + "\":{\"approachA\":" + Range(segment, 308, 550) + ",\"island\":" + Range(segment, 292, 308) + ",\"approachB\":" + Range(segment, 292, 50) + "}";
+    static string Detached(string circuit) => "\"" + circuit + "\":{\"detach\":true}";
+    // A modification that sets crossing coverage: entries of circuits, entries of additions, or both. A null list leaves its object out.
+    static string Cover(string id, string circuits, string path = CrossingPath, string deps = "[]", string extra = "", string additions = null) =>
+        "\"" + id + "\":{" + Target(path) + ",\"relationships\":{\"crossingCoverage\":{" + (circuits == null ? "" : "\"circuits\":{" + circuits + "}") + (circuits != null && additions != null ? "," : "")
+            + (additions == null ? "" : "\"additions\":{" + additions + "}") + "}}" + extra + ",\"dependsOn\":" + deps + "}";
+    static string Add(string id, string additions, string path = CrossingPath, string deps = "[]", string extra = "", string circuits = null) => Cover(id, circuits, path, deps, extra, additions);
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static CircuitCoverage Selected(string segment = "Snew") => CircuitCoverage.Tracks(R(segment, 308, 550), R(segment, 292, 308), R(segment, 292, 50));
     static SpanRange R(string segment, double from, double to) => new SpanRange(new TrackLocation(segment, "a", from), new TrackLocation(segment, "a", to));
     sealed class Fixture {
@@ -183,13 +186,13 @@ static partial class CoverageTests {
         Assert(result.Outcomes["reroute"].Applied && observed["P6id"].Kind == CircuitKind.Native && f.Spans(f.Retained) == "Pdlh,P6id,P1db", "An omitted circuit keeps its native coverage");
         Assert(f.Scene.Read(f.Other).Coverage["Qi"].Kind == CircuitKind.Native, "An omitted crossing keeps its coverage");
         foreach (var invalid in new[] { "", Detached("Pipr").Replace("true", "false"), Detached("Pipr").Replace("}", ",\"island\":" + Range("Snew", 1, 2) + "}"),
-                Tracks("Pipr").Replace(",\"approachB\":" + Range("Snew", 292, 50), ""), Tracks("Pipr") + "," + Detached("Pipr"), "{\"detach\":true}", "null", "{\"circuit\":\"Pipr\"}" }) {
+                Tracks("Pipr").Replace(",\"approachB\":" + Range("Snew", 292, 50), ""), "\"Pipr\":null", "\"Pipr\":{}" }) {
             f = new Fixture();
             var refused = new PatchEngine(f.Scene).Apply(Doc(Cover("bad", invalid)));
-            Assert(!refused.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Native, "An empty, partial, duplicated, false or mixed coverage is neither a selection nor a detach: " + invalid + " -> " + refused.Outcomes["bad"].Error);
+            Assert(!refused.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Native, "An empty, partial, null, false or mixed coverage is neither a selection nor a detach: " + invalid + " -> " + refused.Outcomes["bad"].Error);
         }
         f = new Fixture();
-        var future = new PatchEngine(f.Scene).Apply(Doc(Cover("future", Tracks("Pipr").Replace("\"circuit\":\"Pipr\"", "\"circuit\":\"Pipr\",\"bell\":true"))));
+        var future = new PatchEngine(f.Scene).Apply(Doc(Cover("future", Tracks("Pipr").Replace("\"Pipr\":{", "\"Pipr\":{\"bell\":true,"))));
         Assert(!future.Outcomes["future"].Applied && future.Outcomes["future"].Error.StartsWith("Unsupported", StringComparison.Ordinal) && f.Native, "Unknown circuit content is preserved as unsupported, not executed");
     }
     static void ExplicitAlternativeTransfersDetectionAndRetainsCoverage() {
@@ -232,7 +235,7 @@ static partial class CoverageTests {
         var spans = f.Rerouted.Spans.ToArray();
         var again = engine.Apply(Doc(Cover("reroute", Tracks("Pipr"))));
         Assert(again.Outcomes["reroute"].Applied && f.Rerouted.Spans.SequenceEqual(spans) && f.OwnedRegistered == 3 && f.World.Created == 3, "Repeated application reuses the owned spans");
-        var moved = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", "{\"circuit\":\"Pipr\",\"approachA\":" + Range("Sother", 350, 395) + ",\"island\":" + Range("Sother", 340, 350) + ",\"approachB\":" + Range("Sother", 340, 220) + "}")));
+        var moved = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", "\"Pipr\":{\"approachA\":" + Range("Sother", 350, 395) + ",\"island\":" + Range("Sother", 340, 350) + ",\"approachB\":" + Range("Sother", 340, 220) + "}")));
         Assert(moved.Outcomes["reroute"].Applied && f.OwnedRegistered == 3 && spans.All(s => s.Destroyed && !f.World.Registered(s)), "Other selected tracks replace the owned spans without leaving the earlier ones: " + moved.Outcomes["reroute"].Error);
         Assert(new[] { 380.0, 345, 250 }.All(d => f.World.Detects(f.Crossing, "Sother", d)) && !f.NewRouteDetectsBothWays, "The replacement coverage triggers; the earlier selection does not");
     }
@@ -275,10 +278,10 @@ static partial class CoverageTests {
         markers.Objects["sign"] = new List<object> { sign }; markers.Load(sign);
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(new TrackMarkerScene(markers, Capability.Unchecked)); capabilities.Add(f.Scene);
-        var marker = "{\"id\":\"m\",\"target\":{\"scene\":\"s\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\"},\"relationships\":{\"crossingCoverage\":[" + Detached("Pipr") + "]},\"dependsOn\":[]}";
+        var marker = "\"m\":{\"target\":{\"scene\":\"s\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\"},\"relationships\":{\"crossingCoverage\":{\"circuits\":{" + Detached("Pipr") + "}}},\"dependsOn\":[]}";
         result = new PatchEngine(capabilities).Apply(Doc(marker));
         Assert(!result.Outcomes["m"].Applied && result.Outcomes["m"].Error.Contains("crossing-coverage") && markers.Mutations == 0, "A track marker refuses crossing coverage: " + result.Outcomes["m"].Error);
-        result = new PatchEngine(new Scene { Objects = { ["p"] = new List<object> { new Box() } } }).Apply(Doc("{\"id\":\"b\",\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"relationships\":{\"crossingCoverage\":[" + Detached("Pipr") + "]},\"dependsOn\":[]}"));
+        result = new PatchEngine(new Scene { Objects = { ["p"] = new List<object> { new Box() } } }).Apply(Doc("\"b\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"relationships\":{\"crossingCoverage\":{\"circuits\":{" + Detached("Pipr") + "}}},\"dependsOn\":[]}"));
         Assert(!result.Outcomes["b"].Applied && result.Outcomes["b"].Error.Contains("crossing-coverage"), "An object without relationships refuses crossing coverage");
         Assert(f.Scene.MinimumPatcherVersion(Crossing) == "0.5.0", "The crossing capability names the version that introduced it");
     }
@@ -334,23 +337,24 @@ static partial class CoverageTests {
         var session = new PatchEditingSession(new PatchEngine(f.Scene), mapEditor, store, "map"); mapEditor.Session = session;
         return (f, session, mapEditor, store);
     }
-    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single();
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
     static void EditingPreviewSelectUndoRedoAndRemoval() {
         var (f, session, mapEditor, store) = Session();
         var preview = session.PreviewCoverage(Crossing, "Pipr", Selected());
         Assert(preview.Error == null && preview.Lines.Count == 2, "The preview reports every circuit: " + preview.Error);
         Assert(preview.Lines[0].Contains("Snew end a 308 to 550 m") && preview.Lines[0].Contains("Pcyi, Pipr, Pws9 stay registered and stop triggering"), "The preview shows the selected tracks and the obsolete spans: " + preview.Lines[0]);
         Assert(preview.Lines[1].StartsWith("Circuit P6id: retained", StringComparison.Ordinal), "The preview shows the retained circuit: " + preview.Lines[1]);
-        Assert(f.World.Mutations == 0 && f.Native && session.DocumentText.Contains("\"modifications\": []") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
+        Assert(f.World.Mutations == 0 && f.Native && session.DocumentText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
         Assert(session.PreviewCoverage(Crossing, "Pzzz", Selected()).Error.Contains("not a circuit"), "The preview refuses an obsolete circuit");
         var select = session.Cover(Crossing, "Pipr", Selected());
         Assert(select.Applied && f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.RetainedDetectsBothWays, "A scene patch editing selection transfers detection: " + select.Error);
         var item = Only(session);
-        Assert((string)item["relationships"]["crossingCoverage"][0]["circuit"] == "Pipr" && (double)item["relationships"]["crossingCoverage"][0]["approachB"]["to"]["distance"] == 50
-            && item["placement"] == null && item["active"] == null && ((JArray)item["relationships"]["crossingCoverage"]).Count == 1, "The document records only the explicit circuit: " + item);
+        var covered = (JObject)item["relationships"]["crossingCoverage"];
+        Assert((double)covered["circuits"]["Pipr"]["approachB"]["to"]["distance"] == 50 && covered.Count == 1 && ((JObject)covered["circuits"]).Count == 1
+            && item["placement"] == null && item["active"] == null && item["id"] == null, "The document records only the explicit circuit under its island span: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "Crossing coverage requires the patcher version that introduced it");
         Assert(session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && f.Crossing.Circuits.Count == 1 && f.NewRouteDetectsBothWays, "A second circuit can be detached in the same modification");
-        Assert(((JArray)Only(session)["relationships"]["crossingCoverage"]).Count == 2, "Both circuits are recorded in one modification");
+        Assert(((JObject)Only(session)["relationships"]["crossingCoverage"]["circuits"]).Count == 2, "Both circuits are recorded in one modification");
         var lastPreview = session.PreviewCoverage(Crossing, "Pipr", CircuitCoverage.Detached);
         Assert(lastPreview.Error != null && lastPreview.Error.Contains("without detection") && lastPreview.Lines.Count == 0, "The scene patch editing preview names why detaching the last covered circuit is refused: " + lastPreview.Error);
         Assert(CrossingCoverage.LastCovered(session.Coverage(Crossing), "Pipr") && !CrossingCoverage.LastCovered(session.Coverage(Crossing), "P6id"), "Scene patch editing can tell which circuit is the last covered one");
@@ -359,7 +363,7 @@ static partial class CoverageTests {
         Assert(!last.Applied && last.Error.Contains("without detection") && f.NewRouteDetectsBothWays && mapEditor.UndoGroups.Count == groups, "Detaching the last covered circuit is refused without a history entry: " + last.Error);
         var owned = f.Rerouted.Spans.ToArray();
         mapEditor.Undo(); Assert(f.Crossing.Circuits.Count == 2 && f.Rerouted.Spans.SequenceEqual(owned) && f.RetainedDetectsBothWays, "Undo of the detach restores the circuit and keeps the selected coverage");
-        mapEditor.Undo(); Assert(f.Native && f.OldRouteDetects && session.DocumentText.Contains("\"modifications\": []"), "Undo of the selection restores native coverage and registrations without owned spans");
+        mapEditor.Undo(); Assert(f.Native && f.OldRouteDetects && session.DocumentText.Contains("\"modifications\": {}"), "Undo of the selection restores native coverage and registrations without owned spans");
         mapEditor.Redo(); Assert(f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.OwnedRegistered == 3, "Redo reapplies the selection with one owned set");
         mapEditor.Redo(); Assert(f.Crossing.Circuits.Count == 1 && f.OwnedRegistered == 3, "Redo reapplies the detach");
         var cleared = session.Cover(Crossing, "P6id", null);
@@ -376,7 +380,7 @@ static partial class CoverageTests {
         Assert(!session.Cover(Crossing, "Pipr", Selected("Smissing")).Applied && f.World.Mutations == 0 && f.Native && mapEditor.UndoGroups.Count == 0, "A missing selected track is refused without a history entry");
         f.World.FailSetSpansOnce = true;
         var failed = session.Cover(Crossing, "Pipr", Selected());
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && session.DocumentText.Contains("\"modifications\": []"), "A failed scene patch editing mutation restores coverage and the document: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && session.DocumentText.Contains("\"modifications\": {}"), "A failed scene patch editing mutation restores coverage and the document: " + failed.Error);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         failed = session.Cover(Crossing, "Pipr", Selected());
         Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported: " + failed.Error);

@@ -7,7 +7,8 @@ using RailroaderScenePatcher.Core;
 namespace RailroaderScenePatcher {
     // Whether the supplied definitions, the patch documents of the loaded mods, are still the ones the last refresh
     // read. Stale says that something other than this panel changed them: a document edited, added or removed outside
-    // scene patch editing. The patcher's own Save is not such a change: what it wrote is what scene patch editing already holds, so the
+    // scene patch editing. A document counts as edited when its content differs under the Saved equality of the patch
+    // document, so another member order, spacing or number literal is no change. The patcher's own Save is not such a change: what it wrote is what scene patch editing already holds, so the
     // written text becomes the text to compare against. UI-independent, shared with controlled replay.
     internal sealed class SuppliedDefinitions {
         // Per mod, the document text and the read error of the last refresh, with the patcher's own writes since.
@@ -23,8 +24,11 @@ namespace RailroaderScenePatcher {
             if (baseline == null) { Stale = true; return; }
             var current = Copy(documents);
             if (current.Count != baseline.Count) { Stale = true; return; }
-            foreach (var mod in current)
-                if (!baseline.TryGetValue(mod.Key, out var known) || known.Key != mod.Value.Key || known.Value != mod.Value.Value) { Stale = true; return; }
+            foreach (var mod in current) {
+                if (!baseline.TryGetValue(mod.Key, out var known) || known.Value != mod.Value.Value || !PatchDocument.SameContent(known.Key, mod.Value.Key)) { Stale = true; return; }
+                // Equal content in another form: later comparisons expect this text, so they need not parse it again.
+                if (!ReferenceEquals(known.Key, mod.Value.Key)) baseline[mod.Key] = mod.Value;
+            }
         }
         // The documents could not be read: nothing vouches for them.
         internal void Unreadable() { Stale = true; }

@@ -25,10 +25,10 @@ static class TrackFollowingTests {
     static readonly double[] Quarter = { 0, S, 0, S };
     static bool Near(double[] a, params double[] b) => a.Length == b.Length && a.Select((v, i) => Math.Abs(v - b[i]) < 1e-6).All(x => x);
     static string Follow(string id, string track, string offset = "[2,0,0]", string rotation = "[0,0,0,1]", string path = "p", string extra = "") =>
-        "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"trackFollowing\",\"track\":" + track +
+        "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"trackFollowing\",\"track\":" + track +
         ",\"offset\":" + offset + ",\"rotation\":" + rotation + "}" + extra + ",\"dependsOn\":[]}";
     const string SegmentTrack = "{\"segment\":\"S1\",\"end\":\"a\",\"distance\":10}", NodeTrack = "{\"node\":\"N1\"}";
-    static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[" + items + "]}";
+    static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + items + "}}";
     static (TrackScene scene, Box box) Setup() {
         var scene = new TrackScene(); var box = new Box { Position = new[] { 5.0, 6, 7 }, Rotation = new[] { 0.0, 0, 0, 1 } };
         scene.Objects["p"] = new List<object> { box };
@@ -130,7 +130,7 @@ static class TrackFollowingTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
         return (scene, box, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
     static double[] Numbers(Newtonsoft.Json.Linq.JToken token) => token.Select(v => (double)v).ToArray();
     static void EditingFollowKeepsPlacementAndFollowsTrackMoves() {
         var (scene, box, session, mapEditor, store) = Session();
@@ -151,7 +151,7 @@ static class TrackFollowingTests {
         Assert(session.ReconcileTrackFollowing().Single().Value.Applied && Near(box.Position, 103, 7, -95) && Near(box.Rotation, 0, -S, 0, S), "A turned track turns the object's position and orientation with it: " + String.Join(",", box.Position) + " / " + String.Join(",", box.Rotation));
         Assert(session.DocumentText == text && mapEditor.UndoGroups.Count == 1, "Following the track neither rewrites the stored relative values nor records history");
         mapEditor.Undo();
-        Assert(Near(box.Position, 5, 6, 7) && session.DocumentText.Contains("\"modifications\": []"), "Undo removes the following and returns the underlying placement");
+        Assert(Near(box.Position, 5, 6, 7) && session.DocumentText.Contains("\"modifications\": {}"), "Undo removes the following and returns the underlying placement");
         Assert(session.ReconcileTrackFollowing().Count == 0, "An object no longer following is not reconciled");
         Assert(!session.HasTrackFollowing && session.FollowingOf(P) == null, "After Undo nothing follows a track");
         mapEditor.Redo();

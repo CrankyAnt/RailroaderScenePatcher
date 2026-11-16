@@ -202,10 +202,10 @@ static class BindingTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static string Target(string path = SignPath) => "\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"}";
     static string Binding(string id, string marker, string path = SignPath, string deps = "[]", string extra = "") =>
-        "{\"id\":\"" + id + "\"," + Target(path) + ",\"relationships\":{\"trackMarker\":" + marker + "}" + extra + ",\"dependsOn\":" + deps + "}";
+        "\"" + id + "\":{" + Target(path) + ",\"relationships\":{\"trackMarker\":" + marker + "}" + extra + ",\"dependsOn\":" + deps + "}";
     static string At(string segment, string end, double distance) => "{\"segment\":\"" + segment + "\",\"end\":\"" + end + "\",\"distance\":" + distance.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
     const string Detach = "{\"detach\":true}";
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, TrackMarkerScene scene) Setup() {
         var world = new FakeMarkerWorld();
         var sign = new FakeMarker { Id = "Mi4f", Segment = "S9sc", End = "a", Distance = 225.6681 };
@@ -317,7 +317,7 @@ static class BindingTests {
         Assert(sign.Segment == "S9sc" && sign.CachedGroup == "ela" && Entry(world, sign) == "S9sc|a|225.6681", "Restoration returns reference, registration and dependent cache");
     }
     static string Placed(string id, string extra = "") =>
-        "{\"id\":\"" + id + "\"," + Target() + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1025,1,2],\"rotation\":[0,1,0,0]}" + extra + ",\"dependsOn\":[]}";
+        "\"" + id + "\":{" + Target() + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1025,1,2],\"rotation\":[0,1,0,0]}" + extra + ",\"dependsOn\":[]}";
     static void OmissionLeavesRelationshipUntouched() {
         var (world, sign, other, scene) = Setup();
         var result = new PatchEngine(scene).Apply(Doc(Placed("move-station")));
@@ -388,12 +388,12 @@ static class BindingTests {
         bridges = new BridgeScene(bridgeWorld, Capability.Unchecked);
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(bridges); capabilities.Add(markers);
-        var bridgeBinding = "{\"id\":\"bind-bridge\",\"target\":{\"scene\":\"BushnellWhittier-MapManager\",\"path\":\"World/Large Scenery/Ela/Ela Bridge\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-colliders-v1\"},\"relationships\":{\"trackMarker\":" + At("Nnew", "a", 1) + "},\"dependsOn\":[]}";
+        var bridgeBinding = "\"bind-bridge\":{\"target\":{\"scene\":\"BushnellWhittier-MapManager\",\"path\":\"World/Large Scenery/Ela/Ela Bridge\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-colliders-v1\"},\"relationships\":{\"trackMarker\":" + At("Nnew", "a", 1) + "},\"dependsOn\":[]}";
         var result = new PatchEngine(capabilities).Apply(Doc(bridgeBinding + "," + Binding("rebind", At("Nnew", "a", 2))));
         Assert(!result.Outcomes["bind-bridge"].Applied && result.Outcomes["bind-bridge"].Error.Contains("no supported track-marker relationship") && bridgeWorld.Mutations == 0, "A relationship on an object without one is refused, not ignored: " + result.Outcomes["bind-bridge"].Error);
         Assert(result.Outcomes["rebind"].Applied && Entry(world, sign) == "Nnew|a|2", "The marker capability is composed with others");
         var plain = new Scene(); plain.Objects["p"] = new List<object> { new Box() };
-        var refused = new PatchEngine(plain).Apply(Doc("{\"id\":\"plain\",\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"relationships\":{\"trackMarker\":{\"detach\":true}},\"dependsOn\":[]}"));
+        var refused = new PatchEngine(plain).Apply(Doc("\"plain\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"relationships\":{\"trackMarker\":{\"detach\":true}},\"dependsOn\":[]}"));
         Assert(!refused.Outcomes["plain"].Applied && plain.MutationCalls == 0, "A scene without relationships refuses a relationship");
         (world, sign, other, markers) = Setup();
         sign.Pattern = "Milepost markers belong to the milepost slice";
@@ -405,7 +405,7 @@ static class BindingTests {
         Assert(!foreign.Outcomes["foreign"].Applied && foreign.Outcomes["foreign"].Error.Contains("registration") && world.Mutations == 0, "An incoherent registration refuses the edit before mutation: " + foreign.Outcomes["foreign"].Error);
         var unknown = new PatchEngine(Setup().scene).Apply(Doc(Binding("future", "{\"segment\":\"Nnew\",\"end\":\"a\",\"distance\":1,\"offset\":2}")));
         Assert(!unknown.Outcomes["future"].Applied && unknown.Outcomes["future"].Error.StartsWith("Unsupported", StringComparison.Ordinal), "Unknown relationship content is preserved without execution");
-        var otherKind = new PatchEngine(Setup().scene).Apply(Doc("{\"id\":\"span\"," + Target() + ",\"relationships\":{\"trackSpan\":{}},\"dependsOn\":[]}"));
+        var otherKind = new PatchEngine(Setup().scene).Apply(Doc("\"span\":{" + Target() + ",\"relationships\":{\"trackSpan\":{}},\"dependsOn\":[]}"));
         Assert(!otherKind.Outcomes["span"].Applied && otherKind.Outcomes["span"].Error.StartsWith("Unsupported", StringComparison.Ordinal), "A relationship kind this version does not know is not executed");
     }
     static void DependentsFollowRelationshipOutcome() {
@@ -420,7 +420,7 @@ static class BindingTests {
             var (world, sign, other, scene) = Setup();
             inject(world);
             var engine = new PatchEngine(scene);
-            var outcome = engine.Apply(Doc(Binding("rebind", At("Nnew", "a", 5)) + "," + Binding("keep", Detach, OtherPath))).Outcomes["rebind"];
+            var outcome = engine.Apply(Doc(Binding("rebind", At("Nnew", "a", 5)) + "," + Binding("then-keep", Detach, OtherPath))).Outcomes["rebind"];
             Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure after the relationship write is restored: " + outcome.Error);
             Assert(sign.Segment == "S9sc" && sign.End == "a" && sign.Distance == 225.6681 && Entry(world, sign) == "S9sc|a|225.6681", "The captured reference and registration return");
             Assert(sign.CachedGroup == "ela", "The captured dependent cache returns: " + sign.CachedGroup);
@@ -588,7 +588,7 @@ static class BindingTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
         return (world, sign, other, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
     static void EditingSetReplaceDetachUndoRedo() {
         var (world, sign, other, session, mapEditor, store) = Session();
         var set = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12)));
@@ -607,7 +607,7 @@ static class BindingTests {
         mapEditor.Undo(); Assert(Entry(world, sign) == "Sjdl|a|3" && sign.CachedGroup == "alarka", "Undo of a detach restores the reference, registration and dependent cache");
         mapEditor.Undo(); Assert(Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 40 && sign.CachedGroup == "extension", "Undo of a replacement restores the prior binding and dependent cache");
         mapEditor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|12" && sign.CachedGroup == "extension", "Undo of the placement keeps the binding and dependent cache");
-        mapEditor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && session.DocumentText.Contains("\"modifications\": []"), "Undo of the first binding restores the native relationship and dependent cache");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && session.DocumentText.Contains("\"modifications\": {}"), "Undo of the first binding restores the native relationship and dependent cache");
         mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
         Assert(sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40 && sign.CachedGroup == null, "Redo reapplies every relationship and placement edit");
         Assert(Entry(world, other) == "Sjdl|b|38.6" && other.CachedGroup == "alarka", "No scene patch editing operation touched the unrelated marker or its dependent cache");
@@ -628,7 +628,7 @@ static class BindingTests {
         // Clearing the only setting of a modification removes it.
         (world, sign, other, session, mapEditor, store) = Session();
         session.Bind(Sign, MarkerBinding.Detached);
-        Assert(session.Bind(Sign, null).Applied && session.DocumentText.Contains("\"modifications\": []") && Entry(world, sign) == "S9sc|a|225.6681", "Clearing a binding-only modification removes it");
+        Assert(session.Bind(Sign, null).Applied && session.DocumentText.Contains("\"modifications\": {}") && Entry(world, sign) == "S9sc|a|225.6681", "Clearing a binding-only modification removes it");
     }
     static void EditingRefusalAndFailureRestore() {
         var (world, sign, other, session, mapEditor, store) = Session();

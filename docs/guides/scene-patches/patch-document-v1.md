@@ -11,15 +11,18 @@ This reference defines the v1 JSON fields accepted by the core engine for fixed 
 | `formatVersion` | integer | Required. Must be `1`. |
 | `sourceMap` | object | Required. Must contain `mapId`. |
 | `sourceMap.mapId` | string | Required and non-empty. It must identify the selected map definition or one of its resolved map layers. |
-| `modifications` | array | Required. Each entry must have a unique string `id`. |
+| `modifications` | object | Required. An object keyed by modification ID. Each key is non-empty and not only whitespace, and each value is an object. |
+
+A property name that repeats in any object, at any depth, rejects the document during parsing. A repeated modification key, circuit ID or addition ID is such a name, so duplicate IDs reject the document.
 
 The engine applies a document only when its `sourceMap.mapId` matches the selected map definition identifier or a resolved map layer identifier. A mismatch rejects the document before target resolution or mutation.
 
 ## Modification fields
 
+The ID of a modification is its key in `modifications`. A modification has no `id` member. A modification that carries one fails as unsupported content, with a diagnosis that names its key and says that the ID is the key; the engine preserves it and still applies the other modifications.
+
 | Field | Type | Requirement |
 | --- | --- | --- |
-| `id` | string | Required, non-empty, and unique within the document. |
 | `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position` and `rotation`; a track-following placement contains `mode`, `track`, `offset` and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
@@ -28,7 +31,7 @@ The engine applies a document only when its `sourceMap.mapId` matches the select
 
 The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
 
-The order of the entries in `modifications` has no meaning. The engine applies each modification after every modification its `dependsOn` names, whatever their positions in the array. A modification whose dependency fails is not applied; modifications that do not depend on it still apply.
+The order of the keys in `modifications` has no meaning, and neither has the order of the members of any object or of the values of `dependsOn`. The engine applies each modification after every modification its `dependsOn` names. Modifications that `dependsOn` does not order are applied in the ordinal order of their keys, defined under Canonical order below, so a document applies the same way whatever the order of its text. A value that `dependsOn` repeats counts once. A modification whose dependency fails is not applied; modifications that do not depend on it still apply.
 
 A modification holds the desired state of one object and must contain `placement`, `active`, `relationships`, or a combination. An omitted member leaves that part of the object untouched by this mod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a document that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
 
@@ -57,7 +60,7 @@ A segment or node that is missing, or a distance outside the segment, fails the 
 
 ## Relationships
 
-The `relationships` object accepts `trackMarker` and `crossingCoverage`, and must contain at least one of them. Each relationship has three settings:
+The `relationships` object accepts `trackMarker` and `crossingCoverage`, and must contain at least one of them. `crossingEquipment` is reserved for the equipment of a crossing. When a patcher version defines it, it is an object keyed by equipment ID, and an entry holds no `id` member. Until then the engine treats `crossingEquipment` as an unknown relationship kind. Each relationship has three settings:
 
 | Setting | Meaning |
 | --- | --- |
@@ -79,34 +82,41 @@ The engine checks the reference before mutation. A segment that does not exist, 
 
 ### Crossing coverage
 
-`crossingCoverage` requires patcher 0.5.0 or later. It is a non-empty array with one entry per explicitly set circuit of the target crossing and one entry per detection addition, described under Detection additions below. An entry for a circuit contains `circuit` and either the three spans or a detach:
+`crossingCoverage` requires patcher 0.5.0 or later. It is an object that holds `circuits`, `additions`, or both:
 
 | Field | Type | Requirement |
 | --- | --- | --- |
-| `circuit` | string | Required and non-empty. The ID of the circuit's native island span; it must name a circuit of the target crossing. Each circuit appears at most once. |
+| `circuits` | object | Optional. Keyed by circuit ID: the ID of the circuit's native island span, which must name a circuit of the target crossing. Holds one entry per explicitly set circuit, and at least one. |
+| `additions` | object | Optional. Keyed by addition ID. Holds one entry per detection addition, described under Detection additions below, and at least one. |
+
+An entry under `circuits` contains either the three spans or a detach, and no member that names the circuit:
+
+| Field | Type | Requirement |
+| --- | --- | --- |
 | `approachA`, `island`, `approachB` | object | Required together, unless the entry detaches. Each holds `from` and `to`, both track locations with the `segment`, `end` and `distance` fields above. |
-| `detach` | boolean | `true`, alone with `circuit`. The crossing stops evaluating the circuit. |
+| `detach` | boolean | `true`, alone in the entry. The crossing stops evaluating the circuit. |
 
 The three settings apply per circuit. An omitted circuit keeps its effective coverage, and an omitted `crossingCoverage` leaves every circuit untouched. Selected tracks replace the circuit's spans with spans the patcher owns, covering the route from `from` to `to`; `from` is the native lower end, which lies next to the island for each approach. A detached circuit leaves the crossing's evaluation. In both cases the circuit's native spans stay registered and unchanged, so a still-valid old route stops triggering the crossing without being removed. Circuits keep their identity and native order.
 
-The engine checks every entry before mutation: the circuit must exist on the crossing, each segment must exist exactly once, each distance must lie inside its segment and no span may have zero length. At least one circuit of the crossing must keep detection: a modification whose result, together with the crossing's current effective coverage, detaches every circuit is refused. A refusal leaves the crossing's coverage unchanged. Unknown fields in an entry make the modification unsupported; an entry with `detach` and span fields, `"detach": false`, an empty array and a partial set of spans are invalid.
+A `crossingCoverage`, `circuits` or `additions` value that is not an object, a circuit or addition key that is empty or only whitespace, and an empty `crossingCoverage`, `circuits` or `additions` object each fail the modification as an invalid definition. The engine preserves that modification and still applies the other modifications. A key that repeats inside `circuits` or `additions` is a repeated property name and rejects the whole document, as described under Document fields above.
+
+The engine checks every entry before mutation: the circuit must exist on the crossing, each segment must exist exactly once, each distance must lie inside its segment and no span may have zero length. At least one circuit of the crossing must keep detection: a modification whose result, together with the crossing's current effective coverage, detaches every circuit is refused. A refusal leaves the crossing's coverage unchanged. Unknown fields in `crossingCoverage` or in an entry make the modification unsupported; an entry with `detach` and span fields, `"detach": false`, an entry that is not an object and a partial set of spans are invalid.
 
 #### Detection additions
 
-A detection addition makes the target crossing detect explicitly selected extra tracks. It is a detection addition: a circuit the patcher builds and owns, beside the crossing's native circuits. An entry for an addition contains exactly these members:
+A detection addition makes the target crossing detect explicitly selected extra tracks. It is a detection addition: a circuit the patcher builds and owns, beside the crossing's native circuits. An entry under `additions` is keyed by the addition's ID, which is unique in the document and scoped to the supplying mod. The entry contains exactly these members:
 
 | Field | Type | Requirement |
 | --- | --- | --- |
-| `addition` | string | Required and non-empty. The addition's ID. It is unique in the document and scoped to the supplying mod. |
 | `approachA`, `island`, `approachB` | object | All required. Each holds `from` and `to`, both track locations with the `segment`, `end` and `distance` fields above. |
 
 The ID is the addition's persistent identity. The patcher joins it with the supplying mod's mod identifier, so two mods that choose the same ID get separate additions, and each application of a document finds the addition it built before. An ID may appear in one modification of a document. When two modifications use the same ID, both fail with that reason, whichever comes first in the file.
 
-The three spans state the addition's track membership and detection area. The segments they name are the tracks that get detection, and the distances bound the area. The engine takes neither from track near the crossing. An entry never contains `circuit` or `detach`. An addition exists while the document lists it. Removing the entry deletes the addition.
+The three spans state the addition's track membership and detection area. The segments they name are the tracks that get detection, and the distances bound the area. The engine takes neither from track near the crossing. An entry under `additions` never contains `detach`. An addition exists while the document lists it. Removing the entry deletes the addition.
 
 The engine checks an addition before mutation like selected tracks: each segment must exist exactly once, each distance must lie inside its segment and no span may have zero length. An addition counts as detection for the rule that a crossing keeps at least one detecting circuit. A document result that leaves no detecting circuit or addition is refused.
 
-For each addition the engine builds one circuit with three owned spans, registers the spans in the track graph and adds the circuit to the controller after its native circuits. Added circuits follow each other in the order of their identity, not the order of the entries. A repeated application reuses the circuit and every span whose tracks are unchanged, and replaces the spans of a role whose tracks changed. Deleting an addition removes its circuit from the controller, unregisters its spans and destroys them. Native circuits and other additions keep their state.
+For each addition the engine builds one circuit with three owned spans, registers the spans in the track graph and adds the circuit to the controller after its native circuits. Added circuits follow each other in the order of their scoped identity, which within one mod is the ordinal order of their IDs, not the order of the document text. A repeated application reuses the circuit and every span whose tracks are unchanged, and replaces the spans of a role whose tracks changed. Deleting an addition removes its circuit from the controller, unregisters its spans and destroys them. Native circuits and other additions keep their state.
 
 [Explicit snapping](snapping-to-track.md) writes a fixed placement. Scene patch editing computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to editing preflight and are not serialized. Runtime application and reload use the resulting absolute placement without querying a snap target. Snapping adds no dependency minimum; later track movement does not change the saved placement. Track-following placement is the separate mode above.
 
@@ -180,9 +190,37 @@ Before mutation the adapter requires that the controller evaluates only its nati
 
 ## Writing by the native map editor
 
-The native map editor's Save writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark. It keeps the member order of the source, writes one modification per edited object, and gives a new modification the `id` `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
+The native map editor's Save writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark, in the canonical order below. It writes one modification per edited object and gives a new modification the key `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. Whitespace and comments of the source are not kept.
 
-Unknown fields at the document root and unknown modifications are preserved without being executed. Every number the native map editor did not replace keeps its source text, so a value such as `0.10` or a number beyond double precision is written back unchanged. The engine rejects unknown fields inside a modification, target, placement or relationship when it tries to execute that modification; the native map editor preserves such a modification and does not edit or remove it. A document with a missing, malformed, or unsupported format version, a document for another map, and a document whose numbers cannot be matched to their source text are protected: the native map editor does not write them.
+Reading a document never reorders it. Only a Save that writes the patch document produces the canonical order, and a Save writes it only when the patch document has an outstanding change.
+
+The patch document is Saved exactly when its current content and the text last read or written have equal content. Two texts have equal content when both parse and, at every depth, object members match without regard to their order; the `dependsOn` of a modification that is an array of strings matches as a list sorted in ordinal order, duplicates counted; every other array matches in order; strings, booleans and null match exactly; and numbers compare by value. Two numbers are equal when the values they denote, each converted to the nearest IEEE 754 double, are equal: `1`, `1.0` and `10E-1` are equal, and so are two literals that differ only beyond double precision. Whitespace and comments never matter. An edit that leaves equal content leaves the document Saved, and the following Save writes nothing and leaves the file's bytes unchanged. When no patch document existed at load, the patch is Saved while it has no modification.
+
+A Save refuses to overwrite a file that changed outside scene patch editing: the file's current content must equal the text last read or written under the same equality. A reorder or other spacing made outside scene patch editing is not a change and does not block the Save. A changed value, a file that cannot be parsed, a file deleted since it was read and a file created after a load that found none are changes; the file is protected from overwrite until the native map editor is reloaded.
+
+Unknown fields at the document root and unknown modifications are preserved without being executed. Every number the native map editor did not replace keeps its source text, so a value such as `0.10` or a number beyond double precision is written back unchanged, also inside a modification that scene patch editing changed. The engine rejects unknown fields inside a modification, target, placement or relationship when it tries to execute that modification; the native map editor preserves such a modification and does not edit or remove it. A document with a missing, malformed, or unsupported format version, a document whose `modifications` is an array or any other value that is not an object, a document with an empty modification key or a modification that is not an object, a document in which a property name repeats in any object, a document for another map, and a document whose numbers cannot be matched to their source text are protected: the native map editor does not write them. Format version 1 has no earlier released shape; the array form of `modifications` is not converted.
+
+### Canonical order
+
+A Save that writes the patch document writes its content in this order:
+
+- Document root: `formatVersion`, `sourceMap`, `modifications`, then unknown members.
+- `sourceMap`: `mapId`, then unknown members.
+- The keys of `modifications`, `circuits`, `additions` and `crossingEquipment` are in ordinal order.
+- A modification: `target`, `relationships`, `placement`, `dependsOn`, `active`, then unknown members.
+- `target`: `scene`, `path`, `component`, `structure`.
+- `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`.
+- `crossingCoverage`: `circuits`, `additions`.
+- An entry under `circuits` or `additions`: `approachA`, `island`, `approachB`, `detach`.
+- A span: `from`, `to`.
+- A track location, including a `trackMarker` reference: `segment`, `end`, `distance`. A track-following `track` that names an endpoint holds only `node`, and a detach object holds only `detach`.
+- `placement`: `mode`, `position`, `track`, `offset`, `rotation`. A fixed placement uses `mode`, `position`, `rotation`; a track-following placement uses `mode`, `track`, `offset`, `rotation`.
+- The values of a modification's `dependsOn` are in ordinal order, duplicates kept, when `dependsOn` is an array of strings; otherwise `dependsOn` keeps its source form, including the member order inside its items.
+- Every other array keeps its source order.
+- In every object, unknown members follow the known members, in ordinal name order. This holds at every depth, including inside unknown objects and inside the objects of unknown arrays.
+- Every number that an edit does not replace keeps its source literal.
+
+Ordinal order compares strings by their UTF-16 code units, one unit at a time. A string that is a prefix of a longer string sorts first. `B` sorts before `Z`, `Z` before `_`, and `_` before `a`. A character outside the Basic Multilingual Plane sorts by its surrogate code units, so it sorts before U+E000 to U+FFFF.
 
 ## Dependency minimum
 
@@ -202,11 +240,11 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 
 Fixed placement is the base minimum; other content in the document can raise it according to the table. The minimum follows the document content, whether or not the target is loaded or its capability is available on this build. The legacy Sylva location sign does not raise the pattern-based board dependency minimum. Save writes `crankyant/scene-patcher >=<minimum>` without an upper bound. It leaves an entry unchanged when a constraint already requires that version or a later one, keeps other constraints of the entry, and does not lower a minimum. When an existing constraint excludes the required minimum, Save reports the conflict and does not write the entry. Runtime reporting adds no document, schema or capability requirement.
 
-Duplicate JSON property names are rejected during parsing. Duplicate modification IDs reject the document. A target whose `structure` names a capability that is incompatible with the running game build fails with that reason; other modifications still apply. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
+A target whose `structure` names a capability that is incompatible with the running game build fails with that reason; other modifications still apply. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
 
 ## Application on each peer
 
-Format version 1 has no multiplayer fields. The host and every client read `Data/scene-patches.json` from their own installed copy of the mod and apply it to their own scene. `sourceMap.mapId`, target identity and capability prerequisites are checked on each peer. `placement.position` is in map coordinates and is converted through each peer's own world origin. A repeated world-load callback reconciles the stored placement without accumulating offsets and does not retry failed modifications. A later load of the same map, including reconnect and same-map re-entry, starts a new load attempt. A target that still resolves under its identity keeps its applied state and any unverified-cleanup guard. A target that the game rebuilt gets the modification as new, and the patcher removes only what it owned for the old object, such as the spans of a detection addition. Failed modifications are retried once per load attempt. A cleanup failure is reported on that peer only and retried at the next load. Modification `id` values and addition IDs are the persistent identities across load attempts. In single-player, loading the same save again in one process rebuilt every modded object and added object, and each modification was applied once. The native behavior on reconnect has not been checked.
+Format version 1 has no multiplayer fields. The host and every client read `Data/scene-patches.json` from their own installed copy of the mod and apply it to their own scene. `sourceMap.mapId`, target identity and capability prerequisites are checked on each peer. `placement.position` is in map coordinates and is converted through each peer's own world origin. A repeated world-load callback reconciles the stored placement without accumulating offsets and does not retry failed modifications. A later load of the same map, including reconnect and same-map re-entry, starts a new load attempt. A target that still resolves under its identity keeps its applied state and any unverified-cleanup guard. A target that the game rebuilt gets the modification as new, and the patcher removes only what it owned for the old object, such as the spans of a detection addition. Failed modifications are retried once per load attempt. A cleanup failure is reported on that peer only and retried at the next load. Modification keys and addition IDs are the persistent identities across load attempts. In single-player, loading the same save again in one process rebuilt every modded object and added object, and each modification was applied once. The native behavior on reconnect has not been checked.
 
 ## Minimal example
 
@@ -214,9 +252,8 @@ Format version 1 has no multiplayer fields. The host and every client read `Data
 {
   "formatVersion": 1,
   "sourceMap": { "mapId": "example-map-id" },
-  "modifications": [
-    {
-      "id": "place-object",
+  "modifications": {
+    "place-object": {
       "target": {
         "scene": "BushnellWhittier-MapManager",
         "path": "World/Signs/Loc: Sylva Int",
@@ -230,7 +267,7 @@ Format version 1 has no multiplayer fields. The host and every client read `Data
       },
       "dependsOn": []
     }
-  ]
+  }
 }
 ```
 

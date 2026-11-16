@@ -52,11 +52,10 @@ If an edit fails and the patcher cannot verify the restoration, it reports incom
 
 ## Write the binding by hand
 
-Copy the inspected identity with **Copy ID** in the command band and add a modification to `Data/scene-patches.json`, as described in [patch document v1](patch-document-v1.md):
+Copy the inspected identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
 
 ```json
-{
-  "id": "bind-crossing-pad",
+"bind-crossing-pad": {
   "target": {
     "scene": "<scene from the inspected identity>",
     "path": "World/Roads Wilmot/Crossing Unprotected/Crossing Pad",

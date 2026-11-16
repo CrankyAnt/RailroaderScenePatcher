@@ -62,9 +62,9 @@ static class BridgeTests {
     const string BridgePath = "World/Large Scenery/Ela/Ela Bridge";
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static string Bridge(string id, double x = 1055, string rotation = "[0,0.130526,0,0.991445]", string deps = "[]", string path = BridgePath, string extra = "") =>
-        "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"BushnellWhittier-MapManager\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-colliders-v1\"}," +
+        "\"" + id + "\":{\"target\":{\"scene\":\"BushnellWhittier-MapManager\",\"path\":\"" + path + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-colliders-v1\"}," +
         "\"placement\":{\"mode\":\"fixed\",\"position\":[" + x.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",5,7],\"rotation\":" + rotation + "}" + extra + ",\"dependsOn\":" + deps + "}";
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static (FakeBridgeWorld world, FakeBridge bridge, BridgeScene scene) Setup() {
         var world = new FakeBridgeWorld(); var bridge = new FakeBridge();
         world.Objects[BridgePath] = new List<object> { bridge };
@@ -105,7 +105,7 @@ static class BridgeTests {
         var boardScene = new Scene { Maps = new[] { "map" } }; var box = new Box(); boardScene.Objects["p"] = new List<object> { box };
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(boardScene); capabilities.Add(bridgeScene);
-        var board = "{\"id\":\"board\",\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+        var board = "\"board\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
         var result = new PatchEngine(capabilities).Apply(Doc(Bridge("bridge", deps: "[\"board\"]") + "," + board));
         Assert(result.Outcomes["bridge"].Applied && result.Outcomes["board"].Applied && box.X == 12 && bridge.Position[0] == 55, "A bridge operation runs after its prerequisite listed later");
         bridge.Position[0] = 50;
@@ -176,7 +176,7 @@ static class BridgeTests {
         var boardScene = new Scene { Maps = new[] { "map" } }; var box = new Box(); boardScene.Objects["p"] = new List<object> { box };
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(boardScene); capabilities.AddUnavailable(BridgeScene.Structure, "RendererCuller.RequestUpdateCullingPosition is missing");
-        var board = "{\"id\":\"board\",\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+        var board = "\"board\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
         var result = new PatchEngine(capabilities).Apply(Doc(Bridge("bridge") + "," + board));
         Assert(result.Error == null && result.Outcomes["board"].Applied && box.X == 12, "Unrelated supported work stays available");
         Assert(!result.Outcomes["bridge"].Applied && result.Outcomes["bridge"].Error.Contains("incompatible with this game build"), "The bridge operation reports the incompatible capability: " + result.Outcomes["bridge"].Error);
@@ -190,7 +190,7 @@ static class BridgeTests {
         var identity = new TargetIdentity("BushnellWhittier-MapManager", BridgePath, "Helpers.Culling.RendererCuller", BridgeScene.Structure);
         var moved = new Placement(new[] { 1055.0, 5, 7 }, new[] { 0, 0.130526, 0, 0.991445 });
         Assert(session.Edit(identity, moved, null).Applied && bridge.Position[0] == 55 && Offsets(bridge).SequenceEqual(offsets), "A scene patch editing bridge placement moves the root with its colliders");
-        var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"][0];
+        var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].First.First;
         Assert((string)item["target"]["structure"] == BridgeScene.Structure && item["placement"] != null && item["active"] == null, "The document records bridge placement, not a binding or activity");
         Assert(session.MinimumPatcherVersion == "0.5.0", "A bridge modification requires the common delivery minimum");
         Assert(session.Edit(identity, null, false).Applied && !bridge.Active, "A scene patch editing disable deactivates the bridge");

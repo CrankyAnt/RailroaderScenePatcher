@@ -17,7 +17,7 @@ static class DiagnosticTests {
         public void Remove(CurrentWarning row) { Rows.Remove(row); }
     }
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
-    const string Document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"board\"},\"dependsOn\":[],\"active\":false}]}";
+    const string Document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"board\"},\"dependsOn\":[],\"active\":false}}}";
     public static void Run() {
         var scene = new Scene(); var box = new Box(); scene.Objects["sign"] = new List<object> { box };
         scene.FailApply = true;
@@ -80,7 +80,7 @@ static class DiagnosticTests {
         var world = new SerializedWorld(); var marker = new FakeMarker { Id = "M5pp", Segment = "Shuo", Distance = 58.69453 };
         world.Objects["sign"] = new List<object> { marker }; world.Segments["replacement"] = new List<double> { 100 };
         var engine = new PatchEngine(new TrackMarkerScene(world, Capability.Checked));
-        var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"repair\",\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"replacement\",\"end\":\"a\",\"distance\":58.69453}}}]}";
+        var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"repair\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"replacement\",\"end\":\"a\",\"distance\":58.69453}}}}}";
         var control = new CurrentWarning(new object(), "Control", "unrelated", "Control", "Keep this unrelated message");
         world.Messages.Rows.Add(control);
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
@@ -127,7 +127,7 @@ static class DiagnosticTests {
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(new TrackMarkerScene(world, Capability.Checked)), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
-        var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"repair\",\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"late-track\",\"end\":\"a\",\"distance\":10}}}]}";
+        var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"repair\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"late-track\",\"end\":\"a\",\"distance\":10}}}}}";
         var early = runtime.BeforeNativeCheck(json, source, new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1"));
         Check(early.Outcomes.Count == 0 && early.EarlyRouteUnavailable.Contains("late-track") && messages.Rows.Count == 0 && marker.Segment == "missing", "Unavailable early prerequisites defer without consuming the runtime attempt or silencing the native check");
         world.Segments["late-track"] = new List<double> { 100 };
@@ -138,8 +138,8 @@ static class DiagnosticTests {
         var scene = new Scene(); var broken = new Box(); var independent = new Box();
         scene.Objects["sign"] = new List<object> { broken }; scene.Objects["other"] = new List<object> { independent };
         scene.FailingTarget = broken;
-        var json = JObject.Parse(Document); var entries = (JArray)json["modifications"];
-        var second = (JObject)entries[0].DeepClone(); second["id"] = "independent"; second["target"]["path"] = "other"; entries.Add(second);
+        var json = JObject.Parse(Document); var entries = (JObject)json["modifications"];
+        var second = (JObject)entries["move"].DeepClone(); second["target"]["path"] = "other"; entries["independent"] = second;
         var messages = new Messages(); var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var result = runtime.Apply(json.ToString(), source);
@@ -154,7 +154,7 @@ static class DiagnosticTests {
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
         runtime.Apply(Document, source);
         scene.Capability = Capability.Checked;
-        runtime.Apply(Document.Replace("\"id\":\"move\"", "\"id\":\"document\""), source);
+        runtime.Apply(Document.Replace("\"move\":{", "\"document\":{"), source);
         Check(messages.Rows.Count == 2, "A modification named document is distinct from a document-level failure");
     }
     static void ExactFallbackRequiresVerifiedRepair() {
@@ -207,9 +207,9 @@ static class DiagnosticTests {
         var engine = new PatchEngine(new TrackMarkerScene(world, Capability.Checked));
         var runtime = new PatchRuntime(engine, messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
-        var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"repair\",\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"replacement\",\"end\":\"a\",\"distance\":10}}}]}";
+        var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"repair\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"replacement\",\"end\":\"a\",\"distance\":10}}}}}";
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
-        runtime.BeforeNativeCheck(json.Substring(0, json.Length - 2) + ",{}]}", source, target);
+        runtime.BeforeNativeCheck(json.Substring(0, json.Length - 2) + ",\"\":{}}}", source, target);
         Check(marker.Segment == "missing", "An invalid complete document must not repair even a valid early entry");
         var result = runtime.BeforeNativeCheck(json, source, target);
         // The controlled native check runs after the public callback and remains enabled for unresolved cases.

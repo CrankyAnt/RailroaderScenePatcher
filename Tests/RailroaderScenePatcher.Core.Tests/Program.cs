@@ -68,8 +68,8 @@ class PeerScene : Scene, IDisposable {
 }
 static class LocalWorldTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
-    static string Item(string id, string path) => "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
+    static string Item(string id, string path) => "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
     static PeerScene Peer(double origin, out Box board) {
         board = new Box { Position = new[] { 1.0, 1.0, 1.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         var scene = new PeerScene { Origin = origin };
@@ -170,11 +170,11 @@ class Program {
         Assert(scene.ResolveCalls == 0 && scene.MutationCalls == 0, scenario + ": no target resolution or mutation, including the independent valid entry");
         Assert(box.Position.SequenceEqual(new[] { 7.0, 8.0, 9.0 }) && box.Rotation.SequenceEqual(new[] { 1.0, 0.0, 0.0, 0.0 }), scenario + ": complete original placement retained");
     }
-    static string Item(string id, string path, string deps = "[]", string extra = "") => "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":" + deps + extra + "}";
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Item(string id, string path, string deps = "[]", string extra = "") => "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":" + deps + extra + "}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static int Main() {
         var doc = PatchDocument.Load(Doc("")); Assert(doc.CanWrite, "Valid document must be writable");
-        Assert(!PatchDocument.Load(Doc("{}")).CanWrite, "Unidentifiable modifications must protect the document");
+        Assert(!PatchDocument.Load(Doc("\"\":{}")).CanWrite, "Unidentifiable modifications must protect the document");
         var scene = new Scene(); var box = new Box(); scene.Objects["p"] = new List<object> { box };
         var engine = new PatchEngine(scene); var result = engine.Apply(Doc(Item("a", "p")));
         Assert(result.Error == null && box.X == 12, "Fixed map placement uses scene origin conversion on an unchecked build");
@@ -213,24 +213,24 @@ class Program {
         result = new PatchEngine(scene).Apply(Doc(Item("keep", "independent") + "," + Item("fail", "p")));
         Assert(result.Outcomes["keep"].Applied && !result.Outcomes["fail"].Applied && independent.X == 12 && box.X == 9, "Restoring one failed mutation preserves prior independent work");
         scene.FailingTarget = null;
-        Assert(!PatchDocument.Load("{\"formatVersion\":999999999999999999999999999,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[]}").CanWrite, "Huge version is protected");
+        Assert(!PatchDocument.Load("{\"formatVersion\":999999999999999999999999999,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}").CanWrite, "Huge version is protected");
         var zeroRotation = Item("zero", "p").Replace("[0,0,0,1]", "[0,0,0,0]");
         Assert(!new PatchEngine(scene).Apply(Doc(zeroRotation)).Outcomes["zero"].Applied, "Zero quaternion is rejected");
         var dates = PatchDocument.Load(Doc("").Replace("\"modifications\"", "\"unknown\":\"2020-01-01T00:00:00Z\",\"modifications\""));
         Assert(dates.Write().Contains("2020-01-01T00:00:00Z"), "Unknown date-like strings keep their meaning");
-        var original = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"future\":{\"x\":3},\"modifications\":[]}";
+        var original = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"future\":{\"x\":3},\"modifications\":{}}";
         var roundtrip = PatchDocument.Load(original); Assert(roundtrip.CanWrite && roundtrip.Write().Contains("future"), "Unknown document content survives round trip");
         var preciseUnknown = Doc("").Replace("\"modifications\"", "\"futureNumber\":0.123456789012345678901234567890123456789,\"modifications\"");
         Assert(PatchDocument.Load(preciseUnknown).Write().Contains("0.123456789012345678901234567890123456789"), "Unknown numeric content retains its exact meaning");
-        Assert(!PatchDocument.Load("{broken").CanWrite && !PatchDocument.Load("{\"formatVersion\":2,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[]}").CanWrite, "Unreadable and newer documents are protected");
+        Assert(!PatchDocument.Load("{broken").CanWrite && !PatchDocument.Load("{\"formatVersion\":2,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}").CanWrite, "Unreadable and newer documents are protected");
         Assert(PatchDocument.Load("{\"formatVersion\":1}").Error.StartsWith("Invalid document"), "Malformed known documents remain distinguishable from unsupported format recovery");
         AssertWriteProtected("{broken");
         AssertWriteProtected(Doc("").Replace("\"formatVersion\":1", "\"formatVersion\":2"));
         AssertWriteProtected(Doc("").Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"));
         var validIndependent = Item("independent", "p");
-        AssertWholeDocumentRejected(Doc(validIndependent + ",{}"), "Missing modification identity after a valid entry");
+        AssertWholeDocumentRejected(Doc(validIndependent + ",\" \":{}"), "Missing modification identity after a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent + "," + Item("independent", "p")), "Duplicate modification identity after a valid entry");
-        AssertWholeDocumentRejected(Doc(validIndependent + ",42"), "Non-object modification after a valid entry");
+        AssertWholeDocumentRejected(Doc(validIndependent + ",\"number\":42"), "Non-object modification after a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid target map with a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"), "Duplicate envelope property with a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":2"), "Unsupported document version with a valid entry");
@@ -253,7 +253,9 @@ class Program {
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();
+        ShapeTests.Run();
         PatchEditingTests.Run();
+        CanonicalSaveTests.Run();
         SnapTests.Run();
         GizmoTests.Run();
         GizmoRefusalTests.Run();

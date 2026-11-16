@@ -51,7 +51,7 @@ static class InspectionTests {
         var mutable = new Scene(); var oldTarget = new Box { X = 7 }; var replacement = new Box { X = 9 };
         mutable.Objects["p"] = new List<object> { oldTarget };
         mutable.BeforeCapture = () => mutable.Objects["p"] = new List<object> { replacement };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var result = new PatchEngine(mutable).Apply(document);
         Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == 0 && oldTarget.X == 7 && replacement.X == 9,
             "A replaced target between capture and mutation is rejected without moving either object");
@@ -271,7 +271,7 @@ static class InspectionTests {
         var scene = new Scene(); var box = new Box { X = 7 };
         scene.Objects["p"] = new List<object> { box };
         scene.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var log = new List<string>(); var calls = 0;
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
@@ -605,7 +605,7 @@ static class InspectionTests {
         var scene = new Scene(); var box = new Box { X = 7 }; var scans = 0;
         scene.Objects["p"] = new List<object> { box };
         scene.Observations = () => { scans++; return new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") }; };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         scans = 0;
         var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinForEdit(inventory.Entries.Single()) });
@@ -629,7 +629,7 @@ static class InspectionTests {
         var scene = new Scene(); var box = new Box { X = 7 }; var scans = 0;
         scene.Objects["p"] = new List<object> { box };
         scene.Observations = () => { scans++; return new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") }; };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var passes = inventory.CompletedPasses;
         bool refused = false;
@@ -698,7 +698,7 @@ static class InspectionTests {
         var scene = new TargetedScene(); var box = new Box { X = 7 };
         scene.Inner.Objects["p"] = new List<object> { box };
         scene.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var passes = inventory.CompletedPasses;
         while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
@@ -887,7 +887,7 @@ static class InspectionTests {
         var scene = new TargetedScene(); var box = new Box { X = 7 };
         scene.Inner.Objects["p"] = new List<object> { box };
         scene.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"move\",\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}]}";
+        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         scene.Discoveries = 0; scene.Observations = 0;
         var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinCompared(inventory.Entries.Single()) });

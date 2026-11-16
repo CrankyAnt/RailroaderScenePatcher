@@ -21,13 +21,29 @@ try {
         if ('crankyant/scene-patcher >=0.5.0' -notin $info.dependencies.required) {throw 'Every generated patch fixture must require the common delivery minimum'}
     }
     $valid=Get-Content (Join-Path $out 'Valid/Data/scene-patches.json') -Raw | ConvertFrom-Json
-    if (($valid.modifications[0].placement.position -join ',') -ne '105,200,300') {throw 'The 5m map-X translation was not derived from the selected baseline'}
-    $q=$valid.modifications[0].placement.rotation
+    # A modification is read by its key; the generated documents hold an object keyed by modification ID, with no id member.
+    function Keys($Document) {
+        if ($Document.modifications -isnot [Management.Automation.PSCustomObject]) {throw 'modifications must be an object keyed by modification ID'}
+        return @($Document.modifications.PSObject.Properties.Name)
+    }
+    if ((Keys $valid) -join ',' -cne 'place-sylva-board' -or $null -ne $valid.modifications.'place-sylva-board'.PSObject.Properties['id']) {throw 'The valid fixture must hold one modification under its key, without an id member'}
+    if ((@($valid.PSObject.Properties.Name) -join ',') -cne 'formatVersion,sourceMap,modifications' -or (@($valid.modifications.'place-sylva-board'.PSObject.Properties.Name) -join ',') -cne 'target,placement,dependsOn') {throw 'The generated document must be written in canonical member order'}
+    if (($valid.modifications.'place-sylva-board'.placement.position -join ',') -ne '105,200,300') {throw 'The 5m map-X translation was not derived from the selected baseline'}
+    $q=$valid.modifications.'place-sylva-board'.placement.rotation
     if ([math]::Abs($q[1]-0.7933533402912352) -gt 1e-10 -or [math]::Abs($q[3]-0.6087614290087207) -gt 1e-10) {throw 'Expected 105 degree map-Y quaternion'}
     $bad=Get-Content (Join-Path $out 'InvalidIndependent/Data/scene-patches.json') -Raw | ConvertFrom-Json
-    if ($bad.modifications.Count -ne 3 -or $bad.modifications[0].id -ne 'missing-target' -or $bad.modifications[1].dependsOn[0] -ne 'missing-target') {throw 'Missing, dependent and independent variants must be concrete'}
+    if ((Keys $bad).Count -ne 3 -or $bad.modifications.'missing-target'.target.path -cne 'World/Signs/Loc: Sylva Int/__missing_issue39' -or $bad.modifications.'blocked-dependent'.dependsOn[0] -ne 'missing-target' -or ($bad.modifications.'place-sylva-board'.placement.position -join ',') -ne '105,200,300') {throw 'Missing, dependent and independent variants must be concrete'}
+    $reordered=Get-Content (Join-Path $out 'InvalidIndependentReordered/Data/scene-patches.json') -Raw | ConvertFrom-Json
+    if ((Keys $bad) -join ',' -cne 'missing-target,blocked-dependent,place-sylva-board' -or (Keys $reordered) -join ',' -cne 'place-sylva-board,blocked-dependent,missing-target') {throw 'InvalidIndependent and InvalidIndependentReordered must keep their different key orders'}
+    foreach ($key in Keys $bad) {
+        if (($bad.modifications.$key | ConvertTo-Json -Depth 30 -Compress) -cne ($reordered.modifications.$key | ConvertTo-Json -Depth 30 -Compress)) {throw "The reordered variant must hold the same modification under $key"}
+    }
+    $repair=Get-Content (Join-Path $out 'RepairSameLoad/Data/scene-patches.json') -Raw | ConvertFrom-Json
+    if ((Keys $repair) -join ',' -cne 'missing-target,blocked-dependent,place-sylva-board' -or $repair.modifications.'missing-target'.target.path -cne 'World/Signs/Loc: Sylva Int') {throw 'The repair variant must resolve the formerly missing target under the same key'}
+    $empty=Get-Content (Join-Path $out 'Baseline/Data/scene-patches.json') -Raw | ConvertFrom-Json
+    if ((Keys $empty).Count -ne 0) {throw 'The baseline fixture must hold an empty modifications object'}
     $restore=Get-Content (Join-Path $out 'Restoration/Data/scene-patches.json') -Raw | ConvertFrom-Json
-    if (($restore.modifications[0].placement.position -join ',') -ne '100,200,300') {throw 'Restoration must use the measured baseline'}
+    if (($restore.modifications.'restore-measured-board'.placement.position -join ',') -ne '100,200,300') {throw 'Restoration must use the measured baseline'}
     # A tilted baseline distinguishes map-Y pre-multiplication from local-Y rotation.
     $baseline.board.rotation=@(0.7071067811865476,0,0,0.7071067811865476)
     $confirmation.board.rotation=$baseline.board.rotation
@@ -37,7 +53,7 @@ try {
     $inspectorData|ConvertTo-Json -Depth 30|Set-Content -LiteralPath $inspector -Encoding utf8
     $tilted=Join-Path $testRoot 'tilted'
     & "$PSScriptRoot/Prepare-Fixtures.ps1" -ObservationPath $observations -Sequence 7 -ConfirmSequence 8 -InspectorPath $inspector -LoadId test-load -ExpectedGameSha256 ('A'*64) -OutputRoot $tilted
-    $rot=(Get-Content (Join-Path $tilted 'Valid/Data/scene-patches.json') -Raw|ConvertFrom-Json).modifications[0].placement.rotation
+    $rot=(Get-Content (Join-Path $tilted 'Valid/Data/scene-patches.json') -Raw|ConvertFrom-Json).modifications.'place-sylva-board'.placement.rotation
     $expected=@(0.7010573846499779,0.09229595564125725,-0.09229595564125725,0.7010573846499779)
     for($i=0;$i -lt 4;$i++){if([math]::Abs($rot[$i]-$expected[$i]) -gt 1e-10){throw 'Rotation must be around map Y, not the tilted local Y axis'}}
     $baseline.board.eligible=$false
@@ -46,7 +62,7 @@ try {
     $rejected=$false
     try { & "$PSScriptRoot/Prepare-Fixtures.ps1" -ObservationPath $observations -Sequence 7 -ConfirmSequence 8 -InspectorPath $inspector -LoadId test-load -ExpectedGameSha256 ('A'*64) -OutputRoot (Join-Path $testRoot 'rejected') } catch {$rejected=$true}
     if (!$rejected -or (Test-Path (Join-Path $testRoot 'rejected'))) {throw 'An unexpected pattern must stop without output'}
-    'PASS: synthetic baseline derives concrete fixed-placement variants and rejects an unexpected pattern'
+    'PASS: synthetic baseline derives concrete fixed-placement variants in the keyed shape with their key orders and rejects an unexpected pattern'
 } finally {
     $absolute=[IO.Path]::GetFullPath($testRoot)
     if (![IO.Path]::GetFileName($absolute).StartsWith('Issue39FixtureTest-') -or !($absolute.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase))) {throw "Unsafe test cleanup path $absolute"}

@@ -19,16 +19,22 @@ function Save-Json($Value,[string]$Path) {
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path)) | Out-Null
     [IO.File]::WriteAllText($Path,($Value | ConvertTo-Json -Depth 60).Replace("`r`n","`n")+"`n",[Text.UTF8Encoding]::new($false))
 }
-function Write-Fixture([string]$Name,[array]$Modifications) {
+# The modifications of a document, keyed by modification ID, in the order the pairs are given.
+function Keyed {
+    $modifications=[ordered]@{}
+    for($i=0;$i -lt $args.Count;$i+=2){$modifications[[string]$args[$i]]=$args[$i+1]}
+    return $modifications
+}
+function Write-Fixture([string]$Name,[Collections.Specialized.OrderedDictionary]$Modifications) {
     $destination=Join-Path $OutputRoot $Name
     Save-Json @{identifier='crankyant/fixed-placement-fixture';name='CrankyAnt';author='CrankyAnt';version='0.0.1';dependencies=@{required=@('rr/game >=0.6.2','crankyant/scene-patcher >=0.5.0')}} (Join-Path $destination 'Info.json')
     Save-Json @{objects=@(@{identifier=$mapId;metadata=@{name='Issue39 fixed placement';description='Disposable native test';credits='CrankyAnt';tags=@()};definition=@{kind='Map';mapData='./Map.json';terrainTileSets=@('rr/nc-bryson');mapLayers=@('rr/bushnell-whittier');components=@{}}})} (Join-Path $destination 'Definitions.json')
     Save-Json @{} (Join-Path $destination 'Data/Map.json')
-    Save-Json @{formatVersion=1;sourceMap=@{mapId=$mapId};modifications=$Modifications} (Join-Path $destination 'Data/scene-patches.json')
+    Save-Json ([ordered]@{formatVersion=1;sourceMap=@{mapId=$mapId};modifications=$Modifications}) (Join-Path $destination 'Data/scene-patches.json')
 }
 if ($Bootstrap) {
     if ($ObservationPath -or $Sequence -or $LoadId) {throw 'Bootstrap does not accept a claimed baseline'}
-    Write-Fixture 'Baseline' @()
+    Write-Fixture 'Baseline' (Keyed)
     return
 }
 if (!$ObservationPath -or !$Sequence -or $ConfirmSequence -le $Sequence -or !$InspectorPath -or !$LoadId -or $ExpectedGameSha256 -notmatch '^[A-Fa-f0-9]{64}$') {throw 'Select the exact baseline and confirmation sequences, inspector export, load ID and independently checked Railroader.dll hash'}
@@ -81,18 +87,21 @@ if ([math]::Abs($norm-1) -gt 0.0001) {throw 'Unexpected non-unit baseline quater
 $s=[math]::Sin([math]::PI/24);$c=[math]::Cos([math]::PI/24)
 $turned=@(($c*$q[0]+$s*$q[2]),($c*$q[1]+$s*$q[3]),($c*$q[2]-$s*$q[0]),($c*$q[3]-$s*$q[1]))
 $target=@{scene='BushnellWhittier-MapManager';path=$boardPath;component='Helpers.Culling.RendererCuller';structure='independent-board-v1'}
-function Modification([string]$Id,[double]$Dx,[array]$Rotation,[array]$Depends=@(),[switch]$Missing) {
-    $identity=$target.Clone();if($Missing){$identity.path=$boardPath+'/__missing_issue39'}
-    return @{id=$Id;target=$identity;placement=@{mode='fixed';position=@(($p[0]+$Dx),$p[1],$p[2]);rotation=$Rotation};dependsOn=$Depends}
+$target=[ordered]@{scene=$target.scene;path=$target.path;component=$target.component;structure=$target.structure}
+# A modification without its ID: the ID is its key in the document.
+function Modification([double]$Dx,[array]$Rotation,[array]$Depends=@(),[switch]$Missing) {
+    $identity=[ordered]@{};foreach($name in $target.Keys){$identity[$name]=$target[$name]};if($Missing){$identity.path=$boardPath+'/__missing_issue39'}
+    return [ordered]@{target=$identity;placement=[ordered]@{mode='fixed';position=@(($p[0]+$Dx),$p[1],$p[2]);rotation=$Rotation};dependsOn=$Depends}
 }
-$good=Modification 'place-sylva-board' 5 $turned
-$bad=Modification 'missing-target' 25 $turned -Missing
-$dependent=Modification 'blocked-dependent' 50 $turned @('missing-target')
-Write-Fixture 'Baseline' @()
-Write-Fixture 'Valid' @($good)
-Write-Fixture 'InvalidIndependent' @($bad,$dependent,$good)
-Write-Fixture 'InvalidIndependentReordered' @($good,$dependent,$bad)
-Write-Fixture 'RepairSameLoad' @((Modification 'missing-target' 25 $turned),$dependent,$good)
-Write-Fixture 'Restoration' @((Modification 'restore-measured-board' 0 $q))
+$good=Modification 5 $turned
+$bad=Modification 25 $turned -Missing
+$dependent=Modification 50 $turned @('missing-target')
+Write-Fixture 'Baseline' (Keyed)
+Write-Fixture 'Valid' (Keyed 'place-sylva-board' $good)
+# The two variants hold the same modifications under the same keys in another key order.
+Write-Fixture 'InvalidIndependent' (Keyed 'missing-target' $bad 'blocked-dependent' $dependent 'place-sylva-board' $good)
+Write-Fixture 'InvalidIndependentReordered' (Keyed 'place-sylva-board' $good 'blocked-dependent' $dependent 'missing-target' $bad)
+Write-Fixture 'RepairSameLoad' (Keyed 'missing-target' (Modification 25 $turned) 'blocked-dependent' $dependent 'place-sylva-board' $good)
+Write-Fixture 'Restoration' (Keyed 'restore-measured-board' (Modification 0 $q))
 Save-Json @{schemaVersion=1;snapshot=$b} (Join-Path $OutputRoot 'Baseline.json')
 Save-Json @{schemaVersion=1;sourceObservation=[IO.Path]::GetFullPath($ObservationPath);sourceSha256=(Get-FileHash -LiteralPath $ObservationPath -Algorithm SHA256).Hash;inspectorSha256=(Get-FileHash -LiteralPath $InspectorPath -Algorithm SHA256).Hash;sequence=$Sequence;confirmSequence=$ConfirmSequence;loadId=$LoadId;processId=$b.processId;gameSha256=$ExpectedGameSha256;translationMap=@(5,0,0);rotationRule='map-Y +15 degrees, qDesired = qY15 * qBaseline';baselinePosition=$p;baselineRotation=$q;desiredPosition=$good.placement.position;desiredRotation=$turned;positionToleranceMetres=0.01;rotationToleranceDegrees=0.02} (Join-Path $OutputRoot 'derivation.json')

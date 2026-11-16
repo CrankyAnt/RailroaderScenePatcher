@@ -318,7 +318,7 @@ namespace RailroaderScenePatcher {
         void ReconcileMarkerWarning(LoadedMod mod, string operation, Outcome outcome) {
             if (markerWorld == null || !(outcome.ResolvedTarget is GameObject target) || target == null) return;
             var document = JObject.Parse(mod.Json);
-            var entry = ((JArray)document["modifications"]).OfType<JObject>().Single(e => (string)e["id"] == operation);
+            var entry = (JObject)document["modifications"][operation];
             // Placement or activity alone does not repair a track-marker relationship.
             var binding = entry["relationships"]?["trackMarker"] as JObject;
             if (binding == null || binding["segment"]?.Type != JTokenType.String) return;

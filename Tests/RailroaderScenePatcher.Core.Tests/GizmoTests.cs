@@ -97,7 +97,7 @@ static class GizmoTests {
         Assert(f.MapEditor.UndoGroups.Count == 0, "A stale gesture cannot register history");
     }
     static void UnsupportedExistingContentRejectsPreview() {
-        var patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":[{\"id\":\"future\",\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"futureOperation\":true,\"dependsOn\":[]}]}";
+        var patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"future\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"futureOperation\":true,\"dependsOn\":[]}}}";
         var f = new Fixture(patch); var refused = false;
         try { f.Begin(); } catch (InvalidOperationException) { refused = true; }
         Assert(refused && f.Scene.MutationCalls == 0 && f.Store.Patch == patch && f.MapEditor.UndoGroups.Count == 0, "An unsupported existing contribution refuses the gesture before any preview mutation");
@@ -142,7 +142,7 @@ static class GizmoTests {
         Assert(f.MapEditor.UndoGroups.Count == 0 && !f.MapEditor.IsDirty && JObject.Parse(f.Session.DocumentText)["modifications"].Count() == 0, "Preview creates no canonical edit or history entry");
         var moved = gesture.Complete();
         Assert(moved.Applied && !moved.Unchanged && f.MapEditor.UndoGroups.Count == 1, "One completed gesture registers one native operation");
-        var placement = JObject.Parse(f.Session.DocumentText)["modifications"][0]["placement"];
+        var placement = JObject.Parse(f.Session.DocumentText)["modifications"].First.First["placement"];
         Assert((string)placement["mode"] == "fixed" && (double)placement["position"][0] == 114 && (double)placement["rotation"][1] == 0.6, "Canonical desired state holds map position and complete rotation");
         f.MapEditor.Undo();
         Assert(f.Box.X == 7 && f.Box.Rotation[3] == 1 && JObject.Parse(f.Session.DocumentText)["modifications"].Count() == 0, "Undo restores the prior effective world and document");
@@ -164,7 +164,7 @@ static class GizmoTests {
             Assert(gesture.Preview(placement).Applied && f.Box.Rotation[1] == placement.Rotation[1], "The preview turns the object by " + degrees + " degrees");
             var completed = gesture.Complete();
             Assert(completed.Applied && f.MapEditor.UndoGroups.Count == 1 && Modifications(f).Count() == 1, "A rotation of " + degrees + " degrees completes as one operation: " + completed.Error + " history " + f.MapEditor.UndoGroups.Count);
-            var rotation = Modifications(f)[0]["placement"]["rotation"];
+            var rotation = Modifications(f).First.First["placement"]["rotation"];
             Assert((double)rotation[1] == placement.Rotation[1] && (double)rotation[3] == placement.Rotation[3] && f.Box.Rotation[1] == placement.Rotation[1] && f.Box.X == 7, "The document and the world hold the small rotation: " + rotation);
             f.MapEditor.Undo();
             Assert(f.Box.Rotation[1] == 0 && f.Box.Rotation[3] == 1 && Modifications(f).Count() == 0, "Undo restores the prior rotation");

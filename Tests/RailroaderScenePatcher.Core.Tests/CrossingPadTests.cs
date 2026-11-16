@@ -92,9 +92,9 @@ static class CrossingPadTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static string Target(string path = PadPath) => "\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"crossing-pad-v1\"}";
     static string Binding(string id, string marker, string path = PadPath, string deps = "[]", string extra = "") =>
-        "{\"id\":\"" + id + "\"," + Target(path) + ",\"relationships\":{\"trackMarker\":" + marker + "}" + extra + ",\"dependsOn\":" + deps + "}";
+        "\"" + id + "\":{" + Target(path) + ",\"relationships\":{\"trackMarker\":" + marker + "}" + extra + ",\"dependsOn\":" + deps + "}";
     static string At(string segment, string end, double distance) => "{\"segment\":\"" + segment + "\",\"end\":\"" + end + "\",\"distance\":" + distance.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}";
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static (FakePadWorld world, FakeMarker pad, FakeMarker rear, CrossingPadScene scene) Setup() {
         var world = new FakePadWorld();
         world.Segments["Sj7c"] = new List<double> { 400 };
@@ -226,14 +226,14 @@ static class CrossingPadTests {
         Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && pad.Active, "The refused detach leaves binding, geometry and activity");
     }
     static string Placed(string id, string extra = "") =>
-        "{\"id\":\"" + id + "\"," + Target() + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1025,1,2],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
+        "\"" + id + "\":{" + Target() + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1025,1,2],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
     static void PlacementAndActivityKeepTheBinding() {
         var (world, pad, rear, scene) = Setup();
         var moved = new PatchEngine(scene).Apply(Doc(Placed("move")));
         Assert(moved.Outcomes["move"].Applied && pad.Position[0] == 25 && Entry(world, pad) == "Sj7c|a|185.9477", "Pad placement keeps the binding: " + moved.Outcomes["move"].Error);
         Assert(Mesh(world, pad) == "Sj7c|a|185.9477@1025", "Geometry is regenerated for the new pad position, so it stays on the track: " + Mesh(world, pad));
         (world, pad, rear, scene) = Setup();
-        var disabled = new PatchEngine(scene).Apply(Doc("{\"id\":\"off\"," + Target() + ",\"active\":false,\"dependsOn\":[]}"));
+        var disabled = new PatchEngine(scene).Apply(Doc("\"off\":{" + Target() + ",\"active\":false,\"dependsOn\":[]}"));
         Assert(disabled.Outcomes["off"].Applied && !pad.Active && world.Registrations(pad).Count == 0 && pad.Segment == "Sj7c", "Disabling the pad removes its registration and keeps the binding");
         var enabled = new PatchEngine(scene).Apply(Doc(Binding("on", At("Sj7c", "a", 186.9477), extra: ",\"active\":true")));
         Assert(enabled.Outcomes["on"].Applied && pad.Active && Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Enabling with a rebinding registers and regenerates at this mod's location");
@@ -246,7 +246,7 @@ static class CrossingPadTests {
         markerWorld.Objects["World/Large Scenery/Ela/Signs/Station Sign (1)"] = new List<object> { sign }; markerWorld.Load(sign); markerWorld.Relative(sign);
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); capabilities.Add(pads);
-        var signBinding = "{\"id\":\"sign\",\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"World/Large Scenery/Ela/Signs/Station Sign (1)\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"relationships\":{\"trackMarker\":{\"segment\":\"Nnew\",\"end\":\"a\",\"distance\":2}},\"dependsOn\":[]}";
+        var signBinding = "\"sign\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"World/Large Scenery/Ela/Signs/Station Sign (1)\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"relationships\":{\"trackMarker\":{\"segment\":\"Nnew\",\"end\":\"a\",\"distance\":2}},\"dependsOn\":[]}";
         var wrongStructure = Binding("as-marker", At("Sj7c", "a", 190), RearPath).Replace("crossing-pad-v1", "track-marker-v1");
         var result = new PatchEngine(capabilities).Apply(Doc(signBinding + "," + Binding("pad", At("Sj7c", "a", 186.9477)) + "," + wrongStructure));
         Assert(result.Outcomes["sign"].Applied && result.Outcomes["pad"].Applied && Mesh(world, pad) == Rebound && sign.Segment == "Nnew", "A pad and a Generic marker apply through their own capabilities");
@@ -309,7 +309,7 @@ static class CrossingPadTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
         return (world, pad, rear, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
     static void EditingRebindUndoRedoAndRemoval() {
         var (world, pad, rear, session, mapEditor, store) = Session();
         var before = session.DocumentText;
@@ -322,7 +322,7 @@ static class CrossingPadTests {
         Assert(session.MinimumPatcherVersion == "0.5.0", "A pad modification requires the patcher version that introduced it: " + session.MinimumPatcherVersion);
         Assert(session.Bind(Pad, MarkerBinding.At(new TrackLocation("Nnew", "a", 8))).Applied && Mesh(world, pad) == "Nnew|a|8@1020", "A replacement regenerates again");
         mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Undo of the replacement restores the prior binding and geometry: " + Mesh(world, pad));
-        mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && session.DocumentText.Contains("\"modifications\": []"), "Undo of the first rebinding restores the native binding and geometry: " + Mesh(world, pad));
+        mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && session.DocumentText.Contains("\"modifications\": {}"), "Undo of the first rebinding restores the native binding and geometry: " + Mesh(world, pad));
         mapEditor.Redo(); mapEditor.Redo(); Assert(Entry(world, pad) == "Nnew|a|8" && Mesh(world, pad) == "Nnew|a|8@1020", "Redo reapplies both rebindings with their geometry");
         Assert(session.Edit(Pad, new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && Mesh(world, pad) == "Nnew|a|8@1030" && Entry(world, pad) == "Nnew|a|8", "A placement edit keeps the binding and regenerates on the track");
         Assert(session.Bind(Pad, null).Applied && Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == "Sj7c|a|185.9477@1030", "Clearing this mod's binding returns the effective native binding with its geometry");

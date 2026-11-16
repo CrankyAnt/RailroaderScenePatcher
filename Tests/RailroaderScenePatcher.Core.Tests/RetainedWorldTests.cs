@@ -14,8 +14,8 @@ class ThrowingScene : PeerScene, IScene {
 }
 static class RetainedWorldTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
-    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
-    static string Item(string id, string path, double x = 112) => "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + x + ",2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
+    static string Item(string id, string path, double x = 112) => "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + x + ",2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
     static PeerScene World(out Box board) {
         board = new Box { Position = new[] { 1.0, 1.0, 1.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         var scene = new PeerScene { Origin = 0 };

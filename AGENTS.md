@@ -61,7 +61,7 @@ One line per validation or test command and per CI workflow the repository runs.
 - `dotnet build Src/RailroaderScenePatcher -p:GameManaged=<Railroader_Data/Managed>`: builds the DLL mod against the installed game assemblies
 - `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release`: validates the core library's behaviour without game assemblies
 - `dotnet build Tests/NativeObservation -p:GameManaged=<Railroader_Data/Managed>`: builds the isolated native observation artifact
-- `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation and the common dependency minimum with synthetic measurements
+- `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation in the keyed document shape with its key orders, and the common dependency minimum, with synthetic measurements
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-TestHome.ps1`: validates test-copy ownership and cleanup in a synthetic home
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates separation of active-world and unassigned attempt evidence
 - `ci` (shared, `v1`): runs repository hygiene and the configured CI parts and reports the one required check `ci / verdict`

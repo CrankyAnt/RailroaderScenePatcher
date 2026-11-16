@@ -44,11 +44,10 @@ If an edit fails, the panel reports whether the prior state was restored. When t
 
 ## Write an addition in the document
 
-Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`. Under `relationships.crossingCoverage`, add an entry with `addition` and the three spans:
+Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`. In the `additions` object of `relationships.crossingCoverage`, add a member whose key is the ID of the addition and whose value holds the three spans. The modification itself is a member of `modifications` under its ID:
 
 ```json
-{
-  "id": "cover-bryson-everett",
+"cover-bryson-everett": {
   "target": {
     "scene": "BushnellWhittier",
     "path": "World/Crossings/Bryson Everett",
@@ -56,14 +55,15 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
     "structure": "crossing-coverage-v1"
   },
   "relationships": {
-    "crossingCoverage": [
-      {
-        "addition": "third-track",
-        "approachA": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 550 } },
-        "island": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 } },
-        "approachB": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 50 } }
+    "crossingCoverage": {
+      "additions": {
+        "third-track": {
+          "approachA": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 550 } },
+          "island": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 } },
+          "approachB": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 50 } }
+        }
       }
-    ]
+    }
   },
   "dependsOn": []
 }
@@ -71,7 +71,7 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
 
 The scene, path and segment in this example are placeholders. Use the scene and path from the inspected crossing and the IDs of your own segments. The field rules are in the [patch document v1](patch-document-v1.md#detection-additions).
 
-To delete an addition, remove its entry. An addition exists only while the document lists it. To make one modification wait for another, name it in `dependsOn`. The order of entries and modifications in the file has no effect.
+To delete an addition, remove its member from `additions`; when it was the last one, remove `additions` too, because an empty `additions` object is invalid. An addition exists only while the document lists it. To make one modification wait for another, name it in `dependsOn`. The order of the keys in the file has no effect.
 
 ## Limits
 

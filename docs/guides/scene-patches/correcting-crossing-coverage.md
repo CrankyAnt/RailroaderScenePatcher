@@ -41,11 +41,10 @@ If an edit fails, the panel reports whether the prior coverage was restored. Whe
 
 ## Write coverage in the document
 
-Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`, and list the explicit circuits under `relationships.crossingCoverage`:
+Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`, and set the explicit circuits in the `circuits` object of `relationships.crossingCoverage`, each under the ID of its native island span. The modification itself is a member of `modifications` under its ID:
 
 ```json
-{
-  "id": "cover-bryson-everett",
+"cover-bryson-everett": {
   "target": {
     "scene": "BushnellWhittier",
     "path": "World/Crossings/Bryson Everett",
@@ -53,14 +52,15 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
     "structure": "crossing-coverage-v1"
   },
   "relationships": {
-    "crossingCoverage": [
-      {
-        "circuit": "Pipr",
-        "approachA": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 550 } },
-        "island": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 } },
-        "approachB": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 50 } }
+    "crossingCoverage": {
+      "circuits": {
+        "Pipr": {
+          "approachA": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 550 } },
+          "island": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 308 } },
+          "approachB": { "from": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 292 }, "to": { "segment": "SCrankyAntDetection21", "end": "a", "distance": 50 } }
+        }
       }
-    ]
+    }
   },
   "dependsOn": []
 }
