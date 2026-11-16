@@ -367,11 +367,15 @@ namespace RailroaderScenePatcher.Core {
             // A scene that can observe one object reads the target now and compares it with the inspection. The engine's
             // guard checks beside this that the identity still resolves to this one object.
             if (inspection is ITargetedInspectionScene targeted) {
-                if (!observed.Matches(targeted.Observe(observed.Handle, identity))) throw new InvalidOperationException("Inspected target changed; refresh and inspect again");
+                var current = targeted.Observe(observed.Handle, identity);
+                if (!observed.Matches(current)) throw Changed(current == null ? "missing" : !ReferenceEquals(current.Handle, observed.Handle) ? "another object" : observed.Difference(current));
                 return;
             }
             var matches = inspection.Discover().Where(e => e.Identity.Scene == identity.Scene && e.Identity.Path == identity.Path && e.Identity.Component == identity.Component).ToArray();
-            if (matches.Length != 1 || !observed.Matches(matches[0])) throw new InvalidOperationException("Inspected target changed; refresh and inspect again");
+            if (matches.Length != 1) throw Changed(matches.Length == 0 ? "missing" : matches.Length + " objects hold its identity");
+            if (!observed.Matches(matches[0])) throw Changed(!ReferenceEquals(matches[0].Handle, observed.Handle) ? "another object" : observed.Difference(matches[0]));
         }
+        // The refusal names what differs, as a stale reason does: the first differing part of the observation.
+        static InvalidOperationException Changed(string difference) => new InvalidOperationException("Inspected target changed (" + difference + "); refresh and inspect again");
     }
 }

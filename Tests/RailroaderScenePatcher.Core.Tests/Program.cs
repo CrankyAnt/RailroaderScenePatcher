@@ -256,6 +256,7 @@ class Program {
         AuthoringTests.Run();
         SnapTests.Run();
         GizmoTests.Run();
+        GizmoRefusalTests.Run();
         InspectionTests.Run();
         CommandBandTests.Run();
         BridgeTests.Run();

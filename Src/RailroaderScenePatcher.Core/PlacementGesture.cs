@@ -81,9 +81,14 @@ namespace RailroaderScenePatcher.Core {
             try {
                 // Reject changed targets before restoring a preview or committing its final result.
                 engine.GuardMutation(identity, target, maps, expected);
+                var restored = mutated;
                 Restore(); active = false;
                 if (desired == null || Unchanged(before.Placement, desired)) { engine.AwaitOutput(target); return new Outcome { Applied = true, Unchanged = true, ResolvedTarget = target }; }
-                var result = session.Edit(identity, desired, null, original);
+                // The guard above checked the target against what the previews made of it, and the restoration verified
+                // the captured pose within the read-back tolerance. A native transform can read that pose back a unit
+                // in the last place off, which the inspection compares exactly, so the edit binds to the target as
+                // restored rather than to the inspection from before the gesture.
+                var result = session.Edit(identity, desired, null, restored ? Observed() : original);
                 if (!result.Applied) engine.AwaitOutput(target);
                 return result;
             } catch (Exception e) {
