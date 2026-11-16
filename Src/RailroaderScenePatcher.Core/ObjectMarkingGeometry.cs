@@ -35,9 +35,10 @@ namespace RailroaderScenePatcher.Core {
     // the inspected object and the frames of candidates.
     public static class ObjectMarkingGeometry {
         // Beyond this distance from the camera to an object's bounds, in metres, the object shows only its square
-        // marker: the largest distance at which every frame still surrounded only its own object in the game, 500 m, less
-        // one 50 m measurement step. It stays within the native editor's default gizmo distance of 500 m.
-        public const double FrameDistance = 450;
+        // marker: the largest distance at which every frame still surrounded only its own object in the game with the
+        // pointer over each, 550 m, less one 50 m measurement step. It equals the native editor's default gizmo
+        // distance of 500 m.
+        public const double FrameDistance = 500;
         // A part far larger than the part at the object's marker, such as a culling or proxy volume, does not outline
         // the object: larger than this factor and this margin in metres.
         public const double ExtentFactor = 4, ExtentMargin = 10;

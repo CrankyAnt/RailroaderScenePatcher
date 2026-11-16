@@ -75,13 +75,14 @@ static class ObjectMarkingGeometryTests {
         Check(!behind.Frame.HasValue, "an object wholly behind the camera has no frame");
 
         // Beyond FrameDistance every frame becomes the square marker; the distance is to the bounds, not the centre.
-        // Combined session 3, R4: every frame still surrounded only its own object at the 500 m step; less one 50 m step.
-        Check(ObjectMarkingGeometry.FrameDistance == 450, "the frame distance is 450 m");
-        var atLimit = Frame(new WorldPoint(0, 0, 455), Box("limit", 0, 0, 455, 5, 5, 5));
-        Check(atLimit.Frame.HasValue && atLimit.Distance == 450, "an object at exactly the frame distance keeps its frame");
-        var beyond = Frame(new WorldPoint(0, 0, 456), Box("beyond", 0, 0, 456, 5, 5, 5));
-        Check(!beyond.Frame.HasValue && beyond.Distance == 451, "an object beyond the frame distance keeps only its square marker");
-        Check(Frame(new WorldPoint(0, 0, 490), Box("long", 0, 0, 490, 5, 5, 50)).Frame.HasValue, "a long object whose near end is within the frame distance is framed");
+        // Every frame still surrounded only its own object at the 550 m step with the pointer over each; less one 50 m
+        // step. That is the native editor's default gizmo distance.
+        Check(ObjectMarkingGeometry.FrameDistance == 500, "the frame distance is 500 m");
+        var atLimit = Frame(new WorldPoint(0, 0, 505), Box("limit", 0, 0, 505, 5, 5, 5));
+        Check(atLimit.Frame.HasValue && atLimit.Distance == 500, "an object at exactly the frame distance keeps its frame");
+        var beyond = Frame(new WorldPoint(0, 0, 506), Box("beyond", 0, 0, 506, 5, 5, 5));
+        Check(!beyond.Frame.HasValue && beyond.Distance == 501, "an object beyond the frame distance keeps only its square marker");
+        Check(Frame(new WorldPoint(0, 0, 540), Box("long", 0, 0, 540, 5, 5, 50)).Frame.HasValue, "a long object whose near end is within the frame distance is framed");
 
         // A platform 40 m long turned 45 degrees about the vertical: its world-aligned box is 29 m square, its own box a
         // narrow band inside it, which tightens the frame.
