@@ -64,9 +64,10 @@ One line per validation or test command and per CI workflow the repository runs.
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation and the common dependency minimum with synthetic measurements
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-TestHome.ps1`: validates test-copy ownership and cleanup in a synthetic home
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates separation of active-world and unassigned attempt evidence
-- `core-tests`: builds and runs the core library tests without game assemblies
-- `zizmor --offline .github/workflows/core-tests.yml`: checks the product workflow for locally detectable security findings
-- `repository-hygiene` (shared, `v1`): the convention checks of branch names, commit subjects and pull-request titles, the credential scan, workflow validation, Dependabot coverage and the Markdown link check, and `reuse lint`
+- `.github/scripts/core-tests.sh`: the script of the free job `custom` of `ci`; builds and runs the core library tests without game assemblies
+- `ci` (shared, `v1`): runs repository hygiene and the configured CI parts and reports the one required check `ci / verdict`
+- `automation` (shared, `v1`): runs the configured parts that write, including Dependabot auto-merge, additions, full recording and issue-title normalisation
+- `release` (shared, `v1`): runs the configured release part on a pushed tag or a start by hand and publishes nothing without release configuration
 
 ## Code style
 
