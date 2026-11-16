@@ -92,6 +92,16 @@ _Avoid_: Patch history, movement script
 The document that expresses a mod's scene patch.
 _Avoid_: Patch history, scene-patch document
 
+**Equal content**:
+Two patch document texts have equal content when they say the same thing: the order of keys and members, spacing, comments, the written form of a number and the order of a modification's dependencies do not count.
+
+**Saved**:
+The state of a patch document whose current content and the text last read or written have equal content. A patch document that did not exist at load is Saved while it has no modification.
+_Avoid_: Clean, unchanged on disk
+
+**Canonical order**:
+The fixed order of keys and members that a Save produces when it writes a patch document. Reading a document never changes its order.
+
 **Mod value**:
 A value that a supplying mod's patch document sets for a scene object. Without it, the scene object keeps its effective underlying state.
 _Avoid_: MapMod value, authored value, authored state, authored binding, authored activity
