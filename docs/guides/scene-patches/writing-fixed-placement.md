@@ -1,18 +1,18 @@
 <!-- SPDX-FileCopyrightText: 2026 CrankyAnt -->
 <!-- SPDX-License-Identifier: MIT -->
-# Author fixed scene placement
+# Write fixed scene placement
 
-This guide describes the v1 scene-patch document layout and the native placement capability for independent boards: scene objects with a `Helpers.Culling.RendererCuller`, one circle map mask and no track relationship, identified by the `independent-board-v1` structure. The example uses the Sylva location board, `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene. An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed pose, visible rendering, culler membership and mask position after a measured origin shift. That test does not establish other builds or the complete culling range. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects and failure limits.
+This guide describes the v1 patch document layout and the native placement capability for independent boards: scene objects with a `Helpers.Culling.RendererCuller`, one circle map mask and no track relationship, identified by the `independent-board-v1` structure. The example uses the Sylva location board, `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene. An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed placement, visible rendering, culler membership and mask position after a measured origin shift. That test does not establish other builds or the complete culling range. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects and failure limits.
 
 ## Add the patch document
 
-Create `Data/scene-patches.json` in the asset pack that supplies the Map definition. Fixed placement has a base minimum of `0.1.0`; target-specific capabilities can raise it. The native independent-board pattern raises the minimum to `0.5.0` except for the legacy Sylva location sign, which still uses the pattern checks but does not raise the pattern-based board dependency minimum. To make these edits in the map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). At runtime the patcher scans loaded packs in pack order. In the map editor it reads only the active edited MapMod's document.
+Create `Data/scene-patches.json` in the mod that contains the map definition. Fixed placement has a base minimum of `0.1.0`; target-specific capabilities can raise it. The native independent-board pattern raises the minimum to `0.5.0` except for the legacy Sylva location sign, which still uses the pattern checks but does not raise the pattern-based board dependency minimum. To make these edits in the native map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). At runtime the patcher scans loaded mods in load order. In the native map editor it reads only the edited mod's document.
 
-Save the document as strict UTF-8 JSON. Use the `mapId` of the selected Map definition or one of its resolved map layers. Keep one document with the supplying MapMod so editor inspection and runtime application read the same desired state.
+Save the document as strict UTF-8 JSON. Use the `mapId` of the selected map definition or one of its resolved map layers. Keep one document with the supplying mod so inspection in scene patch editing and runtime application read the same desired state.
 
 ## Describe a fixed placement
 
-In the map editor, open **Scene patches**, select **Refresh** in the command band, find the board in the outliner under the **Independent board** folder, and select its row to display its identity and dependencies on the **Object** tab. Select **Copy ID** in the command band to copy that JSON. **Focus** moves the editor camera without changing the inspected selection. Refresh only inspects; it does not apply patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
+In the native map editor, open **Scene patches**, select **Refresh** in the command band, find the board in the outliner under the **Independent board** folder, and select its row to display its identity and dependencies on the **Object** tab. Select **Copy ID** in the command band to copy that JSON. **Focus** moves the native map editor camera without changing the inspected selection. Refresh only inspects; it does not apply patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
 
 Add one entry to `modifications` for each desired placement. The following example shows the v1 field shape and the supported target identity. Replace the sample map ID and coordinates with values for the selected map.
 
@@ -48,7 +48,7 @@ Use a unique, non-empty `id` for each modification. List prerequisite modificati
 
 ## Distribute for multiplayer
 
-Every player in a multiplayer session needs your MapMod and Railroader Scene Patcher installed, with the game's DLL mod permission enabled on their own installation. Railroader's required-pack and version checks decide who can join. The patcher adds no admission check of its own and does not compare document contents between players.
+Every player in a multiplayer session needs your mod and Railroader Scene Patcher installed, with the game's DLL mod permission enabled on their own installation. Railroader's checks of required mods and versions decide who can join. The patcher adds no admission check of its own and does not compare document contents between players.
 
 Each host and client applies your document to its own scene when its world loads. Each one checks the map context, the target identity and the capability prerequisites locally. A failure on one player's game is reported there and does not undo changes on the others or disconnect anyone. Fixed placement uses map coordinates, so each player's board ends up at the same map position even though their local world origins differ.
 
@@ -60,4 +60,4 @@ The adapter requires the board's parents, culler, and circle map mask to be acti
 
 If a modification fails during a load, the engine does not retry it during that load. Correct the document or target before a later load.
 
-If you correct a document outside the editor, reload the map before retrying. For the exact v1 field requirements, see [scene-patch document v1](scene-patch-document-v1.md).
+If you correct a document outside scene patch editing, reload the map before retrying. For the exact v1 field requirements, see [patch document v1](patch-document-v1.md).
