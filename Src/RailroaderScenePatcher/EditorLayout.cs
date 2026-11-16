@@ -730,7 +730,7 @@ namespace RailroaderScenePatcher {
             foreach (var line in others) BindingFields(builder, line);
         }
 
-        // The Changes tab: what this MapMod changes about the inspected object, and what that change still awaits.
+        // The Changes tab: what this mod changes about the inspected object, and what that change still awaits.
         void DrawChanges(UIPanelBuilder builder) {
             Section(builder, "This MapMod");
             var changed = IsChanged(selected);
@@ -1040,7 +1040,7 @@ namespace RailroaderScenePatcher {
                     var enabled = target != null && target.activeSelf;
                     return new[] {
                         Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
-                        // Named by what it takes back, over two cells; disabled while this MapMod sets no activity.
+                        // Named by what it takes back, over two cells; disabled while this mod sets no activity.
                         Slot(CommandBand.ClearActivity, "Clear this MapMod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
                             () => Edit(ActivityPlace, "Clearing the activity's MapMod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
                 }

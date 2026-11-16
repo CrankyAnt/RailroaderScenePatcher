@@ -7,18 +7,18 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher.Core;
 
-// Controlled storage for the active edited MapMod, with per-participant write failures.
+// Controlled storage for the edited mod, with per-participant write failures.
 class Store : IStorage {
     public string Patch, Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"rr/game >=0.6.2\"]}}";
     public bool FailPatch, FailInfo;
     public int PatchWrites, InfoWrites;
     public string ReadPatchDocument() => Patch;
     public void WritePatchDocument(string text) { if (FailPatch) throw new IOException("patch write injected"); Patch = text; PatchWrites++; }
-    public string ReadPackInfo() => Info;
-    public void WritePackInfo(string text) { if (FailInfo) throw new IOException("metadata write injected"); Info = text; InfoWrites++; }
+    public string ReadModInfo() => Info;
+    public void WriteModInfo(string text) { if (FailInfo) throw new IOException("metadata write injected"); Info = text; InfoWrites++; }
 }
 
-// The real files of a MapMod folder, with a write that stops midway after part of its bytes reached the disk,
+// The real files of a mod folder, with a write that stops midway after part of its bytes reached the disk,
 // or a failing replacement of a file by new content, for files whose name starts with the given text. With
 // ReplaceFailures set, the replacement fails only that many times and then succeeds, as a file another process
 // holds open for a moment does. With RefuseReplace set, the replacement is refused as Windows refuses to replace
@@ -153,7 +153,7 @@ static class AuthoringTests {
         EqualValuesAreNotStored();
     }
     // An editor edit stores only what it changes: a value equal to the object's own is no change, a value equal to
-    // the value without this MapMod takes the setting out of the modification, and a hand-written equal value stays.
+    // the value without this mod takes the setting out of the modification, and a hand-written equal value stays.
     static void EqualValuesAreNotStored() {
         var w = new World();
         var enable = w.Session.Edit(P, null, true);
@@ -163,7 +163,7 @@ static class AuthoringTests {
         var again = w.Session.Edit(P, null, false);
         Assert(again.Applied && again.Unchanged && w.Editor.UndoGroups.Count == groups, "The same value again changes nothing and adds no Undo step");
         var back = w.Session.Edit(P, null, true);
-        Assert(back.Applied && back.Reverted && !back.Unchanged && w.Box.Active && w.Document["modifications"].Count() == 0 && !w.Session.IsChanged(P), "Enabling it again removes the modification: the object is not changed by this MapMod");
+        Assert(back.Applied && back.Reverted && !back.Unchanged && w.Box.Active && w.Document["modifications"].Count() == 0 && !w.Session.IsChanged(P), "Enabling it again removes the modification: the object is not changed by this mod");
         Assert(w.Editor.UndoGroups.Count == groups + 1, "The revert is one Undo step, as setting a native value back is");
         w.Editor.Undo(); Assert(!w.Box.Active && w.Session.IsChanged(P), "Undo of the revert restores the disable");
         w.Editor.Redo(); Assert(w.Box.Active && !w.Session.IsChanged(P), "Redo reverts again");
@@ -185,7 +185,7 @@ static class AuthoringTests {
         string Lines(double x, double[] rotation) => String.Join(" | ", AuthoringSession.ChangeLines(new ObjectState(new Placement(new[] { x, 2, 3 }, rotation), null), before));
         Assert(Lines(5, new[] { 0.0, 0.70710677, 0, 0.70710679 }) == "Position: from 1, 2, 3 to 5, 2, 3", "An X-only change with a rotation that drifted by rounding has no Rotation line: " + Lines(5, new[] { 0.0, 0.70710677, 0, 0.70710679 }));
         Assert(Lines(1.0003, new[] { 0.0, 1.0, 0, 0 }) == "Rotation: changed", "A position within half a millimetre has no Position line: " + Lines(1.0003, new[] { 0.0, 1.0, 0, 0 }));
-        Assert(Lines(1, new[] { 0.0, 0.7071068, 0, 0.7071068 }) == "Placement: set to the placement the object has without this MapMod", "A stored placement equal to the object's own says so");
+        Assert(Lines(1, new[] { 0.0, 0.7071068, 0, 0.7071068 }) == "Placement: set to the placement the object has without this mod", "A stored placement equal to the object's own says so");
         Assert(AuthoringSession.SameRotation(new[] { 0.0, 1, 0, 0 }, new[] { 0.0, -1, 0, 0 }) && !AuthoringSession.SameRotation(new[] { 0.0, 1, 0, 0 }, new[] { 0.0, 0.9999, 0, 0.01414 }), "A rotation and its negated quaternion are the same; under a degree apart is not");
         Assert(AuthoringSession.SamePosition(new[] { 1.0, 2, 3 }, new[] { 1.0005, 2, 3 }) && !AuthoringSession.SamePosition(new[] { 1.0, 2, 3 }, new[] { 1.0006, 2, 3 }) && !AuthoringSession.SamePosition(new[] { 1.0 }, null), "A position is the same within half a millimetre");
         // A document written by hand may hold a value equal to the object's own; an edit of another setting keeps it.
@@ -262,7 +262,7 @@ static class AuthoringTests {
         w.Editor.NativeEdit(2);
         Assert(w.Editor.Save() == null && w.Store.PatchWrites == 1 && w.Store.InfoWrites == 1 && w.Editor.NativeWrites == 2, "Unchanged patcher participants are not rewritten");
         var empty = new World(); empty.Editor.NativeEdit(1);
-        Assert(empty.Editor.Save() == null && empty.Store.Patch == null && empty.Store.InfoWrites == 0, "A MapMod without authored modifications gets no patch document or dependency");
+        Assert(empty.Editor.Save() == null && empty.Store.Patch == null && empty.Store.InfoWrites == 0, "A mod without authored modifications gets no patch document or dependency");
     }
     static void PartialWritesStayIdentifiedAndRetryable() {
         var w = new World();
@@ -286,7 +286,7 @@ static class AuthoringTests {
         first.Editor.Undo(); first.Editor.NativeEdit(2);
         Assert(first.Editor.IsDirty, "A failed Save records no saved identity for a later equal change count");
     }
-    // A MapMod folder on disk with the given files; null leaves a file absent.
+    // A mod folder on disk with the given files; null leaves a file absent.
     static string Folder(string patch, string info) {
         var root = Path.Combine(Path.GetTempPath(), "RailroaderScenePatcherTests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "Data"));
@@ -316,7 +316,7 @@ static class AuthoringTests {
             var root = Folder(c.Patch, info);
             try {
                 var files = new FaultyFiles(); var announced = new List<string>();
-                var storage = new PackStorage(root, files, announced.Add);
+                var storage = new ModStorage(root, files, announced.Add);
                 var w = new World(c.Patch, info, storage);
                 var before = Listing(root);
                 var patchBytes = c.Patch == null ? null : File.ReadAllBytes(storage.PatchPath);
@@ -327,7 +327,7 @@ static class AuthoringTests {
                 Assert(message != null && message.Contains(c.Replace ? "replace failed" : "write interrupted midway") && w.Session.LastSave.Outstanding.Contains(c.Name), label + ": the failure names the participant as outstanding: " + message);
                 Assert(c.Patch == null ? !File.Exists(storage.PatchPath) : File.ReadAllBytes(storage.PatchPath).SequenceEqual(patchBytes), label + ": the previous patch document is intact");
                 Assert(File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes), label + ": the previous Info.json is intact");
-                Assert(Listing(root) == before, label + ": no partial file is left beside the MapMod's files: " + Listing(root));
+                Assert(Listing(root) == before, label + ": no partial file is left beside the mod's files: " + Listing(root));
                 Assert(announced.Count == 0, label + ": a failed write is not announced as written");
                 Assert(w.Editor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 130, label + ": the edit stays in memory and the editor stays unsaved");
                 files.FailWrite = files.FailReplace = null;
@@ -335,17 +335,17 @@ static class AuthoringTests {
                 var written = JObject.Parse(File.ReadAllText(storage.PatchPath));
                 Assert((double)written["modifications"][0]["placement"]["position"][0] == 130 && (metadata ? JObject.Parse(File.ReadAllText(storage.InfoPath))["dependencies"]["required"].Any(d => (string)d == "crankyant/scene-patcher >=0.1.0") : File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)), label + ": the retry writes both files completely");
                 Assert(announced.Count == 1 && announced[0] == File.ReadAllText(storage.PatchPath), label + ": the completed patch write is announced once with the text on disk");
-                Assert(Listing(root) == "Data/scene-patches.json,Info.json", label + ": the retry leaves only the MapMod's own files: " + Listing(root));
+                Assert(Listing(root) == "Data/scene-patches.json,Info.json", label + ": the retry leaves only the mod's own files: " + Listing(root));
             } finally { Directory.Delete(root, true); }
         }
-        // Content left behind by an earlier interrupted Save is never published with the MapMod.
+        // Content left behind by an earlier interrupted Save is never published with the mod.
         var stale = Folder(saved, Info("0.0.1"));
         try {
-            var storage = new PackStorage(stale);
+            var storage = new ModStorage(stale);
             foreach (var leftover in new[] { storage.PatchPath, storage.InfoPath }) File.WriteAllText(leftover + ".saving", "{\"partial");
             var w = new World(saved, Info("0.0.1"), storage);
             w.Session.Edit(P, Pose(140), null);
-            Assert(w.Editor.Save() == null && Listing(stale) == "Data/scene-patches.json,Info.json" && (double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"][0]["placement"]["position"][0] == 140, "A Save replaces leftovers of an interrupted Save and leaves only the MapMod's own files: " + Listing(stale));
+            Assert(w.Editor.Save() == null && Listing(stale) == "Data/scene-patches.json,Info.json" && (double)JObject.Parse(File.ReadAllText(storage.PatchPath))["modifications"][0]["placement"]["position"][0] == 140, "A Save replaces leftovers of an interrupted Save and leaves only the mod's own files: " + Listing(stale));
         } finally { Directory.Delete(stale, true); }
     }
     // Records each pause in the file log and waits it out, so a real hold of a file during the test passes as it would in the editor.
@@ -367,7 +367,7 @@ static class AuthoringTests {
             var root = Folder(saved, info);
             try {
                 var files = new FaultyFiles { FailReplace = target, ReplaceFailures = 2 };
-                var storage = new PackStorage(root, files, null, Waited(files.Log));
+                var storage = new ModStorage(root, files, null, Waited(files.Log));
                 var w = new World(saved, info, storage);
                 w.Session.Edit(P, Pose(130), null);
                 Assert(w.Editor.Save() == null && !w.Editor.IsDirty, target + ": a replacement that fails for a moment does not fail the Save");
@@ -381,7 +381,7 @@ static class AuthoringTests {
             root = Folder(saved, info);
             try {
                 var files = new FaultyFiles { FailReplace = target };
-                var storage = new PackStorage(root, files, null, Waited(files.Log));
+                var storage = new ModStorage(root, files, null, Waited(files.Log));
                 var w = new World(saved, info, storage);
                 var patchBytes = File.ReadAllBytes(storage.PatchPath); var infoBytes = File.ReadAllBytes(storage.InfoPath);
                 w.Session.Edit(P, Pose(130), null);
@@ -389,7 +389,7 @@ static class AuthoringTests {
                 var participant = target == "Info.json" ? AuthoringSession.Metadata : AuthoringSession.PatchData;
                 Assert(message != null && message.Contains("replace failed") && w.Session.LastSave.Outstanding.Contains(participant), target + ": a file that stays held fails the Save and names the participant: " + message);
                 var held = Pauses(files.Log, target, out var tries);
-                Assert(tries == PackStorage.ReplaceAttempts && held.SequenceEqual(new[] { 50, 100, 150, 200 }), target + ": the replacement is tried a bounded number of times");
+                Assert(tries == ModStorage.ReplaceAttempts && held.SequenceEqual(new[] { 50, 100, 150, 200 }), target + ": the replacement is tried a bounded number of times");
                 // Info.json is written before the patch document, so a held patch document leaves the completed metadata write.
                 Assert(File.ReadAllBytes(storage.PatchPath).SequenceEqual(patchBytes) && (target == "scene-patches.json" || File.ReadAllBytes(storage.InfoPath).SequenceEqual(infoBytes)) && Listing(root) == "Data/scene-patches.json,Info.json", target + ": the held file keeps its previous content and no pending file is left");
                 Assert(w.Editor.IsDirty && w.Box.X == 30 && (double)w.Document["modifications"][0]["placement"]["position"][0] == 130, target + ": the edit stays in memory and the editor stays unsaved");
@@ -402,7 +402,7 @@ static class AuthoringTests {
         var refused = Folder(saved, info);
         try {
             var files = new FaultyFiles { FailReplace = "scene-patches.json", RefuseReplace = true };
-            var storage = new PackStorage(refused, files, null, Waited(files.Log));
+            var storage = new ModStorage(refused, files, null, Waited(files.Log));
             var w = new World(saved, info, storage);
             w.Session.Edit(P, Pose(130), null);
             var message = w.Editor.Save();
@@ -417,7 +417,7 @@ static class AuthoringTests {
         var locked = Folder(saved, info);
         try {
             var files = new FaultyFiles();
-            var storage = new PackStorage(locked, files, null, Waited(files.Log));
+            var storage = new ModStorage(locked, files, null, Waited(files.Log));
             File.SetAttributes(storage.PatchPath, FileAttributes.ReadOnly);
             var w = new World(saved, info, storage);
             w.Session.Edit(P, Pose(130), null);
@@ -570,7 +570,7 @@ static class AuthoringTests {
     }
     static void NumericEditReachesWorldAndDocument() {
         var w = new World();
-        Assert(w.Session.Blocked == null && !w.Editor.IsDirty, "A MapMod without a patch document starts clean and editable");
+        Assert(w.Session.Blocked == null && !w.Editor.IsDirty, "A mod without a patch document starts clean and editable");
         var outcome = w.Session.Edit(P, Pose(112), null);
         Assert(outcome.Applied && outcome.Error == null, "A numeric placement edit completes");
         Assert(w.Box.X == 12 && w.Box.Position[1] == 2 && w.Box.Position[2] == 3 && w.Box.Rotation.SequenceEqual(new[] { 0.0, 0.0, 0.0, 1.0 }), "The edit moves the object to the fixed map placement through the current origin");

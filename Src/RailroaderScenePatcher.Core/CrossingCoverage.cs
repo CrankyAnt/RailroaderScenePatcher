@@ -18,8 +18,8 @@ namespace RailroaderScenePatcher.Core {
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
     }
     public enum CircuitKind { Native, Tracks, Detached, Added }
-    // The identity of an authored detection addition. Its ID is unique in the patch document of its supplying MapMod, and the
-    // key joins it with that document's key, so additions of different MapMods never share an identity.
+    // The identity of an authored detection addition. Its ID is unique in the patch document of its supplying mod, and the
+    // key joins it with that document's key, so additions of different mods never share an identity.
     public static class DetectionAddition {
         const string Prefix = "addition:";
         public static string Key(string owner, string id) {
@@ -254,7 +254,7 @@ namespace RailroaderScenePatcher.Core {
             baselines.Remove(target);
         }
         public bool Unsettled(object target) => world.Unsettled(target);
-        // Ends this state while the scene may stay, as a MapMod reload or unload without a scene unload would: every crossing it changed returns to
+        // Ends this state while the scene may stay, as a mod reload or unload without a scene unload would: every crossing it changed returns to
         // its native circuits and spans, and the spans the patcher owns are removed, so a later state records the true native
         // coverage. A crossing that is gone or no longer conforms has nothing to return to; its owned spans are still removed.
         // Nothing here throws: what cannot be restored stays, and a later state refuses to take it for native coverage.

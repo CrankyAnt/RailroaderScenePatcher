@@ -77,7 +77,7 @@ namespace RailroaderScenePatcher.Core {
         public TargetIdentity Target { get; internal set; }
         // Applied without a change: the operation found nothing to do and recorded nothing.
         public bool Unchanged { get; internal set; }
-        // An editor edit whose value equals the object's value without this MapMod: the modification no longer holds
+        // An editor edit whose value equals the object's value without this mod: the modification no longer holds
         // that setting, so the edit acted as a revert of it.
         public bool Reverted { get; internal set; }
     }
@@ -189,7 +189,7 @@ namespace RailroaderScenePatcher.Core {
             var document = PatchDocument.Load(json);
             if (!document.CanWrite) { result.Error = document.Error; result.EditorOnly = true; return result; }
             try {
-                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Source map does not match loaded map context"; result.EditorOnly = true; return result; }
+                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.EditorOnly = true; return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var modifications = (JArray)document.Root["modifications"];
                 var entries = new Dictionary<string, JObject>(StringComparer.Ordinal);
@@ -361,7 +361,7 @@ namespace RailroaderScenePatcher.Core {
             return true;
         }
         // The addition IDs a modification authors, and those that more than one modification of a document uses. An addition ID
-        // names one addition of its supplying MapMod, so every modification that shares one fails, wherever it stands.
+        // names one addition of its supplying mod, so every modification that shares one fails, wherever it stands.
         internal static IEnumerable<string> AdditionIds(JObject item) =>
             ((item["relationships"] as JObject)?["crossingCoverage"] as JArray)?.OfType<JObject>().Where(c => c["addition"]?.Type == JTokenType.String).Select(c => (string)c["addition"]).Distinct(StringComparer.Ordinal) ?? Enumerable.Empty<string>();
         internal static HashSet<string> SharedAdditionIds(IEnumerable<JObject> items) {

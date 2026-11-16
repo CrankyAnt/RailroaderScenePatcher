@@ -103,7 +103,7 @@ static partial class CoverageTests {
         Assert(peer.LastReentry.Released == 1 && OwnedAnywhere(f) == 0, "A reconstructed crossing is released by the early check");
         Assert(peer.Engine.Apply(reroute, "pack").Outcomes["reroute"].Applied && DetectsBothWays(f, rebuilt, "Snew"), "The rebuilt crossing takes the reroute");
     }
-    // Discarding the patcher state while the scene stays, as a MapMod reload or unload without a scene unload would, returns every crossing to its
+    // Discarding the patcher state while the scene stays, as a mod reload or unload without a scene unload would, returns every crossing to its
     // native circuits and removes the owned spans, so the next state records the native coverage and applies once.
     static void DiscardedStateRestoresNativeCoverageWhileTheSceneStays() {
         var f = new Fixture();

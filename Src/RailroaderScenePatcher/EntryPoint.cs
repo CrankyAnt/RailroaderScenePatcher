@@ -38,7 +38,7 @@ namespace RailroaderScenePatcher {
         }
         // The retained state belongs to the active map and layer identifiers in the editor or in play. It is a scoped
         // implementation key, not a verified world identity; each load attempt checks every object against its identity.
-        static object MapContext() => Tuple.Create(String.Join("\n", PackDocuments.MapIds()), PackDocuments.IsEditor);
+        static object MapContext() => Tuple.Create(String.Join("\n", ModDocuments.MapIds()), ModDocuments.IsEditor);
         // A replaced map manager or track graph starts a new load attempt within the same map context. Neither establishes
         // that the scene objects are new; the reconciliation decides that per object.
         static object AttemptIdentity() {
@@ -186,7 +186,7 @@ namespace RailroaderScenePatcher {
             JourneyObservation.Sink = message => Debug.Log("[Issue39Attempt] " + message);
 #endif
             try {
-                editor = PackDocuments.IsEditor;
+                editor = ModDocuments.IsEditor;
                 try {
                     world = new BoardScene();
                     scene = new IndependentBoards(world, () => native.Discover());
@@ -238,9 +238,9 @@ namespace RailroaderScenePatcher {
         }
         internal void PrepareRuntime(IModContext value) {
             if (engine != null) return;
-            context = value; editor = PackDocuments.IsEditor;
+            context = value; editor = ModDocuments.IsEditor;
             native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
-            capabilities = new SceneCapabilities(PackDocuments.MapIds, native);
+            capabilities = new SceneCapabilities(ModDocuments.MapIds, native);
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             engine = new PatchEngine(capabilities);
@@ -254,9 +254,9 @@ namespace RailroaderScenePatcher {
             return markerWorld.DuringEnable(marker.gameObject, () => {
                 bool attempted = false;
                 string unavailable = null;
-                foreach (var pack in PackDocuments.Discover()) {
-                    if (!pack.Applicable) continue;
-                    var result = runtime.BeforeNativeCheck(pack.Json, pack.Source, identity);
+                foreach (var mod in ModDocuments.Discover()) {
+                    if (!mod.Applicable) continue;
+                    var result = runtime.BeforeNativeCheck(mod.Json, mod.Source, identity);
                     if (result.Outcomes.Count > 0) attempted = true;
                     if (result.EarlyRouteUnavailable != null) unavailable = result.EarlyRouteUnavailable;
                 }
@@ -270,36 +270,36 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) { Report("terrain-rebind", "Terrain completion for independent boards is unavailable in this load: " + e.GetBaseException().Message + ". Reload the map. Report to the patcher maintainer."); }
             }
             IReadOnlyList<LoadedDocument> documents;
-            try { documents = runtime.ApplyLoaded(PackDocuments.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
-            catch (Exception e) { Report("discovery", "Loaded MapMod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
+            try { documents = runtime.ApplyLoaded(ModDocuments.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
+            catch (Exception e) { Report("discovery", "Loaded mod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
             // One line per document per load attempt says what happened to it, also when nothing else is reported: a
             // document for another map is skipped without a failure.
             loadAttempts++;
             string[] maps = null;
-            try { maps = PackDocuments.MapIds(); } catch { }
+            try { maps = ModDocuments.MapIds(); } catch { }
             foreach (var document in documents) {
-                var pack = document.Pack;
+                var mod = document.Mod;
                 try { context?.Log.Info(document.LogLine(Version, loadAttempts, maps)); } catch { }
                 // Follow-up work for one document cannot stop the others; their application has already happened in load order.
                 try {
-                    if (document.PresentationError != null) context?.Log.Info(Describe(pack, document.PresentationError));
+                    if (document.PresentationError != null) context?.Log.Info(Describe(mod, document.PresentationError));
                     if (document.Result == null) {
-                        if (pack.Error != null) EditorDiagnostic(Describe(pack, pack.Error));
+                        if (mod.Error != null) EditorDiagnostic(Describe(mod, mod.Error));
                         continue;
                     }
                     var result = document.Result;
                     if (result.Error != null) {
-                        if (result.EditorOnly) EditorDiagnostic(Describe(pack, result.Error));
+                        if (result.EditorOnly) EditorDiagnostic(Describe(mod, result.Error));
                         continue;
                     }
                     foreach (var item in result.Outcomes) {
                         if (!item.Value.Applied) {
-                            var error = Describe(pack, item.Key + ": " + item.Value.Error);
+                            var error = Describe(mod, item.Key + ": " + item.Value.Error);
                             if (item.Value.EditorOnly) EditorDiagnostic(error);
                         }
-                        else ReconcileMarkerWarning(pack, item.Key, item.Value);
+                        else ReconcileMarkerWarning(mod, item.Key, item.Value);
                     }
-                } catch (Exception e) { context?.Log.Info(Describe(pack, "Follow-up after application failed: " + e.GetBaseException().Message)); }
+                } catch (Exception e) { context?.Log.Info(Describe(mod, "Follow-up after application failed: " + e.GetBaseException().Message)); }
             }
             status = "Documents processed. " + (scene?.Status ?? "");
         }
@@ -315,27 +315,27 @@ namespace RailroaderScenePatcher {
                 owner.FlushWarnings();
             }
         }
-        void ReconcileMarkerWarning(LoadedPack pack, string operation, Outcome outcome) {
+        void ReconcileMarkerWarning(LoadedMod mod, string operation, Outcome outcome) {
             if (markerWorld == null || !(outcome.ResolvedTarget is GameObject target) || target == null) return;
-            var document = JObject.Parse(pack.Json);
+            var document = JObject.Parse(mod.Json);
             var entry = ((JArray)document["modifications"]).OfType<JObject>().Single(e => (string)e["id"] == operation);
             // Placement or activity alone does not repair a track-marker relationship.
             var binding = entry["relationships"]?["trackMarker"] as JObject;
             if (binding == null || binding["segment"]?.Type != JTokenType.String) return;
             foreach (var attribution in NativeRepairHooks.Warnings.Where(w => ReferenceEquals(w.Target, target))) {
-                if (runtime.Reconcile(pack.Source, operation, attribution, nativeDiagnostics, () => {
+                if (runtime.Reconcile(mod.Source, operation, attribution, nativeDiagnostics, () => {
                     if (target == null) return false;
                     var matches = capabilities.Resolve(outcome.Target);
                     if (matches.Count != 1 || !ReferenceEquals(matches[0], target)) return false;
                     capabilities.Preflight(target);
                     var actual = markerWorld.Location(target);
-                    return PackDocuments.MapIds().Contains((string)document["sourceMap"]["mapId"], StringComparer.Ordinal) && actual != null && actual.Segment == (string)binding["segment"] && actual.End == (string)binding["end"] && Math.Abs(actual.Distance - (double)binding["distance"]) <= 0.001 && markerWorld.DependentProblem(target) == null;
+                    return ModDocuments.MapIds().Contains((string)document["sourceMap"]["mapId"], StringComparer.Ordinal) && actual != null && actual.Segment == (string)binding["segment"] && actual.End == (string)binding["end"] && Math.Abs(actual.Distance - (double)binding["distance"]) <= 0.001 && markerWorld.DependentProblem(target) == null;
                 })) context?.Log.Info("Scene Patcher reconciled one exactly attributed current marker warning after verified repair. Earlier route unavailable: " + attribution.EarlyRouteUnavailable);
             }
         }
-        static string Describe(LoadedPack loaded, string message) {
-            var pack = loaded.Source;
-            return (pack.Name ?? pack.Identifier) + " [" + pack.Identifier + " " + pack.Version + "] " + message + ". Patcher " + Version + ". Author: " + (pack.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(pack.Website) ? "" : "; website: " + pack.Website);
+        static string Describe(LoadedMod loaded, string message) {
+            var mod = loaded.Source;
+            return (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + " " + mod.Version + "] " + message + ". Patcher " + Version + ". Author: " + (mod.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(mod.Website) ? "" : "; website: " + mod.Website);
         }
         internal void ReportWorld(string message) { Report("world", message); }
         void EditorDiagnostic(string message) { if (editor && !diagnostics.Contains(message)) diagnostics.Add(message); }
@@ -402,7 +402,7 @@ namespace RailroaderScenePatcher {
                 authoring.Session.Replayed = identity => replayed.Add(identity);
                 // The patcher's own Save writes the patch document: that text is what the definitions on disk now are, so it
                 // is no change from outside and the inventory lamp stays Current.
-                PackDocuments.Written = text => { try { definitions.Written(PackDocuments.ActivePackId(), text); } catch { } };
+                ModDocuments.Written = text => { try { definitions.Written(ModDocuments.EditedModId(), text); } catch { } };
                 filled = false;
                 snap = new SnapController(authoring.Session, capabilities, new NativeSnapScene(native));
                 authoring.Log = message => context?.Log.Info(message);
@@ -416,7 +416,7 @@ namespace RailroaderScenePatcher {
             CancelGizmo();
             // A request made in this editor does not run in the next one.
             CancelRequest("the editor was left before the request ran");
-            PackDocuments.Written = null;
+            ModDocuments.Written = null;
             if (authoring == null) return;
             if (ReferenceEquals(Hooks.Current, authoring)) Hooks.Current = null;
             authoring.Dispose(); authoring = null;
@@ -595,7 +595,7 @@ namespace RailroaderScenePatcher {
                 }
                 if (Time.unscaledTime >= nextDefinitionCheck) {
                     nextDefinitionCheck = Time.unscaledTime + 2f;
-                    try { definitions.Compare(PackDocuments.Discover()); }
+                    try { definitions.Compare(ModDocuments.Discover()); }
                     catch { definitions.Unreadable(); }
                 }
             } else inventory?.CancelFreshnessCheck();
@@ -1133,11 +1133,11 @@ namespace RailroaderScenePatcher {
                 var inspectedBefore = selected != null;
                 if (selected != null) selected = inventoryPresentation.CurrentSelection(inventory, selected);
                 var lines = new List<string>();
-                var documents = PackDocuments.Discover().ToArray();
-                foreach (var pack in documents) {
-                    if (pack.Error != null) { lines.Add(pack.Source.Identifier + ": " + pack.Error); continue; }
-                    foreach (var item in inventory.InspectDocument(pack.Json))
-                        lines.Add(pack.Source.Identifier + "/" + (item.Id ?? "document") + ": " + item.MatchCount + " inspection matches; dependsOn=" + String.Join(", ", item.Dependencies) + "; " + String.Join("; ", item.Problems));
+                var documents = ModDocuments.Discover().ToArray();
+                foreach (var mod in documents) {
+                    if (mod.Error != null) { lines.Add(mod.Source.Identifier + ": " + mod.Error); continue; }
+                    foreach (var item in inventory.InspectDocument(mod.Json))
+                        lines.Add(mod.Source.Identifier + "/" + (item.Id ?? "document") + ": " + item.MatchCount + " inspection matches; dependsOn=" + String.Join(", ", item.Dependencies) + "; " + String.Join("; ", item.Problems));
                 }
                 documentInspection = String.Join("\n", lines);
                 definitions.Read(documents);
@@ -1146,7 +1146,7 @@ namespace RailroaderScenePatcher {
         }
         string Identity(SceneObservation entry) {
             var identity = new JObject {
-                ["sourceMap"] = new JObject { ["mapId"] = PackDocuments.MapIds().First() },
+                ["sourceMap"] = new JObject { ["mapId"] = ModDocuments.MapIds().First() },
                 ["target"] = new JObject { ["scene"] = entry.Identity.Scene, ["path"] = entry.Identity.Path, ["component"] = entry.Identity.Component, ["structure"] = entry.Identity.Structure },
                 ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(entry.Position), ["rotation"] = new JArray(entry.Rotation) }
             };

@@ -134,7 +134,7 @@ static class BoardTests {
         InspectedOutputResolvesOncePerInspection();
         ChangedObjectsAreReadFromTheDocument();
     }
-    // The outliner marks every row this MapMod modifies. That reads the document alone and never searches the scene.
+    // The outliner marks every row this mod modifies. That reads the document alone and never searches the scene.
     static void ChangedObjectsAreReadFromTheDocument() {
         var (world, board, boards, session, editor, store) = Authoring();
         Assert(!session.IsChanged(Sylva), "An untouched object is not changed");

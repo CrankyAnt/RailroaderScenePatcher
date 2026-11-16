@@ -9,12 +9,12 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // The files of the active edited MapMod. A read returns null when the file does not exist.
+    // The files of the edited mod. A read returns null when the file does not exist.
     public interface IStorage {
         string ReadPatchDocument();
         void WritePatchDocument(string text);
-        string ReadPackInfo();
-        void WritePackInfo(string text);
+        string ReadModInfo();
+        void WriteModInfo(string text);
     }
     // The editor's shared undo history. Groups are listed oldest first.
     public interface INativeHistory {
@@ -93,7 +93,7 @@ namespace RailroaderScenePatcher.Core {
             var match = Version.Match(version ?? "");
             int major, minor, patch;
             if (!match.Success || !Int32.TryParse(match.Groups[1].Value, out major) || !Int32.TryParse(match.Groups[2].Value, out minor) || !Int32.TryParse(match.Groups[3].Value, out patch) || major > 2146 || minor > 99 || patch > 99)
-                throw new InvalidOperationException("'" + version + "' is not a pack version");
+                throw new InvalidOperationException("'" + version + "' is not a mod version");
             return major * 1000000 + minor * 10000 + patch * 100 + (match.Groups[4].Value.Length == 0 ? 0 : match.Groups[4].Value[0] - 'a' + 1);
         }
         static bool Satisfies(int version, string op, int bound) {
@@ -107,14 +107,14 @@ namespace RailroaderScenePatcher.Core {
                 default: return version == bound;
             }
         }
-        // Returns the pack metadata with the required minimum, or null when it already requires at least that version.
+        // Returns the mod metadata with the required minimum, or null when it already requires at least that version.
         internal static string Raise(string info, string modId, string minimum) {
-            if (info == null) throw new InvalidOperationException("The MapMod's Info.json is missing");
+            if (info == null) throw new InvalidOperationException("The mod's Info.json is missing");
             PreservingJson json;
             try { json = PreservingJson.Parse(info); }
-            catch (Exception e) when (e is JsonException || e is ArgumentException) { throw new InvalidOperationException("The MapMod's Info.json is unreadable: " + e.Message); }
+            catch (Exception e) when (e is JsonException || e is ArgumentException) { throw new InvalidOperationException("The mod's Info.json is unreadable: " + e.Message); }
             var root = json.Root as JObject;
-            if (root == null || !json.Exact) throw new InvalidOperationException("The MapMod's Info.json cannot be rewritten without changing its content");
+            if (root == null || !json.Exact) throw new InvalidOperationException("The mod's Info.json cannot be rewritten without changing its content");
             if (root["dependencies"] == null) root["dependencies"] = new JObject();
             var dependencies = root["dependencies"] as JObject;
             if (dependencies == null) throw new InvalidOperationException("Info.json dependencies is not an object");
@@ -145,7 +145,7 @@ namespace RailroaderScenePatcher.Core {
             return json.Write();
         }
     }
-    // One editor session for the active edited MapMod: its patch document, the completed edits in the
+    // One editor session for the edited mod: its patch document, the completed edits in the
     // shared native history, and the truth about which required writes are still outstanding.
     public sealed class AuthoringSession {
         public const string NativeData = "native map data", PatchData = "patch document", Metadata = "dependency metadata";
@@ -173,14 +173,14 @@ namespace RailroaderScenePatcher.Core {
             identity = new HistoryIdentity(history); savedIdentity = identity.Current;
             try {
                 diskText = storage.ReadPatchDocument();
-                info = storage.ReadPackInfo();
+                info = storage.ReadModInfo();
                 if (diskText == null) { document = PatchDocument.Create(mapId); return; }
                 var loaded = PatchDocument.Load(diskText);
                 if (!loaded.CanWrite) Blocked = loaded.Error;
                 else if (loaded.EditError != null) Blocked = loaded.EditError;
-                else if (!scene.MapIds.Contains((string)loaded.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) Blocked = "Source map does not match loaded map context";
+                else if (!scene.MapIds.Contains((string)loaded.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) Blocked = "Target map does not match the loaded map context";
                 else { document = loaded; savedText = loaded.Serialize(); }
-            } catch (Exception e) { Blocked = "Cannot read the active MapMod's files: " + e.Message; }
+            } catch (Exception e) { Blocked = "Cannot read the edited mod's files: " + e.Message; }
             if (Blocked != null) Blocked += ". The patch document is protected from overwrite; correct it outside the editor and reload.";
         }
         // Why authoring and patch persistence are unavailable in this session, or null.
@@ -338,7 +338,7 @@ namespace RailroaderScenePatcher.Core {
                     var turned = placement.Rotation != null && !SameRotation(placement.Rotation, was?.Rotation);
                     if (moved) lines.Add("Position: from " + Numbers(was?.Position) + " to " + Numbers(placement.Position));
                     if (turned) lines.Add("Rotation: changed");
-                    if (!moved && !turned) lines.Add("Placement: set to the placement the object has without this MapMod");
+                    if (!moved && !turned) lines.Add("Placement: set to the placement the object has without this mod");
                 }
             }
             if (state.Active.HasValue) lines.Add("Enabled: from " + (before?.Active == null ? "unknown" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
@@ -512,7 +512,7 @@ namespace RailroaderScenePatcher.Core {
             var target = item["target"] as JObject;
             return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"];
         }
-        // Sets, replaces or detaches this MapMod's track-marker relationship of the object. Placement and activity stay as authored.
+        // Sets, replaces or detaches this mod's track-marker relationship of the object. Placement and activity stay as authored.
         // A null binding clears the authored relationship: the object returns to its effective underlying relationship.
         public Outcome Bind(TargetIdentity target, MarkerBinding binding) { return Bind(target, binding, null); }
         public Outcome Bind(TargetIdentity target, MarkerBinding binding, InspectedTarget inspected) {
@@ -534,7 +534,7 @@ namespace RailroaderScenePatcher.Core {
                 return value;
             });
         }
-        // Selects tracks for, or detaches, one circuit of this MapMod's crossing coverage. Other circuits keep their authored or
+        // Selects tracks for, or detaches, one circuit of this mod's crossing coverage. Other circuits keep their authored or
         // effective coverage. A null coverage clears the circuit's authored entry: it returns to its effective underlying coverage.
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage) { return Cover(target, circuit, coverage, null); }
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected) {
@@ -624,7 +624,7 @@ namespace RailroaderScenePatcher.Core {
             return value;
         }
         static JObject LocationJson(TrackLocation location) => new JObject { ["segment"] = location.Segment, ["end"] = location.End, ["distance"] = location.Distance };
-        // Clears this MapMod's activity value of the object: it returns to its effective underlying activity, which for an
+        // Clears this mod's activity value of the object: it returns to its effective underlying activity, which for an
         // object following a track group is group-driven again. Placement and relationships stay as authored.
         public Outcome ClearActivity(TargetIdentity target, InspectedTarget inspected = null) {
             return Change("Clear activity", target, inspected, existing => {
@@ -635,7 +635,7 @@ namespace RailroaderScenePatcher.Core {
                 return rest["placement"] == null && rest["relationships"] == null ? null : rest;
             });
         }
-        // Removes this MapMod's saved or unsaved modification of the object; the object returns to its effective underlying state.
+        // Removes this mod's saved or unsaved modification of the object; the object returns to its effective underlying state.
         public Outcome Remove(TargetIdentity target) { return Remove(target, null); }
         public Outcome Remove(TargetIdentity target, InspectedTarget inspected) {
             return Change("Remove scene modification", target, inspected, existing => {
@@ -662,7 +662,7 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidOperationException("The existing modification holds content this patcher version does not understand; it is preserved and cannot be edited or removed here");
                 }
                 // An editor edit stores what it changes. A setting whose new value equals the object's value without
-                // this MapMod leaves the modification: the edit is a revert of that setting. An edit that leaves the
+                // this mod leaves the modification: the edit is a revert of that setting. An edit that leaves the
                 // document as it is changes nothing and adds no step to the native history, as a native field ignores
                 // a value equal to the one it shows.
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
@@ -863,9 +863,9 @@ namespace RailroaderScenePatcher.Core {
             if (document == null) return;
             if (document.Modifications.Count != 0) {
                 try {
-                    var fresh = storage.ReadPackInfo();
+                    var fresh = storage.ReadModInfo();
                     var raised = DependencyMetadata.Raise(fresh, modId, MinimumPatcherVersion);
-                    if (raised != null) { storage.WritePackInfo(raised); written.Add(Metadata); }
+                    if (raised != null) { storage.WriteModInfo(raised); written.Add(Metadata); }
                     info = raised ?? fresh;
                 } catch (Exception e) { throw new InvalidOperationException("Dependency metadata was not written: " + e.Message, e); }
             }

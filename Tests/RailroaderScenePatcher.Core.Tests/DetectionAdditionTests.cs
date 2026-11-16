@@ -94,7 +94,7 @@ static partial class CoverageTests {
         Assert(!ambiguous.Outcomes["add"].Applied && ambiguous.Outcomes["add"].Error.Contains("resolve uniquely") && u.World.Mutations == 0, "An addition for an ambiguous crossing is refused");
     }
     static void AdditionIdentityIsScopedToItsDocument() {
-        // One document uses each addition ID once: the ID names one addition of its MapMod, wherever the entries stand.
+        // One document uses each addition ID once: the ID names one addition of its mod, wherever the entries stand.
         foreach (var items in new[] { Cover("a", Addition("siding")) + "," + Cover("b", Addition("siding", "Sspur"), OtherPath) + "," + Cover("c", Addition("spur", "Sspur"), OtherPath, "[]"),
                 Cover("c", Addition("spur", "Sspur"), OtherPath) + "," + Cover("b", Addition("siding", "Sspur"), OtherPath) + "," + Cover("a", Addition("siding")) }) {
             var f = new Fixture();
@@ -102,18 +102,18 @@ static partial class CoverageTests {
             Assert(!result.Outcomes["a"].Applied && !result.Outcomes["b"].Applied && result.Outcomes["a"].Error.Contains("more than one modification"), "An addition ID used by two modifications fails both, in either order: " + result.Outcomes["a"].Error);
             Assert(Untouched(f) && OwnedAnywhere(f) == 3 && result.Outcomes["c"].Applied && f.Other.Circuits.Count == 2, "The modification with its own ID still applies: " + result.Outcomes["c"].Error);
         }
-        // Two supplying MapMods may choose the same ID; their additions stay apart.
+        // Two supplying mods may choose the same ID; their additions stay apart.
         var g = new Fixture();
         var engine = new PatchEngine(g.Scene);
         var first = engine.Apply(Doc(Cover("add", Addition("siding"))), "pack/a");
         var second = engine.Apply(Doc(Cover("add", Addition("siding", "Sspur"))), "pack/b");
-        Assert(first.Outcomes["add"].Applied && second.Outcomes["add"].Applied && g.Crossing.Circuits.Count == 4 && OwnedAnywhere(g) == 6, "Additions of two MapMods with the same ID coexist: " + second.Outcomes["add"].Error);
+        Assert(first.Outcomes["add"].Applied && second.Outcomes["add"].Applied && g.Crossing.Circuits.Count == 4 && OwnedAnywhere(g) == 6, "Additions of two mods with the same ID coexist: " + second.Outcomes["add"].Error);
         Assert(DetectsBothWays(g, g.Crossing, "Snew") && g.Crossing.Circuits[2].Spans.All(s => s.Id.StartsWith("CrankyAnt.ScenePatcher.added.pack/a.siding.", StringComparison.Ordinal))
-            && g.Crossing.Circuits[3].Spans.All(s => s.Id.StartsWith("CrankyAnt.ScenePatcher.added.pack/b.siding.", StringComparison.Ordinal)), "Owned span IDs carry the supplying MapMod and the addition ID: " + g.Spans(g.Crossing.Circuits[2]));
+            && g.Crossing.Circuits[3].Spans.All(s => s.Id.StartsWith("CrankyAnt.ScenePatcher.added.pack/b.siding.", StringComparison.Ordinal)), "Owned span IDs carry the supplying mod and the addition ID: " + g.Spans(g.Crossing.Circuits[2]));
         var observed = g.Scene.Read(g.Crossing).Coverage;
-        Assert(observed[DetectionAddition.Key("pack/a", "siding")].Ranges[0].From.Segment == "Snew" && observed[DetectionAddition.Key("pack/b", "siding")].Ranges[0].From.Segment == "Sspur", "Each addition is observed under its own MapMod");
+        Assert(observed[DetectionAddition.Key("pack/a", "siding")].Ranges[0].From.Segment == "Snew" && observed[DetectionAddition.Key("pack/b", "siding")].Ranges[0].From.Segment == "Sspur", "Each addition is observed under its own mod");
         engine.Apply(Doc(Cover("add", Addition("siding"))), "pack/a");
-        Assert(g.Crossing.Circuits.Count == 4 && g.World.Created == 6, "Repeating one MapMod's document leaves the other's addition alone");
+        Assert(g.Crossing.Circuits.Count == 4 && g.World.Created == 6, "Repeating one mod's document leaves the other's addition alone");
         // The order of the added circuits follows their identity, never the order they were written or applied in.
         var h = new Fixture();
         new PatchEngine(h.Scene).Apply(Doc(Cover("add", Addition("b", "Sspur") + "," + Addition("a"))));
@@ -240,7 +240,7 @@ static partial class CoverageTests {
         while (editor.CanRedo) editor.Redo();
         Assert(f.Crossing.Circuits.Count == 1 && DetectsNowhere(f, f.Crossing, "Snew") && f.Other.Circuits.Count == 2 && OwnedAnywhere(f) == 3, "Redoing every edit, the deletion included, leaves one owned addition");
         editor.Undo(); Assert(f.Crossing.Circuits.Count == 2 && DetectsBothWays(f, f.Crossing, "Snew") && OwnedAnywhere(f) == 6, "Undo of the redone deletion rebuilds the addition once");
-        // Removing the modification returns the crossing to its state without this MapMod and keeps the other crossing's addition.
+        // Removing the modification returns the crossing to its state without this mod and keeps the other crossing's addition.
         var removed = session.Remove(Crossing);
         Assert(removed.Applied && Untouched(f) && DetectsNowhere(f, f.Crossing, "Snew") && OwnedAnywhere(f) == 3 && f.Other.Circuits.Count == 2, "Removal leaves no owned addition at the crossing: " + removed.Error);
         editor.Undo(); Assert(f.Crossing.Circuits.Count == 2 && DetectsBothWays(f, f.Crossing, "Snew") && OwnedAnywhere(f) == 6, "Undo of removal restores the effective detection");
@@ -273,7 +273,7 @@ static partial class CoverageTests {
         session.AddDetection(Crossing, "siding", Extra());
         session.Cover(Crossing, "P6id", CircuitCoverage.Detached);
         Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && store.Patch.Contains("\"addition\": \"siding\""), "Save writes the addition and the dependency: " + store.Info);
-        // The world load applies the saved document under its pack's key; the editor session then edits the same addition.
+        // The world load applies the saved document under its mod's key; the editor session then edits the same addition.
         var fresh = new Fixture();
         var engine = new PatchEngine(fresh.Scene);
         var reload = engine.Apply(store.Patch, "author/pack");

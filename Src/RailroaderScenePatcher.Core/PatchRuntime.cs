@@ -17,17 +17,17 @@ namespace RailroaderScenePatcher.Core {
         public string Website { get; }
     }
     public sealed class PatchFailure {
-        internal PatchFailure(PatchSource pack, string operation, TargetIdentity target, string error, FailureCause cause, string patcherVersion, string gameVersion, string diagnosticKey) {
-            DiagnosticKey = diagnosticKey; PackIdentifier = pack.Identifier; Operation = operation; ObjectPath = target?.Path; Cause = cause;
-            ReportTo = cause == FailureCause.InvalidDefinition ? "MapMod author" : "patcher maintainer";
-            Message = (pack.Name ?? pack.Identifier) + " [" + pack.Identifier + "; version " + (pack.Version ?? "not supplied") + "]. Definition Data/scene-patches.json; operation " + operation +
+        internal PatchFailure(PatchSource mod, string operation, TargetIdentity target, string error, FailureCause cause, string patcherVersion, string gameVersion, string diagnosticKey) {
+            DiagnosticKey = diagnosticKey; ModIdentifier = mod.Identifier; Operation = operation; ObjectPath = target?.Path; Cause = cause;
+            ReportTo = cause == FailureCause.InvalidDefinition ? "mod author" : "patcher maintainer";
+            Message = (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + "; version " + (mod.Version ?? "not supplied") + "]. Definition Data/scene-patches.json; operation " + operation +
                 "; object " + (target == null ? "not resolved" : target.Scene + "/" + target.Path + " [" + target.Component + "]") + ". " + error +
                 ". Patcher " + patcherVersion + "; game " + gameVersion + ". Report to the " + ReportTo + ".";
-            if (!String.IsNullOrWhiteSpace(pack.Author)) Message += " Supplied author: " + pack.Author + ".";
-            if (Uri.TryCreate(pack.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + pack.Website + ".";
+            if (!String.IsNullOrWhiteSpace(mod.Author)) Message += " Supplied author: " + mod.Author + ".";
+            if (Uri.TryCreate(mod.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + mod.Website + ".";
         }
         public string Source => "Railroader Scene Patcher";
-        public string PackIdentifier { get; }
+        public string ModIdentifier { get; }
         public string DiagnosticKey { get; }
         public string Operation { get; }
         public string ObjectPath { get; }
@@ -71,23 +71,23 @@ namespace RailroaderScenePatcher.Core {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine)); this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
             this.patcherVersion = patcherVersion; this.gameVersion = gameVersion;
         }
-        // Applies the documents of loaded packs in the given native load order. Only a pack that declares the patcher
-        // dependency, or the editor's edit target, reaches the engine, which checks its source map context.
-        public IReadOnlyList<LoadedDocument> ApplyLoaded(IEnumerable<LoadedPack> loadOrder, IOverlapNotices notices) {
+        // Applies the documents of loaded mods in the given native load order. Only a mod that declares the patcher
+        // dependency, or the editor's edit target, reaches the engine, which checks whether its target map is in the map context.
+        public IReadOnlyList<LoadedDocument> ApplyLoaded(IEnumerable<LoadedMod> loadOrder, IOverlapNotices notices) {
             if (loadOrder == null) throw new ArgumentNullException(nameof(loadOrder));
             var documents = new List<LoadedDocument>();
-            foreach (var pack in loadOrder) {
-                if (pack == null) continue;
-                var document = new LoadedDocument(pack);
+            foreach (var mod in loadOrder) {
+                if (mod == null) continue;
+                var document = new LoadedDocument(mod);
                 documents.Add(document);
-                if (pack.Error != null) { document.Skipped = pack.Error; continue; }
-                if (!pack.Applicable) { document.Skipped = "The pack does not declare a dependency on " + LoadedPack.PatcherId; continue; }
+                if (mod.Error != null) { document.Skipped = mod.Error; continue; }
+                if (!mod.Applicable) { document.Skipped = "The mod does not declare a dependency on " + LoadedMod.PatcherId; continue; }
                 // The engine isolates document and operation failures itself; presentation faults stay with this document.
-                ClearSource(pack.Source);
-                document.Result = engine.Apply(pack.Json, pack.Source.Identifier);
-                try { ReportResult(document.Result, pack.Source); }
+                ClearSource(mod.Source);
+                document.Result = engine.Apply(mod.Json, mod.Source.Identifier);
+                try { ReportResult(document.Result, mod.Source); }
                 catch (Exception e) { document.PresentationError = "Failure report delivery failed: " + e.Message; }
-                try { ObserveOverlap(pack, document.Result, notices); }
+                try { ObserveOverlap(mod, document.Result, notices); }
                 catch (Exception e) { document.PresentationError = (document.PresentationError == null ? "" : document.PresentationError + "; ") + "Overlap notice delivery failed: " + e.Message; }
             }
             return documents;
@@ -96,12 +96,12 @@ namespace RailroaderScenePatcher.Core {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
         }
-        sealed class Contribution { internal string Key; internal TargetIdentity Target; internal readonly List<LoadedPack> Packs = new List<LoadedPack>(); }
-        // Supplying packs per uniquely resolved object in this loaded world, in load order, and the notices already given.
+        sealed class Contribution { internal string Key; internal TargetIdentity Target; internal readonly List<LoadedMod> Mods = new List<LoadedMod>(); }
+        // Supplying mods per uniquely resolved object in this loaded world, in load order, and the notices already given.
         readonly Dictionary<object, Contribution> contributions = new Dictionary<object, Contribution>(new ByReference());
         readonly HashSet<string> noticed = new HashSet<string>(StringComparer.Ordinal);
         // An outcome carries its resolved object only after unique resolution, so ambiguous or missing targets never count.
-        void ObserveOverlap(LoadedPack pack, DocumentResult result, IOverlapNotices notices) {
+        void ObserveOverlap(LoadedMod mod, DocumentResult result, IOverlapNotices notices) {
             Exception fault = null;
             foreach (var outcome in result.Outcomes.Values) {
                 if (outcome.ResolvedTarget == null || outcome.Target == null) continue;
@@ -109,12 +109,12 @@ namespace RailroaderScenePatcher.Core {
                     contribution = new Contribution { Target = outcome.Target, Key = "overlap/" + contributions.Count };
                     contributions.Add(outcome.ResolvedTarget, contribution);
                 }
-                if (contribution.Packs.Any(p => p.Source.Identifier == pack.Source.Identifier)) continue;
-                contribution.Packs.Add(pack);
-                if (contribution.Packs.Count < 2 || notices == null) continue;
-                var signature = contribution.Key + "/" + String.Join("\n", contribution.Packs.Select(p => p.Source.Identifier));
+                if (contribution.Mods.Any(p => p.Source.Identifier == mod.Source.Identifier)) continue;
+                contribution.Mods.Add(mod);
+                if (contribution.Mods.Count < 2 || notices == null) continue;
+                var signature = contribution.Key + "/" + String.Join("\n", contribution.Mods.Select(p => p.Source.Identifier));
                 if (noticed.Contains(signature)) continue;
-                try { notices.Notice(new OverlapNotice(contribution.Key, contribution.Target, contribution.Packs.ToArray())); noticed.Add(signature); }
+                try { notices.Notice(new OverlapNotice(contribution.Key, contribution.Target, contribution.Mods.ToArray())); noticed.Add(signature); }
                 catch (Exception e) { fault = fault ?? e; }
             }
             if (fault != null) throw fault;

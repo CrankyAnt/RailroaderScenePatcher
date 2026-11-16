@@ -231,7 +231,7 @@ class Program {
         AssertWholeDocumentRejected(Doc(validIndependent + ",{}"), "Missing modification identity after a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent + "," + Item("independent", "p")), "Duplicate modification identity after a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent + ",42"), "Non-object modification after a valid entry");
-        AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid source map with a valid entry");
+        AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid target map with a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"), "Duplicate envelope property with a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":2"), "Unsupported document version with a valid entry");
         AssertWholeDocumentRejected(Doc(validIndependent).Substring(0, Doc(validIndependent).Length - 1), "Unreadable truncated document containing a valid entry");
@@ -266,7 +266,7 @@ class Program {
         BindingTests.Run();
         CrossingPadTests.Run();
         DiagnosticTests.Run();
-        MultiplePackTests.Run();
+        MultipleModTests.Run();
         TrackFollowingTests.Run();
         GroupActivityTests.Run();
         CoverageTests.Run();
