@@ -1,1 +1,15 @@
 version: 1
+parts:
+  custom:
+    setups: [dotnet-10]
+    script: .github/scripts/core-tests.sh
+    paths:
+      - Src/RailroaderScenePatcher.Core/
+      - Tests/RailroaderScenePatcher.Core.Tests/
+      - Src/RailroaderScenePatcher/
+      - Directory.Build.props
+      - .github/scripts/core-tests.sh
+    request: 100
+    waits-for: dotnet-test.console-runner
+dependabot:
+  nuget: [/Src/RailroaderScenePatcher.Core, /Src/RailroaderScenePatcher, /Tests/RailroaderScenePatcher.Core.Tests, /Tests/NativeObservation]

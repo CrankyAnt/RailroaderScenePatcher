@@ -1,28 +1,42 @@
 version: 2
 updates:
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      minor-and-patch:
-        patterns: ['*']
-        update-types: [minor, patch]
-    ignore:
-      - dependency-name: CrankyAnt/SharedWorkflows/.github/workflows/*
   - package-ecosystem: nuget
-    directories:
-      - /Src/RailroaderScenePatcher.Core
-      - /Src/RailroaderScenePatcher
-      - /Tests/RailroaderScenePatcher.Core.Tests
-      - /Tests/NativeObservation
+    directory: /Src/RailroaderScenePatcher.Core
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
     groups:
       minor-and-patch:
-        patterns: ['*']
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: nuget
+    directory: /Src/RailroaderScenePatcher
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: nuget
+    directory: /Tests/RailroaderScenePatcher.Core.Tests
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: nuget
+    directory: /Tests/NativeObservation
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        patterns: ["*"]
         update-types: [minor, patch]
