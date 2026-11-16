@@ -10,18 +10,35 @@ This context covers scene changes supplied by map mods and made in the Railroade
 
 These terms retain the meanings in Railroader's [asset-pack guide](https://docs.railroadergame.com/modding/asset-packs/), [map-modding guide](https://docs.railroadergame.com/modding/map-modding/) and [load-order reference](https://docs.railroadergame.com/modding/load-order/).
 
-**Asset pack**:
-The package in which a Railroader mod distributes its content, including definitions, data, scripts or bundled assets. A pack and a Map definition within it are distinct.
+**Mod**:
+An addition to Railroader that a player enables in the game's mod list, for a new game or an existing save, and can disable again, except the mod that supplies a save's map. Its package holds definitions, data, scripts or bundled assets; the game's code calls it a pack.
+_Avoid_: Asset pack, MapMod
 
 **Map definition**:
-The game's identified definition of a selectable map, with its map data, referenced map layers and terrain sources. A definition and its containing asset pack are distinct.
+The game's identified definition of a selectable map, with its map data, referenced map layers and terrain sources. A definition and the mod that contains it are distinct.
 
 **Map layer**:
 A Map definition referenced by another Map definition as inherited map content. An inherited layer is source context, not another active edit target.
 _Avoid_: Native map layer
 
+**Map**:
+The Map definition a player chooses when starting a new game. The save keeps that map.
+
+**Map-adding mod**:
+A mod that supplies a selectable Map definition. A mod can be both map-adding and map-changing.
+
+**Map-changing mod**:
+A mod whose content applies to a map it does not supply, such as the base-game map, through the game's map-changing scripts or through a scene-patch document. A mod can be both map-changing and map-adding.
+
+**Target map**:
+The Map definition that a scene-patch document names. The document applies when that map, or a map that inherits it as a map layer, is loaded.
+
+**DLL mod**:
+A mod that adds code to the game itself rather than map content. The Scene Patcher is a DLL mod.
+_Avoid_: Script mod
+
 **Load order**:
-The order in which Railroader loads enabled asset packs. It is distinct from the order in which map layers compose a map.
+The order in which Railroader loads enabled mods. It is distinct from the order in which map layers compose a map.
 _Avoid_: Native pack load order
 
 ### Unity terminology
@@ -36,9 +53,6 @@ _Avoid_: Source scene
 
 These are project terms for editing and applying scene patches, not additional Railroader definition types or Unity object types.
 
-**MapMod**:
-An asset pack that supplies a Railroader Map definition or changes to a map. This includes modifications to an existing map and packs that provide a new map.
-
 **Scene object**:
 An object in a Unity scene loaded for the map that may have physical placement, activity, logical relationships, or dependent state.
 
@@ -49,16 +63,16 @@ A board scene object whose physical placement is independent of any logical trac
 Content generated for terrain tiles from the current scene state, including vegetation affected by an independent board.
 
 **Scene patch**:
-MapMod-supplied desired changes to supported scene objects and their relationships.
+Mod-supplied desired changes to supported scene objects and their relationships.
 _Avoid_: Patch history, movement script
 
 **Patch document**:
-The document that expresses a MapMod's scene patch.
+The document that expresses a mod's scene patch.
 _Avoid_: Patch history
 
-**MapMod value**:
-A value that a supplying MapMod's patch document sets for a scene object. Without it, the object keeps its effective underlying state.
-_Avoid_: Authored value, authored state, authored binding, authored activity
+**Mod value**:
+A value that a supplying mod's patch document sets for a scene object. Without it, the object keeps its effective underlying state.
+_Avoid_: MapMod value, authored value, authored state, authored binding, authored activity
 
 **Physical placement**:
 An object's position and rotation in the map.
@@ -78,7 +92,7 @@ Physical placement defined relative to a selected track or one of its endpoints.
 A supported scene object that already exists in the loaded map context and is identified for a scene patch.
 
 **Modded object**:
-An existing scene object that a MapMod's scene patch changes.
+An existing scene object that a mod's scene patch changes.
 _Avoid_: Authored object
 
 **Supported operation**:
@@ -91,7 +105,7 @@ A single user-recognizable scene change with one outcome and one restoration bou
 An object's membership in a game-managed graph or other structure that makes it available to related game behavior.
 
 **Added object**:
-A scene object that a MapMod's scene patch adds, rather than an existing object in the loaded map. Native objects that are new to a particular MapMod are not automatically added objects.
+A scene object that a mod's scene patch adds, rather than an existing object in the loaded map. Native objects that are new to a particular mod are not automatically added objects.
 _Avoid_: Authored addition
 
 **Existing crossing**:
@@ -101,12 +115,13 @@ _Avoid_: New standalone crossing
 **Map context**:
 The loaded map and resolved map layers against which scene-patch targets are identified.
 
-**Supplying MapMod**:
-The MapMod that owns a scene-patch document, regardless of which source map or pack contains a target object.
-_Avoid_: Target owner
+**Supplying mod**:
+The mod that owns a scene-patch document, regardless of which source map or mod contains a target object.
+_Avoid_: Supplying MapMod, target owner
 
-**Active edited MapMod**:
-The supplying MapMod that owns the selected Map definition being edited in the editor. Other packs can supply inherited content without becoming edit targets.
+**Edited mod**:
+The supplying mod that owns the selected Map definition being edited in the editor; it is always a map-adding mod. Other mods can supply inherited content without becoming edit targets.
+_Avoid_: Active edited MapMod
 
 **Load attempt**:
 One pass in which a player's game applies its scene patches to the loaded world. Loading the same map again starts a new load attempt, which checks each patched object again by its identity.
@@ -115,10 +130,10 @@ One pass in which a player's game applies its scene patches to the loaded world.
 A loaded map whose scene objects a later load attempt in the same map context may find kept or rebuilt. A kept object keeps its state; a rebuilt object receives its modification as new.
 
 **Effective underlying state**:
-The state that remains for an existing object without a particular modification by its supplying MapMod, including the applicable native context and other retained modifications in that editing or runtime context.
+The state that remains for an existing object without a particular modification by its supplying mod, including the applicable native context and other retained modifications in that editing or runtime context.
 
 **Informational overlap notice**:
-A notice that applicable patch documents from different supplying MapMods attempt to modify the same resolved existing scene object. It indicates possible incompatibility, not a proven conflict.
+A notice that applicable patch documents from different supplying mods attempt to modify the same resolved existing scene object. It indicates possible incompatibility, not a proven conflict.
 
 **Supported source pattern**:
 A supported equipment behavior with its required components, relationships and available dependent data. A model name or visual resemblance alone does not identify a pattern.
@@ -127,7 +142,7 @@ A supported equipment behavior with its required components, relationships and a
 An available equipment source that conforms to a supported source pattern and satisfies its applicable requirements.
 
 **Format version**:
-The version that identifies the meaning of patch-document data. It is separate from the release versions of the patcher and supplying MapMod.
+The version that identifies the meaning of patch-document data. It is separate from the release versions of the patcher and supplying mod.
 
 **Checked build**:
 A Railroader build for which the patcher's relevant game functions and prerequisites have been explicitly checked.
@@ -143,32 +158,32 @@ _Avoid_: Group-following object
 An object's dependence on its track group, through which enabling or disabling the group changes the object's activity.
 
 **Explicit disable**:
-A MapMod value that holds an object inactive, which takes precedence over later track-group activation.
+A Mod value that holds an object inactive, which takes precedence over later track-group activation.
 
 **Circuit**:
 One detection unit of an existing crossing's controller, whose approach and island spans decide when the crossing's equipment activates.
 
 **Crossing coverage**:
-The tracks each circuit of an existing crossing detects, set per circuit by a MapMod as omitted, explicitly selected tracks or explicitly detached. Proximity never assigns it.
+The tracks each circuit of an existing crossing detects, set per circuit by a mod as omitted, explicitly selected tracks or explicitly detached. Proximity never assigns it.
 
 **Owned span**:
-A detection span that a MapMod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; native spans are never removed.
+A detection span that a mod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; native spans are never removed.
 
 **Detection addition**:
-A circuit that a MapMod adds at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying MapMod. It adds detection without changing the crossing's native circuits. It is not an Added object.
+A circuit that a mod adds at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying mod. It adds detection without changing the crossing's native circuits. It is not an Added object.
 _Avoid_: Authored addition
 
 **Modification**:
-An entry in a patch document, identified by its modification ID, that holds a MapMod's desired state for one existing scene object.
+An entry in a patch document, identified by its modification ID, that holds a mod's desired state for one existing scene object.
 
 **Patcher dependency**:
-A supplying MapMod's declared dependency on the patcher, with the minimum patcher version that the MapMod requires.
+A supplying mod's declared dependency on the patcher, with the minimum patcher version that the mod requires.
 
 **Fixed placement**:
 Physical placement at a fixed pose in map coordinates, independent of any track. It is distinct from track-following placement.
 
 **Owned state**:
-State that a MapMod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.
+State that a mod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.
 
 **Guarded retry**:
 A retry of an operation whose mutation failed, blocked until the cleanup of the failed attempt is verified or the world reloads.
