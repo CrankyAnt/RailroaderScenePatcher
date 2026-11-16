@@ -11,7 +11,7 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     // Reads serialized bindings and direct references, never binding/cache getters or TryApply.
-    internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene {
+    internal sealed class NativeInventory : ISteppedInspectionScene, IRelatedInspectionScene, IOwnedObjectScene {
         // Observes one component with what the last discovery learned about the rest of the scene: who references what,
         // the graph's segments and the setup holders. A discovery sets it when that knowledge is complete.
         static Func<Component, string, SceneObservation> observer;
@@ -26,6 +26,10 @@ namespace RailroaderScenePatcher {
             var family = component == null ? null : Family(component);
             return family == null ? null : observer(component, family);
         }
+        // Added crossing equipment is the patcher's own runtime state, not inventory.
+        // The wrapper of an addition is its added object and stays inventory; the copy's parts below it do not.
+        public bool IsOwned(object handle) => handle is GameObject go && go != null && go.GetComponent<OwnedEquipment>() == null && OwnedEquipment.Of(go) != null;
+        static bool CopyPart(Component c) => !(c is OwnedEquipment) && OwnedEquipment.Of(c.gameObject) != null;
         public bool Present(object handle) => handle is GameObject target && target != null && target.scene.IsValid() && target.scene.isLoaded;
         // The observed components of the object's hierarchy, which holds the lights, gates and bells of a crossing, and
         // for a crossing the spans this patcher owns in its scene: a coverage edit creates and removes those.
@@ -38,7 +42,7 @@ namespace RailroaderScenePatcher {
             var found = new List<SceneObservation>();
             foreach (var root in roots)
                 foreach (var component in root.GetComponentsInChildren<MonoBehaviour>(true)) {
-                    if (!Loaded(component)) continue;
+                    if (!Loaded(component) || CopyPart(component)) continue;
                     var family = Family(component);
                     if (family != null) found.Add(observer(component, family));
                 }
@@ -126,7 +130,10 @@ namespace RailroaderScenePatcher {
             try { starters = TrackMarkerWorld.StarterSetups(); }
             catch (Exception e) { starters = StarterSetups.Unreadable(e.GetBaseException().Message); }
         }
+        internal const string AddedEquipmentFamily = CommandBand.AddedEquipmentFamily;
         static string Family(Component c) {
+            // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
+            if (c is OwnedEquipment) return AddedEquipmentFamily;
             var type = TypeName(c); var go = c.gameObject;
             if (type == Milepost) return "Milepost";
             if (type == Marker) {
@@ -237,7 +244,10 @@ namespace RailroaderScenePatcher {
                     } catch (Exception e) { graphError = e.GetBaseException().Message; }
                     if (whole || observer == null || (referrerError == null && scanErrors == 0)) observer = (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden, markerIds);
                 },
-                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden, markerIds));
+                (component, family) => Observe(component, family, incoming, working, scanErrors, segmentIds, graphError, boardRefusal, markerReferrers, referrerError, setups, culled, hidden, markerIds),
+                // Equipment the patcher added is edited through its crossing controller; its culling, initialization and history
+                // steps are the patcher's own changes and must not make the inventory stale.
+                component => CopyPart(component));
             foreach (var step in steps) yield return step;
         }
         static bool Transient(Transform child, Transform root) {
@@ -417,7 +427,7 @@ namespace RailroaderScenePatcher {
                 var type = MarkerKind(marker);
                 if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
             });
-            else if (!board && !bridge && !pad && !crossing && !starter) only = CommandBand.NotYetSupported("the " + family + " family");
+            else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter);
             if (only != null) markerEditable = false;
             var structure = only != null ? null : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
             var operations = only != null ? only : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
@@ -426,8 +436,10 @@ namespace RailroaderScenePatcher {
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
                 : pad ? CommandBand.NotEditable(padRefusal)
-                : coverageEditable ? "Crossing coverage: select tracks for, or detach, each circuit explicitly, or add detection for explicitly selected extra tracks; native spans stay registered and the crossing itself does not move"
+                : coverageEditable ? "Crossing coverage, lights and gates: select tracks for, or detach, each circuit explicitly, add detection for explicitly selected extra tracks, or add eligible lights and gates the controller drives; native spans stay registered and the crossing itself does not move"
                 : CommandBand.NotEditable(coverageRefusal);
+            // An added light or gate is edited on its crossing's Connections tab, not as an object of its own.
+            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.Id, added.Scope); }
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {

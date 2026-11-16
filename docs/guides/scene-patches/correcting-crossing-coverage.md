@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Correct the detection coverage of an existing crossing
 
-This guide shows how to move the train detection of an existing grade crossing from an old route to the tracks you choose, or how to detach a circuit, in the native map editor or in `Data/scene-patches.json`. It applies to existing crossings only. To make a crossing detect a track it does not cover yet, see [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). This guide does not create new crossings or change lights, gates, bells, models, signals, CTC or interlocking.
+This guide shows how to move the train detection of an existing grade crossing from an old route to the tracks you choose, or how to detach a circuit, in the native map editor or in `Data/scene-patches.json`. It applies to existing crossings only. To make a crossing detect a track it does not cover yet, see [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). To add lights and gates, see [add lights and gates to an existing crossing](adding-crossing-equipment.md). This guide does not create new crossings or change bells, models, signals, CTC or interlocking.
 
 ## How a crossing detects trains
 

@@ -232,6 +232,19 @@ static class CommandBandTests {
             "The details of a world choice open only once something was clicked");
         Check(CommandBand.NotEditable("the marker is inside a crossing") == "Not editable: the marker is inside a crossing", "An object of a supported family that cannot be edited keeps its own reason");
         Check(!CommandBand.NotEditable("x").StartsWith(InventoryPresentationState.InspectionOnlyGroup, StringComparison.Ordinal), "The refusal's wording does not use the name of the Inspection only group");
+        // An added light or gate is a supported family: its edits are on its crossing's Connections tab, so it is listed
+        // under its own family, not Inspection only, and its object says where it is edited.
+        Check(CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false) == null && CommandBand.InspectionOnly("Crossing light", false).StartsWith("Not yet supported: ", StringComparison.Ordinal)
+            && CommandBand.InspectionOnly("Crossing light", true) == null, "An added light or gate is not inspection only; another family without an edit is");
+        var operations = CommandBand.AddedEquipmentOperations("signal-1-added", "author/pack");
+        Check(operations.Contains("Connections tab") && CommandBand.Refusal(operations) == null && !operations.StartsWith("Not yet supported", StringComparison.Ordinal), "Its supported edits name the crossing's Connections tab: " + operations);
+        var added = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "RailroaderScenePatcher.OwnedEquipment"), CommandBand.AddedEquipmentFamily, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], operations, null, null, null, CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false));
+        var light = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/Signal 1", "Lamp"), "Crossing light", true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "x", null, null, null, CommandBand.InspectionOnly("Crossing light", false));
+        var listed = InventoryPresentationState.Groups(new[] { added, light });
+        Check(listed.Count == 2 && listed[0].Key == CommandBand.AddedEquipmentFamily && listed[0].Value.Single() == added && listed[1].Key == InventoryPresentationState.InspectionOnlyGroup && listed[1].Value.Single() == light,
+            "The added light or gate has its own family folder; only the light without an edit is Inspection only: " + String.Join(", ", listed.Select(g => g.Key)));
         // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
         Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
         Check(CommandBand.SharedPath(2) == "2 objects share this hierarchy path and component, so a patch cannot name one of them"

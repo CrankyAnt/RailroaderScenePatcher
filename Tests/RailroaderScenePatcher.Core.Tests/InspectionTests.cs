@@ -93,6 +93,8 @@ static class InspectionTests {
         Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == mutationCount, "Changed binding after inspection cannot authorize a placement edit");
         SteppedFreshness();
         ComponentsLeavingDuringAPass();
+        OwnedRuntimeObjectsDoNotMakeTheSnapshotStale();
+        AnEquipmentEditAddsNoInventoryEntries();
         EditFeedbackNamesEveryRefusal();
         StaleNoticePromisesOnlyWhatPinRefuses();
         ProblemsFilterLimitsTheOutliner();
@@ -147,7 +149,7 @@ static class InspectionTests {
 
     // A loaded component of a controlled scene. Using it after it left the scene fails, as a destroyed native component does.
     sealed class Part {
-        public string Name, Family; public bool Gone, Active = true; public Part Refers; public readonly object Handle = new object();
+        public string Name, Family; public bool Gone, Active = true, Owned; public Part Refers; public readonly object Handle = new object();
     }
     sealed class PartScene : ISteppedInspectionScene {
         public IEnumerable<string> MapIds => new[] { "map" };
@@ -170,12 +172,34 @@ static class InspectionTests {
                 },
                 () => Reads.Add("reads done"), part => Use(part, "classify").Family, () => Reads.Add("classified"),
                 (part, family) => new SceneObservation(Use(part, "observe").Handle, new TargetIdentity("scene", part.Name, "Component"), family, part.Active, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
-                    new string[0], referrers.TryGetValue(part, out var found) ? found.ToArray() : new string[0], new string[0], "Inspection only"));
+                    new string[0], referrers.TryGetValue(part, out var found) ? found.ToArray() : new string[0], new string[0], "Inspection only"),
+                part => part.Owned);
         }
     }
     // A paused pass meets components that left the scene since its search. A component no observation depends on, such as
     // a widget of a rebuilt panel, changes no observation and must not mark the snapshot stale; a component an observation
     // depends on must.
+    // Crossing equipment the patcher added toggles with culling, initializes later, and appears, moves and disappears with
+    // native Undo and Redo. Those are the patcher's own changes: they must not make the snapshot stale, while a change of a
+    // map object still must.
+    static void OwnedRuntimeObjectsDoNotMakeTheSnapshotStale() {
+        var scene = new PartScene();
+        Part native, copy, copyOwner;
+        scene.Parts.Add(native = new Part { Name = "Grade Crossing/Signal 1/Gate", Family = "Crossing gate" });
+        scene.Parts.Add(copy = new Part { Name = "Grade Crossing/CrankyAnt equipment/Signal 1/Gate", Family = "Crossing gate", Owned = true });
+        scene.Parts.Add(copyOwner = new Part { Name = "Grade Crossing/CrankyAnt equipment", Owned = true, Refers = native });
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        Check(inventory.Entries.Count == 1 && inventory.Entries[0].Identity.Path == native.Name && inventory.Entries[0].Dependencies.Count == 0,
+            "Owned objects are neither observed nor read as referrers: " + String.Join(", ", inventory.Entries.Select(e => e.Identity.Path)));
+        copy.Active = false; inventory.CheckFreshness();
+        Check(!inventory.IsStale, "Culling the added copy keeps the snapshot fresh: " + inventory.StaleReason);
+        copy.Active = true; copy.Gone = true; inventory.CheckFreshness();
+        Check(!inventory.IsStale, "Removing the added copy, as an Undo does, keeps the snapshot fresh: " + inventory.StaleReason);
+        scene.Parts.Add(new Part { Name = "Grade Crossing/CrankyAnt equipment 2/Signal 1/Gate", Family = "Crossing gate", Owned = true }); inventory.CheckFreshness();
+        Check(!inventory.IsStale, "Rebuilding an added copy, as a Redo does, keeps the snapshot fresh: " + inventory.StaleReason);
+        native.Active = false; inventory.CheckFreshness();
+        Check(inventory.IsStale && inventory.StaleReason.Contains(native.Name), "A change of a map object still marks the snapshot stale: " + inventory.StaleReason);
+    }
     static void ComponentsLeavingDuringAPass() {
         PartScene Parts(out SceneInventory inventory, out Part widget, out Part sign, out Part holder, out Part board) {
             var scene = new PartScene();
@@ -841,6 +865,51 @@ static class InspectionTests {
         public SceneObservation Observe(object handle, TargetIdentity identity) => All.FirstOrDefault(o => ReferenceEquals(o.Handle, handle));
         public IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity) => Related(handle);
         public bool Present(object handle) => All.Any(o => ReferenceEquals(o.Handle, handle));
+    }
+    // A scene that also holds objects the patcher created at runtime.
+    sealed class OwningScene : IRelatedInspectionScene, IOwnedObjectScene {
+        public readonly RelatedScene Inner = new RelatedScene();
+        public readonly HashSet<object> Owned = new HashSet<object>();
+        public IEnumerable<string> MapIds => Inner.MapIds;
+        public IEnumerable<SceneObservation> Discover() => Inner.Discover();
+        public SceneObservation Observe(object handle, TargetIdentity identity) => Inner.Observe(handle, identity);
+        public IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity) => Inner.ObserveRelated(handle, identity);
+        public bool Present(object handle) => Inner.Present(handle);
+        public bool IsOwned(object handle) => Owned.Contains(handle);
+    }
+    // Applying a light or gate copies a lamp and a gate beneath the crossing. The re-observation of the crossing's
+    // hierarchy after the edit meets them, and so would any discovery that does not leave them out; they are the
+    // patcher's own state. The snapshot keeps its count, and the next check agrees with the scene.
+    static void AnEquipmentEditAddsNoInventoryEntries() {
+        object crossing = new object(), lamp = new object(), copyLamp = new object(), copyGate = new object();
+        SceneObservation Of(object handle, string path, string family) => new SceneObservation(handle, new TargetIdentity("scene", path, "Component"), family, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Inspection only");
+        var scene = new OwningScene();
+        scene.Inner.All.AddRange(new[] { Of(crossing, "crossing", "Crossing controller"), Of(lamp, "crossing/Signal 1", "Crossing light") });
+        scene.Inner.Related = handle => scene.Inner.All.ToArray();
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        Check(inventory.Entries.Count == 2, "The snapshot holds the crossing and its native light");
+        scene.Owned.Add(copyLamp); scene.Owned.Add(copyGate);
+        scene.Inner.All.Add(Of(copyLamp, "crossing/CrankyAnt equipment/Signal 1", "Crossing light"));
+        scene.Inner.All.Add(Of(copyGate, "crossing/CrankyAnt equipment/Signal 1/Gate", "Crossing gate"));
+        var updated = inventory.ReobserveRelated(inventory.Entries[0]);
+        Check(updated != null && inventory.Entries.Count == 2 && !inventory.Entries.Any(e => scene.Owned.Contains(e.Handle)), "The edit's re-observation adds no entry for the copy: " + inventory.Entries.Count);
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "The next check agrees with the scene: " + inventory.StaleReason);
+        while (inventory.CompletedPasses == 0 && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
+        Check(!inventory.IsStale, "A stepped pass agrees as well: " + inventory.StaleReason);
+        inventory.Refresh();
+        Check(inventory.Entries.Count == 2, "A refresh does not count the copy either: " + inventory.Entries.Count);
+        // The addition itself is an added object: its own entry is taken by the edit's re-observation and by a refresh
+        // alike, so the count stays consistent; only the copy's parts stay out.
+        object wrapper = new object();
+        scene.Inner.All.Add(Of(wrapper, "crossing/CrankyAnt equipment", "Added light or gate"));
+        updated = inventory.ReobserveRelated(inventory.Entries[0]);
+        Check(updated != null && inventory.Entries.Count == 3 && inventory.Entries.Any(e => ReferenceEquals(e.Handle, wrapper)), "The added object enters with the edit: " + inventory.Entries.Count);
+        inventory.CheckFreshness();
+        Check(!inventory.IsStale, "The next check agrees: " + inventory.StaleReason);
+        inventory.Refresh();
+        Check(inventory.Entries.Count == 3, "A refresh counts the added object once and its parts not at all: " + inventory.Entries.Count);
     }
     // An edit of a crossing's coverage changes the crossing, changes the bell that reads its circuits and adds spans the
     // patcher owns; clearing it removes those spans again. The inventory follows without discovering the scene.

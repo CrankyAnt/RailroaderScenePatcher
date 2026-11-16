@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, IDisposable {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IDisposable {
         // The observation of one object, when the inspection source can make it.
         public SceneObservation Observe(object handle, TargetIdentity identity) {
             return inspection is ITargetedInspectionScene targeted ? targeted.Observe(handle, identity) : inspection?.Discover().FirstOrDefault(o => ReferenceEquals(o.Handle, handle) && o.Identity.Component == identity.Component);
@@ -94,8 +94,12 @@ namespace RailroaderScenePatcher.Core {
             if (owner is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
         }
+        // Equipment sources and additions belong to the adapter that resolved the object.
+        public IReadOnlyList<SourceCandidate> EquipmentCandidates(object target) => Owner(target) is ICrossingEquipmentScene equipment ? equipment.EquipmentCandidates(target) : throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
+        public string EquipmentStatus(object target, string scope, string id) => Owner(target) is ICrossingEquipmentScene equipment ? equipment.EquipmentStatus(target, scope, id) : null;
         // Only the adapter that resolved the object can confirm it; an object no adapter resolved is not confirmed.
         public bool StillIdentifies(object target, TargetIdentity identity) =>
             target != null && owners.TryGetValue(target, out var owner) && owner.Capability != Capability.Incompatible && owner is ITargetConfirmation confirmation && confirmation.StillIdentifies(target, identity);

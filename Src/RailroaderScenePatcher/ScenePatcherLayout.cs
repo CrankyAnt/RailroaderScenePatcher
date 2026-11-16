@@ -307,9 +307,9 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Report("Copy ID", "Copy identity failed: " + e.GetBaseException().Message); }
         }
 
-        // No supported operation adds a scene object yet: a detection addition adds a circuit to an existing crossing
-        // and is not an added object. The marker and the badge are ready for the first operation that does.
-        bool IsAdded(SceneObservation entry) => false;
+        // A light or gate the patcher added is an added object: the outliner marks it with "+" and the state line with
+        // + ADDED. A detection addition adds a circuit to an existing crossing and is not an added object.
+        bool IsAdded(SceneObservation entry) => entry?.Family == NativeInventory.AddedEquipmentFamily;
         bool IsChanged(SceneObservation entry) {
             try { return attachment != null && attachment.Session.IsChanged(entry.Identity); } catch { return false; }
         }
@@ -401,7 +401,7 @@ namespace RailroaderScenePatcher {
                         // A click on the row that is inspected already clears the inspection; so does Escape over the panel.
                         if (CommandBand.ClearsInspection(selected, observation)) { ClearInspection(); return; }
                         if (!inventoryPresentation.CanSelect(inventory, observation)) return;
-                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPlacement();
+                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPlacement();
                     })();
                 });
                 var listLayout = outline.GetComponent<LayoutElement>();
@@ -681,7 +681,7 @@ namespace RailroaderScenePatcher {
                     // A native circuit is named by its island span, a detection addition by its ID.
                     var name = DetectionAddition.Id(key) == null ? "Circuit " + key : "Detection addition " + DetectionAddition.Id(key);
                     Field(builder, name, value.ToString());
-                    Button(builder, "Edit " + name, () => { OpenedForm(null); coverageCircuit = key; coverageAddition = DetectionAddition.Id(key); preparedCoverage = null; ReadCoverage(value); }).Inactive(wait != null)
+                    Button(builder, "Edit " + name, () => { OpenedForm(null); CloseEquipmentForm(); coverageCircuit = key; coverageAddition = DetectionAddition.Id(key); preparedCoverage = null; ReadCoverage(value); }).Inactive(wait != null)
                         .Tooltip("Edit " + name, CommandBand.Tooltip(DetectionAddition.Id(key) == null ? "Select the tracks this circuit covers, or detach it. Circuits you do not edit keep their coverage." : "Change the tracks of this detection addition, or delete it.", wait));
                 }
                 if (current.Residue.Count > 0) builder.AddLabel(Tint(Amber, "Owned spans left by an incomplete cleanup: " + String.Join(", ", current.Residue) + ". Use Recheck in the footer."));
@@ -702,11 +702,80 @@ namespace RailroaderScenePatcher {
                         var id = (newAddition ?? "").Trim();
                         if (id.Length == 0) { feedback.Refuse(CoveragePlace, "Detection addition", "give the addition an ID first"); return; }
                         var existing = circuits.Circuits.FirstOrDefault(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == id);
-                        coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value);
+                        CloseEquipmentForm(); coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value);
                         OpenedForm("Detection addition " + id + " is open at the top of this tab: select its tracks, then Preview.");
                     }).Inactive(wait != null).Tooltip("Add detection with this ID", CommandBand.Tooltip("Make the crossing detect an extra track: give the addition an ID that is unique in this MapMod's patch document, then select its tracks.", wait));
                 });
             }
+        }
+        // Lights and gates added to the crossing: copies of eligible devices already loaded in the crossing's scene, which the
+        // crossing controller drives. The open form stands first; the tab's pinned row holds Preview, Remove and Apply for it.
+        // Every device the editor considers is listed: an eligible one with its Use button, a rejected one with its reason.
+        // The open light or gate form stands first in the Connections tab, above the replacement targets it does not use,
+        // so the scrolling tab body shows its ID and position at its least height; its source is one line with the full
+        // path in the tooltip.
+        void DrawEquipmentForm(UIPanelBuilder builder) {
+            var block = EditBlock();
+            {
+                Section(builder, "Light or gate " + (equipmentFields[0] ?? ""));
+                Line(builder, Literal("Source " + equipmentSource), "Source", equipmentSource.ToString());
+                FieldLabel(builder, "Equipment ID");
+                if (block != null) Line(builder, Literal(equipmentFields[0] ?? ""), "Equipment ID", block, 30);
+                else {
+                    var idInput = builder.AddInputField(equipmentFields[0] ?? "", value => equipmentFields[0] = value);
+                    idInput.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => { equipmentFields[0] = value; preparedEquipment = null; FieldsChanged(); });
+                    idInput.Tooltip("Equipment ID", "The persistent ID of this light or gate in this MapMod's patch document: letters, digits, '.', '_' or '-'.");
+                }
+                ValueRow(builder, "Position", "m", new[] { "X", "Y", "Z" }, equipmentFields, 1, block, "The copy's position in map coordinates.", column => true);
+                ValueRow(builder, "Rotation", "°", new[] { "X", "Y", "Z" }, equipmentFields, 4, block, "The copy's rotation in degrees.", column => true);
+                Section(builder, "Preview");
+                if (preparedEquipment == null) Line(builder, "None", null, null);
+                else if (preparedEquipment.Preview.Error != null) builder.AddLabel(Tint(Red, "Preview refused: " + CommandBand.Sentence(preparedEquipment.Preview.Error)));
+                else foreach (var line in preparedEquipment.Preview.Lines) PlainLabel(builder, Breakable(line));
+            }
+        }
+        // The crossing's lights and gates and the devices offered as sources, below its coverage.
+        void DrawEquipment(UIPanelBuilder builder) {
+            var identity = selected.Identity;
+            var block = EditBlock();
+            var wait = ChoiceBlock ?? block;
+            Section(builder, "Lights and gates");
+            CrossingEquipment current = null;
+            IReadOnlyList<EquipmentEntry> mine = Array.Empty<EquipmentEntry>();
+            if (attachment != null) try { current = attachment.Session.Equipment(identity); mine = attachment.Session.EquipmentEntries(identity); }
+                catch (Exception e) { builder.AddLabel(Tint(Red, "Lights and gates unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
+            if (current != null) {
+                var others = current.Additions.Where(a => a.Scope != attachment.Session.DocumentKey).ToArray();
+                if (mine.Count == 0 && others.Length == 0) Line(builder, "None added", null, null);
+                // This mod's additions come from its document, so one whose build failed is listed with its reason and can
+                // be edited or removed.
+                foreach (var entry in mine) {
+                    var item = entry.Built ?? entry.Addition;
+                    string state = null;
+                    if (entry.Built != null) try { state = attachment.Session.EquipmentStatus(identity, item.Id); } catch (Exception e) { state = "state unknown: " + e.GetBaseException().Message; }
+                    if (entry.Problem != null) FieldMarkup(builder, "Light or gate " + item.Id, Literal(Breakable(item.ToString()) + ".") + " " + Tint(Red, "Not built: " + CommandBand.Sentence(entry.Problem)));
+                    else Field(builder, "Light or gate " + item.Id, Breakable(item.ToString()) + (state == null ? "" : ". " + CommandBand.Sentence(state)));
+                    var document = entry.Addition;
+                    Button(builder, "Edit " + item.Id, () => ReadEquipment(document)).Inactive(wait != null)
+                        .Tooltip("Edit light or gate " + item.Id, CommandBand.Tooltip(entry.Problem == null ? "Change this copy's placement, or remove it." : "Correct this light or gate, or remove it.", wait));
+                }
+                foreach (var item in others)
+                    Field(builder, "Light or gate " + item.Id, Breakable(item.ToString()) + " (another MapMod's addition; read only)");
+            }
+            Section(builder, "Add a light or gate");
+            IReadOnlyList<SourceCandidate> candidates = null;
+            if (attachment != null) try { candidates = attachment.Session.EquipmentSources(identity); }
+                catch (Exception e) { builder.AddLabel(Tint(Red, "Sources unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
+            if (candidates == null) return;
+            Line(builder, candidates.Count(c => c.Eligible) + " eligible and " + candidates.Count(c => !c.Eligible) + " rejected devices in the loaded map", null, null);
+            foreach (var candidate in candidates) {
+                var source = candidate;
+                if (source.Eligible) Button(builder, "Use " + source.Label, () => UseSource(attachment.Session, source)).Inactive(wait != null)
+                    .Tooltip("Use " + source.Source.Path, CommandBand.Tooltip("Copy this device to this crossing. Its lamps and gates work through the crossing controller's lights and gates keys.", wait));
+                else Field(builder, "Rejected " + source.Label, Breakable(source.Source.Path) + ": " + CommandBand.Sentence(source.Problem));
+            }
+            if (candidates.Any(c => !c.Eligible))
+                Button(builder, "Why a device is rejected", () => Application.OpenURL(GuideRoot + "adding-crossing-equipment.md#rejected-sources")).Tooltip("Why a device is rejected", "Open the rejection reasons in the guide in the browser.");
         }
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
         // adapter refuses, such as a milepost's, or that the operation is for markers and pads. It is one plain sentence
@@ -743,6 +812,7 @@ namespace RailroaderScenePatcher {
             var pad = selected.Identity.Structure == CrossingPadScene.Structure;
             var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure;
             var block = marker ? EditBlock() : BindingUnavailable();
+            if (coverage && coverageCircuit == null && equipmentSource != null) DrawEquipmentForm(builder);
             Section(builder, "Replacement targets");
             // A starter placement marker gives its own reason: its track location belongs to the starter placement workflow.
             var busy = selected.Family == StarterPlacements.Family ? CommandBand.EditReason(selected.Operations)
@@ -752,7 +822,7 @@ namespace RailroaderScenePatcher {
                 Button(row, "Segment", () => BeginSelection(SelectionKind.TrackSegment, selected)).Inactive(busy != null).Tooltip("Replacement segment", CommandBand.Tooltip("Choose a track segment in the world and confirm its identity.", busy));
                 Button(row, "Node", () => BeginSelection(SelectionKind.TrackNode, selected)).Inactive(busy != null).Tooltip("Replacement node", CommandBand.Tooltip("Choose a track node in the world and confirm its identity.", busy));
             }).Height(RowHeight);
-            if (coverage) DrawCoverage(builder);
+            if (coverage) { DrawCoverage(builder); DrawEquipment(builder); }
             Section(builder, pad ? "Crossing pad binding" : "Track binding");
             ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, (pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.") + " End is a or b.", column => column == 2);
             var current = selected.Bindings.Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith("Graph registration", StringComparison.Ordinal)).ToArray();
@@ -980,10 +1050,10 @@ namespace RailroaderScenePatcher {
             var unchanged = block ?? (IsChanged(selected) ? null : "This MapMod does not change this object.");
             return new[] {
                 // The whole modification goes: the control says so in full and takes two cells.
-                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this MapMod's modification. Every circuit returns to its coverage without it, and its detection additions are deleted." : "Remove this MapMod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
+                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this MapMod's modification. Every circuit returns to its coverage without it, and its detection additions and lights and gates are deleted." : "Remove this MapMod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
                     var removed = current.Remove(identity, inspection);
                     // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
-                    if (removed?.Applied == true) CloseCoverageForm();
+                    if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
                     return removed;
                 }), null, 2),
                 Slot("Recheck", "Recheck the object after a failed edit.", block, () => Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection))),
@@ -1037,6 +1107,27 @@ namespace RailroaderScenePatcher {
                     }
                 case ConnectionsTab: {
                     var structure = identity?.Structure;
+                    if (block == null && structure == CrossingCoverageScene.Structure && coverageCircuit == null && equipmentSource != null) {
+                        var session = attachment.Session;
+                        var equipmentId = (equipmentFields[0] ?? "").Trim();
+                        IReadOnlyList<EquipmentEntry> entries = Array.Empty<EquipmentEntry>();
+                        try { entries = session.EquipmentEntries(identity); } catch { }
+                        // Removal applies to an addition the document holds, whether or not it was built.
+                        var inDocument = entries.Any(e => e.Addition.Id == equipmentId);
+                        var prepared = preparedEquipment != null && preparedEquipment.Preview.Error == null ? preparedEquipment : null;
+                        return new[] {
+                            Slot("Preview", "Preview this light or gate.", null, () => {
+                                var value = ParseEquipment(out var problem);
+                                if (value == null) feedback.Refuse(EquipmentPlace, "Equipment preview", problem); else PrepareEquipment(session, identity, value, null);
+                            }),
+                            Slot("Remove", "Preview removing this light or gate.", inDocument ? null : "This light or gate is not in the document yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
+                            Empty,
+                            Slot("Apply", "Apply the previewed change.", prepared == null ? "Preview a change first." : null, () => Edit(EquipmentPlace, "Lights and gates", (edit, inspection) => {
+                                var done = prepared.Addition != null ? edit.AddEquipment(identity, prepared.Addition, inspection) : edit.RemoveEquipment(identity, prepared.RemoveId, inspection);
+                                if (done?.Applied == true && prepared.Addition == null) CloseEquipmentForm();
+                                return done;
+                            }, true)) };
+                    }
                     if (block == null && structure == CrossingCoverageScene.Structure) {
                         var session = attachment.Session;
                         var circuitKey = coverageCircuit; var additionId = coverageAddition;
@@ -1275,9 +1366,10 @@ namespace RailroaderScenePatcher {
                     new[] { "Set, Detach, Clear binding", "Set registers the marker at the entered location. Detach removes it from the track. Clear binding returns it to its underlying binding." },
                     new[] { "Crossing coverage", "Each circuit has an approach A, an island and an approach B. Select the tracks a circuit covers, or detach it; proximity never assigns coverage. Preview shows the result for every circuit before Apply." },
                     new[] { "Detection addition", "Makes the crossing detect an extra track: a circuit of its own with three spans on tracks you select, under an ID you give it. Delete removes it again." },
+                    new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and culls it with its own equipment. A rejected device names why it does not qualify." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Other families", "Mileposts have their own operation." } },
-                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
+                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this MapMod changes on the object and complete outstanding work.",
                 Terms = new[] {
                     new[] { "Remove modification", "In the footer on every tab. Deletes this MapMod's modification. The object returns to its underlying state, not to an earlier patched position." },

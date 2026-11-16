@@ -283,6 +283,7 @@ class Program {
         RetainedWorldTests.Run();
         CoverageTests.RunRetained();
         SubscriptionTests.Run();
+        EquipmentTests.Run();
         Console.WriteLine("PASS: complete document behavior"); return 0;
     }
 }

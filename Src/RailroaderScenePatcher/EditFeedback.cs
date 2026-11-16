@@ -79,6 +79,8 @@ namespace RailroaderScenePatcher {
             try { Log?.Invoke(Result); } catch { }
         }
         // Removes a message that announced a state which has ended, such as a form that closed. Results stay.
+        // Removes the messages of one place, as a new form of that place starts.
+        internal void ClearPlace(string place) { messages.RemoveAll(m => m.Source == place && !m.Kept); }
         internal void Withdraw(string place, string message) { messages.RemoveAll(m => m.Source == place && m.Text == message); }
         // A refusal reads as one label, the action group of the message, followed by plain sentences: what was refused,
         // then why (CommandBand.Sentence), without a second label before the reason.

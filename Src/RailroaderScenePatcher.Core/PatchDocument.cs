@@ -130,9 +130,17 @@ namespace RailroaderScenePatcher.Core {
         // precision the game stores a transform in the old value, so KeepLiterals then keeps its source literal. A pose
         // read back from the game differs from the document's literal below that precision; an edit of one axis would
         // otherwise rewrite the others' text.
+        // The placements of crossing equipment entries with the same key follow the same rule.
         internal static void KeepStoredPrecision(JToken old, JToken value) {
+            KeepPlacementPrecision(old?["placement"], value?["placement"]);
+            if (old?["relationships"]?["crossingEquipment"] is JObject before && value?["relationships"]?["crossingEquipment"] is JObject after)
+                foreach (var entry in after.Properties())
+                    if (before[entry.Name] is JObject was && entry.Value is JObject now) KeepPlacementPrecision(was["placement"], now["placement"]);
+        }
+        static void KeepPlacementPrecision(JToken old, JToken value) {
+            if (!(old is JObject) || !(value is JObject)) return;
             foreach (var member in new[] { "position", "rotation" }) {
-                if (!(old?["placement"]?[member] is JArray items) || !(value?["placement"]?[member] is JArray others)) continue;
+                if (!(old?[member] is JArray items) || !(value?[member] is JArray others)) continue;
                 for (var i = 0; i < items.Count && i < others.Count; i++) {
                     if (!IsNumber(items[i]) || !IsNumber(others[i])) continue;
                     double was = Number(items[i]), now = Number(others[i]);
@@ -162,9 +170,12 @@ namespace RailroaderScenePatcher.Core {
             static readonly Shape Entry = new Shape { Known = new[] { "approachA", "island", "approachB", "detach" }, Member = name => name == "approachA" || name == "island" || name == "approachB" ? Span : Unknown };
             static readonly Shape Entries = new Shape { Member = name => Entry };
             static readonly Shape Coverage = new Shape { Known = new[] { "circuits", "additions" }, Member = name => name == "circuits" || name == "additions" ? Entries : Unknown };
-            static readonly Shape Relationships = new Shape { Known = new[] { "trackMarker", "crossingCoverage", "crossingEquipment" },
-                Member = name => name == "trackMarker" ? Location : name == "crossingCoverage" ? Coverage : Unknown };
             static readonly Shape Placement = new Shape { Known = new[] { "mode", "position", "track", "offset", "rotation" }, Member = name => name == "track" ? Location : Unknown };
+            static readonly Shape Source = new Shape { Known = new[] { "scene", "path" } };
+            static readonly Shape Equipment = new Shape { Known = new[] { "pattern", "source", "placement" }, Member = name => name == "source" ? Source : name == "placement" ? Placement : Unknown };
+            static readonly Shape EquipmentEntries = new Shape { Member = name => Equipment };
+            static readonly Shape Relationships = new Shape { Known = new[] { "trackMarker", "crossingCoverage", "crossingEquipment" },
+                Member = name => name == "trackMarker" ? Location : name == "crossingCoverage" ? Coverage : name == "crossingEquipment" ? EquipmentEntries : Unknown };
             static readonly Shape Target = new Shape { Known = new[] { "scene", "path", "component", "structure" } };
             static readonly Shape Dependencies = new Shape { SortedStrings = true };
             static readonly Shape Starter = new Shape { Known = new[] { "setup", "track" }, Member = name => name == "track" ? Location : Unknown };

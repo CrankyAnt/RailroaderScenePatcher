@@ -63,7 +63,7 @@ A segment or node that is missing, or a distance outside the segment, fails the 
 
 ## Relationships
 
-The `relationships` object accepts `trackMarker` and `crossingCoverage`, and must contain at least one of them. `crossingEquipment` is reserved for the equipment of a crossing. When a patcher version defines it, it is an object keyed by equipment ID, and an entry holds no `id` member. Until then the engine treats `crossingEquipment` as an unknown relationship kind. Each relationship has three settings:
+The `relationships` object accepts `trackMarker`, `crossingCoverage` and `crossingEquipment`, and must contain at least one of them. Each relationship has three settings:
 
 | Setting | Meaning |
 | --- | --- |
@@ -120,6 +120,26 @@ The three spans state the addition's track membership and detection area. The se
 The engine checks an addition before mutation like selected tracks: each segment must exist exactly once, each distance must lie inside its segment and no span may have zero length. An addition counts as detection for the rule that a crossing keeps at least one detecting circuit. A document result that leaves no detecting circuit or addition is refused.
 
 For each addition the engine builds one circuit with three owned spans, registers the spans in the track graph and adds the circuit to the controller after its native circuits. Added circuits follow each other in the order of their scoped identity, which within one mod is the ordinal order of their IDs, not the order of the document text. A repeated application reuses the circuit and every span whose tracks are unchanged, and replaces the spans of a role whose tracks changed. Deleting an addition removes its circuit from the controller, unregisters its spans and destroys them. Native circuits and other additions keep their state.
+
+### Crossing equipment
+
+`crossingEquipment` requires patcher 0.5.0 or later. It is an object keyed by equipment ID, with at least one entry: the lights and gates the supplying mod adds to the target crossing controller. Being listed under the controller's modification is the explicit controller relationship: the controller drives the addition. The key is the persistent ID of the addition: 1 to 64 letters, digits, `.`, `_` or `-`. The patcher scopes it to the supplying mod, so the same ID in another mod's document names a different addition. An ID may appear in one modification of a document; when two modifications use the same equipment ID, both fail with that reason. An entry holds no `id` member and contains exactly these members:
+
+| Field | Type | Requirement |
+| --- | --- | --- |
+| `pattern` | string | Required. The supported source pattern the source must conform to. Version 1 supports `crossing-light-gate-v1`. |
+| `source` | object | Required. `scene` and `path`, both non-empty strings: the Unity scene name and hierarchy path of a device loaded in the map. |
+| `placement` | object | Required. A fixed placement, as under Placement: `mode` `fixed`, `position` and `rotation` in map coordinates, for the root of the copy. |
+
+An addition the document omits stays untouched; this applies to the additions of other mods. Within the edited mod's own document, an addition that the document no longer lists is removed when scene patch editing removes or edits it, and is simply not rebuilt on the next load. A repeated application keeps one copy per scoped ID, moves it to a changed placement, and rebuilds it when its `source` or `pattern` changes.
+
+A `crossingEquipment` value that is not an object or is empty, an empty or invalid key, an entry that is not an object, a missing pattern, a source without a scene or path and a placement that is not fixed each fail the modification as an invalid definition. A key that repeats is a repeated property name and rejects the whole document. Unknown members in an entry, an `id` member included, unknown members in its `source` or `placement`, and a pattern this version does not know make the modification unsupported; it is preserved and not executed.
+
+The engine checks every addition of a modification before any change: the pattern must be supported, the source must resolve to exactly one loaded object and conform to the pattern for the target controller (see [rejected sources](adding-crossing-equipment.md#rejected-sources)). A source that is not loaded, including one in a scene that is not loaded, and an ambiguous source fail the modification. The engine never loads a scene and never substitutes another source.
+
+`crossing-light-gate-v1` requires that each lamp (`Track.KeyValueLampMaterialController`) and gate (`RollingStock.Controls.KeyValueBoolAnimator`) in the source observes the key the controller publishes as its lights or gates key, that lamp targets lie inside the source and use the lamp material, that each gate has an `Animator` and a clip, that the source holds at least one lamp or gate and no crossing controller, key-value object, track span, culler, bell player or missing script, that the source lies in the destination controller's Unity scene, and that the destination controller has exactly one key-value object and at most one culler.
+
+An equipment modification is refused before any change while an addition of the target crossing fails its check. A modification that leaves the crossing's equipment as it is, such as a coverage change, neither checks nor touches the additions.
 
 [Explicit snapping](snapping-to-track.md) writes a fixed placement. Scene patch editing computes a point on the explicitly selected segment's cubic curve or uses the selected node's position, preserving rotation, activity and logical binding. The graph selection and geometry checks belong to editing preflight and are not serialized. Runtime application and reload use the resulting absolute placement without querying a snap target. Snapping adds no dependency minimum; later track movement does not change the saved placement. Track-following placement is the separate mode above.
 
@@ -202,11 +222,13 @@ A `trackMarker` reference on a pad moves the marker's location and graph registr
 
 ### Crossing
 
-The crossing-coverage adapter recognizes an object holding one `Track.Crossings.GradeCrossingController` whose circuit list is non-empty and whose circuits each hold an approach A, island and approach B span with an ID. The target `component` is `Track.Crossings.GradeCrossingController`; set `structure` to `crossing-coverage-v1`. A modification may set only `relationships.crossingCoverage`; `placement`, `active` and `trackMarker` are refused before mutation.
+The crossing-coverage adapter recognizes an object holding one `Track.Crossings.GradeCrossingController` whose circuit list is non-empty and whose circuits each hold an approach A, island and approach B span with an ID. The target `component` is `Track.Crossings.GradeCrossingController`; set `structure` to `crossing-coverage-v1`. A modification may set only `relationships.crossingCoverage` and `relationships.crossingEquipment`; `placement`, `active` and `trackMarker` are refused before mutation.
 
 The adapter records the crossing's circuits and their native spans at its first observation in the load, which requires every native span to be registered in the track graph under its ID. A selected circuit gets three spans owned by the patcher, created disabled under a root that is not saved, given their ID and endpoints and enabled so that the native span lifecycle registers them; a repeated application reuses matching owned spans. The circuit then refers to them. A detached circuit is removed from the controller's circuit list and keeps its native references; the controller evaluates the remaining circuits in their native order from its next pass. A detection addition gets a new circuit set with three owned spans, built the same way, and the controller's list ends with the added sets. The adapter remembers each set it adds by the set's own identity, so an adapter created later over a world that still holds the set reconciles it and does not build a second one. Owned spans that no circuit uses are disabled, which removes their registration, and destroyed.
 
 Before mutation the adapter requires that the controller evaluates only its native circuits in native order followed by the circuits it added, that each native circuit holds its native spans or owned spans, and that every native span stays registered. After a change it verifies each circuit's coverage, each addition's tracks, that no other added circuit remains, those rules, and that exactly the owned spans in use are registered and cover track. A difference fails the modification and restores the captured coverage, which removes a partly built addition and returns the captured additions; owned spans that stay registered after restoration make cleanup unverified and block further operations on the crossing for the load. The native map editor's Save writes neither the controller's references nor the added circuits nor the owned spans, so each load rebuilds them from the document. See [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) and [add detection for extra tracks at an existing crossing](adding-crossing-detection.md) for the scene patch editing route and limits.
+
+For each equipment addition the adapter creates a disabled wrapper with `HideFlags.DontSave` beneath the controller, records the scope, ID, pattern and source on it, instantiates the source beneath it at the placement, and checks that the copy's lamps and gates are its own components, that its gates keep their clip and that the controller's key-value object is the copy's nearest one. It then adds the copy to the controller's `Helpers.Culling.GameObjectCuller` list with the culler's current state and enables the wrapper; the copy's lamps and gates initialize through the game's restore notifier and observe the controller's keys. Removal takes the copy out of the culler list, disables and destroys the wrapper. At its first observation of a controller in a load the adapter adopts wrappers an earlier application left beneath it, so repeated world-load callbacks and retained worlds reconcile instead of duplicating; a crossing that no longer stands under its identity releases its additions with its owned spans. A construction failure removes the partial copy and restores the captured equipment; a copy that cannot be released makes cleanup unverified. See [add lights and gates to an existing crossing](adding-crossing-equipment.md) for the scene patch editing route and limits.
 
 ### Starter placement marker
 
@@ -218,7 +240,7 @@ The game reads the location in `Game.State.CompanyModeSetup.Setup`, which runs w
 
 ## Writing by the native map editor
 
-The native map editor's Save writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark, in the canonical order below. It writes one modification per edited object and gives a new modification the key `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, `starter-<object name>` when it is a starter placement, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. A prefix that the object name already starts with is written once, so the marker `starter-ewh-int2` gets the key `starter-ewh-int2`. Whitespace and comments of the source are not kept.
+The native map editor's Save writes the document as indented UTF-8 JSON with line-feed line endings and no byte-order mark, in the canonical order below. It writes one modification per edited object and gives a new modification the key `place-<object name>`, `bind-<object name>` when its first edit is a track-marker relationship, `cover-<object name>` when it is crossing coverage, `equip-<object name>` when it is crossing equipment, `starter-<object name>` when it is a starter placement, or `follow-<object name>` when its first edit is track following, made unique with a numeric suffix. A prefix that the object name already starts with is written once, so the marker `starter-ewh-int2` gets the key `starter-ewh-int2`. Whitespace and comments of the source are not kept.
 
 Reading a document never reorders it. Only a Save that writes the patch document produces the canonical order, and a Save writes it only when the patch document has an outstanding change.
 
@@ -241,6 +263,8 @@ A Save that writes the patch document writes its content in this order:
 - `crossingCoverage`: `circuits`, `additions`.
 - `starterPlacement`: `setup`, `track`.
 - An entry under `circuits` or `additions`: `approachA`, `island`, `approachB`, `detach`.
+- An entry under `crossingEquipment`: `pattern`, `source`, `placement`.
+- `source`: `scene`, `path`.
 - A span: `from`, `to`.
 - A track location, including a `trackMarker` reference and a `starterPlacement` track: `segment`, `end`, `distance`. A track-following `track` that names an endpoint holds only `node`, and a detach object holds only `detach`.
 - `placement`: `mode`, `position`, `track`, `offset`, `rotation`. A fixed placement uses `mode`, `position`, `rotation`; a track-following placement uses `mode`, `track`, `offset`, `rotation`.
@@ -265,6 +289,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification with `active` whose target `structure` is `track-marker-v1` | `0.5.0` |
 | Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
 | Any modification with `relationships.crossingCoverage`, including a detection addition, a `Track.Crossings.GradeCrossingController` target component, or target `structure` `crossing-coverage-v1` | `0.5.0` |
+| Any modification with `relationships.crossingEquipment` | `0.5.0` |
 | Any modification whose target `structure` is `crossing-pad-v1` | `0.5.0` |
 | Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |
 

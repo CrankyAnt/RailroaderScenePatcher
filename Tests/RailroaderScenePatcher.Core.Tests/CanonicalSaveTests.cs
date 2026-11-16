@@ -233,7 +233,7 @@ static class CanonicalSaveTests {
     // Every object with a fixed member order, written in reverse. An unknown object inside a coverage entry is ordered as
     // unknown content, not as a span, and a dependsOn that is not an array of strings keeps its source form, items included.
     // The modification that holds them targets no loaded object and
-    // names a relationship kind this version does not execute, so it is preserved; the Save of an edit beside it orders it.
+    // names a relationship kind this version does not execute (crossingSignal), so it is preserved; the Save of an edit beside it orders it.
     static void EveryKnownObjectHasItsCanonicalOrder() {
         var source = """
             {
@@ -243,6 +243,7 @@ static class CanonicalSaveTests {
                   "dependsOn": ["move-p"],
                   "placement": { "rotation": [0, 0, 0, 1], "offset": [1, 2, 3], "track": { "distance": 5.0, "end": "a", "segment": "S1" }, "mode": "trackFollowing" },
                   "relationships": {
+                    "crossingSignal": { "z": 1 },
                     "crossingEquipment": { "gate-b": { "z": 1, "a": 2 }, "gate-a": {} },
                     "crossingCoverage": {
                       "additions": { "siding": { "island": {}, "approachB": {}, "approachA": { "to": { "distance": 2, "end": "a", "segment": "S" }, "from": { "distance": 1, "end": "a", "segment": "S" } } } },
@@ -357,6 +358,9 @@ static class CanonicalSaveTests {
                         "a": 2,
                         "z": 1
                       }
+                    },
+                    "crossingSignal": {
+                      "z": 1
                     }
                   },
                   "placement": {

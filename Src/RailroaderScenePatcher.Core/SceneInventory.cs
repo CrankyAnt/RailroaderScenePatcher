@@ -22,6 +22,12 @@ namespace RailroaderScenePatcher.Core {
     // A scene that knows which observations belong with an object: the object itself, the observed parts of its
     // hierarchy and the objects this patcher keeps for it, such as the spans it owns for a crossing. An edit of the
     // object can change, add or remove those and no other observation.
+    // A scene that holds objects this patcher created at runtime, such as added crossing equipment. They are the patcher's
+    // own state, never inventory: the inventory takes no observation of them from any discovery or re-observation, so they
+    // neither add entries nor make the snapshot stale.
+    public interface IOwnedObjectScene {
+        bool IsOwned(object handle);
+    }
     public interface IRelatedInspectionScene : ITargetedInspectionScene {
         // Every current observation that belongs with the object, the object's own included; null when it is gone.
         IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity);
@@ -92,13 +98,15 @@ namespace RailroaderScenePatcher.Core {
     // skips them, as a discovery that starts at that moment would not find them: the observations that depended on them
     // then differ, and a component no observation depends on changes nothing.
     public static class DiscoveryWalk {
-        // read returns false when the owner walk stops: no further owner is read. family returns null for no candidate.
+        // read returns false when the owner walk stops: no further owner is read. family returns null for no candidate. owned
+        // marks the patcher's own runtime objects, such as added crossing equipment: they are dropped at the loaded check, so
+        // they are never read, classified or observed, and their runtime state never makes a snapshot stale.
         public static IEnumerable<SceneObservation> Steps<T>(Func<IEnumerable<T>> find, Func<T, bool> loaded, Func<T, bool> read, Action afterReads,
-            Func<T, string> family, Action beforeObservations, Func<T, string, SceneObservation> observe) {
+            Func<T, string> family, Action beforeObservations, Func<T, string, SceneObservation> observe, Func<T, bool> owned = null) {
             var found = find();
             yield return null;
             var all = new List<T>();
-            foreach (var component in found) { if (loaded(component)) all.Add(component); yield return null; }
+            foreach (var component in found) { if (loaded(component) && (owned == null || !owned(component))) all.Add(component); yield return null; }
             foreach (var owner in all) {
                 if (loaded(owner) && !read(owner)) break;
                 yield return null;
@@ -228,10 +236,13 @@ namespace RailroaderScenePatcher.Core {
             if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
             return new InspectedTarget(maps, entry);
         }
+        // The observations that are inventory: every one except those of the patcher's own runtime objects.
+        IEnumerable<SceneObservation> Inventoried(IEnumerable<SceneObservation> observations) => observations.Where(o => o != null && !Owned(o));
+        bool Owned(SceneObservation observation) => scene is IOwnedObjectScene owned && owned.IsOwned(observation.Handle);
         public void Refresh() {
             // A pass belongs to the snapshot it started against.
             CancelFreshnessCheck();
-            var observations = scene.Discover().ToArray();
+            var observations = Inventoried(scene.Discover()).ToArray();
             maps = scene.MapIds.ToArray(); Entries = Array.AsReadOnly(observations); IsStale = false; StaleReason = null;
         }
         public IEnumerable<SceneObservation> Search(string text) => Entries.Where(e => e.SearchText.IndexOf(text ?? "", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -284,7 +295,8 @@ namespace RailroaderScenePatcher.Core {
         public SceneObservation ReobserveRelated(SceneObservation entry) {
             if (!(scene is IRelatedInspectionScene related)) return Reobserve(entry);
             if (entry == null || !Entries.Any(e => ReferenceEquals(e, entry))) return null;
-            var current = related.ObserveRelated(entry.Handle, entry.Identity)?.Where(o => o != null).ToArray();
+            var observed0 = related.ObserveRelated(entry.Handle, entry.Identity);
+            var current = observed0 == null ? null : Inventoried(observed0).ToArray();
             var observed = current?.FirstOrDefault(o => SameObject(entry, o));
             if (observed == null) return null;
             // A pass belongs to the snapshot it started against.
@@ -316,7 +328,7 @@ namespace RailroaderScenePatcher.Core {
         public void CheckFreshness() {
             if (IsStale) return;
             try {
-                var current = scene.Discover().ToArray();
+                var current = Inventoried(scene.Discover()).ToArray();
                 Conclude(current.Length, Entries.Select(e => current.Count(e.Matches)).ToArray(), Entries.Select(e => current.FirstOrDefault(c => SameObject(e, c))).ToArray());
             } catch (Exception e) { MarkStale("the scene check failed: " + e.GetBaseException().Message); }
             if (IsStale) CancelFreshnessCheck();
@@ -351,7 +363,7 @@ namespace RailroaderScenePatcher.Core {
                         return;
                     }
                     var current = check.Current;
-                    if (current == null) continue;
+                    if (current == null || Owned(current)) continue;
                     // More observations than entries, or a second match of one entry, cannot become equal again.
                     if (++checkSeen > Entries.Count) MarkStale("more than the " + Entries.Count + " observations of the snapshot; first extra " + Name(current));
                     for (var i = 0; i < Entries.Count; i++) if (SameObject(Entries[i], current)) checkNear[i] = current;

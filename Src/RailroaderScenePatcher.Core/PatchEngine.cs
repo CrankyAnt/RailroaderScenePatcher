@@ -42,8 +42,10 @@ namespace RailroaderScenePatcher.Core {
     public sealed class ObjectState {
         public ObjectState(Placement placement, bool? active) : this(placement, active, null) { }
         public ObjectState(Placement placement, bool? active, MarkerBinding marker) : this(placement, active, marker, null) { }
-        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage) : this(placement, active, marker, coverage, null) { }
-        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, StarterSetting starter) { Placement = placement; Active = active; Marker = marker; Coverage = coverage; Starter = starter; }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage) : this(placement, active, marker, coverage, null, null) { }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, CrossingEquipment equipment) : this(placement, active, marker, coverage, equipment, null) { }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, StarterSetting starter) : this(placement, active, marker, coverage, null, starter) { }
+        public ObjectState(Placement placement, bool? active, MarkerBinding marker, CrossingCoverage coverage, CrossingEquipment equipment, StarterSetting starter) { Placement = placement; Active = active; Marker = marker; Coverage = coverage; Equipment = equipment; Starter = starter; }
         public Placement Placement { get; }
         public bool? Active { get; }
         // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
@@ -51,6 +53,9 @@ namespace RailroaderScenePatcher.Core {
         // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. This mod's coverage
         // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
         public CrossingCoverage Coverage { get; }
+        // The crossing-equipment relationship: equipment added to a crossing controller. Null leaves it untouched, and an object
+        // without one reads null. Authored equipment lists only its explicit additions; observed equipment is complete.
+        public CrossingEquipment Equipment { get; }
         // The starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, and
         // the marker's track location. Null leaves it untouched, and any other object reads null.
         public StarterSetting Starter { get; }
@@ -59,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
         // that another modification installed. False: this is the complete desired state, and a null Active returns the
         // object to its group-driven activity, which releases an explicit disable.
         public bool LeavesActivity { get; private set; }
-        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Starter) { LeavesActivity = true };
+        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true };
     }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
@@ -360,6 +365,7 @@ namespace RailroaderScenePatcher.Core {
             if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
         }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
@@ -384,8 +390,13 @@ namespace RailroaderScenePatcher.Core {
         // The addition IDs a modification sets, and those that more than one modification of a document uses. A blank key is
         // no ID: its modification fails for the empty key, not for sharing it. An addition ID
         // names one addition of its supplying mod, so every modification that shares one fails, wherever it stands.
-        internal static IEnumerable<string> AdditionIds(JObject item) =>
-            (((item["relationships"] as JObject)?["crossingCoverage"] as JObject)?["additions"] as JObject)?.Properties().Select(p => p.Name).Where(name => !String.IsNullOrWhiteSpace(name)) ?? Enumerable.Empty<string>();
+        // Equipment IDs are a separate namespace from detection additions and appear as "equipment <id>".
+        internal static IEnumerable<string> AdditionIds(JObject item) {
+            var relationships = item["relationships"] as JObject;
+            var detection = ((relationships?["crossingCoverage"] as JObject)?["additions"] as JObject)?.Properties().Select(p => p.Name).Where(name => !String.IsNullOrWhiteSpace(name)) ?? Enumerable.Empty<string>();
+            var equipment = (relationships?["crossingEquipment"] as JObject)?.Properties().Select(p => p.Name).Where(name => !String.IsNullOrWhiteSpace(name)).Select(name => "equipment " + name) ?? Enumerable.Empty<string>();
+            return detection.Concat(equipment);
+        }
         internal static HashSet<string> SharedAdditionIds(IEnumerable<JObject> items) {
             var seen = new HashSet<string>(StringComparer.Ordinal); var shared = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in items) foreach (var id in AdditionIds(item)) if (!seen.Add(id)) shared.Add(id);
@@ -401,6 +412,13 @@ namespace RailroaderScenePatcher.Core {
             var shared = SharedAdditionIds(entries.Values);
             foreach (var id in entries.Keys) Effective(id, entries, effective, order, targets, new HashSet<string>(), owner, shared);
             var state = Underlying(target);
+            // The equipment without this mod is what stands now, less this mod's additions: other mods' additions stay as they
+            // are, and this mod's additions exist only through its document, even when an earlier application in this world
+            // left them, so an addition the document no longer lists is removed.
+            if (state?.Equipment != null) {
+                var standing = scene.Read(target)?.Equipment ?? state.Equipment;
+                state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter);
+            }
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
                 state = Overlay(state, item.State);
@@ -409,14 +427,14 @@ namespace RailroaderScenePatcher.Core {
         }
         // One modification's state laid over a complete state: every value the modification sets replaces the one below.
         internal static ObjectState Overlay(ObjectState under, ObjectState mod) =>
-            new ObjectState(mod.Placement ?? under.Placement, mod.Active ?? under.Active, mod.Marker ?? under.Marker, CrossingCoverage.Overlay(under.Coverage, mod.Coverage), StarterSetting.Overlay(under.Starter, mod.Starter));
+            new ObjectState(mod.Placement ?? under.Placement, mod.Active ?? under.Active, mod.Marker ?? under.Marker, CrossingCoverage.Overlay(under.Coverage, mod.Coverage), CrossingEquipment.Overlay(under.Equipment, mod.Equipment), StarterSetting.Overlay(under.Starter, mod.Starter));
         // The state with a track-following placement evaluated at its anchor's current native pose. Throws before any
         // mutation when the anchor does not resolve.
         internal ObjectState Evaluate(ObjectState state) {
             var following = state?.Placement?.Following;
             if (following == null) return state;
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
-            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Starter);
+            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter);
             return state.LeavesActivity ? evaluated.LeavingActivity() : evaluated;
         }
         Modification Effective(string id, SortedDictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting, string owner, HashSet<string> shared) {
@@ -516,16 +534,17 @@ namespace RailroaderScenePatcher.Core {
                 else throw new InvalidOperationException("Unsupported placement");
             }
             if (item["active"] != null && item["active"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid activity");
-            MarkerBinding marker = null; CrossingCoverage coverage = null;
+            MarkerBinding marker = null; CrossingCoverage coverage = null; CrossingEquipment equipment = null;
             if (item["relationships"] != null) {
                 var relationships = item["relationships"] as JObject;
-                if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
+                if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage", "crossingEquipment") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
                 if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
                 if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner);
+                if (relationships["crossingEquipment"] != null) equipment = ParseEquipment(relationships["crossingEquipment"]).In(owner ?? "");
             }
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
-            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && starter == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, starter), Dependencies = dependencies };
+            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter), Dependencies = dependencies };
         }
         public const string TrackFollowingMode = "trackFollowing";
         // A placement relative to an explicitly selected segment location or endpoint node.
@@ -618,6 +637,39 @@ namespace RailroaderScenePatcher.Core {
                 }
             }
             return new CrossingCoverage(parsed);
+        }
+        // Explicit equipment additions to a crossing controller, keyed by a persistent ID unique in this document: each holds the
+        // required pattern, a loaded source and a fixed placement. An addition this document omits stays untouched.
+        static CrossingEquipment ParseEquipment(JToken token) {
+            var entries = token as JObject;
+            if (entries == null || !entries.HasValues) throw new InvalidOperationException("Invalid relationship: crossingEquipment must be an object with at least one entry, keyed by equipment ID");
+            // Content this version does not execute anywhere in the relationship makes it unsupported, whatever else is invalid.
+            foreach (var property in entries.Properties()) {
+                if (!(property.Value is JObject known)) continue;
+                if (!Only(known, "pattern", "source", "placement")) throw new InvalidOperationException("Unsupported relationship content in equipment " + property.Name + (known["id"] != null ? ": an entry carries no id member; its ID is its key, " + property.Name : ""));
+                if (known["source"] is JObject source && !Only(source, "scene", "path")) throw new InvalidOperationException("Unsupported relationship content in the source of equipment " + property.Name);
+                if (known["placement"] is JObject placement && !Only(placement, "mode", "position", "track", "offset", "rotation")) throw new InvalidOperationException("Unsupported relationship content in the placement of equipment " + property.Name);
+            }
+            var parsed = new List<EquipmentAddition>();
+            foreach (var property in entries.Properties().OrderBy(p => p.Name, StringComparer.Ordinal)) {
+                var id = property.Name;
+                if (String.IsNullOrWhiteSpace(id)) throw new InvalidOperationException("Invalid relationship: a key of crossingEquipment is empty; equipment is keyed by its ID");
+                var problem = EquipmentAddition.IdProblem(id);
+                if (problem != null) throw new InvalidOperationException("Invalid relationship: " + problem);
+                var addition = property.Value as JObject;
+                if (addition == null) throw new InvalidOperationException("Invalid relationship: equipment " + id + " must be an object");
+                if (addition["id"] != null) throw new InvalidOperationException("Unsupported relationship content in equipment " + id + ": an entry carries no id member; its ID is its key, " + id);
+                if (!Only(addition, "pattern", "source", "placement")) throw new InvalidOperationException("Unsupported relationship content in equipment " + id);
+                if (!RequiredString(addition, "pattern")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs its required pattern");
+                var pattern = (string)addition["pattern"];
+                if (!EquipmentAddition.Patterns.Contains(pattern, StringComparer.Ordinal)) throw new InvalidOperationException("Unsupported crossing equipment pattern " + pattern + " in equipment " + id);
+                var source = addition["source"] as JObject;
+                if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                var placement = addition["placement"] as JObject;
+                if (placement == null || placement["mode"]?.Type != JTokenType.String || (string)placement["mode"] != "fixed" || !Only(placement, "mode", "position", "rotation")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a fixed placement");
+                parsed.Add(new EquipmentAddition(id, pattern, new EquipmentSource((string)source["scene"], (string)source["path"]), CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4))));
+            }
+            return new CrossingEquipment(parsed, false);
         }
         static TrackLocation RangeEnd(JToken token) {
             if (!(token is JObject location)) throw new InvalidOperationException("Invalid relationship: a track location needs segment, end and distance");

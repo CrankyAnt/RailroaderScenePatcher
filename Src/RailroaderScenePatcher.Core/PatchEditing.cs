@@ -28,6 +28,12 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<string> Lines { get; }
         public string Error { get; }
     }
+    // The intended effect of an equipment edit on each addition of a crossing, or why it would be refused.
+    public sealed class EquipmentPreview {
+        internal EquipmentPreview(IReadOnlyList<string> lines, string error) { Lines = lines; Error = error; }
+        public IReadOnlyList<string> Lines { get; }
+        public string Error { get; }
+    }
     public sealed class SaveReport {
         internal SaveReport(IEnumerable<string> completed, IEnumerable<string> outstanding, string error) {
             Completed = completed.ToArray(); Outstanding = outstanding.ToArray(); Error = error;
@@ -156,6 +162,8 @@ namespace RailroaderScenePatcher.Core {
         readonly string modId;
         // The key the engine applied this document under at world load; it scopes the identities of the document's additions.
         readonly string documentKey;
+        // The key this session's document is applied under: the scope of its additions.
+        public string DocumentKey => documentKey;
         readonly HistoryIdentity identity;
         // Replaced only by a confirmed recovery of a protected document.
         PatchDocument document;
@@ -244,7 +252,7 @@ namespace RailroaderScenePatcher.Core {
                     // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available on this build.
                     if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == "Track.TrackMarker")) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
                     // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available on this build.
-                    if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
+                    if ((item["relationships"] as JObject)?["crossingCoverage"] != null || (item["relationships"] as JObject)?["crossingEquipment"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.5.0");
                     // A starter placement needs its capability whether or not it is available on this build.
@@ -667,6 +675,113 @@ namespace RailroaderScenePatcher.Core {
             return value;
         }
         static JObject LocationJson(TrackLocation location) => new JObject { ["segment"] = location.Segment, ["end"] = location.End, ["distance"] = location.Distance };
+        // Adds this mod's equipment to a crossing controller, or replaces its namesake: an addition with the same ID is moved,
+        // or rebuilt when its source or pattern changes. Other additions keep their mod values or effective state.
+        public Outcome AddEquipment(TargetIdentity target, EquipmentAddition addition, InspectedTarget inspected = null) {
+            if (addition == null) throw new ArgumentNullException(nameof(addition));
+            return Change("Edit crossing equipment", target, inspected, existing => EquipmentValue(target, existing, addition, null), null, "equip-");
+        }
+        // Removes one of this mod's equipment additions: its copy is released from the controller and its culling.
+        public Outcome RemoveEquipment(TargetIdentity target, string id, InspectedTarget inspected = null) {
+            return Change("Remove crossing equipment", target, inspected, existing => EquipmentValue(target, existing, null, id), null, "equip-");
+        }
+        // The crossing's current equipment, read from the scene.
+        public CrossingEquipment Equipment(TargetIdentity target) {
+            var resolved = engine.ResolveUnique(target);
+            scene.Preflight(resolved);
+            return scene.Read(resolved).Equipment ?? throw new InvalidOperationException("This object has no crossing equipment");
+        }
+        // The loaded devices offered as sources for the crossing, eligible or with their concrete rejection reason.
+        public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target) {
+            var resolved = engine.ResolveUnique(target);
+            if (!(scene is ICrossingEquipmentScene equipment)) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
+            return equipment.EquipmentCandidates(resolved);
+        }
+        // The initialization and culling state of one of this mod's additions, or null when it is not present.
+        // An equipment ID from the stem that no modification of the document uses yet, with a numeric suffix when it is
+        // taken, as a new modification key gets one. An invalid stem falls back to "equipment".
+        // This mod's additions of the crossing as the document holds them, each with its built state in the scene or why it
+        // was not built. The document's own order is the ordinal order of the IDs.
+        public IReadOnlyList<EquipmentEntry> EquipmentEntries(TargetIdentity target) {
+            var resolved = engine.ResolveUnique(target);
+            var existing = Own(resolved).FirstOrDefault();
+            if (existing == null) return Array.Empty<EquipmentEntry>();
+            CrossingEquipment authored;
+            try { authored = PatchEngine.Parse(existing, documentKey).State.Equipment; } catch (InvalidOperationException) { return Array.Empty<EquipmentEntry>(); }
+            if (authored == null) return Array.Empty<EquipmentEntry>();
+            CrossingEquipment observed = null;
+            try { observed = scene.Read(resolved).Equipment; } catch (InvalidOperationException) { }
+            var entries = new List<EquipmentEntry>();
+            foreach (var addition in authored.Additions) {
+                var built = observed?.Find(addition.Key);
+                string problem = null;
+                if (built == null) {
+                    try {
+                        engine.CheckRelationships(resolved, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false)));
+                        problem = "it is not built in this world; Recheck builds it";
+                    } catch (InvalidOperationException e) { problem = e.Message; }
+                }
+                entries.Add(new EquipmentEntry(addition, built, problem));
+            }
+            return entries;
+        }
+        public string NewEquipmentId(string stem) {
+            stem = new string((stem ?? "").Select(c => Char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '-').ToArray()).Trim('-');
+            if (stem.Length == 0 || stem.Length > 56) stem = "equipment";
+            var used = new HashSet<string>(document == null ? Enumerable.Empty<string>() : document.Items.SelectMany(PatchEngine.AdditionIds).Where(a => a.StartsWith("equipment ", StringComparison.Ordinal)).Select(a => a.Substring("equipment ".Length)), StringComparer.Ordinal);
+            var id = stem;
+            for (var n = 2; used.Contains(id); n++) id = stem + "-" + n;
+            return id;
+        }
+        public string EquipmentStatus(TargetIdentity target, string id) {
+            var resolved = engine.ResolveUnique(target);
+            return scene is ICrossingEquipmentScene equipment ? equipment.EquipmentStatus(resolved, documentKey, id) : null;
+        }
+        // The effect of adding (addition) or removing (id) one addition, without changing the scene, the document or the history.
+        public EquipmentPreview PreviewEquipment(TargetIdentity target, EquipmentAddition addition, string id, InspectedTarget inspected = null) {
+            try {
+                if (Blocked != null) throw new InvalidOperationException(Blocked);
+                var resolved = engine.ResolveUnique(target);
+                inspected?.Validate(scene, target, resolved);
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before another edit");
+                scene.Preflight(resolved);
+                var own = Own(resolved);
+                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside scene patch editing first");
+                var existing = own.FirstOrDefault();
+                var value = EquipmentValue(target, existing, addition, id);
+                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, documentKey).State);
+                var key = existing == null ? NewId(target, "equip-") : PatchDocument.Key(existing);
+                var candidate = (JObject)document.Modifications.DeepClone();
+                if (value == null) candidate.Remove(key); else candidate[key] = value;
+                var current = scene.Read(resolved).Equipment;
+                var desired = engine.Desired(candidate, resolved, documentKey).Equipment;
+                return new EquipmentPreview(CrossingEquipment.Describe(current, desired), null);
+            } catch (Exception e) { return new EquipmentPreview(Array.Empty<string>(), e.Message); }
+        }
+        // The modification with one entry of its crossing equipment set or, for a null addition, removed. An entry is keyed by
+        // the equipment ID and holds no id member.
+        JObject EquipmentValue(TargetIdentity target, JObject existing, EquipmentAddition addition, string id) {
+            if (addition == null && String.IsNullOrWhiteSpace(id)) throw new InvalidOperationException("Choose an addition");
+            if (existing != null) PatchEngine.Parse(existing);
+            var key = addition?.Id ?? id;
+            if (addition != null && document.Items.Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains("equipment " + key, StringComparer.Ordinal)))
+                throw new InvalidOperationException("Equipment ID " + key + " is already used by another modification of the document; choose another ID");
+            var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+            var relationships = value["relationships"] as JObject ?? new JObject();
+            var entries = relationships["crossingEquipment"] as JObject ?? new JObject();
+            if (addition == null && entries.Property(key) == null) throw new InvalidOperationException("Equipment " + key + " is not an addition of the active document");
+            if (addition == null) entries.Remove(key); else entries[key] = EquipmentJson(addition);
+            // An object that lost its last entry leaves the document: crossingEquipment is never written empty.
+            if (entries.Count == 0) relationships.Remove("crossingEquipment"); else if (entries.Parent == null) relationships["crossingEquipment"] = entries;
+            if (!relationships.HasValues) value.Remove("relationships"); else if (relationships.Parent == null) value["relationships"] = relationships;
+            if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
+            return value["placement"] == null && value["active"] == null && value["relationships"] == null ? null : value;
+        }
+        // An entry of crossingEquipment in canonical order: pattern, source, placement.
+        static JObject EquipmentJson(EquipmentAddition addition) {
+            var placement = PatchEngine.CheckPlacement(addition.Placement?.Position, addition.Placement?.Rotation);
+            return new JObject { ["pattern"] = addition.Pattern, ["source"] = new JObject { ["scene"] = addition.Source.Scene, ["path"] = addition.Source.Path }, ["placement"] = FixedJson(placement) };
+        }
         // Clears this mod's activity value of the object: it returns to its effective underlying activity, which for an
         // object following a track group is group-driven again. Placement and relationships keep their mod values.
         public Outcome ClearActivity(TargetIdentity target, InspectedTarget inspected = null) {
@@ -953,7 +1068,7 @@ namespace RailroaderScenePatcher.Core {
         // as current after its track turned by less than that angle, and the object would not follow.
         const double AngleToleranceDegrees = 0.01;
         static bool Same(ObjectState a, ObjectState b) {
-            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !StarterSetting.Same(a.Starter, b.Starter)) return false;
+            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !CrossingEquipment.Same(a.Equipment, b.Equipment) || !StarterSetting.Same(a.Starter, b.Starter)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }

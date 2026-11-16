@@ -243,6 +243,14 @@ namespace RailroaderScenePatcher {
             : EscapeStep.None;
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
+        // The family of a light or gate this patcher added: a supported family whose edits live on its crossing's
+        // Connections tab, not on the object itself.
+        internal const string AddedEquipmentFamily = "Added light or gate";
+        internal static string AddedEquipmentOperations(string id, string scope) =>
+            "Added light or gate " + id + " of " + scope + ". Edit or remove it on its crossing controller's Connections tab";
+        // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
+        // or an added light or gate, which its crossing edits.
+        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || family == AddedEquipmentFamily ? null : NotYetSupported("the " + family + " family");
         // The track element an object follows, as the world marks it: the anchor's node, or the segment of its
         // location. Null without a following placement.
         internal static SelectionIdentity Followed(TrackFollowing following) =>

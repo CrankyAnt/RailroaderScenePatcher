@@ -158,7 +158,7 @@ namespace RailroaderScenePatcher {
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = "Gizmo", SnapPlace = "Snap", ActivityPlace = "Activity",
-            ModificationPlace = "Modification", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage";
+            ModificationPlace = "Modification", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", EquipmentPlace = "Lights and gates";
         bool staleLogged = true;
         NativeTrackPoses trackPoses;
         float nextTrackFollow;
@@ -171,6 +171,12 @@ namespace RailroaderScenePatcher {
         readonly string[] coverageFields = new string[12];
         sealed class PreparedCoverage { internal string Circuit, Addition; internal CircuitCoverage Value; internal CoveragePreview Preview; }
         PreparedCoverage preparedCoverage;
+        // A light or gate being added or edited: the chosen source, seven fields (ID, position x/y/z, rotation x/y/z in
+        // degrees) and the previewed change, which holds the addition to add or the ID to remove. Null source: no form open.
+        EquipmentSource equipmentSource;
+        readonly string[] equipmentFields = { "", "", "", "", "0", "0", "0" };
+        sealed class PreparedEquipment { internal EquipmentAddition Addition; internal string RemoveId; internal EquipmentPreview Preview; }
+        PreparedEquipment preparedEquipment;
         // Scopes native warning deduplication to one load attempt.
         string loadId = Guid.NewGuid().ToString("N");
         internal void Initialize(IModContext value) {
@@ -227,7 +233,10 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(StarterPlacementScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": starter placement capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked)); }
+                CrossingEquipmentWorld equipmentWorld = null;
+                try { equipmentWorld = new CrossingEquipmentWorld(); }
+                catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": crossing-equipment capability incompatible or unavailable: " + e.GetBaseException().Message); }
+                try { capabilities.Add(new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": crossing-coverage capability incompatible or unavailable: " + e.GetBaseException().Message);
@@ -693,7 +702,8 @@ namespace RailroaderScenePatcher {
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
                 selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot(),
-                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot());
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(),
+                equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
         // Computing the outstanding work serializes the document and reads the dependency metadata. Its inputs change
         // with the native map editor's change counts, a Save attempt or an incomplete operation; one recomputation a second covers
@@ -745,7 +755,7 @@ namespace RailroaderScenePatcher {
             definitions.Reset();
             comparedKey = null; passKey = null; idleKey = null; urgentCheck = false; filled = false; fullRefresh = false;
             terrainFor = null; revealed = null;
-            CloseCoverageForm();
+            CloseCoverageForm(); CloseEquipmentForm();
             feedback.Clear();
             status = "Load attempt over the retained world";
             context?.Log.Info("Scene Patcher " + Version + ": load attempt over the retained world; " + reentry.Retained + " objects retained, " + reentry.Released + " released, " + reentry.Failures.Count + " cleanup failures");
@@ -811,7 +821,7 @@ namespace RailroaderScenePatcher {
         // still waited is refused, and that refusal stays to be read.
         void ClearInspection() {
             var waited = Requests.ReleaseInspection(selection?.Pending != null, CancelSelection,
-                () => { CancelGizmo(); ClearSnap(); CloseCoverageForm(); selected = null; }, "the inspection was cleared before the request ran");
+                () => { CancelGizmo(); ClearSnap(); CloseCoverageForm(); CloseEquipmentForm(); selected = null; }, "the inspection was cleared before the request ran");
             if (waited) inventory?.CancelFreshnessCheck();
             presentation?.RequestRefresh();
         }
@@ -1005,7 +1015,7 @@ namespace RailroaderScenePatcher {
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
             : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the inventory." : null;
-        void ClearSnap() { preparedSnap = null; choosingSnap = false; preparedCoverage = null; }
+        void ClearSnap() { preparedSnap = null; choosingSnap = false; preparedCoverage = null; preparedEquipment = null; }
         void BeginSnap(SelectionKind kind) {
             BeginSelection(kind, selected);
             choosingSnap = selection?.Pending != null;
@@ -1094,6 +1104,64 @@ namespace RailroaderScenePatcher {
                 else feedback.Report(CoveragePlace, "Coverage preview completed. Select Apply to apply it.");
                 presentation?.RequestRefresh();
             });
+        }
+        // The preview compares the scene as an edit does: without a blocking scan.
+        void PrepareEquipment(PatchEditingSession session, TargetIdentity identity, EquipmentAddition addition, string removeId) {
+            Queue(EquipmentPlace, "Equipment preview", pin => {
+                EquipmentPreview preview;
+                try { preview = session.PreviewEquipment(identity, addition, removeId, pin(selected)); }
+                catch (Exception e) { feedback.Refuse(EquipmentPlace, "Equipment preview", e.GetBaseException().Message); preparedEquipment = null; return; }
+                preparedEquipment = new PreparedEquipment { Addition = addition, RemoveId = removeId, Preview = preview };
+                if (preview.Error != null) feedback.Refuse(EquipmentPlace, "Equipment preview", preview.Error);
+                else feedback.Report(EquipmentPlace, "Equipment preview completed. Select Apply to apply it.");
+                presentation?.RequestRefresh();
+            });
+        }
+        // Opens the form for a new copy of the source: an ID from the device's name that the document does not use yet, and
+        // the device's pose relative to its own crossing carried over to the inspected crossing, five metres aside.
+        void UseSource(PatchEditingSession session, SourceCandidate candidate) {
+            CloseCoverageForm(); feedback.ClearPlace(EquipmentPlace);
+            equipmentSource = candidate.Source; preparedEquipment = null; equipmentOwn = null;
+            var name = candidate.Name ?? candidate.Source.Path.Substring(candidate.Source.Path.LastIndexOf('/') + 1);
+            equipmentFields[0] = session.NewEquipmentId(name.ToLowerInvariant().Replace(' ', '-') + "-added");
+            for (var i = 1; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0";
+            if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
+            FillEquipment(EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, candidate.CrossingPosition, candidate.CrossingRotation, selected.Position.ToArray(), selected.Rotation.ToArray()));
+        }
+        // Opens the form for an addition of this mod as the document holds it.
+        void ReadEquipment(EquipmentAddition addition) {
+            CloseCoverageForm(); feedback.ClearPlace(EquipmentPlace);
+            equipmentSource = addition.Source; preparedEquipment = null; equipmentOwn = null;
+            equipmentFields[0] = addition.Id;
+            if (addition.Placement?.Position != null && addition.Placement.Rotation != null) FillEquipment(addition.Placement);
+        }
+        // The exact placement the form was filled from: a field the modder leaves as it shows keeps that value, and a
+        // rotation whose three angles are unchanged keeps its quaternion, so an untouched Apply changes nothing and a
+        // change of one axis rewrites only that axis.
+        Placement equipmentOwn;
+        double[] equipmentAngles;
+        void FillEquipment(Placement placement) {
+            equipmentOwn = placement;
+            var angles = new Quaternion((float)placement.Rotation[0], (float)placement.Rotation[1], (float)placement.Rotation[2], (float)placement.Rotation[3]).eulerAngles;
+            equipmentAngles = new double[] { angles.x, angles.y, angles.z };
+            for (var i = 0; i < 3; i++) { equipmentFields[i + 1] = CommandBand.Number(placement.Position[i]); equipmentFields[i + 4] = CommandBand.Number(equipmentAngles[i]); }
+        }
+        void CloseEquipmentForm() { equipmentSource = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
+        EquipmentAddition ParseEquipment(out string problem) {
+            var id = (equipmentFields[0] ?? "").Trim();
+            problem = EquipmentAddition.IdProblem(id);
+            if (problem != null) return null;
+            var position = new double[3]; var angles = new double[3]; var turned = equipmentOwn == null;
+            for (var i = 0; i < 3; i++) {
+                var ok = equipmentOwn == null ? Double.TryParse(equipmentFields[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out position[i]) : CommandBand.Entered(equipmentFields[i + 1], equipmentOwn.Position[i], out position[i]);
+                ok &= equipmentOwn == null ? Double.TryParse(equipmentFields[i + 4], NumberStyles.Float, CultureInfo.InvariantCulture, out angles[i]) : CommandBand.Entered(equipmentFields[i + 4], equipmentAngles[i], out angles[i]);
+                if (!ok) { problem = "enter the position and rotation as numbers with a decimal point"; return null; }
+                if (equipmentOwn != null && angles[i] != equipmentAngles[i]) turned = true;
+            }
+            double[] rotation;
+            if (!turned) rotation = (double[])equipmentOwn.Rotation.Clone();
+            else { var q = Quaternion.Euler((float)angles[0], (float)angles[1], (float)angles[2]); rotation = new double[] { q.x, q.y, q.z, q.w }; }
+            return new EquipmentAddition(id, EquipmentAddition.LightGatePattern, equipmentSource, new Placement(position, rotation));
         }
         // Fills the fields from the selected tracks of a circuit or addition; a circuit with native spans or detached, and a new
         // addition, start empty.
