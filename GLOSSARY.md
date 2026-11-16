@@ -43,14 +43,14 @@ _Avoid_: Total conversion
 A mod that supplies a selectable map definition. A mod can be both map-adding and map-changing; a map-changing mod made in the native map editor is also map-adding, because the native map editor edits only a map definition.
 
 **Map-changing mod**:
-A mod whose content applies to a map it does not supply, such as the base-game map, through a map-changing script or through a patch document. A mod can be both map-changing and map-adding.
+A mod whose content applies to a map it does not supply, such as the base-game map, through a map-changing script or through a scene patch file. A mod can be both map-changing and map-adding.
 
 **Map-changing script**:
 A mod's script that the game runs each time it loads map data, outside the native map editor, to change that map data before the game reads it. It is how a mod's native changes reach a save on a map the mod does not supply: a mod's map definition and its map data take effect only on a save of that map or of a map that has it as a map layer, or in the native map editor. The project's name for the game's `modifyMap` handler.
 _Avoid_: Merge script
 
 **Target map**:
-The map definition that a patch document names. The patch document applies when that map, or a map that inherits it as a map layer, is loaded.
+The map definition that a scene patch file names. The scene patch file applies when that map, or a map that inherits it as a map layer, is loaded.
 
 **Native map editor**:
 The game's own map editor. It edits native map data, and only a map definition of the mod being developed.
@@ -88,28 +88,28 @@ Content generated for terrain tiles from the current scene state, including vege
 Desired changes that a supplying mod makes to supported scene objects and their relationships.
 _Avoid_: Patch history, movement script
 
-**Patch document**:
-The document that expresses a mod's scene patch.
-_Avoid_: Patch history, scene-patch document
+**Scene patch file**:
+The file in a mod, `Data/scene-patches.json`, that expresses the mod's scene patch.
+_Avoid_: Patch document, scene-patch document, patch history
 
 **Equal content**:
-Two patch document texts have equal content when they say the same thing: the order of keys and members, spacing, comments, the written form of a number and the order of a modification's dependencies do not count.
+Two scene patch file texts have equal content when they say the same thing: the order of keys and members, spacing, comments, the written form of a number and the order of a modification's dependencies do not count.
 
 **Saved**:
-The state of a patch document whose current content and the text last read or written have equal content. A patch document that did not exist at load is Saved while it has no modification.
+The state of a scene patch file whose current content and the text last read or written have equal content. A scene patch file that did not exist at load is Saved while it has no modification.
 _Avoid_: Clean, unchanged on disk
 
 **Canonical order**:
-The fixed order of keys and members that a Save produces when it writes a patch document. Reading a document never changes its order.
+The fixed order of keys and members that a Save produces when it writes a scene patch file. Reading a scene patch file never changes its order.
 
-**Protected patch document**:
-A patch document that scene patch editing will not overwrite: one that is unreadable, in a format this version does not understand, for another map, unsafe to convert, or changed outside scene patch editing since it was read. Its content is kept until it is corrected outside scene patch editing or replaced by a fresh start.
+**Protected scene patch file**:
+A scene patch file that scene patch editing will not overwrite: one that is unreadable, in a format this version does not understand, for another map, unsafe to convert, or changed outside scene patch editing since it was read. Its content is kept until it is corrected outside scene patch editing or replaced by a fresh start.
 
 **Fresh start**:
-Replacing a protected patch document with a new document for the edited mod, only after explicit confirmation and a backup of the original.
+Replacing a protected scene patch file with a new scene patch file for the edited mod, only after explicit confirmation and a backup of the original.
 
 **Mod value**:
-A value that a supplying mod's patch document sets for a scene object. Without it, the scene object keeps its effective underlying state.
+A value that a supplying mod's scene patch file sets for a scene object. Without it, the scene object keeps its effective underlying state.
 _Avoid_: MapMod value, authored value, authored state, authored binding, authored activity
 
 **Physical placement**:
@@ -154,7 +154,7 @@ _Avoid_: New standalone crossing
 The loaded map definition and its resolved map layers, against which a scene patch's targets, tracks included, are identified.
 
 **Supplying mod**:
-The mod that owns a patch document, regardless of which map definition or mod contains an existing target.
+The mod that owns a scene patch file, regardless of which map definition or mod contains an existing target.
 _Avoid_: Supplying MapMod, target owner
 
 **Edited mod**:
@@ -171,7 +171,7 @@ A loaded map whose scene objects a later load attempt in the same map context ma
 The state that remains for an existing target without a particular modification by its supplying mod, including the applicable native context and other retained modifications in that editing or runtime context.
 
 **Informational overlap notice**:
-A notice that applicable patch documents from different supplying mods attempt to modify the same resolved existing target. It indicates possible incompatibility, not a proven conflict.
+A notice that applicable scene patch files from different supplying mods attempt to modify the same resolved existing target. It indicates possible incompatibility, not a proven conflict.
 
 **Supported source pattern**:
 A supported equipment behavior with its required components, relationships and available dependent data. A model name or visual resemblance alone does not identify a pattern.
@@ -180,7 +180,7 @@ A supported equipment behavior with its required components, relationships and a
 An available equipment source that conforms to a supported source pattern and satisfies its applicable requirements.
 
 **Format version**:
-The version that identifies the meaning of the data in a patch document. It is separate from the release versions of the patcher and supplying mod.
+The version that identifies the meaning of the data in a scene patch file. It is separate from the release versions of the patcher and supplying mod.
 
 **Checked build**:
 A Railroader build for which the patcher's relevant game functions and prerequisites have been explicitly checked.
@@ -221,7 +221,7 @@ A circuit that a supplying mod adds at an existing crossing: explicitly selected
 _Avoid_: Authored addition
 
 **Modification**:
-An entry in a patch document, identified by its modification ID, that holds the mod values a supplying mod sets for one existing target.
+An entry in a scene patch file, identified by its modification ID, that holds the mod values a supplying mod sets for one existing target.
 
 **Patcher dependency**:
 A supplying mod's declared dependency on the patcher, with the minimum patcher version that the mod requires.
@@ -353,7 +353,7 @@ The outliner filter that limits the list to scene objects with a detected proble
 A defect of one scene object that the modder can repair with the patcher for that object, such as a duplicate marker id or a broken binding.
 
 **Recheck**:
-The explicit action that compares an inspected scene object with the patch document again, applies the document's state where they differ, and lifts the block of an incomplete cleanup once they agree. A refresh of the inventory alone applies nothing.
+The explicit action that compares an inspected scene object with the scene patch file again, applies the file's state where they differ, and lifts the block of an incomplete cleanup once they agree. A refresh of the inventory alone applies nothing.
 
 **Inspector**:
 The region of scene patch editing that shows the inspected scene object's values, dependencies and actions.
