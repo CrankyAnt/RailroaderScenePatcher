@@ -4,7 +4,7 @@
 
 This guide shows how to set, replace or detach the track location of a Generic track marker, such as a yard-limit or station sign, and what changes with it. The binding is the location stored in the object's `Track.TrackMarker`: a segment ID, the segment end the distance counts from, and the distance in metres. The track graph registers the marker under that segment, and game code that looks the marker up by its ID finds it there.
 
-A binding edit never moves the object. Placement and activity are separate settings of the same modification; you can change them before, after or without a binding edit. Track-marker relationship and target capabilities require patcher 0.5.0 or later. The editor's Save derives the dependency minimum from the document's content; see [the document reference](scene-patch-document-v1.md#dependency-minimum).
+A binding edit never moves the object. Placement and activity are separate settings of the same modification; you can change them before, after or without a binding edit. Track-marker relationship and target capabilities require patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the document's content; see [the document reference](patch-document-v1.md#dependency-minimum).
 
 ## What qualifies
 
@@ -23,7 +23,7 @@ Each of these refusals names a consumer of the marker's location that a binding 
 
 The inventory shows such an object in the `Track marker` family with the structure `track-marker-v1`. For any other marker, **Supported edits** on the **Object** tab reads **Not editable:** with the reason. A marker of another type than Generic, and a starter placement marker that a new-game setup uses, stand in the **Inspection only** group of the outliner instead. Crossing pads have their own operation, described in [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md). Mileposts have their own later operation; the detection coverage of a crossing is corrected as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Signal markers fall outside the supported operations.
 
-## Set or replace the binding in the editor
+## Set or replace the binding in the native map editor
 
 1. Open **Scene patches**, select **Refresh** in the command band, and select the marker's row in the outliner. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
 2. On the **Connections** tab, **Replacement targets** and the fields of the binding come first, and **Current binding** below them shows what the marker is bound to now; the world marks that track in green while the tab is open. Check the **Current binding** lines. They show the stored segment, end and distance, and each graph registration under the marker ID with its owner. For an enabled marker, a stored segment that no longer exists appears under **Detected problems** on the **Object** tab as a broken binding; for a disabled one, and for an empty binding, a **Marker binding note** says what the state means.
@@ -32,7 +32,7 @@ The inventory shows such an object in the `Track marker` family with the structu
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit, and the marker keeps its binding and registration. The patcher never picks a nearby segment instead.
 
-After the check it removes the marker's graph registration, writes the new location, and registers the marker at that location when the marker is enabled and active. A map label below the marker is registered with the map again, so its dimming follows the track group of the new location. The patcher then verifies that the stored location is the authored one, that the graph holds exactly one registration, for this marker, at that location, and that each registered map label is dimmed by the new location's track group. Any difference fails the edit and restores the earlier location and registration.
+After the check it removes the marker's graph registration, writes the new location, and registers the marker at that location when the marker is enabled and active. A map label below the marker is registered with the map again, so its dimming follows the track group of the new location. The patcher then verifies that the stored location is the mod's location, that the graph holds exactly one registration, for this marker, at that location, and that each registered map label is dimmed by the new location's track group. Any difference fails the edit and restores the earlier location and registration.
 
 ## Detach the marker
 
@@ -40,7 +40,7 @@ Select **Detach** at the bottom of the tab. The stored location becomes empty an
 
 ## Undo, clear and remove
 
-Native Undo and Redo reverse and reapply each binding edit together with its registration. **Clear binding** at the bottom of the **Connections** tab removes only the relationship from this MapMod's modification: the marker returns to the binding the loaded map gives it, while any authored placement or activity stays. **Remove modification** in the footer removes the whole modification and returns binding, registration, placement and activity to the loaded map's values. Other objects' modifications stay applied.
+Native Undo and Redo reverse and reapply each binding edit together with its registration. **Clear binding** at the bottom of the **Connections** tab removes only the relationship from this mod's modification: the marker returns to the binding the loaded map gives it, while the mod's placement or activity stays. **Remove modification** in the footer removes the whole modification and returns binding, registration, placement and activity to the loaded map's values. Other objects' modifications stay applied.
 
 If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the marker until **Recheck** in the footer succeeds or the world reloads. Recheck refuses while the graph registration does not match the stored location.
 
@@ -50,7 +50,7 @@ A disabled marker keeps its binding without a registration. When it is enabled, 
 
 ## Write the binding by hand
 
-Copy the identity with **Copy ID** in the command band and add a modification to `Data/scene-patches.json`, as described in [scene-patch document v1](scene-patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add a modification to `Data/scene-patches.json`, as described in [patch document v1](patch-document-v1.md):
 
 ```json
 {
@@ -70,15 +70,15 @@ Copy the identity with **Copy ID** in the command band and add a modification to
 
 Replace the `trackMarker` value with `{ "detach": true }` to detach the marker. Add `placement` or `active` to the same modification to change those as well.
 
-## Repair feedback in the map editor
+## Repair feedback in the native map editor
 
-When a marker binding edit is refused, read the editor feedback beside the binding controls. It names the failed operation and reason. Refresh the inventory and inspect the marker again before retrying, especially after Undo, Redo or another native edit. The editor keeps unknown or changed definitions protected; it does not ask players to edit JSON.
+When a marker binding edit is refused, read the scene patch editing feedback beside the binding controls. It names the failed operation and reason. Refresh the inventory and inspect the marker again before retrying, especially after Undo, Redo or another native edit. Scene patch editing keeps unknown or changed definitions protected; it does not ask players to edit JSON.
 
-Some markers can emit a game warning before the patcher can apply a MapMod repair. The patcher attempts an early repair only for a dependency-free relationship-only operation, before the game's original `TrackMarker.OnEnable` check, when the target belongs to a valid scene and the track graph is populated. The game's check still runs. If that route is unavailable, the patcher can remove only the exact current warning row emitted by that check, and only after the applicable operation succeeds and the marker binding and dependent state pass a separate verification. Historical log entries are not changed. Unknown, changed, ambiguous or unrelated warnings remain. If the patcher cannot establish ownership of a warning window, it leaves the window open; you may close it manually. The patcher does not close player windows.
+Some markers can emit a game warning before the patcher can apply a mod repair. The patcher attempts an early repair only for a dependency-free relationship-only operation, before the game's original `TrackMarker.OnEnable` check, when the target belongs to a valid scene and the track graph is populated. The game's check still runs. If that route is unavailable, the patcher can remove only the exact current warning row emitted by that check, and only after the applicable operation succeeds and the marker binding and dependent state pass a separate verification. Historical log entries are not changed. Unknown, changed, ambiguous or unrelated warnings remain. If the patcher cannot establish ownership of a warning window, it leaves the window open; you may close it manually. The patcher does not close player windows.
 
-Recover unknown content or document-format problems in the map editor. Players should not create or edit JSON to resolve these reports.
+Recover unknown content or document-format problems in the native map editor. Players should not create or edit JSON to resolve these reports.
 
-Remove a repair with **Remove modification** in the footer. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same document target the object, combine them into one before editing or removing it in the editor.
+Remove a repair with **Remove modification** in the footer. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same document target the object, combine them into one before editing or removing it in the native map editor.
 
 ## Limits
 
@@ -86,7 +86,7 @@ The automated tests check set, replacement, detachment, omission, refusal of mis
 
 The supported pattern comes from the game's source: setting a marker's location does not change its graph registration, so the patcher repeats the registration steps the marker performs when it is enabled and disabled.
 
-One native journey on Railroader 0.6.2 with patcher source `a59b8d9` exercised the yard limit Mkwd in the map editor of a test MapMod, with four other inherited signs as unchanged controls. Set, replacement, detachment, refusal of a missing segment and of a distance beyond the segment, a placement change, native Undo and Redo, clearing the authored binding, physical snap, Save, editor reload and removal behaved as described above. Each bound state had exactly one graph registration owned by the marker and a matching graph lookup, a detached marker had none, and the controls kept their bindings, registrations and poses. That journey did not cover a completed transform-gizmo placement of a bound marker, which it refused as a changed target, a map-label refresh, because no admitted sign has a registered map label, or a second application within one load. It covers that marker, build and fixture only.
+One native journey on Railroader 0.6.2 with patcher source `a59b8d9` exercised the yard limit Mkwd in the native map editor of a test mod, with four other inherited signs as unchanged controls. Set, replacement, detachment, refusal of a missing segment and of a distance beyond the segment, a placement change, native Undo and Redo, clearing the mod's binding, physical snap, Save, native map editor reload and removal behaved as described above. Each bound state had exactly one graph registration owned by the marker and a matching graph lookup, a detached marker had none, and the controls kept their bindings, registrations and placements. That journey did not cover a completed transform-gizmo placement of a bound marker, which it refused as a changed target, a map-label refresh, because no admitted sign has a registered map label, or a second application within one load. It covers that marker, build and fixture only.
 
 The game reads a Generic marker's binding in these places:
 

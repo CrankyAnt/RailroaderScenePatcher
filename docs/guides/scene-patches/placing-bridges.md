@@ -4,15 +4,15 @@
 
 This guide shows how to move, rotate, disable and restore a supported bridge, and what stays where it is. Bridge placement moves the bridge's own hierarchy, including its colliders and culling. It does not move track, generated trestles or the construction scenery beside the bridge, and it does not change which track the bridge belongs to.
 
-The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Other bridges show up in the inventory without an edit. A bridge target requires patcher 0.5.0 or later. The editor's Save derives the dependency minimum from the document's content; see [the document reference](scene-patch-document-v1.md#dependency-minimum).
+The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Other bridges show up in the inventory without an edit. A bridge target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the document's content; see [the document reference](patch-document-v1.md#dependency-minimum).
 
-## Move the bridge in the editor
+## Move the bridge in the native map editor
 
 1. Open **Scene patches**, select **Refresh** in the command band, search for `Ela Bridge` and select its row in the outliner. **Select in world** with a click on the bridge's marking also selects it, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `bridge-colliders-v1`. If **Supported edits** on the **Object** tab starts with **Not editable:**, the bridge does not match the supported pattern and the reason follows.
 2. Select **Focus** in the command band to see the bridge and the track beside it.
 3. On the **Placement** tab, in **Numeric** mode, change the six fields: position in map coordinates and rotation in degrees. Select **Apply** at the bottom of the tab.
 
-The bridge root moves at once, with every collider below it. Save, Undo, Redo and **Remove modification** in the footer work as described in [edit and save fixed placement in the map editor](editing-placement-in-the-editor.md). Removal returns the bridge to the pose the loaded map gives it.
+The bridge root moves at once, with every collider below it. Save, Undo, Redo and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal returns the bridge to the placement the loaded map gives it.
 
 Moving the bridge away from its track leaves the track and the sampled nearby trestles where they were. How trains behave on a moved or disabled bridge has not been tested. Check the result in the world: the patcher does not align the bridge with the track for you.
 
@@ -22,7 +22,7 @@ Select **Disable** at the bottom of the tab of the **Object** tab. The bridge di
 
 ## Write the modification by hand
 
-Copy the identity with **Copy ID** in the command band and add it to `Data/scene-patches.json` as described in [scene-patch document v1](scene-patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add it to `Data/scene-patches.json` as described in [patch document v1](patch-document-v1.md):
 
 ```json
 {
@@ -54,8 +54,8 @@ Before it touches the bridge, the patcher requires:
 - no construction-scenery entry that switches the bridge root,
 - the same colliders, shapes and positions relative to the root that the bridge had when the patcher first saw it in this load.
 
-After each change it checks that the root has the authored pose and activity, that every collider kept its identity, shape and position relative to the root, that collider activity follows the root, and that the nearby generated trestles and the construction-scenery controller did not change. Any difference fails the modification and restores the bridge. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the bridge until **Recheck** succeeds or the world reloads.
+After each change it checks that the root has the mod's placement and activity, that every collider kept its identity, shape and position relative to the root, that collider activity follows the root, and that the nearby generated trestles and the construction-scenery controller did not change. Any difference fails the modification and restores the bridge. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the bridge until **Recheck** succeeds or the world reloads.
 
 ## Limits
 
-The automated tests check this behavior with a controlled bridge. The trestle comparison covers loaded trestles within 250 m of the bridge's first observed position. Bounds of mesh colliders are not compared. An isolated native test on Railroader 0.6.2 build 26335745 with patcher source `afe9d1b` observed the Ela bridge's seven box colliders keep their shapes and follow the root through move, disable, native Undo and Redo, removal, Save and an editor reload, without duplicated colliders after the reload. A disposable test ball recorded physics contact with a bridge collider at the original, moved, restored and reloaded poses. The two sampled nearby trestles and the sampled construction-scenery relationships stayed unchanged. That test covers this bridge and build only, not other bridges or builds, ordinary-play loading or an origin shift during edits. Collision under trains, construction-state transitions and multiplayer are not covered.
+The automated tests check this behavior with a controlled bridge. The trestle comparison covers loaded trestles within 250 m of the bridge's first observed position. Bounds of mesh colliders are not compared. An isolated native test on Railroader 0.6.2 build 26335745 with patcher source `afe9d1b` observed the Ela bridge's seven box colliders keep their shapes and follow the root through move, disable, native Undo and Redo, removal, Save and a native map editor reload, without duplicated colliders after the reload. A disposable test ball recorded physics contact with a bridge collider at the original, moved, restored and reloaded placements. The two sampled nearby trestles and the sampled construction-scenery relationships stayed unchanged. That test covers this bridge and build only, not other bridges or builds, ordinary-play loading or an origin shift during edits. Collision under trains, construction-state transitions and multiplayer are not covered.

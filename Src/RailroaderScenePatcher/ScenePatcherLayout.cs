@@ -1153,7 +1153,7 @@ namespace RailroaderScenePatcher {
                     new[] { "* and +", "Before a name, * marks an object this MapMod changes and + an object it adds; the state line shows the same as CHANGED and ADDED. Neither means unsaved: only the Unsaved lamp does." },
                     new[] { "Footer", "Below the messages, Remove modification and Recheck are the same on every tab. A tab's own actions stand in the row at the bottom of the tab." },
                     new[] { "Failed edit", "A failed edit restores the object. If that cannot be verified, the object is blocked until Recheck succeeds or the editor reloads." } },
-                Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-editor.md" }, new[] { "Document reference", "scene-patch-document-v1.md" } } },
+                Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-map-editor.md" }, new[] { "Document reference", "patch-document-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
@@ -1182,7 +1182,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current pose relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." } },
-                Guides = new[] { new[] { "Fixed placement", "authoring-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
+                Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
                 Terms = new[] {
@@ -1199,7 +1199,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Remove modification", "In the footer on every tab. Deletes this MapMod's modification. The object returns to its underlying state, not to an earlier patched position." },
                     new[] { "Recheck", "In the footer on every tab. After a failed edit, compares the object with the document and unblocks it once they agree." },
                     new[] { "Terrain output", "The game regenerates terrain after a board move. Save does not write that output. Retry asks for it again." } },
-                Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
+                Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {
             if (!Help.TryGetValue(region, out var help)) return;
