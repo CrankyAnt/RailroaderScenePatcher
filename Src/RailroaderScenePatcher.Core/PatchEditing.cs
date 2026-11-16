@@ -16,7 +16,7 @@ namespace RailroaderScenePatcher.Core {
         string ReadModInfo();
         void WriteModInfo(string text);
     }
-    // The editor's shared undo history. Groups are listed oldest first.
+    // The native map editor's shared undo history. Groups are listed oldest first.
     public interface INativeHistory {
         IReadOnlyList<object> UndoGroups { get; }
         IReadOnlyList<object> RedoGroups { get; }
@@ -145,9 +145,9 @@ namespace RailroaderScenePatcher.Core {
             return json.Write();
         }
     }
-    // One editor session for the edited mod: its patch document, the completed edits in the
+    // One scene patch editing session for the edited mod: its patch document, the completed edits in the
     // shared native history, and the truth about which required writes are still outstanding.
-    public sealed class AuthoringSession {
+    public sealed class PatchEditingSession {
         public const string NativeData = "native map data", PatchData = "patch document", Metadata = "dependency metadata";
         readonly PatchEngine engine;
         readonly IScene scene;
@@ -165,7 +165,7 @@ namespace RailroaderScenePatcher.Core {
         // Set when native Undo or Redo threw. The native manager then keeps an open partial group, so later
         // native edits reach neither its stack nor its change count. No Save in this session can prove a clean state.
         string unrecovered;
-        public AuthoringSession(PatchEngine engine, INativeHistory history, IStorage storage, string mapId, string modId = "crankyant/scene-patcher", string documentKey = "") {
+        public PatchEditingSession(PatchEngine engine, INativeHistory history, IStorage storage, string mapId, string modId = "crankyant/scene-patcher", string documentKey = "") {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
             this.history = history ?? throw new ArgumentNullException(nameof(history));
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
@@ -181,9 +181,9 @@ namespace RailroaderScenePatcher.Core {
                 else if (!scene.MapIds.Contains((string)loaded.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) Blocked = "Target map does not match the loaded map context";
                 else { document = loaded; savedText = loaded.Serialize(); }
             } catch (Exception e) { Blocked = "Cannot read the edited mod's files: " + e.Message; }
-            if (Blocked != null) Blocked += ". The patch document is protected from overwrite; correct it outside the editor and reload.";
+            if (Blocked != null) Blocked += ". The patch document is protected from overwrite; correct it outside scene patch editing and reload.";
         }
-        // Why authoring and patch persistence are unavailable in this session, or null.
+        // Why scene patch editing and patch persistence are unavailable in this session, or null.
         public string Blocked { get; private set; }
         // A history or edit operation that did not complete, until a complete Save.
         public string IncompleteOperation { get; private set; }
@@ -198,19 +198,19 @@ namespace RailroaderScenePatcher.Core {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
-                    // Track-following placement needs its capability whether or not it is available in this editor.
+                    // Track-following placement needs its capability whether or not it is available on this build.
                     if ((item["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)item["placement"]["mode"] == PatchEngine.TrackFollowingMode) minimum = Max(minimum, TrackFollowingVersion);
-                    // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available in this editor.
+                    // A relationship, and any edit of a track-marker object, needs the relationship capability whether or not it is available on this build.
                     if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == "Track.TrackMarker")) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
-                    // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available in this editor.
+                    // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available on this build.
                     if ((item["relationships"] as JObject)?["crossingCoverage"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
-                    // Bridge placement needs its capability whether or not it is available in this editor.
+                    // Bridge placement needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.5.0");
-                    // Crossing-pad rebinding needs its capability whether or not it is available in this editor.
+                    // Crossing-pad rebinding needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingPadScene.Structure) minimum = Max(minimum, CrossingPadScene.RequiredVersion);
                     TargetIdentity target;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
-                    // Board placement beyond the Sylva board needs its capability whether or not it is available in this editor.
+                    // Board placement beyond the Sylva board needs its capability whether or not it is available on this build.
                     var board = IndependentBoards.RequiredVersion(target);
                     if (board != null) minimum = Max(minimum, board);
                     if (!(scene is IVersionedScene versioned)) continue;
@@ -274,11 +274,11 @@ namespace RailroaderScenePatcher.Core {
         }
 
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active) { return Edit(target, placement, active, null); }
-        // An editor edit passes the token of its inspected observation; the edit is refused when that observation no longer holds.
+        // An edit in scene patch editing passes the token of its inspected observation; the edit is refused when that observation no longer holds.
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active, InspectedTarget inspected) {
             return Edit(target, placement, active, inspected, null);
         }
-        // A one-time placement operation may depend on an editor-only selection. Recheck it
+        // A one-time placement operation may depend on a selection in scene patch editing. Recheck it
         // after document/state callbacks, inside the same restoration boundary as the edit.
         public Outcome Edit(TargetIdentity target, Placement placement, bool? active, InspectedTarget inspected, Action validateBeforeMutation) {
             return Change("Edit scene object", target, inspected, existing => {
@@ -300,7 +300,7 @@ namespace RailroaderScenePatcher.Core {
             }, validateBeforeMutation);
         }
         // Makes the object follow an explicitly selected track or endpoint from where it stands: the document records its
-        // current pose relative to the anchor's current native pose. Activity and relationships stay as authored.
+        // current placement relative to the anchor's current native pose. Activity and relationships keep their mod values.
         public Outcome Follow(TargetIdentity target, TrackAnchor anchor, InspectedTarget inspected = null, Action validateBeforeMutation = null) {
             return Change("Follow track", target, inspected, existing => {
                 if (anchor == null) throw new InvalidOperationException("Explicitly select a track or endpoint to follow");
@@ -359,7 +359,7 @@ namespace RailroaderScenePatcher.Core {
         // Whether any modification of the active document follows a track, read from the document alone.
         public bool HasTrackFollowing => document != null && Blocked == null && document.Modifications.OfType<JObject>()
             .Any(m => (m["placement"] as JObject)?["mode"]?.Type == JTokenType.String && (string)m["placement"]["mode"] == PatchEngine.TrackFollowingMode);
-        // Ends track following: the object keeps its current pose as fixed placement.
+        // Ends track following: the object keeps its current placement as fixed placement.
         public Outcome StopFollowing(TargetIdentity target, InspectedTarget inspected = null) {
             return Change("Stop following track", target, inspected, existing => {
                 if (existing == null || PatchEngine.Parse(existing).State.Placement?.Following == null) throw new InvalidOperationException("This object does not follow a track in the active document");
@@ -438,7 +438,7 @@ namespace RailroaderScenePatcher.Core {
                     scene.Preflight(resolved);
                     var desired = engine.Desired(document.Modifications, resolved, documentKey);
                     var prior = scene.Read(resolved);
-                    // A pose that already agrees can still leave derived state, such as a pad's generated geometry, behind its track.
+                    // A placement that already agrees can still leave derived state, such as a pad's generated geometry, behind its track.
                     if (Same(prior, desired) && (!(scene is IDerivedStateScene derived) || derived.DerivedProblem(resolved, desired) == null)) { report = false; continue; }
                     engine.GuardMutation(parsed.Identity, resolved, mapContext, null);
                     try {
@@ -476,7 +476,7 @@ namespace RailroaderScenePatcher.Core {
                 return !(scene is IDerivedStateScene derived) || derived.DerivedProblem(held.Target, desired) == null;
             } catch (Exception) { return false; }
         }
-        // A follow update of a held target that changes only its pose or derived state, such as during a track drag. The
+        // A follow update of a held target that changes only its placement or derived state, such as during a track drag. The
         // scene confirms the held object, a placement preflight checks its own pattern and registration without scene-wide
         // scans, and the relationship, activity and coverage must already agree, so the update writes placement only.
         // Null when the update needs the full path.
@@ -512,14 +512,14 @@ namespace RailroaderScenePatcher.Core {
             var target = item["target"] as JObject;
             return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"];
         }
-        // Sets, replaces or detaches this mod's track-marker relationship of the object. Placement and activity stay as authored.
-        // A null binding clears the authored relationship: the object returns to its effective underlying relationship.
+        // Sets, replaces or detaches this mod's track-marker relationship of the object. Placement and activity keep their mod values.
+        // A null binding clears the mod's relationship: the object returns to its effective underlying relationship.
         public Outcome Bind(TargetIdentity target, MarkerBinding binding) { return Bind(target, binding, null); }
         public Outcome Bind(TargetIdentity target, MarkerBinding binding, InspectedTarget inspected) {
             return Change(binding == null ? "Clear track binding" : "Edit track binding", target, inspected, existing => {
                 if (existing != null) PatchEngine.Parse(existing);
                 if (binding == null) {
-                    if (existing?["relationships"] == null) throw new InvalidOperationException("This object has no authored relationship in the active document");
+                    if (existing?["relationships"] == null) throw new InvalidOperationException("This object has no relationship set by this mod in the active document");
                     var rest = (JObject)existing.DeepClone();
                     rest.Remove("relationships");
                     return rest["placement"] == null && rest["active"] == null ? null : rest;
@@ -534,13 +534,13 @@ namespace RailroaderScenePatcher.Core {
                 return value;
             });
         }
-        // Selects tracks for, or detaches, one circuit of this mod's crossing coverage. Other circuits keep their authored or
-        // effective coverage. A null coverage clears the circuit's authored entry: it returns to its effective underlying coverage.
+        // Selects tracks for, or detaches, one circuit of this mod's crossing coverage. Other circuits keep their mod values or
+        // effective coverage. A null coverage clears the entry set by this mod for the circuit: it returns to its effective underlying coverage.
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage) { return Cover(target, circuit, coverage, null); }
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage, InspectedTarget inspected) {
             return Change(coverage == null ? "Clear crossing coverage" : "Edit crossing coverage", target, inspected, existing => CoverageValue(target, existing, circuit, coverage, false));
         }
-        // Adds detection for explicitly selected tracks to the crossing as an authored addition with this ID, or replaces the
+        // Adds detection for explicitly selected tracks to the crossing as a detection addition with this ID, or replaces the
         // tracks of the addition that has it. The ID names one addition in the document. Native circuits keep their coverage.
         public Outcome AddDetection(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
             return Change("Add crossing detection", target, inspected, existing => {
@@ -548,7 +548,7 @@ namespace RailroaderScenePatcher.Core {
                 return CoverageValue(target, existing, id, tracks, true);
             });
         }
-        // Deletes the authored addition: its circuit leaves the crossing and its owned spans are removed. Other additions and
+        // Deletes the detection addition: its circuit leaves the crossing and its owned spans are removed. Other additions and
         // the coverage of the native circuits stay as they are.
         public Outcome DeleteDetection(TargetIdentity target, string id, InspectedTarget inspected = null) {
             return Change("Delete crossing detection", target, inspected, existing => CoverageValue(target, existing, id, null, true));
@@ -575,7 +575,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before another edit");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside the editor first");
+                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside scene patch editing first");
                 var existing = own.FirstOrDefault();
                 var value = CoverageValue(target, existing, circuit, coverage, addition);
                 if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, documentKey).State);
@@ -595,10 +595,10 @@ namespace RailroaderScenePatcher.Core {
             if (desired != null) engine.CheckRelationships(target, new ObjectState(null, null, null, desired));
         }
         // The modification with one entry of its crossing coverage set, replaced or, for a null coverage, cleared. An entry
-        // names a native circuit by its island span, or an authored addition by its ID.
+        // names a native circuit by its island span, or a detection addition by its ID.
         JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage, bool addition) {
             if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException(addition ? "Give the addition an ID" : "Choose a circuit of the crossing");
-            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the circuit's authored coverage to return it to its native spans");
+            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to its native spans");
             if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "Add detection for extra tracks as an addition; a native circuit takes selected tracks or a detach");
             if (existing != null) PatchEngine.Parse(existing);
             if (addition && coverage != null && document.Modifications.OfType<JObject>().Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))
@@ -608,7 +608,7 @@ namespace RailroaderScenePatcher.Core {
             var relationships = value["relationships"] as JObject ?? new JObject();
             var circuits = relationships["crossingCoverage"] as JArray ?? new JArray();
             var entry = circuits.OfType<JObject>().FirstOrDefault(c => c[name]?.Type == JTokenType.String && (string)c[name] == circuit);
-            if (coverage == null && entry == null) throw new InvalidOperationException(addition ? "Addition " + circuit + " is not authored in the active document for this crossing" : "Circuit " + circuit + " has no authored coverage in the active document");
+            if (coverage == null && entry == null) throw new InvalidOperationException(addition ? "Addition " + circuit + " is not set in the active document for this crossing" : "Circuit " + circuit + " has no coverage set by this mod in the active document");
             var replacement = coverage == null ? null : CircuitJson(circuit, coverage);
             if (entry != null) { if (replacement == null) entry.Remove(); else entry.Replace(replacement); }
             else circuits.Add(replacement);
@@ -625,10 +625,10 @@ namespace RailroaderScenePatcher.Core {
         }
         static JObject LocationJson(TrackLocation location) => new JObject { ["segment"] = location.Segment, ["end"] = location.End, ["distance"] = location.Distance };
         // Clears this mod's activity value of the object: it returns to its effective underlying activity, which for an
-        // object following a track group is group-driven again. Placement and relationships stay as authored.
+        // object following a track group is group-driven again. Placement and relationships keep their mod values.
         public Outcome ClearActivity(TargetIdentity target, InspectedTarget inspected = null) {
             return Change("Clear activity", target, inspected, existing => {
-                if (existing?["active"] == null) throw new InvalidOperationException("This object has no authored activity in the active document");
+                if (existing?["active"] == null) throw new InvalidOperationException("This object has no activity set by this mod in the active document");
                 PatchEngine.Parse(existing);
                 var rest = (JObject)existing.DeepClone();
                 rest.Remove("active");
@@ -654,14 +654,14 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException(engine.AwaitingOutput(resolved) ? "Target cleanup is unverified until the restored dependent output completes; edit again once it has" : "Target cleanup is unverified. Recheck the object or reload before another edit");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside the editor first");
+                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the document target this object; combine them outside scene patch editing first");
                 var existing = own.FirstOrDefault();
                 JObject value;
                 try { value = next(existing); }
                 catch (InvalidOperationException e) when (existing != null && e.Message.StartsWith("Unsupported", StringComparison.Ordinal)) {
                     throw new InvalidOperationException("The existing modification holds content this patcher version does not understand; it is preserved and cannot be edited or removed here");
                 }
-                // An editor edit stores what it changes. A setting whose new value equals the object's value without
+                // An edit in scene patch editing stores what it changes. A setting whose new value equals the object's value without
                 // this mod leaves the modification: the edit is a revert of that setting. An edit that leaves the
                 // document as it is changes nothing and adds no step to the native history, as a native field ignores
                 // a value equal to the one it shows.
@@ -700,7 +700,7 @@ namespace RailroaderScenePatcher.Core {
             if (a == null || b == null || (a.Position == null && a.Rotation == null)) return false;
             return (a.Position == null || SamePosition(a.Position, b.Position)) && (a.Rotation == null || SameRotation(a.Rotation, b.Rotation));
         }
-        // The tolerance within which two poses are the same setting, for the equal-value rule and for the lines of the
+        // The tolerance within which two placements are the same setting, for the equal-value rule and for the lines of the
         // Changes tab alike: half a millimetre on each axis, and about a hundredth of a degree.
         public static bool SamePosition(IReadOnlyList<double> a, IReadOnlyList<double> b) {
             if (a == null || b == null || a.Count != b.Count) return false;
@@ -740,7 +740,7 @@ namespace RailroaderScenePatcher.Core {
             var mutating = false;
             try {
                 var desired = engine.Desired(document.Modifications, target, documentKey);
-                // Only the authored relationship needs a resolvable target; the underlying one may be the broken binding being repaired.
+                // Only the mod's relationship needs a resolvable target; the underlying one may be the broken binding being repaired.
                 if (value != null) engine.CheckRelationships(target, PatchEngine.Parse(value, documentKey).State);
                 CheckEffectiveCoverage(target, desired.Coverage);
                 // Reading state and resolving the document may invoke native callbacks. Never redirect to a new match.
@@ -811,7 +811,7 @@ namespace RailroaderScenePatcher.Core {
             if (target.Structure != null) value["structure"] = target.Structure;
             return value;
         }
-        // The pose tolerances of the scene adapters' own verification. A wider angle here would count a following object
+        // The placement tolerances of the scene adapters' own verification. A wider angle here would count a following object
         // as current after its track turned by less than that angle, and the object would not follow.
         const double AngleToleranceDegrees = 0.01;
         static bool Same(ObjectState a, ObjectState b) {
@@ -822,12 +822,12 @@ namespace RailroaderScenePatcher.Core {
             return la > 0 && lb > 0 && 2 * Math.Acos(Math.Min(1, Math.Abs(dot) / Math.Sqrt(la * lb))) * 180 / Math.PI <= AngleToleranceDegrees;
         }
 
-        // History notifications from the editor: around each native Undo or Redo, and after any history change.
+        // History notifications from the native map editor: around each native Undo or Redo, and after any history change.
         public void BeginHistoryExecution() { identity.Begin(); }
         public void EndHistoryExecution(Exception error) {
             identity.End(error != null);
             if (error == null) return;
-            unrecovered = "Native Undo or Redo stopped on an error: " + error.Message + ". The native history is unrecovered and may no longer record edits. Save still writes the current state, but the editor stays unsaved until it is reloaded.";
+            unrecovered = "Native Undo or Redo stopped on an error: " + error.Message + ". The native history is unrecovered and may no longer record edits. Save still writes the current state, but the native map editor stays unsaved until it is reloaded.";
             IncompleteOperation = unrecovered;
         }
         public void HistoryChanged() { identity.Observe(); }
@@ -840,7 +840,7 @@ namespace RailroaderScenePatcher.Core {
                 catch (InvalidOperationException) { return true; }
             }
         }
-        // The participants whose required write has not completed. nativeDirty is the editor's own change-count answer.
+        // The participants whose required write has not completed. nativeDirty is the native map editor's own change-count answer.
         public IReadOnlyList<string> Outstanding(bool nativeDirty) {
             var result = new List<string>();
             if (nativeDirty || uncertain || unrecovered != null || identity.Current != savedIdentity) result.Add(NativeData);
@@ -871,7 +871,7 @@ namespace RailroaderScenePatcher.Core {
             }
             if (!PatchOutstanding) return;
             try {
-                if (storage.ReadPatchDocument() != diskText) throw new InvalidOperationException("the file changed outside the editor after it was read. It is protected from overwrite; reload the editor to read it again");
+                if (storage.ReadPatchDocument() != diskText) throw new InvalidOperationException("the file changed outside scene patch editing after it was read. It is protected from overwrite; reload the native map editor to read it again");
                 var text = document.Serialize();
                 storage.WritePatchDocument(text);
                 diskText = text; savedText = text; written.Add(PatchData);

@@ -33,7 +33,7 @@ class Scene : IScene, IInspectionScene {
         if (FailNextApplies > 0) { FailNextApplies--; throw new Exception("injected once"); }
         if (FailApply || ReferenceEquals(target, FailingTarget)) throw new Exception("injected");
     }
-    public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var pose = (object[])snapshot; box.Position = (double[])pose[0]; box.Rotation = (double[])pose[1]; box.Active = (bool)pose[2]; return true; }
+    public bool Restore(object target, object snapshot) { if (FailRestore) return false; var box = (Box)target; var placement = (object[])snapshot; box.Position = (double[])placement[0]; box.Rotation = (double[])placement[1]; box.Active = (bool)placement[2]; return true; }
 }
 class Box { public double[] Position = new double[3], Rotation = new double[4]; public bool Active = true; public double X { get => Position[0]; set => Position[0] = value; } }
 // One peer's world state as the native entry point binds it: an adapter and its engine.
@@ -168,7 +168,7 @@ class Program {
         var result = new PatchEngine(scene).Apply(json);
         Assert(!String.IsNullOrEmpty(result.Error) && result.Outcomes.Count == 0, scenario + ": whole document rejected without individual outcomes");
         Assert(scene.ResolveCalls == 0 && scene.MutationCalls == 0, scenario + ": no target resolution or mutation, including the independent valid entry");
-        Assert(box.Position.SequenceEqual(new[] { 7.0, 8.0, 9.0 }) && box.Rotation.SequenceEqual(new[] { 1.0, 0.0, 0.0, 0.0 }), scenario + ": complete original pose retained");
+        Assert(box.Position.SequenceEqual(new[] { 7.0, 8.0, 9.0 }) && box.Rotation.SequenceEqual(new[] { 1.0, 0.0, 0.0, 0.0 }), scenario + ": complete original placement retained");
     }
     static string Item(string id, string path, string deps = "[]", string extra = "") => "{\"id\":\"" + id + "\",\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":" + deps + extra + "}";
     static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":[" + items + "]}";
@@ -196,7 +196,7 @@ class Program {
         result = new PatchEngine(scene).Apply(Doc(Item("dependent", "p", "[\"base\"]") + "," + Item("base", "p")));
         Assert(result.Outcomes["dependent"].Applied && result.Outcomes["base"].Applied, "Dependencies run regardless of document order");
         engine = new PatchEngine(scene); box.Position = new[] { 4.0, 5.0, 6.0 }; box.Rotation = new[] { 1.0, 0.0, 0.0, 0.0 }; scene.FailApply = true;
-        result = engine.Apply(Doc(Item("a", "p"))); Assert(!result.Outcomes["a"].Applied && box.X == 4 && box.Position[1] == 5 && box.Position[2] == 6 && box.Rotation[0] == 1 && box.Rotation[3] == 0, "Failed mutation restores the complete pose");
+        result = engine.Apply(Doc(Item("a", "p"))); Assert(!result.Outcomes["a"].Applied && box.X == 4 && box.Position[1] == 5 && box.Position[2] == 6 && box.Rotation[0] == 1 && box.Rotation[3] == 0, "Failed mutation restores the complete placement");
         scene.FailApply = false; result = engine.Apply(Doc(Item("a", "p"))); Assert(!result.Outcomes["a"].Applied && box.X == 4, "Failure is not retried during the load");
         scene.FailApply = true; scene.FailRestore = true; engine = new PatchEngine(scene);
         result = engine.Apply(Doc(Item("a", "p"))); scene.FailApply = false; scene.FailRestore = false;
@@ -253,7 +253,7 @@ class Program {
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();
-        AuthoringTests.Run();
+        PatchEditingTests.Run();
         SnapTests.Run();
         GizmoTests.Run();
         GizmoRefusalTests.Run();

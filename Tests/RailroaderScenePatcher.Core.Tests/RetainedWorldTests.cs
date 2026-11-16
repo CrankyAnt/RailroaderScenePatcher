@@ -84,8 +84,8 @@ static class RetainedWorldTests {
         peer.Enter("map", "graph");
         peer.Engine.Apply(json, "pack");
         Assert(peer.Enter("map", "rebuilt-graph") == WorldEntry.Reentered && peer.Engine.Apply(json, "pack").Outcomes["move-board"].Applied && board.X == 112, "The retained board keeps its patched placement through re-entry");
-        var editor = new Editor();
-        var session = new AuthoringSession(peer.Engine, editor, new Store { Patch = json }, "map", documentKey: "pack"); editor.Session = session;
+        var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(peer.Engine, mapEditor, new Store { Patch = json }, "map", documentKey: "pack"); mapEditor.Session = session;
         var removed = session.Remove(new TargetIdentity("s", "board", "c"));
         Assert(removed.Applied && board.X == 1 && board.Position[1] == 1 && board.Position[2] == 1, "Removal after re-entry returns the board to its native placement, not to the patched one: " + removed.Error + " at " + board.X);
     }

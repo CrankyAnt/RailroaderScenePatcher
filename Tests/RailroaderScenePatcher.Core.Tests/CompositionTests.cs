@@ -82,14 +82,14 @@ static class CompositionTests {
         var w = new World(boardAvailable: false);
         var result = w.Engine.Apply(Doc(Board("board", Moved) + "," + Bridge("bridge")), "author/pack");
         Assert(!result.Outcomes["board"].Applied && result.Outcomes["board"].Error.Contains("board functions missing") && result.Outcomes["bridge"].Applied, "An unavailable board capability fails only the board modification");
-        Assert(w.Boards.PoseWrites == 0, "No board is moved without its capability");
+        Assert(w.Boards.PlacementWrites == 0, "No board is moved without its capability");
         w = new World(bridgeAvailable: false);
         result = w.Engine.Apply(Doc(Board("board", Moved) + "," + Bridge("bridge")), "author/pack");
         Assert(result.Outcomes["board"].Applied && !result.Outcomes["bridge"].Applied && result.Outcomes["bridge"].Error.Contains("bridge functions missing"), "An unavailable bridge capability fails only the bridge modification");
         Assert(w.Bridges.Mutations == 0 && w.BoardConsistent, "The board applies with its registrations while the bridge is untouched");
     }
     static void VersionMinimumIsTheDocumentMaximum() {
-        AuthoringSession Session(World w, Store store) { var editor = new Editor(); var s = new AuthoringSession(w.Engine, editor, store, "map"); editor.Session = s; return s; }
+        PatchEditingSession Session(World w, Store store) { var mapEditor = new NativeMapEditor(); var s = new PatchEditingSession(w.Engine, mapEditor, store, "map"); mapEditor.Session = s; return s; }
         var cases = new (string Name, string Items, bool BoardAvailable, bool BridgeAvailable, string Expected)[] {
             ("Sylva placement", Board("a", Moved), true, true, "0.1.0"),
             ("Sylva with activity", Board("a", Moved, extra: ",\"active\":false"), true, true, "0.2.0"),
@@ -113,6 +113,6 @@ static class CompositionTests {
         var store = new Store { Patch = Doc(Board("a", new[] { 110.0, 5.0, 90.0 }, OtherBoard)), Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.5.0\"]}}" };
         stricter.Boards.Add(new FakeBoard { Path = OtherBoard, Position = new[] { 100.0, 5.0, 100.0 } });
         var kept = Session(stricter, store);
-        Assert(!kept.Outstanding(false).Contains(AuthoringSession.Metadata), "A stricter existing constraint is kept");
+        Assert(!kept.Outstanding(false).Contains(PatchEditingSession.Metadata), "A stricter existing constraint is kept");
     }
 }

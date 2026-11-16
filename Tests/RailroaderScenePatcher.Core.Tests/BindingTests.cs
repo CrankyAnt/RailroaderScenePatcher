@@ -142,7 +142,7 @@ class FakeMarkerWorld : ITrackMarkerWorld {
     public double[] Position(object target) { var m = (FakeMarker)target; return new[] { m.Position[0] + Origin, m.Position[1], m.Position[2] }; }
     public double[] Rotation(object target) => (double[])((FakeMarker)target).Rotation.Clone();
     public bool Active(object target) => ((FakeMarker)target).Active;
-    public void SetPose(object target, double[] position, double[] rotation) {
+    public void SetPlacement(object target, double[] position, double[] rotation) {
         Mutations++; var m = (FakeMarker)target;
         m.Position = new[] { position[0] - Origin, position[1], position[2] }; m.Rotation = (double[])rotation.Clone();
     }
@@ -190,7 +190,7 @@ class FakeMarkerWorld : ITrackMarkerWorld {
     // A group follower present at load, as its Awake observes the group.
     public void LoadFollower(FakeMarker m) { m.Follows = true; ObserveGroup(m); Load(m); Mutations = 0; m.Activations = 0; }
 }
-// A marker world with the native adapter's target confirmation and pose-only check: the structural rule and no consumer scan.
+// A marker world with the native adapter's target confirmation and placement-only check: the structural rule and no consumer scan.
 class PlacementCheckedMarkerWorld : FakeMarkerWorld, ITargetConfirmation, IPlacementPattern {
     public int PlacementChecks;
     public bool StillIdentifies(object target, TargetIdentity identity) =>
@@ -236,14 +236,14 @@ static class BindingTests {
         SharedFieldPassReadsEachFieldOnce();
         ReferenceWalkPausesBetweenOwners();
         SetupPlacementsAreIndexedOncePerDiscovery();
-        EditorSetReplaceDetachUndoRedo();
-        EditorRemovalRecomputesUnderlyingRelationship();
-        EditorRefusalAndFailureRestore();
+        EditingSetReplaceDetachUndoRedo();
+        EditingRemovalRecomputesUnderlyingRelationship();
+        EditingRefusalAndFailureRestore();
         SaveAndReloadReproduceBindingOnce();
         GizmoGestureKeepsTheBinding();
         PhysicalSnapKeepsTheBinding();
         GenericMarkerInsideCrossingIsEditable();
-        Console.WriteLine("PASS: track-marker relationship set, replacement, detachment, omission, refusal, restoration and authoring");
+        Console.WriteLine("PASS: track-marker relationship set, replacement, detachment, omission, refusal, restoration and scene patch editing");
     }
     // A whistle sign inside a grade-crossing setup is an ordinary Generic marker: no game logic reads it, and the crossing's
     // horn comes from its pad. Only the pad and the crossing's own markers stay with the crossing capabilities.
@@ -260,8 +260,8 @@ static class BindingTests {
         tracks.Poses["node:N1"] = new TrackPose(new[] { 1050.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
         var capabilities = new SceneCapabilities(() => world.MapIds) { Tracks = tracks };
         capabilities.Add(new TrackMarkerScene(world, Capability.Unchecked));
-        var store = new Store(); var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(capabilities), editor, store, "map"); editor.Session = session;
+        var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
         var sign = InCrossing(WhistlePath);
         var set = session.Bind(sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 4)));
         Assert(set.Applied && Entry(world, whistle) == "Nnew|b|4" && whistle.CachedGroup == "extension" && whistle.Position[0] == 20, "A whistle sign inside a crossing takes a binding like any Generic marker: " + set.Error);
@@ -270,7 +270,7 @@ static class BindingTests {
         var placed = session.Edit(sign, new Placement(new[] { 1045.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
         Assert(placed.Applied && whistle.Position[0] == 45 && Entry(world, whistle) == "S377|a|7.511661", "Its fixed placement is editable and keeps the binding: " + placed.Error);
         var disabled = session.Edit(sign, null, false);
-        Assert(disabled.Applied && !whistle.Active && world.Registrations(whistle).Count == 0 && whistle.Segment == "S377" && whistle.Position[0] == 45, "It can be disabled, which withdraws its registration and keeps its binding and pose: " + disabled.Error);
+        Assert(disabled.Applied && !whistle.Active && world.Registrations(whistle).Count == 0 && whistle.Segment == "S377" && whistle.Position[0] == 45, "It can be disabled, which withdraws its registration and keeps its binding and placement: " + disabled.Error);
         Assert(Only(session)["active"] != null && !(bool)Only(session)["active"], "The document records the explicit disable");
         var enabled = session.Edit(sign, null, true);
         Assert(enabled.Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661" && whistle.Position[0] == 45, "It can be enabled again, which registers it at its binding: " + enabled.Error);
@@ -282,17 +282,17 @@ static class BindingTests {
         var at = whistle.Position[0]; var checks = world.PlacementChecks;
         tracks.Poses["node:N1"] = new TrackPose(new[] { 1060.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
         var moved = session.ReconcileTrackFollowing().Single().Value;
-        Assert(moved.Applied && whistle.Position[0] == at + 10 && world.PlacementChecks > checks && Entry(world, whistle) == "S377|a|7.511661", "A track move carries it through the pose-only check: " + moved.Error);
+        Assert(moved.Applied && whistle.Position[0] == at + 10 && world.PlacementChecks > checks && Entry(world, whistle) == "S377|a|7.511661", "A track move carries it through the placement-only check: " + moved.Error);
         var detached = session.Bind(sign, MarkerBinding.Detached);
         Assert(detached.Applied && whistle.Segment == null && world.Registrations(whistle).Count == 0 && whistle.CachedGroup == null, "Its binding can be detached: " + detached.Error);
-        editor.Undo(); Assert(Entry(world, whistle) == "S377|a|7.511661" && whistle.CachedGroup == "bryson", "Undo restores its binding and registration");
+        mapEditor.Undo(); Assert(Entry(world, whistle) == "S377|a|7.511661" && whistle.CachedGroup == "bryson", "Undo restores its binding and registration");
         var before = world.Mutations;
         var padEdit = session.Bind(InCrossing(PadPath), MarkerBinding.At(new TrackLocation("Nnew", "a", 3)));
         Assert(!padEdit.Applied && padEdit.Error.Contains("crossing-pad capability"), "The crossing pad stays with its own capability: " + padEdit.Error);
         var crossingEdit = session.Bind(InCrossing(CrossingMarkerPath), MarkerBinding.Detached);
         Assert(!crossingEdit.Applied && crossingEdit.Error.Contains("this marker is Crossing"), "A Crossing-type marker stays outside the Generic pattern: " + crossingEdit.Error);
         Assert(!session.Edit(InCrossing(PadPath), new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied, "The pad's placement stays outside the Generic pattern");
-        Assert(world.Mutations == before && Entry(world, pad) == "S377|a|9" && pad.Position[0] == 25 && Entry(world, crossingMarker) == "S377|b|4", "The refused crossing markers keep their binding, registration and pose");
+        Assert(world.Mutations == before && Entry(world, pad) == "S377|a|9" && pad.Position[0] == 25 && Entry(world, crossingMarker) == "S377|b|4", "The refused crossing markers keep their binding, registration and placement");
     }
     static void SetBindsLocationAndRegistration() {
         var (world, sign, other, scene) = Setup();
@@ -326,7 +326,7 @@ static class BindingTests {
         // A placement and a relationship in one modification are applied independently.
         (world, sign, other, scene) = Setup();
         result = new PatchEngine(scene).Apply(Doc(Binding("both", At("Nnew", "a", 10), extra: ",\"placement\":{\"mode\":\"fixed\",\"position\":[1030,1,2],\"rotation\":[0,0,0,1]}")));
-        Assert(result.Outcomes["both"].Applied && sign.Position[0] == 30 && Entry(world, sign) == "Nnew|a|10", "Placement and binding each take their own authored value");
+        Assert(result.Outcomes["both"].Applied && sign.Position[0] == 30 && Entry(world, sign) == "Nnew|a|10", "Placement and binding each take their own mod value");
     }
     static void DetachClearsLocationAndRegistration() {
         var (world, sign, other, scene) = Setup();
@@ -565,16 +565,16 @@ static class BindingTests {
             ("unreadable generic list declaration", (w, m) => w.Owners.Add(new FakeOwner { Name = "Consumer", Fields = { Declared("markers", typeof(IList<FakeMarker>), () => throw new InvalidOperationException("generic list read injected")) } }), "could not read 1 field, first Consumer.markers"),
         };
         foreach (var (name, inject, expected) in cases) {
-            var (world, sign, other, session, editor, store) = Session();
+            var (world, sign, other, session, mapEditor, store) = Session();
             inject(world, sign);
             var runtime = new PatchEngine(new TrackMarkerScene(world, Capability.Unchecked)).Apply(Doc(Binding("rebind", At("Nnew", "a", 4)) + "," + Placed("move")));
             Assert(!runtime.Outcomes["rebind"].Applied && runtime.Outcomes["rebind"].Error.Contains(expected), name + ": runtime application refuses: " + runtime.Outcomes["rebind"].Error);
             Assert(!runtime.Outcomes["move"].Applied, name + ": a placement of the same marker is refused too, since its preflight shares the scan");
             var before = session.DocumentText;
             var edit = session.Bind(Sign, MarkerBinding.Detached);
-            Assert(!edit.Applied && edit.Error.Contains(expected), name + ": the editor binding refuses: " + edit.Error);
-            Assert(world.Mutations == 0 && editor.UndoGroups.Count == 0 && session.DocumentText == before && store.Patch == null, name + ": no mutation, history entry or document change");
-            Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && sign.Position[0] == 20 && Entry(world, other) == "Sjdl|b|38.6", name + ": reference, registration, dependent cache and pose stay");
+            Assert(!edit.Applied && edit.Error.Contains(expected), name + ": the scene patch editing binding refuses: " + edit.Error);
+            Assert(world.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && session.DocumentText == before && store.Patch == null, name + ": no mutation, history entry or document change");
+            Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && sign.Position[0] == 20 && Entry(world, other) == "Sjdl|b|38.6", name + ": reference, registration, dependent cache and placement stay");
             var incomplete = new[] { "unreadable relevant field", "unenumerable list", "unavailable fields", "unreadable generic list declaration", "unenumerable generic-only list" };
             Assert(session.Bind(Other, MarkerBinding.Detached).Applied == !incomplete.Contains(name),
                 name + ": an incomplete scan refuses every marker, a holder refuses only its marker");
@@ -582,68 +582,68 @@ static class BindingTests {
     }
     static readonly TargetIdentity Sign = new TargetIdentity("BushnellWhittier", SignPath, "Track.TrackMarker", TrackMarkerScene.Structure);
     static readonly TargetIdentity Other = new TargetIdentity("BushnellWhittier", OtherPath, "Track.TrackMarker", TrackMarkerScene.Structure);
-    static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, AuthoringSession session, Editor editor, Store store) Session(string patch = null) {
+    static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null) {
         var (world, sign, other, scene) = Setup();
-        var store = new Store { Patch = patch }; var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(scene), editor, store, "map"); editor.Session = session;
-        return (world, sign, other, session, editor, store);
+        var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        return (world, sign, other, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(AuthoringSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
-    static void EditorSetReplaceDetachUndoRedo() {
-        var (world, sign, other, session, editor, store) = Session();
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
+    static void EditingSetReplaceDetachUndoRedo() {
+        var (world, sign, other, session, mapEditor, store) = Session();
         var set = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12)));
-        Assert(set.Applied && Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 20, "An editor binding sets the reference and registration without moving the object: " + set.Error);
+        Assert(set.Applied && Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 20, "A scene patch editing binding sets the reference and registration without moving the object: " + set.Error);
         var item = Only(session);
         Assert((string)item["relationships"]["trackMarker"]["segment"] == "Nnew" && (string)item["relationships"]["trackMarker"]["end"] == "b" && (double)item["relationships"]["trackMarker"]["distance"] == 12
             && item["placement"] == null && item["active"] == null, "The document records only the binding: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "A relationship requires the common delivery minimum");
         var moved = new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.Edit(Sign, moved, null).Applied && sign.Position[0] == 40 && Entry(world, sign) == "Nnew|b|12", "A later placement edit keeps the binding");
-        Assert(Only(session)["relationships"] != null && Only(session)["placement"] != null, "The placement edit preserves the authored relationship");
+        Assert(Only(session)["relationships"] != null && Only(session)["placement"] != null, "The placement edit preserves this mod's relationship");
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Sjdl", "a", 3))).Applied && Entry(world, sign) == "Sjdl|a|3" && sign.Position[0] == 40, "A replacement binding changes only the binding");
-        Assert(session.Bind(Sign, MarkerBinding.Detached).Applied && sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40, "An editor detach clears reference and registration");
+        Assert(session.Bind(Sign, MarkerBinding.Detached).Applied && sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40, "A scene patch editing detach clears reference and registration");
         Assert((bool)Only(session)["relationships"]["trackMarker"]["detach"], "The document records an explicit detach");
         Assert(sign.CachedGroup == null, "Detach clears the dependent cache");
-        editor.Undo(); Assert(Entry(world, sign) == "Sjdl|a|3" && sign.CachedGroup == "alarka", "Undo of a detach restores the reference, registration and dependent cache");
-        editor.Undo(); Assert(Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 40 && sign.CachedGroup == "extension", "Undo of a replacement restores the prior binding and dependent cache");
-        editor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|12" && sign.CachedGroup == "extension", "Undo of the placement keeps the binding and dependent cache");
-        editor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && session.DocumentText.Contains("\"modifications\": []"), "Undo of the first binding restores the native relationship and dependent cache");
-        editor.Redo(); editor.Redo(); editor.Redo(); editor.Redo();
+        mapEditor.Undo(); Assert(Entry(world, sign) == "Sjdl|a|3" && sign.CachedGroup == "alarka", "Undo of a detach restores the reference, registration and dependent cache");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 40 && sign.CachedGroup == "extension", "Undo of a replacement restores the prior binding and dependent cache");
+        mapEditor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|12" && sign.CachedGroup == "extension", "Undo of the placement keeps the binding and dependent cache");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && session.DocumentText.Contains("\"modifications\": []"), "Undo of the first binding restores the native relationship and dependent cache");
+        mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
         Assert(sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40 && sign.CachedGroup == null, "Redo reapplies every relationship and placement edit");
-        Assert(Entry(world, other) == "Sjdl|b|38.6" && other.CachedGroup == "alarka", "No editor operation touched the unrelated marker or its dependent cache");
+        Assert(Entry(world, other) == "Sjdl|b|38.6" && other.CachedGroup == "alarka", "No scene patch editing operation touched the unrelated marker or its dependent cache");
     }
-    static void EditorRemovalRecomputesUnderlyingRelationship() {
-        var (world, sign, other, session, editor, store) = Session();
+    static void EditingRemovalRecomputesUnderlyingRelationship() {
+        var (world, sign, other, session, mapEditor, store) = Session();
         session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 7)));
         session.Edit(Sign, new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
         var cleared = session.Bind(Sign, null);
-        Assert(cleared.Applied && Entry(world, sign) == "S9sc|a|225.6681" && sign.Position[0] == 30, "Clearing the authored binding returns the underlying relationship and keeps the placement: " + cleared.Error);
+        Assert(cleared.Applied && Entry(world, sign) == "S9sc|a|225.6681" && sign.Position[0] == 30, "Clearing this mod's binding returns the underlying relationship and keeps the placement: " + cleared.Error);
         Assert(Only(session)["relationships"] == null && Only(session)["placement"] != null, "The modification keeps its placement without a relationship");
         Assert(!session.Bind(Sign, null).Applied, "Clearing an absent binding is refused");
-        editor.Undo(); Assert(Entry(world, sign) == "Nnew|a|7", "Undo of the clearing restores the authored binding");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "Nnew|a|7", "Undo of the clearing restores this mod's binding");
         Assert(session.Bind(Other, MarkerBinding.Detached).Applied && world.Registrations(other).Count == 0, "A second object's binding is a separate contribution");
-        Assert(session.Remove(Sign).Applied && Entry(world, sign) == "S9sc|a|225.6681" && sign.Position[0] == 20 && sign.CachedGroup == "ela", "Removal recomputes the underlying relationship, dependent cache and pose");
-        Assert(world.Registrations(other).Count == 0 && other.CachedGroup == null, "Removal keeps the remaining authored contribution of another object and its dependent cache");
-        editor.Undo(); Assert(Entry(world, sign) == "Nnew|a|7" && sign.Position[0] == 30 && sign.CachedGroup == "extension", "Undo of the removal restores the authored binding and dependent cache");
+        Assert(session.Remove(Sign).Applied && Entry(world, sign) == "S9sc|a|225.6681" && sign.Position[0] == 20 && sign.CachedGroup == "ela", "Removal recomputes the underlying relationship, dependent cache and placement");
+        Assert(world.Registrations(other).Count == 0 && other.CachedGroup == null, "Removal keeps this mod's remaining contribution of another object and its dependent cache");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "Nnew|a|7" && sign.Position[0] == 30 && sign.CachedGroup == "extension", "Undo of the removal restores this mod's binding and dependent cache");
         // Clearing the only setting of a modification removes it.
-        (world, sign, other, session, editor, store) = Session();
+        (world, sign, other, session, mapEditor, store) = Session();
         session.Bind(Sign, MarkerBinding.Detached);
         Assert(session.Bind(Sign, null).Applied && session.DocumentText.Contains("\"modifications\": []") && Entry(world, sign) == "S9sc|a|225.6681", "Clearing a binding-only modification removes it");
     }
-    static void EditorRefusalAndFailureRestore() {
-        var (world, sign, other, session, editor, store) = Session();
+    static void EditingRefusalAndFailureRestore() {
+        var (world, sign, other, session, mapEditor, store) = Session();
         var before = session.DocumentText;
         foreach (var bad in new[] { new TrackLocation("Smissing", "a", 1), new TrackLocation("Nnew", "a", 999) }) {
             var refused = session.Bind(Sign, MarkerBinding.At(bad));
-            Assert(!refused.Applied && session.DocumentText == before && editor.UndoGroups.Count == 0 && Entry(world, sign) == "S9sc|a|225.6681" && world.Mutations == 0, "An unresolved editor binding changes nothing and records no history: " + refused.Error);
+            Assert(!refused.Applied && session.DocumentText == before && mapEditor.UndoGroups.Count == 0 && Entry(world, sign) == "S9sc|a|225.6681" && world.Mutations == 0, "An unresolved scene patch editing binding changes nothing and records no history: " + refused.Error);
         }
         world.SkipRegister = true;
         var failed = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 1)));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Entry(world, sign) == "S9sc|a|225.6681" && session.DocumentText == before, "A failed editor binding restores reference and registration: " + failed.Error);
-        Assert(sign.CachedGroup == "ela" && other.CachedGroup == "alarka" && Entry(world, other) == "Sjdl|b|38.6", "A failed editor binding restores the dependent cache and leaves the unrelated marker's cache");
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Entry(world, sign) == "S9sc|a|225.6681" && session.DocumentText == before, "A failed scene patch editing binding restores reference and registration: " + failed.Error);
+        Assert(sign.CachedGroup == "ela" && other.CachedGroup == "alarka" && Entry(world, other) == "Sjdl|b|38.6", "A failed scene patch editing binding restores the dependent cache and leaves the unrelated marker's cache");
         world.StickyRegistration = true;
         failed = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 1)));
-        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete editor cleanup is reported: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
         world.StickyRegistration = false;
         Assert(!session.Bind(Sign, MarkerBinding.Detached).Applied, "The unverified marker refuses another edit");
         foreach (var b in world.Buckets.Values) b.Remove("Mi4f");
@@ -651,38 +651,38 @@ static class BindingTests {
         Assert(session.Recheck(Sign).Applied && Entry(world, sign) == "S9sc|a|225.6681", "Recheck verifies the restored relationship before unblocking");
         Assert(session.Bind(Sign, MarkerBinding.Detached).Applied, "The verified marker accepts edits again");
     }
-    // A transform gizmo gesture on a marker object changes its placement only; an authored binding stays in the modification.
+    // A transform gizmo gesture on a marker object changes its placement only; this mod's binding stays in the modification.
     static void GizmoGestureKeepsTheBinding() {
         var (world, sign, other, markers) = Setup();
         var capabilities = new SceneCapabilities(() => world.MapIds, new FakeMarkerInspection(world));
         capabilities.Add(markers);
-        var store = new Store(); var editor = new Editor();
+        var store = new Store(); var mapEditor = new NativeMapEditor();
         var engine = new PatchEngine(capabilities);
-        var session = new AuthoringSession(engine, editor, store, "map"); editor.Session = session;
+        var session = new PatchEditingSession(engine, mapEditor, store, "map"); mapEditor.Session = session;
         var inventory = new SceneInventory(capabilities);
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 6))).Applied && Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension", "The marker is bound before the gesture");
         PlacementGesture Begin() { inventory.Refresh(); return new PlacementGesture(engine, session, Sign, inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, sign)))); }
         var cancelled = Begin();
         Assert(cancelled.Preview(new Placement(new[] { 1035.0, 1, 2 }, new[] { 0.0, 0, 0, 1 })).Applied && sign.Position[0] == 35, "A preview moves the marker object: " + cancelled.Current.Position[0]);
         Assert(Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension", "A preview leaves the binding, registration and dependent cache");
-        Assert(cancelled.Cancel().Applied && sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension" && editor.UndoGroups.Count == 1, "Cancel restores the pose and keeps the binding without history");
+        Assert(cancelled.Cancel().Applied && sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension" && mapEditor.UndoGroups.Count == 1, "Cancel restores the placement and keeps the binding without history");
         var completed = Begin();
         Assert(completed.Preview(new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 })).Applied, "A second preview applies");
         var outcome = completed.Complete();
-        Assert(outcome.Applied && sign.Position[0] == 40 && Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension" && editor.UndoGroups.Count == 2, "A completed gesture places the marker and keeps the binding: " + outcome.Error);
+        Assert(outcome.Applied && sign.Position[0] == 40 && Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension" && mapEditor.UndoGroups.Count == 2, "A completed gesture places the marker and keeps the binding: " + outcome.Error);
         var item = Only(session);
-        Assert(item["placement"] != null && (string)item["relationships"]["trackMarker"]["segment"] == "Nnew", "The modification keeps the authored binding beside the gesture's placement: " + item);
-        editor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|6", "Undo of the gesture restores the pose and keeps the binding");
-        editor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela", "Undo of the binding restores the native relationship");
+        Assert(item["placement"] != null && (string)item["relationships"]["trackMarker"]["segment"] == "Nnew", "The modification keeps this mod's binding beside the gesture's placement: " + item);
+        mapEditor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|6", "Undo of the gesture restores the placement and keeps the binding");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela", "Undo of the binding restores the native relationship");
         Assert(Entry(world, other) == "Sjdl|b|38.6" && other.CachedGroup == "alarka" && other.Position[0] == 70, "The unrelated marker is untouched");
     }
-    // A physical snap of a marker object changes its position once; the authored binding and registration stay.
+    // A physical snap of a marker object changes its position once; this mod's binding and registration stay.
     static void PhysicalSnapKeepsTheBinding() {
         var (world, sign, other, markers) = Setup();
         var capabilities = new SceneCapabilities(() => world.MapIds, new FakeMarkerInspection(world));
         capabilities.Add(markers);
-        var store = new Store(); var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(capabilities), editor, store, "map"); editor.Session = session;
+        var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
         var tracks = new FakeSnapTracks();
         var node = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackNode, "Nend"), "Track node Nend", "1050,1,2");
         tracks.Items.Add(new SnapGeometry(node, new[] { new double[] { 1050, 1, 2 } }));
@@ -698,14 +698,14 @@ static class BindingTests {
         Assert(Entry(world, sign) == "Nnew|a|9" && sign.Segment == "Nnew" && sign.CachedGroup == "extension", "The snap leaves the binding, registration and dependent cache");
         var item = Only(session);
         Assert((string)item["placement"]["mode"] == "fixed" && (string)item["relationships"]["trackMarker"]["segment"] == "Nnew", "The document holds the fixed snapped placement beside the binding: " + item);
-        editor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|a|9", "Undo of the snap restores the position and keeps the binding");
+        mapEditor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|a|9", "Undo of the snap restores the position and keeps the binding");
         Assert(Entry(world, other) == "Sjdl|b|38.6" && other.Position[0] == 70, "The unrelated marker is untouched");
     }
     static void SaveAndReloadReproduceBindingOnce() {
-        var (world, sign, other, session, editor, store) = Session();
+        var (world, sign, other, session, mapEditor, store) = Session();
         session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12.25)));
         session.Bind(Other, MarkerBinding.Detached);
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the relationship version: " + store.Info);
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the relationship version: " + store.Info);
         var (fresh, freshSign, freshOther, freshScene) = Setup();
         var engine = new PatchEngine(freshScene);
         var reload = engine.Apply(store.Patch);

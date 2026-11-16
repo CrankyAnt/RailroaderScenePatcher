@@ -215,7 +215,7 @@ namespace RailroaderScenePatcher {
         bool inspectOnly;
         internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false) {
             if (Pending != null) return;
-            if (Camera.main == null) throw new InvalidOperationException("The editor camera is unavailable");
+            if (Camera.main == null) throw new InvalidOperationException("The native map editor camera is unavailable");
             WorldOffset();
             this.inspectOnly = inspectOnly;
             var current = Offered(kind, inspectOnly);

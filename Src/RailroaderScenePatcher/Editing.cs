@@ -10,7 +10,7 @@ using HarmonyLib;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    // The editor's own undo manager, read through the internal members this capability checks.
+    // The native map editor's own undo manager, read through the internal members this capability checks.
     internal sealed class NativeHistory : INativeHistory {
         readonly object manager;
         readonly FieldInfo undo, redo;
@@ -29,60 +29,60 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<object> RedoGroups => Oldest(redo.GetValue(manager));
         public void Register(Action inverse, string name) { register.Invoke(manager, new object[] { inverse, name }); }
     }
-    // One attached map editor: its session, history and files.
-    internal sealed class Authoring : IDisposable {
-        internal readonly object Editor, Manager;
-        internal readonly AuthoringSession Session;
+    // One attached native map editor: its session, history and files.
+    internal sealed class MapEditorAttachment : IDisposable {
+        internal readonly object MapEditor, Manager;
+        internal readonly PatchEditingSession Session;
         internal readonly string PatchPath;
         internal string Fault;
         internal Action<string> Log = _ => { };
         internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list); }
         readonly EventInfo changed;
         readonly Action handler;
-        internal Authoring(PatchEngine engine, object editor) {
-            Editor = editor; Manager = Native.Read(editor, "UndoManager");
+        internal MapEditorAttachment(PatchEngine engine, object mapEditor) {
+            MapEditor = mapEditor; Manager = Native.Read(mapEditor, "UndoManager");
             if (Manager == null) throw new MissingMemberException("Native undo manager unavailable");
-            Native.Read(editor, "_cleanChangeCount"); Native.Read(editor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
+            Native.Read(mapEditor, "_cleanChangeCount"); Native.Read(mapEditor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
             var storage = ModDocuments.ActiveStorage(); PatchPath = storage.PatchPath;
-            Session = new AuthoringSession(engine, new NativeHistory(Manager), storage, ModDocuments.ActiveId, ModDocuments.PatcherId, ModDocuments.EditedModId());
+            Session = new PatchEditingSession(engine, new NativeHistory(Manager), storage, ModDocuments.ActiveId, ModDocuments.PatcherId, ModDocuments.EditedModId());
             changed = Manager.GetType().GetEvent("DidChange", Native.Flags);
             if (changed == null || changed.EventHandlerType != typeof(Action)) throw new MissingMemberException("Native history notification unavailable");
             handler = Session.HistoryChanged;
             changed.AddEventHandler(Manager, handler);
         }
-        // The editor values every change of the outstanding work passes through: an edit, Undo and Redo move the change
+        // The native map editor values every change of the outstanding work passes through: an edit, Undo and Redo move the change
         // count, a completed Save moves the clean count.
-        internal string ChangeKey => Native.Read(Editor, "_upgradedOnLoad") + "|" + Native.Read(Manager, "ChangeCount") + "|" + Native.Read(Editor, "_cleanChangeCount");
-        // The editor's own change-count answer, without the patcher's accounting.
-        internal bool NativeDirty => (bool)Native.Read(Editor, "_upgradedOnLoad") || Convert.ToInt32(Native.Read(Manager, "ChangeCount")) != Convert.ToInt32(Native.Read(Editor, "_cleanChangeCount"));
+        internal string ChangeKey => Native.Read(MapEditor, "_upgradedOnLoad") + "|" + Native.Read(Manager, "ChangeCount") + "|" + Native.Read(MapEditor, "_cleanChangeCount");
+        // The native map editor's own change-count answer, without the patcher's accounting.
+        internal bool NativeDirty => (bool)Native.Read(MapEditor, "_upgradedOnLoad") || Convert.ToInt32(Native.Read(Manager, "ChangeCount")) != Convert.ToInt32(Native.Read(MapEditor, "_cleanChangeCount"));
         // The native title and Save button read the dirty state when they are built; rebuild them after the accounting changed.
         internal void RefreshChrome() {
             try {
                 var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared");
                 var window = controller as UnityEngine.Object == null ? null : Native.Read(controller, "_window");
                 if (window as UnityEngine.Object != null) Native.Call(window, "RefreshChrome");
-            } catch (Exception e) { Fault = "Editor title and Save button could not be refreshed: " + e.GetBaseException().Message; }
+            } catch (Exception e) { Fault = "Native map editor title and Save button could not be refreshed: " + e.GetBaseException().Message; }
         }
         public void Dispose() { changed.RemoveEventHandler(Manager, handler); }
     }
-    // Extends the editor's Save, dirty state, Undo/Redo and exit confirmation. Installed once per process.
+    // Extends the native map editor's Save, dirty state, Undo/Redo and exit confirmation. Installed once per process.
     internal static class Hooks {
         const string Id = "crankyant.scene-patcher";
         static Harmony harmony;
-        internal static Authoring Current;
-        // Why Save and history integration is unavailable, or null. Authoring stays disabled without it.
+        internal static MapEditorAttachment Current;
+        // Why Save and history integration is unavailable, or null. Scene patch editing stays disabled without it.
         internal static string Error { get; private set; }
         internal static void Install() {
             if (harmony != null || Error != null) return;
             var patcher = new Harmony(Id);
             try {
-                var editor = Native.Type("Game.MapEditor.MapEditor"); var undo = Native.Type("Core.UndoManager"); var window = Native.Type("Game.MapEditor.MapEditorWindow");
-                var save = editor?.GetMethod("Save", Native.Flags, null, Type.EmptyTypes, null);
-                var dirty = editor?.GetProperty("IsDirty", Native.Flags)?.GetGetMethod(true);
+                var mapEditor = Native.Type("Game.MapEditor.MapEditor"); var undo = Native.Type("Core.UndoManager"); var window = Native.Type("Game.MapEditor.MapEditorWindow");
+                var save = mapEditor?.GetMethod("Save", Native.Flags, null, Type.EmptyTypes, null);
+                var dirty = mapEditor?.GetProperty("IsDirty", Native.Flags)?.GetGetMethod(true);
                 var undoMethod = undo?.GetMethod("Undo", Native.Flags, null, Type.EmptyTypes, null);
                 var redoMethod = undo?.GetMethod("Redo", Native.Flags, null, Type.EmptyTypes, null);
                 var exit = window?.GetMethod("ConfirmExitEditor", Native.Flags, null, Type.EmptyTypes, null);
-                if (save == null || dirty == null || undoMethod == null || redoMethod == null || exit == null || window.GetMethod("RefreshChrome", Native.Flags) == null) throw new MissingMethodException("Native editor Save, history or exit functions unavailable");
+                if (save == null || dirty == null || undoMethod == null || redoMethod == null || exit == null || window.GetMethod("RefreshChrome", Native.Flags) == null) throw new MissingMethodException("Native map editor Save, history or exit functions unavailable");
                 PresentMethod();
                 patcher.Patch(save, prefix: Method(nameof(BeforeSave)), postfix: Method(nameof(AfterSave)), finalizer: Method(nameof(SaveFinalizer)));
                 patcher.Patch(dirty, postfix: Method(nameof(AfterIsDirty)));
@@ -92,7 +92,7 @@ namespace RailroaderScenePatcher {
                 harmony = patcher;
             } catch (Exception e) {
                 try { patcher.UnpatchAll(Id); } catch { }
-                Error = "Editor Save and history integration unavailable on this build: " + e.GetBaseException().Message;
+                Error = "Native map editor Save and history integration unavailable on this build: " + e.GetBaseException().Message;
             }
         }
         internal static void Remove() {
@@ -101,8 +101,8 @@ namespace RailroaderScenePatcher {
             harmony = null;
         }
         static HarmonyMethod Method(string name) => new HarmonyMethod(typeof(Hooks).GetMethod(name, Native.Flags));
-        static Authoring For(object editor) { var current = Current; return current != null && ReferenceEquals(current.Editor, editor) ? current : null; }
-        static Authoring ForManager(object manager) { var current = Current; return current != null && ReferenceEquals(current.Manager, manager) ? current : null; }
+        static MapEditorAttachment For(object mapEditor) { var current = Current; return current != null && ReferenceEquals(current.MapEditor, mapEditor) ? current : null; }
+        static MapEditorAttachment ForManager(object manager) { var current = Current; return current != null && ReferenceEquals(current.Manager, manager) ? current : null; }
         // Runs before the native map write. A failing patcher write aborts the Save and reaches the native Save Failed alert.
         static void BeforeSave(object __instance) { For(__instance)?.Session.BeginSave(); }
         static void AfterSave(object __instance) {
@@ -124,7 +124,7 @@ namespace RailroaderScenePatcher {
             var current = For(__instance);
             if (current == null) return;
             try { __result = current.Session.IsDirty(__result); }
-            catch (Exception e) { __result = true; current.Fault = "Outstanding work could not be determined; the editor is treated as unsaved: " + e.GetBaseException().Message; }
+            catch (Exception e) { __result = true; current.Fault = "Outstanding work could not be determined; the native map editor is treated as unsaved: " + e.GetBaseException().Message; }
         }
         static void BeforeHistory(object __instance) { ForManager(__instance)?.Session.BeginHistoryExecution(); }
         static Exception HistoryFinalizer(object __instance, Exception __exception) {

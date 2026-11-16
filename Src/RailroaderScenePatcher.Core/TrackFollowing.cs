@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher.Core {
         public double[] Rotation { get; }
     }
     // A placement relative to an explicitly selected track or endpoint. The offset is expressed in the track's frame;
-    // the rotation is applied after the track's rotation. The absolute pose follows the anchor whenever it is evaluated.
+    // the rotation is applied after the track's rotation. The absolute placement follows the anchor whenever it is evaluated.
     public sealed class TrackFollowing {
         public TrackFollowing(TrackAnchor anchor, double[] offset, double[] rotation) {
             Anchor = anchor ?? throw new ArgumentNullException(nameof(anchor)); Offset = offset; Rotation = rotation;
@@ -40,7 +40,7 @@ namespace RailroaderScenePatcher.Core {
         public TrackAnchor Anchor { get; }
         public double[] Offset { get; }
         public double[] Rotation { get; }
-        // The absolute pose for the anchor's current native pose.
+        // The absolute placement for the anchor's current native pose.
         public Placement Evaluate(TrackPose track) {
             if (track?.Position == null || track.Rotation == null || track.Position.Length != 3 || track.Rotation.Length != 4
                 || track.Position.Concat(track.Rotation).Any(v => Double.IsNaN(v) || Double.IsInfinity(v)) || Quaternion.Length(track.Rotation) == 0)
@@ -50,7 +50,7 @@ namespace RailroaderScenePatcher.Core {
             var position = new[] { track.Position[0] + turned[0], track.Position[1] + turned[1], track.Position[2] + turned[2] };
             return new Placement(position, Quaternion.Normalize(Quaternion.Multiply(frame, Rotation))) { Following = this };
         }
-        // The relative placement that keeps an absolute pose at the anchor's current native pose.
+        // The relative placement that keeps an absolute placement at the anchor's current native pose.
         public static TrackFollowing Relative(TrackAnchor anchor, TrackPose track, double[] position, double[] rotation) {
             if (track?.Position == null || track.Rotation == null || Quaternion.Length(track.Rotation) == 0) throw new InvalidOperationException("Track anchor " + anchor + " has no finite native pose");
             var inverse = Quaternion.Conjugate(Quaternion.Normalize(track.Rotation));

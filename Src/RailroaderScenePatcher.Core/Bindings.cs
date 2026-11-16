@@ -176,7 +176,7 @@ namespace RailroaderScenePatcher.Core {
         // object whose activity follows a track group.
         void CheckRelationships(object target, ObjectState state);
     }
-    // The group-following activity of a marker object: its TrackRelativePosition subscribes to the track graph's group
+    // The group-driven activity of a marker object: its TrackRelativePosition subscribes to the track graph's group
     // event for the bound segment's group and activates or deactivates the object with that group. The explicit-disable
     // hold replaces the native activation step and keeps the object inactive.
     public sealed class GroupActivity {
@@ -223,11 +223,11 @@ namespace RailroaderScenePatcher.Core {
         double[] Position(object marker);
         double[] Rotation(object marker);
         bool Active(object marker);
-        // Sets the root pose and refreshes dependent culling.
-        void SetPose(object marker, double[] position, double[] rotation);
+        // Sets the root placement and refreshes dependent culling.
+        void SetPlacement(object marker, double[] position, double[] rotation);
         // Activates or deactivates the root; the native marker lifecycle then registers or removes the marker.
         void SetActive(object marker, bool active);
-        // The object's group-following activity, or null when its activity does not follow a track group.
+        // The object's group-driven activity, or null when its activity does not follow a track group.
         GroupActivity GroupActivity(object marker);
         // The native unsubscribe and observe steps for the current location's group. The observation sets the object's
         // activity from the group, through the hold when it is installed.
@@ -242,7 +242,7 @@ namespace RailroaderScenePatcher.Core {
     }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
-    // placement stays a separate, independently authored setting.
+    // placement stays a separate, independently set value.
     public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
         public const string Structure = "track-marker-v1", RequiredVersion = "0.5.0";
         readonly MarkerRelationship relationship;
@@ -261,20 +261,20 @@ namespace RailroaderScenePatcher.Core {
         public void ApplyFollowUpdate(object target, ObjectState state) => relationship.Apply(target, state, true);
         public bool Restore(object target, object snapshot) => relationship.Restore(target, snapshot);
     }
-    // State that a marker's consumer derives from the marker's location and the object's pose, such as generated geometry.
+    // State that a marker's consumer derives from the marker's location and the object's placement, such as generated geometry.
     internal interface IMarkerConsumer {
         object Capture(object target);
-        // Brings the derived state up to date with the current location and pose. A following object's placement follows
+        // Brings the derived state up to date with the current location and placement. A following object's placement follows
         // a track, so its derived state also follows that track's shape; an explicit application, such as an edit or a
         // removal, also brings derived state up to date with a track shape it recorded.
         void Refresh(object target, bool resolvable, bool following, bool explicitApply);
-        // Why the derived state disagrees with the current location and pose, or null.
+        // Why the derived state disagrees with the current location and placement, or null.
         string Problem(object target, bool resolvable, bool following, bool explicitApply);
         // Why the restored derived state differs from the captured one, or null.
         string Restored(object target, object captured);
     }
     // The shared relationship of a track-marker object: the serialized location, its graph registration, the object's
-    // pose and activity, and an optional consumer of the location.
+    // placement and activity, and an optional consumer of the location.
     internal sealed class MarkerRelationship {
         const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
         sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; internal object Consumer; }
@@ -291,7 +291,7 @@ namespace RailroaderScenePatcher.Core {
         }
         internal bool StillIdentifies(object target, TargetIdentity identity) =>
             (identity.Structure == null || identity.Structure == structure) && world is ITargetConfirmation confirmation && confirmation.StillIdentifies(target, identity);
-        // The preflight of a pose-only update: the object's own pattern and its registration, without the consumer scans.
+        // The preflight of a placement-only update: the object's own pattern and its registration, without the consumer scans.
         // A world without the placement check takes the full preflight.
         internal void PreflightPlacement(object target) {
             var problem = world is IPlacementPattern placement ? placement.PlacementProblem(target) : world.PatternProblem(target);
@@ -351,7 +351,7 @@ namespace RailroaderScenePatcher.Core {
             // changes neither skips the reconciliation and its search of every marker; an explicit application always runs it.
             if (!followUpdate || relationshipWritten || world.Active(target) != activeBefore) (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
         }
-        // Why the object's derived state disagrees with the desired state although its pose may already agree, or null.
+        // Why the object's derived state disagrees with the desired state although its placement may already agree, or null.
         internal string DerivedProblem(object target, ObjectState desired) =>
             consumer?.Problem(target, Resolvable(world.Location(target)), desired?.Placement?.Following != null, false);
         internal bool Restore(object target, object snapshot) {
@@ -368,7 +368,7 @@ namespace RailroaderScenePatcher.Core {
         // The relationship first, so the registration follows the new location; activity then lets the native lifecycle register or remove it.
         // A group follower's hold is installed before anything can activate the object and released only after the
         // relationship; its subscription is observed again for the current location; without the hold the group sets activity.
-        // The consumer follows the final location and pose.
+        // The consumer follows the final location and placement.
         // True when the relationship and its registration were written.
         bool Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind, bool following, bool explicitApply) {
             var group = world.GroupActivity(target);
@@ -388,7 +388,7 @@ namespace RailroaderScenePatcher.Core {
                 if (release) world.HoldDisabled(target, false);
                 if (rebind || release || GroupProblem(target) != null) world.ObserveGroup(target);
             } else if (active == true && !world.Active(target)) world.SetActive(target, true);
-            if (position != null) world.SetPose(target, position, rotation);
+            if (position != null) world.SetPlacement(target, position, rotation);
             if (group == null && active == false && world.Active(target)) world.SetActive(target, false);
             consumer?.Refresh(target, Resolvable(world.Location(target)), following, explicitApply);
             return written;
@@ -397,7 +397,7 @@ namespace RailroaderScenePatcher.Core {
             if (!TrackLocation.Same(world.Location(target), location)) return "the serialized location is " + (world.Location(target)?.ToString() ?? "detached") + ", expected " + (location?.ToString() ?? "detached");
             var group = world.GroupActivity(target);
             if (group == null ? world.Active(target) != active : group.Held != (active == false)) return "activity differs";
-            if (placement != null && (!Near(world.Position(target), placement.Position) || !SameRotation(world.Rotation(target), placement.Rotation))) return "pose differs";
+            if (placement != null && (!Near(world.Position(target), placement.Position) || !SameRotation(world.Rotation(target), placement.Rotation))) return "placement differs";
             return Coherence(target) ?? world.DependentProblem(target) ?? GroupProblem(target) ?? consumer?.Problem(target, Resolvable(location), following, explicitApply);
         }
         // The subscription and activity the native observation holds for the current location: one handler for the

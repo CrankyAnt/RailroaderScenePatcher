@@ -70,7 +70,7 @@ namespace RailroaderScenePatcher {
             removeLabel = mapBuilder.GetMethod("Remove", Native.Flags, null, new[] { mapLabel }, null) ?? throw new MissingMethodException(MapBuilderType, "Remove(MapLabel)");
             labelGroup = mapBuilder.GetMethod("TrackGroupIdFor", Native.Flags, null, new[] { mapLabel }, null) ?? throw new MissingMethodException(MapBuilderType, "TrackGroupIdFor");
             if (FieldOf(mapBuilder, "_mapLabels") == null || mapBuilder.GetProperty("Shared", Native.Flags) == null) throw new MissingMemberException(MapBuilderType, "_mapLabels or Shared");
-            // The group-following steps of the relative position and the graph's group event.
+            // The steps for group-driven activity of the relative position and the graph's group event.
             var relative = Native.Type(Relative) ?? throw new InvalidOperationException("Track-relative position unavailable");
             foreach (var field in new[] { "targetTransform", "targetActiveFollowsTrackGroup", "_observing", "_observedGroupId" }) if (FieldOf(relative, field) == null) throw new MissingFieldException(Relative, field);
             setTargetActive = FieldOf(relative, "_setTargetActive");
@@ -115,7 +115,7 @@ namespace RailroaderScenePatcher {
                 .Where(g => VisibleForCheck(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path && belongs(g)).Cast<object>().ToArray();
         }
         // The reference scan of a discovery the owner vouches for, or null. The check of a marker reads every field of
-        // every loaded component, which is most of a discovery; the editor panel supplies the scan of the discovery its
+        // every loaded component, which is most of a discovery; the Scene patches window supplies the scan of the discovery its
         // snapshot was compared with instead. Runtime application and the check while a marker is enabled never use it.
         internal Func<ReferenceScan> KnownReferrers;
         public virtual string PatternProblem(object target) =>
@@ -172,7 +172,7 @@ namespace RailroaderScenePatcher {
         static string Describe(object owner) => owner is Component c && c != null ? c.GetType().FullName + " on " + BoardScene.PathOf(c.transform) : System.Convert.ToString(owner);
         // Why the object does not conform to the supported Generic-marker pattern, or null. Shared with the inventory,
         // which supplies the reference scan and setup index of its discovery.
-        // The pattern without the consumer scans, for an update that changes only the pose of a held object.
+        // The pattern without the consumer scans, for an update that changes only the placement of a held object.
         public virtual string PlacementProblem(object target) => Problem(target as GameObject, null, null, ReferenceEquals(target, enablingTarget), true);
         internal static string Problem(GameObject go, ReferenceScan references, HolderIndex setups, bool enabling = false, bool placementOnly = false) {
             if (!Loaded(go) && !(enabling && go != null && go.scene.IsValid())) return "This object has no implemented track-marker capability";
@@ -185,9 +185,9 @@ namespace RailroaderScenePatcher {
             return Consumers(go, m, references, setups, (owner, field) => owner is Component c && c.gameObject == go && c.GetType().FullName == Relative && field == "_marker", placementOnly);
         }
         // The consumer checks shared by the Generic-marker and crossing-pad patterns: the marker's ID, location listeners,
-        // group-following activity, new-game car placements and direct holders other than the allowed colocated ones.
+        // group-driven activity, new-game car placements and direct holders other than the allowed colocated ones.
         // A placement-only check reads this object alone: the setup placements and the direct-reference scan concern
-        // consumers of the marker's location, which a pose update does not change.
+        // consumers of the marker's location, which a placement update does not change.
         internal static string Consumers(GameObject go, Component m, ReferenceScan references, HolderIndex setups, Func<object, string, bool> allowed, bool placementOnly = false) {
             if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID; its graph registration cannot be identified";
             // A listener of location changes is a dependent consumer this adapter does not refresh.
@@ -336,7 +336,7 @@ namespace RailroaderScenePatcher {
         }
         public double[] Rotation(object target) { var r = ((GameObject)target).transform.rotation; return new double[] { r.x, r.y, r.z, r.w }; }
         public bool Active(object target) => ((GameObject)target).activeSelf;
-        public void SetPose(object target, double[] position, double[] rotation) {
+        public void SetPlacement(object target, double[] position, double[] rotation) {
             var go = (GameObject)target;
             var p = new Vector3(Checked(position[0]), Checked(position[1]), Checked(position[2]));
             var q = new Quaternion(Checked(rotation[0]), Checked(rotation[1]), Checked(rotation[2]), Checked(rotation[3]));

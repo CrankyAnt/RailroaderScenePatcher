@@ -37,23 +37,23 @@ namespace RailroaderScenePatcher.Core {
         // segments within reach and the segments connected at their nodes. An unchanged token means unchanged source curves.
         string CurveToken(object pad);
     }
-    // A scene whose objects derive state from their desired state beyond their pose, such as a track-following pad's
+    // A scene whose objects derive state from their desired state beyond their placement, such as a track-following pad's
     // geometry generated from the track's curves. Track-following reconciliation applies the desired state when either differs.
     // A scene that can confirm, without a scene-wide search, that a previously resolved object is still the object its
     // identity names. Uniqueness is not checked again; a mutation still resolves and preflights first.
     public interface ITargetConfirmation {
         bool StillIdentifies(object target, TargetIdentity identity);
     }
-    // A world that can check its pattern for an update that changes only the pose of an object, without the consumer
+    // A world that can check its pattern for an update that changes only the placement of an object, without the consumer
     // scans of the full check. Placement does not touch the relationship those scans guard.
     public interface IPlacementPattern {
         string PlacementProblem(object target);
     }
-    // A scene that can preflight a pose-only update of a held object without scene-wide work.
+    // A scene that can preflight a placement-only update of a held object without scene-wide work.
     public interface IPlacementPreflight {
         void PreflightPlacement(object target);
     }
-    // A scene that applies a track-following update, which changes the object's pose or derived state, without the
+    // A scene that applies a track-following update, which changes the object's placement or derived state, without the
     // follow-up work an explicit edit needs, such as reconciling a native warning that only a binding or activity change affects.
     public interface IFollowUpdateScene {
         void ApplyFollowUpdate(object target, ObjectState state);
@@ -63,7 +63,7 @@ namespace RailroaderScenePatcher.Core {
         string DerivedProblem(object target, ObjectState desired);
     }
     // Rebinds the track-marker location of a crossing pad with its graph registration and regenerates the pad's
-    // geometry and culling from the authored location. A pad without a track location has no geometry, so a
+    // geometry and culling from the mod's location. A pad without a track location has no geometry, so a
     // relationship must name a location; disabling the pad is the way to hide it. Placement and activity stay
     // separate settings; the generated geometry follows the track, not the pad object.
     public sealed class CrossingPadScene : IScene, IRelationshipScene, IVersionedScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
@@ -113,7 +113,7 @@ namespace RailroaderScenePatcher.Core {
             public object Capture(object target) => world.Geometry(target);
             public void Refresh(object target, bool resolvable, bool following, bool explicitApply) { if (Problem(target, resolvable, following, explicitApply) != null) world.Generate(target); }
             // A pad that follows a track is also regenerated when the curves the builder reads have changed, such as after
-            // a track edit or its native Undo that leaves the pad's pose unchanged. A pad that is only rebound keeps the
+            // a track edit or its native Undo that leaves the pad's placement unchanged. A pad that is only rebound keeps the
             // native behavior: the game does not regenerate it after a track edit.
             // An explicit application, such as an edit, Undo or Remove, also regenerates a pad whose recorded source curves
             // differ from the current track, so it never leaves a mesh built from an earlier track shape.

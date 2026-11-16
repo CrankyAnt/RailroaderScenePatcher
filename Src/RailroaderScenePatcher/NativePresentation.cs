@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
         // right-side default do not override the new one.
         internal const string WindowIdentifier = "crankyant/scene-patcher/inspector";
         public override string Identifier => WindowIdentifier;
-        public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(NativeEditorPresentation.DefaultWidth, NativeEditorPresentation.DefaultHeight), new Vector2Int(NativeEditorPresentation.MinimumWidth, NativeEditorPresentation.MinimumHeight), Window.Position.UpperLeft);
+        public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(NativePresentation.DefaultWidth, NativePresentation.DefaultHeight), new Vector2Int(NativePresentation.MinimumWidth, NativePresentation.MinimumHeight), Window.Position.UpperLeft);
         protected override string Title { get; set; } = "Scene patches";
         internal Window NativeWindow => Window;
         protected override void BuildContent(UIPanelBuilder builder) { Build?.Invoke(builder); }
@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher {
         internal void Refresh() { RebuildPanel(); }
     }
 
-    internal sealed class NativeEditorPresentation : IDisposable {
+    internal sealed class NativePresentation : IDisposable {
         // Canvas units. The default width holds the outliner filters beside the four tab titles, which is wider
         // than the native Map Editor window. The minimum keeps the outliner, the inspector's minimum and the footer in
         // view, and the band's buttons and states at their own widths: at 620 they needed about 24 more and overlapped; its height fits below the Map Editor window on a 1080-high screen.
@@ -408,7 +408,7 @@ namespace RailroaderScenePatcher {
             }
         }
 
-        internal NativeEditorPresentation(Action<UIPanelBuilder> build, Action onClosed) {
+        internal NativePresentation(Action<UIPanelBuilder> build, Action onClosed) {
             content = build; closed = onClosed;
             var manager = WindowManager.Shared;
             if (manager == null || manager.windowPrefab == null || manager.builderAssets == null ||
@@ -443,7 +443,7 @@ namespace RailroaderScenePatcher {
                 }
                 AddTitleHelp(manager);
                 Layout(true);
-                // The native window saves whether it was shown; a panel that was open when the editor was left opens again.
+                // The native window saves whether it was shown; a panel that was open when the native map editor was left opens again.
                 // The owner builds the content through this presentation, which it holds only after this constructor has
                 // returned: the window opens on the first tick, not here.
                 openOnTick = savedShown;
@@ -473,7 +473,7 @@ namespace RailroaderScenePatcher {
             "UnityEngine.Transform", "UnityEngine.RectTransform", "UnityEngine.CanvasRenderer", "UnityEngine.UI.Button", "UnityEngine.UI.Image",
             "UnityEngine.UI.LayoutElement", "UnityEngine.UI.Outline", "UnityEngine.UI.Shadow", "UI.Tooltips.UITooltipProvider" };
         // The icon ships beside the assembly, so another drawing replaces it without a rebuild.
-        static string IconPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(NativeEditorPresentation).Assembly.Location) ?? "", "Icons", "SceneWrench.png");
+        static string IconPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(NativePresentation).Assembly.Location) ?? "", "Icons", "SceneWrench.png");
         // The part of the icon texture the button shows: a square centred on the drawing, sized so the drawing fills the
         // button as the native icons fill theirs. The drawing itself is untouched; a PNG with uneven transparent margins
         // would otherwise sit off-centre and smaller than its neighbours.
@@ -501,7 +501,7 @@ namespace RailroaderScenePatcher {
             return frame;
         }
         // An icon button among the native icons of the top-right strip: a clone of a native icon button with the native
-        // tooltip, placed by the strip's own layout after the last native icon. It exists while a map editor is attached,
+        // tooltip, placed by the strip's own layout after the last native icon. It exists while a native map editor is attached,
         // so it is absent in normal play.
         GameObject StripEntry(WindowManager manager) {
             var area = UnityEngine.Object.FindAnyObjectByType<UI.TopRightArea>();
@@ -623,7 +623,7 @@ namespace RailroaderScenePatcher {
                 if (Native.Read(controller, "_isVisible") is bool visible && visible) group.alpha = 1f;
             } catch { tooltipHidden = false; }
         }
-        // Whether a field of the panel has the keyboard: Escape is then left alone, as in the native editor. A text
+        // Whether a field of the panel has the keyboard: Escape is then left alone, as in the native map editor. A text
         // field takes Escape itself, ends its edit and gives up the focus in the same press, so asking the fields
         // when Escape arrives finds none focused. The frame in which a field of the panel last had the focus is
         // noted every frame instead (CommandBand.FieldHasFocus), from the event system's selected object, which
@@ -860,7 +860,7 @@ namespace RailroaderScenePatcher {
         }
         // The native window saves its bounds when the user moves or resizes it and when it is shown or closed. It is
         // shown before this layout places it, so without a move by the user the saved position would stay the window's
-        // initial one, the top-left corner, and the next editor session would restore that. Raising the window's own
+        // initial one, the top-left corner, and the next native map editor session would restore that. Raising the window's own
         // moved event makes the native persistence save the placed bounds in its own format.
         void SaveBounds(Window native) {
             try {
@@ -871,13 +871,13 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { SaveProblem = e.GetBaseException().Message; }
         }
         // Why the default placement could not be saved, or null. The window then opens at its initial position in the
-        // next editor session until the user moves it.
+        // next native map editor session until the user moves it.
         internal string SaveProblem { get; private set; }
         // Where the window opens while no bounds are saved: PanelPlacement decides between the space below the native Map
         // Editor window and the top right of the screen. The lower edge of what occupies that corner, the button strip
         // and the status readout below it, is read from the visible native UI.
         Rect DefaultBounds() {
-            var native = NativeEditorBounds();
+            var native = MapEditorBounds();
             var width = Mathf.Min(Mathf.Max(DefaultWidth * scale, native.width), Screen.width);
             chrome.Clear();
             CollectVisibleUi(chrome, false);
@@ -889,11 +889,11 @@ namespace RailroaderScenePatcher {
         }
         // Whether the last default placement took the top right of the screen.
         internal bool DefaultAtTopRight { get; private set; }
-        static Rect NativeEditorBounds() {
+        static Rect MapEditorBounds() {
             try {
                 var type = Native.Type("Game.MapEditor.MapEditorWindow");
-                var editor = type == null ? null : UnityEngine.Object.FindAnyObjectByType(type) as Component;
-                var native = editor == null ? null : editor.GetComponent<Window>();
+                var mapEditor = type == null ? null : UnityEngine.Object.FindAnyObjectByType(type) as Component;
+                var native = mapEditor == null ? null : mapEditor.GetComponent<Window>();
                 return native != null && native.IsShown ? Bounds((RectTransform)native.transform) : Rect.zero;
             } catch { return Rect.zero; }
         }
@@ -909,7 +909,7 @@ namespace RailroaderScenePatcher {
             transform.sizeDelta = new Vector2(pixels.width / s.x, pixels.height / s.y);
             transform.position = new Vector3(pixels.x, Screen.height - pixels.y, 0);
         }
-        // The game's tooltip is one callout that its controller fades out when the pointer leaves. When the editor is left
+        // The game's tooltip is one callout that its controller fades out when the pointer leaves. When the native map editor is left
         // while a tooltip of this window shows, that controller stops and the callout stays as it was. Its alpha is set
         // to zero when the window goes; a running controller fades it in again for whatever the pointer rests on next.
         static void HideTooltip() {

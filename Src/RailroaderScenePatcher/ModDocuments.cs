@@ -22,19 +22,19 @@ namespace RailroaderScenePatcher {
         internal static string[] MapIds() {
             var active = Native.Type("Game.ActiveMapDefinition");
             var id = Native.Read(active, "Identifier")?.ToString();
-            if (String.IsNullOrEmpty(id)) throw new InvalidOperationException("No active Map definition");
+            if (String.IsNullOrEmpty(id)) throw new InvalidOperationException("No active map definition");
             var layers = Native.Read(active, "MapLayerIdentifiers") as IEnumerable;
             if (layers == null) throw new InvalidOperationException("Resolved map layers unavailable");
             return new[] { id }.Concat(layers.Cast<object>().Select(v => v.ToString())).Distinct(StringComparer.Ordinal).ToArray();
         }
-        internal static bool IsEditor => (bool)Native.Read(Native.Type("Game.ActiveMapDefinition"), "IsEditTarget");
+        internal static bool IsMapEditor => (bool)Native.Read(Native.Type("Game.ActiveMapDefinition"), "IsEditTarget");
         internal static string ActiveId => Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")?.ToString();
         internal static string ActiveRoot() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
             var root = Native.Call(manager, "GetPackBasePathForDefinition", Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")) as string;
             return root == null ? null : Path.GetFullPath(root);
         }
-        // The identifier of the mod that owns the active Map definition: the key its patch document is applied under.
+        // The identifier of the mod that owns the active map definition: the key its patch document is applied under.
         internal static string EditedModId() {
             var root = ActiveRoot();
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
@@ -45,14 +45,14 @@ namespace RailroaderScenePatcher {
                 }
             throw new InvalidOperationException("Edited mod owner unavailable");
         }
-        // The mods carrying a patch document, in Railroader's load order (AssetPackManager.OrderedPacks). In the editor only the
+        // The mods carrying a patch document, in Railroader's load order (AssetPackManager.OrderedPacks). In the native map editor only the
         // edited mod is returned, marked as edit target. Whether a mod applies is decided by LoadedMod and the engine.
         internal static IReadOnlyList<LoadedMod> Discover() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
             var mods = Native.Read(manager, "OrderedPacks") as IEnumerable;
             if (mods == null) throw new InvalidOperationException("Load order unavailable");
             string editedModRoot = null;
-            if (IsEditor) {
+            if (IsMapEditor) {
                 editedModRoot = Native.Call(manager, "GetPackBasePathForDefinition", Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")) as string;
                 if (editedModRoot == null) throw new InvalidOperationException("Edited mod owner unavailable");
                 editedModRoot = Path.GetFullPath(editedModRoot);

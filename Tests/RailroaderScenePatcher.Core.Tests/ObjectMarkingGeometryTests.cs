@@ -364,7 +364,7 @@ static class ObjectMarkingGeometryTests {
 
         // Beyond FrameDistance every frame becomes the square marker; the distance is to the bounds, not the centre.
         // Every frame still surrounded only its own object at the 550 m step with the pointer over each; less one 50 m
-        // step. That is the native editor's default gizmo distance.
+        // step. That is the native map editor's default gizmo distance.
         Check(ObjectMarkingGeometry.FrameDistance == 500, "the frame distance is 500 m");
         var atLimit = Frame(new WorldPoint(0, 0, 505), Box("limit", 0, 0, 505, 5, 5, 5));
         Check(atLimit.Frame.HasValue && atLimit.Distance == 500, "an object at exactly the frame distance keeps its frame");

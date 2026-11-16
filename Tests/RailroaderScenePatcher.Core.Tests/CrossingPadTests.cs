@@ -124,13 +124,13 @@ static class CrossingPadTests {
         PreflightRefusalChangesNothing();
         GenerationFailureRestoresCapturedState();
         IncompleteCleanupGuardsRetry();
-        EditorRebindUndoRedoAndRemoval();
+        EditingRebindUndoRedoAndRemoval();
         SaveAndReloadReproduceThePadOnce();
         CullingTogglesKeepTheInspectedPadFresh();
         FollowingPadsRegenerateWhenTheirCurvesChange();
         InspectChooseAndFollowAPad();
         CurveChangesAndRemovalRegenerateFromTheCurrentTrack();
-        PoseUpdatesOfAHeldPadDoNoSceneWideWork();
+        PlacementUpdatesOfAHeldPadDoNoSceneWideWork();
         Console.WriteLine("PASS: crossing-pad rebinding with regenerated geometry and culling");
     }
     static void RebindRegeneratesGeometry() {
@@ -138,8 +138,8 @@ static class CrossingPadTests {
         Assert(Mesh(world, pad) == Baseline, "The loaded pad holds its baseline geometry: " + Mesh(world, pad));
         var result = new PatchEngine(scene).Apply(Doc(Binding("rebind-pad", At("Sj7c", "a", 186.9477))));
         Assert(result.Error == null && result.Outcomes["rebind-pad"].Applied, "A pad rebinding applies: " + result.Error + result.Outcomes["rebind-pad"].Error);
-        Assert(Entry(world, pad) == "Sj7c|a|186.9477", "The graph registers the pad marker at the authored location: " + Entry(world, pad));
-        Assert(Mesh(world, pad) == Rebound, "The pad geometry is regenerated from the authored marker: " + Mesh(world, pad));
+        Assert(Entry(world, pad) == "Sj7c|a|186.9477", "The graph registers the pad marker at this mod's location: " + Entry(world, pad));
+        Assert(Mesh(world, pad) == Rebound, "The pad geometry is regenerated from this mod's marker: " + Mesh(world, pad));
         Assert(world.Geometry(pad).CullingAligned, "Generation leaves the culling sphere on the regenerated bounds");
         Assert(pad.Position[0] == 20, "A rebinding does not move the pad object");
         Assert(Mesh(world, rear) == "Sj7c|a|210@1045" && Entry(world, rear) == "Sj7c|a|210", "The rear pad keeps its geometry and registration");
@@ -162,8 +162,8 @@ static class CrossingPadTests {
         var repaired = new PatchEngine(scene).Apply(Doc(Binding("repair", At("Sj7c", "a", 185.9477))));
         Assert(repaired.Outcomes["repair"].Applied && Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline, "A broken pad binding is repaired with registration and geometry: " + repaired.Outcomes["repair"].Error);
     }
-    // Geometry the game generated at load has no recorded source: the first application regenerates it once from the
-    // authored location, and later applications converge without regeneration.
+    // Geometry the game generated at load has no recorded source: the first application regenerates it once from
+    // this mod's location, and later applications converge without regeneration.
     // A pad can carry a mesh object that was saved with the scene under the builder's container. The first generation
     // destroys it and builds a runtime one. Neither is a dependency, so the pad's dependency lines stay the same.
     static void ASavedMeshUnderThePadContainerIsOutput() {
@@ -236,7 +236,7 @@ static class CrossingPadTests {
         var disabled = new PatchEngine(scene).Apply(Doc("{\"id\":\"off\"," + Target() + ",\"active\":false,\"dependsOn\":[]}"));
         Assert(disabled.Outcomes["off"].Applied && !pad.Active && world.Registrations(pad).Count == 0 && pad.Segment == "Sj7c", "Disabling the pad removes its registration and keeps the binding");
         var enabled = new PatchEngine(scene).Apply(Doc(Binding("on", At("Sj7c", "a", 186.9477), extra: ",\"active\":true")));
-        Assert(enabled.Outcomes["on"].Applied && pad.Active && Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Enabling with a rebinding registers and regenerates at the authored location");
+        Assert(enabled.Outcomes["on"].Applied && pad.Active && Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Enabling with a rebinding registers and regenerates at this mod's location");
     }
     // Pads and Generic markers are separate capabilities over the same component; each structure resolves only its own objects.
     static void PadsComposeWithGenericMarkers() {
@@ -303,52 +303,52 @@ static class CrossingPadTests {
     }
     static readonly TargetIdentity Pad = new TargetIdentity("BushnellWhittier", PadPath, "Track.TrackMarker", CrossingPadScene.Structure);
     static readonly TargetIdentity Rear = new TargetIdentity("BushnellWhittier", RearPath, "Track.TrackMarker", CrossingPadScene.Structure);
-    static (FakePadWorld world, FakeMarker pad, FakeMarker rear, AuthoringSession session, Editor editor, Store store) Session(string patch = null) {
+    static (FakePadWorld world, FakeMarker pad, FakeMarker rear, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null) {
         var (world, pad, rear, scene) = Setup();
-        var store = new Store { Patch = patch }; var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(scene), editor, store, "map"); editor.Session = session;
-        return (world, pad, rear, session, editor, store);
+        var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        return (world, pad, rear, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(AuthoringSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
-    static void EditorRebindUndoRedoAndRemoval() {
-        var (world, pad, rear, session, editor, store) = Session();
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
+    static void EditingRebindUndoRedoAndRemoval() {
+        var (world, pad, rear, session, mapEditor, store) = Session();
         var before = session.DocumentText;
         var detach = session.Bind(Pad, MarkerBinding.Detached);
-        Assert(!detach.Applied && detach.Error.Contains("cannot be detached") && editor.UndoGroups.Count == 0 && session.DocumentText == before && world.Mutations == 0, "An editor detach of a pad is refused without history: " + detach.Error);
+        Assert(!detach.Applied && detach.Error.Contains("cannot be detached") && mapEditor.UndoGroups.Count == 0 && session.DocumentText == before && world.Mutations == 0, "A scene patch editing detach of a pad is refused without history: " + detach.Error);
         var set = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
-        Assert(set.Applied && Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound && pad.Position[0] == 20, "An editor rebinding regenerates the pad geometry: " + set.Error);
+        Assert(set.Applied && Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound && pad.Position[0] == 20, "A scene patch editing rebinding regenerates the pad geometry: " + set.Error);
         var item = Only(session);
         Assert((string)item["target"]["structure"] == "crossing-pad-v1" && (double)item["relationships"]["trackMarker"]["distance"] == 186.9477 && item["placement"] == null, "The document records the pad binding under its structure: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "A pad modification requires the patcher version that introduced it: " + session.MinimumPatcherVersion);
         Assert(session.Bind(Pad, MarkerBinding.At(new TrackLocation("Nnew", "a", 8))).Applied && Mesh(world, pad) == "Nnew|a|8@1020", "A replacement regenerates again");
-        editor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Undo of the replacement restores the prior binding and geometry: " + Mesh(world, pad));
-        editor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && session.DocumentText.Contains("\"modifications\": []"), "Undo of the first rebinding restores the native binding and geometry: " + Mesh(world, pad));
-        editor.Redo(); editor.Redo(); Assert(Entry(world, pad) == "Nnew|a|8" && Mesh(world, pad) == "Nnew|a|8@1020", "Redo reapplies both rebindings with their geometry");
+        mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Undo of the replacement restores the prior binding and geometry: " + Mesh(world, pad));
+        mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && session.DocumentText.Contains("\"modifications\": []"), "Undo of the first rebinding restores the native binding and geometry: " + Mesh(world, pad));
+        mapEditor.Redo(); mapEditor.Redo(); Assert(Entry(world, pad) == "Nnew|a|8" && Mesh(world, pad) == "Nnew|a|8@1020", "Redo reapplies both rebindings with their geometry");
         Assert(session.Edit(Pad, new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && Mesh(world, pad) == "Nnew|a|8@1030" && Entry(world, pad) == "Nnew|a|8", "A placement edit keeps the binding and regenerates on the track");
-        Assert(session.Bind(Pad, null).Applied && Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == "Sj7c|a|185.9477@1030", "Clearing the authored binding returns the effective native binding with its geometry");
-        editor.Undo(); Assert(Mesh(world, pad) == "Nnew|a|8@1030", "Undo of the clearing restores the authored geometry");
-        Assert(session.Remove(Pad).Applied && Entry(world, pad) == "Sj7c|a|185.9477" && pad.Position[0] == 20 && Mesh(world, pad) == Baseline, "Removal restores the underlying binding, pose and geometry: " + Mesh(world, pad));
-        editor.Undo(); Assert(Entry(world, pad) == "Nnew|a|8" && Mesh(world, pad) == "Nnew|a|8@1030", "Undo of the removal restores the authored binding and geometry");
-        Assert(Mesh(world, rear) == "Sj7c|a|210@1045" && Entry(world, rear) == "Sj7c|a|210", "No editor operation touched the rear pad");
-        // A failed editor rebinding restores the captured geometry and records no history.
-        (world, pad, rear, session, editor, store) = Session();
+        Assert(session.Bind(Pad, null).Applied && Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == "Sj7c|a|185.9477@1030", "Clearing this mod's binding returns the effective native binding with its geometry");
+        mapEditor.Undo(); Assert(Mesh(world, pad) == "Nnew|a|8@1030", "Undo of the clearing restores this mod's geometry");
+        Assert(session.Remove(Pad).Applied && Entry(world, pad) == "Sj7c|a|185.9477" && pad.Position[0] == 20 && Mesh(world, pad) == Baseline, "Removal restores the underlying binding, placement and geometry: " + Mesh(world, pad));
+        mapEditor.Undo(); Assert(Entry(world, pad) == "Nnew|a|8" && Mesh(world, pad) == "Nnew|a|8@1030", "Undo of the removal restores this mod's binding and geometry");
+        Assert(Mesh(world, rear) == "Sj7c|a|210@1045" && Entry(world, rear) == "Sj7c|a|210", "No scene patch editing operation touched the rear pad");
+        // A failed scene patch editing rebinding restores the captured geometry and records no history.
+        (world, pad, rear, session, mapEditor, store) = Session();
         before = session.DocumentText;
         world.FailGenerate = true;
         var failed = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Mesh(world, pad) == Baseline && Entry(world, pad) == "Sj7c|a|185.9477" && session.DocumentText == before && editor.UndoGroups.Count == 0, "A failed editor rebinding restores binding and geometry: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Mesh(world, pad) == Baseline && Entry(world, pad) == "Sj7c|a|185.9477" && session.DocumentText == before && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing rebinding restores binding and geometry: " + failed.Error);
         world.StaleCulling = true;
         failed = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
-        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete editor cleanup is reported: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
         world.StaleCulling = false;
         Assert(!session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 187))).Applied, "The unverified pad refuses another edit");
         world.Generate(pad);
         Assert(session.Recheck(Pad).Applied && session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 187))).Applied && Mesh(world, pad) == "Sj7c|a|187@1020", "Recheck after regeneration unblocks the pad");
     }
     static void SaveAndReloadReproduceThePadOnce() {
-        var (world, pad, rear, session, editor, store) = Session();
+        var (world, pad, rear, session, mapEditor, store) = Session();
         session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
         session.Bind(Rear, MarkerBinding.At(new TrackLocation("Nnew", "b", 3.5)));
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the pad version: " + store.Info);
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the pad version: " + store.Info);
         var (fresh, freshPad, freshRear, freshScene) = Setup();
         var engine = new PatchEngine(freshScene);
         var reload = engine.Apply(store.Patch);
@@ -366,8 +366,8 @@ static class CrossingPadTests {
         var inspection = new FakePadInspection(world);
         var capabilities = new SceneCapabilities(() => world.MapIds, inspection);
         capabilities.Add(pads);
-        var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(capabilities), editor, new Store(), "map"); editor.Session = session;
+        var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
         var inventory = new SceneInventory(capabilities);
         inventory.Refresh();
         var pinned = inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, pad)));
@@ -396,7 +396,7 @@ static class CrossingPadTests {
         public Dictionary<string, TrackPose> Poses = new Dictionary<string, TrackPose>();
         public TrackPose TrackPose(TrackAnchor anchor) => Poses.TryGetValue(anchor.ToString(), out var pose) ? pose : throw new InvalidOperationException("Track anchor " + anchor + " does not resolve");
     }
-    // A pad that follows a track is regenerated when the curves its builder reads change while its pose does not, as after
+    // A pad that follows a track is regenerated when the curves its builder reads change while its placement does not, as after
     // a longitudinal node move or its native Undo. A pad that is only rebound keeps the native behavior.
     static void FollowingPadsRegenerateWhenTheirCurvesChange() {
         var (world, pad, rear, pads) = Setup();
@@ -405,14 +405,14 @@ static class CrossingPadTests {
         var tracks = new FixedTrackPoses();
         tracks.Poses["Sj7c|a|185.9477"] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
         capabilities.Tracks = tracks;
-        var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(capabilities), editor, new Store(), "map"); editor.Session = session;
+        var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
         var follow = session.Follow(Pad, TrackAnchor.At(new TrackLocation("Sj7c", "a", 185.9477)));
-        Assert(follow.Applied && pad.Position[0] == 20 && Mesh(world, pad) == Baseline, "The pad follows its track at an unchanged pose: " + follow.Error + " / " + Mesh(world, pad));
+        Assert(follow.Applied && pad.Position[0] == 20 && Mesh(world, pad) == Baseline, "The pad follows its track at an unchanged placement: " + follow.Error + " / " + Mesh(world, pad));
         Assert(session.Bind(Rear, MarkerBinding.At(new TrackLocation("Sj7c", "a", 211))).Applied && Mesh(world, rear) == "Sj7c|a|211@1045", "The rear pad is only rebound");
         Assert(!session.ReconcileTrackFollowing().Any(), "An unchanged track leaves the following pad alone");
         var padGenerations = world.PadGenerations[pad]; var rearGenerations = world.PadGenerations[rear];
-        // A track edit reshapes Sj7c beyond the anchor; the anchor's pose and therefore the pad's pose stay the same. The first
+        // A track edit reshapes Sj7c beyond the anchor; the anchor's pose and therefore the pad's placement stay the same. The first
         // check sees the change, the next one confirms it held still and regenerates.
         world.Shapes["Sj7c"] = "longer";
         Assert(!session.ReconcileTrackFollowing().Any() && world.PadGenerations[pad] == padGenerations, "A curve change waits one check to hold still");
@@ -421,7 +421,7 @@ static class CrossingPadTests {
         Assert(Mesh(world, pad) == Baseline + "~longer", "The regenerated mesh follows the changed curve: " + Mesh(world, pad));
         Assert(!session.ReconcileTrackFollowing().Any() && world.PadGenerations[pad] == padGenerations + 1, "The current curve is not regenerated again");
         Assert(world.PadGenerations[rear] == rearGenerations && Mesh(world, rear) == "Sj7c|a|211@1045", "The pad that is only rebound is untouched, as the game leaves it");
-        // Native Undo of the track edit restores the curve; the pose still does not change.
+        // Native Undo of the track edit restores the curve; the placement still does not change.
         world.Shapes.Remove("Sj7c");
         Assert(!session.ReconcileTrackFollowing().Any(), "The undone curve waits one check to hold still");
         moved = session.ReconcileTrackFollowing();
@@ -447,7 +447,7 @@ static class CrossingPadTests {
         Assert(!session.ReconcileTrackFollowing().Any() && world.Resolutions > resolutions, "A target the scene no longer confirms is resolved again");
         world.Objects[PadPath] = new List<object> { pad };
     }
-    // The editor route: refresh, inspect the pad, choose and confirm its track segment, then follow it through the edit
+    // The scene patch editing route: refresh, inspect the pad, choose and confirm its track segment, then follow it through the edit
     // feedback with its inspected observation, while reconciliation holds the target. A pad capability that failed its
     // game checks refuses with that cause, not as a changed inspected context, and changes nothing.
     static void InspectChooseAndFollowAPad() {
@@ -458,8 +458,8 @@ static class CrossingPadTests {
             var tracks = new FixedTrackPoses();
             tracks.Poses["Sj7c|a|185.9477"] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
             capabilities.Tracks = tracks;
-            var editor = new Editor();
-            var session = new AuthoringSession(new PatchEngine(capabilities), editor, new Store(), "map"); editor.Session = session;
+            var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
             var inventory = new SceneInventory(capabilities);
             inventory.Refresh();
             var selected = inventory.Entries.Single(e => ReferenceEquals(e.Handle, pad));
@@ -481,7 +481,7 @@ static class CrossingPadTests {
                     "After a refresh, following again with the held target applies: " + feedback.Result);
             } else {
                 Assert(!followed && feedback.Result.Contains("crossing-pad-v1 capability is incompatible") && !feedback.Result.Contains("Inspected target context changed"), "An unavailable pad capability names its cause: " + feedback.Result);
-                Assert(world.Mutations == 0 && editor.UndoGroups.Count == 0 && Mesh(world, pad) == Baseline, "The refused follow changes nothing");
+                Assert(world.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && Mesh(world, pad) == Baseline, "The refused follow changes nothing");
             }
         }
     }
@@ -499,8 +499,8 @@ static class CrossingPadTests {
             var anchor = "Sj7c|a|185.9477";
             tracks.Poses[anchor] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
             capabilities.Tracks = tracks;
-            var editor = new Editor();
-            var session = new AuthoringSession(new PatchEngine(capabilities), editor, new Store(), "map"); editor.Session = session;
+            var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
             Assert(session.Follow(Pad, TrackAnchor.At(new TrackLocation("Sj7c", "a", 185.9477))).Applied && Mesh(world, pad) == Baseline, "The pad follows Sj7c" + mode);
             int Settle() { var lines = 0; for (var i = 0; i < 3; i++) lines += session.ReconcileTrackFollowing().Count(r => r.Value.Applied); return lines; }
             // Step 3: a longitudinal move of the far node changes the curve under the pad but not the anchor pose.
@@ -532,7 +532,7 @@ static class CrossingPadTests {
     // During a track drag every follow update moves the pad: such an update resolves nothing, runs no consumer scan and
     // reconciles no native warning, because neither the binding nor the activity changes. Explicit binding edits, Undo and
     // Remove keep the warning reconciliation.
-    static void PoseUpdatesOfAHeldPadDoNoSceneWideWork() {
+    static void PlacementUpdatesOfAHeldPadDoNoSceneWideWork() {
         var (world, pad, rear, pads) = Setup();
         var capabilities = new SceneCapabilities(() => world.MapIds);
         capabilities.Add(pads);
@@ -540,8 +540,8 @@ static class CrossingPadTests {
         var anchor = "Sj7c|a|185.9477";
         tracks.Poses[anchor] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
         capabilities.Tracks = tracks;
-        var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(capabilities), editor, new Store(), "map"); editor.Session = session;
+        var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
         Assert(session.Follow(Pad, TrackAnchor.At(new TrackLocation("Sj7c", "a", 185.9477))).Applied, "The pad follows Sj7c");
         session.ReconcileTrackFollowing();
         int resolutions = world.Resolutions, patterns = world.PatternChecks, warnings = world.WarningReconciliations, placements = world.PlacementChecks;
@@ -551,9 +551,9 @@ static class CrossingPadTests {
             tracks.Poses[anchor] = new TrackPose(new double[] { 1020 + step * 0.1, 1, 2 }, new double[] { 0, 0, 0, 1 });
             lines += session.ReconcileTrackFollowing().Count(r => r.Value.Applied);
         }
-        Assert(lines == 6 && Math.Abs(pad.Position[0] - 20.6) < 1e-9 && Mesh(world, pad) == "Sj7c|a|185.9477@1020.6~drag-6", "Every pose step of the drag moves and regenerates the pad: " + lines + " / " + Mesh(world, pad));
+        Assert(lines == 6 && Math.Abs(pad.Position[0] - 20.6) < 1e-9 && Mesh(world, pad) == "Sj7c|a|185.9477@1020.6~drag-6", "Every placement step of the drag moves and regenerates the pad: " + lines + " / " + Mesh(world, pad));
         Assert(world.Resolutions == resolutions && world.PatternChecks == patterns && world.WarningReconciliations == warnings,
-            "Pose-driven follow updates resolve nothing, run no consumer scan and reconcile no warning: " + (world.Resolutions - resolutions) + " resolutions, " + (world.PatternChecks - patterns) + " pattern checks, " + (world.WarningReconciliations - warnings) + " warning reconciliations");
+            "Placement-driven follow updates resolve nothing, run no consumer scan and reconcile no warning: " + (world.Resolutions - resolutions) + " resolutions, " + (world.PatternChecks - patterns) + " pattern checks, " + (world.WarningReconciliations - warnings) + " warning reconciliations");
         Assert(world.PlacementChecks >= placements + 6, "Each update checks the pad's own pattern and registration instead");
         // A pad whose own pattern no longer holds takes the full path, which refuses it.
         pad.Pattern = "Missing script on the pad object";
@@ -566,7 +566,7 @@ static class CrossingPadTests {
         warnings = world.WarningReconciliations;
         Assert(session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186))).Applied && world.WarningReconciliations > warnings, "A binding edit reconciles the native warning");
         warnings = world.WarningReconciliations;
-        editor.Undo();
+        mapEditor.Undo();
         Assert(world.WarningReconciliations > warnings && pad.Distance == 185.9477, "Undo of the binding reconciles the native warning");
         warnings = world.WarningReconciliations;
         Assert(session.Remove(Pad).Applied && world.WarningReconciliations > warnings, "Remove reconciles the native warning");

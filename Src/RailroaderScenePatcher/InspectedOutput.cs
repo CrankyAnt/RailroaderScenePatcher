@@ -8,11 +8,11 @@ namespace RailroaderScenePatcher {
     // the whole scene, so the object is resolved once per observation: every inspection, refresh and completed edit
     // produces a new observation. The output itself is read on every call. UI-independent, shared with controlled replay.
     internal sealed class InspectedOutput {
-        AuthoringSession owner;
+        PatchEditingSession owner;
         SceneObservation observed;
         object target;
 
-        internal DependentOutput Of(AuthoringSession session, SceneObservation inspected, out string problem) {
+        internal DependentOutput Of(PatchEditingSession session, SceneObservation inspected, out string problem) {
             problem = null;
             try {
                 if (!ReferenceEquals(owner, session) || !ReferenceEquals(observed, inspected)) {

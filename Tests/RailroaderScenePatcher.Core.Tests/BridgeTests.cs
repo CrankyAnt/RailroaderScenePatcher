@@ -28,7 +28,7 @@ class FakeBridgeWorld : IBridgeWorld {
     public string PatternError;
     public int Mutations;
     // Failure injections.
-    public bool ThrowAfterPose, DesyncOnPose, MoveTrestleOnPose, StaleBoundsOnPose, KeepDesync;
+    public bool ThrowAfterPlacement, DesyncOnPlacement, MoveTrestleOnPlacement, StaleBoundsOnPlacement, KeepDesync;
     FakeCollider desynced; double[] desyncOffset;
     bool staleBounds;
     public IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -44,18 +44,18 @@ class FakeBridgeWorld : IBridgeWorld {
             bridge.ParentActive && bridge.Active, colliders, "trestle " + String.Join(",", TrestlePosition));
     }
     public void SetActive(object target, bool active) { Mutations++; ((FakeBridge)target).Active = active; }
-    public void SetPose(object target, Placement placement) {
+    public void SetPlacement(object target, Placement placement) {
         Mutations++;
         var bridge = (FakeBridge)target;
         bridge.Position = new[] { placement.Position[0] - Origin, placement.Position[1], placement.Position[2] };
         bridge.Rotation = (double[])placement.Rotation.Clone();
-        // A pose change always resynchronises an earlier desync unless the injection keeps it.
+        // A placement change always resynchronises an earlier desync unless the injection keeps it.
         if (desynced != null && !KeepDesync) { desynced.Offset = desyncOffset; desynced = null; }
-        // Pose injections fire once; a moved trestle keeps moving and cannot be restored.
-        staleBounds = StaleBoundsOnPose; StaleBoundsOnPose = false;
-        if (DesyncOnPose && desynced == null) { desynced = bridge.Colliders[0]; desyncOffset = desynced.Offset; desynced.Offset = new[] { 3.0, 3.0, 3.0 }; DesyncOnPose = false; }
-        if (MoveTrestleOnPose) TrestlePosition = new[] { TrestlePosition[0] + 5, TrestlePosition[1], TrestlePosition[2] };
-        if (ThrowAfterPose) { ThrowAfterPose = false; throw new Exception("injected after pose"); }
+        // Placement injections fire once; a moved trestle keeps moving and cannot be restored.
+        staleBounds = StaleBoundsOnPlacement; StaleBoundsOnPlacement = false;
+        if (DesyncOnPlacement && desynced == null) { desynced = bridge.Colliders[0]; desyncOffset = desynced.Offset; desynced.Offset = new[] { 3.0, 3.0, 3.0 }; DesyncOnPlacement = false; }
+        if (MoveTrestleOnPlacement) TrestlePosition = new[] { TrestlePosition[0] + 5, TrestlePosition[1], TrestlePosition[2] };
+        if (ThrowAfterPlacement) { ThrowAfterPlacement = false; throw new Exception("injected after placement"); }
     }
 }
 static class BridgeTests {
@@ -79,10 +79,10 @@ static class BridgeTests {
         RepeatedApplicationConverges();
         ActivityTakesCollidersAlong();
         PreflightRefusalLeavesStateUnchanged();
-        FailureAfterMutationRestoresPoseAndColliders();
+        FailureAfterMutationRestoresPlacementAndColliders();
         UnverifiedCleanupBlocksRetry();
         IncompatibleBridgeCapabilityIsIsolated();
-        EditorUndoRedoAndRemovalRestoreBridge();
+        EditingUndoRedoAndRemovalRestoreBridge();
     }
     static void MapMismatchRejectsBeforeResolution() {
         var (world, bridge, scene) = Setup();
@@ -118,9 +118,9 @@ static class BridgeTests {
         var offsets = Offsets(bridge); var engine = new PatchEngine(scene);
         engine.Apply(Doc(Bridge("place-ela-bridge")));
         var second = engine.Apply(Doc(Bridge("place-ela-bridge")));
-        Assert(second.Outcomes["place-ela-bridge"].Applied && bridge.Position.SequenceEqual(new[] { 55.0, 5, 7 }) && Offsets(bridge).SequenceEqual(offsets), "Repeated application keeps the absolute pose and collider layout");
+        Assert(second.Outcomes["place-ela-bridge"].Applied && bridge.Position.SequenceEqual(new[] { 55.0, 5, 7 }) && Offsets(bridge).SequenceEqual(offsets), "Repeated application keeps the absolute placement and collider layout");
         world.Origin = 1010;
-        Assert(new PatchEngine(scene).Apply(Doc(Bridge("place-ela-bridge"))).Outcomes["place-ela-bridge"].Applied && bridge.Position[0] == 45, "A new load at another origin reaches the same map pose");
+        Assert(new PatchEngine(scene).Apply(Doc(Bridge("place-ela-bridge"))).Outcomes["place-ela-bridge"].Applied && bridge.Position[0] == 45, "A new load at another origin reaches the same map placement");
         Assert(world.TrestlePosition.SequenceEqual(new[] { 60.0, 4, 7 }), "Repetition never moves the separate trestle");
     }
     static void ActivityTakesCollidersAlong() {
@@ -146,27 +146,27 @@ static class BridgeTests {
         result = new PatchEngine(scene2).Apply(Doc(Bridge("place-ela-bridge")));
         Assert(!result.Outcomes["place-ela-bridge"].Applied && world.Mutations == 0, "A collider layout that changed since its first observation refuses mutation");
     }
-    static void FailureAfterMutationRestoresPoseAndColliders() {
-        foreach (var inject in new Action<FakeBridgeWorld>[] { w => { w.ThrowAfterPose = true; w.DesyncOnPose = true; }, w => w.DesyncOnPose = true, w => w.StaleBoundsOnPose = true }) {
+    static void FailureAfterMutationRestoresPlacementAndColliders() {
+        foreach (var inject in new Action<FakeBridgeWorld>[] { w => { w.ThrowAfterPlacement = true; w.DesyncOnPlacement = true; }, w => w.DesyncOnPlacement = true, w => w.StaleBoundsOnPlacement = true }) {
             var (world, bridge, scene) = Setup();
             var offsets = Offsets(bridge); inject(world);
             var engine = new PatchEngine(scene);
             var result = engine.Apply(Doc(Bridge("place-ela-bridge")));
             var outcome = result.Outcomes["place-ela-bridge"];
             Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "Injected failure after mutation is restored: " + outcome.Error);
-            Assert(bridge.Position.SequenceEqual(new[] { 50.0, 5, 7 }) && bridge.Rotation.SequenceEqual(new[] { 0.0, 0, 0, 1 }) && Offsets(bridge).SequenceEqual(offsets), "Captured pose and collider layout are restored");
-            world.ThrowAfterPose = world.DesyncOnPose = world.StaleBoundsOnPose = false;
+            Assert(bridge.Position.SequenceEqual(new[] { 50.0, 5, 7 }) && bridge.Rotation.SequenceEqual(new[] { 0.0, 0, 0, 1 }) && Offsets(bridge).SequenceEqual(offsets), "Captured placement and collider layout are restored");
+            world.ThrowAfterPlacement = world.DesyncOnPlacement = world.StaleBoundsOnPlacement = false;
             Assert(!engine.Apply(Doc(Bridge("place-ela-bridge"))).Outcomes["place-ela-bridge"].Applied, "A failed bridge operation is not retried in the same load");
         }
     }
     static void UnverifiedCleanupBlocksRetry() {
-        foreach (var inject in new Action<FakeBridgeWorld>[] { w => { w.DesyncOnPose = true; w.KeepDesync = true; }, w => w.MoveTrestleOnPose = true }) {
+        foreach (var inject in new Action<FakeBridgeWorld>[] { w => { w.DesyncOnPlacement = true; w.KeepDesync = true; }, w => w.MoveTrestleOnPlacement = true }) {
             var (world, bridge, scene) = Setup();
             inject(world);
             var engine = new PatchEngine(scene);
             var outcome = engine.Apply(Doc(Bridge("place-ela-bridge"))).Outcomes["place-ela-bridge"];
             Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "Incomplete bridge cleanup is reported: " + outcome.Error);
-            world.DesyncOnPose = world.KeepDesync = world.MoveTrestleOnPose = false;
+            world.DesyncOnPlacement = world.KeepDesync = world.MoveTrestleOnPlacement = false;
             var mutations = world.Mutations;
             var retry = engine.Apply(Doc(Bridge("another-edit", 1060))).Outcomes["another-edit"];
             Assert(!retry.Applied && retry.Error.Contains("cleanup") && world.Mutations == mutations, "Another operation on the unverified bridge is blocked");
@@ -182,26 +182,26 @@ static class BridgeTests {
         Assert(!result.Outcomes["bridge"].Applied && result.Outcomes["bridge"].Error.Contains("incompatible with this game build"), "The bridge operation reports the incompatible capability: " + result.Outcomes["bridge"].Error);
         Assert(new SceneCapabilities(() => new[] { "map" }).Capability == Capability.Incompatible, "Without any capability nothing can be placed");
     }
-    static void EditorUndoRedoAndRemovalRestoreBridge() {
+    static void EditingUndoRedoAndRemovalRestoreBridge() {
         var (world, bridge, scene) = Setup();
         var offsets = Offsets(bridge);
-        var store = new Store(); var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(scene), editor, store, "map"); editor.Session = session;
+        var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
         var identity = new TargetIdentity("BushnellWhittier-MapManager", BridgePath, "Helpers.Culling.RendererCuller", BridgeScene.Structure);
         var moved = new Placement(new[] { 1055.0, 5, 7 }, new[] { 0, 0.130526, 0, 0.991445 });
-        Assert(session.Edit(identity, moved, null).Applied && bridge.Position[0] == 55 && Offsets(bridge).SequenceEqual(offsets), "An editor bridge placement moves the root with its colliders");
+        Assert(session.Edit(identity, moved, null).Applied && bridge.Position[0] == 55 && Offsets(bridge).SequenceEqual(offsets), "A scene patch editing bridge placement moves the root with its colliders");
         var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"][0];
         Assert((string)item["target"]["structure"] == BridgeScene.Structure && item["placement"] != null && item["active"] == null, "The document records bridge placement, not a binding or activity");
         Assert(session.MinimumPatcherVersion == "0.5.0", "A bridge modification requires the common delivery minimum");
-        Assert(session.Edit(identity, null, false).Applied && !bridge.Active, "An editor disable deactivates the bridge");
-        editor.Undo(); Assert(bridge.Active && bridge.Position[0] == 55, "Undo re-enables the moved bridge");
-        editor.Undo(); Assert(bridge.Position.SequenceEqual(new[] { 50.0, 5, 7 }) && bridge.Rotation[3] == 1 && Offsets(bridge).SequenceEqual(offsets), "Undo restores the prior bridge pose and colliders");
-        editor.Redo(); Assert(bridge.Position[0] == 55, "Redo reapplies the bridge placement");
+        Assert(session.Edit(identity, null, false).Applied && !bridge.Active, "A scene patch editing disable deactivates the bridge");
+        mapEditor.Undo(); Assert(bridge.Active && bridge.Position[0] == 55, "Undo re-enables the moved bridge");
+        mapEditor.Undo(); Assert(bridge.Position.SequenceEqual(new[] { 50.0, 5, 7 }) && bridge.Rotation[3] == 1 && Offsets(bridge).SequenceEqual(offsets), "Undo restores the prior bridge placement and colliders");
+        mapEditor.Redo(); Assert(bridge.Position[0] == 55, "Redo reapplies the bridge placement");
         Assert(session.Remove(identity).Applied && bridge.Position[0] == 50 && bridge.Active && Offsets(bridge).SequenceEqual(offsets), "Removal returns the bridge to its effective underlying state");
-        Assert(world.TrestlePosition.SequenceEqual(new[] { 60.0, 4, 7 }), "No editor route moves the separate trestle");
-        Assert(editor.Save() == null && !store.Info.Contains("crankyant/scene-patcher"), "Save after removal writes no dependency for an empty document");
-        editor.Undo(); Assert(bridge.Position[0] == 55, "Undo of the removal restores the authored bridge placement");
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the bridge capability version: " + store.Info);
+        Assert(world.TrestlePosition.SequenceEqual(new[] { 60.0, 4, 7 }), "No scene patch editing route moves the separate trestle");
+        Assert(mapEditor.Save() == null && !store.Info.Contains("crankyant/scene-patcher"), "Save after removal writes no dependency for an empty document");
+        mapEditor.Undo(); Assert(bridge.Position[0] == 55, "Undo of the removal restores this mod's bridge placement");
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the bridge capability version: " + store.Info);
         var fresh = new FakeBridge(); var replay = new FakeBridgeWorld(); replay.Objects[BridgePath] = new List<object> { fresh };
         var reload = new PatchEngine(new BridgeScene(replay, Capability.Unchecked)).Apply(store.Patch);
         Assert(reload.Outcomes.Values.Single().Applied && fresh.Position[0] == 55 && fresh.Colliders.Count == 2, "A reloaded world reproduces the saved bridge placement without duplicated colliders");
@@ -211,7 +211,7 @@ static class BridgeTests {
         var offsets = Offsets(bridge);
         var result = new PatchEngine(scene).Apply(Doc(Bridge("place-ela-bridge")));
         Assert(result.Error == null && result.Outcomes["place-ela-bridge"].Applied, "Bridge placement applies: " + result.Error + result.Outcomes["place-ela-bridge"].Error);
-        Assert(bridge.Position.SequenceEqual(new[] { 55.0, 5, 7 }) && bridge.Rotation[1] == 0.130526, "Bridge root takes the authored map pose through the current origin");
+        Assert(bridge.Position.SequenceEqual(new[] { 55.0, 5, 7 }) && bridge.Rotation[1] == 0.130526, "Bridge root takes this mod's map placement through the current origin");
         Assert(Offsets(bridge).SequenceEqual(offsets) && bridge.Colliders.All(c => c.Enabled), "Colliders keep their identity and follow the root");
         Assert(world.TrestlePosition.SequenceEqual(new[] { 60.0, 4, 7 }), "Separate trestle stays where it was");
     }

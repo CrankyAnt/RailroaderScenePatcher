@@ -14,13 +14,13 @@ namespace RailroaderScenePatcher.Core {
         }
         // Stable for the loaded object: hierarchy path below the bridge root, collider type and instance.
         public string Id { get; }
-        // Type and shape properties that a pose or activity change must not alter.
+        // Type and shape properties that a placement or activity change must not alter.
         public string Shape { get; }
         public bool Enabled { get; }
         // Every object from the collider up to, but excluding, the bridge root is active.
         public bool ChainActive { get; }
         public bool ActiveInHierarchy { get; }
-        // Pose relative to the bridge root.
+        // Placement relative to the bridge root.
         public IReadOnlyList<double> RootPosition { get; }
         public IReadOnlyList<double> RootRotation { get; }
         // The physics shape agrees with the collider's transform after synchronisation.
@@ -45,8 +45,8 @@ namespace RailroaderScenePatcher.Core {
         void CheckPattern(object bridge);
         BridgeObservation Observe(object bridge);
         void SetActive(object bridge, bool active);
-        // Sets the root pose and refreshes the dependent culling and physics state.
-        void SetPose(object bridge, Placement placement);
+        // Sets the root placement and refreshes the dependent culling and physics state.
+        void SetPlacement(object bridge, Placement placement);
     }
     // Places and enables or disables a bridge root together with its colliders. Separate track-owned
     // scenery, such as generated trestles, is never part of the moved hierarchy and must stay unchanged.
@@ -81,11 +81,11 @@ namespace RailroaderScenePatcher.Core {
             var before = world.Observe(target);
             var active = state.Active ?? before.Root.Active ?? true;
             if (active && before.Root.Active != true) world.SetActive(target, true);
-            if (state.Placement != null) world.SetPose(target, state.Placement);
+            if (state.Placement != null) world.SetPlacement(target, state.Placement);
             if (!active && before.Root.Active != false) world.SetActive(target, false);
             var after = world.Observe(target);
             var desired = new ObjectState(state.Placement ?? before.Root.Placement, active);
-            if (!SamePose(after.Root, desired) || after.Root.Active != active) throw new InvalidOperationException("Applied bridge pose or activity did not verify");
+            if (!SamePlacement(after.Root, desired) || after.Root.Active != active) throw new InvalidOperationException("Applied bridge placement or activity did not verify");
             var difference = Layout(expected, after) ?? Activity(before, after) ?? (after.SeparateScenery == before.SeparateScenery ? null : "separate track-owned scenery changed");
             if (difference != null) throw new InvalidOperationException("Bridge collider state did not verify: " + difference);
         }
@@ -95,14 +95,14 @@ namespace RailroaderScenePatcher.Core {
                 var expected = Reference(target);
                 var root = captured.Root;
                 if (root.Active == true) world.SetActive(target, true);
-                if (root.Placement != null) world.SetPose(target, root.Placement);
+                if (root.Placement != null) world.SetPlacement(target, root.Placement);
                 if (root.Active == false) world.SetActive(target, false);
                 var current = world.Observe(target);
-                return SamePose(current.Root, root) && current.Root.Active == root.Active && current.ActiveInHierarchy == captured.ActiveInHierarchy
+                return SamePlacement(current.Root, root) && current.Root.Active == root.Active && current.ActiveInHierarchy == captured.ActiveInHierarchy
                     && Layout(expected, current) == null && Activity(captured, current) == null && current.SeparateScenery == captured.SeparateScenery;
             } catch { return false; }
         }
-        // Collider identities, shapes, enabled flags, root-relative poses and physics agreement.
+        // Collider identities, shapes, enabled flags, root-relative placements and physics agreement.
         static string Layout(BridgeObservation expected, BridgeObservation current) {
             if (!expected.Colliders.Select(c => c.Id).SequenceEqual(current.Colliders.Select(c => c.Id))) return "collider identities changed";
             for (var i = 0; i < expected.Colliders.Count; i++) {
@@ -136,7 +136,7 @@ namespace RailroaderScenePatcher.Core {
             var angle = 2 * Math.Acos(Math.Min(1, Math.Abs(dot) / Math.Sqrt(la * lb))) * 180 / Math.PI;
             return angle <= AngleToleranceDegrees;
         }
-        static bool SamePose(ObjectState a, ObjectState b) =>
+        static bool SamePlacement(ObjectState a, ObjectState b) =>
             a.Placement != null && b.Placement != null && Near(a.Placement.Position, b.Placement.Position) && SameRotation(a.Placement.Rotation, b.Placement.Rotation);
     }
 }

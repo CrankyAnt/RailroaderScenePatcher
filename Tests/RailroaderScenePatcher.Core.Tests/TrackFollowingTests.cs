@@ -42,7 +42,7 @@ static class TrackFollowingTests {
         EndpointAnchorAndRepeatDoNotAccumulate();
         UnresolvedAnchorChangesNothing();
         CapabilitiesReportTrackPoses();
-        EditorFollowKeepsPoseAndFollowsTrackMoves();
+        EditingFollowKeepsPlacementAndFollowsTrackMoves();
         SmallTrackTurnsAreFollowed();
         PlacementEditsKeepFollowingUntilStopped();
         ReconciliationFailureRestoresAndGuards();
@@ -64,7 +64,7 @@ static class TrackFollowingTests {
         Assert(engine.Apply(doc).Outcomes["follow"].Applied && Near(box.Position, 201, 2, 54) && Near(box.Rotation, Quarter), "An endpoint anchor places the object relative to the node: " + String.Join(",", box.Position));
         for (var i = 0; i < 3; i++) Assert(engine.Apply(doc).Outcomes["follow"].Applied, "Repeated application succeeds");
         Assert(Near(box.Position, 201, 2, 54) && Near(box.Rotation, Quarter), "Repeated application of the same document does not accumulate the offset or rotation");
-        // A changed track pose yields the new absolute pose from the same relative values.
+        // A changed track pose yields the new absolute placement from the same relative values.
         scene.Poses["node:N1"] = new TrackPose(new[] { 400.0, 3, 0 }, Quarter);
         Assert(new PatchEngine(scene).Apply(doc).Outcomes["follow"].Applied && Near(box.Position, 304, 3, -1), "The next load follows the moved endpoint: " + String.Join(",", box.Position));
         Assert(Near(box.Rotation, 0, 1, 0, 0), "The relative rotation composes with the moved endpoint's rotation: " + String.Join(",", box.Rotation));
@@ -99,10 +99,10 @@ static class TrackFollowingTests {
         Assert(!new PatchEngine(without).Apply(Doc(Follow("follow", SegmentTrack))).Outcomes["follow"].Applied, "A composed scene without a track source refuses the mode");
     }
     static readonly TargetIdentity P = new TargetIdentity("s", "p", "c");
-    // Following is reconciled several times a second for as long as the editor is open. A scene that can tell whether
+    // Following is reconciled several times a second for as long as the native map editor is open. A scene that can tell whether
     // a resolved target is still its object is searched once and again only now and then, not on every reconciliation.
     static void ReconciliationDoesNotSearchTheSceneEachTime() {
-        var (scene, box, session, editor, store) = Session();
+        var (scene, box, session, mapEditor, store) = Session();
         session.Follow(P, TrackAnchor.At(new TrackLocation("S1", "a", 10)));
         var searches = scene.ResolveCalls;
         for (var i = 0; i < 10; i++) session.ReconcileTrackFollowing();
@@ -124,23 +124,23 @@ static class TrackFollowingTests {
         session.ReconcileTrackFollowing();
         Assert(scene.ResolveCalls > searches, "A target that is no longer live is searched for again at once");
     }
-    static (TrackScene scene, Box box, AuthoringSession session, Editor editor, Store store) Session(string patch = null) {
+    static (TrackScene scene, Box box, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null) {
         var (scene, box) = Setup();
-        var store = new Store { Patch = patch }; var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(scene), editor, store, "map"); editor.Session = session;
-        return (scene, box, session, editor, store);
+        var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        return (scene, box, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(AuthoringSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single();
     static double[] Numbers(Newtonsoft.Json.Linq.JToken token) => token.Select(v => (double)v).ToArray();
-    static void EditorFollowKeepsPoseAndFollowsTrackMoves() {
-        var (scene, box, session, editor, store) = Session();
+    static void EditingFollowKeepsPlacementAndFollowsTrackMoves() {
+        var (scene, box, session, mapEditor, store) = Session();
         var follow = session.Follow(P, TrackAnchor.At(new TrackLocation("S1", "a", 10)));
         Assert(follow.Applied && Near(box.Position, 5, 6, 7) && Near(box.Rotation, 0, 0, 0, 1), "Choosing a followed track keeps the object where it is: " + follow.Error);
         var placement = Only(session)["placement"];
         Assert((string)placement["mode"] == "trackFollowing" && (string)placement["track"]["segment"] == "S1" && (string)placement["track"]["end"] == "a" && (double)placement["track"]["distance"] == 10, "The document records the explicit track: " + placement);
-        // Map pose (105,6,7) relative to (200,1,0) turned a quarter: the offset in the track frame is (-7,5,-95).
+        // Map placement (105,6,7) relative to (200,1,0) turned a quarter: the offset in the track frame is (-7,5,-95).
         Assert(Near(Numbers(placement["offset"]), -7, 5, -95), "The document records the offset in the track frame: " + placement["offset"]);
-        Assert(editor.UndoGroups.Count == 1 && session.MinimumPatcherVersion == "0.5.0", "Following is one history entry and needs patcher 0.5.0");
+        Assert(mapEditor.UndoGroups.Count == 1 && session.MinimumPatcherVersion == "0.5.0", "Following is one history entry and needs patcher 0.5.0");
         Assert(session.HasTrackFollowing && session.FollowingOf(P)?.Anchor.ToString() == "S1|a|10", "The session reports the followed track of the object");
         var text = session.DocumentText; var mutations = scene.MutationCalls;
         Assert(session.ReconcileTrackFollowing().Count == 0 && scene.MutationCalls == mutations, "Reconciliation without a track change mutates nothing");
@@ -149,18 +149,18 @@ static class TrackFollowingTests {
         Assert(moved.Count == 1 && moved[0].Value.Applied && Near(box.Position, 15, 7, 7) && Near(box.Rotation, 0, 0, 0, 1), "A moved track carries the object by the same relative placement: " + String.Join(",", box.Position));
         scene.Poses["S1|a|10"] = new TrackPose(new[] { 210.0, 2, 0 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.ReconcileTrackFollowing().Single().Value.Applied && Near(box.Position, 103, 7, -95) && Near(box.Rotation, 0, -S, 0, S), "A turned track turns the object's position and orientation with it: " + String.Join(",", box.Position) + " / " + String.Join(",", box.Rotation));
-        Assert(session.DocumentText == text && editor.UndoGroups.Count == 1, "Following the track neither rewrites the stored relative values nor records history");
-        editor.Undo();
-        Assert(Near(box.Position, 5, 6, 7) && session.DocumentText.Contains("\"modifications\": []"), "Undo removes the following and returns the underlying pose");
+        Assert(session.DocumentText == text && mapEditor.UndoGroups.Count == 1, "Following the track neither rewrites the stored relative values nor records history");
+        mapEditor.Undo();
+        Assert(Near(box.Position, 5, 6, 7) && session.DocumentText.Contains("\"modifications\": []"), "Undo removes the following and returns the underlying placement");
         Assert(session.ReconcileTrackFollowing().Count == 0, "An object no longer following is not reconciled");
         Assert(!session.HasTrackFollowing && session.FollowingOf(P) == null, "After Undo nothing follows a track");
-        editor.Redo();
+        mapEditor.Redo();
         Assert(Near(box.Position, 103, 7, -95), "Redo follows the track's current pose, not the pose at the time of the edit");
-        Assert(!session.Follow(P, TrackAnchor.Endpoint("Nmissing")).Applied && editor.UndoGroups.Count == 1, "An unresolved followed track is refused without history");
+        Assert(!session.Follow(P, TrackAnchor.Endpoint("Nmissing")).Applied && mapEditor.UndoGroups.Count == 1, "An unresolved followed track is refused without history");
     }
     // A track that turns by a fraction of a degree, as a slightly reshaped curve does, still turns the following object.
     static void SmallTrackTurnsAreFollowed() {
-        var (scene, box, session, editor, store) = Session();
+        var (scene, box, session, mapEditor, store) = Session();
         // The endpoint stands at the object's own map position, so a turn of the endpoint changes the orientation alone.
         scene.Poses["node:N1"] = new TrackPose(new[] { 105.0, 6, 7 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.Follow(P, TrackAnchor.Endpoint("N1")).Applied && session.ReconcileTrackFollowing().Count == 0, "The object follows the endpoint");
@@ -173,7 +173,7 @@ static class TrackFollowingTests {
         }
     }
     static void PlacementEditsKeepFollowingUntilStopped() {
-        var (scene, box, session, editor, store) = Session();
+        var (scene, box, session, mapEditor, store) = Session();
         session.Follow(P, TrackAnchor.Endpoint("N1"));
         Assert(session.Edit(P, new Placement(new[] { 310.0, 2, 60 }, new[] { 0.0, 0, 0, 1 }), null).Applied && Near(box.Position, 210, 2, 60), "A placement edit of a following object moves it");
         var placement = Only(session)["placement"];
@@ -183,15 +183,15 @@ static class TrackFollowingTests {
         Assert(Near(box.Position, 230, 2, 60), "The edited offset follows the endpoint");
         Assert(session.Edit(P, null, false).Applied && (string)Only(session)["placement"]["mode"] == "trackFollowing" && !box.Active, "An activity edit keeps the following placement");
         var stopped = session.StopFollowing(P);
-        Assert(stopped.Applied && Near(box.Position, 230, 2, 60) && (string)Only(session)["placement"]["mode"] == "fixed" && Only(session)["active"] != null, "Stopping keeps the current pose as fixed placement and keeps activity: " + stopped.Error);
+        Assert(stopped.Applied && Near(box.Position, 230, 2, 60) && (string)Only(session)["placement"]["mode"] == "fixed" && Only(session)["active"] != null, "Stopping keeps the current placement as fixed placement and keeps activity: " + stopped.Error);
         scene.Poses["node:N1"] = new TrackPose(new[] { 400.0, 2, 50 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.ReconcileTrackFollowing().Count == 0 && Near(box.Position, 230, 2, 60), "A fixed placement no longer follows the endpoint");
         Assert(!session.StopFollowing(P).Applied, "Stopping an object that does not follow a track is refused");
-        editor.Undo();
+        mapEditor.Undo();
         Assert(Near(box.Position, 310, 2, 60) && (string)Only(session)["placement"]["mode"] == "trackFollowing", "Undo of stopping resumes following at the endpoint's current pose: " + String.Join(",", box.Position));
     }
     static void ReconciliationFailureRestoresAndGuards() {
-        var (scene, box, session, editor, store) = Session();
+        var (scene, box, session, mapEditor, store) = Session();
         session.Follow(P, TrackAnchor.At(new TrackLocation("S1", "a", 10)));
         scene.Poses["S1|a|10"] = new TrackPose(new[] { 210.0, 1, 0 }, Quarter);
         scene.FailNextApplies = 1;
@@ -212,9 +212,9 @@ static class TrackFollowingTests {
         Assert(!lost.Applied && lost.Error.Contains("does not resolve") && Near(box.Position, 25, 6, 7), "A followed track that no longer resolves leaves the object untouched and is reported");
     }
     static void SaveAndReloadReproduceFollowingOnce() {
-        var (scene, box, session, editor, store) = Session();
+        var (scene, box, session, mapEditor, store) = Session();
         session.Follow(P, TrackAnchor.At(new TrackLocation("S1", "a", 10)));
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && store.Patch.Contains("trackFollowing"), "Save writes the following placement and raises the dependency to 0.5.0: " + store.Info);
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && store.Patch.Contains("trackFollowing"), "Save writes the following placement and raises the dependency to 0.5.0: " + store.Info);
         var (fresh, freshBox) = Setup();
         fresh.Poses["S1|a|10"] = new TrackPose(new[] { 250.0, 1, 0 }, Quarter);
         var engine = new PatchEngine(fresh);

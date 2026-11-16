@@ -17,7 +17,7 @@ namespace RailroaderScenePatcher.Core {
         public string Json { get; }
         // Identifiers the mod lists under dependencies.required, without their version constraints.
         public IReadOnlyList<string> Dependencies { get; }
-        // The editor's edited mod, applied before Save has declared the patcher dependency.
+        // The native map editor's edited mod, applied before Save has declared the patcher dependency.
         public bool EditTarget { get; }
         // Set when the document or supplying metadata cannot be read; the mod is skipped as a whole.
         public string Error { get; }
@@ -73,7 +73,7 @@ namespace RailroaderScenePatcher.Core {
     }
     // Receives informational notices for the structured native collector. A notice with a known Key replaces that row.
     public interface IOverlapNotices { void Notice(OverlapNotice notice); }
-    // Different supplying mods attempt to modify the same uniquely resolved existing object. It reports possible
+    // Different supplying mods attempt to modify the same uniquely resolved existing target. It reports possible
     // incompatibility only: it is not a failure, chooses no winner and does not stop application.
     public sealed class OverlapNotice {
         internal OverlapNotice(string key, TargetIdentity target, IReadOnlyList<LoadedMod> mods) {
@@ -84,7 +84,7 @@ namespace RailroaderScenePatcher.Core {
                     if (!ReferenceEquals(dependent, prerequisite) && dependent.Dependencies.Contains(prerequisite.Source.Identifier, StringComparer.Ordinal))
                         dependencies.Add(Name(dependent.Source) + " declares a dependency on " + Name(prerequisite.Source));
             Dependencies = dependencies;
-            Message = "Supplying mods " + String.Join(", ", Mods.Select(Name)) + " each modify the existing object " + target.Scene + "/" + target.Path + " [" + target.Component + "]. " +
+            Message = "Supplying mods " + String.Join(", ", Mods.Select(Name)) + " each modify the existing target " + target.Scene + "/" + target.Path + " [" + target.Component + "]. " +
                 "This indicates a possible incompatibility, not a confirmed conflict. " + (dependencies.Count == 0 ? "" : String.Join("; ", dependencies) + "; a dependency does not establish that the changes are compatible. ") +
                 "Application continued in load order; no change was undone and no winner was chosen. Check the mods' descriptions if the result looks wrong.";
         }

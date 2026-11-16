@@ -96,19 +96,19 @@ static class GroupActivityTests {
         Assert(!refused["enable"].Applied && refused["enable"].Error.Contains("follows track group ela") && !sign.Active && sign.Position[0] == 20, "An explicit enable of a group follower is refused before mutation: " + refused["enable"].Error);
         Assert(refused["independent"].Applied && !other.Active, "Independent work still applies");
     }
-    static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, AuthoringSession session, Editor editor, Store store) Session(string patch = null, TrackScene tracks = null) {
+    static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null, TrackScene tracks = null) {
         var (world, sign, other, markers) = Setup();
         var capabilities = new SceneCapabilities(() => world.MapIds) { Tracks = tracks };
         capabilities.Add(markers);
-        var store = new Store { Patch = patch }; var editor = new Editor();
-        var session = new AuthoringSession(new PatchEngine(capabilities), editor, store, "map"); editor.Session = session;
-        return (world, sign, other, session, editor, store);
+        var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
+        return (world, sign, other, session, mapEditor, store);
     }
-    static JObject Only(AuthoringSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single();
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single();
     static void RemovingTheDisableReturnsActivityToTheGroup() {
-        var (world, sign, other, session, editor, store) = Session();
-        Assert(!session.Edit(Sign, null, true).Applied && editor.UndoGroups.Count == 0, "The editor refuses an explicit enable of a follower");
-        Assert(session.Edit(Sign, null, false).Applied && !sign.Active && sign.Held && sign.Activations == 0, "The editor disables the follower with a hold");
+        var (world, sign, other, session, mapEditor, store) = Session();
+        Assert(!session.Edit(Sign, null, true).Applied && mapEditor.UndoGroups.Count == 0, "Scene patch editing refuses an explicit enable of a follower");
+        Assert(session.Edit(Sign, null, false).Applied && !sign.Active && sign.Held && sign.Activations == 0, "Scene patch editing disables the follower with a hold");
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 5))).Applied && Subscription(sign) == "extension|1|held" && !sign.Active && sign.Activations == 0, "Rebinding a disabled follower moves the subscription and keeps the hold");
         world.SetGroupEnabled("extension", false);
         Assert(session.HasActivityValue(Sign) && !session.HasActivityValue(Other), "The document sets an activity for the disabled object and none for the other");
@@ -118,7 +118,7 @@ static class GroupActivityTests {
         Assert(Only(session)["active"] == null && Only(session)["relationships"] != null, "The modification keeps its binding without an activity value");
         world.SetGroupEnabled("extension", true);
         Assert(sign.Active && Registered(world, sign) == "Nnew", "The group then activates the object");
-        editor.Undo();
+        mapEditor.Undo();
         Assert(!sign.Active && sign.Held, "Undo of the clearing restores the hold");
         world.SetGroupEnabled("extension", false); world.SetGroupEnabled("extension", true);
         Assert(!sign.Active, "The restored hold keeps precedence over group activation");
@@ -127,7 +127,7 @@ static class GroupActivityTests {
         world.SetGroupEnabled("ela", false);
         Assert(!sign.Active, "After removal the native group drives activity");
         world.SetGroupEnabled("ela", true);
-        editor.Undo();
+        mapEditor.Undo();
         Assert(sign.Held && !sign.Active && Subscription(sign) == "extension|1|held", "Undo of the removal restores the disable and the new subscription");
     }
     static void FailedApplicationRestoresSubscriptionAndHold() {
@@ -136,7 +136,7 @@ static class GroupActivityTests {
         var failed = new PatchEngine(scene).Apply(Doc(Item("rebind", ToExtension))).Outcomes["rebind"];
         Assert(!failed.Applied && failed.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal) && failed.Error.Contains("group"), "A lost subscription fails the rebinding: " + failed.Error);
         Assert(Subscription(sign) == "ela|1" && sign.Active && Registered(world, sign) == "S9sc" && sign.Segment == "S9sc", "Restoration returns the location, registration and subscription: " + Subscription(sign));
-        var (w2, s2, o2, session, editor, store) = Session();
+        var (w2, s2, o2, session, mapEditor, store) = Session();
         Assert(session.Edit(Sign, null, false).Applied && s2.Held, "The follower is disabled");
         w2.FailHold = true; w2.SkipObserve = true;
         var unverified = session.ClearActivity(Sign);
@@ -149,7 +149,7 @@ static class GroupActivityTests {
     static void TrackFollowingKeepsGroupActivity() {
         var tracks = new TrackScene();
         tracks.Poses["node:N1"] = new TrackPose(new[] { 1050.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
-        var (world, sign, other, session, editor, store) = Session(tracks: tracks);
+        var (world, sign, other, session, mapEditor, store) = Session(tracks: tracks);
         Assert(session.Follow(Sign, TrackAnchor.Endpoint("N1")).Applied && Subscription(sign) == "ela|1" && sign.Active, "Following a track leaves the bound group's subscription and activity");
         Assert(session.Edit(Sign, null, false).Applied && !sign.Active && sign.Activations == 0, "The following follower is disabled");
         tracks.Poses["node:N1"] = new TrackPose(new[] { 1060.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
@@ -163,11 +163,11 @@ static class GroupActivityTests {
         Assert(session.ReconcileTrackFollowing().Single().Value.Applied && sign.Position[0] == 40 && !sign.Active, "Following the track does not override the disabled group");
     }
     static void SaveAndReloadReproduceTheHoldOnce() {
-        var (world, sign, other, session, editor, store) = Session();
+        var (world, sign, other, session, mapEditor, store) = Session();
         session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 5)));
         session.Edit(Sign, null, false);
         Assert(session.MinimumPatcherVersion == "0.5.0", "An activity value on a track-marker target needs 0.5.0");
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency: " + store.Info);
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency: " + store.Info);
         var (fresh, freshSign, freshOther, freshScene) = Setup();
         var engine = new PatchEngine(freshScene);
         Assert(engine.Apply(store.Patch).Outcomes.Values.Single().Applied && !freshSign.Active && Subscription(freshSign) == "extension|1|held" && freshSign.Activations == 0, "A reload reproduces the binding, subscription and hold without activating the object");
@@ -208,16 +208,16 @@ static class GroupActivityTests {
             Assert(!sign.Active && sign.Activations == 0, "Group activation after the document keeps the object inactive");
         }
     }
-    // A gizmo drag of an explicitly disabled follower previews the pose only: the hold stays through every preview.
+    // A gizmo drag of an explicitly disabled follower previews the placement only: the hold stays through every preview.
     static void GizmoPreviewKeepsTheDisable() {
         var (world, sign, other, markers) = Setup();
         var capabilities = new SceneCapabilities(() => world.MapIds, new FakeMarkerInspection(world));
         capabilities.Add(markers);
-        var editor = new Editor(); var engine = new PatchEngine(capabilities);
-        var session = new AuthoringSession(engine, editor, new Store(), "map"); editor.Session = session;
+        var mapEditor = new NativeMapEditor(); var engine = new PatchEngine(capabilities);
+        var session = new PatchEditingSession(engine, mapEditor, new Store(), "map"); mapEditor.Session = session;
         var inventory = new SceneInventory(capabilities);
         PlacementGesture Begin() { inventory.Refresh(); return new PlacementGesture(engine, session, Sign, inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, sign)))); }
-        Assert(session.Edit(Sign, null, false).Applied && sign.Held && !sign.Active && sign.Activations == 0, "The editor disables the follower");
+        Assert(session.Edit(Sign, null, false).Applied && sign.Held && !sign.Active && sign.Activations == 0, "Scene patch editing disables the follower");
         var cancelled = Begin();
         foreach (var x in new[] { 1035.0, 1036, 1037 }) {
             var preview = cancelled.Preview(new Placement(new[] { x, 1, 2 }, new[] { 0.0, 0, 0, 1 }));
@@ -226,7 +226,7 @@ static class GroupActivityTests {
         }
         world.SetGroupEnabled("ela", false); world.SetGroupEnabled("ela", true);
         Assert(!sign.Active && sign.Activations == 0, "Group activation during the drag keeps the object inactive");
-        Assert(cancelled.Cancel().Applied && sign.Position[0] == 20 && sign.Held && !sign.Active && sign.Activations == 0, "Cancel restores the pose under the hold");
+        Assert(cancelled.Cancel().Applied && sign.Position[0] == 20 && sign.Held && !sign.Active && sign.Activations == 0, "Cancel restores the placement under the hold");
         var completed = Begin();
         Assert(completed.Preview(new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 })).Applied && sign.Held && sign.Activations == 0, "A second gesture previews under the hold");
         var outcome = completed.Complete();

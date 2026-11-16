@@ -18,7 +18,7 @@ namespace RailroaderScenePatcher.Core {
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
     }
     public enum CircuitKind { Native, Tracks, Detached, Added }
-    // The identity of an authored detection addition. Its ID is unique in the patch document of its supplying mod, and the
+    // The identity of a detection addition. Its ID is unique in the patch document of its supplying mod, and the
     // key joins it with that document's key, so additions of different mods never share an identity.
     public static class DetectionAddition {
         const string Prefix = "addition:";
@@ -43,7 +43,7 @@ namespace RailroaderScenePatcher.Core {
         internal static string SpanStem(string key) { TryRead(key, out var owner, out var id); return "added." + (owner.Length == 0 ? "" : owner + ".") + id; }
     }
     // The coverage of one circuit of a crossing: its native spans, explicitly selected tracks, detached from the crossing, or
-    // an authored addition with its own tracks.
+    // a detection addition with its own tracks.
     public sealed class CircuitCoverage {
         public static readonly string[] Roles = { "approachA", "island", "approachB" };
         public static readonly CircuitCoverage Detached = new CircuitCoverage(CircuitKind.Detached, null, null);
@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher.Core {
         // The explicitly selected tracks in role order: approach A, island, approach B.
         public static CircuitCoverage Tracks(SpanRange approachA, SpanRange island, SpanRange approachB) =>
             new CircuitCoverage(CircuitKind.Tracks, new[] { approachA ?? throw new ArgumentNullException(nameof(approachA)), island ?? throw new ArgumentNullException(nameof(island)), approachB ?? throw new ArgumentNullException(nameof(approachB)) }, null);
-        // An authored addition: a circuit the patcher adds to the crossing for explicitly selected tracks, in role order.
+        // A detection addition: a circuit the patcher adds to the crossing for explicitly selected tracks, in role order.
         public static CircuitCoverage Added(SpanRange approachA, SpanRange island, SpanRange approachB) =>
             new CircuitCoverage(CircuitKind.Added, new[] { approachA ?? throw new ArgumentNullException(nameof(approachA)), island ?? throw new ArgumentNullException(nameof(island)), approachB ?? throw new ArgumentNullException(nameof(approachB)) }, null);
         // The circuit's own spans, by ID in role order, as the map defines them.
@@ -82,7 +82,7 @@ namespace RailroaderScenePatcher.Core {
         }
     }
     // The detection coverage of a crossing by circuit. A circuit is named by the ID of its native island span, which identifies
-    // it in the map. An authored coverage lists only explicitly selected or detached circuits; an omitted circuit keeps its
+    // it in the map. A mod's coverage lists only explicitly selected or detached circuits; an omitted circuit keeps its
     // effective coverage. An observed coverage lists every circuit of the crossing in its native order, followed by every
     // addition. An addition is named by its DetectionAddition key and exists only while a coverage lists it.
     public sealed class CrossingCoverage {
@@ -99,7 +99,7 @@ namespace RailroaderScenePatcher.Core {
         // coverage removes the additions it does not list; applying any other coverage keeps them.
         internal bool Complete { get; private set; }
         internal CrossingCoverage AsComplete() { Complete = true; return this; }
-        // The coverage with every addition that has no owner yet given to the document that authors it.
+        // The coverage with every addition that has no owner yet given to the document that sets it.
         internal CrossingCoverage OwnedBy(string owner) {
             if (String.IsNullOrEmpty(owner) || !circuits.Any(c => c.Value.Kind == CircuitKind.Added)) return this;
             return new CrossingCoverage(circuits.Select(c => DetectionAddition.TryRead(c.Key, out var o, out var id) && o.Length == 0 ? new KeyValuePair<string, CircuitCoverage>(DetectionAddition.Key(owner, id), c.Value) : c), Residue) { Complete = Complete };
@@ -109,12 +109,12 @@ namespace RailroaderScenePatcher.Core {
         // coverage holds them; any application removes them.
         public IReadOnlyList<string> Residue { get; }
         public CircuitCoverage this[string circuit] => circuits.FirstOrDefault(c => c.Key == circuit).Value;
-        // The authored circuits laid over the observed ones; an omitted circuit keeps its coverage.
-        internal static CrossingCoverage Overlay(CrossingCoverage observed, CrossingCoverage authored) {
-            if (authored == null) return observed;
-            if (observed == null) return authored;
-            var result = observed.circuits.Select(c => new KeyValuePair<string, CircuitCoverage>(c.Key, authored[c.Key] ?? c.Value)).ToList();
-            result.AddRange(authored.circuits.Where(c => observed[c.Key] == null));
+        // The mod's circuits laid over the observed ones; an omitted circuit keeps its coverage.
+        internal static CrossingCoverage Overlay(CrossingCoverage observed, CrossingCoverage modCoverage) {
+            if (modCoverage == null) return observed;
+            if (observed == null) return modCoverage;
+            var result = observed.circuits.Select(c => new KeyValuePair<string, CircuitCoverage>(c.Key, modCoverage[c.Key] ?? c.Value)).ToList();
+            result.AddRange(modCoverage.circuits.Where(c => observed[c.Key] == null));
             return new CrossingCoverage(result) { Complete = observed.Complete };
         }
         // Whether the circuit is the only one that still detects trains, so detaching it would be refused.
@@ -176,7 +176,7 @@ namespace RailroaderScenePatcher.Core {
         object CreateSpan(object controller, string id, SpanRange range);
         // Unregisters and destroys an owned span.
         void DestroySpan(object span);
-        // Creates a circuit set for an authored addition, not yet evaluated by any controller and without spans.
+        // Creates a circuit set for a detection addition, not yet evaluated by any controller and without spans.
         object CreateCircuit(object controller, string key);
         // The addition key of a circuit set the patcher created in this world, or null for a native set.
         string AdditionKey(object circuit);
@@ -187,7 +187,7 @@ namespace RailroaderScenePatcher.Core {
         bool Active(object controller);
     }
     // Corrects and extends the detection coverage of an existing grade crossing. A circuit keeps its native spans, uses explicitly
-    // selected tracks covered by spans the patcher owns, or is detached from the crossing. An authored addition is a further
+    // selected tracks covered by spans the patcher owns, or is detached from the crossing. A detection addition is a further
     // circuit the patcher owns, with owned spans for explicitly selected extra tracks, evaluated after the native circuits. The native spans stay registered
     // and unchanged, so another consumer keeps them; the crossing simply stops evaluating them. Proximity never assigns
     // coverage, and the crossing object itself is never moved or disabled by this capability.
@@ -196,7 +196,7 @@ namespace RailroaderScenePatcher.Core {
         const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
         sealed class Circuit { internal string Key; internal object Set; internal object[] Original; }
         // The native circuits of a controller as first observed in this load, and every span the patcher owns for it.
-        // Added holds the circuits the patcher owns for authored additions; their Original is null.
+        // Added holds the circuits the patcher owns for detection additions; their Original is null.
         sealed class Baseline { internal List<Circuit> Circuits = new List<Circuit>(); internal List<Circuit> Added = new List<Circuit>(); internal List<object> Owned = new List<object>(); }
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
@@ -285,7 +285,7 @@ namespace RailroaderScenePatcher.Core {
             // A complete coverage is an effective state, which may hold circuits on their native spans.
             Validate(target, BaselineOf(target), state.Coverage, state.Coverage.Complete);
         }
-        // Authored coverage names circuits of this crossing with selected tracks or a detach, and additions with their tracks; an
+        // This mod's coverage names circuits of this crossing with selected tracks or a detach, and additions with their tracks; an
         // applied coverage may also return a circuit to its native spans. At least one circuit or addition must keep detection.
         void Validate(object target, Baseline baseline, CrossingCoverage coverage, bool allowNative) {
             foreach (var circuit in coverage.Circuits) {
@@ -360,7 +360,7 @@ namespace RailroaderScenePatcher.Core {
         // spans or owned spans covering exactly its selected tracks, every listed addition has one owned circuit with such spans,
         // the controller evaluates the circuits that are not detached in their native order followed by the additions in key
         // order, and no other owned circuit or span remains. Matching owned circuits and spans are reused, so repeating an
-        // application creates nothing, and the order of the additions never depends on the order they were authored in.
+        // application creates nothing, and the order of the additions never depends on the order they were written in.
         void Write(object target, Baseline baseline, CrossingCoverage coverage) {
             var used = new List<object>();
             var created = new List<object>();

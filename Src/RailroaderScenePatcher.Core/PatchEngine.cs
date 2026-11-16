@@ -47,7 +47,7 @@ namespace RailroaderScenePatcher.Core {
         public bool? Active { get; }
         // The track-marker relationship: a location or explicit detachment. Null leaves it untouched, and an object without one reads null.
         public MarkerBinding Marker { get; }
-        // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. Authored coverage
+        // The crossing-coverage relationship. Null leaves it untouched, and an object without one reads null. This mod's coverage
         // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
         public CrossingCoverage Coverage { get; }
         // Tells the two meanings of a null Active apart for an object whose activity follows a track group. True: this is
@@ -73,11 +73,11 @@ namespace RailroaderScenePatcher.Core {
         public string Error { get; internal set; }
         public object ResolvedTarget { get; internal set; }
         public FailureCause Cause { get; internal set; }
-        public bool EditorOnly { get; internal set; }
+        public bool MapEditorOnly { get; internal set; }
         public TargetIdentity Target { get; internal set; }
         // Applied without a change: the operation found nothing to do and recorded nothing.
         public bool Unchanged { get; internal set; }
-        // An editor edit whose value equals the object's value without this mod: the modification no longer holds
+        // An edit in scene patch editing whose value equals the object's value without this mod: the modification no longer holds
         // that setting, so the edit acted as a revert of it.
         public bool Reverted { get; internal set; }
     }
@@ -104,7 +104,7 @@ namespace RailroaderScenePatcher.Core {
     public sealed class DocumentResult {
         public string Error { get; internal set; }
         public IReadOnlyDictionary<string, Outcome> Outcomes { get; internal set; }
-        public bool EditorOnly { get; internal set; }
+        public bool MapEditorOnly { get; internal set; }
         public string EarlyRouteUnavailable { get; internal set; }
     }
     public sealed class PatchEngine {
@@ -187,9 +187,9 @@ namespace RailroaderScenePatcher.Core {
             var result = new DocumentResult();
             var outcomes = new Dictionary<string, Outcome>(); result.Outcomes = outcomes;
             var document = PatchDocument.Load(json);
-            if (!document.CanWrite) { result.Error = document.Error; result.EditorOnly = true; return result; }
+            if (!document.CanWrite) { result.Error = document.Error; result.MapEditorOnly = true; return result; }
             try {
-                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.EditorOnly = true; return result; }
+                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.MapEditorOnly = true; return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var modifications = (JArray)document.Root["modifications"];
                 var entries = new Dictionary<string, JObject>(StringComparer.Ordinal);
@@ -242,12 +242,12 @@ namespace RailroaderScenePatcher.Core {
                     Observe("retry-blocked", documentKey, id);
                     var previous = failed[key];
                     outcome.Error = "Operation already failed during this load: " + previous.Error;
-                    outcome.Cause = previous.Cause; outcome.EditorOnly = previous.EditorOnly; outcome.Target = previous.Target;
+                    outcome.Cause = previous.Cause; outcome.MapEditorOnly = previous.MapEditorOnly; outcome.Target = previous.Target;
                     outcomes[id] = outcome;
                     return outcome;
                 }
                 var item = entries[id];
-                if (!Only(item, Known)) { outcome.EditorOnly = true; throw new InvalidOperationException("Unsupported modification content"); }
+                if (!Only(item, Known)) { outcome.MapEditorOnly = true; throw new InvalidOperationException("Unsupported modification content"); }
                 var shared = AdditionIds(item).FirstOrDefault(sharedAdditions.Contains);
                 if (shared != null) throw new InvalidPatchDefinitionException(SharedAddition(shared));
                 string[] dependencies;
@@ -256,13 +256,13 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var dep in dependencies) {
                     if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency failed: " + dep);
                     var dependency = Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets);
-                    if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.EditorOnly = dependency.EditorOnly; throw new InvalidOperationException("Dependency failed: " + dep); }
+                    if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new InvalidOperationException("Dependency failed: " + dep); }
                 }
                 Modification parsed;
                 try { outcome.Target = ParseTarget(item["target"] as JObject); parsed = Parse(item, documentKey); }
                 catch (InvalidOperationException e) {
                     outcome.Cause = FailureCause.InvalidDefinition;
-                    outcome.EditorOnly = e.Message.StartsWith("Unsupported", StringComparison.Ordinal) || e.Message == "Invalid or unsupported target";
+                    outcome.MapEditorOnly = e.Message.StartsWith("Unsupported", StringComparison.Ordinal) || e.Message == "Invalid or unsupported target";
                     throw;
                 }
                 var identity = parsed.Identity;
@@ -324,7 +324,7 @@ namespace RailroaderScenePatcher.Core {
             return matches[0];
         }
         // The immediate guard before any mutation: same prerequisites, same unique object, same map context,
-        // and for an editor edit the same inspected observation.
+        // and for an edit in scene patch editing the same inspected observation.
         internal void GuardMutation(TargetIdentity identity, object resolved, string[] mapContext, InspectedTarget expected) {
             scene.Preflight(resolved);
             var current = scene.Resolve(identity);
@@ -360,7 +360,7 @@ namespace RailroaderScenePatcher.Core {
             awaitingOutput.Add(target);
             return true;
         }
-        // The addition IDs a modification authors, and those that more than one modification of a document uses. An addition ID
+        // The addition IDs a modification sets, and those that more than one modification of a document uses. An addition ID
         // names one addition of its supplying mod, so every modification that shares one fails, wherever it stands.
         internal static IEnumerable<string> AdditionIds(JObject item) =>
             ((item["relationships"] as JObject)?["crossingCoverage"] as JArray)?.OfType<JObject>().Where(c => c["addition"]?.Type == JTokenType.String).Select(c => (string)c["addition"]).Distinct(StringComparer.Ordinal) ?? Enumerable.Empty<string>();
@@ -433,12 +433,12 @@ namespace RailroaderScenePatcher.Core {
             if (!Only(item, Known)) throw new InvalidOperationException("Unsupported modification content");
             var dependencies = Dependencies(item);
             var identity = ParseTarget(item["target"] as JObject);
-            Placement pose = null;
+            Placement checkedPlacement = null;
             if (item["placement"] != null) {
                 var placement = item["placement"] as JObject;
                 var mode = placement?["mode"]?.Type == JTokenType.String ? (string)placement["mode"] : null;
-                if (mode == "fixed" && Only(placement, "mode", "position", "rotation")) pose = CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4));
-                else if (mode == TrackFollowingMode && Only(placement, "mode", "track", "offset", "rotation")) pose = new Placement { Following = ParseFollowing(placement) };
+                if (mode == "fixed" && Only(placement, "mode", "position", "rotation")) checkedPlacement = CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4));
+                else if (mode == TrackFollowingMode && Only(placement, "mode", "track", "offset", "rotation")) checkedPlacement = new Placement { Following = ParseFollowing(placement) };
                 else throw new InvalidOperationException("Unsupported placement");
             }
             if (item["active"] != null && item["active"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid activity");
@@ -449,8 +449,8 @@ namespace RailroaderScenePatcher.Core {
                 if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
                 if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner);
             }
-            if (pose == null && item["active"] == null && marker == null && coverage == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(pose, (bool?)item["active"], marker, coverage), Dependencies = dependencies };
+            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = (string)item["id"], Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage), Dependencies = dependencies };
         }
         public const string TrackFollowingMode = "trackFollowing";
         // A placement relative to an explicitly selected segment location or endpoint node.
@@ -487,7 +487,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // Explicit crossing coverage: each listed circuit, named by its native island span, gets selected tracks or an explicit
         // detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every circuit untouched. An entry
-        // named by addition is an authored addition: a circuit the patcher adds for its selected tracks, which exists only while
+        // named by addition is a detection addition: a circuit the patcher adds for its selected tracks, which exists only while
         // the document lists it.
         static CrossingCoverage ParseCoverage(JToken token) {
             var circuits = token as JArray;
