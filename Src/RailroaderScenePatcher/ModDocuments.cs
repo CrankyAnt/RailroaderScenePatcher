@@ -28,7 +28,6 @@ namespace RailroaderScenePatcher {
             return new[] { id }.Concat(layers.Cast<object>().Select(v => v.ToString())).Distinct(StringComparer.Ordinal).ToArray();
         }
         internal static bool IsMapEditor => (bool)Native.Read(Native.Type("Game.ActiveMapDefinition"), "IsEditTarget");
-        internal static string ActiveId => Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")?.ToString();
         internal static string ActiveRoot() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
             var root = Native.Call(manager, "GetPackBasePathForDefinition", Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")) as string;

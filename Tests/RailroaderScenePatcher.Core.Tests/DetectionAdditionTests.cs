@@ -309,7 +309,7 @@ static partial class CoverageTests {
         engine.Apply(store.Patch, "author/pack");
         Assert(OwnedAnywhere(fresh) == 3 && fresh.World.Created == 3 && fresh.Crossing.Circuits.Count == 2, "A repeated world-load callback leaves exactly one owned addition");
         var reopenedMapEditor = new NativeMapEditor();
-        var reopened = new PatchEditingSession(engine, reopenedMapEditor, new Store { Patch = store.Patch }, "map", documentKey: "author/pack"); reopenedMapEditor.Session = reopened;
+        var reopened = new PatchEditingSession(engine, reopenedMapEditor, new Store { Patch = store.Patch }, documentKey: "author/pack"); reopenedMapEditor.Session = reopened;
         var set = fresh.Crossing.Circuits[1];
         Assert(reopened.Blocked == null && reopened.Cover(Crossing, "P6id", null).Applied && fresh.Crossing.Circuits.Count == 3 && ReferenceEquals(fresh.Crossing.Circuits[2], set) && fresh.World.Created == 3, "The reopened session edits beside the loaded addition without rebuilding it");
         Assert(reopened.DeleteDetection(Crossing, "siding").Applied && fresh.Native && OwnedAnywhere(fresh) == 0, "The reopened session deletes the loaded addition and leaves nothing owned");

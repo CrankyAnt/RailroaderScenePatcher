@@ -142,7 +142,7 @@ static class SelectionTests {
         var inventory = new SceneInventory(scene);
         var store = new Store();
         var mapEditor = new NativeMapEditor();
-        var editing = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map");
+        var editing = new PatchEditingSession(new PatchEngine(scene), mapEditor, store);
         mapEditor.Session = editing;
         var candidates = new Candidates();
         var source = new SelectionCandidate(board, SelectionIdentity.SceneObject(target), "Board");

@@ -51,7 +51,7 @@ static class SnapTests {
                 new[] { Box.X + Scene.Origin, Box.Position[1], Box.Position[2] }, Box.Rotation,
                 new[] { "binding-to-other-track" }, Array.Empty<string>(), Array.Empty<string>(), "fixed placement") };
             Engine = new PatchEngine(Scene);
-            Session = new PatchEditingSession(Engine, MapEditor, Store, "map"); MapEditor.Session = Session;
+            Session = new PatchEditingSession(Engine, MapEditor, Store); MapEditor.Session = Session;
             Snap = new SnapController(Session, Scene, Tracks);
         }
         public SnapRequest Prepare(SnapGeometry geometry) {

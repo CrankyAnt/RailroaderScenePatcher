@@ -101,7 +101,7 @@ static class GroupActivityTests {
         var capabilities = new SceneCapabilities(() => world.MapIds) { Tracks = tracks };
         capabilities.Add(markers);
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store); mapEditor.Session = session;
         return (world, sign, other, session, mapEditor, store);
     }
     static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
@@ -214,7 +214,7 @@ static class GroupActivityTests {
         var capabilities = new SceneCapabilities(() => world.MapIds, new FakeMarkerInspection(world));
         capabilities.Add(markers);
         var mapEditor = new NativeMapEditor(); var engine = new PatchEngine(capabilities);
-        var session = new PatchEditingSession(engine, mapEditor, new Store(), "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(engine, mapEditor, new Store()); mapEditor.Session = session;
         var inventory = new SceneInventory(capabilities);
         PlacementGesture Begin() { inventory.Refresh(); return new PlacementGesture(engine, session, Sign, inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, sign)))); }
         Assert(session.Edit(Sign, null, false).Applied && sign.Held && !sign.Active && sign.Activations == 0, "Scene patch editing disables the follower");

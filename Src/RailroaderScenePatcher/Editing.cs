@@ -44,7 +44,7 @@ namespace RailroaderScenePatcher {
             if (Manager == null) throw new MissingMemberException("Native undo manager unavailable");
             Native.Read(mapEditor, "_cleanChangeCount"); Native.Read(mapEditor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
             var storage = ModDocuments.ActiveStorage(); PatchPath = storage.PatchPath;
-            Session = new PatchEditingSession(engine, new NativeHistory(Manager), storage, ModDocuments.ActiveId, ModDocuments.PatcherId, ModDocuments.EditedModId());
+            Session = new PatchEditingSession(engine, new NativeHistory(Manager), storage, ModDocuments.PatcherId, ModDocuments.EditedModId());
             changed = Manager.GetType().GetEvent("DidChange", Native.Flags);
             if (changed == null || changed.EventHandlerType != typeof(Action)) throw new MissingMemberException("Native history notification unavailable");
             handler = Session.HistoryChanged;

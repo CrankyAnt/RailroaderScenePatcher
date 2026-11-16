@@ -122,13 +122,14 @@ static class PatchEditingTests {
         public Box Other = new Box { Position = new[] { -50.0, 0.0, 0.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         public Store Store = new Store(); public NativeMapEditor MapEditor = new NativeMapEditor(); public PatchEditingSession Session;
         public bool AtUnderlying => Box.X == -93 && Box.Position[1] == 8 && Box.Position[2] == 9 && Box.Rotation.SequenceEqual(new[] { 0.0, 1.0, 0.0, 0.0 }) && Box.Active;
-        public World(string patch = null, string info = null, IStorage files = null) {
+        public World(string patch = null, string info = null, IStorage files = null, string[] maps = null) {
+            if (maps != null) Scene.Maps = maps;
             Scene.Objects["p"] = new List<object> { Box }; Scene.Objects["q"] = new List<object> { Other }; Store.Patch = patch;
             if (info != null) Store.Info = info;
             else if (patch != null) Store.Info = Store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.5.0\"");
             var engine = new PatchEngine(Scene);
             if (patch != null) engine.Apply(patch, "author/pack");
-            Session = new PatchEditingSession(engine, MapEditor, files ?? Store, "map");
+            Session = new PatchEditingSession(engine, MapEditor, files ?? Store);
             MapEditor.Session = Session;
         }
         public JObject Saved => JObject.Parse(Store.Patch);
@@ -151,6 +152,93 @@ static class PatchEditingTests {
         ExitIdentifiesOutstandingWork();
         InspectedEditsBindToTheirObservation();
         EqualValuesAreNotStored();
+        NewDocumentsNameTheBottomMapLayer();
+        CopyIdNamesTheDocumentsTargetMap();
+        ExistingTargetMapsAreKept();
+        AxesAtStoredPrecisionKeepTheirLiteral();
+    }
+    // The loaded map context as the game resolves it: the edited map definition, then its map layers topmost first.
+    // Source of the order: Railroader 0.6.2 build 26335745, Game.MapLayerResolver.Resolve sorts the layer graph with the
+    // map before each of its layers and an earlier listed layer before a later one, removes the edited map, and
+    // Game.MapLoader passes the matching ActiveMapDefinition.MapLayerDataPaths as baseLayerPathsTopmostFirst. Layers of
+    // map layers are part of that one list, so its last entry is the lowest layer the game composes.
+    static readonly string[] NoLayers = { "author/own-map" };
+    static readonly string[] OneLayer = { "author/own-map", "rr/bushnell-whittier" };
+    static readonly string[] TwoLayers = { "author/own-map", "other/upper-layer", "rr/bushnell-whittier" };
+    // A patch document that scene patch editing creates names the bottom map layer, or the edited map definition
+    // itself when that has no map layers, and Save writes that target map.
+    static void NewDocumentsNameTheBottomMapLayer() {
+        foreach (var (maps, expected) in new[] { (NoLayers, "author/own-map"), (OneLayer, "rr/bushnell-whittier"), (TwoLayers, "rr/bushnell-whittier") }) {
+            var w = new World(maps: maps);
+            Assert(w.Session.Blocked == null && (string)w.Document["sourceMap"]["mapId"] == expected, "A new document for " + maps.Length + " resolved maps names " + expected + ": " + w.Document["sourceMap"]);
+            Assert(w.Session.Edit(P, PlacementAt(112), null).Applied && w.MapEditor.Save() == null && (string)w.Saved["sourceMap"]["mapId"] == expected, "Save writes the target map " + expected);
+            var reopened = new World(w.Store.Patch, w.Store.Info, maps: maps);
+            Assert(reopened.Session.Blocked == null && reopened.Box.X == 12 && !reopened.MapEditor.IsDirty, "The saved document reopens and applies on the edited map: " + reopened.Session.Blocked);
+        }
+        var upper = new World(maps: new[] { "other/upper-layer", "rr/bushnell-whittier" });
+        Assert((string)upper.Document["sourceMap"]["mapId"] == "rr/bushnell-whittier", "Editing a map layer itself also names its bottom layer");
+    }
+    // Copy ID names the target map of the edited mod's patch document, or the target map a new document would name.
+    static void CopyIdNamesTheDocumentsTargetMap() {
+        var entry = new SceneObservation(new Box(), new TargetIdentity("s", "p", "c"), "Board", true, new[] { 112.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }, new string[0], new string[0], new string[0], "Fixed placement");
+        foreach (var (maps, expected) in new[] { (NoLayers, "author/own-map"), (TwoLayers, "rr/bushnell-whittier") }) {
+            var copied = JObject.Parse(new World(maps: maps).Session.CopyId(entry));
+            Assert((string)copied["sourceMap"]["mapId"] == expected && (string)copied["target"]["path"] == "p" && (double)copied["placement"]["position"][0] == 112, "Copy ID without a document names " + expected + ": " + copied);
+        }
+        var existing = new World(Doc(Mod("move-p", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"author/own-map\""), maps: TwoLayers);
+        Assert(existing.Session.Blocked == null && (string)JObject.Parse(existing.Session.CopyId(entry))["sourceMap"]["mapId"] == "author/own-map", "Copy ID names the existing document's target map");
+        Assert((string)JObject.Parse(PatchEditingSession.CopyId(TwoLayers, entry))["sourceMap"]["mapId"] == "rr/bushnell-whittier", "Copy ID without scene patch editing names the target map a new document would name");
+        // While the edited mod's document cannot be read, Copy ID is unavailable with the session's refusal: it names
+        // no target map, because the document that exists names one this session cannot read.
+        foreach (var text in new[] { "{broken", "{\"formatVersion\":1,\"sourceMap\":{},\"modifications\":{}}", "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":3},\"modifications\":{}}" }) {
+            var blocked = new World(text, maps: TwoLayers);
+            Assert(blocked.Session.Blocked != null && blocked.Session.CopyIdRefusal == blocked.Session.Blocked, "An unreadable document makes Copy ID unavailable with the session's refusal: " + text);
+            try { blocked.Session.CopyId(entry); throw new Exception("Copy ID copied a target map for an unreadable document: " + text); }
+            catch (InvalidOperationException e) { Assert(e.Message == blocked.Session.Blocked, "Copy ID refuses with the session's refusal: " + e.Message); }
+        }
+        Assert(new World(maps: TwoLayers).Session.CopyIdRefusal == null && existing.Session.CopyIdRefusal == null, "Copy ID is available with a new or a readable document");
+    }
+    // An edit that writes a position or rotation leaves an axis whose new value equals the document's value at the
+    // single precision the game stores in its source literal, so an edit of one axis leaves the others' text alone.
+    static void AxesAtStoredPrecisionKeepTheirLiteral() {
+        const string Pose = "\"placement\":{\"mode\":\"fixed\",\"position\":[25702.977,2,3],\"rotation\":[0,0.7071068,0,0.7071068]}";
+        var w = new World(Doc(Mod("move-p", "p", Pose)));
+        var readBack = new Placement(new[] { (double)(float)25702.977, 2.0, 13.0 }, new[] { 0.0, (double)(float)0.7071068, 0.0, (double)(float)0.7071068 });
+        Assert(readBack.Position[0] != 25702.977 && readBack.Rotation[1] != 0.7071068, "The read-back values differ from the document's literals in double precision");
+        var edit = w.Session.Edit(P, readBack, null);
+        Assert(edit.Applied && w.MapEditor.Save() == null, "An edit of Z alone completes and saves: " + edit.Error + " " + w.Session.Blocked);
+        Assert(w.Store.Patch.Contains("25702.977") && !w.Store.Patch.Contains("25702.9765625") && w.Store.Patch.Split(new[] { "0.7071068" }, StringSplitOptions.None).Length == 3 && !w.Store.Patch.Contains("0.70710676"),
+            "X and the rotation keep their literals; only Z is rewritten: " + w.Store.Patch);
+        Assert((double)w.Saved["modifications"]["move-p"]["placement"]["position"][2] == 13, "The changed axis is written");
+        var finer = new World(w.Store.Patch, w.Store.Info);
+        Assert(finer.Session.Edit(P, new Placement(new[] { 25702.98, 2.0, 13.0 }, readBack.Rotation), null).Applied && finer.MapEditor.Save() == null
+            && finer.Store.Patch.Contains("25702.98") && !finer.Store.Patch.Contains("25702.977"), "A value the game stores differently is written: " + finer.Store.Patch);
+        var same = new World(w.Store.Patch, w.Store.Info);
+        var outcome = same.Session.Edit(P, readBack, null);
+        Assert(outcome.Applied && outcome.Unchanged && !same.MapEditor.CanUndo && !same.MapEditor.IsDirty, "An edit that differs only below the stored precision changes nothing");
+    }
+    // An existing document keeps the target map it names through opening, editing and Save; scene patch editing never
+    // rewrites it to the bottom map layer, also when the modder set a layer or the edited map by hand.
+    static void ExistingTargetMapsAreKept() {
+        foreach (var (maps, named) in new[] { (TwoLayers, "author/own-map"), (TwoLayers, "other/upper-layer"), (TwoLayers, "rr/bushnell-whittier"), (NoLayers, "author/own-map") }) {
+            var text = Doc(Mod("move-p", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"" + named + "\"");
+            var w = new World(text, maps: maps);
+            Assert(w.Session.Blocked == null && (string)w.Document["sourceMap"]["mapId"] == named, "Opening keeps the target map " + named + ": " + w.Session.Blocked);
+            Assert(w.Session.Edit(P, PlacementAt(130), null).Applied && (string)w.Document["sourceMap"]["mapId"] == named, "Editing keeps the target map " + named);
+            Assert(w.MapEditor.Save() == null && (string)w.Saved["sourceMap"]["mapId"] == named, "Save keeps the target map " + named);
+            var reread = new World(w.Store.Patch, w.Store.Info, maps: maps);
+            Assert(reread.Session.Blocked == null && (string)reread.Document["sourceMap"]["mapId"] == named && reread.Box.X == 30, "The saved document reads back with the target map " + named);
+        }
+        // A Save round trip of a document whose target map is a layer id: read, edited, saved and read back, the
+        // saved text is the text that was read.
+        var written = new World(Doc(Mod("move-p", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"rr/bushnell-whittier\""), maps: OneLayer);
+        written.Session.Edit(P, PlacementAt(130), null); written.MapEditor.Save();
+        var before = written.Store.Patch;
+        var layered = new World(before, written.Store.Info, maps: OneLayer);
+        Assert(layered.Session.Blocked == null && layered.Session.Edit(P, PlacementAt(150), null).Applied && layered.MapEditor.Save() == null && (string)layered.Saved["sourceMap"]["mapId"] == "rr/bushnell-whittier", "A document naming a layer is edited and saved with that target map");
+        Assert(layered.Session.Edit(P, PlacementAt(130), null).Applied && layered.MapEditor.Save() == null && layered.Store.Patch == before, "Edited back and saved, the document naming a layer is the text that was read: " + layered.Store.Patch);
+        var readBack = new World(layered.Store.Patch, layered.Store.Info, maps: OneLayer);
+        Assert(readBack.Session.Blocked == null && readBack.Session.DocumentText == before && readBack.Box.X == 30, "The document naming a layer reads back unchanged");
     }
     // An edit in scene patch editing stores only what it changes: a value equal to the object's own is no change, a value equal to
     // the value without this mod takes the setting out of the modification, and a hand-written equal value stays.
@@ -575,7 +663,7 @@ static class PatchEditingTests {
         Assert(outcome.Applied && outcome.Error == null, "A numeric placement edit completes");
         Assert(w.Box.X == 12 && w.Box.Position[1] == 2 && w.Box.Position[2] == 3 && w.Box.Rotation.SequenceEqual(new[] { 0.0, 0.0, 0.0, 1.0 }), "The edit moves the object to the fixed map placement through the current origin");
         var item = (JObject)w.Document["modifications"].First.First;
-        Assert((int)w.Document["formatVersion"] == 1 && (string)w.Document["sourceMap"]["mapId"] == "map", "A new document carries the format and the active map context");
+        Assert((int)w.Document["formatVersion"] == 1 && (string)w.Document["sourceMap"]["mapId"] == "layer", "A new document carries the format and names the bottom map layer of the loaded map context");
         Assert((string)item["target"]["path"] == "p" && (string)item["placement"]["mode"] == "fixed" && (double)item["placement"]["position"][0] == 112 && (double)item["placement"]["rotation"][3] == 1, "The canonical document holds the desired fixed placement");
         var replay = new Scene(); var fresh = new Box(); replay.Objects["p"] = new List<object> { fresh };
         Assert(new PatchEngine(replay).Apply(w.Session.DocumentText).Outcomes.Values.Single().Applied && fresh.X == 12, "The document applies through the runtime engine");

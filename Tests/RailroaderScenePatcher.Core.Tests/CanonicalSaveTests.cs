@@ -27,7 +27,7 @@ static class CanonicalSaveTests {
             if (patch != null) Store.Info = Store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.5.0\"");
             var engine = new PatchEngine(Scene);
             if (patch != null) Applied = engine.Apply(patch, "author/pack");
-            Session = new PatchEditingSession(engine, MapEditor, Store, "map");
+            Session = new PatchEditingSession(engine, MapEditor, Store);
             MapEditor.Session = Session;
         }
         public bool PatchOutstanding => Session.Outstanding(MapEditor.NativeDirty).Contains(PatchEditingSession.PatchData);

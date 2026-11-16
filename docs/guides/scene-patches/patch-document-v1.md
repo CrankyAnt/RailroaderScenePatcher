@@ -17,6 +17,8 @@ A property name that repeats in any object, at any depth, rejects the document d
 
 The engine applies a document only when its `sourceMap.mapId` matches the selected map definition identifier or a resolved map layer identifier. A mismatch rejects the document before target resolution or mutation.
 
+A document that scene patch editing creates names the bottom map layer of the edited map definition: the lowest of all map layers the game composes for it, the layers of its map layers included. It names the edited map definition itself when that has no map layers. For a map definition layered on `rr/bushnell-whittier`, the document names `rr/bushnell-whittier`. It then applies on a save of the base-game map, where the mod's map-changing script brings its native changes and the mod's own map definition is not loaded, and on every map layered on it, the mod's own map included. Scene patch editing never changes the target map of an existing document, also not on Save. To apply a document only on your own map, set `sourceMap.mapId` to your map definition's identifier by hand. **Copy ID** copies the target map of the edited mod's document, or, while that document does not exist, the target map scene patch editing would write for it. While the document cannot be read, **Copy ID** is unavailable and its tooltip gives the reason.
+
 ## Modification fields
 
 The ID of a modification is its key in `modifications`. A modification has no `id` member. A modification that carries one fails as unsupported content, with a diagnosis that names its key and says that the ID is the key; the engine preserves it and still applies the other modifications.

@@ -1144,15 +1144,9 @@ namespace RailroaderScenePatcher {
                 status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
-        string Identity(SceneObservation entry) {
-            var identity = new JObject {
-                ["sourceMap"] = new JObject { ["mapId"] = ModDocuments.MapIds().First() },
-                ["target"] = new JObject { ["scene"] = entry.Identity.Scene, ["path"] = entry.Identity.Path, ["component"] = entry.Identity.Component, ["structure"] = entry.Identity.Structure },
-                ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(entry.Position), ["rotation"] = new JArray(entry.Rotation) }
-            };
-            if (entry.Identity.Structure == null) ((JObject)identity["target"]).Remove("structure");
-            return identity.ToString();
-        }
+        // Copy ID names the target map of the edited mod's patch document, or the one scene patch editing would write for it.
+        string Identity(SceneObservation entry) =>
+            attachment != null ? attachment.Session.CopyId(entry) : PatchEditingSession.CopyId(ModDocuments.MapIds(), entry);
         // Focus needs the inspected object, not a fresh inventory: it moves the camera to where the object is now. It
         // never jumps to another object of the same path, because it uses the inspected handle.
         void Focus(SceneObservation entry) {

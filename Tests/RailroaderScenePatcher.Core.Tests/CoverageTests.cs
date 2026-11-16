@@ -334,7 +334,7 @@ static partial class CoverageTests {
     static (Fixture f, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null, Fixture fixture = null) {
         var f = fixture ?? new Fixture();
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(f.Scene), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(f.Scene), mapEditor, store); mapEditor.Session = session;
         return (f, session, mapEditor, store);
     }
     static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;

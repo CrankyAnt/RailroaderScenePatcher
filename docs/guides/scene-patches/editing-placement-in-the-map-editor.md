@@ -6,7 +6,7 @@ This guide shows how to move, rotate, disable and restore a supported scene obje
 
 ## Before you start
 
-Open your mod's map definition from the Editor menu. The patcher edits only the edited mod: it reads and writes `Data/scene-patches.json` and `Info.json` in that mod and never writes to a mod that supplies a map layer or terrain tile set. You do not need to create the document or declare the dependency first; Save does both.
+Open your mod's map definition from the Editor menu. The patcher edits only the edited mod: it reads and writes `Data/scene-patches.json` and `Info.json` in that mod and never writes to a mod that supplies a map layer or terrain tile set. You do not need to create the document or declare the dependency first; Save does both. A new document names the bottom map layer of your map definition as its target map, or your map definition itself when it has no map layers, so it also applies on a save of the base-game map that your map-changing script changes. An existing document keeps the target map it names; see [the document reference](patch-document-v1.md#document-fields).
 
 Open **Scene patches** and its session details (the page icon in the title bar). The **Editing** section reads **Editing ready for** followed by the document path. If it names a problem instead, the document is protected: an unreadable document, a newer format, or a document for another map is never overwritten. Correct the file outside scene patch editing and reload the native map editor.
 
@@ -16,7 +16,7 @@ Open **Scene patches** and its session details (the page icon in the title bar).
 2. Change the values. Use a decimal point.
 3. Select **Apply** at the bottom of the tab.
 
-The object moves when the edit runs and the document receives one modification for that object, holding the fixed position and the rotation as a quaternion. Applying again replaces the values; it does not add a second modification or accumulate movement. **Read** refills the fields from the inspected observation.
+The object moves when the edit runs and the document receives one modification for that object, holding the fixed position and the rotation as a quaternion. An axis whose value the game stores unchanged keeps its text in the document, so changing Z alone does not rewrite X as a longer number read back from the game. Applying again replaces the values; it does not add a second modification or accumulate movement. **Read** refills the fields from the inspected observation.
 
 Every edit is bound to that observation. The patcher refuses the edit when the object, its placement, activity, bindings or dependencies no longer match what you inspected, or when the inventory is stale. The first message slot shows the action group with **Working...** until the edit has run; the result then follows, such as `Placement completed.`, and a completed edit refreshes the inventory itself a moment later. After Undo, Redo or a native edit, select **Refresh** in the command band before the next edit; the refusal names this when you forget.
 

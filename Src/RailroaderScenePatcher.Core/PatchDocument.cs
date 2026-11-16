@@ -119,6 +119,20 @@ namespace RailroaderScenePatcher.Core {
                 SourceLiterals.Add((JValue)value, literal);
             }
         }
+        // Gives every axis of the new placement position and rotation that equals the old document's value at the single
+        // precision the game stores a transform in the old value, so KeepLiterals then keeps its source literal. A pose
+        // read back from the game differs from the document's literal below that precision; an edit of one axis would
+        // otherwise rewrite the others' text.
+        internal static void KeepStoredPrecision(JToken old, JToken value) {
+            foreach (var member in new[] { "position", "rotation" }) {
+                if (!(old?["placement"]?[member] is JArray items) || !(value?["placement"]?[member] is JArray others)) continue;
+                for (var i = 0; i < items.Count && i < others.Count; i++) {
+                    if (!IsNumber(items[i]) || !IsNumber(others[i])) continue;
+                    double was = Number(items[i]), now = Number(others[i]);
+                    if (was != now && (float)was == (float)now) others[i] = new JValue(was);
+                }
+            }
+        }
         // The text in the member order of the source.
         internal string Write() { return Text(writer => Write(writer, Root, null)); }
         // The text in canonical order. The tokens stay where they are; only the text is ordered.

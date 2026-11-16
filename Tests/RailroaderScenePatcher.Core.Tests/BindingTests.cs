@@ -261,7 +261,7 @@ static class BindingTests {
         var capabilities = new SceneCapabilities(() => world.MapIds) { Tracks = tracks };
         capabilities.Add(new TrackMarkerScene(world, Capability.Unchecked));
         var store = new Store(); var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store); mapEditor.Session = session;
         var sign = InCrossing(WhistlePath);
         var set = session.Bind(sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 4)));
         Assert(set.Applied && Entry(world, whistle) == "Nnew|b|4" && whistle.CachedGroup == "extension" && whistle.Position[0] == 20, "A whistle sign inside a crossing takes a binding like any Generic marker: " + set.Error);
@@ -585,7 +585,7 @@ static class BindingTests {
     static (FakeMarkerWorld world, FakeMarker sign, FakeMarker other, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null) {
         var (world, sign, other, scene) = Setup();
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (world, sign, other, session, mapEditor, store);
     }
     static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
@@ -658,7 +658,7 @@ static class BindingTests {
         capabilities.Add(markers);
         var store = new Store(); var mapEditor = new NativeMapEditor();
         var engine = new PatchEngine(capabilities);
-        var session = new PatchEditingSession(engine, mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
         var inventory = new SceneInventory(capabilities);
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 6))).Applied && Entry(world, sign) == "Nnew|b|6" && sign.CachedGroup == "extension", "The marker is bound before the gesture");
         PlacementGesture Begin() { inventory.Refresh(); return new PlacementGesture(engine, session, Sign, inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, sign)))); }
@@ -682,7 +682,7 @@ static class BindingTests {
         var capabilities = new SceneCapabilities(() => world.MapIds, new FakeMarkerInspection(world));
         capabilities.Add(markers);
         var store = new Store(); var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store); mapEditor.Session = session;
         var tracks = new FakeSnapTracks();
         var node = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackNode, "Nend"), "Track node Nend", "1050,1,2");
         tracks.Items.Add(new SnapGeometry(node, new[] { new double[] { 1050, 1, 2 } }));

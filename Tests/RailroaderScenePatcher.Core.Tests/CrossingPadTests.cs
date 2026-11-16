@@ -306,7 +306,7 @@ static class CrossingPadTests {
     static (FakePadWorld world, FakeMarker pad, FakeMarker rear, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null) {
         var (world, pad, rear, scene) = Setup();
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (world, pad, rear, session, mapEditor, store);
     }
     static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
@@ -367,7 +367,7 @@ static class CrossingPadTests {
         var capabilities = new SceneCapabilities(() => world.MapIds, inspection);
         capabilities.Add(pads);
         var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store()); mapEditor.Session = session;
         var inventory = new SceneInventory(capabilities);
         inventory.Refresh();
         var pinned = inventory.Pin(inventory.Entries.Single(e => ReferenceEquals(e.Handle, pad)));
@@ -406,7 +406,7 @@ static class CrossingPadTests {
         tracks.Poses["Sj7c|a|185.9477"] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
         capabilities.Tracks = tracks;
         var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store()); mapEditor.Session = session;
         var follow = session.Follow(Pad, TrackAnchor.At(new TrackLocation("Sj7c", "a", 185.9477)));
         Assert(follow.Applied && pad.Position[0] == 20 && Mesh(world, pad) == Baseline, "The pad follows its track at an unchanged placement: " + follow.Error + " / " + Mesh(world, pad));
         Assert(session.Bind(Rear, MarkerBinding.At(new TrackLocation("Sj7c", "a", 211))).Applied && Mesh(world, rear) == "Sj7c|a|211@1045", "The rear pad is only rebound");
@@ -459,7 +459,7 @@ static class CrossingPadTests {
             tracks.Poses["Sj7c|a|185.9477"] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
             capabilities.Tracks = tracks;
             var mapEditor = new NativeMapEditor();
-            var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
+            var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store()); mapEditor.Session = session;
             var inventory = new SceneInventory(capabilities);
             inventory.Refresh();
             var selected = inventory.Entries.Single(e => ReferenceEquals(e.Handle, pad));
@@ -500,7 +500,7 @@ static class CrossingPadTests {
             tracks.Poses[anchor] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
             capabilities.Tracks = tracks;
             var mapEditor = new NativeMapEditor();
-            var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
+            var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store()); mapEditor.Session = session;
             Assert(session.Follow(Pad, TrackAnchor.At(new TrackLocation("Sj7c", "a", 185.9477))).Applied && Mesh(world, pad) == Baseline, "The pad follows Sj7c" + mode);
             int Settle() { var lines = 0; for (var i = 0; i < 3; i++) lines += session.ReconcileTrackFollowing().Count(r => r.Value.Applied); return lines; }
             // Step 3: a longitudinal move of the far node changes the curve under the pad but not the anchor pose.
@@ -541,7 +541,7 @@ static class CrossingPadTests {
         tracks.Poses[anchor] = new TrackPose(new double[] { 1020, 1, 2 }, new double[] { 0, 0, 0, 1 });
         capabilities.Tracks = tracks;
         var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store()); mapEditor.Session = session;
         Assert(session.Follow(Pad, TrackAnchor.At(new TrackLocation("Sj7c", "a", 185.9477))).Applied, "The pad follows Sj7c");
         session.ReconcileTrackFollowing();
         int resolutions = world.Resolutions, patterns = world.PatternChecks, warnings = world.WarningReconciliations, placements = world.PlacementChecks;

@@ -187,7 +187,7 @@ static class BoardTests {
         var (world, board, boards, engine) = Setup();
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
         if (patch != null) engine.Apply(patch, "author/pack");
-        var session = new PatchEditingSession(engine, mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
         return (world, board, boards, session, mapEditor, store);
     }
     static void PlacementMovesBoardAndItsRegistrations() {

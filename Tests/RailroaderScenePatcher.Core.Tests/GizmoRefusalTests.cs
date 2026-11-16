@@ -34,7 +34,7 @@ static class GizmoRefusalTests {
             Capabilities = new SceneCapabilities(() => World.MapIds, new FakeMarkerInspection(World));
             Capabilities.Add(new TrackMarkerScene(World, Capability.Unchecked));
             Engine = new PatchEngine(Capabilities);
-            Session = new PatchEditingSession(Engine, MapEditor, new Store(), "map"); MapEditor.Session = Session;
+            Session = new PatchEditingSession(Engine, MapEditor, new Store()); MapEditor.Session = Session;
             Inventory = new SceneInventory(Capabilities); Inventory.Refresh();
             World.Drift = true;
         }

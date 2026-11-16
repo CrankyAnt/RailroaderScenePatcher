@@ -170,7 +170,40 @@ namespace RailroaderScenePatcher.Core {
         // Set when native Undo or Redo threw. The native manager then keeps an open partial group, so later
         // native edits reach neither its stack nor its change count. No Save in this session can prove a clean state.
         string unrecovered;
-        public PatchEditingSession(PatchEngine engine, INativeHistory history, IStorage storage, string mapId, string modId = "crankyant/scene-patcher", string documentKey = "") {
+        // The target map a new patch document names: the lowest map layer the game composes for the edited map definition,
+        // or that definition itself when it has no map layers. mapIds is the loaded map context as the game resolves it,
+        // the edited map definition followed by all its map layers, layers of layers included, topmost first, so the last
+        // entry is the bottom layer. An existing document keeps the target map it names; see ADR 0006.
+        public static string TargetMapFor(IEnumerable<string> mapIds) {
+            var last = (mapIds ?? throw new ArgumentNullException(nameof(mapIds))).LastOrDefault();
+            if (String.IsNullOrWhiteSpace(last)) throw new InvalidOperationException("Loaded map context unavailable");
+            return last;
+        }
+        // The target map of the edited mod's patch document, or, while that document does not exist, the target map
+        // scene patch editing would write for it. Null while the session cannot read the document. Copy ID names this map.
+        public string TargetMap => document == null ? null : (string)document.Root["sourceMap"]["mapId"];
+        // Why Copy ID is unavailable in this session, or null: the session's own refusal while it cannot read the
+        // edited mod's patch document, because that document names a target map the session does not know.
+        public string CopyIdRefusal => document == null ? Blocked ?? "The patch document is unavailable" : null;
+        // The inspected object's target map, target identity and placement as patch-document JSON: what Copy ID copies.
+        public string CopyId(SceneObservation entry) {
+            var refusal = CopyIdRefusal;
+            if (refusal != null) throw new InvalidOperationException(refusal);
+            return CopyId(TargetMap, entry);
+        }
+        // Copy ID without scene patch editing names the target map a new document would name for the loaded map context.
+        public static string CopyId(IEnumerable<string> mapIds, SceneObservation entry) => CopyId(TargetMapFor(mapIds), entry);
+        static string CopyId(string targetMap, SceneObservation entry) {
+            if (entry == null) throw new ArgumentNullException(nameof(entry));
+            var target = new JObject { ["scene"] = entry.Identity.Scene, ["path"] = entry.Identity.Path, ["component"] = entry.Identity.Component };
+            if (entry.Identity.Structure != null) target["structure"] = entry.Identity.Structure;
+            return new JObject {
+                ["sourceMap"] = new JObject { ["mapId"] = targetMap },
+                ["target"] = target,
+                ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(entry.Position), ["rotation"] = new JArray(entry.Rotation) }
+            }.ToString();
+        }
+        public PatchEditingSession(PatchEngine engine, INativeHistory history, IStorage storage, string modId = "crankyant/scene-patcher", string documentKey = "") {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine));
             this.history = history ?? throw new ArgumentNullException(nameof(history));
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
@@ -179,7 +212,7 @@ namespace RailroaderScenePatcher.Core {
             try {
                 diskText = storage.ReadPatchDocument();
                 info = storage.ReadModInfo();
-                if (diskText == null) { document = PatchDocument.Create(mapId); return; }
+                if (diskText == null) { document = PatchDocument.Create(TargetMapFor(scene.MapIds)); return; }
                 var loaded = PatchDocument.Load(diskText);
                 if (!loaded.CanWrite) Blocked = loaded.Error;
                 else if (loaded.EditError != null) Blocked = loaded.EditError;
@@ -671,6 +704,11 @@ namespace RailroaderScenePatcher.Core {
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
                 value = normal;
+                // An axis the edit leaves at the document's value as the game stores it keeps that value.
+                if (value != null && existing != null) {
+                    if (value.Parent != null) value = (JObject)value.DeepClone();
+                    PreservingJson.KeepStoredPrecision(existing, value);
+                }
                 // Equal content is no change: a number written in another literal, or dependencies in another order, leave the document as it is.
                 if (value == null ? existing == null : existing != null && PreservingJson.SameModification(existing, value)) { outcome.Reverted = false; outcome.Applied = true; outcome.Unchanged = true; return outcome; }
                 var slot = existing == null ? NewId(target, prefix) : PatchDocument.Key(existing);

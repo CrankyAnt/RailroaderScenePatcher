@@ -52,7 +52,8 @@ namespace RailroaderScenePatcher {
         internal static string SelectInWorld(bool available, bool pending) =>
             !available ? "World selection is unavailable." : pending ? "Confirm or cancel the pending world choice first." : null;
         internal static string Focus(bool inspected) => inspected ? null : "Inspect an object first.";
-        internal static string CopyId(bool inspected) => inspected ? null : "Inspect an object first.";
+        // Copy ID is also disabled, with the editing session's refusal, while the edited mod's patch document cannot be read.
+        internal static string CopyId(bool inspected, string refusal = null) => inspected ? refusal : "Inspect an object first.";
         // Clear ends the inspection and cancels a pending world choice: it is disabled only when there is neither.
         internal static string Clear(bool inspected, bool pending) => inspected || pending ? null : "Nothing is inspected and no world choice is pending.";
         // The tooltip of a control: what it does, and when it cannot be used now, also why. A disabled control keeps its

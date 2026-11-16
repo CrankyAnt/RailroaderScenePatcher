@@ -127,7 +127,7 @@ static class TrackFollowingTests {
     static (TrackScene scene, Box box, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null) {
         var (scene, box) = Setup();
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (scene, box, session, mapEditor, store);
     }
     static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;

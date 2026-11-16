@@ -89,7 +89,7 @@ static class CompositionTests {
         Assert(w.Bridges.Mutations == 0 && w.BoardConsistent, "The board applies with its registrations while the bridge is untouched");
     }
     static void VersionMinimumIsTheDocumentMaximum() {
-        PatchEditingSession Session(World w, Store store) { var mapEditor = new NativeMapEditor(); var s = new PatchEditingSession(w.Engine, mapEditor, store, "map"); mapEditor.Session = s; return s; }
+        PatchEditingSession Session(World w, Store store) { var mapEditor = new NativeMapEditor(); var s = new PatchEditingSession(w.Engine, mapEditor, store); mapEditor.Session = s; return s; }
         var cases = new (string Name, string Items, bool BoardAvailable, bool BridgeAvailable, string Expected)[] {
             ("Sylva placement", Board("a", Moved), true, true, "0.1.0"),
             ("Sylva with activity", Board("a", Moved, extra: ",\"active\":false"), true, true, "0.2.0"),

@@ -86,7 +86,7 @@ static class DiagnosticTests {
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
         Check(engine.BeforeNativeCheck(json, "fixture", target).Outcomes["repair"].Applied, "The complete document repairs the native marker before its native check");
         Check(engine.Apply(json, "fixture").Outcomes["repair"].Applied, "The later world-load callback retains the same original underlying reference");
-        var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }, "map"); mapEditor.Session = session;
+        var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }); mapEditor.Session = session;
         var removed = session.Remove(target);
         Check(removed.Applied, "Remove must restore the original serialized missing reference instead of refusing it: " + removed.Error);
         Check(world.Native._location.segmentId == "Shuo" && Math.Abs(world.Native._location.distance - 58.69453) < 0.001 && world.Registrations(marker).Count == 0, "Removal restores the original native reference with no graph registration");
@@ -217,7 +217,7 @@ static class DiagnosticTests {
         Check(messages.Rows.Count == 0, "A successful early repair must not create a patch failure diagnostic");
         runtime.Apply(json, source);
         Check(world.Registrations(marker).Count == 1, "The later world-load callback must converge without duplicate graph registrations");
-        var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }, "map"); mapEditor.Session = session;
+        var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }); mapEditor.Session = session;
         Check(session.Remove(target).Applied && marker.Segment == "missing" && world.Registrations(marker).Count == 0, "scene patch editing removal after early repair restores the original underlying binding and registration");
         var unresolved = new FakeMarker { Id = "unpatched", Segment = "missing" };
         world.Objects["unpatched"] = new List<object> { unresolved };

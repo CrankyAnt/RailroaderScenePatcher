@@ -186,7 +186,7 @@ static class BridgeTests {
         var (world, bridge, scene) = Setup();
         var offsets = Offsets(bridge);
         var store = new Store(); var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store, "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         var identity = new TargetIdentity("BushnellWhittier-MapManager", BridgePath, "Helpers.Culling.RendererCuller", BridgeScene.Structure);
         var moved = new Placement(new[] { 1055.0, 5, 7 }, new[] { 0, 0.130526, 0, 0.991445 });
         Assert(session.Edit(identity, moved, null).Applied && bridge.Position[0] == 55 && Offsets(bridge).SequenceEqual(offsets), "A scene patch editing bridge placement moves the root with its colliders");

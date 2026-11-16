@@ -96,6 +96,8 @@ static class CommandBandTests {
         Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", CommandBand.Clear(false, false))
             == "End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.\nUnavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear says what it does first");
         Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
+        Check(CommandBand.CopyId(true, "Invalid JSON. The patch document is protected from overwrite.") == "Invalid JSON. The patch document is protected from overwrite."
+            && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the patch document cannot be read, and asks for an inspection first");
     }
     // The native outline appends its markers; the panel puts them before the name so that a cut-off name keeps them.
     static void MarkersStandBeforeTheName() {

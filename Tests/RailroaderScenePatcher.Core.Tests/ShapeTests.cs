@@ -61,7 +61,7 @@ static class ShapeTests {
             try { document.Write(); } catch (InvalidOperationException) { wrote = false; }
             Assert(!document.CanWrite && document.Error != null && !wrote, scenario + ": the document is not writable");
             var store = new Store { Patch = text }; var editor = new NativeMapEditor();
-            var session = new PatchEditingSession(engine, editor, store, "map"); editor.Session = session;
+            var session = new PatchEditingSession(engine, editor, store); editor.Session = session;
             Assert(session.Blocked != null && session.Blocked.Contains("protected from overwrite"), scenario + ": scene patch editing reports the protected document: " + session.Blocked);
             var edit = session.Edit(P, new Placement(new[] { 130.0, 2.0, 3.0 }, new[] { 0.0, 0.0, 0.0, 1.0 }), null);
             Assert(!edit.Applied && w.Untouched && editor.Save() == null && store.PatchWrites == 0 && ReferenceEquals(store.Patch, text), scenario + ": an edit is refused and a Save leaves the file's text as it is");
@@ -126,7 +126,7 @@ static class ShapeTests {
     static void AssertPreserved(World w, PatchEngine engine, string text, string scenario) {
         var store = new Store { Patch = text }; var editor = new NativeMapEditor();
         store.Info = store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.5.0\"");
-        var session = new PatchEditingSession(engine, editor, store, "map"); editor.Session = session;
+        var session = new PatchEditingSession(engine, editor, store); editor.Session = session;
         Assert(session.Blocked == null, scenario + ": the document opens in scene patch editing: " + session.Blocked);
         var key = JObject.Parse(text)["modifications"].Children<JProperty>().First().Name;
         var edit = session.Edit(Q, new Placement(new[] { 170.0, 2.0, 3.0 }, new[] { 0.0, 0.0, 0.0, 1.0 }), null);

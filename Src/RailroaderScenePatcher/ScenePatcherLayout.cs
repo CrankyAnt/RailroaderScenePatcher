@@ -271,9 +271,9 @@ namespace RailroaderScenePatcher {
                 var clear = CommandBand.Clear(selected != null, pending);
                 Button(row, "Clear", ClearInspection).Inactive(clear != null)
                     .Tooltip("Clear", CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", clear));
-                var copy = CommandBand.CopyId(selected != null);
+                var copy = CommandBand.CopyId(selected != null, attachment?.Session.CopyIdRefusal);
                 Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
-                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's map context, target identity and placement as patch-document JSON.", copy));
+                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's target map, target identity and placement as patch-document JSON.", copy));
                 row.Spacer();
                 // The window's "?" belongs in the title bar; it stands here only when the title bar could not take it.
                 if (!presentation.TitleHelp) HelpButton(row, NativePresentation.WindowHelpRegion, "Window");
@@ -1173,7 +1173,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Track group", "Some markers switch with their track group. For those, an explicit enable is refused." },
                     new[] { "Dependencies", "Culling, masks, graph registration and other state that follows an edit. Indirect references are not inspected." },
                     new[] { "Runtime state", "Enabled flags the game switches while it runs. They are shown and do not make the inventory stale." },
-                    new[] { "Copy ID", "Copies the identity as patch-document JSON." } },
+                    new[] { "Copy ID", "Copies the identity with the target map as patch-document JSON." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {

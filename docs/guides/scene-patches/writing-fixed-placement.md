@@ -8,7 +8,7 @@ This guide describes the v1 patch document layout and the native placement capab
 
 Create `Data/scene-patches.json` in the mod that contains the map definition. Fixed placement has a base minimum of `0.1.0`; target-specific capabilities can raise it. The native independent-board pattern raises the minimum to `0.5.0` except for the legacy Sylva location sign, which still uses the pattern checks but does not raise the pattern-based board dependency minimum. To make these edits in the native map editor instead, with Save writing the document and the dependency, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). At runtime the patcher scans loaded mods in load order. In the native map editor it reads only the edited mod's document.
 
-Save the document as strict UTF-8 JSON. Use the `mapId` of the selected map definition or one of its resolved map layers. Keep one document with the supplying mod so inspection in scene patch editing and runtime application read the same desired state.
+Save the document as strict UTF-8 JSON. Use the `mapId` of the selected map definition or one of its resolved map layers. **Copy ID** fills in the target map of your mod's document, or the bottom map layer that scene patch editing would write while the document does not exist; see [the document reference](patch-document-v1.md#document-fields). Keep one document with the supplying mod so inspection in scene patch editing and runtime application read the same desired state.
 
 ## Describe a fixed placement
 

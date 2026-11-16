@@ -39,7 +39,7 @@ static class GizmoTests {
                 Scene.Read(Box).Placement.Position, Box.Rotation, new[] { "unchanged-binding" },
                 Array.Empty<string>(), Array.Empty<string>(), "placement") };
             Engine = new PatchEngine(Scene);
-            Session = new PatchEditingSession(Engine, MapEditor, Store, "map"); MapEditor.Session = Session;
+            Session = new PatchEditingSession(Engine, MapEditor, Store); MapEditor.Session = Session;
             Inventory = new SceneInventory(Scene); Inventory.Refresh();
         }
         internal PlacementGesture Begin() => new PlacementGesture(Engine, Session, Target, Inventory.Pin(Inventory.Entries[0]));
@@ -59,7 +59,7 @@ static class GizmoTests {
         scene.Observations = () => new[] { new SceneObservation(box, Target, "board", box.Active, scene.Read(box).Placement.Position, box.Rotation,
             new[] { "unchanged-binding" }, Array.Empty<string>(), Array.Empty<string>(), "placement") };
         var engine = new PatchEngine(scene); var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(engine, mapEditor, new Store(), "map"); mapEditor.Session = session;
+        var session = new PatchEditingSession(engine, mapEditor, new Store()); mapEditor.Session = session;
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var gesture = new PlacementGesture(engine, session, Target, inventory.PinCompared(inventory.Entries[0]));
         scene.Discoveries = 0; scene.Targeted = 0;
