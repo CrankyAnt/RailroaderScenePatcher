@@ -28,7 +28,7 @@ static class SelectionTests {
         var several = new PendingSelection(candidates, SelectionKind.SceneObject, "Replace scene target");
         var twin = new SelectionCandidate(original, SelectionIdentity.SceneObject(new TargetIdentity("scene", "original", "Culler")), "Original board");
         several.Offer(new[] { candidate, twin });
-        Check(several.Candidate == null && several.Problem == "Choose from the list beside the pointer.", "A group or overlapping offers direct the choice to the list without claiming the objects share one spot");
+        Check(several.Candidate == null && several.Problem == "Choose an item from the list next to the pointer.", "A group or overlapping offers direct the choice to the list without claiming the objects share one spot");
         Check(several.Number(candidate) == 1 && several.Number(twin) == 2 && several.Number(new SelectionCandidate(original, twin.Identity, "Other")) == 0, "Offers carry their numbers from 1; a candidate that is not offered has none");
         // The list of one spot closes without a choice, as a dropdown does on Escape: the choice stays pending.
         Check(several.ListOpen, "Several offers without a choice are an open list");

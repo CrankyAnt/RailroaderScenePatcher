@@ -117,7 +117,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // A group's objects or overlapping markers offer a list beside the pointer. The same number names each
         // offer wherever the panel lists it.
-        public const string SeveralOffers = "Choose from the list beside the pointer.";
+        public const string SeveralOffers = "Choose an item from the list next to the pointer.";
         // A click that met no candidate.
         public const string NoOffer = "No candidate at this point";
         // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks
