@@ -19,7 +19,8 @@ namespace RailroaderScenePatcher {
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
-            context = value; Hooks.Install(); NativeRepairHooks.Install(this);
+            context = value; Hooks.Install(); NativeSaveGuard.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this);
+            if (NativeSaveGuard.Error != null) context.Log.Info(NativeSaveGuard.Error);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
@@ -93,7 +94,7 @@ namespace RailroaderScenePatcher {
             NativeRepairHooks.Reset();
             world?.Release();
             ReleaseReporter();
-            Hooks.Remove(); NativeRepairHooks.Remove();
+            MapEditorReload.Remove(); NativeSaveGuard.Remove(); Hooks.Remove(); NativeRepairHooks.Remove();
         }
         void ReleaseReporter() {
             if (reporter == null) return;
@@ -145,6 +146,8 @@ namespace RailroaderScenePatcher {
         readonly InventoryPresentationState inventoryPresentation = new InventoryPresentationState();
         internal const string Version = "0.5.0";
         MapEditorAttachment attachment;
+        string reloadRequirement;
+        float nextReloadCheck;
         object refusedMapEditor;
         string editingStatus = "";
         // The last edit results, shown in the message area above the action slots and written to the log. A place is the
@@ -434,7 +437,9 @@ namespace RailroaderScenePatcher {
             if (Hooks.Error != null) { refusedMapEditor = found; editingStatus = Hooks.Error; return; }
             try {
                 attachment = new MapEditorAttachment(engine, found); Hooks.Current = attachment;
+                attachment.VersionChanged = VersionChanged;
                 attachment.Session.Replayed = identity => replayed.Add(identity);
+                attachment.Session.HistoryNotice = feedback.QueueHistoryNotice;
                 // The patcher's own Save writes the scene patch file: that text is what the definitions on disk now are, so it
                 // is no change from outside and the inventory lamp stays Current.
                 ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
@@ -447,6 +452,8 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
         }
         void Detach() {
+            reloadRequirement = null;
+            presentation?.SetRepairMode(false);
             CancelGuided();
             pickedTrackLocation = null; pickedTrackSelection = null;
             ClearSnap(); snap = null;
@@ -519,9 +526,38 @@ namespace RailroaderScenePatcher {
         }
         // After the game's own tooltip update of the frame.
         void LateUpdate() { presentation?.PauseTooltip(); }
+        bool applicationFocused, fileCheckAfterFocus;
+        float nextFileVersionCheck;
+        void OnApplicationFocus(bool focused) {
+            applicationFocused = focused;
+            if (focused) fileCheckAfterFocus = true;
+        }
+        void CheckFileVersion() {
+            if (attachment == null) return;
+            try {
+                if (feedback.CheckFileVersion(attachment.Session, RecoveryPlace)) VersionChanged();
+            } catch (Exception e) { attachment.Fault = "Could not check the scene patch file: " + e.GetBaseException().Message; }
+        }
+        void VersionChanged() {
+            if (attachment != null) feedback.ObserveFileVersion(attachment.Session, RecoveryPlace);
+            var repair = attachment?.Session.VersionState == FileVersionState.Repair;
+            if (repair) {
+                CancelGizmo(); ClearSnap();
+                selection?.Cancel();
+                CancelRequest("the scene patch file needs repair");
+            }
+            presentation?.SetRepairMode(repair);
+            attachment?.RefreshChrome();
+            presentation?.RequestRefresh();
+        }
         void Update() {
             FlushWarnings();
             if (!Initialized || engine == null) return;
+            // Focus callbacks can arrive before the editor attachment is ready. Keep the check pending until Update
+            // has attached it, and also observe the focus edge when Unity does not deliver the callback to this host.
+            var focused = Application.isFocused;
+            if (focused && !applicationFocused) fileCheckAfterFocus = true;
+            applicationFocused = focused;
             // A request waits only while its panel is open: a closed window does no per-frame work.
             if (Requests.Pending && !(presentation != null && presentation.IsOpen)) CancelRequest("the panel was closed before the request ran");
             if (Requests.Pending) {
@@ -609,6 +645,21 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { escapeHeld = escapable; context?.Log.Info("Escape handling for the world choice and the gizmo is unavailable: " + e.GetBaseException().Message); }
             try { Attach(); }
             catch (Exception e) { editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
+            if (fileCheckAfterFocus && applicationFocused && attachment != null) {
+                fileCheckAfterFocus = false;
+                CheckFileVersion();
+            }
+            if (attachment != null && Time.unscaledTime >= nextFileVersionCheck) {
+                nextFileVersionCheck = Time.unscaledTime + 2f;
+                CheckFileVersion();
+            }
+            MapEditorReload.Poll(attachment);
+            if (attachment != null && Time.unscaledTime >= nextReloadCheck) {
+                reloadRequirement = attachment.Session.ReloadRequirement;
+                nextReloadCheck = Time.unscaledTime + 1f;
+            }
+            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene patches" : "Scene patches: reload",
+                reloadRequirement ?? "Open scene-patch inspection and editing.");
             bool open = presentation != null && presentation.IsOpen;
             if (!open) CancelGizmo();
             SyncInputRegions();
@@ -627,6 +678,7 @@ namespace RailroaderScenePatcher {
                 // A history that moved without this patcher's own edit is a native edit, Undo or Redo: what the last
                 // action completed may no longer hold, so its result goes.
                 if (key != idleKey) { idleKey = key; urgentCheck = true; nextInventoryCheck = 0; feedback.HistoryMoved(); }
+                feedback.FlushHistoryNotice();
                 // No pass runs between this patcher's own change and the observation of the changed objects: it would
                 // compare them with what they were before.
                 // While a gizmo is active the placement of its target is this patcher's own preview: a pass would compare it
@@ -720,8 +772,8 @@ namespace RailroaderScenePatcher {
                 scenePatchFileInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot(),
-                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(),
+                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, reloadRequirement, MapEditorReload.Error, TerrainSnapshot(),
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage,
                 equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
         // Computing the outstanding work serializes the scene patch file and reads the dependency metadata. Its inputs change

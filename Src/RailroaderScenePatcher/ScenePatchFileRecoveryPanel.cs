@@ -20,6 +20,22 @@ namespace RailroaderScenePatcher {
         bool freshStartSeen;
         // The diagnostics of the edited mod's scene patch file from world load, or from the last recovery.
         readonly System.Collections.Generic.List<string> editedDiagnostics = new System.Collections.Generic.List<string>();
+        static string FullDiagnosis(PatchEditingSession session) => session.ScenePatchFileDiagnostics.Count == 0 ? (session.VersionMessage ?? "") : String.Join("\n\n", session.ScenePatchFileDiagnostics.Select(d =>
+            (String.IsNullOrEmpty(d.Path) ? "Scene patch file" : d.Path) + ", " + (d.StartLine == 0 ? "line unavailable" : d.StartLine == d.EndLine ? "line " + d.StartLine : "lines " + d.StartLine + " to " + d.EndLine)
+            + ": " + d.Message + "\n" + d.Fragment + "\nExpected: " + d.Expected));
+        void ChooseFileVersion(bool useFile) {
+            var session = attachment.Session;
+            var result = useFile ? session.UseFileVersion() : session.KeepEditorVersion();
+            feedback.ObserveFileVersion(session, RecoveryPlace);
+            if (!result.Applied) { attachment.Fault = result.Error; feedback.Refuse(RecoveryPlace, useFile ? "Use file version" : "Keep editor version", result.Error); }
+            else {
+                attachment.Fault = null;
+                if (useFile) { ReplaceScenePatchFileDiagnostics(session.LastVersionApplication); Inspect(); }
+                feedback.Report(RecoveryPlace, !useFile && session.LastBackup != null && session.VersionMessage != null ? "Editor version kept. The next Save replaces the file with this version." : session.VersionMessage ?? (useFile ? "File version applied." : "Editor version kept. The next Save replaces the file with this version."));
+            }
+            attachment.RefreshChrome();
+            presentation?.RequestRefresh();
+        }
         // Once Save replaced the original after a fresh start, everything that described the old scene patch file is read again:
         // the message of the fresh start goes, the scene patch file's diagnostics are replaced and the supplied definitions and
         // the inventory are refreshed.
@@ -58,42 +74,45 @@ namespace RailroaderScenePatcher {
             var problems = session.ScenePatchFileDiagnostics;
             if (session.Blocked == null && problems.Count == 0 && session.LastBackup == null) return;
             Section(builder, "Scene patch file");
+            if (session.VersionMessage != null) PlainLabel(builder, session.VersionMessage);
             if (session.Blocked != null) builder.AddLabel(PathBreaks(Tint(Amber, session.Blocked)));
             foreach (var problem in problems) {
                 FieldLabel(builder, problem.Path.Length == 0 ? "Scene patch file" : problem.Path);
                 builder.AddLabel(PathBreaks(Literal(problem.Message)));
                 Field(builder, problem.StartLine == 0 ? "Lines" : problem.StartLine == problem.EndLine ? "Line" : "Lines",
-                    problem.StartLine == 0 ? "None, the field is missing" : problem.StartLine == problem.EndLine ? problem.StartLine.ToString() : problem.StartLine + " to " + problem.EndLine);
+                    problem.StartLine == 0 ? "None. The field is missing." : problem.StartLine == problem.EndLine ? problem.StartLine.ToString() : problem.StartLine + " to " + problem.EndLine);
                 Field(builder, "Text there", problem.Fragment);
                 Field(builder, "Expected", problem.Expected);
             }
             if (problems.Count != 0 || session.Blocked != null) {
                 builder.HStack(row => {
                     row.ConfigureLayout(4f);
-                    Button(row, "Format reference", () => Application.OpenURL(ScenePatchFileDiagnostic.FormatReference)).Tooltip("Format reference", "Open the scene patch file reference in the browser. It describes every field and the values it takes.");
-                    Button(row, "Recovery guide", () => Application.OpenURL(ScenePatchFileDiagnostic.RecoveryReference)).Tooltip("Recovery guide", "Open the guide to correcting a protected scene patch file in the browser.");
+                    Button(row, "Format reference", () => Application.OpenURL(ScenePatchFileDiagnostic.FormatReference)).Tooltip("Format reference", "Open the scene patch file reference in your browser. It describes each field and its values.");
+                    Button(row, "Recovery guide", () => Application.OpenURL(ScenePatchFileDiagnostic.RecoveryReference)).Tooltip("Recovery guide", "Open the guide to correcting a protected scene patch file in your browser.");
                     row.Spacer();
                 }).Height(RowHeight);
             }
             if (session.LastBackup != null)
                 FieldMarkup(builder, "Backup of the original", PathBreaks(Literal(session.LastBackup + (session.FreshStartPending ? " (Save replaces the original with the new empty scene patch file)" : ""))));
+            if (problems.Count != 0)
+                Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(session));
             if (session.Blocked == null) { recoveryStep = RecoveryStep.None; return; }
             switch (recoveryStep) {
                 case RecoveryStep.ReviewReread:
-                    PlainLabel(builder, "The patcher reads the file as it is now and uses it in this session. Its modifications are applied to the objects at once. The file itself is not written. Anything you deleted from the file stays deleted, also content this patcher does not understand.");
+                    PlainLabel(builder, "The patcher reads the current file and applies its modifications to the objects immediately. You can then edit it in this session. The file is not written. Anything you deleted stays deleted, including content this patcher does not understand.");
                     Confirmation(builder, "Read again", "Read the corrected file, apply its modifications and edit it in this session.", () => Recover("Read again", session.Reread(true, attachment.NativeDirty)));
                     break;
                 case RecoveryStep.ReviewFreshStart when session.CanStartFresh:
-                    PlainLabel(builder, "Start fresh removes all content of the scene patch file, also content this patcher does not understand. The original file is first copied to a backup beside it; Save then replaces the original with an empty scene patch file.");
+                    PlainLabel(builder, "Start fresh removes all content from the scene patch file, including content this patcher does not understand. The original is first copied to a backup beside it. Save then replaces the original with an empty scene patch file.");
                     Confirmation(builder, "Back up and start fresh", "Copy the original to a backup and start an empty scene patch file that Save writes.", () => Recover("Start fresh", session.FreshStart(true, attachment.NativeDirty)));
                     break;
                 default:
                     builder.HStack(row => {
                         row.ConfigureLayout(4f);
-                        Button(row, "Read again", () => recoveryStep = RecoveryStep.ReviewReread).Tooltip("Read again", "Review reading the scene patch file again after correcting it outside the Map Editor.");
+                        Button(row, "Read again", () => recoveryStep = RecoveryStep.ReviewReread).Tooltip("Read again", "Review the option to read the scene patch file again after correcting it outside the Map Editor.");
                         // Start fresh replaces the scene patch file; it is offered only when that scene patch file is what blocks editing.
                         if (session.CanStartFresh)
-                            Button(row, "Start fresh", () => recoveryStep = RecoveryStep.ReviewFreshStart).Tooltip("Start fresh", "Review replacing the scene patch file with an empty one behind a backup of the original.");
+                            Button(row, "Start fresh", () => recoveryStep = RecoveryStep.ReviewFreshStart).Tooltip("Start fresh", "Review the option to back up the original scene patch file and replace it with an empty one.");
                         row.Spacer();
                     }).Height(RowHeight);
                     break;
@@ -113,13 +132,13 @@ namespace RailroaderScenePatcher {
             var session = attachment.Session;
             editingStatus = "Editing ready for " + attachment.PatchPath;
             if (session.FreshStartPending) {
-                freshStartMessage = "Start fresh completed. The original is kept at " + session.LastBackup + ". Save replaces it with an empty scene patch file.";
+                freshStartMessage = "Start fresh completed. The original is backed up at " + session.LastBackup + ". Save replaces it with an empty scene patch file.";
                 feedback.Report(RecoveryPlace, freshStartMessage);
             } else {
                 var outcomes = session.LastReread?.Outcomes?.Values.ToArray() ?? new Outcome[0];
                 var failed = session.LastReread?.Outcomes?.Where(o => !o.Value.Applied).Select(o => o.Key).ToArray() ?? new string[0];
                 feedback.Report(RecoveryPlace, "Read again completed. " + (session.LastReread?.Error != null ? "The modifications were not applied. " + CommandBand.Sentence(session.LastReread.Error)
-                    : (outcomes.Length - failed.Length) + " of " + outcomes.Length + " modifications applied" + (failed.Length == 0 ? "." : ". Not applied, " + String.Join(", ", failed) + "; the diagnostics say why.")));
+                    : (outcomes.Length - failed.Length) + " of " + outcomes.Length + " modifications applied" + (failed.Length == 0 ? "." : ". Not applied: " + String.Join(", ", failed) + ". See the diagnostics for the reasons.")));
                 // The scene and the definitions changed: the scene patch file's diagnostics are replaced, and the inventory and
                 // the supplied definitions are read again.
                 ReplaceScenePatchFileDiagnostics(session.LastReread);

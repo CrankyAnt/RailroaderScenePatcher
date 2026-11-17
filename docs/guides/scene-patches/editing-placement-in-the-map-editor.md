@@ -10,6 +10,23 @@ Open your mod's map definition from the Editor menu. The patcher edits only the 
 
 Open **Scene patches** and its session details (the page icon in the title bar). The **Editing** section reads **Editing ready for** followed by the scene patch file path. If it names a problem instead, the scene patch file is protected: an unreadable scene patch file, a newer format, or a scene patch file for another map is never overwritten. The **Scene patch file** section below it shows where the file is wrong and offers to read it again after you correct it, or to start fresh behind a backup; see [Recover a protected scene patch file](recover-scene-patch-files.md).
 
+## Choose a scene patch file version
+
+Scene patch editing checks `Data/scene-patches.json` when the game regains focus and when you select **Refresh** or **Save**. It compares content rather than formatting. Changes to whitespace, object-member order or the order of entries with stable identities do not create a version choice.
+
+When the file content has changed outside scene patch editing, Scene patches says `The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version.` Save remains disabled until you choose one:
+
+- **Use file version** applies the changed file in the current session and discards unsaved patch edits. Scene patches explains this loss before you confirm. The discarded history step remains in native Undo and Redo under its original action name, but has no effect. The menu titles still identify that step. Undo or Redo of that step, or of a patch edit recorded before the choice, does not change the scene patch file. Unsaved native map work is unaffected. Afterward, the patch status is **Saved** if the session's patch content equals the file on disk, and **Unsaved** otherwise.
+- **Keep editor version** retains the session's scene patch file and edits. Scene patches says that the next Save will overwrite the changed file.
+
+Neither choice requires a reload.
+
+The choice remains visible after the action that detected the change. Undo, Redo and **Remove modification** update reload feedback to match the current session. If the file changed while the game was closed, the next native map editor load reads it without a version-choice dialog.
+
+If the file cannot be read as a valid scene patch file, or its format version is missing, unrecognized or newer, Scene patches enters **File needs repair** and shows the diagnosis with line numbers. **Use file version** is unavailable. Scene patch controls and Save are disabled except **Refresh**, **Keep editor version**, **Details** and **Copy to clipboard**. See [Recover a protected scene patch file](recover-scene-patch-files.md).
+
+If a repair check finds that the file is readable but still changed, Scene patches says `The file is readable again.` and offers the normal version choice. If the file's content is unchanged, the choice clears.
+
 ## Set a numeric placement
 
 For a step-by-step edit that keeps the same object selected and lets you review changes before **Apply**, see [complete an edit with a guided task](completing-guided-tasks.md).
@@ -62,7 +79,7 @@ The title star and the Save button follow all three writes. They stay active aft
 
 When a write fails, the native map editor shows **Save Failed** with the cause, the writes that completed and the writes still outstanding. The session details repeat that report as **Last Save failed**. Completed writes are not reversed, your edits stay in memory and the native map editor stays unsaved. A failed write never damages the file it was replacing: the patcher writes the new content of `Data/scene-patches.json` or `Info.json` completely to a file beside it, ending in `.saving`, and only then puts it in the file's place. A write that stops midway leaves the previous file as it was, or no file at the first Save, and the patcher removes the unfinished `.saving` file. A `.saving` file left by an interrupted Save, for example after a crash, is replaced by the next Save. When another program, such as a virus scanner or a sync client, holds the file open for a moment, Save tries again for up to half a second before it reports the failure.
 
-Correct the cause, for example a locked or read-only file, and select **Save** again. The retry writes only what is outstanding. If `Data/scene-patches.json` changed outside scene patch editing after the patcher read it, the retry refuses to overwrite it; reload the native map editor to read the file again.
+Correct the cause, such as a locked or read-only file, and select **Save** again. The retry writes only what is outstanding. If `Data/scene-patches.json` changed outside scene patch editing after the patcher read it, the retry refuses to overwrite it. Choose **Use file version** or **Keep editor version** before retrying. A file that needs repair requires a backup first.
 
 Save refuses to write the dependency when an existing constraint in `Info.json`, such as `^0.1.0`, excludes the version the scene patch file needs. Correct that constraint and save again.
 
@@ -85,3 +102,11 @@ The scene patch editing session never retries a failed edit automatically. Each 
 When work is outstanding, the exit confirmation names it, for example `Unsaved work: native map data, scene patch file.` **Cancel** returns to the native map editor. **Exit** discards the unsaved work.
 
 For the fields the native map editor's Save writes, see [scene patch file v1](scene-patch-file-v1.md).
+
+## Reload the native map editor
+
+Select **Reload Map Editor...** in Scene patches to request a native map editor reload. The confirmation says that native Undo/Redo history ends on reload. Choose **Cancel** to leave the Map Editor and its work open. **Save and Reload** saves the required native and patcher work, then reloads after all writes complete. **Discard and Reload** discards remaining unsaved work. Writes already completed during a partial Save stay on disk. If Save fails, the Map Editor stays open and reports completed and outstanding writes.
+
+While a scene patch file version choice is pending or the file needs repair, reload and exit offer discard or cancel. Save is offered only after you choose **Use file version** or **Keep editor version** and, in repair state, after the backup succeeds. After an unrecovered native history error, the native map editor may be unable to prove that native map data is clean. The confirmation identifies outstanding work so you can cancel or discard it.
+
+The native reload relaunches the requested map definition. For the same map, the patcher records the camera's ground location in map coordinates and requests a return once the new native map editor and camera are ready. The request survives mod replacement in the same process, expires after five minutes and is discarded if another map opens. The patcher checks the settled horizontal ground position before reporting arrival. Selection, camera angle and native history are not preserved. Reload does not replace an installed DLL; installing or replacing one requires a process restart. A native journey is still needed to establish the tested build and layout's rendered prompts, reload behavior, discard behavior and return to the working location.

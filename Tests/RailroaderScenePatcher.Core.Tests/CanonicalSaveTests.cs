@@ -443,20 +443,20 @@ static class CanonicalSaveTests {
         w.Store.Patch = reordered;
         Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 1 && (double)JObject.Parse(w.Store.Patch)["modifications"]["a"]["placement"]["position"][0] == 130 && !w.MapEditor.IsDirty, "A file reordered and re-spaced outside scene patch editing does not block the Save");
         // Each external change refuses the Save and leaves the file as it is.
-        var cases = new (string scenario, string load, string outside)[] {
-            ("a changed value", canonical, canonical.Replace("[160,2,3]", "[161,2,3]")),
-            ("a removed modification", canonical, Doc(Mod("a", "p", "[112,2,3]"))),
-            ("a file that cannot be parsed", canonical, canonical.Substring(0, canonical.Length - 3)),
-            ("a file with a repeated property name", canonical, canonical.Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1")),
-            ("a file deleted since load", canonical, null),
-            ("a file created after a load that found none", null, canonical),
+        var cases = new (string scenario, string load, string outside, FileVersionState expectedState)[] {
+            ("a changed value", canonical, canonical.Replace("[160,2,3]", "[161,2,3]"), FileVersionState.Changed),
+            ("a removed modification", canonical, Doc(Mod("a", "p", "[112,2,3]")), FileVersionState.Changed),
+            ("a file that cannot be parsed", canonical, canonical.Substring(0, canonical.Length - 3), FileVersionState.Repair),
+            ("a file with a repeated property name", canonical, canonical.Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"), FileVersionState.Repair),
+            ("a file deleted since load", canonical, null, FileVersionState.Repair),
+            ("a file created after a load that found none", null, canonical, FileVersionState.Changed),
         };
-        foreach (var (scenario, load, outside) in cases) {
+        foreach (var (scenario, load, outside, expectedState) in cases) {
             var g = new World(load);
             Assert(g.Session.Edit(P, PlacementAt(130), null).Applied, scenario + ": an edit is pending");
             g.Store.Patch = outside;
             var message = g.MapEditor.Save();
-            Assert(message != null && message.Contains("changed outside scene patch editing") && message.Contains("outstanding: ") && message.Contains(PatchEditingSession.PatchData), scenario + ": the Save refuses to overwrite the external change: " + message);
+            Assert(message != null && g.Session.VersionState == expectedState && message.Contains(expectedState == FileVersionState.Changed ? "The scene patch file changed outside scene patch editing" : "File needs repair") && message.Contains("outstanding: ") && message.Contains(PatchEditingSession.PatchData), scenario + ": the Save refuses to overwrite the external change: " + message);
             Assert(ReferenceEquals(g.Store.Patch, outside) && g.Store.PatchWrites == 0 && g.MapEditor.IsDirty && g.Box.X == 30, scenario + ": the file stays as it is and the edit stays in memory");
         }
     }
@@ -496,7 +496,7 @@ static class CanonicalSaveTests {
         Assert(g.Session.Edit(P, PlacementAt(130), null).Applied, "An edit is pending");
         var single = With("[\"a\"]"); g.Store.Patch = single;
         var message = g.MapEditor.Save();
-        Assert(message != null && message.Contains("changed outside scene patch editing") && ReferenceEquals(g.Store.Patch, single), "A dependency list without the duplicate is other content: " + message);
+        Assert(message != null && g.Session.VersionState == FileVersionState.Changed && message.Contains("The scene patch file changed outside scene patch editing") && ReferenceEquals(g.Store.Patch, single), "A dependency list without the duplicate is other content: " + message);
         // A writing Save orders the values and keeps the duplicate.
         var kept = new World(With("[\"b\",\"a\",\"b\"]"));
         Assert(kept.Session.Edit(P, PlacementAt(130), null).Applied && kept.MapEditor.Save() == null, "The scene patch file is saved");

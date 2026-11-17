@@ -104,8 +104,14 @@ namespace RailroaderScenePatcher.Core {
             try { return storage.ReadScenePatchFile() != null; }
             catch (ArgumentException) { return true; }
         }
-        // The guard of a Save that replaces the original: the original and its backup must still hold the secured bytes.
+        // A version choice checks the original against the secured bytes. Legacy fresh start
+        // also verifies its backup; a version-choice backup is left alone after initial verification.
         void CheckReplacement() {
+            if (versionBackup) {
+                if (((IVersionBackupStorage)storage).VersionFingerprint() != backedVersionFingerprint)
+                    throw new InvalidOperationException("the file changed after its backup was written. Review the new file version before saving");
+                return;
+            }
             if (!((IRecoveryStorage)storage).MatchesPatchBackup(replacementBackup))
                 throw new InvalidOperationException("the original scene patch file or its backup changed after fresh start. Both are kept; reopen the native map editor to read the scene patch file again");
         }

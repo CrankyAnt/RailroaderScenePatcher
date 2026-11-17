@@ -59,7 +59,7 @@ One line per validation or test command and per CI workflow the repository runs.
 - `git diff --check`: checks changes for whitespace errors
 - `actionlint`: validates GitHub Actions workflow definitions
 - `dotnet build Src/RailroaderScenePatcher -p:GameManaged=<Railroader_Data/Managed>`: builds the DLL mod against the installed game assemblies
-- `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release`: validates the core library's behaviour without game assemblies, and that the normal build has no fault injection switch
+- `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release`: validates the core library's behaviour without game assemblies, and that the normal build has no fault injection switch; append `-- --suite <test-class>` to run one test class
 - `dotnet run --project Tests/RailroaderScenePatcher.Core.Tests --configuration Release -p:SceneFaults=true -p:BuildArtifactsRoot=<fault build root>`: validates the test-only fault injection points in a fault build of the core library
 - `dotnet build Tests/FaultInjection --configuration Release -p:GameManaged=<Railroader_Data/Managed>`: builds the test-only switch that arms a failure in a fault build during a native journey
 - `dotnet build Tests/NativeObservation -p:GameManaged=<Railroader_Data/Managed>`: builds the isolated native observation artifact

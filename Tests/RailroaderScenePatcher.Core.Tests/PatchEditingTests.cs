@@ -54,8 +54,11 @@ class NativeMapEditor : INativeHistory {
     public int ChangeCount, CleanCount, MaxLevels = 50, NativeValue, NativeWrites;
     public bool FailNative, ThrowInNativeAction;
     public PatchEditingSession Session;
+    public Action HistoryStarted { get; set; }
+    public Action HistoryFinished { get; set; }
     public IReadOnlyList<object> UndoGroups => undo;
     public IReadOnlyList<object> RedoGroups => redo;
+    public IReadOnlyList<Action> GroupActions(object group) => ((Group)group).Actions.ToArray();
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
     public void Register(Action inverse, string name) {
@@ -76,6 +79,7 @@ class NativeMapEditor : INativeHistory {
     void Execute(List<Group> source, ref bool flag, int delta) {
         if (source.Count == 0) return;
         Session.BeginHistoryExecution();
+        HistoryStarted?.Invoke();
         Exception error = null;
         flag = true;
         try {
@@ -87,6 +91,7 @@ class NativeMapEditor : INativeHistory {
         } catch (Exception e) { error = e; }
         finally { flag = false; }
         Session.EndHistoryExecution(error);
+        HistoryFinished?.Invoke();
     }
     public void Undo() { Execute(undo, ref undoing, -1); }
     public void Redo() { Execute(redo, ref redoing, 1); }
@@ -368,7 +373,7 @@ static class PatchEditingTests {
         Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && w.Store.PatchWrites == 1 && w.Store.InfoWrites == 1 && w.MapEditor.NativeWrites == 1, "The retry writes only the outstanding participant");
         w.Session.Edit(P, PlacementAt(120), null); var external = w.Store.Patch.Replace("112", "999"); w.Store.Patch = external;
         message = w.MapEditor.Save();
-        Assert(message.Contains("changed outside scene patch editing") && w.Store.Patch == external && w.MapEditor.IsDirty, "The retry is guarded: an externally changed scene patch file is not overwritten");
+        Assert(w.Session.VersionState == FileVersionState.Changed && message.Contains("The scene patch file changed outside scene patch editing") && w.Store.Patch == external && w.MapEditor.IsDirty, "The retry is guarded: an externally changed scene patch file is not overwritten");
         var first = new World(Doc(Mod("move-p", "p", Fixed(112))));
         first.MapEditor.NativeEdit(1); first.MapEditor.FailNative = true; first.MapEditor.Save(); first.MapEditor.FailNative = false;
         first.MapEditor.Undo(); first.MapEditor.NativeEdit(2);

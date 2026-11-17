@@ -165,6 +165,12 @@ namespace RailroaderScenePatcher.Core {
         // The key this session's scene patch file is applied under: the scope of its additions.
         public string ScenePatchFileKey => scenePatchFileKey;
         readonly HistoryIdentity identity;
+        readonly HistoryIdentity nativeIdentity;
+        bool historyExecuting, alignNativeCleanPending;
+        readonly ConditionalWeakTable<Action, object> patchActions = new ConditionalWeakTable<Action, object>();
+        long savedNativeIdentity;
+        public bool HasNativeHistoryAccounting => nativeIdentity != null;
+        void RegisterPatchAction(Action action, string name) { patchActions.Add(action, new object()); history.Register(action, name); }
         // Replaced only by a confirmed recovery of a protected scene patch file.
         ScenePatchFile scenePatchFile;
         readonly List<string> written = new List<string>();
@@ -218,6 +224,7 @@ namespace RailroaderScenePatcher.Core {
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
             this.modId = modId; this.scenePatchFileKey = scenePatchFileKey ?? ""; scene = engine.Scene;
             identity = new HistoryIdentity(history); savedIdentity = identity.Current;
+            if (history is INativeHistoryActions) { nativeIdentity = new HistoryIdentity(new NativeOnlyHistory(history, action => patchActions.TryGetValue(action, out _))); savedNativeIdentity = nativeIdentity.Current; }
             string scenePatchFileError = null, metadataError = null;
             try { diskText = storage.ReadScenePatchFile(); } catch (Exception e) { scenePatchFileError = e.Message; }
             try { info = storage.ReadModInfo(); } catch (Exception e) { metadataError = e.Message; }
@@ -916,7 +923,8 @@ namespace RailroaderScenePatcher.Core {
                     PreservingJson.KeepLiterals(existing, value);
                 }
                 Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation);
-                history.Register(() => Replay(name, slot, target, existing), name);
+                var generation = versionGeneration;
+                RegisterPatchAction(() => Replay(name, slot, target, existing, generation), name);
                 outcome.Applied = true;
             } catch (Exception e) { Fail(outcome, e); }
             return outcome;
@@ -991,8 +999,14 @@ namespace RailroaderScenePatcher.Core {
         // Runs inside native Undo or Redo. It must not throw: an exception there corrupts the native grouping.
         // Raised after Undo or Redo replayed one of this session's own edits on the target.
         public Action<TargetIdentity> Replayed;
+        public Action<string> HistoryNotice;
         // Undo and Redo restore the modification under its key.
-        void Replay(string name, string slot, TargetIdentity target, JObject value) {
+        void Replay(string name, string slot, TargetIdentity target, JObject value, int generation) {
+            if (generation != versionGeneration) {
+                RegisterPatchAction(() => Replay(name, slot, target, value, generation), name);
+                try { HistoryNotice?.Invoke("This discarded scene patch step no longer changes the scene patch file."); } catch { }
+                return;
+            }
             var current = scenePatchFile.Modifications[slot] as JObject;
             try {
                 var resolved = engine.ResolveUnique(target);
@@ -1005,7 +1019,7 @@ namespace RailroaderScenePatcher.Core {
                 uncertain = true;
                 IncompleteOperation = name + " could not be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown; Save remains available.";
             }
-            history.Register(() => Replay(name, slot, target, current), name);
+            RegisterPatchAction(() => Replay(name, slot, target, current, generation), name);
         }
         void Commit(TargetIdentity identity, object target, InspectedTarget inspected, string key, JObject current, JObject value, Action validateBeforeMutation = null) {
             var mapContext = scene.MapIds.ToArray();
@@ -1132,14 +1146,23 @@ namespace RailroaderScenePatcher.Core {
         }
 
         // History notifications from the native map editor: around each native Undo or Redo, and after any history change.
-        public void BeginHistoryExecution() { identity.Begin(); }
+        public void BeginHistoryExecution() { historyExecuting = true; identity.Begin(); nativeIdentity?.Begin(); }
         public void EndHistoryExecution(Exception error) {
             identity.End(error != null);
+            nativeIdentity?.End(error != null);
+            historyExecuting = false;
+            if (alignNativeCleanPending && error == null && nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current;
+            alignNativeCleanPending = false;
             if (error == null) return;
             unrecovered = "Native Undo or Redo stopped on an error: " + error.Message + ". The native history is unrecovered and may no longer record edits. Save still writes the current state, but the native map editor stays unsaved until it is reloaded.";
             IncompleteOperation = unrecovered;
         }
-        public void HistoryChanged() { identity.Observe(); }
+        public void HistoryChanged() { identity.Observe(); nativeIdentity?.Observe(); }
+        // The native editor reached its pre-attachment clean state for the first time.
+        public void AlignNativeCleanHistory() {
+            if (historyExecuting) alignNativeCleanPending = true;
+            else if (nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current;
+        }
 
         // The scene patch file is Saved exactly when its content equals the content of the text last read or written; member
         // order, spacing and the literal a number is written in do not count. Without such a text it is Saved while it has
@@ -1148,7 +1171,7 @@ namespace RailroaderScenePatcher.Core {
             get {
                 if (scenePatchFile == null) return false;
                 // A fresh start stays outstanding until Save replaced the original, even without a modification.
-                if (replacementBackup != null) return true;
+                if (replacementBackup != null || acceptedVersion) return true;
                 if (saved == null) return scenePatchFile.Modifications.Count != 0;
                 if (comparedVersion != scenePatchFile.Version) { differs = !PreservingJson.SameContent(scenePatchFile.Root, saved); comparedVersion = scenePatchFile.Version; }
                 return differs;
@@ -1169,10 +1192,10 @@ namespace RailroaderScenePatcher.Core {
                 catch (InvalidOperationException) { return true; }
             }
         }
-        // The participants whose required write has not completed. nativeDirty is the native map editor's own change-count answer.
+        // The participants whose required write has not completed. nativeDirty includes the tracker's native work and unexplained changes.
         public IReadOnlyList<string> Outstanding(bool nativeDirty) {
             var result = new List<string>();
-            if (nativeDirty || uncertain || unrecovered != null || identity.Current != savedIdentity) result.Add(NativeData);
+            if (nativeDirty || uncertain || unrecovered != null || (nativeIdentity == null ? identity.Current != savedIdentity : nativeIdentity.Current != savedNativeIdentity)) result.Add(NativeData);
             if (PatchOutstanding) result.Add(PatchData);
             if (MetadataOutstanding) result.Add(Metadata);
             return result;
@@ -1190,6 +1213,8 @@ namespace RailroaderScenePatcher.Core {
         public void BeginSave() {
             written.Clear();
             if (scenePatchFile == null) return;
+            CheckFileVersion();
+            if (!CanSaveForReload) throw new InvalidOperationException(SaveRefusal);
             if (scenePatchFile.Modifications.Count != 0) {
                 try {
                     var fresh = storage.ReadModInfo();
@@ -1201,14 +1226,14 @@ namespace RailroaderScenePatcher.Core {
             if (!PatchOutstanding) return;
             try {
                 if (replacementBackup != null) CheckReplacement();
-                else if (ChangedOutside(storage.ReadScenePatchFile())) throw new InvalidOperationException("the file changed outside scene patch editing after it was read. It is protected from overwrite; reload the native map editor to read it again");
+                else { CheckFileVersion(); if (!CanSaveForReload) throw new InvalidOperationException(SaveRefusal); }
                 var text = scenePatchFile.Serialize();
                 storage.WriteScenePatchFile(text);
-                diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1; replacementBackup = null; written.Add(PatchData);
+                diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1; replacementBackup = null; versionBackup = false; backedVersionFingerprint = null; ClearVersionAcceptance(); VersionMessage = null; written.Add(PatchData);
             } catch (Exception e) { throw new InvalidOperationException("The scene patch file was not written: " + e.Message, e); }
         }
         public void CompleteNativeSave() {
-            savedIdentity = identity.Current; uncertain = false; IncompleteOperation = unrecovered;
+            savedIdentity = identity.Current; if (nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current; uncertain = false; IncompleteOperation = unrecovered;
             written.Add(NativeData);
             LastSave = new SaveReport(written, Outstanding(false), null);
         }
