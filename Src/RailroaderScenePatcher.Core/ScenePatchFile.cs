@@ -126,9 +126,9 @@ namespace RailroaderScenePatcher.Core {
                 SourceLiterals.Add((JValue)value, literal);
             }
         }
-        // Gives every axis of the new placement position and rotation that equals the old document's value at the single
-        // precision the game stores a transform in the old value, so KeepLiterals then keeps its source literal. A pose
-        // read back from the game differs from the document's literal below that precision; an edit of one axis would
+        // Gives every axis of the new placement position and rotation that equals the old scene patch file's value at the single
+        // precision the game stores a transform in the old value, so KeepLiterals then keeps its source literal. A placement
+        // read back from the game differs from the scene patch file's literal below that precision; an edit of one axis would
         // otherwise rewrite the others' text.
         // The placements of crossing equipment entries with the same key follow the same rule.
         internal static void KeepStoredPrecision(JToken old, JToken value) {
@@ -151,7 +151,7 @@ namespace RailroaderScenePatcher.Core {
         // The text in the member order of the source.
         internal string Write() { return Text(writer => Write(writer, Root, null)); }
         // The text in canonical order. The tokens stay where they are; only the text is ordered.
-        internal string WriteCanonical() { return Text(writer => Write(writer, Root, Shape.Document)); }
+        internal string WriteCanonical() { return Text(writer => Write(writer, Root, Shape.ScenePatchFile)); }
         static string Text(Action<JsonWriter> write) {
             var text = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
             using (var writer = new JsonTextWriter(text) { Formatting = Formatting.Indented }) write(writer);
@@ -183,7 +183,7 @@ namespace RailroaderScenePatcher.Core {
                 Member = name => name == "target" ? Target : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
             static readonly Shape Modifications = new Shape { Member = name => Modification };
             static readonly Shape TargetMap = new Shape { Known = new[] { "mapId" } };
-            internal static readonly Shape Document = new Shape { Known = new[] { "formatVersion", "sourceMap", "modifications" },
+            internal static readonly Shape ScenePatchFile = new Shape { Known = new[] { "formatVersion", "sourceMap", "modifications" },
                 Member = name => name == "sourceMap" ? TargetMap : name == "modifications" ? Modifications : Unknown };
         }
         static void Write(JsonWriter writer, JToken token, Shape shape) {
@@ -205,73 +205,73 @@ namespace RailroaderScenePatcher.Core {
             else token.WriteTo(writer);
         }
     }
-    public sealed class PatchDocument {
+    public sealed class ScenePatchFile {
         // The format version this patcher reads and writes.
         public const int CurrentFormat = 1;
         internal readonly JObject Root;
         readonly string original;
         readonly PreservingJson source;
-        readonly List<DocumentDiagnostic> diagnostics = new List<DocumentDiagnostic>();
+        readonly List<ScenePatchFileDiagnostic> diagnostics = new List<ScenePatchFileDiagnostic>();
         string serialized;
         bool edited;
         public string Error { get; private set; }
         public bool CanWrite { get { return Root != null && Error == null; } }
-        // Set when the document is readable but an edit could not preserve all of its content.
+        // Set when the scene patch file is readable but an edit could not preserve all of its content.
         internal string EditError { get; private set; }
-        // What the last read found wrong in the text: why the document is protected, and each modification this
-        // patcher does not execute. Empty for a document without problems.
-        public IReadOnlyList<DocumentDiagnostic> Diagnostics => diagnostics;
-        private PatchDocument(PreservingJson source, string error, string original = null) {
+        // What the last read found wrong in the text: why the scene patch file is protected, and each modification this
+        // patcher does not execute. Empty for a scene patch file without problems.
+        public IReadOnlyList<ScenePatchFileDiagnostic> Diagnostics => diagnostics;
+        private ScenePatchFile(PreservingJson source, string error, string original = null) {
             this.source = source; Root = source?.Root as JObject; Error = error; this.original = original;
             if (source != null && !source.Exact) {
-                EditError = "Numeric content of this document cannot be preserved exactly by an edit";
+                EditError = "Numeric content of this scene patch file cannot be preserved exactly by an edit";
                 var place = source.Inexact;
-                diagnostics.Add(DocumentDiagnostic.Create(original, place?.Path ?? "", EditError, "Numbers written as plain JSON literals; correct values such as NaN or Infinity outside scene patch editing", place ?? (JToken)Root));
+                diagnostics.Add(ScenePatchFileDiagnostic.Create(original, place?.Path ?? "", EditError, "Numbers written as plain JSON literals; correct values such as NaN or Infinity outside scene patch editing", place ?? (JToken)Root));
             }
         }
-        static PatchDocument Protected(string json, string message, string path, string expected, JToken token = null, int line = 0) {
-            var rejected = new PatchDocument(null, message, json);
-            rejected.diagnostics.Add(DocumentDiagnostic.Create(json, path, message, expected, token, line));
+        static ScenePatchFile Protected(string json, string message, string path, string expected, JToken token = null, int line = 0) {
+            var rejected = new ScenePatchFile(null, message, json);
+            rejected.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, path, message, expected, token, line));
             return rejected;
         }
-        const string VersionExpected = "\"formatVersion\": 1 as the first thing the document declares; a newer document needs the patcher version that wrote it";
-        public static PatchDocument Load(string json) {
+        const string VersionExpected = "\"formatVersion\": 1 as the first thing the scene patch file declares; a newer scene patch file needs the patcher version that wrote it";
+        public static ScenePatchFile Load(string json) {
             // The declared format version decides how the rest of the text is read, so it is checked before anything
-            // else: a missing, unrecognized or newer version protects the document whatever the rest contains.
+            // else: a missing, unrecognized or newer version protects the scene patch file whatever the rest contains.
             var version = DeclaredVersion(json);
             if (version != null && version.Problem != null) return Protected(json, version.Problem, "formatVersion", VersionExpected, null, version.Line);
             try {
                 var source = PreservingJson.Parse(json);
                 var root = source.Root as JObject;
                 if (root == null)
-                    return Protected(json, "Invalid document envelope. The document must be a JSON object", "", "A JSON object with formatVersion, sourceMap and modifications", source.Root);
+                    return Protected(json, "Invalid scene patch file envelope. The scene patch file must be a JSON object", "", "A JSON object with formatVersion, sourceMap and modifications", source.Root);
                 if (!(root["sourceMap"] is JObject targetMap) || targetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)targetMap["mapId"]))
-                    return Protected(json, "Invalid document map context or modifications. The sourceMap needs a mapId", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the target map>\" } with the ID of the edited map or one of its map layers", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
+                    return Protected(json, "Invalid scene patch file map context or modifications. The sourceMap needs a mapId", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the target map>\" } with the ID of the edited map or one of its map layers", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
                 if (!(root["modifications"] is JObject modifications))
-                    return Protected(json, "Invalid document map context or modifications. The modifications must be an object keyed by modification ID", "modifications", "\"modifications\": { \"<modification ID>\": { ... } }", root["modifications"]);
+                    return Protected(json, "Invalid scene patch file map context or modifications. The modifications must be an object keyed by modification ID", "modifications", "\"modifications\": { \"<modification ID>\": { ... } }", root["modifications"]);
                 foreach (var property in modifications.Properties())
                     if (String.IsNullOrWhiteSpace(property.Name) || !(property.Value is JObject))
                         return Protected(json, "Every modification must be an object under a key that is not empty", property.Path, "\"<modification ID>\": { \"target\": { ... }, ... } under a key that is not empty", property);
-                var loaded = new PatchDocument(source, null, json);
-                // A modification this patcher does not execute stays in the document unchanged; its diagnostic says why.
+                var loaded = new ScenePatchFile(source, null, json);
+                // A modification this patcher does not execute stays in the scene patch file unchanged; its diagnostic says why.
                 foreach (var property in modifications.Properties()) {
                     try { PatchEngine.Parse((JObject)property.Value, "", property.Name); }
                     catch (InvalidOperationException e) {
-                        loaded.diagnostics.Add(DocumentDiagnostic.Create(json, property.Path, "Modification " + property.Name + " is not executed. " + Sentence(e.Message),
+                        loaded.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, property.Path, "Modification " + property.Name + " is not executed. " + Sentence(e.Message),
                             "A target, a placement and/or active, relationships and a dependsOn list as the format reference describes. Correct known values outside scene patch editing; keep content of a newer patcher unless you mean to remove it", property.Value));
                     }
                 }
                 return loaded;
             } catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) {
                 var reader = e as JsonReaderException;
-                return Protected(json, "Unreadable document. " + Sentence(e.Message), reader?.Path ?? "", "Valid JSON with each property name once per object", null, reader?.LineNumber ?? 0);
+                return Protected(json, "Unreadable scene patch file. " + Sentence(e.Message), reader?.Path ?? "", "Valid JSON with each property name once per object", null, reader?.LineNumber ?? 0);
             }
         }
         // Why the text's declared format version keeps any of its content from being read, or null. Before this answer
         // is null, no other member of the text, such as its target map, has a meaning.
         public static string FormatProblem(string json) => DeclaredVersion(json)?.Problem;
         sealed class Declaration { internal string Problem; internal int Line; }
-        // Reads only the top-level formatVersion of the text, without the checks of the full read, so a document of
+        // Reads only the top-level formatVersion of the text, without the checks of the full read, so a scene patch file of
         // another format version is recognised as such even when its content would not read as the current format.
         // Null when the text cannot be read as far as a decision: the full read then reports it as unreadable.
         static Declaration DeclaredVersion(string json) {
@@ -303,7 +303,7 @@ namespace RailroaderScenePatcher.Core {
                 if (declared < 0) return null;
                 return Describe(found[declared], values[declared]);
             }
-            if (found.Count == 0) return new Declaration { Problem = "Missing format version. The document does not declare formatVersion, so none of its content is read" };
+            if (found.Count == 0) return new Declaration { Problem = "Missing format version. The scene patch file does not declare formatVersion, so none of its content is read" };
             var other = values.FindIndex(v => v != "1");
             return other < 0 ? new Declaration() : Describe(found[other], values[other]);
         }
@@ -333,11 +333,11 @@ namespace RailroaderScenePatcher.Core {
             // A JSON integer literal without a sign is greater than the current format when it is longer or larger.
             var digits = value != null && value.All(c => c >= '0' && c <= '9');
             if (digits && (value.Length > 1 || value[0] - '0' > CurrentFormat))
-                version.Problem = "Newer format version " + value + ". This patcher reads format version " + CurrentFormat + " and applies none of this document's content";
-            else version.Problem = "Unrecognized format version. The formatVersion must be the number " + CurrentFormat + "; none of this document's content is read";
+                version.Problem = "Newer format version " + value + ". This patcher reads format version " + CurrentFormat + " and applies none of this scene patch file's content";
+            else version.Problem = "Unrecognized format version. The formatVersion must be the number " + CurrentFormat + "; none of this scene patch file's content is read";
             return version;
         }
-        // Whether two document texts have equal content under the Saved equality: member order, spacing, comments and the
+        // Whether two scene patch file texts have equal content under the Saved equality: member order, spacing, comments and the
         // literal a number is written in do not count. A text that cannot be parsed equals only the same text; a missing
         // text equals only a missing text.
         public static bool SameContent(string first, string second) {
@@ -346,15 +346,15 @@ namespace RailroaderScenePatcher.Core {
             try { return PreservingJson.SameContent(PreservingJson.Parse(first).Root, PreservingJson.Parse(second).Root); }
             catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) { return false; }
         }
-        internal static PatchDocument Create(string mapId) {
-            var document = Load(new JObject { ["formatVersion"] = 1, ["sourceMap"] = new JObject { ["mapId"] = mapId }, ["modifications"] = new JObject() }.ToString(Formatting.None));
-            document.edited = true;
-            return document;
+        internal static ScenePatchFile Create(string mapId) {
+            var scenePatchFile = Load(new JObject { ["formatVersion"] = 1, ["sourceMap"] = new JObject { ["mapId"] = mapId }, ["modifications"] = new JObject() }.ToString(Formatting.None));
+            scenePatchFile.edited = true;
+            return scenePatchFile;
         }
         // The modifications by key, in the order of the source followed by the order edits added them.
         internal JObject Modifications { get { return (JObject)Root["modifications"]; } }
         internal IEnumerable<JObject> Items { get { return Modifications.PropertyValues().OfType<JObject>(); } }
-        // The key of a modification that stands in a document, or null.
+        // The key of a modification that stands in a scene patch file, or null.
         internal static string Key(JObject item) { return (item?.Parent as JProperty)?.Name; }
         // Counts the edits, so a caller can tell whether the content changed since it last looked.
         internal int Version { get; private set; }
@@ -371,7 +371,7 @@ namespace RailroaderScenePatcher.Core {
         // The canonical text: known and unknown content with their meaning in canonical order, without the source whitespace.
         internal string Serialize() { return serialized ?? (serialized = source.WriteCanonical()); }
         public string Write() {
-            if (!CanWrite) throw new InvalidOperationException("Document cannot be safely written");
+            if (!CanWrite) throw new InvalidOperationException("Scene patch file cannot be safely written");
             return edited ? Serialize() : original;
         }
     }

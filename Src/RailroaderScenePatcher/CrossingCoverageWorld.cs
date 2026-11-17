@@ -14,7 +14,7 @@ namespace RailroaderScenePatcher {
     // track span. The controller re-reads the sets and their span references on every pass of its loop, so changing them
     // changes detection from the next pass. A span registers in the track graph under its ID when it is enabled and removes
     // that ID when it is disabled. The native map editor saves neither the controller's references nor runtime spans, so owned spans
-    // exist only in the load that the patch document builds them in. A circuit set is a plain object the controller's list
+    // exist only in the load that the scene patch file builds them in. A circuit set is a plain object the controller's list
     // refers to; a set the patcher adds for a detection addition is remembered by its own identity, so a later adapter over a
     // retained world still tells it from the native sets.
     internal sealed class CrossingCoverageWorld : ICrossingCoverageWorld {
@@ -52,7 +52,7 @@ namespace RailroaderScenePatcher {
             newLocation = location.GetConstructor(Native.Flags, null, new[] { typeof(string), typeof(float), end }, null) ?? throw new MissingMethodException(LocationType, ".ctor(string, float, End)");
             foreach (var field in new[] { "segmentId", "distance", "end" }) if (location.GetField(field, Native.Flags) == null) throw new MissingFieldException(LocationType, field);
         }
-        public IEnumerable<string> MapIds => ModDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         static object Graph() => Native.Read(Native.Type(GraphType), "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
         Component ControllerOf(object target) => ((GameObject)target).GetComponent(controller) ?? throw new InvalidOperationException("The object no longer holds a crossing controller");

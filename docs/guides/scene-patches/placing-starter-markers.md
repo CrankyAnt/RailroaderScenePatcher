@@ -17,7 +17,7 @@ When the game starts a new company game, the setup places its cuts one after the
 - the marker's track location would be detached. The game reads it to place the cut.
 - another scene marker holds the same marker id. The game removes a marker's registration by marker id from every marker that holds it, so the refusal names the duplicate marker id and every holder; see [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
 
-The other cuts stand where your patch document places them: a cut that another starter placement of the same document moves is judged at its new track location, also when the game loads the document, so two cuts can swap places. Move one of them away first in the native map editor, then the other into its old place. A failure of another placement that this cut does not cause, such as another marker on a missing segment, does not refuse this location. Fix that marker on its own.
+The other cuts stand where your scene patch file places them: a cut that another starter placement of the same scene patch file moves is judged at its new track location, also when the game loads the scene patch file, so two cuts can swap places. Move one of them away first in the native map editor, then the other into its old place. A failure of another placement that this cut does not cause, such as another marker on a missing segment, does not refuse this location. Fix that marker on its own.
 
 The patcher checks against the track as the native map editor has it: which track groups are available and which way each switch is lined. A new company game starts from the same map data.
 
@@ -35,21 +35,21 @@ The patcher runs the checks above. A refusal appears in the footer with its reas
 ## Undo, clear and remove
 
 - Native **Undo** returns the track location from before the edit, with its registration; **Redo** applies the edit again. The title, the dirty state and the **Save** button follow.
-- **Clear location** at the bottom of the **Connections** tab removes this mod's track location: the marker returns to the track location the loaded map gives it. A modification that sets nothing else leaves the document.
+- **Clear location** at the bottom of the **Connections** tab removes this mod's track location: the marker returns to the track location the loaded map gives it. A modification that sets nothing else leaves the scene patch file.
 - **Remove modification** in the footer removes the whole modification and returns the marker to the loaded map's track location, computed again from the map and the other mods' values.
-- Setting the marker back to the map's own track location reverts the setting, and the modification leaves the document.
+- Setting the marker back to the map's own track location reverts the setting, and the modification leaves the scene patch file.
 
 If an edit fails after the patcher started to change the marker, it restores the track location and registration the marker had before. When it cannot verify that restoration, it says so and refuses further edits of the marker until **Recheck** in the footer succeeds or the world reloads. **Recheck** refuses while the graph registration does not match the stored location.
 
 ## Save and play
 
-The native map editor's **Save** writes the modification to `Data/scene-patches.json` and raises the mod's dependency on the patcher to 0.5.0, keeping a stricter constraint that `Info.json` already has. The document stays in format version 1.
+The native map editor's **Save** writes the modification to `Data/scene-patches.json` and raises the mod's dependency on the patcher to 0.5.0, keeping a stricter constraint that `Info.json` already has. The scene patch file stays in format version 1.
 
-When a player starts a new company game on the map, the patcher applies the document when the world loads, before the setup places its cars, so the cut stands at the patched track location. The same checks run then: a document whose location fails them is not applied, the marker keeps the map's track location and the player sees a patcher warning that names the reason. In a game loaded from a save the setup does not run, so the patched track location places no cars there.
+When a player starts a new company game on the map, the patcher applies the scene patch file when the world loads, before the setup places its cars, so the cut stands at the patched track location. The same checks run then: a scene patch file whose location fails them is not applied, the marker keeps the map's track location and the player sees a patcher warning that names the reason. In a game loaded from a save the setup does not run, so the patched track location places no cars there.
 
 ## Write the starter placement by hand
 
-Copy the identity with **Copy ID** in the command band and add a modification under a key of your choice, as described in [patch document v1](patch-document-v1.md#starter-placement):
+Copy the identity with **Copy ID** in the command band and add a modification under a key of your choice, as described in [scene patch file v1](scene-patch-file-v1.md#starter-placement):
 
 ```json
 "starter-ewh-int2": {

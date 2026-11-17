@@ -34,11 +34,11 @@ namespace RailroaderScenePatcher {
             var state = binding.State;
             if (state == null) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": " + binding.Error); return; }
             if (binding.ReentryError != null) state.ReportWorld(binding.ReentryError + ". The patcher started over for this world. Report to the patcher maintainer.");
-            if (!state.Initialized) state.Initialize(context); else state.ApplyDocuments();
+            if (!state.Initialized) state.Initialize(context); else state.ApplyScenePatchFiles();
         }
         // The retained state belongs to the active map and layer identifiers in the native map editor or in play. It is a scoped
         // implementation key, not a verified world identity; each load attempt checks every object against its identity.
-        static object MapContext() => Tuple.Create(String.Join("\n", ModDocuments.MapIds()), ModDocuments.IsMapEditor);
+        static object MapContext() => Tuple.Create(String.Join("\n", ModScenePatchFiles.MapIds()), ModScenePatchFiles.IsMapEditor);
         // A replaced map manager or track graph starts a new load attempt within the same map context. Neither establishes
         // that the scene objects are new; the reconciliation decides that per object.
         static object AttemptIdentity() {
@@ -125,8 +125,8 @@ namespace RailroaderScenePatcher {
         GizmoController gizmo;
         SceneObservation selected;
         string selectionProblem;
-        string documentInspection = "";
-        // The patch documents the last refresh read, and whether they changed outside scene patch editing since.
+        string scenePatchFileInspection = "";
+        // The scene patch files the last refresh read, and whether they changed outside scene patch editing since.
         readonly SuppliedDefinitions definitions = new SuppliedDefinitions();
         bool definitionsStale => definitions.Stale;
         float nextInventoryCheck, nextDefinitionCheck;
@@ -192,7 +192,7 @@ namespace RailroaderScenePatcher {
             JourneyObservation.Sink = message => Debug.Log("[Issue39Attempt] " + message);
 #endif
             try {
-                inMapEditor = ModDocuments.IsMapEditor;
+                inMapEditor = ModScenePatchFiles.IsMapEditor;
                 try {
                     world = new BoardScene();
                     scene = new IndependentBoards(world, () => native.Discover());
@@ -249,7 +249,7 @@ namespace RailroaderScenePatcher {
                 try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); }
                 catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": track-following placement unavailable: " + e.GetBaseException().Message); }
                 context.Log.Info("Scene Patcher " + Version + ": native capabilities checked; game " + Application.version + "; production integration unchecked");
-                ApplyDocuments();
+                ApplyScenePatchFiles();
             } catch (Exception e) {
                 status = "Scene capabilities unavailable: " + e.GetBaseException().Message;
                 Report("capability", status);
@@ -257,9 +257,9 @@ namespace RailroaderScenePatcher {
         }
         internal void PrepareRuntime(IModContext value) {
             if (engine != null) return;
-            context = value; inMapEditor = ModDocuments.IsMapEditor;
+            context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
-            capabilities = new SceneCapabilities(ModDocuments.MapIds, native);
+            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native);
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             engine = new PatchEngine(capabilities);
@@ -273,7 +273,7 @@ namespace RailroaderScenePatcher {
             return markerWorld.DuringEnable(marker.gameObject, () => {
                 bool attempted = false;
                 string unavailable = null;
-                foreach (var mod in ModDocuments.Discover()) {
+                foreach (var mod in ModScenePatchFiles.Discover()) {
                     if (!mod.Applicable) continue;
                     var result = runtime.BeforeNativeCheck(mod.Json, mod.Source, identity);
                     if (result.Outcomes.Count > 0) attempted = true;
@@ -282,45 +282,45 @@ namespace RailroaderScenePatcher {
                 return attempted ? null : unavailable ?? "No applicable dependency-free relationship-only repair before TrackMarker.OnEnable";
             });
         }
-        internal void ApplyDocuments() {
+        internal void ApplyScenePatchFiles() {
             if (engine == null) return;
             if (world != null) {
                 try { world.Rebind(); }
                 catch (Exception e) { Report("terrain-rebind", "Terrain completion for independent boards is unavailable in this load: " + e.GetBaseException().Message + ". Reload the map. Report to the patcher maintainer."); }
             }
-            IReadOnlyList<LoadedDocument> documents;
-            try { documents = runtime.ApplyLoaded(ModDocuments.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
+            IReadOnlyList<LoadedScenePatchFile> scenePatchFiles;
+            try { scenePatchFiles = runtime.ApplyLoaded(ModScenePatchFiles.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
             catch (Exception e) { Report("discovery", "Loaded mod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
-            // One line per document per load attempt says what happened to it, also when nothing else is reported: a
-            // document for another map is skipped without a failure.
+            // One line per scene patch file per load attempt says what happened to it, also when nothing else is reported: a
+            // scene patch file for another map is skipped without a failure.
             loadAttempts++;
             string[] maps = null;
-            try { maps = ModDocuments.MapIds(); } catch { }
-            foreach (var document in documents) {
-                var mod = document.Mod;
-                try { context?.Log.Info(document.LogLine(Version, loadAttempts, maps)); } catch { }
-                // Follow-up work for one document cannot stop the others; their application has already happened in load order.
+            try { maps = ModScenePatchFiles.MapIds(); } catch { }
+            foreach (var scenePatchFile in scenePatchFiles) {
+                var mod = scenePatchFile.Mod;
+                try { context?.Log.Info(scenePatchFile.LogLine(Version, loadAttempts, maps)); } catch { }
+                // Follow-up work for one scene patch file cannot stop the others; their application has already happened in load order.
                 try {
-                    if (document.PresentationError != null) context?.Log.Info(Describe(mod, document.PresentationError));
-                    if (document.Result == null) {
-                        if (mod.Error != null) EditedDocumentDiagnostic(mod, Describe(mod, mod.Error));
+                    if (scenePatchFile.PresentationError != null) context?.Log.Info(Describe(mod, scenePatchFile.PresentationError));
+                    if (scenePatchFile.Result == null) {
+                        if (mod.Error != null) EditedScenePatchFileDiagnostic(mod, Describe(mod, mod.Error));
                         continue;
                     }
-                    var result = document.Result;
+                    var result = scenePatchFile.Result;
                     if (result.Error != null) {
-                        if (result.MapEditorOnly) EditedDocumentDiagnostic(mod, Describe(mod, result.Error));
+                        if (result.MapEditorOnly) EditedScenePatchFileDiagnostic(mod, Describe(mod, result.Error));
                         continue;
                     }
                     foreach (var item in result.Outcomes) {
                         if (!item.Value.Applied) {
                             var error = Describe(mod, item.Key + ": " + item.Value.Error);
-                            if (item.Value.MapEditorOnly) EditedDocumentDiagnostic(mod, error);
+                            if (item.Value.MapEditorOnly) EditedScenePatchFileDiagnostic(mod, error);
                         }
                         else ReconcileMarkerWarning(mod, item.Key, item.Value);
                     }
                 } catch (Exception e) { context?.Log.Info(Describe(mod, "Follow-up after application failed: " + e.GetBaseException().Message)); }
             }
-            status = "Documents processed. " + (scene?.Status ?? "");
+            status = "Scene patch files processed. " + (scene?.Status ?? "");
         }
         NativeOverlapNotices overlapNotices;
         // The load attempts of this world so far; the log lines of one attempt carry its number.
@@ -336,8 +336,8 @@ namespace RailroaderScenePatcher {
         }
         void ReconcileMarkerWarning(LoadedMod mod, string operation, Outcome outcome) {
             if (markerWorld == null || !(outcome.ResolvedTarget is GameObject target) || target == null) return;
-            var document = JObject.Parse(mod.Json);
-            var entry = (JObject)document["modifications"][operation];
+            var scenePatchFile = JObject.Parse(mod.Json);
+            var entry = (JObject)scenePatchFile["modifications"][operation];
             // Placement or activity alone does not repair a track-marker relationship.
             var binding = entry["relationships"]?["trackMarker"] as JObject;
             if (binding == null || binding["segment"]?.Type != JTokenType.String) return;
@@ -348,7 +348,7 @@ namespace RailroaderScenePatcher {
                     if (matches.Count != 1 || !ReferenceEquals(matches[0], target)) return false;
                     capabilities.Preflight(target);
                     var actual = markerWorld.Location(target);
-                    return ModDocuments.MapIds().Contains((string)document["sourceMap"]["mapId"], StringComparer.Ordinal) && actual != null && actual.Segment == (string)binding["segment"] && actual.End == (string)binding["end"] && Math.Abs(actual.Distance - (double)binding["distance"]) <= 0.001 && markerWorld.DependentProblem(target) == null;
+                    return ModScenePatchFiles.MapIds().Contains((string)scenePatchFile["sourceMap"]["mapId"], StringComparer.Ordinal) && actual != null && actual.Segment == (string)binding["segment"] && actual.End == (string)binding["end"] && Math.Abs(actual.Distance - (double)binding["distance"]) <= 0.001 && markerWorld.DependentProblem(target) == null;
                 })) context?.Log.Info("Scene Patcher reconciled one exactly attributed current marker warning after verified repair. Earlier route unavailable: " + attribution.EarlyRouteUnavailable);
             }
         }
@@ -358,15 +358,15 @@ namespace RailroaderScenePatcher {
         }
         internal void ReportWorld(string message) { Report("world", message); }
         void MapEditorDiagnostic(string message) { if (inMapEditor && !diagnostics.Contains(message)) diagnostics.Add(message); }
-        // A diagnostic of the edited mod's patch document at world load. Recovery replaces that document in the session,
+        // A diagnostic of the edited mod's scene patch file at world load. Recovery replaces that scene patch file in the session,
         // and then replaces these diagnostics too.
-        void EditedDocumentDiagnostic(LoadedMod mod, string message) {
+        void EditedScenePatchFileDiagnostic(LoadedMod mod, string message) {
             MapEditorDiagnostic(message);
             if (mod.EditTarget && inMapEditor) editedDiagnostics.Add(message);
         }
         // The game's Log window heads a row with its originator, the thing it is about, and its source, the part of the
         // game that reports it, as native rows name a mod file or definition with their subsystem. The source is this
-        // patcher's one name; the originator is the supplying mod's patch document, the object of an overlap notice, or
+        // patcher's one name; the originator is the supplying mod's scene patch file, the object of an overlap notice, or
         // the patcher's own mod for a state of the patcher.
         const string LogSource = "Railroader Scene Patcher";
         void Report(string key, string message, string originator = LoadedMod.PatcherId) {
@@ -430,14 +430,14 @@ namespace RailroaderScenePatcher {
             try {
                 attachment = new MapEditorAttachment(engine, found); Hooks.Current = attachment;
                 attachment.Session.Replayed = identity => replayed.Add(identity);
-                // The patcher's own Save writes the patch document: that text is what the definitions on disk now are, so it
+                // The patcher's own Save writes the scene patch file: that text is what the definitions on disk now are, so it
                 // is no change from outside and the inventory lamp stays Current.
-                ModDocuments.Written = text => { try { definitions.Written(ModDocuments.EditedModId(), text); } catch { } };
+                ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
                 filled = false;
                 snap = new SnapController(attachment.Session, capabilities, new NativeSnapScene(native));
                 attachment.Log = message => context?.Log.Info(message);
                 editingStatus = attachment.Session.Blocked ?? "Editing ready for " + attachment.PatchPath;
-                // The native map editor built its title before this session could account for the document.
+                // The native map editor built its title before this session could account for the scene patch file.
                 attachment.RefreshChrome();
             } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
         }
@@ -446,7 +446,7 @@ namespace RailroaderScenePatcher {
             CancelGizmo();
             // A request made in this native map editor does not run in the next one.
             CancelRequest("the native map editor was left before the request ran");
-            ModDocuments.Written = null;
+            ModScenePatchFiles.Written = null;
             if (attachment == null) return;
             if (ReferenceEquals(Hooks.Current, attachment)) Hooks.Current = null;
             attachment.Dispose(); attachment = null;
@@ -625,7 +625,7 @@ namespace RailroaderScenePatcher {
                 }
                 if (Time.unscaledTime >= nextDefinitionCheck) {
                     nextDefinitionCheck = Time.unscaledTime + 2f;
-                    try { definitions.Compare(ModDocuments.Discover()); }
+                    try { definitions.Compare(ModScenePatchFiles.Discover()); }
                     catch { definitions.Unreadable(); }
                 }
             } else inventory?.CancelFreshnessCheck();
@@ -665,7 +665,7 @@ namespace RailroaderScenePatcher {
                 presentation.Tick(); SyncInputRegions();
             }
         }
-        // Objects of the edited document that follow a track move with it, a few times a second. No document or history changes.
+        // Objects of the edited scene patch file that follow a track move with it, a few times a second. No scene patch file or history changes.
         string surfaceStamp;
         void FollowTracks() {
             if (attachment == null || gizmo?.Active == true || Time.unscaledTime < nextTrackFollow) return;
@@ -688,7 +688,7 @@ namespace RailroaderScenePatcher {
                     }
             } catch (Exception e) { if (reported.Add("follow/" + e.GetBaseException().Message)) context?.Log.Info("Scene Patcher: track following stopped: " + e.GetBaseException().Message); }
         }
-        // Differs whenever the set of objects the document changes can differ.
+        // Differs whenever the set of objects the scene patch file changes can differ.
         string ChangeStamp() { try { return attachment?.ChangeKey; } catch { return null; } }
         string PresentationSnapshot() {
             var pending = selection?.Pending;
@@ -703,14 +703,14 @@ namespace RailroaderScenePatcher {
                 }
             } catch (Exception e) { outstanding = e.GetBaseException().Message; }
             return String.Join("|", inspectorTab.Value, presentation?.HelpRegion, candidateDetails, gizmoTool, Requests.Place, status, scene?.Status, inventory?.IsStale, inventory?.StaleReason, definitionsStale, editingStatus, feedback.Place, feedback.Result,
-                documentInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
+                scenePatchFileInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
                 selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot(),
                 coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(),
                 equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
-        // Computing the outstanding work serializes the document and reads the dependency metadata. Its inputs change
+        // Computing the outstanding work serializes the scene patch file and reads the dependency metadata. Its inputs change
         // with the native map editor's change counts, a Save attempt or an incomplete operation; one recomputation a second covers
         // a change that passes none of them.
         string outstandingKey, outstandingText;
@@ -754,7 +754,7 @@ namespace RailroaderScenePatcher {
             reported.Clear(); diagnostics.Clear(); editedDiagnostics.Clear(); pendingWarnings.Clear(); pendingNotices.Clear();
             loadId = Guid.NewGuid().ToString("N"); presentationErrorLogged = false;
             if (inventory != null) { inventory = new SceneInventory(native); staleLogged = true; }
-            selected = null; selectionProblem = null; documentInspection = "";
+            selected = null; selectionProblem = null; scenePatchFileInspection = "";
             // The panel's state belongs to the load attempt as well: what it read, compared, reported and had open. The
             // next native map editor session builds a new window and fills it from the scene as it is then.
             definitions.Reset();
@@ -805,7 +805,7 @@ namespace RailroaderScenePatcher {
         void BeginSelection(SelectionKind kind, SceneObservation origin) {
             CancelGizmo();
             ClearSnap();
-            // A choice without a source object only inspects what it confirms; no patch document names it.
+            // A choice without a source object only inspects what it confirms; no scene patch file names it.
             try {
                 selection.Begin(kind, origin, origin == null && kind == SelectionKind.SceneObject); selectionProblem = null;
                 // The refusal of an earlier action, such as a Set, does not stand beside the new choice.
@@ -831,7 +831,7 @@ namespace RailroaderScenePatcher {
             presentation?.RequestRefresh();
         }
         // The world marks the track the inspected object follows in green, as a confirmed relation, also while another
-        // track is being chosen. The followed track is read from the document when the inspection or the native map editor's
+        // track is being chosen. The followed track is read from the scene patch file when the inspection or the native map editor's
         // history changes, not every frame.
         object followedOf, modeOf; string followedKey;
         void MarkFollowed() {
@@ -1091,8 +1091,8 @@ namespace RailroaderScenePatcher {
             queuedKey = ChangeStamp();
             Requests.Enqueue(place, action, () => {
                 if (!ReferenceEquals(inspected, selected)) { feedback.Refuse(place, action, "another object was inspected before the request ran"); return; }
-                if (ChangeStamp() != queuedKey) { feedback.Refuse(place, action, "the editor's history changed while the scene was compared; select the action again"); return; }
-                if (inventory == null) { feedback.Refuse(place, action, "map-editor inspection is unavailable"); return; }
+                if (ChangeStamp() != queuedKey) { feedback.Refuse(place, action, "the Map Editor's history changed while the scene was compared; select the action again"); return; }
+                if (inventory == null) { feedback.Refuse(place, action, "Inspection is unavailable"); return; }
                 var passes = queuedPasses; var compared = queuedCompared;
                 run(entry => compared ? inventory.PinCompared(entry) : inventory.PinAfterPass(entry, passes, true));
             });
@@ -1122,8 +1122,8 @@ namespace RailroaderScenePatcher {
                 presentation?.RequestRefresh();
             });
         }
-        // Opens the form for a new copy of the source: an ID from the device's name that the document does not use yet, and
-        // the device's pose relative to its own crossing carried over to the inspected crossing, five metres aside.
+        // Opens the form for a new copy of the source: an ID from the device's name that the scene patch file does not use yet, and
+        // the device's placement relative to its own crossing carried over to the inspected crossing, five metres aside.
         void UseSource(PatchEditingSession session, SourceCandidate candidate) {
             CloseCoverageForm(); feedback.ClearPlace(EquipmentPlace);
             equipmentSource = candidate.Source; preparedEquipment = null; equipmentOwn = null;
@@ -1133,7 +1133,7 @@ namespace RailroaderScenePatcher {
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
             FillEquipment(EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, candidate.CrossingPosition, candidate.CrossingRotation, selected.Position.ToArray(), selected.Rotation.ToArray()));
         }
-        // Opens the form for an addition of this mod as the document holds it.
+        // Opens the form for an addition of this mod as the scene patch file holds it.
         void ReadEquipment(EquipmentAddition addition) {
             CloseCoverageForm(); feedback.ClearPlace(EquipmentPlace);
             equipmentSource = addition.Source; preparedEquipment = null; equipmentOwn = null;
@@ -1267,25 +1267,25 @@ namespace RailroaderScenePatcher {
                 var inspectedBefore = selected != null;
                 if (selected != null) selected = inventoryPresentation.CurrentSelection(inventory, selected);
                 var lines = new List<string>();
-                var documents = ModDocuments.Discover().ToArray();
-                foreach (var mod in documents) {
+                var scenePatchFiles = ModScenePatchFiles.Discover().ToArray();
+                foreach (var mod in scenePatchFiles) {
                     if (mod.Error != null) { lines.Add(mod.Source.Identifier + ": " + mod.Error); continue; }
-                    foreach (var item in inventory.InspectDocument(mod.Json))
+                    foreach (var item in inventory.InspectScenePatchFile(mod.Json))
                                                 // A field without a value is left out.
-                        lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "document") + ", " + item.MatchCount + " inspection matches",
+                        lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "scene patch file") + ", " + item.MatchCount + " inspection matches",
                             item.Dependencies.Count == 0 ? null : "dependsOn=" + String.Join(", ", item.Dependencies) }.Concat(item.Problems).Where(f => !String.IsNullOrEmpty(f))));
                 }
-                documentInspection = String.Join("\n", lines);
-                definitions.Read(documents);
+                scenePatchFileInspection = String.Join("\n", lines);
+                definitions.Read(scenePatchFiles);
                 // Setups that could not be read leave every marker in its own family; each marker notes it, and the
                 // diagnostics say it once for the inventory.
                 if (NativeInventory.StartersError != null) MapEditorDiagnostic(StarterPlacements.Unreadable(NativeInventory.StartersError));
                 status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
-        // Copy ID names the target map of the edited mod's patch document, or the one scene patch editing would write for it.
+        // Copy ID names the target map of the edited mod's scene patch file, or the one scene patch editing would write for it.
         string Identity(SceneObservation entry) =>
-            attachment != null ? attachment.Session.CopyId(entry) : PatchEditingSession.CopyId(ModDocuments.MapIds(), entry);
+            attachment != null ? attachment.Session.CopyId(entry) : PatchEditingSession.CopyId(ModScenePatchFiles.MapIds(), entry);
         // Focus needs the inspected object, not a fresh inventory: it moves the camera to where the object is now. It
         // never jumps to another object of the same path, because it uses the inspected handle.
         void Focus(SceneObservation entry) {

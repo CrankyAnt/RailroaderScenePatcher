@@ -18,9 +18,9 @@ namespace RailroaderScenePatcher.Core {
         internal static bool Same(EquipmentSource a, EquipmentSource b) => a == null ? b == null : b != null && a.Scene == b.Scene && a.Path == b.Path;
         public override string ToString() => Scene + "/" + Path;
     }
-    // One piece of crossing equipment a MapMod adds to an existing crossing controller: a copy of an eligible source built
+    // One piece of crossing equipment a mod adds to an existing crossing controller: a copy of an eligible source built
     // with the required pattern and addressed by that controller. Its ID is persistent and unique within the supplying
-    // MapMod's document; the scope is that MapMod's identifier, so two MapMods may use the same ID.
+    // mod's scene patch file; the scope is that mod's identifier, so two mods may use the same ID.
     public sealed class EquipmentAddition {
         public const string LightGatePattern = "crossing-light-gate-v1";
         public static readonly string[] Patterns = { LightGatePattern };
@@ -36,7 +36,7 @@ namespace RailroaderScenePatcher.Core {
         public EquipmentSource Source { get; }
         // The fixed placement of the copy's root in map coordinates.
         public Placement Placement { get; }
-        // The supplying MapMod's identifier.
+        // The supplying mod's identifier.
         public string Scope { get; }
         internal string Key => Scope + "\n" + Id;
         internal EquipmentAddition In(string scope) => new EquipmentAddition(Id, Pattern, Source, Placement, scope);
@@ -50,7 +50,7 @@ namespace RailroaderScenePatcher.Core {
         internal static bool SameBuild(EquipmentAddition a, EquipmentAddition b) => a.Key == b.Key && a.Pattern == b.Pattern && EquipmentSource.Same(a.Source, b.Source);
         internal static bool Same(EquipmentAddition a, EquipmentAddition b) => SameBuild(a, b) && SamePlacement(a.Placement, b.Placement);
         // The placement tolerance of scene patch editing: half a millimetre on each axis and about a hundredth of a degree,
-        // so every move the editor stores reaches the scene.
+        // so every move the native map editor stores reaches the scene.
         internal static bool SamePlacement(Placement a, Placement b) =>
             a?.Position != null && b?.Position != null && PatchEditingSession.SamePosition(a.Position, b.Position) && PatchEditingSession.SameRotation(a.Rotation, b.Rotation);
         public override string ToString() {
@@ -58,14 +58,14 @@ namespace RailroaderScenePatcher.Core {
             return (Scope.Length == 0 ? "" : Scope + " ") + Id + ": " + Pattern + " from " + Source + (p == null ? "" : " at (" + String.Join(", ", p.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture))) + ")");
         }
     }
-    // The equipment additions of one crossing. An authored set lists only its explicit additions; an addition it omits stays
+    // The equipment additions of one crossing. A mod's set lists only its explicit additions; an addition it omits stays
     // untouched. A complete set lists every addition the controller should own, so an addition absent from it is removed.
     public sealed class CrossingEquipment {
         readonly List<EquipmentAddition> additions;
         public CrossingEquipment(IEnumerable<EquipmentAddition> additions, bool complete) {
             this.additions = (additions ?? throw new ArgumentNullException(nameof(additions))).ToList();
             if (this.additions.Any(a => a == null)) throw new ArgumentException("Every addition is required");
-            if (this.additions.Select(a => a.Key).Distinct(StringComparer.Ordinal).Count() != this.additions.Count) throw new ArgumentException("Equipment IDs must be unique within their MapMod");
+            if (this.additions.Select(a => a.Key).Distinct(StringComparer.Ordinal).Count() != this.additions.Count) throw new ArgumentException("Equipment IDs must be unique within their mod");
             Complete = complete;
         }
         public IReadOnlyList<EquipmentAddition> Additions => additions;
@@ -73,12 +73,12 @@ namespace RailroaderScenePatcher.Core {
         internal CrossingEquipment In(string scope) => new CrossingEquipment(additions.Select(a => a.In(scope)), Complete);
         internal CrossingEquipment Without(string scope) => new CrossingEquipment(additions.Where(a => a.Scope != scope), Complete);
         internal EquipmentAddition Find(string key) => additions.FirstOrDefault(a => a.Key == key);
-        // The authored additions laid over a base set: each authored addition replaces its namesake or is added.
-        internal static CrossingEquipment Overlay(CrossingEquipment basis, CrossingEquipment authored) {
-            if (authored == null) return basis;
-            if (basis == null) return authored;
-            var result = basis.additions.Select(a => authored.Find(a.Key) ?? a).ToList();
-            result.AddRange(authored.additions.Where(a => basis.Find(a.Key) == null));
+        // The mod's equipment additions laid over a base set: each mod addition replaces its namesake or is added.
+        internal static CrossingEquipment Overlay(CrossingEquipment basis, CrossingEquipment modEquipment) {
+            if (modEquipment == null) return basis;
+            if (basis == null) return modEquipment;
+            var result = basis.additions.Select(a => modEquipment.Find(a.Key) ?? a).ToList();
+            result.AddRange(modEquipment.additions.Where(a => basis.Find(a.Key) == null));
             return new CrossingEquipment(result, basis.Complete);
         }
         internal static bool Same(CrossingEquipment a, CrossingEquipment b) {
@@ -168,17 +168,17 @@ namespace RailroaderScenePatcher.Core {
             return null;
         }
     }
-    // One addition of the edited mod's document for a crossing: built in the scene, or with why it is not, such as a source
+    // One addition of the edited mod's scene patch file for a crossing: built in the scene, or with why it is not, such as a source
     // that is missing or no longer conforms. An addition that was not built can still be edited or removed.
     public sealed class EquipmentEntry {
         public EquipmentEntry(EquipmentAddition addition, EquipmentAddition built, string problem) { Addition = addition; Built = built; Problem = problem; }
-        // The addition as the document holds it.
+        // The addition as the scene patch file holds it.
         public EquipmentAddition Addition { get; }
         // The addition as it stands in the scene, or null when it was not built.
         public EquipmentAddition Built { get; }
         public string Problem { get; }
     }
-    // A device the editor offers as a source, with why it does not conform to the pattern, or null when it is eligible.
+    // A device scene patch editing offers as a source, with why it does not conform to the pattern, or null when it is eligible.
     public sealed class SourceCandidate {
         public SourceCandidate(EquipmentSource source, string model, string problem, double[] position = null, double[] rotation = null) : this(source, model, problem, position, rotation, null, null, null, null) { }
         public SourceCandidate(EquipmentSource source, string model, string problem, double[] position, double[] rotation, string name, string crossing, double[] crossingPosition, double[] crossingRotation) {
@@ -187,7 +187,7 @@ namespace RailroaderScenePatcher.Core {
         // The source's map placement, or null when it is unknown.
         public double[] Position { get; }
         public double[] Rotation { get; }
-        // The device's own name and the crossing it stands at, as the editor tells candidates apart; null when unknown.
+        // The device's own name and the crossing it stands at, as scene patch editing tells candidates apart; null when unknown.
         public string Name { get; }
         public string Crossing { get; }
         // The map placement of the crossing controller the device stands at, or null when it is unknown.
@@ -200,9 +200,9 @@ namespace RailroaderScenePatcher.Core {
         public string Problem { get; }
         public bool Eligible => Problem == null;
     }
-    // The placement the editor proposes for a copy of a source at another crossing: the source's pose relative to its own
+    // The placement scene patch editing proposes for a copy of a source at another crossing: the source's placement relative to its own
     // crossing, carried over to the destination crossing, then moved aside along the copy's own X axis so it does not
-    // stand inside the device it copies. Without the source crossing's pose the copy starts at the destination crossing
+    // stand inside the device it copies. Without the source crossing's placement the copy starts at the destination crossing
     // with the source's rotation.
     public static class EquipmentPlacement {
         public const double Aside = 5;
@@ -257,8 +257,8 @@ namespace RailroaderScenePatcher.Core {
         // Releases the addition from the controller, its culling and the scene.
         void Destroy(object addition);
         bool Present(object addition);
-        Placement Pose(object addition);
-        void SetPose(object addition, Placement placement);
+        Placement Placement(object addition);
+        void SetPlacement(object addition, Placement placement);
         // Why a present addition is not addressed, culled and built as the pattern requires, or null.
         string Problem(object addition);
         // Its initialization and culling state, for inspection.
@@ -275,7 +275,7 @@ namespace RailroaderScenePatcher.Core {
         internal CrossingEquipmentPart(ICrossingEquipmentWorld world) { this.world = world; }
         internal CrossingEquipment Observed(object controller, List<object> owned) {
             var present = owned.Where(world.Present).ToList();
-            return new CrossingEquipment(present.Select(a => world.Describe(a).At(world.Pose(a))), true);
+            return new CrossingEquipment(present.Select(a => world.Describe(a).At(world.Placement(a))), true);
         }
         internal void Adopt(object controller, List<object> owned) {
             foreach (var addition in world.Owned(controller) ?? Array.Empty<object>()) if (!owned.Any(o => ReferenceEquals(o, addition))) owned.Add(addition);
@@ -312,7 +312,7 @@ namespace RailroaderScenePatcher.Core {
                 var record = world.Describe(addition);
                 var want = desired.Find(record.Key);
                 if (want == null || kept.Contains(record.Key) || !EquipmentAddition.SameBuild(record, want)) { Retire(owned, addition); continue; }
-                if (!EquipmentAddition.SamePlacement(world.Pose(addition), want.Placement)) world.SetPose(addition, want.Placement);
+                if (!EquipmentAddition.SamePlacement(world.Placement(addition), want.Placement)) world.SetPlacement(addition, want.Placement);
                 kept.Add(record.Key);
             }
             foreach (var want in desired.Additions.Where(a => !kept.Contains(a.Key))) {
@@ -341,7 +341,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
                 if (now == null) return "equipment " + want.Id + " is missing";
-                if (!EquipmentAddition.Same(now, want)) return "equipment " + want.Id + " differs from its authored source or placement";
+                if (!EquipmentAddition.Same(now, want)) return "equipment " + want.Id + " differs from the mod's source or placement";
             }
             var extra = observed.Additions.FirstOrDefault(a => desired.Find(a.Key) == null);
             if (extra != null) return "equipment " + extra.Id + " remains although it was removed";

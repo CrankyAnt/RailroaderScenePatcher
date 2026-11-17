@@ -84,7 +84,7 @@ namespace RailroaderScenePatcher {
             var setup = Native.Type(SetupType);
             if (setup == null || FieldOf(setup, "placements") == null) throw new MissingMemberException(SetupType, "placements");
         }
-        public IEnumerable<string> MapIds => ModDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         static FieldInfo FieldOf(Type type, string name) {
             for (var t = type; t != null; t = t.BaseType) { var f = t.GetField(name, Native.Flags | BindingFlags.DeclaredOnly); if (f != null) return f; }
             return null;

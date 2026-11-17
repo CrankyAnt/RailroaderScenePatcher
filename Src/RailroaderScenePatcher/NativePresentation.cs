@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher {
         internal Action<UIPanelBuilder> Build;
         internal const string WindowIdentifier = "crankyant/scene-patcher/session-details";
         internal const int DefaultWidth = 420, DefaultHeight = 420;
-        // The least size at which the patch document section shows a diagnostic beside its buttons without much scrolling.
+        // The least size at which the scene patch file section shows a diagnostic beside its buttons without much scrolling.
         internal const int MinimumWidth = 360, MinimumHeight = 320;
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(DefaultWidth, DefaultHeight), new Vector2Int(MinimumWidth, MinimumHeight), Window.Position.UpperLeft);
@@ -186,7 +186,7 @@ namespace RailroaderScenePatcher {
             }
             try {
                 titleDetails = TitleIcon(manager, close.transform.parent, "CrankyAnt Scene Patcher session details", DetailsGlyph(), ToggleDetails,
-                    () => new TooltipInfo("Session details", DetailsOpen ? "Close the session details." : "Open the session details in their own window: the editing document, supplied definitions, diagnostics and the candidates of a world choice."), out detailsGlyph);
+                    () => new TooltipInfo("Session details", DetailsOpen ? "Close the session details." : "Open the session details in their own window: the edited mod's scene patch file, supplied definitions, diagnostics and the candidates of a world choice."), out detailsGlyph);
             } catch (Exception e) {
                 if (titleDetails != null) UnityEngine.Object.Destroy(titleDetails.gameObject);
                 titleDetails = null; detailsGlyph = null;
@@ -432,7 +432,7 @@ namespace RailroaderScenePatcher {
                 manager.builderAssets.labelControl == null || manager.builderAssets.labelEmpty == null || manager.builderAssets.sectionHeader == null ||
                 manager.builderAssets.fieldRow == null || manager.builderAssets.tabView == null || manager.builderAssets.segment.left == null ||
                 manager.builderAssets.segmentSelected.left == null || manager.builderAssets.scrollRectVertical == null)
-                throw new InvalidOperationException("Native editor window or control assets unavailable");
+                throw new InvalidOperationException("Native map editor window or control assets unavailable");
             try {
                 // Read before the window exists: the native window saves its bounds as soon as it is shown.
                 var saved = Game.GlobalPreferences.GetString("window." + ScenePatchWindow.WindowIdentifier);

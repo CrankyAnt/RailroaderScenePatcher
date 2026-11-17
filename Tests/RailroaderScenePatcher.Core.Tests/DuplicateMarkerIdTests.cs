@@ -66,11 +66,11 @@ static class DuplicateMarkerIdTests {
         WriteRefusesARestoreThatWouldReRegisterAHolder();
         Console.WriteLine("PASS: duplicate marker ids are named and their unsafe edits are refused before mutation");
     }
-    static void AssertRefused(World w, Outcome outcome, string before, string document, string scenario, params string[] holders) {
+    static void AssertRefused(World w, Outcome outcome, string before, string scenePatchFile, string scenario, params string[] holders) {
         Assert(!outcome.Applied, scenario + " is refused");
         Assert(holders.All(outcome.Error.Contains), scenario + ": the refusal names the marker id and every holder: " + outcome.Error);
         AssertNoReloadAdvice(outcome.Error, scenario);
-        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.DocumentText == document, scenario + ": the scene and the patch document are unchanged and every holder keeps its registration: " + w.Registrations());
+        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == scenePatchFile, scenario + ": the scene and the scene patch file are unchanged and every holder keeps its registration: " + w.Registrations());
     }
     // The refusal says that reloading does not help, and never advises it.
     static void AssertNoReloadAdvice(string error, string scenario) {
@@ -80,22 +80,22 @@ static class DuplicateMarkerIdTests {
     }
     static void RebindingAHolderIsRefusedWithTheExplanation() {
         var w = new World();
-        var before = w.Registrations(); var document = w.Session.DocumentText;
-        AssertRefused(w, w.Session.Bind(Marker(YardPath), MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3))), before, document, "A rebind of the Yard Limit to pi3pzp", "Mg6m", SpeedPath, YardPath);
-        AssertRefused(w, w.Session.Bind(Marker(YardPath), MarkerBinding.Detached), before, document, "A detach of the Yard Limit", "Mg6m", SpeedPath, YardPath);
-        AssertRefused(w, w.Session.Bind(Marker(SpeedPath), MarkerBinding.At(new TrackLocation("Sjdl", "a", 12))), before, document, "A rebind of the active speed sign", "Mg6m", SpeedPath, YardPath);
-        AssertRefused(w, w.Session.Edit(Marker(SpeedPath), null, false), before, document, "A disable of the active speed sign", "Mg6m", SpeedPath, YardPath);
+        var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
+        AssertRefused(w, w.Session.Bind(Marker(YardPath), MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3))), before, scenePatchFile, "A rebind of the Yard Limit to pi3pzp", "Mg6m", SpeedPath, YardPath);
+        AssertRefused(w, w.Session.Bind(Marker(YardPath), MarkerBinding.Detached), before, scenePatchFile, "A detach of the Yard Limit", "Mg6m", SpeedPath, YardPath);
+        AssertRefused(w, w.Session.Bind(Marker(SpeedPath), MarkerBinding.At(new TrackLocation("Sjdl", "a", 12))), before, scenePatchFile, "A rebind of the active speed sign", "Mg6m", SpeedPath, YardPath);
+        AssertRefused(w, w.Session.Edit(Marker(SpeedPath), null, false), before, scenePatchFile, "A disable of the active speed sign", "Mg6m", SpeedPath, YardPath);
         Assert(!w.MapEditor.CanUndo, "No refused edit adds an Undo step");
         var unrelated = w.Session.Bind(Marker("World/Large Scenery/Signs/Unrelated"), MarkerBinding.At(new TrackLocation("Nnew", "b", 7)));
         Assert(unrelated.Applied && w.Unrelated.End == "b", "A marker with an id of its own still takes a binding: " + unrelated.Error);
     }
     static void GroupHoldersRefuseActivityBindingAndFollowing() {
         var w = new World();
-        var before = w.Registrations(); var document = w.Session.DocumentText;
+        var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
         var all = new[] { "Mkft" }.Concat(WhistlePaths).ToArray();
-        AssertRefused(w, w.Session.Edit(Marker(WhistlePaths[1]), null, false), before, document, "A disable of one of three whistle signs", all);
-        AssertRefused(w, w.Session.Bind(Marker(WhistlePaths[0]), MarkerBinding.At(new TrackLocation("Sb", "a", 30))), before, document, "A rebind of one whistle sign", all);
-        AssertRefused(w, w.Session.Follow(Marker(WhistlePaths[2]), TrackAnchor.Endpoint("N1")), before, document, "Track following of one whistle sign", all);
+        AssertRefused(w, w.Session.Edit(Marker(WhistlePaths[1]), null, false), before, scenePatchFile, "A disable of one of three whistle signs", all);
+        AssertRefused(w, w.Session.Bind(Marker(WhistlePaths[0]), MarkerBinding.At(new TrackLocation("Sb", "a", 30))), before, scenePatchFile, "A rebind of one whistle sign", all);
+        AssertRefused(w, w.Session.Follow(Marker(WhistlePaths[2]), TrackAnchor.Endpoint("N1")), before, scenePatchFile, "Track following of one whistle sign", all);
         var refusal = w.Session.Edit(Marker(WhistlePaths[1]), null, false).Error;
         Assert(!refusal.Contains(SpeedPath) && !refusal.Contains("Mg6m"), "The refusal names only the holders of its own marker id: " + refusal);
     }
@@ -185,7 +185,7 @@ static class DuplicateMarkerIdTests {
         Assert(!outcomes["enable-yard"].Applied && outcomes["enable-yard"].Error.Contains("Mg6m"), "Enabling the Yard Limit at load fails: " + outcomes["enable-yard"].Error);
         Assert(outcomes["same-activity"].Applied, "An activity equal to the holder's current one changes nothing and applies: " + outcomes["same-activity"].Error);
         Assert(outcomes["move-speed"].Applied && w.Speed.Position[0] == 30, "A fixed placement of a holder still applies: " + outcomes["move-speed"].Error);
-        Assert(outcomes["rebind-unrelated"].Applied && w.Unrelated.End == "b", "The document's other modifications still apply: " + outcomes["rebind-unrelated"].Error);
+        Assert(outcomes["rebind-unrelated"].Applied && w.Unrelated.End == "b", "The scene patch file's other modifications still apply: " + outcomes["rebind-unrelated"].Error);
         Assert(w.Registrations() == before.Replace("Mown:True:Nnew:Nnew|a|5", "Mown:True:Nnew:Nnew|b|9"), "Every holder keeps its registration: " + w.Registrations());
     }
     static void PadHoldersRefuseActivityAndBindingAtEditAndLoad() {
@@ -219,12 +219,12 @@ static class DuplicateMarkerIdTests {
 
     static void EnablingAnInactiveHolderIsRefusedWithTheExplanation() {
         var w = new World();
-        var before = w.Registrations(); var document = w.Session.DocumentText;
+        var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
         var enable = w.Session.Edit(Marker(YardPath), null, true);
         Assert(!enable.Applied, "Enabling the inactive Yard Limit that holds Mg6m is refused");
         Assert(enable.Error.Contains("Mg6m") && enable.Error.Contains(SpeedPath) && enable.Error.Contains(YardPath), "The refusal names the marker id and every holder: " + enable.Error);
         AssertNoReloadAdvice(enable.Error, "Enable");
-        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.DocumentText == document && !w.MapEditor.CanUndo, "Nothing changed: " + w.Registrations());
+        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == scenePatchFile && !w.MapEditor.CanUndo, "Nothing changed: " + w.Registrations());
     }
 
     // The edited holder comes first, then the active holders, whose registration is at stake, and the inactive ones last.
@@ -246,8 +246,8 @@ static class DuplicateMarkerIdTests {
         var w = new World();
         w.Markers.Groups["Sb"] = "bryson"; w.Markers.EnabledGroups.Add("bryson");
         w.Markers.LoadFollower(w.Whistles[1]);
-        var before = w.Registrations(); var document = w.Session.DocumentText;
-        AssertRefused(w, w.Session.Edit(Marker(WhistlePaths[1]), null, false), before, document, "An explicit disable of a group-following holder", new[] { "Mkft" }.Concat(WhistlePaths).ToArray());
+        var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
+        AssertRefused(w, w.Session.Edit(Marker(WhistlePaths[1]), null, false), before, scenePatchFile, "An explicit disable of a holder with group-driven activity", new[] { "Mkft" }.Concat(WhistlePaths).ToArray());
         Assert(!w.Whistles[1].Held && w.Whistles[1].Active && w.Whistles[1].Subscriptions == 1, "The hold is not installed and the group subscription stays");
     }
     static void PadHolderRefusesEnableAndTrackFollowing() {
@@ -281,8 +281,8 @@ static class DuplicateMarkerIdTests {
         var elsewhere = new FakeMarker { Id = "Mown", Segment = "Sjdl", End = "b", Distance = 30 };
         w.Markers.Unloaded[elsewhere] = "OtherScene/World/Signs/Elsewhere";
         w.Markers.Buckets["Sjdl"]["Mown"] = ("b", 30, elsewhere);
-        var before = w.Registrations(); var document = w.Session.DocumentText;
-        AssertRefused(w, w.Session.Bind(Marker("World/Large Scenery/Signs/Unrelated"), MarkerBinding.At(new TrackLocation("Nnew", "b", 7))), before, document,
+        var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
+        AssertRefused(w, w.Session.Bind(Marker("World/Large Scenery/Signs/Unrelated"), MarkerBinding.At(new TrackLocation("Nnew", "b", 7))), before, scenePatchFile,
             "A rebind of a marker whose registration another scene marker elsewhere holds", "Mown", "World/Large Scenery/Signs/Unrelated", "OtherScene/World/Signs/Elsewhere (active)");
         Assert(w.Markers.Buckets["Sjdl"]["Mown"].owner == elsewhere, "The other marker keeps its registration");
         var lines = Lines(w, w.Unrelated);
@@ -301,11 +301,11 @@ static class DuplicateMarkerIdTests {
     static void StaleDependentCacheOfAHolderIsRefusedBeforeMutation() {
         var w = new World();
         w.Whistles[0].CachedGroup = "stale";
-        var before = w.Registrations(); var document = w.Session.DocumentText;
+        var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
         var moved = w.Session.Edit(Marker(WhistlePaths[0]), new Placement(new[] { 1090.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
         Assert(!moved.Applied && moved.Error.Contains("the map label caches track group stale") && moved.Error.Contains("Mkft") && WhistlePaths.All(moved.Error.Contains), "The placement edit is refused with the cache and every holder: " + moved.Error);
         AssertNoReloadAdvice(moved.Error, "A stale cache");
-        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.DocumentText == document && w.Whistles[0].Position[0] == 80, "Nothing changed: " + w.Registrations());
+        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == scenePatchFile && w.Whistles[0].Position[0] == 80, "Nothing changed: " + w.Registrations());
         var unrelated = new World();
         unrelated.Unrelated.CachedGroup = "stale";
         Assert(unrelated.Session.Edit(Marker("World/Large Scenery/Signs/Unrelated"), new Placement(new[] { 1061.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && unrelated.Unrelated.CachedGroup == "extension",

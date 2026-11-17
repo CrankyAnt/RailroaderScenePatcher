@@ -13,11 +13,11 @@ Track following stores where the object stands relative to the track. When the t
 3. On the **Placement** tab, select **Follow**, then select **Track** at the bottom of the tab and click a track segment, or **Node** and click a track node. Check the candidate's identity in the footer's first message slot, under **World choice**, with **Details** in the footer for its identity, and choose **Confirm**. The track an inspected object follows is marked green in the world, labelled `Follows: …`; it keeps that marking while you pick another track, beside the blue candidate.
 4. Select **Start** at the bottom of the tab. The object stays where it is. For a segment, the patcher takes the location on that segment nearest to the object, measured from end `a`. For an endpoint, it uses the node.
 
-The **Placement** tab then shows the followed track under **Following** and the offset in the track's frame under **Offset**. The edit is one native Undo step. Save writes it to `Data/scene-patches.json` as [`placement.mode = "trackFollowing"`](patch-document-v1.md#placement) and raises the patcher dependency to 0.5.0.
+The **Placement** tab then shows the followed track under **Following** and the offset in the track's frame under **Offset**. The edit is one native Undo step. Save writes it to `Data/scene-patches.json` as [`placement.mode = "trackFollowing"`](scene-patch-file-v1.md#placement) and raises the patcher dependency to 0.5.0.
 
 While the object follows the track:
 
-- Moving or turning the followed segment or node in the native map editor carries the object with it a moment later. This changes neither the document nor the Undo history, and Undo of the track edit carries the object back.
+- Moving or turning the followed segment or node in the native map editor carries the object with it a moment later. This changes neither the scene patch file nor the Undo history, and Undo of the track edit carries the object back.
 - A placement edit, a snap or a gizmo gesture moves the object and stores the new offset relative to the same track.
 - **Stop** at the bottom of the tab stores the current placement as fixed placement. The object no longer moves with the track.
 - **Remove modification** in the footer returns the object to its state without this mod's modification.
@@ -40,8 +40,8 @@ Some Generic marker objects, such as the Alarka speed sign, carry a `Track.Track
 
 Rebinding such a marker moves its group subscription with it. The object then follows the new segment's group and no longer reacts to the old one. A detached marker follows no group. An explicit disable stays in place through a rebinding and through a gizmo drag, including its preview. Undo and Redo restore the binding, the subscription and the hold together.
 
-A document with an `active` value on a track-marker object needs patcher 0.5.0, because an older patcher cannot hold a group follower inactive.
+A scene patch file with an `active` value on a track-marker object needs patcher 0.5.0, because an older patcher cannot hold a group follower inactive.
 
 ## Limits
 
-In the native map editor only the edited mod's document applies, and scene patch editing moves its following objects while their track moves. In ordinary play, every applicable document places its following objects from the track's current pose at world load. The automated tests cover track-following reconciliation, repeated application, refusal, restoration, explicit-disable precedence, native group activity and their Undo, Redo, Save and reload with controlled track and group fixtures. A Railroader journey is required for the native track and group behavior on a given build; the tested builds and fixtures are recorded with that journey. Group followers whose relative position activates another object, and objects whose group activation another component replaced, are refused. Multiplayer is not covered.
+In the native map editor only the edited mod's scene patch file applies, and scene patch editing moves its following objects while their track moves. In ordinary play, every applicable scene patch file places its following objects from the track's current pose at world load. The automated tests cover track-following reconciliation, repeated application, refusal, restoration, explicit-disable precedence, native group activity and their Undo, Redo, Save and reload with controlled track and group fixtures. A Railroader journey is required for the native track and group behavior on a given build; the tested builds and fixtures are recorded with that journey. Group followers whose relative position activates another object, and objects whose group activation another component replaced, are refused. Multiplayer is not covered.

@@ -4,7 +4,7 @@
 
 This guide shows how to move, rotate, disable and restore a supported bridge, and what stays where it is. Bridge placement moves the bridge's own hierarchy, including its colliders and culling. It does not move track, generated trestles or the construction scenery beside the bridge, and it does not change which track the bridge belongs to.
 
-The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Other bridges show up in the inventory without an edit. A bridge target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the document's content; see [the document reference](patch-document-v1.md#dependency-minimum).
+The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Other bridges show up in the inventory without an edit. A bridge target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Move the bridge in the native map editor
 
@@ -22,7 +22,7 @@ Select **Disable** at the bottom of the tab of the **Object** tab. The bridge di
 
 ## Write the modification by hand
 
-Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [scene patch file v1](scene-patch-file-v1.md):
 
 ```json
 "place-ela-bridge": {

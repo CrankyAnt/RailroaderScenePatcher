@@ -29,7 +29,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld {
     public readonly List<Added> All = new List<Added>();
     public int Constructed, Mutations;
     public int FailConstructAfter = -1;
-    public bool StickyDestroy, FailSetPoseOnce, CullerVisible = true;
+    public bool StickyDestroy, FailSetPlacementOnce, CullerVisible = true;
     public FakeDevice Device(string path, Action<FakeDevice> setup = null) { var d = new FakeDevice { Path = path }; setup?.Invoke(d); Devices.Add(d); return d; }
     public IReadOnlyList<object> ResolveSource(EquipmentSource source) => Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
     public string SourceProblem(object source, object controller, string pattern) {
@@ -54,11 +54,11 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld {
     }
     public void Destroy(object addition) { Mutations++; if (StickyDestroy) return; var a = (Added)addition; a.Destroyed = true; a.InCuller = false; Devices.Remove(a.Copy); }
     public bool Present(object addition) => !((Added)addition).Destroyed;
-    public Placement Pose(object addition) { var a = (Added)addition; return new Placement((double[])a.Position.Clone(), (double[])a.Rotation.Clone()); }
-    public void SetPose(object addition, Placement placement) {
+    public Placement Placement(object addition) { var a = (Added)addition; return new Placement((double[])a.Position.Clone(), (double[])a.Rotation.Clone()); }
+    public void SetPlacement(object addition, Placement placement) {
         Mutations++; var a = (Added)addition;
         a.Position = (double[])placement.Position.Clone(); a.Rotation = (double[])placement.Rotation.Clone();
-        if (FailSetPoseOnce) { FailSetPoseOnce = false; throw new Exception("pose injected"); }
+        if (FailSetPlacementOnce) { FailSetPlacementOnce = false; throw new Exception("placement injected"); }
     }
     public string Problem(object addition) { var a = (Added)addition; return a.InCuller ? null : "the copy is not in the controller's culler"; }
     public string Status(object addition) => ((Added)addition).Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
@@ -101,28 +101,28 @@ static class EquipmentTests {
         PreflightRefusalBuildsNothing();
         ConstructionFailureRestoresCapturedEquipment();
         IncompleteCleanupGuardsRetry();
-        SupplyingMapModsKeepSeparateIdentities();
+        SupplyingModsKeepSeparateIdentities();
         MissingCapabilityRefusesEquipment();
-        EditorPreviewAddMoveUndoRedoAndRemoval();
-        EditorRefusalAndFailureRestore();
+        EditingPreviewAddMoveUndoRedoAndRemoval();
+        EditingRefusalAndFailureRestore();
         SaveAndReloadReproduceEquipmentOnce();
-        EquipmentIdsNameOneAdditionPerDocument();
+        EquipmentIdsNameOneAdditionPerScenePatchFile();
         DetectionAdditionsAndEquipmentWorkTogether();
         FaultyEquipmentLeavesCoverageEditsAvailable();
-        TheEditorProposesADistinctIdAndAPlacementAtTheCrossing();
+        TheEditingProposesADistinctIdAndAPlacementAtTheCrossing();
         EditingKeepsAnotherModsEquipment();
         AFailedAdditionIsListedAndRemovable();
         SmallMovesReachTheSceneAndUntouchedValuesStay();
         UnknownSourceOrPlacementContentIsUnsupported();
-        Console.WriteLine("PASS: crossing light and gate eligibility, construction, refusal, restoration and authoring");
+        Console.WriteLine("PASS: crossing light and gate eligibility, construction, refusal, restoration and scene patch editing");
     }
     static void AdditionConstructsThroughTheController() {
         var f = new Fixture();
         var engine = new PatchEngine(f.Scene);
         var result = engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
         Assert(result.Error == null && result.Outcomes["signals"].Applied, "A conforming light/gate source is added: " + result.Error + result.Outcomes["signals"].Error);
-        Assert(f.Live.Count == 1 && ReferenceEquals(f.Live[0].Controller, f.Crossing) && f.Live[0].Position.SequenceEqual(new double[] { 10, 0, 7 }), "One addition is owned by the intended controller at its authored placement");
-        Assert(f.Live[0].Record.Scope == "author/pack" && f.Live[0].Record.Id == "west" && f.Live[0].Record.Source.Path == SignalPath, "The addition keeps its supplying-MapMod-scoped identity and source");
+        Assert(f.Live.Count == 1 && ReferenceEquals(f.Live[0].Controller, f.Crossing) && f.Live[0].Position.SequenceEqual(new double[] { 10, 0, 7 }), "One addition is owned by the intended controller at the mod's placement");
+        Assert(f.Live[0].Record.Scope == "author/pack" && f.Live[0].Record.Id == "west" && f.Live[0].Record.Source.Path == SignalPath, "The addition keeps its supplying-mod-scoped identity and source");
         engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
         Assert(f.Live.Count == 1 && f.World.Constructed == 1, "Repeating the application adds no duplicate");
         var fresh = new PatchEngine(new CrossingCoverageScene(f.Coverage, Capability.Unchecked, f.World));
@@ -217,7 +217,7 @@ static class EquipmentTests {
         }
         var g = new Fixture();
         var repeated = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Addition("west") + "," + Addition("west", x: 20))));
-        Assert(repeated.Error != null && g.World.Mutations == 0, "A repeated equipment key is a repeated property name and rejects the whole document: " + repeated.Error);
+        Assert(repeated.Error != null && g.World.Mutations == 0, "A repeated equipment key is a repeated property name and rejects the whole scene patch file: " + repeated.Error);
         var h = new Fixture();
         var legacy = new PatchEngine(h.Scene).Apply(Doc(EquipRaw("old", "{" + Addition("west").Replace("\"west\":{", "\"west\":{\"id\":\"west\",") + "}")));
         Assert(legacy.Outcomes["old"].Error.StartsWith("Unsupported", StringComparison.Ordinal) && legacy.Outcomes["old"].Error.Contains("its ID is its key"), "An entry with an id member is content of the older shape: " + legacy.Outcomes["old"].Error);
@@ -249,14 +249,14 @@ static class EquipmentTests {
         var retry = engine.Apply(Doc(Equip("other", Addition("north", x: 30))), "author/pack");
         Assert(!retry.Outcomes["other"].Applied && retry.Outcomes["other"].Error.Contains("cleanup is unverified") && f.World.Live(f.Crossing).Count() == 1, "A retry on the uncertain controller is blocked: " + retry.Outcomes["other"].Error);
     }
-    static void SupplyingMapModsKeepSeparateIdentities() {
+    static void SupplyingModsKeepSeparateIdentities() {
         var f = new Fixture();
         var engine = new PatchEngine(f.Scene);
         engine.Apply(Doc(Equip("signals", Addition("west"))), "first/pack");
         engine.Apply(Doc(Equip("signals", Addition("west", x: 20))), "second/pack");
-        Assert(f.Live.Count == 2 && f.Live.Select(a => a.Record.Scope).OrderBy(s => s).SequenceEqual(new[] { "first/pack", "second/pack" }), "The same ID from two supplying MapMods names two additions");
+        Assert(f.Live.Count == 2 && f.Live.Select(a => a.Record.Scope).OrderBy(s => s).SequenceEqual(new[] { "first/pack", "second/pack" }), "The same ID from two supplying mods names two additions");
         engine.Apply(Doc(Equip("coverage-only", Addition("other", x: 30))), "third/pack");
-        Assert(f.Live.Count == 3 && f.Live.Single(a => a.Record.Scope == "first/pack").Position[0] == 10, "A document never removes or moves another MapMod's additions");
+        Assert(f.Live.Count == 3 && f.Live.Single(a => a.Record.Scope == "first/pack").Position[0] == 10, "A scene patch file never removes or moves another mod's additions");
     }
     static void MissingCapabilityRefusesEquipment() {
         var f = new Fixture();
@@ -267,27 +267,27 @@ static class EquipmentTests {
         var other = new PatchEngine(board).Apply(Doc("\"x\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"relationships\":{\"crossingEquipment\":{" + Addition("west") + "}},\"dependsOn\":[]}"));
         Assert(!other.Outcomes["x"].Applied && other.Outcomes["x"].Error.Contains("no supported crossing-equipment relationship"), "An object without the relationship refuses it");
     }
-    static (Fixture f, PatchEditingSession session, NativeMapEditor editor, Store store) Session(string patch = null, Fixture fixture = null) {
+    static (Fixture f, PatchEditingSession session, NativeMapEditor mapEditor, Store store) Session(string patch = null, Fixture fixture = null) {
         var f = fixture ?? new Fixture();
-        var store = new Store { Patch = patch }; var editor = new NativeMapEditor();
-        var session = new PatchEditingSession(new PatchEngine(f.Scene), editor, store, documentKey: "author/pack"); editor.Session = session;
-        return (f, session, editor, store);
+        var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(f.Scene), mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        return (f, session, mapEditor, store);
     }
     static EquipmentAddition West(double x = 10, string path = SignalPath, string id = "west") =>
         new EquipmentAddition(id, EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", path), new Placement(new[] { x, 0, 7 }, new double[] { 0, 0, 0, 1 }));
-    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
-    static void EditorPreviewAddMoveUndoRedoAndRemoval() {
-        var (f, session, editor, store) = Session();
-        Assert(session.EquipmentSources(Crossing).Count(c => c.Eligible) == 2, "The editor offers the loaded conforming sources");
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
+    static void EditingPreviewAddMoveUndoRedoAndRemoval() {
+        var (f, session, mapEditor, store) = Session();
+        Assert(session.EquipmentSources(Crossing).Count(c => c.Eligible) == 2, "Scene patch editing offers the loaded conforming sources");
         var preview = session.PreviewEquipment(Crossing, West(), null);
         Assert(preview.Error == null && preview.Lines.Single().StartsWith("Add author/pack west", StringComparison.Ordinal), "The preview names the addition: " + preview.Error + String.Join("|", preview.Lines));
-        Assert(f.World.Mutations == 0 && editor.UndoGroups.Count == 0 && session.DocumentText.Contains("\"modifications\": {}"), "A preview changes nothing");
+        Assert(f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}"), "A preview changes nothing");
         var added = session.AddEquipment(Crossing, West());
-        Assert(added.Applied && f.Live.Single().Position[0] == 10, "An editor addition builds the equipment directly: " + added.Error);
+        Assert(added.Applied && f.Live.Single().Position[0] == 10, "A scene patch editing addition builds the equipment directly: " + added.Error);
         var item = Only(session);
         var entry = (JObject)item["relationships"]["crossingEquipment"]["west"];
         Assert(entry != null && entry["id"] == null && entry.Properties().Select(p => p.Name).SequenceEqual(new[] { "pattern", "source", "placement" }) && ((JObject)item["relationships"]["crossingEquipment"]).Count == 1 && (string)entry["pattern"] == EquipmentAddition.LightGatePattern && (string)entry["source"]["path"] == SignalPath && (string)entry["placement"]["mode"] == "fixed"
-            && (string)item["target"]["path"] == CrossingPath, "The document records the source, the pattern and the controller relationship: " + item);
+            && (string)item["target"]["path"] == CrossingPath, "The scene patch file records the source, the pattern and the controller relationship: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "Crossing equipment requires patcher 0.5.0");
         Assert(session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east")).Applied && f.Live.Count == 2, "A second addition joins the same modification");
         Assert(session.AddEquipment(Crossing, West(12)).Applied && f.Live.Count == 2 && f.World.Constructed == 2 && f.Live.Single(a => a.Record.Id == "west").Position[0] == 12, "Re-adding an ID moves its addition");
@@ -295,42 +295,42 @@ static class EquipmentTests {
         Assert(removePreview.Error == null && removePreview.Lines.Any(l => l.StartsWith("Remove author/pack east", StringComparison.Ordinal)), "Removal is previewed: " + String.Join("|", removePreview.Lines));
         Assert(session.RemoveEquipment(Crossing, "east").Applied && f.Live.Single().Record.Id == "west", "Removing one addition releases only it");
         Assert(!session.RemoveEquipment(Crossing, "east").Applied, "Removing an absent addition is refused");
-        editor.Undo(); Assert(f.Live.Count == 2 && f.Live.Single(a => a.Record.Id == "east").Position[0] == 20, "Undo of removal rebuilds the addition");
-        editor.Undo(); Assert(f.Live.Single(a => a.Record.Id == "west").Position[0] == 10, "Undo of the move restores the placement");
-        editor.Undo(); editor.Undo();
-        Assert(f.Live.Count == 0 && session.DocumentText.Contains("\"modifications\": {}"), "Undo of every addition releases all owned equipment");
-        editor.Redo(); Assert(f.Live.Single().Record.Id == "west", "Redo rebuilds the addition");
+        mapEditor.Undo(); Assert(f.Live.Count == 2 && f.Live.Single(a => a.Record.Id == "east").Position[0] == 20, "Undo of removal rebuilds the addition");
+        mapEditor.Undo(); Assert(f.Live.Single(a => a.Record.Id == "west").Position[0] == 10, "Undo of the move restores the placement");
+        mapEditor.Undo(); mapEditor.Undo();
+        Assert(f.Live.Count == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Undo of every addition releases all owned equipment");
+        mapEditor.Redo(); Assert(f.Live.Single().Record.Id == "west", "Redo rebuilds the addition");
         var removed = session.Remove(Crossing);
         Assert(removed.Applied && f.Live.Count == 0 && f.World.All.All(a => a.Destroyed && !a.InCuller), "Removing the modification releases every owned addition from the controller and culling: " + removed.Error);
-        editor.Undo(); Assert(f.Live.Count == 1, "Undo of removal restores the effective equipment");
-        Assert(f.World.Live(f.Other).Count() == 0, "No editor operation touched the other crossing");
+        mapEditor.Undo(); Assert(f.Live.Count == 1, "Undo of removal restores the effective equipment");
+        Assert(f.World.Live(f.Other).Count() == 0, "No scene patch editing operation touched the other crossing");
     }
-    static void EditorRefusalAndFailureRestore() {
-        var (f, session, editor, store) = Session();
+    static void EditingRefusalAndFailureRestore() {
+        var (f, session, mapEditor, store) = Session();
         var refused = session.AddEquipment(Crossing, West(path: CrossingPath + "/Missing"));
-        Assert(!refused.Applied && f.World.Mutations == 0 && editor.UndoGroups.Count == 0 && refused.Error.Contains("not loaded"), "A missing source is refused without a change or history entry: " + refused.Error);
+        Assert(!refused.Applied && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && refused.Error.Contains("not loaded"), "A missing source is refused without a change or history entry: " + refused.Error);
         Assert(session.PreviewEquipment(Crossing, West(path: CrossingPath + "/Missing"), null).Error.Contains("not loaded"), "The preview names the refusal");
         session.AddEquipment(Crossing, West());
         f.World.FailConstructAfter = 0;
         var failed = session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east"));
         Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Live.Single().Record.Id == "west" && ((JObject)Only(session)["relationships"]["crossingEquipment"]).Count == 1,
-            "A failed construction restores the prior equipment and document: " + failed.Error);
-        f.World.FailSetPoseOnce = true; f.World.StickyDestroy = true;
+            "A failed construction restores the prior equipment and scene patch file: " + failed.Error);
+        f.World.FailSetPlacementOnce = true; f.World.StickyDestroy = true;
         failed = session.AddEquipment(Crossing, West(30));
         Assert(!failed.Applied, "A failed move is reported: " + failed.Error);
         f.World.StickyDestroy = false;
-        Assert(session.Recheck(Crossing).Applied && f.Live.Single().Position[0] == 10, "A recheck converges the controller on the document");
+        Assert(session.Recheck(Crossing).Applied && f.Live.Single().Position[0] == 10, "A recheck converges the controller on the scene patch file");
     }
-    static void EquipmentIdsNameOneAdditionPerDocument() {
+    static void EquipmentIdsNameOneAdditionPerScenePatchFile() {
         var f = new Fixture();
         var result = new PatchEngine(f.Scene).Apply(Doc(Equip("here", Addition("west")) + "," + Equip("there", Addition("west", x: 20), OtherPath) + "," + Equip("alone", Addition("solo", x: 30))));
         Assert(!result.Outcomes["here"].Applied && !result.Outcomes["there"].Applied && result.Outcomes["here"].Error.Contains("more than one modification"), "Two modifications sharing an equipment ID both fail: " + result.Outcomes["here"].Error);
         Assert(result.Outcomes["alone"].Applied && f.Live.Single().Record.Id == "solo" && f.World.Live(f.Other).Count() == 0, "Independent work still applies");
-        var (g, session, editor, store) = Session();
+        var (g, session, mapEditor, store) = Session();
         Assert(session.AddEquipment(Crossing, West()).Applied, "The first use of an ID is accepted");
         var other = new TargetIdentity("BushnellWhittier", OtherPath, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure);
         var refused = session.AddEquipment(other, West(20));
-        Assert(!refused.Applied && refused.Error.Contains("already used by another modification") && g.World.Live(g.Other).Count() == 0, "The editor refuses an equipment ID another modification uses: " + refused.Error);
+        Assert(!refused.Applied && refused.Error.Contains("already used by another modification") && g.World.Live(g.Other).Count() == 0, "Scene patch editing refuses an equipment ID another modification uses: " + refused.Error);
     }
     static void DetectionAdditionsAndEquipmentWorkTogether() {
         var f = new Fixture();
@@ -344,23 +344,23 @@ static class EquipmentTests {
         Assert(f.Crossing.Circuits.Count == 2 && f.Live.Single().Record.Id == "west", "The crossing gains one added circuit and one added device");
         engine.Apply(Doc(both), "author/pack");
         Assert(f.Crossing.Circuits.Count == 2 && f.World.Constructed == 1, "Repeating the application duplicates neither");
-        var (g, session, editor, store) = Session(Doc(both));
-        Assert(session.Blocked == null && g.Crossing.Circuits.Count == 1, "A fresh editor world starts without additions");
-        Assert(session.Recheck(Crossing).Applied && g.Crossing.Circuits.Count == 2 && g.Live.Count == 1, "Applying the document builds both additions: " + session.Recheck(Crossing).Error);
+        var (g, session, mapEditor, store) = Session(Doc(both));
+        Assert(session.Blocked == null && g.Crossing.Circuits.Count == 1, "A fresh native map editor world starts without additions");
+        Assert(session.Recheck(Crossing).Applied && g.Crossing.Circuits.Count == 2 && g.Live.Count == 1, "Applying the scene patch file builds both additions: " + session.Recheck(Crossing).Error);
         Assert(session.Remove(Crossing).Applied && g.Crossing.Circuits.Count == 1 && g.Live.Count == 0, "Removing the modification deletes the added circuit and releases the equipment");
-        editor.Undo(); Assert(g.Crossing.Circuits.Count == 2 && g.Live.Count == 1, "Undo restores both additions");
+        mapEditor.Undo(); Assert(g.Crossing.Circuits.Count == 2 && g.Live.Count == 1, "Undo restores both additions");
     }
     // An addition that fails its native check guards only equipment operations: coverage edits of the same crossing, in the
-    // editor and from a document, stay available, and an equipment edit is refused before any change.
+    // native map editor and from a scene patch file, stay available, and an equipment edit is refused before any change.
     static void FaultyEquipmentLeavesCoverageEditsAvailable() {
-        var (f, session, editor, store) = Session();
+        var (f, session, mapEditor, store) = Session();
         Assert(session.AddEquipment(Crossing, West()).Applied, "The addition is built");
         f.Live[0].InCuller = false;
         SpanRange Span(double a, double b) => new SpanRange(new TrackLocation("Snew", "a", a), new TrackLocation("Snew", "a", b));
         var cover = session.Cover(Crossing, "Pipr", CircuitCoverage.Tracks(Span(308, 550), Span(292, 308), Span(292, 50)));
         Assert(cover.Applied && f.Crossing.Circuits[0].Spans.All(sp => sp.Owned), "A coverage edit of the crossing applies although its addition is faulty: " + cover.Error);
         Assert(session.Cover(Crossing, "Pipr", null).Applied, "Clearing the coverage applies as well");
-        editor.Undo(); editor.Redo();
+        mapEditor.Undo(); mapEditor.Redo();
         Assert(session.IncompleteOperation == null, "Undo and Redo of coverage edits run beside the faulty addition: " + session.IncompleteOperation);
         var mutations = f.World.Mutations;
         var refused = session.AddEquipment(Crossing, West(12));
@@ -374,12 +374,12 @@ static class EquipmentTests {
         g.Live[0].InCuller = false;
         var coverage = "\"cover\":{" + Target() + ",\"relationships\":{\"crossingCoverage\":{\"circuits\":{\"Pipr\":{\"approachA\":" + Range(308, 550) + ",\"island\":" + Range(292, 308) + ",\"approachB\":" + Range(292, 50) + "}}}},\"dependsOn\":[]}";
         var result = engine.Apply(Doc(coverage + "," + Equip("more", Addition("east", CrossingPath + "/Signal 2", 20))), "other/pack");
-        Assert(result.Outcomes["cover"].Applied, "A document's coverage modification applies beside a faulty addition: " + result.Outcomes["cover"].Error);
+        Assert(result.Outcomes["cover"].Applied, "A scene patch file's coverage modification applies beside a faulty addition: " + result.Outcomes["cover"].Error);
         Assert(!result.Outcomes["more"].Applied && result.Outcomes["more"].Error.Contains("Reload before editing its equipment"), "Its equipment modification is refused: " + result.Outcomes["more"].Error);
     }
-    // Use names each device with its crossing, proposes an ID the document does not use yet, and places the copy at the
+    // Use names each device with its crossing, proposes an ID the scene patch file does not use yet, and places the copy at the
     // inspected crossing as its source stands at its own crossing, five metres aside.
-    static void TheEditorProposesADistinctIdAndAPlacementAtTheCrossing() {
+    static void TheEditingProposesADistinctIdAndAPlacementAtTheCrossing() {
         var candidate = new SourceCandidate(new EquipmentSource("BushnellWhittier", "World/Roads/Grade Crossing - Allen/Signal 1"), "Crossing Signal Wishbone A (1)", null,
             new double[] { 110, 5, 200 }, new double[] { 0, 0, 0, 1 }, "Signal 1", "Allen", new double[] { 100, 5, 200 }, new double[] { 0, 0, 0, 1 });
         Assert(candidate.Label == "Signal 1 at Allen", "A candidate is labelled with its device and crossing: " + candidate.Label);
@@ -399,8 +399,8 @@ static class EquipmentTests {
         var same = EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, candidate.CrossingPosition, candidate.CrossingRotation, candidate.CrossingPosition, candidate.CrossingRotation);
         Assert(Near(same.Position, new double[] { 115, 5, 200 }), "At its own crossing the copy stands five metres beside its source: " + String.Join(", ", same.Position));
         var unknown = EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, null, null, new double[] { 4000, 529, 5000 }, quarter);
-        Assert(Near(unknown.Position, new double[] { 4005, 529, 5000 }) && Near(unknown.Rotation, new double[] { 0, 0, 0, 1 }), "Without the source crossing's pose the copy starts at the destination crossing: " + String.Join(", ", unknown.Position));
-        var (f, session, editor, store) = Session();
+        Assert(Near(unknown.Position, new double[] { 4005, 529, 5000 }) && Near(unknown.Rotation, new double[] { 0, 0, 0, 1 }), "Without the source crossing's placement the copy starts at the destination crossing: " + String.Join(", ", unknown.Position));
+        var (f, session, mapEditor, store) = Session();
         var first = session.AddEquipment(Crossing, West(id: "first"));
         var later = session.PreviewEquipment(Crossing, West(30, id: "second"), null);
         Assert(first.Applied && later.Lines.Count == 2 && later.Lines[0].StartsWith("Add author/pack second", StringComparison.Ordinal) && later.Lines[1].StartsWith("Keep author/pack first", StringComparison.Ordinal),
@@ -418,8 +418,8 @@ static class EquipmentTests {
         var engine = new PatchEngine(f.Scene);
         var foreign = engine.Apply(Doc(Equip("signals", Addition("theirs", CrossingPath + "/Signal 2", 40))), "other/pack");
         Assert(foreign.Outcomes["signals"].Applied && f.Live.Single().Record.Scope == "other/pack", "The other mod's addition is built at load");
-        var store = new Store(); var editor = new NativeMapEditor();
-        var session = new PatchEditingSession(engine, editor, store, documentKey: "author/pack"); editor.Session = session;
+        var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
         bool Theirs() => f.Live.Count(a => a.Record.Scope == "other/pack" && a.Record.Id == "theirs") == 1;
         Assert(session.AddEquipment(Crossing, West()).Applied && Theirs() && f.Live.Count == 2, "Adding this mod's equipment keeps the other mod's");
         SpanRange Span(double a, double b) => new SpanRange(new TrackLocation("Snew", "a", a), new TrackLocation("Snew", "a", b));
@@ -427,30 +427,30 @@ static class EquipmentTests {
         Assert(session.AddEquipment(Crossing, West(12)).Applied && Theirs(), "A move keeps it");
         Assert(session.RemoveEquipment(Crossing, "west").Applied && Theirs() && f.Live.Count == 1, "Removing this mod's addition keeps it");
         Assert(session.Remove(Crossing).Applied && Theirs(), "Removing this mod's modification keeps it");
-        editor.Undo(); editor.Undo();
+        mapEditor.Undo(); mapEditor.Undo();
         Assert(Theirs() && f.Live.Count(a => a.Record.Scope == "author/pack") == 1, "Undo restores this mod's addition beside the other mod's");
         Assert(session.Recheck(Crossing).Applied && Theirs(), "A recheck keeps it");
     }
-    // An addition whose source was missing at load has no copy. The editor still lists it from the document with its
+    // An addition whose source was missing at load has no copy. Scene patch editing still lists it from the scene patch file with its
     // reason, and it can be removed; afterwards edits of the crossing work again.
     static void AFailedAdditionIsListedAndRemovable() {
         var f = new Fixture();
         var engine = new PatchEngine(f.Scene);
-        var document = Doc(Equip("equip-crossing", Addition("lost", CrossingPath + "/Gone")));
-        var load = engine.Apply(document, "author/pack");
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("lost", CrossingPath + "/Gone")));
+        var load = engine.Apply(scenePatchFile, "author/pack");
         Assert(!load.Outcomes["equip-crossing"].Applied && f.Live.Count == 0, "The addition with a missing source fails at load");
-        var store = new Store { Patch = document }; var editor = new NativeMapEditor();
-        var session = new PatchEditingSession(engine, editor, store, documentKey: "author/pack"); editor.Session = session;
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
         var entries = session.EquipmentEntries(Crossing);
-        Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Addition.Id == "lost" && entries[0].Problem.Contains("not loaded"), "The failed addition is listed from the document with its reason: " + entries.FirstOrDefault()?.Problem);
+        Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Addition.Id == "lost" && entries[0].Problem.Contains("not loaded"), "The failed addition is listed from the scene patch file with its reason: " + entries.FirstOrDefault()?.Problem);
         var removed = session.RemoveEquipment(Crossing, "lost");
-        Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.DocumentText.Contains("lost"), "The failed addition is removed from the document: " + removed.Error);
+        Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.ScenePatchFileText.Contains("lost"), "The failed addition is removed from the scene patch file: " + removed.Error);
         Assert(session.AddEquipment(Crossing, West()).Applied && f.Live.Count == 1, "Afterwards the crossing takes equipment again");
     }
-    // A move as small as the editor stores reaches the scene, and a value the form did not change keeps the document's
+    // A move as small as the native map editor stores reaches the scene, and a value the form did not change keeps the scene patch file's
     // literal, so an untouched apply is no change and a one-axis change rewrites only that axis.
     static void SmallMovesReachTheSceneAndUntouchedValuesStay() {
-        var (f, session, editor, store) = Session();
+        var (f, session, mapEditor, store) = Session();
         Assert(session.AddEquipment(Crossing, West()).Applied, "The addition is built");
         Assert(session.AddEquipment(Crossing, West(10.003)).Applied && Math.Abs(f.Live.Single().Position[0] - 10.003) < 1e-9, "A 3 mm move reaches the scene: " + f.Live.Single().Position[0]);
         var turn = new EquipmentAddition("west", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", SignalPath), new Placement(new[] { 10.003, 0, 7 }, new[] { 0, Math.Sin(0.05 * Math.PI / 360), 0, Math.Cos(0.05 * Math.PI / 360) }));
@@ -461,9 +461,9 @@ static class EquipmentTests {
         reopened.Recheck(Crossing);
         var asStored = new EquipmentAddition("west", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", SignalPath), new Placement(new[] { (double)(float)10.1234567, (double)(float)0.30000001, 7 }, new double[] { 0, 0, 0, 1 }));
         var untouched = reopened.AddEquipment(Crossing, asStored);
-        Assert(untouched.Applied && untouched.Unchanged && reopened.DocumentText.Contains("10.1234567") && reopened.DocumentText.Contains("0.30000001"), "An apply with the values as the game stores them is no change: " + reopened.DocumentText);
+        Assert(untouched.Applied && untouched.Unchanged && reopened.ScenePatchFileText.Contains("10.1234567") && reopened.ScenePatchFileText.Contains("0.30000001"), "An apply with the values as the game stores them is no change: " + reopened.ScenePatchFileText);
         var oneAxis = new EquipmentAddition("west", EquipmentAddition.LightGatePattern, asStored.Source, new Placement(new[] { (double)(float)10.1234567, (double)(float)0.30000001, 9 }, new double[] { 0, 0, 0, 1 }));
-        Assert(reopened.AddEquipment(Crossing, oneAxis).Applied && reopened.DocumentText.Contains("10.1234567") && reopened.DocumentText.Contains("0.30000001"), "A change of one axis keeps the other axes' literals: " + reopened.DocumentText);
+        Assert(reopened.AddEquipment(Crossing, oneAxis).Applied && reopened.ScenePatchFileText.Contains("10.1234567") && reopened.ScenePatchFileText.Contains("0.30000001"), "A change of one axis keeps the other axes' literals: " + reopened.ScenePatchFileText);
     }
     static void UnknownSourceOrPlacementContentIsUnsupported() {
         foreach (var unknown in new[] { Addition("west").Replace("\"path\":\"" + SignalPath + "\"", "\"path\":\"" + SignalPath + "\",\"hash\":1"), Addition("west").Replace("\"mode\":\"fixed\",", "\"mode\":\"fixed\",\"snap\":true,") }) {
@@ -473,10 +473,10 @@ static class EquipmentTests {
         }
     }
     static void SaveAndReloadReproduceEquipmentOnce() {
-        var (f, session, editor, store) = Session();
+        var (f, session, mapEditor, store) = Session();
         session.AddEquipment(Crossing, West());
         session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east"));
-        Assert(editor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the crossing-equipment version: " + store.Info);
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the crossing-equipment version: " + store.Info);
         var fresh = new Fixture();
         var engine = new PatchEngine(fresh.Scene);
         var reload = engine.Apply(store.Patch, "author/pack");
@@ -484,10 +484,10 @@ static class EquipmentTests {
         engine.Apply(store.Patch, "author/pack");
         Assert(fresh.Live.Count == 2 && fresh.World.Constructed == 2, "A repeated world-load callback adds no duplicate");
         var (f2, reopened, e2, s2) = Session(store.Patch, fresh);
-        Assert(reopened.Blocked == null && reopened.RemoveEquipment(Crossing, "east").Applied && fresh.Live.Single().Record.Id == "west", "A saved equipment document reopens for editing in the world it built");
+        Assert(reopened.Blocked == null && reopened.RemoveEquipment(Crossing, "east").Applied && fresh.Live.Single().Record.Id == "west", "A saved equipment scene patch file reopens for editing in the world it built");
         var withUnknown = JObject.Parse(store.Patch);
         withUnknown["futureTopLevel"] = new JObject { ["keep"] = true };
         var (f3, unknown, e3, s3) = Session(withUnknown.ToString());
-        Assert(unknown.AddEquipment(Crossing, West(40, id: "north")).Applied && unknown.DocumentText.Contains("futureTopLevel"), "Unknown document content survives an equipment edit");
+        Assert(unknown.AddEquipment(Crossing, West(40, id: "north")).Applied && unknown.ScenePatchFileText.Contains("futureTopLevel"), "Unknown scene patch file content survives an equipment edit");
     }
 }

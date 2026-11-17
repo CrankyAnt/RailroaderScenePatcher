@@ -71,26 +71,26 @@ namespace RailroaderScenePatcher.Core {
             this.engine = engine ?? throw new ArgumentNullException(nameof(engine)); this.diagnostics = diagnostics ?? throw new ArgumentNullException(nameof(diagnostics));
             this.patcherVersion = patcherVersion; this.gameVersion = gameVersion;
         }
-        // Applies the documents of loaded mods in the given native load order. Only a mod that declares the patcher
+        // Applies the scene patch files of loaded mods in the given native load order. Only a mod that declares the patcher
         // dependency, or the native map editor's edit target, reaches the engine, which checks whether its target map is in the map context.
-        public IReadOnlyList<LoadedDocument> ApplyLoaded(IEnumerable<LoadedMod> loadOrder, IOverlapNotices notices) {
+        public IReadOnlyList<LoadedScenePatchFile> ApplyLoaded(IEnumerable<LoadedMod> loadOrder, IOverlapNotices notices) {
             if (loadOrder == null) throw new ArgumentNullException(nameof(loadOrder));
-            var documents = new List<LoadedDocument>();
+            var scenePatchFiles = new List<LoadedScenePatchFile>();
             foreach (var mod in loadOrder) {
                 if (mod == null) continue;
-                var document = new LoadedDocument(mod);
-                documents.Add(document);
-                if (mod.Error != null) { document.Skipped = mod.Error; continue; }
-                if (!mod.Applicable) { document.Skipped = "The mod does not declare a dependency on " + LoadedMod.PatcherId; continue; }
-                // The engine isolates document and operation failures itself; presentation faults stay with this document.
+                var scenePatchFile = new LoadedScenePatchFile(mod);
+                scenePatchFiles.Add(scenePatchFile);
+                if (mod.Error != null) { scenePatchFile.Skipped = mod.Error; continue; }
+                if (!mod.Applicable) { scenePatchFile.Skipped = "The mod does not declare a dependency on " + LoadedMod.PatcherId; continue; }
+                // The engine isolates scene patch file and operation failures itself; presentation faults stay with this scene patch file.
                 ClearSource(mod.Source);
-                document.Result = engine.Apply(mod.Json, mod.Source.Identifier);
-                try { ReportResult(document.Result, mod.Source); }
-                catch (Exception e) { document.PresentationError = "Failure report delivery failed: " + e.Message; }
-                try { ObserveOverlap(mod, document.Result, notices); }
-                catch (Exception e) { document.PresentationError = (document.PresentationError == null ? "" : document.PresentationError + "; ") + "Overlap notice delivery failed: " + e.Message; }
+                scenePatchFile.Result = engine.Apply(mod.Json, mod.Source.Identifier);
+                try { ReportResult(scenePatchFile.Result, mod.Source); }
+                catch (Exception e) { scenePatchFile.PresentationError = "Failure report delivery failed: " + e.Message; }
+                try { ObserveOverlap(mod, scenePatchFile.Result, notices); }
+                catch (Exception e) { scenePatchFile.PresentationError = (scenePatchFile.PresentationError == null ? "" : scenePatchFile.PresentationError + "; ") + "Overlap notice delivery failed: " + e.Message; }
             }
-            return documents;
+            return scenePatchFiles;
         }
         sealed class ByReference : IEqualityComparer<object> {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
@@ -101,7 +101,7 @@ namespace RailroaderScenePatcher.Core {
         readonly Dictionary<object, Contribution> contributions = new Dictionary<object, Contribution>(new ByReference());
         readonly HashSet<string> noticed = new HashSet<string>(StringComparer.Ordinal);
         // An outcome carries its resolved object only after unique resolution, so ambiguous or missing targets never count.
-        void ObserveOverlap(LoadedMod mod, DocumentResult result, IOverlapNotices notices) {
+        void ObserveOverlap(LoadedMod mod, ScenePatchFileResult result, IOverlapNotices notices) {
             Exception fault = null;
             foreach (var outcome in result.Outcomes.Values) {
                 if (outcome.ResolvedTarget == null || outcome.Target == null) continue;
@@ -119,13 +119,13 @@ namespace RailroaderScenePatcher.Core {
             }
             if (fault != null) throw fault;
         }
-        public DocumentResult Apply(string json, PatchSource source) {
+        public ScenePatchFileResult Apply(string json, PatchSource source) {
             ClearSource(source);
             var result = engine.Apply(json, source.Identifier);
             ReportResult(result, source);
             return result;
         }
-        public DocumentResult BeforeNativeCheck(string json, PatchSource source, TargetIdentity target) {
+        public ScenePatchFileResult BeforeNativeCheck(string json, PatchSource source, TargetIdentity target) {
             var result = engine.BeforeNativeCheck(json, source.Identifier, target);
             if (result.Error != null) ClearSource(source);
             ReportResult(result, source);
@@ -135,7 +135,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var key in latest.Keys.Where(k => k.StartsWith(Key(source, ""), StringComparison.Ordinal)).ToArray()) latest.Remove(key);
         }
         // Records every outcome before delivery, and attempts every report even when one delivery fails.
-        void ReportResult(DocumentResult result, PatchSource source) {
+        void ReportResult(ScenePatchFileResult result, PatchSource source) {
             foreach (var item in result.Outcomes) latest[Key(source, item.Key)] = item.Value;
             Exception fault = null;
             void Deliver(Action report) { try { report(); } catch (Exception e) { fault = fault ?? e; } }
@@ -164,8 +164,8 @@ namespace RailroaderScenePatcher.Core {
             var row = matches[0];
             return ReferenceEquals(row.Token, original.Token) && row.Originator == original.Originator && row.Description == original.Description ? row : null;
         }
-        void Report(PatchSource source, string operation, TargetIdentity target, string error, FailureCause cause, bool document = false) {
-            var key = (document ? "document/" : "operation/") + Key(source, operation);
+        void Report(PatchSource source, string operation, TargetIdentity target, string error, FailureCause cause, bool scenePatchFile = false) {
+            var key = (scenePatchFile ? "document/" : "operation/") + Key(source, operation);
             if (reported.Contains(key)) return;
             diagnostics.Warning(new PatchFailure(source, operation, target, error, cause, patcherVersion, gameVersion, key));
             reported.Add(key);

@@ -43,8 +43,8 @@ namespace RailroaderScenePatcher {
             MapEditor = mapEditor; Manager = Native.Read(mapEditor, "UndoManager");
             if (Manager == null) throw new MissingMemberException("Native undo manager unavailable");
             Native.Read(mapEditor, "_cleanChangeCount"); Native.Read(mapEditor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
-            var storage = ModDocuments.ActiveStorage(); PatchPath = storage.PatchPath;
-            Session = new PatchEditingSession(engine, new NativeHistory(Manager), storage, ModDocuments.PatcherId, ModDocuments.EditedModId());
+            var storage = ModScenePatchFiles.ActiveStorage(); PatchPath = storage.PatchPath;
+            Session = new PatchEditingSession(engine, new NativeHistory(Manager), storage, ModScenePatchFiles.PatcherId, ModScenePatchFiles.EditedModId());
             changed = Manager.GetType().GetEvent("DidChange", Native.Flags);
             if (changed == null || changed.EventHandlerType != typeof(Action)) throw new MissingMemberException("Native history notification unavailable");
             handler = Session.HistoryChanged;
@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher {
                     var mode = Native.Type("UI.CarEditor.DefinitionEditorModeController");
                     if (choice == 1 && (bool)Native.Read(mode, "IsEditing")) Native.Call(mode, "ExitEditorMode");
                 };
-                PresentMethod().Invoke(null, new object[] { "Exit Map Editor", "Exit the map editor? " + warning + " Exit discards it; Cancel returns to the editor.", new[] { (0, "Cancel"), (1, "Exit") }, choose });
+                PresentMethod().Invoke(null, new object[] { "Exit Map Editor", "Exit the Map Editor? " + warning + " Exit discards it; Cancel returns to the Map Editor.", new[] { (0, "Cancel"), (1, "Exit") }, choose });
                 return false;
             } catch (Exception e) { current.Fault = "Exit confirmation fell back to the native text: " + e.GetBaseException().Message; return true; }
         }

@@ -110,7 +110,7 @@ static class StarterTrackLocationTests {
         DistanceOutsideTheSegmentIsRefused();
         TheWholeCutMustPassTheGamesRule();
         TheMarkerNeedsOneReader();
-        CutsAreJudgedWithTheDocumentsOtherStarterPlacements();
+        CutsAreJudgedWithTheScenePatchFilesOtherStarterPlacements();
         ANativeFailureOnTheTrackIsARefusal();
         ADuplicateMarkerIdIsRefusedBeforeMutation();
         ObjectSettingsAndOtherRelationshipsAreRefused();
@@ -157,16 +157,16 @@ static class StarterTrackLocationTests {
         var result = engine.Apply(Doc(Starter("move-hopper", HopperPath, At("S2", "a", 80))));
         Check(result.Error == null && result.Outcomes["move-hopper"].Applied, "The starter placement applies: " + result.Outcomes["move-hopper"].Error);
         Check(Entry(world, hopper) == "S2|a|80" && hopper.Position[0] == 20 && hopper.Active, "The marker takes the track location with its registration and keeps its object placement and activity: " + Entry(world, hopper));
-        Check(Entry(world, wreck) == "S1|a|50" && shed.Segment == "S2" && shed.Distance == 50 && world.Registrations(shed).Count == 0, "Markers the document omits keep the map's track location");
+        Check(Entry(world, wreck) == "S1|a|50" && shed.Segment == "S2" && shed.Distance == 50 && world.Registrations(shed).Count == 0, "Markers the scene patch file omits keep the map's track location");
         // A disabled marker takes the location without a registration, as the native marker lifecycle keeps it.
         var shedResult = engine.Apply(Doc(Starter("move-shed", ShedPath, At("S2", "b", 60)))).Outcomes["move-shed"];
         Check(shedResult.Applied && shed.Segment == "S2" && shed.End == "b" && shed.Distance == 60 && world.Registrations(shed).Count == 0 && !shed.Active, "A disabled marker takes the location and stays unregistered: " + shedResult.Error);
         var read = scene.Read(hopper);
         Check(read.Starter.Setup == "ewh-steam" && read.Starter.Track.Location.Display == "S2 / a / 80", "The capability reads the setup and track location back");
     }
-    static void Refused(string document, string id, string expected, string message) {
+    static void Refused(string scenePatchFile, string id, string expected, string message) {
         var (world, wreck, shed, hopper, scene) = Setup();
-        var outcome = new PatchEngine(scene).Apply(Doc(document)).Outcomes[id];
+        var outcome = new PatchEngine(scene).Apply(Doc(scenePatchFile)).Outcomes[id];
         Check(!outcome.Applied && outcome.Error.Contains(expected) && outcome.Cause == FailureCause.InvalidDefinition, message + ": " + outcome.Error);
         Check(world.Mutations == 0 && Entry(world, hopper) == "S2|a|90" && Entry(world, wreck) == "S1|a|50", message + ": nothing changed before the refusal");
     }
@@ -208,7 +208,7 @@ static class StarterTrackLocationTests {
         Check(independent.Applied, "A failure of another cut that this cut does not cause does not refuse it: " + independent.Error);
     }
     // A starter placement changes one car placement: a marker that no active car placement reads, or several read, is
-    // refused, and so is a document that names another setup than the one that reads the marker.
+    // refused, and so is a scene patch file that names another setup than the one that reads the marker.
     static void TheMarkerNeedsOneReader() {
         var (world, _, _, hopper, scene) = Setup();
         world.Placements.RemoveAt(2);
@@ -220,16 +220,16 @@ static class StarterTrackLocationTests {
         Check(!several.Applied && several.Error.StartsWith("2 new-game car placements read this marker (setup ewh-steam, car placement 3 of 3; setup ewh-diesel, car placement 1 of 1)", StringComparison.Ordinal) && Entry(world, hopper) == "S2|a|90", "A marker several car placements read is refused: " + several.Error);
         (world, _, _, hopper, scene) = Setup();
         var other = new PatchEngine(scene).Apply(Doc(Starter("other", HopperPath, At("S2", "a", 80), "ewh-diesel"))).Outcomes["other"];
-        Check(!other.Applied && other.Error.Contains("names setup ewh-diesel, but the car placement that reads this marker is setup ewh-steam, car placement 3 of 3"), "A document naming another setup is refused: " + other.Error);
+        Check(!other.Applied && other.Error.Contains("names setup ewh-diesel, but the car placement that reads this marker is setup ewh-steam, car placement 3 of 3"), "A scene patch file naming another setup is refused: " + other.Error);
         (world, _, _, hopper, scene) = Setup();
         world.FailSetups = true;
         var unreadable = new PatchEngine(scene).Apply(Doc(Starter("unreadable", HopperPath, At("S2", "a", 80)))).Outcomes["unreadable"];
         Check(!unreadable.Applied && unreadable.Error.Contains("placements unavailable") && Entry(world, hopper) == "S2|a|90", "Setups that cannot be read refuse the placement: " + unreadable.Error);
     }
     // Two cuts that swap places: the gondolas move to the locomotive's old place and the locomotive moves away. Each cut
-    // is judged with the document's other starter placement at its desired location, so the document applies whichever
+    // is judged with the scene patch file's other starter placement at its desired location, so the scene patch file applies whichever
     // modification runs first; judged against the current locations, the one that runs first would be blocked.
-    static void CutsAreJudgedWithTheDocumentsOtherStarterPlacements() {
+    static void CutsAreJudgedWithTheScenePatchFilesOtherStarterPlacements() {
         foreach (var keys in new[] { new[] { "a-hopper", "b-shed" }, new[] { "b-hopper", "a-shed" } }) {
             var (world, _, shed, hopper, scene) = Setup();
             var result = new PatchEngine(scene).Apply(Doc(Starter(keys[0], HopperPath, At("S2", "a", 50)) + "," + Starter(keys[1], ShedPath, At("S2", "a", 90))));
@@ -237,24 +237,24 @@ static class StarterTrackLocationTests {
             Check(Entry(world, hopper) == "S2|a|50" && shed.Distance == 90, "Both markers stand at their new track locations");
         }
         // Scene patch editing moves the locomotive away to S1 first and then the gondolas into its old place, and judges
-        // each edit with the document as it stands; the saved document then applies at load, where the gondolas' key
+        // each edit with the scene patch file as it stands; the saved scene patch file then applies at load, where the gondolas' key
         // sorts first and the locomotive still stands in that place.
         var (w, _, s2, h2, sc) = Setup();
         var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(sc), mapEditor, store); mapEditor.Session = session;
         Check(session.PlaceStarter(Shed, new TrackLocation("S1", "a", 80)).Applied && session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 50)).Applied, "Scene patch editing accepts the two moves one after the other");
-        Check(session.Recheck(Shed).Applied && session.Recheck(Hopper).Applied, "Recheck judges each cut with the document's other starter placement");
+        Check(session.Recheck(Shed).Applied && session.Recheck(Hopper).Applied, "Recheck judges each cut with the scene patch file's other starter placement");
         Check(mapEditor.Save() == null, "Save succeeds");
         var keysInFile = Newtonsoft.Json.Linq.JObject.Parse(store.Patch)["modifications"].Cast<Newtonsoft.Json.Linq.JProperty>().Select(p => p.Name).ToArray();
         var (world2, _, shed2, hopper2, scene2) = Setup();
         var reloaded = new PatchEngine(scene2).Apply(store.Patch);
-        Check(reloaded.Outcomes.Values.All(o => o.Applied) && Entry(world2, hopper2) == "S2|a|50" && shed2.Segment == "S1" && shed2.Distance == 80, "The saved document applies at load whatever the order of its keys (" + String.Join(",", keysInFile) + "): " + String.Join(" | ", reloaded.Outcomes.Select(o => o.Key + "=" + o.Value.Error)));
-        // A modification that cannot apply leaves no planned location behind for a later document.
+        Check(reloaded.Outcomes.Values.All(o => o.Applied) && Entry(world2, hopper2) == "S2|a|50" && shed2.Segment == "S1" && shed2.Distance == 80, "The saved scene patch file applies at load whatever the order of its keys (" + String.Join(",", keysInFile) + "): " + String.Join(" | ", reloaded.Outcomes.Select(o => o.Key + "=" + o.Value.Error)));
+        // A modification that cannot apply leaves no planned location behind for a later scene patch file.
         var (world3, _, _, hopper3, scene3) = Setup();
         var engine3 = new PatchEngine(scene3);
-        Check(engine3.Apply(Doc(Starter("away", ShedPath, At("S1", "a", 80)))).Outcomes["away"].Applied, "The first document moves the locomotive to S1");
+        Check(engine3.Apply(Doc(Starter("away", ShedPath, At("S1", "a", 80)))).Outcomes["away"].Applied, "The first scene patch file moves the locomotive to S1");
         var later = engine3.Apply(Doc(Starter("in", HopperPath, At("S1", "a", 78))));
-        Check(!later.Outcomes["in"].Applied && later.Outcomes["in"].Error.Contains("Blocked by the cut of setup ewh-steam, car placement 2 of 3"), "A later document is judged against the applied locations: " + later.Outcomes["in"].Error);
+        Check(!later.Outcomes["in"].Applied && later.Outcomes["in"].Error.Contains("Blocked by the cut of setup ewh-steam, car placement 2 of 3"), "A later scene patch file is judged against the applied locations: " + later.Outcomes["in"].Error);
     }
     // A failure inside the game while the track is walked is a refusal with its reason, and nothing changes.
     static void ANativeFailureOnTheTrackIsARefusal() {
@@ -293,13 +293,13 @@ static class StarterTrackLocationTests {
     static void RepeatedApplicationConverges() {
         var (world, _, _, hopper, scene) = Setup();
         var engine = new PatchEngine(scene);
-        var document = Doc(Starter("move-hopper", HopperPath, At("S2", "a", 80)));
-        engine.Apply(document); var mutations = world.Mutations;
-        var again = engine.Apply(document).Outcomes["move-hopper"];
+        var scenePatchFile = Doc(Starter("move-hopper", HopperPath, At("S2", "a", 80)));
+        engine.Apply(scenePatchFile); var mutations = world.Mutations;
+        var again = engine.Apply(scenePatchFile).Outcomes["move-hopper"];
         Check(again.Applied && Entry(world, hopper) == "S2|a|80", "A second application converges on the same track location with one registration");
         Check(world.Mutations == mutations, "A converged marker is not written again: " + (world.Mutations - mutations));
         hopper.Distance = 30; foreach (var b in world.Buckets.Values) b.Remove("Mhop"); world.Load(hopper);
-        Check(engine.Apply(document).Outcomes["move-hopper"].Applied && Entry(world, hopper) == "S2|a|80", "An application after the marker drifted returns it to the patched location");
+        Check(engine.Apply(scenePatchFile).Outcomes["move-hopper"].Applied && Entry(world, hopper) == "S2|a|80", "An application after the marker drifted returns it to the patched location");
     }
     static void FailedAttemptRestoresThePriorLocation() {
         foreach (var inject in new Action<FakeMarkerWorld>[] { w => w.ThrowAfterLocation = true, w => w.SkipRegister = true }) {
@@ -346,7 +346,7 @@ static class StarterTrackLocationTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (world, hopper, session, mapEditor, store);
     }
-    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void EditingPlacesUndoesAndRedoes() {
         var (world, hopper, session, mapEditor, store) = Session();
         Check(!mapEditor.IsDirty, "A fresh session is clean");
@@ -355,14 +355,14 @@ static class StarterTrackLocationTests {
         var item = Only(session);
         Check(((JProperty)item.Parent).Name == "starter-ewh-int2", "A new modification's key names the marker without repeating starter-: " + ((JProperty)item.Parent).Name);
         Check((string)item["starterPlacement"]["setup"] == "ewh-steam" && (string)item["starterPlacement"]["track"]["segment"] == "S2" && (double)item["starterPlacement"]["track"]["distance"] == 80
-            && item["placement"] == null && item["active"] == null && item["relationships"] == null && (string)item["target"]["structure"] == StarterPlacementScene.Structure, "The document records the setup and the track location only: " + item);
+            && item["placement"] == null && item["active"] == null && item["relationships"] == null && (string)item["target"]["structure"] == StarterPlacementScene.Structure, "The scene patch file records the setup and the track location only: " + item);
         Check(session.HasStarterTrack(Hopper) && session.Changes(Hopper).SequenceEqual(new[] { "Track location: from S2 / a / 90 to S2 / a / 80" }), "The Changes lines name the track location: " + String.Join(" | ", session.Changes(Hopper)));
-        Check(mapEditor.IsDirty && session.Outstanding(mapEditor.NativeDirty).Contains(PatchEditingSession.PatchData), "The edit leaves the patch document outstanding");
+        Check(mapEditor.IsDirty && session.Outstanding(mapEditor.NativeDirty).Contains(PatchEditingSession.PatchData), "The edit leaves the scene patch file outstanding");
         Check(session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 85)).Applied && Entry(world, hopper) == "S2|a|85", "A second placement replaces the location");
         mapEditor.Undo();
         Check(Entry(world, hopper) == "S2|a|80" && (double)Only(session)["starterPlacement"]["track"]["distance"] == 80, "Undo returns the track location from before the edit");
         mapEditor.Undo();
-        Check(Entry(world, hopper) == "S2|a|90" && session.DocumentText.Contains("\"modifications\": {}") && !mapEditor.IsDirty, "Undo of the first placement returns the map's location and a clean state");
+        Check(Entry(world, hopper) == "S2|a|90" && session.ScenePatchFileText.Contains("\"modifications\": {}") && !mapEditor.IsDirty, "Undo of the first placement returns the map's location and a clean state");
         mapEditor.Redo();
         Check(Entry(world, hopper) == "S2|a|80" && mapEditor.IsDirty, "Redo reapplies the edit and the dirty state follows");
         mapEditor.Redo();
@@ -372,15 +372,15 @@ static class StarterTrackLocationTests {
         Check(mapEditor.IsDirty && session.Outstanding(mapEditor.NativeDirty).Contains(PatchEditingSession.PatchData) && Entry(world, hopper) == "S2|a|80", "Undo after Save makes the patch outstanding again");
         mapEditor.Redo();
         Check(!mapEditor.IsDirty, "Redo back to the saved state is clean again");
-        // Placing the marker back on the map's own location reverts the setting, and the modification leaves the document.
-        Check(session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 90)).Reverted && session.DocumentText.Contains("\"modifications\": {}") && Entry(world, hopper) == "S2|a|90", "Placing the marker on its underlying location reverts the modification");
+        // Placing the marker back on the map's own location reverts the setting, and the modification leaves the scene patch file.
+        Check(session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 90)).Reverted && session.ScenePatchFileText.Contains("\"modifications\": {}") && Entry(world, hopper) == "S2|a|90", "Placing the marker on its underlying location reverts the modification");
     }
     static void EditingRefusesBeforeAnythingChanges() {
         var (world, hopper, session, mapEditor, store) = Session();
-        var before = session.DocumentText;
+        var before = session.ScenePatchFileText;
         foreach (var bad in new[] { new TrackLocation("Sgone", "a", 1), new TrackLocation("S1", "a", 999), new TrackLocation("S1", "a", 10), new TrackLocation("S1", "a", 45) }) {
             var refused = session.PlaceStarter(Hopper, bad);
-            Check(!refused.Applied && refused.Error != null && session.DocumentText == before && Entry(world, hopper) == "S2|a|90" && !mapEditor.CanUndo, "An invalid location is refused before anything changes: " + bad.Display + ": " + refused.Error);
+            Check(!refused.Applied && refused.Error != null && session.ScenePatchFileText == before && Entry(world, hopper) == "S2|a|90" && !mapEditor.CanUndo, "An invalid location is refused before anything changes: " + bad.Display + ": " + refused.Error);
         }
         // A location equal to the map's own changes nothing and records no history step.
         Check(session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 90)).Unchanged && !mapEditor.CanUndo, "The current location changes nothing");
@@ -391,7 +391,7 @@ static class StarterTrackLocationTests {
         var (world, hopper, session, mapEditor, store) = Session();
         session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 80));
         var cleared = session.ClearStarterTrack(Hopper);
-        Check(cleared.Applied && Entry(world, hopper) == "S2|a|90" && session.DocumentText.Contains("\"modifications\": {}"), "Clearing the track location returns the underlying location and removes the empty modification: " + cleared.Error);
+        Check(cleared.Applied && Entry(world, hopper) == "S2|a|90" && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Clearing the track location returns the underlying location and removes the empty modification: " + cleared.Error);
         mapEditor.Undo(); Check(Entry(world, hopper) == "S2|a|80", "Undo of the clearing restores this mod's location");
         var removed = session.Remove(Hopper);
         Check(removed.Applied && Entry(world, hopper) == "S2|a|90" && hopper.Position[0] == 20 && hopper.Active, "Removal returns the effective underlying track location computed from the native context");
@@ -419,12 +419,12 @@ static class StarterTrackLocationTests {
         session = new PatchEditingSession(new PatchEngine(new StarterPlacementScene(world, Capability.Unchecked)), mapEditor, store); mapEditor.Session = session;
         session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 80));
         Check(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.9.0") && !store.Info.Contains(">=" + StarterPlacementScene.RequiredVersion + "\""), "A stricter existing constraint is retained: " + store.Info);
-        // A document in another member order reads as the same content and loads unchanged.
+        // A scene patch file in another member order reads as the same content and loads unchanged.
         var reordered = "{\"modifications\":{\"starter-int2\":{\"dependsOn\":[],\"starterPlacement\":{\"track\":{\"distance\":80,\"end\":\"a\",\"segment\":\"S2\"},\"setup\":\"ewh-steam\"},\"target\":{\"structure\":\"starter-placement-v1\",\"component\":\"Track.TrackMarker\",\"path\":\"" + HopperPath + "\",\"scene\":\"level4\"}}},\"sourceMap\":{\"mapId\":\"map\"},\"formatVersion\":1}";
         (world, hopper, session, mapEditor, store) = Session(reordered);
-        Check(Entry(world, hopper) == "S2|a|90" && !session.Outstanding(mapEditor.NativeDirty).Contains(PatchEditingSession.PatchData), "A reordered document is read without a patch change");
-        Check(session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 85)).Applied && mapEditor.Save() == null, "An edit of the reordered document saves");
+        Check(Entry(world, hopper) == "S2|a|90" && !session.Outstanding(mapEditor.NativeDirty).Contains(PatchEditingSession.PatchData), "A reordered scene patch file is read without a patch change");
+        Check(session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 85)).Applied && mapEditor.Save() == null, "An edit of the reordered scene patch file saves");
         var written = (JObject)JObject.Parse(store.Patch)["modifications"]["starter-int2"];
-        Check(String.Join(",", written.Properties().Select(p => p.Name)) == "target,starterPlacement,dependsOn" && String.Join(",", ((JObject)written["starterPlacement"]).Properties().Select(p => p.Name)) == "setup,track", "Save writes the edited document in canonical order: " + written);
+        Check(String.Join(",", written.Properties().Select(p => p.Name)) == "target,starterPlacement,dependsOn" && String.Join(",", ((JObject)written["starterPlacement"]).Properties().Select(p => p.Name)) == "setup,track", "Save writes the edited scene patch file in canonical order: " + written);
     }
 }

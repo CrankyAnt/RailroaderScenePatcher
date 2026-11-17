@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher.Core {
         // lists only its explicit circuits; observed coverage lists every circuit of the crossing.
         public CrossingCoverage Coverage { get; }
         // The crossing-equipment relationship: equipment added to a crossing controller. Null leaves it untouched, and an object
-        // without one reads null. Authored equipment lists only its explicit additions; observed equipment is complete.
+        // without one reads null. The mod's equipment lists only its explicit additions; observed equipment is complete.
         public CrossingEquipment Equipment { get; }
         // The starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, and
         // the marker's track location. Null leaves it untouched, and any other object reads null.
@@ -110,7 +110,7 @@ namespace RailroaderScenePatcher.Core {
         // Local cleanup failures. The affected target stays recorded so the next load attempt retries its release.
         public IReadOnlyList<string> Failures { get; }
     }
-    public sealed class DocumentResult {
+    public sealed class ScenePatchFileResult {
         public string Error { get; internal set; }
         public IReadOnlyDictionary<string, Outcome> Outcomes { get; internal set; }
         public bool MapEditorOnly { get; internal set; }
@@ -131,18 +131,18 @@ namespace RailroaderScenePatcher.Core {
             public new bool Equals(object a, object b) => ReferenceEquals(a, b);
             public int GetHashCode(object value) => RuntimeHelpers.GetHashCode(value);
         }
-        // Addition IDs that more than one modification of the document being applied uses.
+        // Addition IDs that more than one modification of the scene patch file being applied uses.
         HashSet<string> sharedAdditions = new HashSet<string>(StringComparer.Ordinal);
         internal IScene Scene { get { return scene; } }
         internal sealed class Modification {
             internal string Id; internal TargetIdentity Identity; internal ObjectState State; internal string[] Dependencies;
         }
         [Conditional("ISSUE39_OBSERVATION")]
-        void Observe(string stage, string document, string id = null, string path = null, string error = null) {
+        void Observe(string stage, string scenePatchFile, string id = null, string path = null, string error = null) {
 #if ISSUE39_OBSERVATION
             try {
                 JourneyObservation.Sink?.Invoke(new JObject {
-                    ["stage"] = stage, ["document"] = document, ["id"] = id,
+                    ["stage"] = stage, ["document"] = scenePatchFile, ["id"] = id,
                     ["path"] = path, ["error"] = error,
                     ["engineRuntimeId"] = RuntimeHelpers.GetHashCode(this)
                 }.ToString(Newtonsoft.Json.Formatting.None));
@@ -178,31 +178,31 @@ namespace RailroaderScenePatcher.Core {
             return new ReentryResult(retained, released, failures);
         }
         static string Describe(TargetIdentity identity) => identity.Scene + "/" + identity.Path + " [" + identity.Component + "]";
-        public DocumentResult Apply(string json) { return Apply(json, ""); }
-        public DocumentResult Apply(string json, string documentKey) {
-            return Apply(json, documentKey, null);
+        public ScenePatchFileResult Apply(string json) { return Apply(json, ""); }
+        public ScenePatchFileResult Apply(string json, string scenePatchFileKey) {
+            return Apply(json, scenePatchFileKey, null);
         }
-        public DocumentResult Apply(string json, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
-            return ApplyDocument(json, documentKey, inspectedTargets, null);
+        public ScenePatchFileResult Apply(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
+            return ApplyScenePatchFile(json, scenePatchFileKey, inspectedTargets, null);
         }
         // The complete envelope is checked before selecting a dependency-free relationship repair for this native check.
-        public DocumentResult BeforeNativeCheck(string json, string documentKey, TargetIdentity target) {
+        public ScenePatchFileResult BeforeNativeCheck(string json, string scenePatchFileKey, TargetIdentity target) {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            return ApplyDocument(json, documentKey, null, target);
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, target);
         }
-        DocumentResult ApplyDocument(string json, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget) {
-            if (documentKey == null) throw new ArgumentNullException(nameof(documentKey));
-            Observe("document-dispatch", documentKey);
-            var result = new DocumentResult();
+        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget) {
+            if (scenePatchFileKey == null) throw new ArgumentNullException(nameof(scenePatchFileKey));
+            Observe("document-dispatch", scenePatchFileKey);
+            var result = new ScenePatchFileResult();
             var outcomes = new Dictionary<string, Outcome>(); result.Outcomes = outcomes;
-            var document = PatchDocument.Load(json);
-            if (!document.CanWrite) { result.Error = document.Error; result.MapEditorOnly = true; return result; }
+            var scenePatchFile = ScenePatchFile.Load(json);
+            if (!scenePatchFile.CanWrite) { result.Error = scenePatchFile.Error; result.MapEditorOnly = true; return result; }
             try {
-                if (!scene.MapIds.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.MapEditorOnly = true; return result; }
+                if (!scene.MapIds.Contains((string)scenePatchFile.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.MapEditorOnly = true; return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
-                var entries = Entries(document.Modifications);
+                var entries = Entries(scenePatchFile.Modifications);
                 sharedAdditions = SharedAdditionIds(entries.Values);
-                Plan(document.Modifications, documentKey);
+                Plan(scenePatchFile.Modifications, scenePatchFileKey);
                 var visiting = new HashSet<string>();
                 // Modifications that dependsOn does not order run in ordinal key order, whatever the order of the text.
                 foreach (var id in entries.Keys) {
@@ -210,14 +210,14 @@ namespace RailroaderScenePatcher.Core {
                         if (unavailable != null) result.EarlyRouteUnavailable = unavailable;
                         continue;
                     }
-                    Execute(id, entries, outcomes, visiting, documentKey, inspectedTargets);
+                    Execute(id, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
                 }
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
             finally { Unplan(); }
             return result;
         }
-        // Gives a scene that judges modifications with their document the desired state of every object that a starter
-        // placement of the document sets. A modification that cannot be read or resolved is left out.
+        // Gives a scene that judges modifications with their scene patch file the desired state of every object that a starter
+        // placement of the scene patch file sets. A modification that cannot be read or resolved is left out.
         internal void Plan(JObject modifications, string owner) {
             if (!(scene is IPlannedStateScene planned)) return;
             var desired = new Dictionary<object, ObjectState>(new ByReference());
@@ -253,15 +253,15 @@ namespace RailroaderScenePatcher.Core {
                 } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + e.Message; return false; }
             } catch (InvalidOperationException) { return false; }
         }
-        Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string documentKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
+        Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
             Outcome prior;
             if (outcomes.TryGetValue(id, out prior)) return prior;
             var outcome = new Outcome();
             if (!visiting.Add(id)) { outcome.Error = "Dependency cycle"; outcome.Cause = FailureCause.InvalidDefinition; return outcome; }
-            var key = documentKey.Length + ":" + documentKey + id;
+            var key = scenePatchFileKey.Length + ":" + scenePatchFileKey + id;
             try {
                 if (failed.ContainsKey(key)) {
-                    Observe("retry-blocked", documentKey, id);
+                    Observe("retry-blocked", scenePatchFileKey, id);
                     var previous = failed[key];
                     outcome.Error = "Operation already failed during this load: " + previous.Error;
                     outcome.Cause = previous.Cause; outcome.MapEditorOnly = previous.MapEditorOnly; outcome.Target = previous.Target;
@@ -279,12 +279,12 @@ namespace RailroaderScenePatcher.Core {
                 try { dependencies = Dependencies(item); }
                 catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(e.Message); }
                 foreach (var dep in dependencies) {
-                    if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the document");
-                    var dependency = Execute(dep, entries, outcomes, visiting, documentKey, inspectedTargets);
+                    if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the scene patch file");
+                    var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
                     if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new InvalidOperationException("Dependency failed: " + dep); }
                 }
                 Modification parsed;
-                try { outcome.Target = ParseTarget(item["target"] as JObject); parsed = Parse(item, documentKey, id); }
+                try { outcome.Target = ParseTarget(item["target"] as JObject); parsed = Parse(item, scenePatchFileKey, id); }
                 catch (InvalidOperationException e) {
                     outcome.Cause = FailureCause.InvalidDefinition;
                     outcome.MapEditorOnly = e.Message.StartsWith("Unsupported", StringComparison.Ordinal) || e.Message == "Invalid or unsupported target";
@@ -292,7 +292,7 @@ namespace RailroaderScenePatcher.Core {
                 }
                 var identity = parsed.Identity;
                 outcome.Target = identity;
-                Observe("resolve", documentKey, id, identity.Path);
+                Observe("resolve", scenePatchFileKey, id, identity.Path);
                 var matches = scene.Resolve(identity);
                 if (matches == null || matches.Count != 1 || matches[0] == null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException("Target must resolve uniquely"); }
                 var resolved = matches[0];
@@ -304,31 +304,31 @@ namespace RailroaderScenePatcher.Core {
                 expected?.Validate(scene, identity, resolved);
                 outcome.ResolvedTarget = resolved;
                 if (IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
-                Observe("preflight", documentKey, id, identity.Path);
+                Observe("preflight", scenePatchFileKey, id, identity.Path);
                 scene.Preflight(resolved);
                 // One modification's own state: an omitted active leaves the activity another modification set.
                 var state = Evaluate(parsed.State.LeavingActivity());
                 CheckRelationships(resolved, state);
-                Observe("capture", documentKey, id, identity.Path);
+                Observe("capture", scenePatchFileKey, id, identity.Path);
                 Underlying(resolved);
                 var snapshot = scene.Capture(resolved);
                 // Capture and preflight may invoke native callbacks. Never redirect to a new match.
                 GuardMutation(identity, resolved, mapContext, expected);
                 try {
-                    Observe("mutation", documentKey, id, identity.Path);
+                    Observe("mutation", scenePatchFileKey, id, identity.Path);
                     scene.Apply(resolved, state);
-                    Observe("applied", documentKey, id, identity.Path);
+                    Observe("applied", scenePatchFileKey, id, identity.Path);
                 } catch (Exception e) {
                     bool restored = false;
-                    Observe("restore-request", documentKey, id, identity.Path);
+                    Observe("restore-request", scenePatchFileKey, id, identity.Path);
                     try { restored = scene.Restore(resolved, snapshot); } catch { }
-                    Observe("restore-result", documentKey, id, identity.Path, restored ? "verified" : "unverified");
+                    Observe("restore-result", scenePatchFileKey, id, identity.Path, restored ? "verified" : "unverified");
                     if (!restored) unsafeTargets.Add(resolved);
                     else if (AwaitOutput(resolved)) throw new InvalidOperationException("Mutation failed and was restored; the restored dependent output is still being regenerated, and this target waits until it verifies: " + e.Message);
                     throw new InvalidOperationException(restored ? "Mutation failed and was restored: " + e.Message : "Mutation failed; cleanup is unverified: " + e.Message);
                 }
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition; failed[key] = outcome; Observe("failed", documentKey, id, error: e.Message); }
+            } catch (Exception e) { outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition; failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message); }
             finally { visiting.Remove(id); }
             outcomes[id] = outcome;
             return outcome;
@@ -387,7 +387,7 @@ namespace RailroaderScenePatcher.Core {
             awaitingOutput.Add(target);
             return true;
         }
-        // The addition IDs a modification sets, and those that more than one modification of a document uses. A blank key is
+        // The addition IDs a modification sets, and those that more than one modification of a scene patch file uses. A blank key is
         // no ID: its modification fails for the empty key, not for sharing it. An addition ID
         // names one addition of its supplying mod, so every modification that shares one fails, wherever it stands.
         // Equipment IDs are a separate namespace from detection additions and appear as "equipment <id>".
@@ -402,9 +402,9 @@ namespace RailroaderScenePatcher.Core {
             foreach (var item in items) foreach (var id in AdditionIds(item)) if (!seen.Add(id)) shared.Add(id);
             return shared;
         }
-        internal static string SharedAddition(string id) => "Addition ID " + id + " is used by more than one modification; an addition ID names one addition in its document";
-        // Underlying state overlaid with every effective modification of this document for the object. The owner is the key
-        // of the document, which scopes the identities of its additions.
+        internal static string SharedAddition(string id) => "Addition ID " + id + " is used by more than one modification; an addition ID names one addition in its scene patch file";
+        // Underlying state overlaid with every effective modification of this scene patch file for the object. The owner is the key
+        // of the scene patch file, which scopes the identities of its additions.
         internal ObjectState Desired(JObject modifications, object target, string owner = "") {
             var entries = Entries(modifications);
             var effective = new Dictionary<string, Modification>(StringComparer.Ordinal);
@@ -413,8 +413,8 @@ namespace RailroaderScenePatcher.Core {
             foreach (var id in entries.Keys) Effective(id, entries, effective, order, targets, new HashSet<string>(), owner, shared);
             var state = Underlying(target);
             // The equipment without this mod is what stands now, less this mod's additions: other mods' additions stay as they
-            // are, and this mod's additions exist only through its document, even when an earlier application in this world
-            // left them, so an addition the document no longer lists is removed.
+            // are, and this mod's additions exist only through its scene patch file, even when an earlier application in this world
+            // left them, so an addition the scene patch file no longer lists is removed.
             if (state?.Equipment != null) {
                 var standing = scene.Read(target)?.Equipment ?? state.Equipment;
                 state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter);
@@ -455,7 +455,7 @@ namespace RailroaderScenePatcher.Core {
             return result;
         }
         // Why the modification under the key would not take effect because of its dependencies, or null: a dependency is
-        // missing from the document, fails itself, or the dependencies form a cycle. The same rules decide which
+        // missing from the scene patch file, fails itself, or the dependencies form a cycle. The same rules decide which
         // modifications Desired overlays.
         internal string IneffectiveReason(JObject modifications, string key, string owner = "") {
             var entries = Entries(modifications);
@@ -470,9 +470,9 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var dependency in dependencies) {
                     var loop = chain.IndexOf(dependency);
                     if (loop >= 0) return "its dependencies form the cycle " + String.Join(" -> ", chain.Skip(loop).Concat(new[] { dependency }));
-                    if (!entries.ContainsKey(dependency)) return "dependency " + dependency + " is missing from the document";
+                    if (!entries.ContainsKey(dependency)) return "dependency " + dependency + " is missing from the scene patch file";
                     var failure = DependencyFailure(dependency, entries, shared, owner);
-                    if (failure != null) return "dependency " + dependency + " does not take effect (" + PatchDocument.Sentence(failure) + ")";
+                    if (failure != null) return "dependency " + dependency + " does not take effect (" + ScenePatchFile.Sentence(failure) + ")";
                     var deeper = DependencyProblem(dependency, entries, shared, owner, chain);
                     if (deeper != null) return deeper;
                 }
@@ -505,7 +505,7 @@ namespace RailroaderScenePatcher.Core {
             return dependencies.Select(x => (string)x).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
         internal static readonly string[] Known = { "target", "placement", "active", "relationships", "starterPlacement", "dependsOn" };
-        // The modifications of a document by key, in ordinal key order.
+        // The modifications of a scene patch file by key, in ordinal key order.
         internal static SortedDictionary<string, JObject> Entries(JObject modifications) {
             var entries = new SortedDictionary<string, JObject>(StringComparer.Ordinal);
             foreach (var property in modifications.Properties()) if (property.Value is JObject item) entries[property.Name] = item;
@@ -517,10 +517,10 @@ namespace RailroaderScenePatcher.Core {
             if (item["id"] != null) return "Unsupported modification content: modification " + id + " carries an id member. The ID of a modification is its key, " + id + "; remove the id member";
             return Only(item, Known) ? null : "Unsupported modification content";
         }
-        // The owner is the key of the document the modification belongs to; it scopes the identities of its additions.
-        // The ID is the key of the modification; a modification that stands in a document has it without being told.
+        // The owner is the key of the scene patch file the modification belongs to; it scopes the identities of its additions.
+        // The ID is the key of the modification; a modification that stands in a scene patch file has it without being told.
         internal static Modification Parse(JObject item, string owner = "", string id = null) {
-            id = id ?? PatchDocument.Key(item);
+            id = id ?? ScenePatchFile.Key(item);
             var unsupported = UnsupportedContent(id, item);
             if (unsupported != null) throw new InvalidOperationException(unsupported);
             var dependencies = Dependencies(item);
@@ -599,7 +599,7 @@ namespace RailroaderScenePatcher.Core {
         // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by its native island span, with selected
         // tracks or an explicit detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every
         // circuit untouched. additions holds the detection additions keyed by their IDs: circuits the patcher adds for their
-        // selected tracks, which exist only while the document lists them. Neither the order of the two objects nor the
+        // selected tracks, which exist only while the scene patch file lists them. Neither the order of the two objects nor the
         // order of their keys has a meaning.
         static CrossingCoverage ParseCoverage(JToken token) {
             var coverage = token as JObject;
@@ -638,8 +638,8 @@ namespace RailroaderScenePatcher.Core {
             }
             return new CrossingCoverage(parsed);
         }
-        // Explicit equipment additions to a crossing controller, keyed by a persistent ID unique in this document: each holds the
-        // required pattern, a loaded source and a fixed placement. An addition this document omits stays untouched.
+        // Explicit equipment additions to a crossing controller, keyed by a persistent ID unique in this scene patch file: each holds the
+        // required pattern, a loaded source and a fixed placement. An addition this scene patch file omits stays untouched.
         static CrossingEquipment ParseEquipment(JToken token) {
             var entries = token as JObject;
             if (entries == null || !entries.HasValues) throw new InvalidOperationException("Invalid relationship: crossingEquipment must be an object with at least one entry, keyed by equipment ID");

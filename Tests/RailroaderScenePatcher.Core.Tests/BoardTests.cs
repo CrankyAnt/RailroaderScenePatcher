@@ -132,10 +132,10 @@ static class BoardTests {
         FailedEditWaitsForRestoredOutput();
         SaveRaisesMinimumForPatternBoards();
         InspectedOutputResolvesOncePerInspection();
-        ChangedObjectsAreReadFromTheDocument();
+        ChangedObjectsAreReadFromTheScenePatchFile();
     }
-    // The outliner marks every row this mod modifies. That reads the document alone and never searches the scene.
-    static void ChangedObjectsAreReadFromTheDocument() {
+    // The outliner marks every row this mod modifies. That reads the scene patch file alone and never searches the scene.
+    static void ChangedObjectsAreReadFromTheScenePatchFile() {
         var (world, board, boards, session, mapEditor, store) = PatchEditing();
         Assert(!session.IsChanged(Sylva), "An untouched object is not changed");
         Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied, "The board is placed");
@@ -234,7 +234,7 @@ static class BoardTests {
         Assert(!result.Outcomes["move"].Applied && !world.Boards.Any(b => Near(b.Position, Moved)), "An ambiguous board identity moves neither candidate");
         (world, board, boards, engine) = Setup();
         result = engine.Apply(Doc(Mod("move", Place(Moved)), "elsewhere"), "author/pack");
-        Assert(result.Error != null && result.Outcomes.Count == 0 && !Near(board.Position, Moved) && world.PlacementWrites == 0, "A map mismatch rejects the document before resolution");
+        Assert(result.Error != null && result.Outcomes.Count == 0 && !Near(board.Position, Moved) && world.PlacementWrites == 0, "A map mismatch rejects the scene patch file before resolution");
         (world, board, boards, engine) = Setup();
         result = engine.Apply(Doc("\"wrong\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + IndependentBoards.SylvaPath + "\",\"component\":\"Helpers.Culling.RendererCuller\",\"structure\":\"bridge-v1\"}," + Place(Moved) + ",\"dependsOn\":[]}"), "author/pack");
         Assert(!result.Outcomes["wrong"].Applied && world.PlacementWrites == 0, "Another structure identity does not resolve to a board");
@@ -328,9 +328,9 @@ static class BoardTests {
         var (world, board, boards, session, mapEditor, store) = PatchEditing();
         var original = (double[])board.Position.Clone();
         Assert(session.Edit(Sylva, PlacementAt(Moved), null).Applied && Near(board.Position, Moved) && Consistent(world, board) && world.Registrations == 1, "This mod's board placement moves the board and its registrations");
-        var document = JObject.Parse(session.DocumentText);
-        var modification = (JObject)document["modifications"].First.First;
-        Assert((string)modification["target"]["structure"] == IndependentBoards.Structure && modification["placement"] != null && modification.Properties().All(p => p.Name != "binding"), "The document records the board placement without a track binding");
+        var scenePatchFile = JObject.Parse(session.ScenePatchFileText);
+        var modification = (JObject)scenePatchFile["modifications"].First.First;
+        Assert((string)modification["target"]["structure"] == IndependentBoards.Structure && modification["placement"] != null && modification.Properties().All(p => p.Name != "binding"), "The scene patch file records the board placement without a track binding");
         mapEditor.Undo();
         Assert(Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Undo restores the captured placement and registrations without an owned leftover");
         mapEditor.Redo();
@@ -351,8 +351,8 @@ static class BoardTests {
         world.Clock = IndependentBoards.OutputTimeout + 1; boards.Poll();
         var output = session.Output(Sylva);
         Assert(output.Error != null && output.Completed.Count == 1 && output.Outstanding.Count == 1, "A terrain-write failure names its completed and outstanding writes");
-        Assert(Near(board.Position, Far) && session.DocumentText.Contains("26310"), "The in-memory edit survives the terrain-write failure");
-        Assert(mapEditor.Save() == null && !mapEditor.IsDirty, "Save persists the document; Save does not write the generated terrain output");
+        Assert(Near(board.Position, Far) && session.ScenePatchFileText.Contains("26310"), "The in-memory edit survives the terrain-write failure");
+        Assert(mapEditor.Save() == null && !mapEditor.IsDirty, "Save persists the scene patch file; Save does not write the generated terrain output");
         Assert(!session.Output(Sylva).Settled, "Save does not report the failed terrain output complete");
         var retry = session.RetryOutput(Sylva);
         Assert(retry.Applied && !session.Output(Sylva).Settled && session.Output(Sylva).Error == null, "Retry requests the outstanding write again without reporting it complete");
@@ -366,7 +366,7 @@ static class BoardTests {
         world.FailRebuildCount = 1;
         var failed = session.Edit(Sylva, PlacementAt(Moved), null);
         Assert(!failed.Applied && failed.Error.Contains("restored") && Near(board.Position, original) && Consistent(world, board), "A failed edit restores the board and its registrations: " + failed.Error);
-        Assert(JObject.Parse(session.DocumentText)["modifications"].Count() == 0 && mapEditor.UndoGroups.Count == 0, "A failed edit leaves the document and history unchanged");
+        Assert(JObject.Parse(session.ScenePatchFileText)["modifications"].Count() == 0 && mapEditor.UndoGroups.Count == 0, "A failed edit leaves the scene patch file and history unchanged");
         var blocked = session.Edit(Sylva, PlacementAt(Moved), null);
         Assert(!blocked.Applied && blocked.Error.Contains("cleanup"), "The board waits for the restored terrain output before the next edit");
         world.PendingTiles.Clear(); world.Clock = IndependentBoards.OutputTimeout + 1; boards.Poll();

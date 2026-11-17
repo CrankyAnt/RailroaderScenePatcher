@@ -21,7 +21,7 @@ The source must already be loaded in the map you are editing. The patcher never 
 
 ### Rejected sources
 
-The editor lists every device beneath a loaded crossing controller, including the bell player each controller generates, and gives each rejected one its concrete reason:
+Scene patch editing lists every device beneath a loaded crossing controller, including the bell player each controller generates, and gives each rejected one its concrete reason:
 
 | Reason | Meaning |
 | --- | --- |
@@ -46,25 +46,25 @@ The editor lists every device beneath a loaded crossing controller, including th
 - Each addition is an added object: the outliner lists it once in the family **Added light or gate**, marked with `+`, and its state line shows **+ ADDED**. The parts of the copy are not listed, and its culling, initialization and Undo/Redo steps do not mark the inventory stale. You edit it on its crossing's **Connections** tab.
 - An addition that fails its check blocks only equipment edits of that crossing until the world reloads. Coverage and detection edits of the same crossing stay available.
 - The crossing object, its coverage and its native equipment do not change.
-- Each addition has an ID that is unique in your document: one modification may use it, and two modifications that share it both fail. The editor refuses an ID another modification already uses. The patcher scopes it to your mod, so another supplying mod can use the same ID without a conflict, and a document never moves or removes another mod's additions.
+- Each addition has an ID that is unique in your scene patch file: one modification may use it, and two modifications that share it both fail. Scene patch editing refuses an ID another modification already uses. The patcher scopes it to your mod, so another supplying mod can use the same ID without a conflict, and a scene patch file never moves or removes another mod's additions.
 
 ## Add equipment in the native map editor
 
 1. Open the Scene patches window and inspect the crossing controller, from the outliner (family **Crossing controller**) or by selecting it in the world.
 2. On the **Connections** tab, read **Lights and gates** for the current additions and **Add a light or gate** for the devices. Each rejected device shows its reason; **Why a device is rejected** opens the table above.
-3. Select **Use** for an eligible device; each button names the device and its crossing, such as **Use Signal 1 at Allen**. The form **Light or gate** opens at the top of the tab. Its proposed **Equipment ID** is not yet used in your document, with a numeric suffix when the name is taken. Its proposed placement puts the copy at the inspected crossing as the device stands at its own crossing, five metres aside. Change the **Equipment ID**, the **Position** in map coordinates and the **Rotation** in degrees as needed.
+3. Select **Use** for an eligible device; each button names the device and its crossing, such as **Use Signal 1 at Allen**. The form **Light or gate** opens at the top of the tab. Its proposed **Equipment ID** is not yet used in your scene patch file, with a numeric suffix when the name is taken. Its proposed placement puts the copy at the inspected crossing as the device stands at its own crossing, five metres aside. Change the **Equipment ID**, the **Position** in map coordinates and the **Rotation** in degrees as needed.
 4. Select **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt or removed. Nothing changes yet.
 5. Select **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
 
 To move an addition, select **Edit** with its ID, change the fields, preview and apply. To remove one, select **Edit**, then **Remove** at the bottom of the tab and apply. **Remove modification** in the footer removes your mod's coverage, detection additions and lights and gates of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including rebuilding a removed addition.
 
-**Lights and gates** shows each addition's state: visible with its lamp and gate observers registered, initialization pending, or culled with its crossing. An addition of your document that could not be built, for example because its source is missing, is listed with **Not built** and its reason; **Edit** opens it so you can correct it or remove it.
+**Lights and gates** shows each addition's state: visible with its lamp and gate observers registered, initialization pending, or culled with its crossing. An addition of your scene patch file that could not be built, for example because its source is missing, is listed with **Not built** and its reason; **Edit** opens it so you can correct it or remove it.
 
-Save writes the additions to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the copies in native map data; the patcher rebuilds them from the document on every load, and a repeated load reconciles existing copies instead of duplicating them.
+Save writes the additions to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the copies in native map data; the patcher rebuilds them from the scene patch file on every load, and a repeated load reconciles existing copies instead of duplicating them.
 
 If an edit fails, the message area reports whether the prior equipment was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
-## Write equipment in the document
+## Write equipment in the scene patch file
 
 Target the crossing controller as for coverage, with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`, and key the additions by their IDs under `relationships.crossingEquipment`. The modification is itself an entry of `modifications`, keyed by its ID:
 
@@ -89,7 +89,7 @@ Target the crossing controller as for coverage, with `component` `Track.Crossing
 }
 ```
 
-The scene, paths and coordinates are placeholders; use the values the editor shows for your crossing and source. The modification that targets a crossing records the controller relationship: its additions belong to that controller. An entry holds no `id` member: its key is its ID. The field rules are in the [patch document v1 reference](patch-document-v1.md#crossing-equipment).
+The scene, paths and coordinates are placeholders; use the values scene patch editing shows for your crossing and source. The modification that targets a crossing records the controller relationship: its additions belong to that controller. An entry holds no `id` member: its key is its ID. The field rules are in the [scene patch file v1 reference](scene-patch-file-v1.md#crossing-equipment).
 
 ## Limits
 

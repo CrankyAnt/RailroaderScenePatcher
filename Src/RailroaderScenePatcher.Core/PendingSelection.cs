@@ -106,7 +106,7 @@ namespace RailroaderScenePatcher.Core {
                 throw new InvalidOperationException("The loaded map context is unavailable");
         }
 
-        // The choice only inspects its result, as Select in world does: no patch document will name it.
+        // The choice only inspects its result, as Select in world does: no scene patch file will name it.
         public bool InspectOnly { get; set; }
         public void Offer(IEnumerable<SelectionCandidate> hits) {
             if (!IsPending) return;
@@ -152,7 +152,7 @@ namespace RailroaderScenePatcher.Core {
             if (!IsPending || Candidate == null) return false;
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
                 return Reject("The loaded map changed. Cancel and start a new selection.");
-            // An identity that several objects share cannot be targeted by a patch: a document names its target by that
+            // An identity that several objects share cannot be targeted by a patch: a scene patch file names its target by that
             // identity, and nothing in it could tell the objects apart. Inspecting or picking again does not change
             // that, so the refusal says so instead of asking for it.
             var sharedSource = false;
@@ -163,7 +163,7 @@ namespace RailroaderScenePatcher.Core {
             difference = Difference(Candidate, out var sharedCandidate);
             // An object chosen only to be inspected (InspectOnly) needs no identity a patch could name: it is
             // confirmed by itself when it is still there, and it then says under its supported edits why it cannot
-            // be edited. As a replacement target it is refused, since the document would have to name it.
+            // be edited. As a replacement target it is refused, since the scene patch file would have to name it.
             if (difference != null && sharedCandidate && InspectOnly && Source == null && Kind == SelectionKind.SceneObject && StillOffered(Candidate)) difference = null;
             if (difference != null)
                 return Reject(sharedCandidate ? "The candidate shares its identity " + Candidate.Identity + " with another object, so a patch cannot target it. Pick an object whose path is unique."
@@ -211,8 +211,8 @@ namespace RailroaderScenePatcher.Core {
     }
 
     // Which candidates a world choice offers. A choice that only inspects offers every candidate. A choice whose result
-    // a patch document has to name, such as a replacement object, offers no candidate whose identity another candidate
-    // shares: the document could not tell them apart, so offering one would only lead to a refusal.
+    // a scene patch file has to name, such as a replacement object, offers no candidate whose identity another candidate
+    // shares: the scene patch file could not tell them apart, so offering one would only lead to a refusal.
     public static class SelectionOffers {
         public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly) {
             var all = (candidates ?? Enumerable.Empty<SelectionCandidate>()).Where(c => c != null).ToArray();
@@ -229,7 +229,7 @@ namespace RailroaderScenePatcher.Core {
 
         public SelectionSession(ISelectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
 
-        // inspectOnly says the choice only inspects its result: no patch document will name it.
+        // inspectOnly says the choice only inspects its result: no scene patch file will name it.
         public void Begin(SelectionKind kind, string purpose, SelectionCandidate source = null, bool inspectOnly = false) {
             if (Pending != null) throw new InvalidOperationException("A selection is already pending");
             Pending = new PendingSelection(scene, kind, purpose, source) { InspectOnly = inspectOnly };

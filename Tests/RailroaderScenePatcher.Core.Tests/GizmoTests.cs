@@ -139,24 +139,24 @@ static class GizmoTests {
         var f = new Fixture(); var gesture = f.Begin();
         Assert(gesture.Preview(PlacementAt(112)).Applied && f.Box.X == 12, "Dragging previews the checked map placement in the world");
         Assert(gesture.Preview(PlacementAt(114)).Applied && f.Box.X == 14, "Successive previews use absolute desired state without drift");
-        Assert(f.MapEditor.UndoGroups.Count == 0 && !f.MapEditor.IsDirty && JObject.Parse(f.Session.DocumentText)["modifications"].Count() == 0, "Preview creates no canonical edit or history entry");
+        Assert(f.MapEditor.UndoGroups.Count == 0 && !f.MapEditor.IsDirty && JObject.Parse(f.Session.ScenePatchFileText)["modifications"].Count() == 0, "Preview creates no canonical edit or history entry");
         var moved = gesture.Complete();
         Assert(moved.Applied && !moved.Unchanged && f.MapEditor.UndoGroups.Count == 1, "One completed gesture registers one native operation");
-        var placement = JObject.Parse(f.Session.DocumentText)["modifications"].First.First["placement"];
+        var placement = JObject.Parse(f.Session.ScenePatchFileText)["modifications"].First.First["placement"];
         Assert((string)placement["mode"] == "fixed" && (double)placement["position"][0] == 114 && (double)placement["rotation"][1] == 0.6, "Canonical desired state holds map position and complete rotation");
         f.MapEditor.Undo();
-        Assert(f.Box.X == 7 && f.Box.Rotation[3] == 1 && JObject.Parse(f.Session.DocumentText)["modifications"].Count() == 0, "Undo restores the prior effective world and document");
+        Assert(f.Box.X == 7 && f.Box.Rotation[3] == 1 && JObject.Parse(f.Session.ScenePatchFileText)["modifications"].Count() == 0, "Undo restores the prior effective world and scene patch file");
         f.MapEditor.Redo();
         Assert(f.Box.X == 14 && f.MapEditor.Save() == null && !f.MapEditor.IsDirty && f.Store.Info.Contains("crankyant/scene-patcher"), "Redo and Save persist patch and dependency with clean accounting");
         var loaded = new Fixture(); loaded.Scene.Origin = 110;
         var applied = loaded.Engine.Apply(f.Store.Patch);
-        Assert(applied.Error == null && applied.Outcomes.Values.Single().Applied && loaded.Box.X == 4 && loaded.Box.Rotation[1] == 0.6, "The complete saved document reproduces the placement at a different origin");
+        Assert(applied.Error == null && applied.Outcomes.Values.Single().Applied && loaded.Box.X == 4 && loaded.Box.Rotation[1] == 0.6, "The complete saved scene patch file reproduces the placement at a different origin");
         loaded.Engine.Apply(f.Store.Patch);
         Assert(loaded.Box.X == 4, "Repeated load reconciles desired state without accumulated movement");
     }
     // A rotation about the vertical axis by the given angle, at the fixture object's own map position.
     static Placement Turned(double degrees) { var half = degrees * Math.PI / 360; return new Placement(new[] { 107.0, 2.0, 3.0 }, new[] { 0.0, Math.Sin(half), 0.0, Math.Cos(half) }); }
-    static JToken Modifications(Fixture f) => JObject.Parse(f.Session.DocumentText)["modifications"];
+    static JToken Modifications(Fixture f) => JObject.Parse(f.Session.ScenePatchFileText)["modifications"];
     // A completed gesture is one operation however small its rotation; only a gesture that ends where it began is none.
     static void SmallRotationsCompleteAsOperations() {
         foreach (var degrees in new[] { 0.4, 0.1, 0.02 }) {
@@ -165,7 +165,7 @@ static class GizmoTests {
             var completed = gesture.Complete();
             Assert(completed.Applied && f.MapEditor.UndoGroups.Count == 1 && Modifications(f).Count() == 1, "A rotation of " + degrees + " degrees completes as one operation: " + completed.Error + " history " + f.MapEditor.UndoGroups.Count);
             var rotation = Modifications(f).First.First["placement"]["rotation"];
-            Assert((double)rotation[1] == placement.Rotation[1] && (double)rotation[3] == placement.Rotation[3] && f.Box.Rotation[1] == placement.Rotation[1] && f.Box.X == 7, "The document and the world hold the small rotation: " + rotation);
+            Assert((double)rotation[1] == placement.Rotation[1] && (double)rotation[3] == placement.Rotation[3] && f.Box.Rotation[1] == placement.Rotation[1] && f.Box.X == 7, "The scene patch file and the world hold the small rotation: " + rotation);
             f.MapEditor.Undo();
             Assert(f.Box.Rotation[1] == 0 && f.Box.Rotation[3] == 1 && Modifications(f).Count() == 0, "Undo restores the prior rotation");
             f.MapEditor.Redo();

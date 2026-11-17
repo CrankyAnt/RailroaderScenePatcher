@@ -8,9 +8,9 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    internal static class ModDocuments {
+    internal static class ModScenePatchFiles {
         internal const string PatcherId = LoadedMod.PatcherId;
-        // Raised after the patcher wrote the edited mod's patch document, with the written text.
+        // Raised after the patcher wrote the edited mod's scene patch file, with the written text.
         internal static Action<string> Written;
         internal static string ReadUtf8(string path) => ModStorage.Decode(File.ReadAllBytes(path));
         // The storage of the edited mod, the only destination the patcher writes. Mods that supply a map layer or terrain tile set are never one.
@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher {
             var root = Native.Call(manager, "GetPackBasePathForDefinition", Native.Read(Native.Type("Game.ActiveMapDefinition"), "Identifier")) as string;
             return root == null ? null : Path.GetFullPath(root);
         }
-        // The identifier of the mod that owns the active map definition: the key its patch document is applied under.
+        // The identifier of the mod that owns the active map definition: the key its scene patch file is applied under.
         internal static string EditedModId() {
             var root = ActiveRoot();
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
@@ -44,7 +44,7 @@ namespace RailroaderScenePatcher {
                 }
             throw new InvalidOperationException("Edited mod owner unavailable");
         }
-        // The mods carrying a patch document, in Railroader's load order (AssetPackManager.OrderedPacks). In the native map editor only the
+        // The mods carrying a scene patch file, in Railroader's load order (AssetPackManager.OrderedPacks). In the native map editor only the
         // edited mod is returned, marked as edit target. Whether a mod applies is decided by LoadedMod and the engine.
         internal static IReadOnlyList<LoadedMod> Discover() {
             var manager = Native.Read(Native.Type("Model.Database.AssetPackManager"), "Shared");
@@ -71,7 +71,7 @@ namespace RailroaderScenePatcher {
                     if (String.IsNullOrWhiteSpace(identifier)) throw new InvalidOperationException("Mod identifier unavailable");
                     string info = null, json = null, error = null;
                     try { info = ReadUtf8(Path.Combine(root, "Info.json")); json = ReadUtf8(path); }
-                    catch (Exception e) { error = "Cannot read patch document or supplying metadata: " + e.GetType().Name; }
+                    catch (Exception e) { error = "Cannot read scene patch file or supplying metadata: " + e.GetType().Name; }
                     var mod = error == null ? LoadedMod.Read(identifier, info, json, editedModRoot != null) : new LoadedMod(new PatchSource(identifier, identifier, null), null, null, editedModRoot != null, error);
                     found.Add(mod);
                 } catch (Exception e) {

@@ -114,7 +114,7 @@ namespace RailroaderScenePatcher {
         }
         // The devices beneath every loaded crossing controller: its direct children that hold lamps, gates or bell players, or
         // are culled with it. The controller's generated bell player is listed too, and rejected with its reason, so the
-        // editor explains why a bell does not qualify. The patcher's own additions are not offered.
+        // scene patch editing explains why a bell does not qualify. The patcher's own additions are not offered.
         public IReadOnlyList<SourceCandidate> Candidates(object target) {
             var result = new List<SourceCandidate>();
             foreach (var owner in Resources.FindObjectsOfTypeAll(controller).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)).Select(c => c.gameObject).Distinct()) {
@@ -125,8 +125,8 @@ namespace RailroaderScenePatcher {
                     var device = All(child, lamp).Length + All(child, gate).Length > 0 || (bell != null && All(child, bell).Length > 0);
                     if (!device && !listed.Contains(child)) continue;
                     var model = All(child, gate).Select(g => g.name).Concat(All(child, lamp).Select(l => l.name)).FirstOrDefault() ?? child.name;
-                    Pose(child.transform, out var position, out var rotation);
-                    Pose(owner.transform, out var crossingPosition, out var crossingRotation);
+                    Placement(child.transform, out var position, out var rotation);
+                    Placement(owner.transform, out var crossingPosition, out var crossingRotation);
                     result.Add(new SourceCandidate(new EquipmentSource(child.scene.name, BoardScene.PathOf(child.transform)), model, SourceProblem(child, target, EquipmentAddition.LightGatePattern),
                         position, rotation, child.name, CrossingEquipment.Place(owner.name, Ancestors(owner.transform)), crossingPosition, crossingRotation));
                 }
@@ -134,7 +134,7 @@ namespace RailroaderScenePatcher {
             return result;
         }
         // A map placement, or nulls when the floating origin cannot convert it.
-        void Pose(Transform t, out double[] position, out double[] rotation) {
+        void Placement(Transform t, out double[] position, out double[] rotation) {
             position = null; rotation = null;
             try { var p = (Vector3)Native.Call(transformer, "WorldToGame", t.position); var r = t.rotation; position = new double[] { p.x, p.y, p.z }; rotation = new double[] { r.x, r.y, r.z, r.w }; } catch { }
         }
@@ -222,12 +222,12 @@ namespace RailroaderScenePatcher {
             UnityEngine.Object.Destroy(wrapper);
         }
         public bool Present(object addition) { var owned = (OwnedEquipment)addition; return owned != null && !owned.Retired && owned.Controller != null && owned.transform.parent == owned.Controller.transform; }
-        public Placement Pose(object addition) {
+        public Placement Placement(object addition) {
             var copy = ((OwnedEquipment)addition).gameObject;
             var p = (Vector3)Native.Call(transformer, "WorldToGame", copy.transform.position); var r = copy.transform.rotation;
             return new Placement(new double[] { p.x, p.y, p.z }, new double[] { r.x, r.y, r.z, r.w });
         }
-        public void SetPose(object addition, Placement placement) => Place(((OwnedEquipment)addition).gameObject, placement);
+        public void SetPlacement(object addition, Placement placement) => Place(((OwnedEquipment)addition).gameObject, placement);
         void Place(GameObject copy, Placement placement) {
             if (Native.Read(transformer, "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");
             var game = new Vector3(Checked(placement.Position[0]), Checked(placement.Position[1]), Checked(placement.Position[2]));

@@ -38,16 +38,16 @@ static class CompositionTests {
         public bool BoardConsistent => Board.Active ? Board.Sphere != null && Board.Keys.Count == 1 && Boards.MaskStore.ContainsKey(Board.Keys[0]) : Board.Sphere == null && Board.Keys.Count == 0;
     }
     internal static void Run() {
-        OneDocumentAppliesBoardAndBridge();
+        OneScenePatchFileAppliesBoardAndBridge();
         DependentOutputReachesTheOwningCapability();
         UnavailableCapabilityLeavesTheOtherAvailable();
-        VersionMinimumIsTheDocumentMaximum();
+        VersionMinimumIsTheScenePatchFileMaximum();
         Console.WriteLine("PASS: board and bridge capability composition");
     }
-    static void OneDocumentAppliesBoardAndBridge() {
+    static void OneScenePatchFileAppliesBoardAndBridge() {
         var w = new World();
         var result = w.Engine.Apply(Doc(Bridge("bridge", 1055, "[\"board\"]") + "," + Board("board", Moved)), "author/pack");
-        Assert(result.Error == null && result.Outcomes["board"].Applied && result.Outcomes["bridge"].Applied, "One document places the board and the bridge: " + result.Error + result.Outcomes["board"].Error + result.Outcomes["bridge"].Error);
+        Assert(result.Error == null && result.Outcomes["board"].Applied && result.Outcomes["bridge"].Applied, "One scene patch file places the board and the bridge: " + result.Error + result.Outcomes["board"].Error + result.Outcomes["bridge"].Error);
         Assert(w.Board.Position.Zip(Moved, (a, b) => Math.Abs(a - b)).All(d => d < 0.001) && w.BoardConsistent && w.Boards.Registrations == 1, "The board moves with its culling and mask registration");
         Assert(Math.Abs(w.Bridge.Position[0] - 55) < 0.001 && w.Bridges.TrestlePosition[0] == 60, "The bridge moves and its separate trestle stays");
         result = new PatchEngine(w.Scene).Apply(Doc(Board("untyped", Moved, structure: "")), "author/pack");
@@ -88,7 +88,7 @@ static class CompositionTests {
         Assert(result.Outcomes["board"].Applied && !result.Outcomes["bridge"].Applied && result.Outcomes["bridge"].Error.Contains("bridge functions missing"), "An unavailable bridge capability fails only the bridge modification");
         Assert(w.Bridges.Mutations == 0 && w.BoardConsistent, "The board applies with its registrations while the bridge is untouched");
     }
-    static void VersionMinimumIsTheDocumentMaximum() {
+    static void VersionMinimumIsTheScenePatchFileMaximum() {
         PatchEditingSession Session(World w, Store store) { var mapEditor = new NativeMapEditor(); var s = new PatchEditingSession(w.Engine, mapEditor, store); mapEditor.Session = s; return s; }
         var cases = new (string Name, string Items, bool BoardAvailable, bool BridgeAvailable, string Expected)[] {
             ("Sylva placement", Board("a", Moved), true, true, "0.1.0"),
@@ -101,8 +101,8 @@ static class CompositionTests {
         foreach (var c in cases) {
             var w = new World(c.BoardAvailable, c.BridgeAvailable);
             var session = Session(w, new Store { Patch = Doc(c.Items) });
-            Assert(session.Blocked == null, c.Name + ": the document is editable: " + session.Blocked);
-            Assert(session.MinimumPatcherVersion == c.Expected, c.Name + ": the minimum is the highest requirement of the document, got " + session.MinimumPatcherVersion);
+            Assert(session.Blocked == null, c.Name + ": the scene patch file is editable: " + session.Blocked);
+            Assert(session.MinimumPatcherVersion == c.Expected, c.Name + ": the minimum is the highest requirement of the scene patch file, got " + session.MinimumPatcherVersion);
         }
         foreach (var component in new[] { "Track.TrackMarker", CrossingCoverageScene.ComponentType }) {
             var content = "\"disable\":{\"target\":{\"scene\":\"scene\",\"path\":\"unavailable\",\"component\":\"" + component + "\"},\"active\":false,\"dependsOn\":[]}";

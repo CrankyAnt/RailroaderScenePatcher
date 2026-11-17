@@ -5,7 +5,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // A temporary checked preview. Only Complete changes the canonical document and native history.
+    // A temporary checked preview. Only Complete changes the canonical scene patch file and native history.
     public sealed class PlacementGesture {
         readonly PatchEngine engine;
         readonly PatchEditingSession session;
@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher.Core {
             target = engine.ResolveUnique(identity); maps = scene.MapIds.ToArray();
             if (engine.IsUnsafe(target)) throw new InvalidOperationException("Target cleanup is unverified; recheck before editing");
             engine.GuardMutation(identity, target, maps, inspected);
-            var own = PatchDocument.Load(session.DocumentText).Items.Where(item => {
+            var own = ScenePatchFile.Load(session.ScenePatchFileText).Items.Where(item => {
                 try { return ReferenceEquals(engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)), target); }
                 catch (InvalidOperationException) { return false; }
             }).ToArray();

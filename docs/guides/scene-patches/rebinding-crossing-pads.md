@@ -4,7 +4,7 @@
 
 This guide shows how to set or replace the track location of a crossing pad, and what changes with it. The binding is the only way to move a pad in the native map editor: the **Placement** tab shows the pad's placement, and its modes **Numeric**, **Gizmo**, **Snap** and **Follow** are inactive for a pad, because none of them changes the binding the pad's geometry is generated along. A crossing pad is the road surface laid across the rails at a grade crossing. Its object holds a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding decides where the pad lies on the track.
 
-The game generates a pad once, when the pad first comes into view or close to the camera, and does not generate it again by itself. Writing a new location alone leaves the old mesh where it was. The patcher therefore runs the game's own pad generation after every binding change, so the visible pad and its culling follow the mod's location. A document with a crossing-pad modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
+The game generates a pad once, when the pad first comes into view or close to the camera, and does not generate it again by itself. Writing a new location alone leaves the old mesh where it was. The patcher therefore runs the game's own pad generation after every binding change, so the visible pad and its culling follow the mod's location. A scene patch file with a crossing-pad modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
 
 ## What qualifies
 
@@ -36,7 +36,7 @@ The patcher verifies the stored location, the single graph registration, that th
 
 ## Detaching is refused
 
-A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach** at the bottom of the tab is unavailable for pads, and its tooltip says why, and a document that detaches a pad fails before any change. To hide a pad, disable it.
+A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach** at the bottom of the tab is unavailable for pads, and its tooltip says why, and a scene patch file that detaches a pad fails before any change. To hide a pad, disable it.
 
 ## Placement and activity
 
@@ -52,7 +52,7 @@ If an edit fails and the patcher cannot verify the restoration, it reports incom
 
 ## Write the binding by hand
 
-Copy the inspected identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
+Copy the inspected identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [scene patch file v1](scene-patch-file-v1.md):
 
 ```json
 "bind-crossing-pad": {
@@ -77,7 +77,7 @@ The automated tests check rebinding, replacement, repair of a broken binding, re
 
 Research on Railroader 0.6.2 observed the pad Mg74 at `World/Roads Wilmot/Crossing Unprotected/Crossing Pad`: a one-metre rebind left the mesh and culling sphere unchanged for at least 17 seconds, explicit generation shifted the visible pad along the track, and generating again after restoring the binding returned the recorded vertex signature, bounds and culling sphere.
 
-One native journey on Railroader 0.6.2 with patcher commit `a282015` exercised the same pad in the native map editor of a test mod. The inventory listed Mg74 as a `Crossing pad marker` with `crossing-pad-v1`, binding Sj7c end a at 185.9477 and one registration owned by the marker, and offered no detach. Setting the binding to 186.9477 shifted the visible pad about one metre along the track while the pad object kept its position, and a ten-metre check shifted it clearly. The graph then held one registration at the new location. A missing segment and a distance beyond the segment were refused without change. Native Undo returned the pad to its baseline alignment on the road and Redo restored the rebound pad. Remove modification returned the baseline and its Undo the rebound pad. After Save and a native map editor reload, the document held one modification and the pad showed the saved binding with one registration. While the inspected pad stayed in view during camera movement, the inventory did not become stale because of the pad.
+One native journey on Railroader 0.6.2 with patcher commit `a282015` exercised the same pad in the native map editor of a test mod. The inventory listed Mg74 as a `Crossing pad marker` with `crossing-pad-v1`, binding Sj7c end a at 185.9477 and one registration owned by the marker, and offered no detach. Setting the binding to 186.9477 shifted the visible pad about one metre along the track while the pad object kept its position, and a ten-metre check shifted it clearly. The graph then held one registration at the new location. A missing segment and a distance beyond the segment were refused without change. Native Undo returned the pad to its baseline alignment on the road and Redo restored the rebound pad. Remove modification returned the baseline and its Undo the rebound pad. After Save and a native map editor reload, the scene patch file held one modification and the pad showed the saved binding with one registration. While the inspected pad stayed in view during camera movement, the inventory did not become stale because of the pad.
 
 A second native journey with patcher commit `ab2816f` compared the pad's geometry numerically, with the camera at the pad. Before the edit the pad held one generated mesh object with 1300 vertices, and its culling sphere matched the mesh bounds. The rebinding to 186.9477 changed the vertex hash and moved the bounds and the culling sphere 0.993 metres along the track; the sphere stayed aligned with the new bounds and the radius stayed 4.307 metres. Native Undo, and Redo followed by Remove modification, each restored the original vertex hash, bounds and culling sphere exactly. A pad far from the camera held no generated mesh yet, as the game generates it only when it comes near.
 

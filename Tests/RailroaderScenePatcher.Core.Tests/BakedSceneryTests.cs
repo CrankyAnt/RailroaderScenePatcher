@@ -102,7 +102,7 @@ static class BakedSceneryTests {
         UnmatchedAndAmbiguousPathsFailBeforeMutation();
         AnotherMapContextFailsBeforeMutation();
         RepeatedApplicationAccumulatesNoOffset();
-        PreflightRefusalLeavesSceneAndDocumentUnchanged();
+        PreflightRefusalLeavesSceneAndScenePatchFileUnchanged();
         FailureAfterMutationRestoresTheGroup();
         IncompleteCleanupBlocksRetry();
         EditingHistoryRemovalAndSave();
@@ -121,7 +121,7 @@ static class BakedSceneryTests {
         Assert(!BakedSceneryRules.SpanListed(serialized: false, patcherOwned: false), "A span the game builds while it runs is not listed");
         Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true), "A scene span and the patcher's own spans are listed");
     }
-    // The components of World/Environment Effects/Fireflies * in the base map: a VFX Graph effect, whose VFXRenderer is a
+    // The components of World/Environment Effects/Fireflies * in the base-game map: a VFX Graph effect, whose VFXRenderer is a
     // renderer that nothing can run into. A particle system's renderer is the same; a mesh, collider or light is not.
     static void EffectsGiveNoPresence() {
         var fireflies = new[] { "UnityEngine.Transform", "UnityEngine.VFX.VisualEffect", "UnityEngine.VFX.VFXRenderer", "Effects.ClockDrivenVisualEffect" };
@@ -134,12 +134,12 @@ static class BakedSceneryTests {
     static void VersionHoldsWithoutTheCapability() {
         var store = new Store { Patch = Doc(Group("move-house")) }; var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(new Scene { Maps = new[] { "map" } }), mapEditor, store); mapEditor.Session = session;
-        Assert(session.MinimumPatcherVersion == BakedSceneryGroups.RequiredVersion, "A group document requires the group capability version: " + session.MinimumPatcherVersion);
+        Assert(session.MinimumPatcherVersion == BakedSceneryGroups.RequiredVersion, "A group scene patch file requires the group capability version: " + session.MinimumPatcherVersion);
     }
     static void AnotherMapContextFailsBeforeMutation() {
         var (world, group, scene) = Setup();
         var result = new PatchEngine(scene).Apply(Doc(Group("move-house"), "other-map"));
-        Assert(result.Error != null && result.Outcomes.Count == 0 && world.Mutations == 0 && group.Position[0] == 100, "A document for another map context is rejected before mutation");
+        Assert(result.Error != null && result.Outcomes.Count == 0 && world.Mutations == 0 && group.Position[0] == 100, "A scene patch file for another map context is rejected before mutation");
     }
     static void RepeatedApplicationAccumulatesNoOffset() {
         var (world, group, scene) = Setup();
@@ -149,16 +149,16 @@ static class BakedSceneryTests {
         world.Origin = 1010;
         Assert(new PatchEngine(scene).Apply(Doc(Group("move-house"))).Outcomes["move-house"].Applied && group.Position[0] == 100, "A load at another origin reaches the same map placement");
     }
-    static void PreflightRefusalLeavesSceneAndDocumentUnchanged() {
+    static void PreflightRefusalLeavesSceneAndScenePatchFileUnchanged() {
         var (world, group, scene) = Setup();
         world.Refused = "The group's scene is not loaded";
         var outcome = new PatchEngine(scene).Apply(Doc(Group("move-house"))).Outcomes["move-house"];
         Assert(!outcome.Applied && outcome.Error.Contains("not loaded") && world.Mutations == 0 && group.Position[0] == 100 && group.Active, "A refused group is not touched: " + outcome.Error);
         var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
-        var before = session.DocumentText;
-        Assert(!session.Edit(Identity, new Placement(new[] { 1110.0, 10, 20 }, new[] { 0.0, 0, 0, 1 }), null).Applied && session.DocumentText == before && world.Mutations == 0 && !mapEditor.CanUndo,
-            "A scene patch editing refusal leaves the scene, the patch document and the history unchanged");
+        var before = session.ScenePatchFileText;
+        Assert(!session.Edit(Identity, new Placement(new[] { 1110.0, 10, 20 }, new[] { 0.0, 0, 0, 1 }), null).Applied && session.ScenePatchFileText == before && world.Mutations == 0 && !mapEditor.CanUndo,
+            "A scene patch editing refusal leaves the scene, the scene patch file and the history unchanged");
     }
     static void FailureAfterMutationRestoresTheGroup() {
         var cases = new (Action<FakeGroupWorld> inject, string extra)[] { (w => w.ThrowAfterPlacement = true, ",\"active\":false"), (w => w.SkipCullingRefresh = true, ""), (w => w.LeavePartBehind = true, ",\"active\":false") };
@@ -192,9 +192,9 @@ static class BakedSceneryTests {
         var moved = new Placement(new[] { 1110.0, 10, 20 }, new[] { 0, 0.130526, 0, 0.991445 });
         Assert(session.Edit(Identity, moved, null).Applied && group.Position[0] == 110 && Offsets(group).SequenceEqual(offsets), "A scene patch editing group move moves the whole group");
         Assert(session.Edit(Identity, null, false).Applied && !group.Active, "A scene patch editing Enabled off deactivates the group root");
-        var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].First.First;
+        var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].First.First;
         Assert((string)item["target"]["structure"] == BakedSceneryGroups.Structure && (string)item["target"]["component"] == "UnityEngine.Transform" && item["placement"] != null && (bool)item["active"] == false,
-            "The document records the group's placement and activity");
+            "The scene patch file records the group's placement and activity");
         Assert(mapEditor.IsDirty, "Unsaved group edits leave the session dirty");
         mapEditor.Undo(); Assert(group.Active && group.Position[0] == 110, "Undo re-enables the moved group");
         mapEditor.Undo(); Assert(group.Position.SequenceEqual(new[] { 100.0, 10, 20 }) && Offsets(group).SequenceEqual(offsets) && !mapEditor.IsDirty, "Undo restores the prior placement, and nothing is left to save");
@@ -207,11 +207,11 @@ static class BakedSceneryTests {
         Assert(reload.Outcomes.Values.Single().Applied && fresh.Position[0] == 110 && !fresh.Active && fresh.Parts.Count == 3, "A reloaded world reproduces the group edits without duplicated state");
         Assert(session.Remove(Identity).Applied && group.Position[0] == 100 && group.Active && Offsets(group).SequenceEqual(offsets), "Remove modification returns the effective underlying state");
         mapEditor.Undo(); Assert(group.Position[0] == 110 && !group.Active, "Undo of the removal restores this mod's group edits");
-        Assert(mapEditor.IsDirty == false, "Undo back to the saved document leaves nothing to save");
+        Assert(mapEditor.IsDirty == false, "Undo back to the saved scene patch file leaves nothing to save");
         var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
         var (_, other, otherScene) = Setup();
-        var editor = new NativeMapEditor(); var kept = new PatchEditingSession(new PatchEngine(otherScene), editor, strict); editor.Session = kept;
-        Assert(kept.Edit(Identity, moved, null).Applied && editor.Save() == null && strict.Info.Contains("crankyant/scene-patcher >=0.9.0") && !strict.Info.Contains(">=0.5.0"), "A stricter existing constraint is retained: " + strict.Info);
+        var strictMapEditor = new NativeMapEditor(); var kept = new PatchEditingSession(new PatchEngine(otherScene), strictMapEditor, strict); strictMapEditor.Session = kept;
+        Assert(kept.Edit(Identity, moved, null).Applied && strictMapEditor.Save() == null && strict.Info.Contains("crankyant/scene-patcher >=0.9.0") && !strict.Info.Contains(">=0.5.0"), "A stricter existing constraint is retained: " + strict.Info);
     }
     static void GroupMoveMovesTheWholeGroup() {
         var (world, group, scene) = Setup();
@@ -331,7 +331,7 @@ static class BakedSceneryTests {
             signs.Reason == "the group holds track markers, which keep their own family, and moving such a group as a whole is not supported yet", "A group with track markers states why it is left out, without a ticket: " + signs?.Reason + " " + signs?.Ticket);
         ResearchHierarchy();
     }
-    // The paths, components and physical presence recorded for the level4 scene of the base map
+    // The paths, components and physical presence recorded for the level4 scene of the base-game map
     // (Records/BakedScenery/groups_classified.csv, buckets X1 to X3).
     static void ResearchHierarchy() {
         var verdicts = BakedSceneryRules.Classify(new Node("World",

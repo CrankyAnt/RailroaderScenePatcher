@@ -115,7 +115,7 @@ namespace RailroaderScenePatcher.Core {
             return dependent.Output(target) ?? DependentOutput.None;
         }
         public void RetryOutput(object target) { if (Owner(target) is IDependentOutputScene dependent) dependent.RetryOutput(target); }
-        // Every adapter that judges a modification with its document receives the desired states of the objects it resolved.
+        // Every adapter that judges a modification with its scene patch file receives the desired states of the objects it resolved.
         public void Plan(IReadOnlyDictionary<object, ObjectState> desired) {
             foreach (var adapter in capabilities.OfType<IPlannedStateScene>())
                 adapter.Plan(desired?.Where(pair => pair.Key != null && owners.TryGetValue(pair.Key, out var owner) && ReferenceEquals(owner, adapter)).ToDictionary(pair => pair.Key, pair => pair.Value, new ByReference()));

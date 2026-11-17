@@ -93,8 +93,8 @@ namespace RailroaderScenePatcher.Core {
     public sealed class StarterTrackException : Exception {
         public StarterTrackException(string reason) : base(reason) { }
     }
-    // A scene that judges one modification together with the other modifications of its document: before a document's
-    // modifications are checked, the engine and the session give it the desired state of every object the document's
+    // A scene that judges one modification together with the other modifications of its scene patch file: before a scene patch file's
+    // modifications are checked, the engine and the session give it the desired state of every object the scene patch file's
     // other modifications set, and null afterwards.
     public interface IPlannedStateScene {
         void Plan(IReadOnlyDictionary<object, ObjectState> desired);

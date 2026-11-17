@@ -15,7 +15,7 @@ namespace RailroaderScenePatcher {
     internal sealed class NativePatchDiagnostics : NativeCurrentWarnings, IPatchDiagnostics {
         readonly Action<string, string, string> report;
         internal NativePatchDiagnostics(Action<string, string, string> report) { this.report = report; }
-        // The row is about the supplying mod's patch document.
+        // The row is about the supplying mod's scene patch file.
         public void Warning(PatchFailure failure) => report(failure.DiagnosticKey, failure.Message, failure.ModIdentifier + ":Data/scene-patches.json");
     }
     internal class NativeCurrentWarnings : ICurrentWarnings {
@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher {
         static EntryPoint owner;
         static object graph;
         static object restoredMarker;
-        // An intentional restoration must reach the game's check without reapplying the still-unsaved disk document.
+        // An intentional restoration must reach the game's check without reapplying the still-unsaved disk scene patch file.
         internal static void CheckRestoredBinding(object marker, Action nativeCheck) {
             var prior = restoredMarker; restoredMarker = marker;
             try { nativeCheck(); } finally { restoredMarker = prior; }
