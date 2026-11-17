@@ -13,17 +13,36 @@ class Node : IHierarchyNode {
     public bool Physical { get; set; }
     public bool Serialized { get; set; } = true;
     public bool HasFamily { get; set; }
+    public bool LodLevel { get; set; }
     public IReadOnlyList<string> Components => Own;
     public IReadOnlyList<IHierarchyNode> Children => Kids;
     public Node(string name, params Node[] children) { Name = name; Kids.AddRange(children); }
     public Node With(params string[] components) { Own.AddRange(components); return this; }
     public Node Solid() { Physical = true; return this; }
     public Node Family() { HasFamily = true; return this; }
+    public Node Lod() { LodLevel = true; return this; }
 }
-// One part below a group root: its offset from the root, its own activity and whether a culler switches it.
-class FakePart { public string Id; public double[] Offset; public bool Active = true; public bool Culled; }
+// Quaternions in x, y, z, w order for the controlled worlds.
+static class Turn {
+    public static double[] Multiply(double[] a, double[] b) => new[] {
+        a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1], a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+        a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3], a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2] };
+    public static double[] Inverse(double[] q) => new[] { -q[0], -q[1], -q[2], q[3] };
+    public static double[] Rotate(double[] q, double[] v) { var r = Multiply(Multiply(q, new[] { v[0], v[1], v[2], 0 }), Inverse(q)); return new[] { r[0], r[1], r[2] }; }
+    public static double[] Yaw(double degrees) { var half = degrees * Math.PI / 360; return new[] { 0, Math.Sin(half), 0, Math.Cos(half) }; }
+}
+// One part below a group root: its placement relative to the root, its own activity, whether a culler switches it,
+// and the part it stands below. Switched: a game-object culler switches it by camera distance.
+class FakePart {
+    public string Id; public double[] Offset; public double[] Rotation = { 0, 0, 0, 1 }; public bool Active = true; public bool Culled, Switched;
+    // For a switched part: whether its culler shows it now. Off while its culler hides it, it counts as on.
+    public bool Shown = true;
+    public FakePart Parent; public FakeGroup Group;
+}
 // A culler in the group: where its culling sphere is registered, relative to the root, or null while it holds none.
-class FakeCuller { public string Id; public double[] Offset = { 0, 0, 0 }; public double[] Registered; public bool OnRoot; }
+// On names the part a renderer culler stands on. Radius is the sphere radius of the simple culler on the root.
+// Switcher: a game-object culler, which culls the parts it Lists rather than the parts below it.
+class FakeCuller { public string Id; public double[] Offset = { 0, 0, 0 }; public double[] Registered; public bool OnRoot, Switcher; public FakePart On; public double Radius = 10, Authored = 10; public List<FakePart> Lists = new List<FakePart>(); }
 class FakeGroup {
     public double[] Position = { 100, 10, 20 }, Rotation = { 0, 0, 0, 1 };
     public bool Active = true;
@@ -36,43 +55,111 @@ class FakeGroup {
     public List<FakeCuller> Cullers = new List<FakeCuller> { new FakeCuller { Id = "SimpleCuller#9", OnRoot = true } };
     // Whether the simple culler on the root switches the root; null without one.
     public bool? RootCulling = true;
+    public FakeGroup() { foreach (var part in Parts) part.Group = this; }
+    public FakePart Add(FakePart part) { part.Group = this; Parts.Add(part); return part; }
 }
-// Controlled world: map coordinates are scene coordinates plus Origin on X. A placement refreshes every culler of an
-// active group; a disabled group holds no culling registration.
+// Controlled world: map coordinates are scene coordinates plus Origin on X. A culling refresh moves every culler of an
+// active group to where it stands; a disabled group holds no culling registration.
 class FakeGroupWorld : IGroupWorld {
     public string[] Maps = { "map" };
     public IEnumerable<string> MapIds => Maps;
     public Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();
+    public Dictionary<string, List<object>> PartsAt = new Dictionary<string, List<object>>();
     public double Origin = 1000;
-    public string Refused;
+    public string Refused, PartRefused;
     public int Mutations;
-    public bool ThrowAfterPlacement, SkipCullingRefresh, LeavePartBehind, KeepPartBehind, KeepRootCulling;
-    double[] behind;
+    public bool ThrowAfterPlacement, SkipCullingRefresh, LeavePartBehind, KeepPartBehind, KeepRootCulling, ThrowAfterPartPlacement, MoveSibling, KeepSiblingMoved;
+    // The cullers the last culling refresh of a group let enclose their renderers.
+    public ICollection<string> Enclosed;
+    double[] behind, sibling;
     public IReadOnlyList<object> Find(string scene, string path) => Objects.TryGetValue(path, out var found) ? found : new List<object>();
     public string Refusal(object group) => Refused;
     static double[] Add(double[] a, double[] b) => a.Zip(b, (x, y) => x + y).ToArray();
+    static double[] Sub(double[] a, double[] b) => a.Zip(b, (x, y) => x - y).ToArray();
     double[] Map(double[] scene) => new[] { scene[0] + Origin, scene[1], scene[2] };
+    double[] SceneOf(double[] map) => new[] { map[0] - Origin, map[1], map[2] };
+    // A part's position in the scene: the root's position and rotation applied to its place relative to the root.
+    static double[] ScenePosition(FakePart part) => Add(part.Group.Position, Turn.Rotate(part.Group.Rotation, part.Offset));
+    // A part is on as the scene authored it while it and every part above it is on, or off only because its culler
+    // hides it.
+    static bool Enabled(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!(p.Active || (p.Switched && !p.Shown))) return false; return true; }
+    // The radius around the root, or around a part, that encloses the renderers of the enabled parts at or below it, each
+    // a metre across.
+    static double Required(FakeGroup group) => group.Parts.Where(Enabled).Select(p => Math.Sqrt(p.Offset.Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
+    static double Required(FakePart above) => above.Group.Parts.Where(p => (p == above || IsBelow(p, above)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, above.Offset).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
+    static bool IsBelow(FakePart part, FakePart above) { for (var p = part.Parent; p != null; p = p.Parent) if (p == above) return true; return false; }
+    // What a culler encloses: a game-object culler its listed parts and what stands below them, any other culler the
+    // parts below its object.
+    static double Required(FakeGroup group, FakeCuller culler) {
+        if (!culler.Switcher) return culler.On != null ? Required(culler.On) : Required(group);
+        var at = culler.On != null ? culler.On.Offset : culler.Offset;
+        return group.Parts.Where(p => culler.Lists.Any(l => p == l || IsBelow(p, l)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, at).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
+    }
+    double[] CullerAt(FakeGroup group, FakeCuller culler) => culler.On != null ? ScenePosition(culler.On) : Add(group.Position, culler.Offset);
     public GroupObservation Observe(object target) {
         var group = (FakeGroup)target;
         return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), group.Active),
-            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, new double[] { 0, 0, 0, 1 }, p.Active, p.Culled)),
-            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(Add(group.Position, c.Offset)))), group.Parent, group.RootCulling);
+            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, p.Active, p.Culled, p, p.Parent)),
+            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, Required(group, c), (object)c.On ?? group, c.Lists, c.Switcher)), group.Parent, group.RootCulling);
     }
     public void SetActive(object target, bool active) {
         Mutations++; var group = (FakeGroup)target; group.Active = active;
         if (group.RootCulling != null && !KeepRootCulling) group.RootCulling = active;
-        foreach (var culler in group.Cullers) culler.Registered = active ? Add(group.Position, culler.Offset) : null;
+        foreach (var culler in group.Cullers) culler.Registered = active && (culler.On == null || Enabled(culler.On)) ? CullerAt(group, culler) : null;
     }
     public void SetPlacement(object target, Placement placement) {
         Mutations++; var group = (FakeGroup)target;
-        group.Position = new[] { placement.Position[0] - Origin, placement.Position[1], placement.Position[2] };
+        group.Position = SceneOf(placement.Position);
         group.Rotation = (double[])placement.Rotation.Clone();
-        if (group.Active && !SkipCullingRefresh) foreach (var culler in group.Cullers) culler.Registered = Add(group.Position, culler.Offset);
-        SkipCullingRefresh = false;
         // A part left behind once follows the root again at the next placement, unless the injection keeps it behind.
         if (behind != null && !KeepPartBehind) { group.Parts[0].Offset = behind; behind = null; }
         else if (LeavePartBehind && behind == null) { behind = group.Parts[0].Offset; group.Parts[0].Offset = new[] { 9.0, 9, 9 }; LeavePartBehind = false; }
         if (ThrowAfterPlacement) { ThrowAfterPlacement = false; throw new Exception("injected after placement"); }
+    }
+    public void RefreshCulling(object target, ICollection<string> enclose) {
+        var group = (FakeGroup)target;
+        Enclosed = enclose;
+        if (SkipCullingRefresh) { SkipCullingRefresh = false; return; }
+        foreach (var culler in group.Cullers) {
+            culler.Radius = enclose.Contains(culler.Id) ? Math.Max(culler.Authored, Required(group, culler)) : culler.Authored;
+            if (group.Active && (culler.On == null || Enabled(culler.On))) culler.Registered = CullerAt(group, culler);
+        }
+    }
+    public IReadOnlyList<object> FindParts(string scene, string path) => PartsAt.TryGetValue(path, out var found) ? found : new List<object>();
+    public string PartRefusal(object part) => PartRefused;
+    public string ActivityRefusal(object part) => ((FakePart)part).Switched ? "A culler of the game switches this part by camera distance" : null;
+    public PartObservation ObservePart(object target) {
+        var part = (FakePart)target; var group = part.Group;
+        var parent = part.Parent == null ? new Placement(Map(group.Position), (double[])group.Rotation.Clone()) : new Placement(Map(ScenePosition(part.Parent)), Turn.Multiply(group.Rotation, part.Parent.Rotation));
+        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), part.Active || (part.Switched && !part.Shown)), group, Observe(group), (object)part.Parent ?? group, parent);
+    }
+    public void SetPartActive(object target, bool active) {
+        Mutations++; var part = (FakePart)target; part.Active = active;
+        foreach (var culler in part.Group.Cullers.Where(c => c.On != null && (c.On == part || Below(c.On, part)))) culler.Registered = active && part.Group.Active && Enabled(culler.On) ? CullerAt(part.Group, culler) : null;
+    }
+    // Everything below the part keeps its place relative to it.
+    public void SetPartPlacement(object target, Placement placement) {
+        Mutations++; var part = (FakePart)target; var group = part.Group;
+        var inverse = Turn.Inverse(group.Rotation);
+        var offset = Turn.Rotate(inverse, Sub(SceneOf(placement.Position), group.Position)); var rotation = Turn.Multiply(inverse, placement.Rotation);
+        var undo = Turn.Inverse(part.Rotation);
+        foreach (var child in group.Parts.Where(p => Below(p, part))) {
+            var local = Turn.Rotate(undo, Sub(child.Offset, part.Offset));
+            child.Offset = Add(offset, Turn.Rotate(rotation, local)); child.Rotation = Turn.Multiply(rotation, Turn.Multiply(undo, child.Rotation));
+        }
+        part.Offset = offset; part.Rotation = rotation;
+        // A sibling moved once returns at the next part placement, unless the injection keeps it moved.
+        var other = group.Parts.First(p => p != part && p.Parent == null && !Below(part, p));
+        if (sibling != null && !KeepSiblingMoved) { other.Offset = sibling; sibling = null; }
+        else if (MoveSibling && sibling == null) { sibling = other.Offset; other.Offset = new[] { 7.0, 7, 7 }; MoveSibling = false; }
+        if (ThrowAfterPartPlacement) { ThrowAfterPartPlacement = false; throw new Exception("injected after part placement"); }
+    }
+    public bool Alive(object handle) => handle is FakeGroup group ? Objects.Values.Any(list => list.Contains(group)) : handle is FakePart part && part.Group.Parts.Contains(part);
+    public bool Below(object target, object above) {
+        if (!(target is FakePart part) || !part.Group.Parts.Contains(part)) return false;
+        if (above is FakeGroup group) return part.Group == group;
+        for (var p = part.Parent; p != null; p = p.Parent) if (p == above) return true;
+        return false;
     }
 }
 static class BakedSceneryTests {
@@ -109,6 +196,7 @@ static class BakedSceneryTests {
         VersionHoldsWithoutTheCapability();
         SceneRootsAndBuiltSpansStayOut();
         EffectsGiveNoPresence();
+        ListingDoesNotFollowTheCamera();
         Console.WriteLine("PASS: baked scenery group rule, coverage rules, group placement and activity, refusal, restoration and scene patch editing");
     }
     // Every object below CTC and CTC Auxiliary is kept out, and a span the game builds from operations data is not
@@ -120,6 +208,26 @@ static class BakedSceneryTests {
             "Objects below World are listed, and starter placement markers in Setups keep their family; signal markers below CTC do not");
         Assert(!BakedSceneryRules.SpanListed(serialized: false, patcherOwned: false), "A span the game builds while it runs is not listed");
         Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true), "A scene span and the patcher's own spans are listed");
+    }
+    // A storage pile (Scenery.Pile) builds a "Pile Collider" child the scene does not save while its culling sphere is
+    // near the camera and destroys it when the camera moves away, as at Sylva Paperboard and Connelly. The group's
+    // verdict is the same with and without that child, so its listing never follows the camera.
+    static void ListingDoesNotFollowTheCamera() {
+        Node Paperboard(bool near) {
+            Node Pile(string name) {
+                var pile = new Node(name).With("Scenery.Pile");
+                if (near) { var collider = new Node("Pile Collider").With("UnityEngine.MeshCollider").Solid(); collider.Serialized = false; pile.Kids.Add(collider); }
+                return pile;
+            }
+            return new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Sylva Paperboard", Pile("Pile"), Pile("Pile (1)")).With("Scenery.BulkIndustryStorageSynchronizer"))));
+        }
+        GroupRootVerdict Verdict(bool near) => At(BakedSceneryRules.Classify(Paperboard(near)), "World/Large Scenery/Sylva/Sylva Paperboard");
+        Assert(Verdict(false).Disposition == GroupDisposition.NotListed && Verdict(false).Reason == BakedSceneryRules.NoPhysicalPresence, "Far away, the pile group has no physical presence of its own");
+        Assert(Verdict(true).Disposition == Verdict(false).Disposition && Verdict(true).Reason == Verdict(false).Reason, "Near the camera, the collider the pile builds does not list the group: " + Verdict(true).Disposition + " " + Verdict(true).Reason);
+        // A runtime child with a component of a kind a later ticket covers does not change the reason of a listed group.
+        var runtime = new Node("Spawned Marker").With("Track.TrackMarker").Solid(); runtime.Serialized = false;
+        var shed = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Shed", new Node("Wall").Solid(), runtime))))), "World/Large Scenery/Town/Shed");
+        Assert(shed.Disposition == GroupDisposition.Group, "A runtime child does not make a listed group inspection only: " + shed.Disposition);
     }
     // The components of World/Environment Effects/Fireflies * in the base-game map: a VFX Graph effect, whose VFXRenderer is a
     // renderer that nothing can run into. A particle system's renderer is the same; a mesh, collider or light is not.

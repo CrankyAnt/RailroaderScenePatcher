@@ -230,9 +230,14 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new BakedSceneryGroups(new GroupWorld())); }
-                catch (Exception e) {
+                // Groups and their parts share one world and the fixed placements that hold parts when their group moves.
+                try {
+                    var groupWorld = new GroupWorld(); var holds = new PartHolds();
+                    capabilities.Add(new BakedSceneryGroups(groupWorld, Capability.Unchecked, holds));
+                    capabilities.Add(new BakedSceneryParts(groupWorld, holds));
+                } catch (Exception e) {
                     capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
+                    capabilities.AddUnavailable(BakedSceneryParts.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": baked scenery group capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
@@ -1071,7 +1076,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Refuse(BindingPlace, action, e.GetBaseException().Message + "; enter end and distance by hand"); }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure || selected.Identity.Structure == BakedSceneryParts.Structure) && selected.Handle is GameObject;
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
         // A starter placement marker is edited on the Connections tab only, where it is placed on the track; on every other
         // tab its object's placement and activity stay disabled with the reason.
@@ -1356,6 +1361,7 @@ namespace RailroaderScenePatcher {
             try {
                 if (inventory == null) throw new InvalidOperationException("Inspection is unavailable");
                 inventory.Refresh();
+                feedback.InventoryCurrent();
                 LogGroupVerdicts();
                 // A refresh read the whole scene: the snapshot is compared for the history as it is now.
                 comparedKey = idleKey = ChangeStamp(); comparedAt = Time.unscaledTime;

@@ -149,10 +149,12 @@ namespace RailroaderScenePatcher.Core {
         // the native map editor does not edit it. Such an object is listed in the Inspection only group, shows no
         // problem and offers no edit; what would be a problem for a supported kind is a note here.
         public string InspectionOnly { get; }
+        // For a part of a baked scenery group, the hierarchy path of its group root; null for every other object.
+        public string GroupPath { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null) {
-            Enabled = enabled ?? active;
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string groupPath = null) {
+            Enabled = enabled ?? active; GroupPath = groupPath;
             InspectionOnly = inspectionOnly;
             var noted = (notes ?? Array.Empty<string>()).ToArray();
             if (inspectionOnly != null) { noted = noted.Concat(problems).ToArray(); problems = Array.Empty<string>(); }
@@ -195,7 +197,8 @@ namespace RailroaderScenePatcher.Core {
         internal string Fingerprint => new JArray(Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Active,
             new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly).ToString(Newtonsoft.Json.Formatting.None);
         public bool Matches(SceneObservation current) => current != null && ReferenceEquals(Handle, current.Handle) && Fingerprint == current.Fingerprint && SamePosition(current);
-        internal string SearchText => String.Join(" ", new[] { Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family,
+        // The name a part row shows, with its group, is searchable as shown.
+        internal string SearchText => String.Join(" ", new[] { Identity.Scene, Identity.Path, GroupPath == null ? null : BakedSceneryRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family,
             Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes));
     }
     public sealed class SceneInventory {
@@ -203,6 +206,8 @@ namespace RailroaderScenePatcher.Core {
         string[] maps = Array.Empty<string>();
         public IReadOnlyList<SceneObservation> Entries { get; private set; } = Array.Empty<SceneObservation>();
         public bool IsStale { get; private set; } = true;
+        // How a refusal because the snapshot is stale begins.
+        public const string StaleRefusal = "Inventory is stale";
         // Why the snapshot is stale: the first difference a check found, or its failure. Null while it is not stale.
         public string StaleReason { get; private set; } = "not yet scanned";
         public SceneInventory(IInspectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
@@ -221,7 +226,7 @@ namespace RailroaderScenePatcher.Core {
         // With validateEvery the first validation is not taken as done: every validation observes the target. That costs
         // a scene that can observe one object next to nothing, and it is what a use with a single validation needs.
         public InspectedTarget PinAfterPass(SceneObservation entry, int passesBefore, bool validateEvery = false) {
-            if (IsStale) throw new InvalidOperationException("Inventory is stale (" + StaleReason + "); refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "); refresh and inspect again");
             if (CompletedPasses <= passesBefore) throw new InvalidOperationException("The scene comparison for this edit has not completed");
             if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
             return new InspectedTarget(maps, entry) { ComparedNow = !validateEvery };
@@ -232,7 +237,7 @@ namespace RailroaderScenePatcher.Core {
         // observe one object compares the whole scene instead, as Pin does.
         public InspectedTarget PinCompared(SceneObservation entry) {
             if (!(scene is ITargetedInspectionScene)) return Pin(entry);
-            if (IsStale) throw new InvalidOperationException("Inventory is stale (" + StaleReason + "); refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "); refresh and inspect again");
             if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
             return new InspectedTarget(maps, entry);
         }
@@ -313,7 +318,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public InspectedTarget Pin(SceneObservation entry) {
             CheckFreshness();
-            if (IsStale) throw new InvalidOperationException("Inventory is stale (" + StaleReason + "); refresh and inspect again");
+            if (IsStale) throw new InvalidOperationException(StaleRefusal + " (" + StaleReason + "); refresh and inspect again");
             if (!Entries.Contains(entry)) throw new InvalidOperationException("The inspected observation is not part of the current inventory; refresh and inspect again");
             return new InspectedTarget(maps, entry);
         }

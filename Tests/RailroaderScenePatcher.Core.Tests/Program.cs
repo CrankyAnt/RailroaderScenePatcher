@@ -289,6 +289,7 @@ class Program {
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
+        BakedPartTests.Run();
         SelectionTests.Run();
         GameDefinedGroupTests.Run();
         BoardTests.Run();

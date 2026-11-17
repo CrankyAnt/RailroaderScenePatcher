@@ -40,8 +40,9 @@ namespace RailroaderScenePatcher {
         internal static string Summary(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             Rows(inventory, search, filter, changed).Count + " of " + (inventory?.Entries.Count ?? 0) + " objects";
 
-        // The object's own name: the last part of its hierarchy path.
-        internal static string Name(SceneObservation entry) => entry.Identity.Path.Substring(entry.Identity.Path.LastIndexOf('/') + 1);
+        // The object's own name: the last part of its hierarchy path. A part of a baked scenery group is named with its
+        // group: the group root's name, then the path from the root to the part.
+        internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.Identity.Path.Substring(entry.Identity.Path.LastIndexOf('/') + 1);
 
         // The group of the objects that are inspection only: outside the family groups, after them, and absent while
         // it holds no entry.
