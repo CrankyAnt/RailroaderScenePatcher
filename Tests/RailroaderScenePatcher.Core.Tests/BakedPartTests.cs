@@ -30,7 +30,10 @@ static class BakedPartTests {
 
     // A saw mill group: a platform, a ramp, a culled lamp, and a jetty with a post below it; a renderer culler stands on
     // the jetty and a simple culler on the root.
-    sealed class Fixture : IInspectionScene {
+    // As an inspection scene it observes what belongs with an edited group root or part: the object and every part
+    // below it, as the native inventory does. ObjectOnly observes the object alone, as the native inventory did before.
+    sealed class Fixture : IRelatedInspectionScene {
+        public bool ObjectOnly;
         public readonly FakeGroupWorld World = new FakeGroupWorld();
         public readonly FakeGroup Group = new FakeGroup();
         public readonly FakePart Platform, Ramp, Lamp, Jetty, Post;
@@ -52,14 +55,27 @@ static class BakedPartTests {
         }
         public IEnumerable<string> MapIds => World.Maps;
         public IEnumerable<SceneObservation> Discover() {
-            var root = World.Observe(Group).Root;
-            yield return new SceneObservation(Group, GroupId, BakedSceneryRules.Family, root.Active == true, root.Placement.Position, root.Placement.Rotation, new string[0], new string[0], new string[0], "group");
-            foreach (var pair in World.PartsAt) {
-                var part = (FakePart)pair.Value[0]; var state = World.ObservePart(part).Part;
-                yield return new SceneObservation(part, new TargetIdentity(SceneName, pair.Key, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure), BakedSceneryRules.Family,
-                    state.Active == true, state.Placement.Position, state.Placement.Rotation, new string[0], new string[0], new string[0], "part", groupPath: Mill);
-            }
+            yield return Of(Group);
+            foreach (var pair in World.PartsAt) yield return Of(pair.Value[0]);
         }
+        // An object's observation; a part is active while it and every part above it are on.
+        SceneObservation Of(object handle) {
+            if (handle == Group) {
+                var root = World.Observe(Group).Root;
+                return new SceneObservation(Group, GroupId, BakedSceneryRules.Family, root.Active == true, root.Placement.Position, root.Placement.Rotation, new string[0], new string[0], new string[0], "group");
+            }
+            var part = (FakePart)handle; var state = World.ObservePart(part).Part; var path = World.PartsAt.Single(p => p.Value.Contains(part)).Key;
+            var active = Group.Active; for (var p = part; p != null; p = p.Parent) active &= p.Active;
+            return new SceneObservation(part, new TargetIdentity(SceneName, path, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure), BakedSceneryRules.Family,
+                active, state.Placement.Position, state.Placement.Rotation, new string[0], new string[0], new string[0], "part", groupPath: Mill);
+        }
+        public SceneObservation Observe(object handle, TargetIdentity identity) => Of(handle);
+        public IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity) {
+            var found = new List<SceneObservation> { Of(handle) };
+            if (!ObjectOnly) found.AddRange(World.PartsAt.Select(p => p.Value[0]).Where(part => World.Below(part, handle)).Select(Of));
+            return found;
+        }
+        public bool Present(object handle) => true;
         public Placement MapOf(FakePart part) => World.ObservePart(part).Part.Placement;
     }
     static bool Near(IReadOnlyList<double> a, IReadOnlyList<double> b, double tolerance = 0.001) => a.Count == b.Count && a.Zip(b, (x, y) => Math.Abs(x - y)).All(d => d <= tolerance);
@@ -92,6 +108,9 @@ static class BakedPartTests {
         ReleaseAndDestroyedPartsLetTheCullingGo();
         HiddenSwitchedPartStillCountsForEnclosure();
         GameObjectCullerEnclosesOnlyWhatItSwitches();
+        EditOfAPartWithAChildLeavesTheInventoryCurrent();
+        SearchMatchesThePartNameAsShown();
+        RefreshClearsTheStaleRefusal();
         Console.WriteLine("PASS: baked scenery parts: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
@@ -391,6 +410,45 @@ static class BakedPartTests {
         var g = new Fixture();
         var ramp = new FakeCuller { Id = "Jetty|Helpers.Culling.GameObjectCuller", Switcher = true, On = g.Jetty, Lists = { g.Ramp } }; g.Group.Cullers.Add(ramp);
         Assert(g.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && ramp.Radius > 50, "A game-object culler on a held part encloses the part it switches outside it: " + ramp.Radius);
+    }
+
+    // The edit of a part moves and switches the parts below it, and the edit of a group root every part: those entries
+    // take their new observations with the edited object, so a completed edit leaves the inventory current. Observing
+    // the object alone, as the game test showed, leaves the child's old observation and marks the inventory stale.
+    static void EditOfAPartWithAChildLeavesTheInventoryCurrent() {
+        foreach (var objectOnly in new[] { false, true }) {
+            var f = new Fixture { ObjectOnly = objectOnly }; var (_, _, session) = Session(f);
+            var inventory = new SceneInventory(f); inventory.Refresh();
+            SceneObservation Entry(object handle) => inventory.Entries.Single(e => ReferenceEquals(e.Handle, handle));
+            var steps = new (string name, Func<bool> edit, object handle)[] {
+                ("moving the jetty", () => session.Edit(PartId("Jetty"), new Placement(JettyTarget, JettyTurn), null).Applied, f.Jetty),
+                ("disabling the jetty", () => session.Edit(PartId("Jetty"), null, false).Applied, f.Jetty),
+                ("moving the group", () => session.Edit(GroupId, new Placement(GroupTarget, GroupTurn), null).Applied, f.Group) };
+            foreach (var (name, edit, handle) in steps) {
+                Assert(edit(), name + " applies");
+                Assert(inventory.ReobserveRelated(Entry(handle)) != null, "the edited object is observed again");
+                inventory.CheckFreshness();
+                if (objectOnly) { Assert(inventory.IsStale && inventory.StaleReason.Contains("Jetty/Post"), "Observing the edited object alone leaves the post stale: " + inventory.StaleReason); break; }
+                Assert(!inventory.IsStale, "After " + name + " the inventory stays current: " + inventory.StaleReason);
+            }
+        }
+    }
+
+    static void SearchMatchesThePartNameAsShown() {
+        var f = new Fixture(); var inventory = new SceneInventory(f); inventory.Refresh();
+        var found = inventory.Search("Whittier Saw Mill / Jetty").Select(e => e.Handle).ToArray();
+        Assert(found.Length == 2 && found.Contains(f.Jetty) && found.Contains(f.Post), "A search for a part row's name finds that part and the parts below it: " + found.Length);
+        Assert(inventory.Search("whittier saw mill / jetty / post").Single().Handle == f.Post, "The search ignores case and finds a nested part by its full row name");
+    }
+
+    static void RefreshClearsTheStaleRefusal() {
+        var feedback = new EditFeedback();
+        feedback.Refuse("Placement", "Placement", SceneInventory.StaleRefusal + " (World/Jetty changed); refresh and inspect again");
+        feedback.InventoryCurrent();
+        Assert(feedback.Messages.Count == 0, "A refresh that makes the inventory current removes the stale refusal");
+        feedback.Refuse("Placement", "Placement", "the object is no longer present");
+        feedback.InventoryCurrent();
+        Assert(feedback.Messages.Count == 1, "Another refusal stays");
     }
 
     static void PartsAreNamedWithTheirGroupAndDecorative() {

@@ -40,7 +40,14 @@ namespace RailroaderScenePatcher {
             var found = new List<SceneObservation>();
             // A group root or a part is observed through its transform; the families below it through their own components.
             var group = GroupWorld.FamilyOf(target);
-            if (group != null) found.Add(observer(target.transform, group));
+            if (group != null) {
+                found.Add(observer(target.transform, group));
+                // An edit of a group root or a part moves or switches every part below it with it: those parts are
+                // entries of their own, and they take their new observations too, so the edit's own consequence never
+                // reads as a change by another hand.
+                foreach (var below in target.GetComponentsInChildren<Transform>(true))
+                    if (below != target.transform && GroupWorld.IsPart(below.gameObject)) found.Add(observer(below, BakedSceneryRules.Family));
+            }
             if (Get(target, Crossing) != null)
                 roots.AddRange(target.scene.GetRootGameObjects().Where(root => root != null && root.name == CrossingCoverageWorld.RootName));
             foreach (var root in roots)

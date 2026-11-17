@@ -66,6 +66,8 @@ namespace RailroaderScenePatcher {
         // A world choice starts: it is a new action, so the result or refusal of the action before it goes, as it
         // goes when another action reports. A refusal kept for the next inspection stays.
         internal void ChoiceStarted() { messages.RemoveAll(m => !m.Kept); }
+        // A refresh made the inventory current: a refusal because it was stale no longer holds and goes.
+        internal void InventoryCurrent() { messages.RemoveAll(m => m.Text.IndexOf(SceneInventory.StaleRefusal, StringComparison.Ordinal) >= 0); }
         // The result of an action. It takes the place of the result before it and of that result's follow-ups.
         internal void Report(string place, string message) {
             messages.Clear();

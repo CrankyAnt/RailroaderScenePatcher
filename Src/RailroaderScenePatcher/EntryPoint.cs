@@ -1266,6 +1266,7 @@ namespace RailroaderScenePatcher {
             try {
                 if (inventory == null) throw new InvalidOperationException("Inspection is unavailable");
                 inventory.Refresh();
+                feedback.InventoryCurrent();
                 LogGroupVerdicts();
                 // A refresh read the whole scene: the snapshot is compared for the history as it is now.
                 comparedKey = idleKey = ChangeStamp(); comparedAt = Time.unscaledTime;
