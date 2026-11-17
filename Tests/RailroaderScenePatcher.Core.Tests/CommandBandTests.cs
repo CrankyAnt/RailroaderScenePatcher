@@ -27,6 +27,9 @@ static class CommandBandTests {
     // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
     // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
     static void ReasonsReadAsOnePlainSentence() {
+        // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
+        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")) != "Inspection only: The patcher has no edit for baked scenery groups that hold a car loader yet.")
+            throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")));
         var starter = StarterPlacements.ObjectSettings + ".";
         var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
         foreach (var row in new[] {

@@ -37,9 +37,12 @@ namespace RailroaderScenePatcher {
             var target = handle as GameObject;
             if (target == null || observer == null) return null;
             var roots = new List<GameObject> { target };
+            var found = new List<SceneObservation>();
+            // A group root is observed through its transform; the families below it through their own components.
+            var group = GroupWorld.FamilyOf(target);
+            if (group != null) found.Add(observer(target.transform, group));
             if (Get(target, Crossing) != null)
                 roots.AddRange(target.scene.GetRootGameObjects().Where(root => root != null && root.name == CrossingCoverageWorld.RootName));
-            var found = new List<SceneObservation>();
             foreach (var root in roots)
                 foreach (var component in root.GetComponentsInChildren<MonoBehaviour>(true)) {
                     if (!Loaded(component) || CopyPart(component)) continue;
@@ -120,6 +123,8 @@ namespace RailroaderScenePatcher {
             } catch { }
             return photoMarkers = found;
         }
+        // The family of a component that is not a transform, for the baked scenery rule's check of existing families.
+        internal static string FamilyOf(Component c) => c is Transform ? null : Family(c);
         // The car placements of the loaded setups as the last discovery read them. A single object observed later is
         // classified by them, as it takes the reference scan of that discovery. Setups that could not be read classify
         // no marker as a starter placement marker; every marker then carries a note that says so.
@@ -135,6 +140,11 @@ namespace RailroaderScenePatcher {
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
             if (c is OwnedEquipment) return AddedEquipmentFamily;
             var type = TypeName(c); var go = c.gameObject;
+            // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
+            // editor helpers stays out; a starter placement marker below Setups keeps its family.
+            if (!BakedSceneryRules.ListedBelow(c.transform.root.name, type == Marker)) return null;
+            // A group root of the baked scenery rule is listed through its transform.
+            if (c is Transform) return GroupWorld.FamilyOf(go);
             if (type == Milepost) return "Milepost";
             if (type == Marker) {
                 // Kinds the inventory does not list: signals, map objects whose track anchor the native map editor owns, and
@@ -145,7 +155,9 @@ namespace RailroaderScenePatcher {
                 return starters.Family(c, Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker");
             }
             if (type == Relative && Get(go, Marker) == null) return "Track-relative scene object";
-            if (type == Span) return "Track span";
+            // A span the game builds from the map's operations data is not serialized and stays with the native map
+            // editor; the spans this patcher adds for a crossing are listed.
+            if (type == Span) return BakedSceneryRules.SpanListed(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName) ? "Track span" : null;
             // A storage pile of an industry is a scene object the patcher will place; until then it is listed without
             // an edit, in the Inspection only group, instead of being left out.
             if (type == Pile) return "Storage pile";
@@ -170,6 +182,8 @@ namespace RailroaderScenePatcher {
         // by its own observations, and single-object observation keeps the last complete scan, so an object observed
         // alone meanwhile is not classified by the incomplete one.
         static IEnumerable<SceneObservation> Steps(Func<GameObject, string> boardRefusal, bool whole) {
+            // A whole discovery reads the group roots again; a stepped pass reuses them while the hierarchy above them stays.
+            if (whole) GroupWorld.Invalidate();
             var incoming = new Dictionary<UnityEngine.Object, List<string>>(); var scanErrors = 0;
             // A reference in a field Unity does not serialize is working state of a running manager, such as a culling or
             // audio list: it appears and disappears when the camera moves or an object is inspected. It is runtime state.
@@ -209,8 +223,10 @@ namespace RailroaderScenePatcher {
             HashSet<string> segmentIds = null;
             PhotoMarkers(true);
             string graphError = null;
-            var steps = DiscoveryWalk.Steps<MonoBehaviour>(() => Resources.FindObjectsOfTypeAll<MonoBehaviour>(), Loaded,
+            // The components of the scene, and the transforms of the group roots, which may carry no behaviour at all.
+            var steps = DiscoveryWalk.Steps<Component>(() => Resources.FindObjectsOfTypeAll<MonoBehaviour>().Cast<Component>().Concat(GroupRoots()), Loaded,
                 owner => {
+                    if (!(owner is MonoBehaviour)) return true;
                     try { walk.Add(owner); return true; }
                     catch (Exception e) {
                         // The walk stopped early: the dependency strings are incomplete as well.
@@ -250,6 +266,9 @@ namespace RailroaderScenePatcher {
                 component => CopyPart(component));
             foreach (var step in steps) yield return step;
         }
+        // The transforms of the group roots the baked scenery rule lists, in the family or as inspection only.
+        static IEnumerable<Component> GroupRoots() =>
+            GroupWorld.Verdicts().Where(pair => pair.Key != null && GroupWorld.FamilyOf(pair.Key) != null).Select(pair => (Component)pair.Key.transform).ToArray();
         static bool Transient(Transform child, Transform root) {
             for (var t = child; t != null && t != root; t = t.parent) if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return true;
             return false;
@@ -257,6 +276,7 @@ namespace RailroaderScenePatcher {
         static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, Dictionary<UnityEngine.Object, List<string>> working, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal,
             ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HashSet<GameObject> hidden, Func<Dictionary<string, List<Component>>> markerIds) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>(); var duplicate = new List<string>();
+            var groupRoot = c is Transform;
             // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
             // that is off while its culler shows its objects was switched off by the scene or by a patch.
             var enabled = AuthoredActivity.Enabled(go.activeSelf, culled.ContainsKey(go), !hidden.Contains(go));
@@ -370,15 +390,20 @@ namespace RailroaderScenePatcher {
             });
             if (Get(go, BoardScene.CullerType) != null) dependencies.Add("Culling registration and origin-dependent position");
             if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output");
+            if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root");
             if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling; separate construction scenery has its own placement");
             // Crossing equipment sits under objects that a culler switches off when the camera is far away, so whether it
             // is active in the game changes with every camera jump. Its activity is what the scene authored: every
             // object from it upward that no culler switches is switched on. What the cullers do now is runtime state.
             var active = go.activeInHierarchy;
-            if (CulledFamilies.Contains(family)) {
+            // A simple culler on a group root switches the root itself by camera distance: what it switches is runtime
+            // state, as for the cullers of crossing equipment.
+            if (groupRoot) enabled = GroupWorld.Authored(go);
+            if (CulledFamilies.Contains(family) || groupRoot) {
                 var chain = new List<KeyValuePair<bool, bool>>();
                 for (var t = go.transform; t != null; t = t.parent) {
                     var switched = culled.TryGetValue(t.gameObject, out var by);
+                    if (!switched && GroupWorld.SwitchesItself(t.gameObject)) { switched = true; by = GroupWorld.SimpleCullerType; }
                     chain.Add(new KeyValuePair<bool, bool>(t.gameObject.activeSelf, switched));
                     if (switched) runtime.Add("Culled by " + by + ": " + BoardScene.PathOf(t) + " active=" + t.gameObject.activeSelf);
                 }
@@ -414,6 +439,8 @@ namespace RailroaderScenePatcher {
             if (pad) Read(() => padRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : CrossingPadWorld.PadProblem(go, markerReferrers, setups));
             var padEditable = pad && padRefusal == null;
+            string groupRefusal = null; GroupRootVerdict verdict = null;
+            if (groupRoot) Read(() => { verdict = GroupWorld.VerdictOf(go); groupRefusal = GroupWorld.Problem(go); });
             var crossing = family == "Crossing controller";
             string coverageRefusal = crossing ? "the crossing-coverage capability is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
@@ -427,10 +454,11 @@ namespace RailroaderScenePatcher {
                 var type = MarkerKind(marker);
                 if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
             });
+            else if (groupRoot) { if (verdict?.Disposition != GroupDisposition.Group) only = verdict?.ReasonIsSentence == true ? CommandBand.NotYetSupportedBecause(verdict.Reason) : CommandBand.NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant()); }
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter);
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
-            var operations = only != null ? only : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
+            var structure = only != null ? null : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
+            var operations = only != null ? only : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight" : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
                 : marked ? CommandBand.NotEditable(markerRefusal)

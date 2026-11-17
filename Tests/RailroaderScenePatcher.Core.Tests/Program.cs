@@ -266,6 +266,7 @@ class Program {
         StarterTrackLocationTests.Run();
         CommandBandTests.Run();
         BridgeTests.Run();
+        BakedSceneryTests.Run();
         SelectionTests.Run();
         GameDefinedGroupTests.Run();
         BoardTests.Run();

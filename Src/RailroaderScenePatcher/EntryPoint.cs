@@ -223,6 +223,11 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
+                try { capabilities.Add(new BakedSceneryGroups(new GroupWorld())); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": baked scenery group capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
                 try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingPadScene.Structure, e.GetBaseException().Message);
@@ -996,7 +1001,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Refuse(BindingPlace, action, e.GetBaseException().Message + "; enter end and distance by hand"); }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure) && selected.Handle is GameObject;
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
         // A starter placement marker is edited on the Connections tab only, where it is placed on the track; on every other
         // tab its object's placement and activity stay disabled with the reason.
@@ -1240,11 +1245,23 @@ namespace RailroaderScenePatcher {
         // A crossing pad's geometry is generated along its track binding: a placement moves the pad object and nothing
         // the player sees, and its result says so.
         bool IsPad => selected != null && selected.Identity.Structure == CrossingPadScene.Structure;
+        // The baked scenery rule's verdicts, written to the log once per load attempt for the evidence of the listed and
+        // unlisted group roots.
+        string loggedVerdicts;
+        void LogGroupVerdicts() {
+            if (loggedVerdicts == loadId) return;
+            loggedVerdicts = loadId;
+            try {
+                var lines = GroupWorld.Report().ToArray();
+                context?.Log.Info("Scene Patcher " + Version + ": baked scenery rule, " + lines.Length + " candidates:" + Environment.NewLine + String.Join(Environment.NewLine, lines));
+            } catch (Exception e) { context?.Log.Info("Scene Patcher " + Version + ": baked scenery rule report unavailable: " + e.GetBaseException().Message); }
+        }
         void Inspect() {
             ClearSnap();
             try {
                 if (inventory == null) throw new InvalidOperationException("Inspection is unavailable");
                 inventory.Refresh();
+                LogGroupVerdicts();
                 // A refresh read the whole scene: the snapshot is compared for the history as it is now.
                 comparedKey = idleKey = ChangeStamp(); comparedAt = Time.unscaledTime;
                 var inspectedBefore = selected != null;

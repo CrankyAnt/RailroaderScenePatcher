@@ -241,8 +241,13 @@ namespace RailroaderScenePatcher {
             : pending ? EscapeStep.CancelChoice
             : dragging ? EscapeStep.CancelDrag
             : EscapeStep.None;
+        // The supported edits of a group root of the Baked scenery group family.
+        internal const string GroupOperations = "Fixed placement and activity of the whole group; culling and colliders follow the group. Decorative: moving or disabling it changes no game function";
+        internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
+        // The reason an object is inspection only, given as a whole clause.
+        internal static string NotYetSupportedBecause(string reason) => NotYetSupportedPrefix + reason;
         // The family of a light or gate this patcher added: a supported family whose edits live on its crossing's
         // Connections tab, not on the object itself.
         internal const string AddedEquipmentFamily = "Added light or gate";
@@ -275,6 +280,8 @@ namespace RailroaderScenePatcher {
             return Sentence(own);
         }
         const string NotYetSupportedPrefix = "Not yet supported: ";
+        // The Inspection only line of a row tooltip and of the state line: one label, and the reason as one plain sentence.
+        internal static string InspectionOnlyLine(string reason) => "Inspection only: " + Sentence(reason);
         // Every number the panel shows or fills a field with: metres and degrees to three decimals, without trailing
         // zeros, never in scientific notation, and no negative zero. A value below half a thousandth reads 0.
         internal static string Number(double value) {

@@ -264,6 +264,8 @@ namespace RailroaderScenePatcher.Core {
                     // Board placement beyond the Sylva board needs its capability whether or not it is available on this build.
                     var board = IndependentBoards.RequiredVersion(target);
                     if (board != null) minimum = Max(minimum, board);
+                    // A baked scenery group modification needs its capability whether or not it is available on this build.
+                    if (target.Structure == BakedSceneryGroups.Structure) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
                     if (!(scene is IVersionedScene versioned)) continue;
                     var required = versioned.MinimumPatcherVersion(target);
                     if (required != null) minimum = Max(minimum, required);

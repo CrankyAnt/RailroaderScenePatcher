@@ -389,7 +389,7 @@ namespace RailroaderScenePatcher {
                         if (item.InspectionOnly != null) context += "  <alpha=#99>" + Literal(item.Family) + "<alpha=#FF>";
                         holder.AddChild(new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
                             (item.Active ? Literal(name) : "<i>" + Literal(name) + "</i>") + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\nInspection only: " + item.InspectionOnly) + (changed ? "\nChanged by this MapMod" : "") + (added ? "\nAdded by this MapMod" : "") +
+                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly)) + (changed ? "\nChanged by this MapMod" : "") + (added ? "\nAdded by this MapMod" : "") +
                                 (item.Problems.Count == 0 ? "" : "\n" + String.Join("\n", item.Problems))).Replace("<", "\\u003c").Replace(">", "\\u003e")
                         });
                     }
@@ -465,7 +465,7 @@ namespace RailroaderScenePatcher {
             foreach (var badge in CommandBand.Badges(IsChanged(selected), IsAdded(selected))) {
                 parts.Add(badge.Markup); text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this MapMod" : "Added by this MapMod");
             }
-            if (selected.InspectionOnly != null) { parts.Add("Inspection only"); text.Add("Inspection only: " + selected.InspectionOnly); }
+            if (selected.InspectionOnly != null) { parts.Add("Inspection only"); text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly)); }
             if (selected.Problems.Count != 0) {
                 var count = selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
                 parts.Add("<color=" + Red + ">" + count + "</color>"); text.Add(count);
@@ -513,9 +513,15 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Inspection notes");
                 foreach (var note in selected.Notes) PlainLabel(builder, Breakable(note));
             }
+            // A group of the Baked scenery group family is decorative: the game reads nothing from where it stands.
+            if (selected.InspectionOnly == null && selected.Family == BakedSceneryRules.Family) {
+                Section(builder, "Use in the game");
+                PlainLabel(builder, CommandBand.Decorative);
+            }
             Section(builder, "State");
             var target = selected.Handle as GameObject;
-            var own = target != null && target.activeSelf;
+            // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
+            var own = target != null && (selected.Family == BakedSceneryRules.Family ? selected.Enabled : target.activeSelf);
             Field(builder, "Enabled", own ? (selected.Active ? "Yes" : "Yes; a parent is inactive") : "No")
                 .Tooltip("Enabled", "Whether this object is active in the scene.");
             if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
@@ -1198,7 +1204,7 @@ namespace RailroaderScenePatcher {
                 }
                 default: {
                     var target = selected?.Handle as GameObject;
-                    var enabled = target != null && target.activeSelf;
+                    var enabled = target != null && (selected.Family == BakedSceneryRules.Family ? selected.Enabled : target.activeSelf);
                     return new[] {
                         Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
@@ -1356,9 +1362,10 @@ namespace RailroaderScenePatcher {
                     new[] { "Gizmo", "The native gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the pose and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current pose relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
-                    new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." } },
+                    new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." },
+                    new[] { "Baked scenery groups", "A group moves as one, with its culling and colliders; its parts keep their own Enabled setting." } },
                 Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
-                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" } } },
+                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
                 Terms = new[] {
                     new[] { "Track binding", "The track location a marker is registered at. Changing it does not move the object." },
