@@ -113,6 +113,12 @@ namespace RailroaderScenePatcher.Core {
         // or the ballast of track that lies on that terrain. Track carried over the terrain, as on a bridge deck,
         // and track without terrain under it do not count: a bridge carries its track and stands in the terrain at
         // its ends. Null where there is no terrain.
+        // What a hit of the downward ray counts as: terrain on the terrain layer, ballast on the track layer, and
+        // nothing on a collider of an inventory object. The scene can put an object on the terrain layer, such as a coal
+        // heap that cars and characters stand on; it is still the object, not the ground it stands in, and taking it for
+        // the ground would raise the frame's lower face to the object's own top.
+        public enum SurfaceHit { None, Terrain, Ballast }
+        public static SurfaceHit HitKind(bool terrainLayer, bool inventoryObject) => inventoryObject ? SurfaceHit.None : terrainLayer ? SurfaceHit.Terrain : SurfaceHit.Ballast;
         public static double? Surface(double? terrain, IEnumerable<double> track) {
             if (!terrain.HasValue || !Finite(terrain.Value)) return null;
             var surface = terrain.Value;

@@ -297,6 +297,33 @@ static class ObjectMarkingGeometryTests {
         var heap = ObjectMarkingGeometry.Frame(new WorldPoint(0, -1, 100), Eye,
             new[] { new ObjectMarkingPart("heap", new WorldPoint(0, -1, 100), new WorldPoint(8, 1.5, 8), null, ObjectMarkingPartKind.Mesh, tilted) }, Camera, View, new List<string>());
         Check(SameOutline(heap.Outline, Unground(new WorldPoint(0, -.25, 100), new WorldPoint(8, .75, 8)).Outline), "a half-buried heap on a slope is framed by one box from the lowest ground under what stands above to its top");
+        // A heap turned as Andrews' Coal & Oil / Heap (1) is: rotation X 270, Y 93.536, Z 0, so its local Z axis points
+        // up. It is 12 m by 6 m and 2.4 m high along that axis, with its centre 0.4 m above level ground, so 0.8 m of it
+        // lies under the ground. Its frame keeps the height from the ground to its top: the same frame as its box from
+        // the ground up, and well higher on screen than a flat outline.
+        WorldPoint[] HeapBox(double bottom, double top) {
+            double yaw = 93.536 * Math.PI / 180, cosine = Math.Cos(yaw), sine = Math.Sin(yaw);
+            var corners = new WorldPoint[8];
+            for (int i = 0; i < 8; i++) {
+                double lx = ((i & 1) == 0 ? -6 : 6), ly = ((i & 2) == 0 ? -3 : 3), lz = (i & 4) == 0 ? bottom : top;
+                // X 270 turns local Z to world up and local Y to world -Z; the yaw then turns about world up.
+                double x = lx, y = lz, z = -ly;
+                corners[i] = new WorldPoint(x * cosine + z * sine, -1 + y, 100 - x * sine + z * cosine);
+            }
+            return corners;
+        }
+        ObjectMarkingFrame Turned270(Func<double, double, double?> ground, double bottom, double top) => ObjectMarkingGeometry.Frame(new WorldPoint(0, -1, 100), Eye,
+            new[] { new ObjectMarkingPart("heap", new WorldPoint(0, -1 + (bottom + top) / 2, 100), new WorldPoint(6.2, (top - bottom) / 2, 6.2), HeapBox(bottom, top), ObjectMarkingPartKind.Mesh, ground) }, Camera, View, new List<string>());
+        // Level ground 1 m under the camera's height; the heap reaches from 0.8 m under it to 1.6 m above it.
+        var heap270 = Turned270((x, z) => -1, -.8, 1.6); var heapAbove = Turned270(null, 0, 1.6);
+        Check(SameOutline(heap270.Outline, heapAbove.Outline), "a heap turned X 270 and Y 93.536 is framed by its box from the ground to its top");
+        Check(heap270.Frame.Value.Height - 2 * ObjectMarkingGeometry.Margin > 10, "the frame of the turned heap has its height on screen, not a flat outline: " + heap270.Frame.Value.Height);
+        // A collider of an inventory object is never the ground, whatever its layer: the heap's own collider on the
+        // terrain layer would otherwise raise the frame to the heap's top.
+        Check(ObjectMarkingGeometry.HitKind(true, true) == ObjectMarkingGeometry.SurfaceHit.None && ObjectMarkingGeometry.HitKind(false, true) == ObjectMarkingGeometry.SurfaceHit.None
+            && ObjectMarkingGeometry.HitKind(true, false) == ObjectMarkingGeometry.SurfaceHit.Terrain && ObjectMarkingGeometry.HitKind(false, false) == ObjectMarkingGeometry.SurfaceHit.Ballast, "only terrain and ballast outside the inventory are the ground");
+        var onItself = Turned270((x, z) => .5, -.8, 1.6);
+        Check(onItself.Frame.Value.Height < heap270.Frame.Value.Height - 10, "taken for the ground, the heap's own top would flatten its frame, which the hit rule prevents: " + onItself.Frame.Value.Height);
         // A grouped object on the same slope: one box around both parts, cut the same way.
         var pair = ObjectMarkingGeometry.Frame(new WorldPoint(0, -1, 100), Eye, new[] {
             new ObjectMarkingPart("heap", new WorldPoint(-4, -1, 100), new WorldPoint(4, 1.5, 8), null, ObjectMarkingPartKind.Mesh, tilted),
