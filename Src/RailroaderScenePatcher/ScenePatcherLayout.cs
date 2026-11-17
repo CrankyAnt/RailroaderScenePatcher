@@ -1012,8 +1012,8 @@ namespace RailroaderScenePatcher {
         // A row of actions, from the left: a tab's pinned row and the footer's row. Every button follows the one
         // padding rule, with the widest of its labels where the label changes in place. A row that would not fit
         // the inspector's minimum with its full labels takes the shorter label of each button that has one. blocked
-        // disables every button of the row with one reason. A disabled button's tooltip says what the control does
-        // first, then why it cannot be used.
+        // disables every button of the row with one reason. A disabled button's tooltip gives only why it cannot be
+        // used (CommandBand.Tooltip).
         void ActionRow(UIPanelBuilder builder, Act[] acts, string blocked) {
             builder.HStack(row => {
                 row.ConfigureLayout(CommandBand.ActionRowSpacing);
