@@ -195,13 +195,29 @@ static class BakedSceneryTests {
         var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].First.First;
         Assert((string)item["target"]["structure"] == BakedSceneryGroups.Structure && (string)item["target"]["component"] == "UnityEngine.Transform" && item["placement"] != null && (bool)item["active"] == false,
             "The scene patch file records the group's placement and activity");
-        Assert(mapEditor.IsDirty, "Unsaved group edits leave the session dirty");
+        // The native title indication and the Save button both read the native map editor's IsDirty, which the patcher answers from
+        // the outstanding participants: every group edit, Undo and Redo must leave the two in agreement.
+        var all = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
+        void Persistence(bool dirty, string[] outstanding, string step) {
+            var now = session.Outstanding(mapEditor.NativeDirty);
+            Assert(mapEditor.IsDirty == dirty && now.SequenceEqual(outstanding), step + ": title indication and Save availability read " + mapEditor.IsDirty + " for outstanding " + String.Join(", ", now));
+        }
+        Persistence(true, all, "After a group move and a disable");
         mapEditor.Undo(); Assert(group.Active && group.Position[0] == 110, "Undo re-enables the moved group");
-        mapEditor.Undo(); Assert(group.Position.SequenceEqual(new[] { 100.0, 10, 20 }) && Offsets(group).SequenceEqual(offsets) && !mapEditor.IsDirty, "Undo restores the prior placement, and nothing is left to save");
-        mapEditor.Redo(); Assert(group.Position[0] == 110 && mapEditor.IsDirty, "Redo reapplies the move, which is unsaved again");
+        Persistence(true, all, "After Undo of the disable");
+        mapEditor.Undo(); Assert(group.Position.SequenceEqual(new[] { 100.0, 10, 20 }) && Offsets(group).SequenceEqual(offsets), "Undo restores the prior placement");
+        Persistence(false, new string[0], "After Undo back to the unedited group");
+        mapEditor.Redo(); Assert(group.Position[0] == 110, "Redo reapplies the move");
+        Persistence(true, all, "After Redo of the move");
         mapEditor.Redo(); Assert(!group.Active, "Redo reapplies the disable");
+        Persistence(true, all, "After Redo of the disable");
         Assert(mapEditor.Save() == null && !mapEditor.IsDirty && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && (int)Newtonsoft.Json.Linq.JObject.Parse(store.Patch)["formatVersion"] == 1,
             "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
+        Persistence(false, new string[0], "After Save");
+        mapEditor.Undo(); Assert(group.Active, "Undo after Save re-enables the group");
+        Persistence(true, new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData }, "After Undo past the saved state");
+        mapEditor.Redo(); Assert(!group.Active, "Redo returns to the saved state");
+        Persistence(false, new string[0], "After Redo back to the saved state");
         var fresh = new FakeGroup(); var replay = new FakeGroupWorld(); replay.Objects[HousePath] = new List<object> { fresh };
         var reload = new PatchEngine(new BakedSceneryGroups(replay)).Apply(store.Patch);
         Assert(reload.Outcomes.Values.Single().Applied && fresh.Position[0] == 110 && !fresh.Active && fresh.Parts.Count == 3, "A reloaded world reproduces the group edits without duplicated state");
