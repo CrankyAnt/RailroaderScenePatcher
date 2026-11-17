@@ -49,10 +49,19 @@ namespace RailroaderScenePatcher.Core {
         }
         internal static bool SameBuild(EquipmentAddition a, EquipmentAddition b) => a.Key == b.Key && a.Pattern == b.Pattern && EquipmentSource.Same(a.Source, b.Source);
         internal static bool Same(EquipmentAddition a, EquipmentAddition b) => SameBuild(a, b) && SamePlacement(a.Placement, b.Placement);
-        // The placement tolerance of scene patch editing: half a millimetre on each axis and about a hundredth of a degree,
-        // so every move the native map editor stores reaches the scene.
+        // The game's transforms store float32 coordinates. Beyond the editing tolerance, positions compare equal
+        // only when they have the same finite stored coordinate; a different representable position remains a move.
         internal static bool SamePlacement(Placement a, Placement b) =>
-            a?.Position != null && b?.Position != null && PatchEditingSession.SamePosition(a.Position, b.Position) && PatchEditingSession.SameRotation(a.Rotation, b.Rotation);
+            a?.Position != null && b?.Position != null && SamePosition(a.Position, b.Position) && PatchEditingSession.SameRotation(a.Rotation, b.Rotation);
+        internal static bool SamePosition(IReadOnlyList<double> a, IReadOnlyList<double> b) {
+            if (a == null || b == null || a.Count != 3 || b.Count != 3) return false;
+            for (var i = 0; i < 3; i++) {
+                var storedA = (float)a[i]; var storedB = (float)b[i];
+                if (Single.IsNaN(storedA) || Single.IsNaN(storedB) || Single.IsInfinity(storedA) || Single.IsInfinity(storedB)) return false;
+                if (Math.Abs(a[i] - b[i]) > .0005 && storedA != storedB) return false;
+            }
+            return true;
+        }
         public override string ToString() {
             var p = Placement?.Position;
             return (Scope.Length == 0 ? "" : Scope + " ") + Id + ": " + Pattern + " from " + Source + (p == null ? "" : " at (" + String.Join(", ", p.Select(v => v.ToString("0.###", CultureInfo.InvariantCulture))) + ")");
@@ -363,9 +372,9 @@ namespace RailroaderScenePatcher.Core {
                 var comparable = want != null && now != null;
                 var comparison = comparable ? " identity=" + EquipmentAddition.SameBuild(now, want).ToString().ToLowerInvariant()
                     + " source=" + EquipmentSource.Same(now.Source, want.Source).ToString().ToLowerInvariant()
-                    + " position=" + PatchEditingSession.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
+                    + " position=" + EquipmentAddition.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
                     + " rotation=" + PatchEditingSession.SameRotation(now.Placement?.Rotation, want.Placement?.Rotation).ToString().ToLowerInvariant() : "";
-                sink.VerificationFailed(controller, "reason=" + Quoted(reason) + comparison + " positionTolerance=0.0005-per-axis rotationTolerance=normalized-absolute-dot>=0.99999999 desired=" + Detail(want) + " observed=" + Detail(now));
+                sink.VerificationFailed(controller, "reason=" + Quoted(reason) + comparison + " positionTolerance=0.0005-per-axis-or-equal-float32 rotationTolerance=normalized-absolute-dot>=0.99999999 desired=" + Detail(want) + " observed=" + Detail(now));
             } catch { /* Diagnostics must not change verification or restoration. */ }
         }
         internal IReadOnlyList<SourceCandidate> Candidates(object controller) => world.Candidates(controller) ?? Array.Empty<SourceCandidate>();

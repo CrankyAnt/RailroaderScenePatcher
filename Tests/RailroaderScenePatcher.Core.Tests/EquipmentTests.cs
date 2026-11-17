@@ -30,6 +30,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public int Constructed, Mutations;
     public int FailConstructAfter = -1;
     public double ConstructOffset;
+    public double[] ConstructPosition;
     public readonly List<string> VerificationFailures = new List<string>();
     public void VerificationFailed(object controller, string detail) => VerificationFailures.Add(detail);
     public bool StickyDestroy, FailSetPlacementOnce, CullerVisible = true;
@@ -50,7 +51,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         if (FailConstructAfter == 0) { FailConstructAfter = -1; throw new Exception("construction injected"); }
         if (FailConstructAfter > 0) FailConstructAfter--;
         var d = (FakeDevice)source;
-        var added = new Added { Controller = (FakeCrossing)controller, Record = addition, Position = (double[])addition.Placement.Position.Clone(), Rotation = (double[])addition.Placement.Rotation.Clone(), Culled = !CullerVisible };
+        var added = new Added { Controller = (FakeCrossing)controller, Record = addition, Position = (double[])(ConstructPosition ?? addition.Placement.Position).Clone(), Rotation = (double[])addition.Placement.Rotation.Clone(), Culled = !CullerVisible };
         added.Position[0] += ConstructOffset;
         added.Copy = new FakeDevice { Scene = d.Scene, Path = "owned/" + addition.Id, Model = d.Model, Owner = added };
         All.Add(added); Devices.Add(added.Copy); Constructed++;
@@ -75,8 +76,8 @@ static class EquipmentTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static string Target(string path = CrossingPath) => "\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"" + CrossingCoverageScene.ComponentType + "\",\"structure\":\"" + CrossingCoverageScene.Structure + "\"}";
     static string N(double value) => value.ToString(CultureInfo.InvariantCulture);
-    static string Addition(string id, string source = SignalPath, double x = 10, string pattern = EquipmentAddition.LightGatePattern, string extra = "") =>
-        "\"" + id + "\":{\"pattern\":\"" + pattern + "\",\"source\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + source + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + N(x) + ",0,7],\"rotation\":[0,0,0,1]}" + extra + "}";
+    static string Addition(string id, string source = SignalPath, double x = 10, string pattern = EquipmentAddition.LightGatePattern, string extra = "", double[] position = null) =>
+        "\"" + id + "\":{\"pattern\":\"" + pattern + "\",\"source\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + source + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", (position ?? new[] { x, 0, 7 }).Select(N)) + "],\"rotation\":[0,0,0,1]}" + extra + "}";
     static string Equip(string id, string additions, string path = CrossingPath, string deps = "[]") => EquipRaw(id, "{" + additions + "}", path, deps);
     // A modification whose crossingEquipment value is the given JSON text, keyed by equipment ID when it is valid.
     static string EquipRaw(string id, string equipment, string path = CrossingPath, string deps = "[]") =>
@@ -124,7 +125,7 @@ static class EquipmentTests {
         var f = new Fixture();
         var engine = new PatchEngine(f.Scene);
         var result = engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
-        Assert(result.Error == null && result.Outcomes["signals"].Applied, "A conforming light/gate source is added: " + result.Error + result.Outcomes["signals"].Error);
+        Assert(result.Error == null && result.Outcomes["signals"].Applied && FloatStoredPlacementsVerify(), "A conforming light/gate source verifies at its stored position, including far from the origin: " + result.Error + result.Outcomes["signals"].Error);
         Assert(f.Live.Count == 1 && ReferenceEquals(f.Live[0].Controller, f.Crossing) && f.Live[0].Position.SequenceEqual(new double[] { 10, 0, 7 }), "One addition is owned by the intended controller at the mod's placement");
         Assert(f.Live[0].Record.Scope == "author/pack" && f.Live[0].Record.Id == "west" && f.Live[0].Record.Source.Path == SignalPath, "The addition keeps its supplying-mod-scoped identity and source");
         engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
@@ -141,7 +142,28 @@ static class EquipmentTests {
         Assert(f.Crossing.Position.SequenceEqual(new double[] { 5, 0, 7 }) && f.Crossing.Circuits.Count == 1
             && refusal.Outcomes["signals"].Error == "The change failed. The object is back as it was. Reason: Applied crossing equipment did not verify: equipment west differs from the mod's source or placement"
             && failed.World.VerificationFailures.Count == 1
-            && failed.World.VerificationFailures[0] == "reason=\"mismatch\" identity=true source=true position=false rotation=true positionTolerance=0.0005-per-axis rotationTolerance=normalized-absolute-dot>=0.99999999 desired={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10,0,7],rotation=[0,0,0,1]} observed={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10.125,0,7],rotation=[0,0,0,1]}", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
+            && failed.World.VerificationFailures[0] == "reason=\"mismatch\" identity=true source=true position=false rotation=true positionTolerance=0.0005-per-axis-or-equal-float32 rotationTolerance=normalized-absolute-dot>=0.99999999 desired={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10,0,7],rotation=[0,0,0,1]} observed={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10.125,0,7],rotation=[0,0,0,1]}", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
+    }
+    static bool FloatStoredPlacementsVerify() {
+        // Desired and observed values from the Allen journey, plus negative and larger map coordinates.
+        var cases = new[] {
+            new[] { new[] { 24631.32947220674, 620.50640869140625, -939.62025711108242 }, new[] { 24631.330078125, 620.50640869140625, -939.6201171875 } },
+            new[] { new[] { 24637.317507956483, 620.18865966796875, -940.59328430260223 }, new[] { 24637.318359375, 620.18865966796875, -940.59326171875 } },
+            new[] { new[] { -24631.32947220674, -620.50640869140625, 939.62025711108242 }, new[] { -24631.330078125, -620.50640869140625, 939.6201171875 } },
+            new[] { new[] { 1000000.1239, 0, 7 }, new[] { 1000000.125, 0, 7 } }
+        };
+        foreach (var values in cases) foreach (var offset in new[] { 0, 0.125 }) {
+            var f = new Fixture(); f.World.ConstructPosition = values[1]; f.World.ConstructOffset = offset;
+            var engine = new PatchEngine(f.Scene);
+            var file = Doc(Equip("signals", Addition("far", position: values[0])));
+            var result = engine.Apply(file, "author/pack");
+            if (offset == 0) {
+                if (!result.Outcomes["signals"].Applied || f.Live.Count != 1 || !f.Live[0].Position.SequenceEqual(values[1])) return false;
+                var mutations = f.World.Mutations;
+                if (!engine.Apply(file, "author/pack").Outcomes["signals"].Applied || f.World.Mutations != mutations) return false;
+            } else if (result.Outcomes["signals"].Applied || !f.Unchanged || f.World.VerificationFailures.Count != 1) return false;
+        }
+        return true;
     }
     // Devices with other model values qualify through the same lamp and gate mechanisms, judged by the production
     // LightGatePattern; each rule that fails names its concrete gap.
