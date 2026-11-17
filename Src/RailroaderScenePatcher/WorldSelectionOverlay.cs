@@ -128,8 +128,9 @@ namespace RailroaderScenePatcher {
                     var mask = (1 << terrainLayer) | (trackLayer >= 0 ? 1 << trackLayer : 0);
                     double? terrain = null; List<double> track = null;
                     foreach (var hit in Physics.RaycastAll(new Vector3((float)x, 5000f, (float)z), Vector3.down, 10000f, mask)) {
-                        if (hit.collider.gameObject.layer == terrainLayer) terrain = terrain.HasValue ? Math.Max(terrain.Value, hit.point.y) : hit.point.y;
-                        else (track ?? (track = new List<double>())).Add(hit.point.y);
+                        var kind = ObjectMarkingGeometry.HitKind(hit.collider.gameObject.layer == terrainLayer, OfInventory(hit.collider.transform));
+                        if (kind == ObjectMarkingGeometry.SurfaceHit.Terrain) terrain = terrain.HasValue ? Math.Max(terrain.Value, hit.point.y) : hit.point.y;
+                        else if (kind == ObjectMarkingGeometry.SurfaceHit.Ballast) (track ?? (track = new List<double>())).Add(hit.point.y);
                     }
                     return ObjectMarkingGeometry.Surface(terrain, track);
                 } catch { return (double?)null; }
@@ -137,6 +138,12 @@ namespace RailroaderScenePatcher {
             if (grounds.Count > 50000) grounds.Clear();
             grounds[key] = height;
             return height;
+        }
+        // Whether a collider belongs to an inventory object: the object itself or anything below one.
+        bool OfInventory(Transform t) {
+            if (IsInventory == null) return false;
+            for (; t != null; t = t.parent) if (IsInventory(t.gameObject)) return true;
+            return false;
         }
         // The surface may have changed: an edit, a terrain output that completed, or a track change. The heights are
         // read again.
@@ -194,12 +201,13 @@ namespace RailroaderScenePatcher {
                 : new PickTarget(shape.Marker.center.x, shape.Marker.center.y, marked, shape.InFrame(pointer) || (shape.Track != null && shape.Track.Contains(new MarkingPoint(pointer.x, pointer.y))));
             var targets = new PickTarget[shapes.Length];
             for (var i = 0; i < shapes.Length; i++) targets[i] = Target(shapes[i], shapes[i] != null && Marked(shapes[i], candidates[i], camera, origin));
-            return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own)).ToArray());
+            return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own, group.Unlisted)).ToArray());
         }
 
         // A game-defined group that shows as one square marker: its objects among the candidates, as indices, those
-        // of them that show on their own, what the group shows and its one marking, or null when it is not in view.
-        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal GroupShows Shows; internal Shape Shape; }
+        // of them that show on their own, those its choice list leaves out (its detection spans), what the group
+        // shows and its one marking, or null when it is not in view.
+        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; }
         // The groups that show as one from this camera, for each candidate whether its group stands for it, the
         // candidates that show their own frame at their group's frame distance, and the frame distance of the
         // inspected object (GameDefinedGroups.OwnFrameDistance).
@@ -211,15 +219,16 @@ namespace RailroaderScenePatcher {
         // group takes its bounds and its one box from these, without reading the object again.
         sealed class Measured { internal ObjectMarkingFrame Frame; }
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
-        // anchors a grade-crossing setup, and a track marker that is no crossing pad is, below that controller's
-        // root, a whistle sign.
-        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker";
+        // anchors a grade-crossing setup, a track marker that is no crossing pad is, below that controller's root, a
+        // whistle sign, and a track span there is a detection span that the controller manages.
+        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
         // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;
-        // One group of the inventory: its objects that have a usable position, and the scene object of the game
-        // component that anchors it, whose orientation the group's one box takes.
-        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal GameObject Root; }
+        // One group of the inventory: its objects that have a usable position, for each of them whether the group's
+        // choice list offers it and its frame surrounds it (GameDefinedGroup.Listed), and the scene object of the
+        // game component that anchors it, whose orientation the group's one box takes.
+        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; }
         // The groups are decided once per inventory snapshot, and again when the snapshot is another one or has
         // another number of entries, and after the scene may have changed (ClearSurface, on every move of the
         // native map editor's history). Without a snapshot they are decided from the candidates of the choice.
@@ -244,8 +253,11 @@ namespace RailroaderScenePatcher {
                 var all = listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray();
                 if (all.Any(o => o.Family == ControllerFamily))
                     inventoryGroups = GameDefinedGroups.Of(all.Select(o => o.Handle is GameObject go && go != null
-                            ? new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily) : null).ToArray())
-                        .Select(group => new InventoryGroup { Root = group.Anchor as GameObject, Objects = group.Members.Select(i => SpatialSelectionScene.Observe(all[i])).Where(c => c.Points.Length != 0).ToArray() }).ToArray();
+                            ? new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily) : null).ToArray())
+                        .Select(group => {
+                            var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i) }).Where(m => m.Object.Points.Length != 0).ToArray();
+                            return new InventoryGroup { Root = group.Anchor as GameObject, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray() };
+                        }).ToArray();
             } catch (Exception e) { Debug.LogWarning("Scene Patcher: game-defined groups could not be read; every object shows on its own. " + e.GetBaseException().Message); }
             return inventoryGroups;
         }
@@ -280,13 +292,17 @@ namespace RailroaderScenePatcher {
             for (var g = 0; g < groups.Length; g++) {
                 var objects = groups[g].Objects; var indices = map[g];
                 var members = indices.Where(i => i >= 0).ToArray();
-                if (members.Length == 0) continue;
-                // A candidate was measured when it was projected. An object of the group that the choice does not
-                // offer is measured here, once per pass: it bounds the group and outlines it like the others.
+                // The group's bounds, its one box and its list hold its listed objects: the invisible detection spans
+                // of a grade-crossing setup do not count. A choice that offers none of the listed objects, only
+                // detection spans, shows no group: its spans show on their own.
+                var listed = groups[g].Listed;
+                if (!indices.Where((i, k) => i >= 0 && listed[k]).Any()) continue;
+                // A candidate was measured when it was projected. A listed object of the group that the choice does
+                // not offer is measured here, once per pass: it bounds the group and outlines it like the others.
                 var parts = new Measured[objects.Length];
                 for (var k = 0; k < objects.Length; k++) {
                     if (indices[k] >= 0) parts[k] = measured[indices[k]];
-                    else Project(objects[k], camera, origin, ObjectMarkingGeometry.FrameDistance, out parts[k]);
+                    else if (listed[k]) Project(objects[k], camera, origin, ObjectMarkingGeometry.FrameDistance, out parts[k]);
                 }
                 var anchors = objects.Select(member => Point(member.Position + origin)).ToArray();
                 var frames = parts.Select(part => part?.Frame).ToArray();
@@ -294,7 +310,7 @@ namespace RailroaderScenePatcher {
                 // controller's root, around where its objects stand and around the parts of their pieces, and is cut
                 // at the surface like the box of an object.
                 var root = groups[g].Root;
-                var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera));
+                var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera), listed);
                 if (marking.Shows == GroupShows.Objects) continue;
                 bool Inspected(SpatialCandidate member) => inspected != null && Same(member, inspected.Choice);
                 var own = members.Where(m => Same(candidates[m], chosen) || Inspected(candidates[m])).ToArray();
@@ -304,7 +320,8 @@ namespace RailroaderScenePatcher {
                     layout.OwnAtGroupDistance.AddRange(own);
                     if (objects.Any(Inspected)) layout.InspectedFrameDistance = ownDistance;
                 }
-                shown.Add(new ShownGroup { Members = members, Own = own, Shows = marking.Shows, Shape = GroupShape(marking, camera) });
+                var unlisted = indices.Where((i, k) => i >= 0 && !listed[k]).ToArray();
+                shown.Add(new ShownGroup { Members = members, Own = own, Unlisted = unlisted, Shows = marking.Shows, Shape = GroupShape(marking, camera) });
             }
             layout.Shown = shown.ToArray();
             return layout;

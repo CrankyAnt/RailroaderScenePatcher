@@ -18,6 +18,38 @@ namespace RailroaderScenePatcher.Core {
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
     }
     public enum CircuitKind { Native, Tracks, Detached, Added }
+    // What a crossing controller reports about the detection spans its circuits hold.
+    public static class CircuitSpanProblems {
+        // The key of a circuit as the Connections tab names it, from its island span's ID and the key of the detection
+        // addition the patcher built the circuit for, or null for another circuit. An addition is keyed by its addition
+        // key. A circuit with selected tracks holds owned spans whose IDs are the owned prefix, the circuit's key and
+        // the role, perhaps numbered: its key is what lies between. A native circuit is keyed by its island span's ID.
+        public static string CircuitKey(string island, string addition) {
+            if (addition != null) return addition;
+            if (island == null || !island.StartsWith(CrossingCoverageScene.OwnedPrefix, StringComparison.Ordinal)) return island;
+            var key = island.Substring(CrossingCoverageScene.OwnedPrefix.Length);
+            var dot = key.LastIndexOf('.');
+            if (dot > 0 && dot < key.Length - 1 && key.Skip(dot + 1).All(Char.IsDigit)) key = key.Substring(0, dot);
+            const string role = ".island";
+            return key.EndsWith(role, StringComparison.Ordinal) ? key.Substring(0, key.Length - role.Length) : key;
+        }
+        // The problem of a circuit's span whose two ends do not both lie on an existing track segment, or null. circuit
+        // is the circuit's key (CircuitKey); role is the span's role in the circuit; segments holds the IDs of the
+        // existing track segments, or is null when the track graph could not be read: then only an end without a
+        // segment is a problem, and the controller has one note (Unknown). The recovery is the one the controller's
+        // Connections tab offers for the kind of circuit.
+        public static string Unresolved(string circuit, string role, string span, string lower, string upper, ISet<string> segments) {
+            var addition = DetectionAddition.Id(circuit);
+            var name = (addition == null ? "Circuit " + circuit : "Detection addition " + addition) + " " + CircuitCoverage.RoleCaption(role) + " span " + span;
+            var recovery = addition == null ? "On the controller's Connections tab, select tracks for this circuit or detach it." : "On the controller's Connections tab, select other tracks for this addition or delete it.";
+            if (String.IsNullOrWhiteSpace(lower) || String.IsNullOrWhiteSpace(upper)) return name + " has an end with no track segment assigned. " + recovery;
+            if (segments == null) return null;
+            var missing = new[] { lower, upper }.Where(id => !segments.Contains(id)).Distinct(StringComparer.Ordinal).ToArray();
+            return missing.Length == 0 ? null : name + " refers to track that no longer exists. Missing segment IDs: " + String.Join(", ", missing) + ". " + recovery;
+        }
+        // The one inspection note of a controller whose circuit spans could not be checked against the track graph.
+        public static string Unknown(string graphError) => "Circuit span validity unknown. The track graph could not be read: " + graphError;
+    }
     // The identity of a detection addition. Its ID is unique in the scene patch file of its supplying mod, and the
     // key joins it with that scene patch file's key, so additions of different mods never share an identity.
     public static class DetectionAddition {
@@ -46,6 +78,8 @@ namespace RailroaderScenePatcher.Core {
     // a detection addition with its own tracks.
     public sealed class CircuitCoverage {
         public static readonly string[] Roles = { "approachA", "island", "approachB" };
+        // The caption of a role, in words, as the Connections tab shows it: "approachA" reads "Approach A".
+        public static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
         public static readonly CircuitCoverage Detached = new CircuitCoverage(CircuitKind.Detached, null, null);
         CircuitCoverage(CircuitKind kind, SpanRange[] ranges, string[] spans) { Kind = kind; this.ranges = ranges; this.spans = spans; }
         readonly SpanRange[] ranges;
@@ -193,7 +227,8 @@ namespace RailroaderScenePatcher.Core {
     // coverage, and the crossing object itself is never moved or disabled by this capability.
     public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene, IDisposable, ICrossingEquipmentScene {
         public const string Structure = "crossing-coverage-v1", RequiredVersion = "0.5.0", ComponentType = "Track.Crossings.GradeCrossingController";
-        const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
+        // The start of the ID of every span the patcher owns (NewId); CircuitSpanProblems.CircuitKey reads it back.
+        internal const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
         sealed class Circuit { internal string Key; internal object Set; internal object[] Original; }
         // The native circuits of a controller as first observed in this load, and every span the patcher owns for it.
         // Added holds the circuits the patcher owns for detection additions; their Original is null.
@@ -316,9 +351,10 @@ namespace RailroaderScenePatcher.Core {
                 if (equipment == null) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
                 equipment.Check(target, state.Equipment);
                 var baseline = BaselineOf(target);
-                if (EquipmentChange(target, baseline, state.Equipment) != null) {
-                    var difference = equipment.Coherence(baseline.Equipment);
-                    if (difference != null) throw new InvalidOperationException("The crossing's added equipment differs from its pattern: " + difference + ". Reload before editing its equipment; coverage edits stay available");
+                var change = EquipmentChange(target, baseline, state.Equipment);
+                if (change != null) {
+                    var refusal = equipment.Refusal(baseline.Equipment, change);
+                    if (refusal != null) throw new InvalidOperationException(refusal);
                 }
             }
             if (state.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);

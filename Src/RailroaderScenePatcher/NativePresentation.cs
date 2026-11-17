@@ -98,6 +98,19 @@ namespace RailroaderScenePatcher {
         internal bool TitleReset => titleReset != null;
         internal bool TitleDetails => titleDetails != null;
         RectTransform titleHelp, titleReset, titleDetails, titleClose;
+        bool repairMode;
+        internal void SetRepairMode(bool value) {
+            repairMode = value;
+            if (value) CloseHelp();
+            if (divider != null) divider.enabled = !value;
+            SetTitleRepairControls();
+        }
+        void SetTitleRepairControls() {
+            foreach (var rect in new[] { titleHelp, titleReset, titleClose }) {
+                var button = rect == null ? null : rect.GetComponent<Button>();
+                if (button != null) button.interactable = !repairMode;
+            }
+        }
         TMP_Text titleHelpText;
         Sprite resetSprite, detailsSprite;
         Texture2D resetTexture, detailsTexture;
@@ -193,6 +206,7 @@ namespace RailroaderScenePatcher {
                 TitleIconProblem = (TitleIconProblem == null ? "" : TitleIconProblem + "; ") + "Session details: " + e.GetBaseException().Message;
             }
             PlaceTitleHelp();
+            SetTitleRepairControls();
         }
         // Draws a glyph of 56 x 56 pixels with a soft edge, white so that the image tints it. covers says whether a
         // point of the texture, rows counted from the bottom, lies in the drawing.
@@ -582,6 +596,7 @@ namespace RailroaderScenePatcher {
             var image = rule.GetComponent<Image>();
             if (image != null) image.raycastTarget = true;
             var drag = rule.gameObject.AddComponent<ColumnDivider>();
+            drag.enabled = !repairMode;
             drag.Column = column; drag.Minimum = minimum; drag.Maximum = maximum; drag.Changed = changed;
             divider = drag; dividerWidth = desired;
             rule.Tooltip("Outliner width", "Drag to resize the outliner.");

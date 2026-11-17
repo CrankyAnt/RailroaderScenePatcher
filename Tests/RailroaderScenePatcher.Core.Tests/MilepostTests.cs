@@ -135,7 +135,7 @@ static class MilepostTests {
     static void MapMismatchChangesNothing() {
         var (world, t46, t47, scene) = Setup();
         var result = new PatchEngine(scene).Apply(Doc(Item("rebind", Bind(Detach) + Place(1030)), "other-map"));
-        Assert(result.Outcomes.Count == 0 || !result.Outcomes.Values.Any(o => o.Applied), "A scene patch file for another map applies nothing");
+        Assert(result.Outcomes.Count == 0 || !result.Outcomes.Values.Any(o => o.Applied), "A scene patch file whose scene target map is another map applies nothing");
         Assert(world.Mutations == 0 && Entry(world, t46) == "Stvw|b|51.20403" && t46.Position[0] == 20, "The map mismatch leaves the milepost untouched");
     }
     static void OmittedSetAndDetachedValues() {

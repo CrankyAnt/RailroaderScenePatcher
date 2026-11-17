@@ -58,11 +58,12 @@ namespace RailroaderScenePatcher {
         internal static string CopyId(bool inspected, string refusal = null) => inspected ? refusal : "Inspect an object first.";
         // Clear ends the inspection and cancels a pending world choice: it is disabled only when there is neither.
         internal static string Clear(bool inspected, bool pending) => inspected || pending ? null : "Nothing is inspected and no world choice is pending.";
-        // The tooltip of a control: what it does, and when it cannot be used now, also why. A disabled control keeps its
-        // description, so two disabled controls with one reason still say what each would do.
-        // The reason follows the one label Unavailable: as a plain sentence (Sentence), without a label of its own.
+        // The tooltip of a control: what it does while it can be used, and otherwise only why it cannot now. The
+        // description is left out of a disabled control's tooltip, since it applies only while the control can be used;
+        // the tooltip's title still names the control. The reason follows the one label Unavailable: as a plain sentence
+        // (Sentence), without a label of its own.
         internal static string Tooltip(string description, string reason) =>
-            String.IsNullOrEmpty(reason) ? description : String.IsNullOrEmpty(description) ? Sentence(reason) : description + "\nUnavailable: " + Sentence(reason);
+            String.IsNullOrEmpty(reason) ? description : "Unavailable: " + Sentence(reason);
         // The labels a reason can carry where it is stored or shown on its own: under Supported edits, or in the
         // reason of a binding that cannot be set.
         static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Track binding unavailable: ", "Pad binding unavailable: " };
@@ -82,6 +83,11 @@ namespace RailroaderScenePatcher {
             text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
             return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
         }
+        // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
+        // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
+        // ignored click.
+        internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason) =>
+            windowOpen ? ((string Title, string Message)?)null : ("Save refused", "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
@@ -223,9 +229,6 @@ namespace RailroaderScenePatcher {
         internal const string AllFilter = "All", ChangedFilter = "Changed", DisabledFilter = "Disabled", ProblemsFilter = "Problems";
         internal static readonly float[] FilterSegments = { 20.64f + 12, 74.67f + 12, 71.2f + 12, 77.88f + 12 };
         internal const float OutlinerWidth = 296;
-        // Whether Escape does what Clear does: with the pointer over the open panel, while an object is inspected or a
-        // world choice is pending. Elsewhere Escape cancels a pending choice or the gizmo, or opens the pause menu.
-        internal static bool EscapeClears(bool overPanel, bool inspected, bool pending) => overPanel && (inspected || pending);
         // Whether the tooltip callout is hidden now: the game is paused, and either the panel is open or the tooltip
         // was hidden already in this pause. It so stays hidden until the pause menu closes, whatever the panel does.
         internal static bool HidesTooltip(bool paused, bool panelOpen, bool hidden) => paused && (panelOpen || hidden);
@@ -236,33 +239,46 @@ namespace RailroaderScenePatcher {
         internal static bool FieldHasFocus(int frame, int lastFocused) => lastFocused >= 0 && frame - lastFocused <= FocusFrames;
         // What one press of Escape does, first that applies. The native map editor's Escape cancels its first armed
         // interaction, does nothing while a text field has the focus, and otherwise leaves Escape to the pause
-        // menu; it never clears a selection. Here: while a field of the panel has the focus Escape is left alone;
-        // the list beside the click closes alone, as a native dropdown does, and the choice stays pending; over the
-        // panel Escape does what Clear does; a pending world choice or a gizmo drag is an armed interaction and is
-        // cancelled; anything else, such as a gizmo that merely stands, leaves Escape to the pause menu.
-        internal enum EscapeStep { None, CloseList, Clear, CancelChoice, CancelDrag }
-        internal static EscapeStep Escape(bool fieldFocused, bool listOpen, bool overPanel, bool inspected, bool pending, bool dragging) =>
+        // menu; it never clears a selection. A list closes before an interaction is cancelled. The caller supplies
+        // standing gizmo and prepared snap only while the pointer is over the panel.
+        internal enum EscapeStep { None, CloseList, CancelDrag, CancelChoice, CancelGizmo, CancelSnap }
+        internal static EscapeStep Escape(bool fieldFocused, bool listOpen, bool pending, bool dragging, bool gizmo, bool snap) =>
             fieldFocused ? EscapeStep.None
             : listOpen ? EscapeStep.CloseList
-            : EscapeClears(overPanel, inspected, pending) ? EscapeStep.Clear
-            : pending ? EscapeStep.CancelChoice
             : dragging ? EscapeStep.CancelDrag
+            : pending ? EscapeStep.CancelChoice
+            : gizmo ? EscapeStep.CancelGizmo
+            : snap ? EscapeStep.CancelSnap
             : EscapeStep.None;
         // The supported edits of a group root of the Baked scenery group family.
         internal const string GroupOperations = "Fixed placement and activity of the whole group; culling and colliders follow the group. Decorative: moving or disabling it changes no game function";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
+        // The supported edits of a part of a listed baked scenery group.
+        internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves. Moving or disabling it does not affect game functions";
+        internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
         // The reason an object is inspection only, given as a whole clause.
         internal static string NotYetSupportedBecause(string reason) => NotYetSupportedPrefix + reason;
-        // The family of a light or gate this patcher added: a supported family whose edits live on its crossing's
-        // Connections tab, not on the object itself.
-        internal const string AddedEquipmentFamily = "Added light or gate";
-        internal static string AddedEquipmentOperations(string id, string scope) =>
-            "Added light or gate " + id + " of " + scope + ". Edit or remove it on its crossing controller's Connections tab";
+        // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
+        // crossing's Connections tab, not on the object itself.
+        internal const string AddedEquipmentFamily = "Added light or gate", AddedBellFamily = "Added bell";
+        // The guide link offered below a list of equipment sources: its label and the guide page with the anchor of its
+        // rejection reasons, or null while no source of the list is rejected. A list of bell definitions links to the bell
+        // guide, a list of devices to the light and gate guide.
+        internal static string[] RejectionGuide(IEnumerable<SourceCandidate> sources) {
+            var rejected = (sources ?? Enumerable.Empty<SourceCandidate>()).Where(s => s != null && !s.Eligible).ToList();
+            if (rejected.Count == 0) return null;
+            return rejected.Any(s => s.Source.IsDefinition)
+                ? new[] { "Why a bell definition is rejected", "adding-crossing-bells.md#rejected-bell-definitions" }
+                : new[] { "Why a device is rejected", "adding-crossing-equipment.md#rejected-sources" };
+        }
+        internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
+        internal static string AddedEquipmentOperations(string id, string scope, bool bell = false) =>
+            (bell ? "Added bell " : "Added light or gate ") + id + " of " + scope + ". Use its crossing controller's Connections tab to edit or remove it.";
         // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
-        // or an added light or gate, which its crossing edits.
-        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || family == AddedEquipmentFamily ? null : NotYetSupported("the " + family + " family");
+        // or an added light, gate or bell, which its crossing edits.
+        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) ? null : NotYetSupported("the " + family + " family");
         // The track element an object follows, as the world marks it: the anchor's node, or the segment of its
         // location. Null without a following placement.
         internal static SelectionIdentity Followed(TrackFollowing following) =>
@@ -323,7 +339,7 @@ namespace RailroaderScenePatcher {
         internal static string ChoiceLog(string forObject, string problem, IReadOnlyList<string> offers) =>
             LogLine("World choice", forObject, problem + (offers == null || offers.Count < 2 ? "" : " Candidates: " + String.Join("; ", offers.Select((label, i) => (i + 1) + " " + ChoiceLabel(label, offers, 80)))));
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
-        internal static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
+        internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
         // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
         // placement, and has every other mode inactive with the object's own reason.
@@ -369,7 +385,7 @@ namespace RailroaderScenePatcher {
         internal static string FieldReason(string block, IReadOnlyList<string> entered, IReadOnlyList<string> current, string same, params int[] exact) =>
             block ?? (SameFields(entered, current, exact) ? same : null);
         internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.",
-            SameLocation = "The fields hold the marker's current track location.";
+            SameLocation = "The fields hold the marker's current track location.", SameActivity = "The object already has the selected enabled or disabled state.";
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the
         // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.

@@ -10,8 +10,8 @@ using RailroaderScenePatcher.Core;
 static class GameDefinedGroupTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Game-defined group: " + message); }
     // One inventory object: the scene object it is on and the scene objects above that one, nearest first.
-    static GroupObject Object(string at, string above, bool controller = false, bool marker = false) =>
-        new GroupObject(at, above.Length == 0 ? new string[0] : above.Split('/').Reverse().ToArray(), controller, marker);
+    static GroupObject Object(string at, string above, bool controller = false, bool marker = false, bool span = false) =>
+        new GroupObject(at, above.Length == 0 ? new string[0] : above.Split('/').Reverse().ToArray(), controller, marker, span);
     static string Members(IReadOnlyList<GameDefinedGroup> groups) =>
         String.Join(" | ", groups.Select(g => g.Kind + ":" + String.Join(",", g.Members)));
 
@@ -41,6 +41,26 @@ static class GameDefinedGroupTests {
         Check(Members(groups) == "GradeCrossingSetup:0,1,2,3,4,5", "a grade-crossing setup holds its controller and the inventory objects below the controller's root, without its whistle signs and without what stands beside it (got " + Members(groups) + ")");
         Check(ReferenceEquals(groups[0].Anchor, andrews[0].Node), "the group is anchored by its controller's scene object");
         Check(GameDefinedGroups.Of(andrews.Reverse().ToArray())[0].Members.SequenceEqual(new[] { 3, 4, 5, 6, 7, 8 }), "membership does not depend on the order of the inventory");
+
+        // The detection spans below the controller's root are members of the setup, but its controller manages them:
+        // the setup's choice list and frame leave them out, which the listed members say.
+        var spans = new[] {
+            Object("Setup", "World/Roads", controller: true),           // 0
+            Object("Approach A", "World/Roads/Setup/Spans", span: true), // 1
+            Object("Light 1", "World/Roads/Setup/Signal 1"),             // 2
+            Object("Island", "World/Roads/Setup/Spans", span: true),     // 3
+            Object("Bell", "World/Roads/Setup"),                         // 4
+            Object("Whistle E", "World/Roads/Setup", marker: true),      // 5
+            Object("Approach B", "World/Roads/Setup", span: true),       // 6
+            Object("Loose span", "World/Roads", span: true),             // 7
+        };
+        var spanned = GameDefinedGroups.Of(spans);
+        Check(Members(spanned) == "GradeCrossingSetup:0,1,2,3,4,6", "the detection spans below the controller's root are members of the setup (got " + Members(spanned) + ")");
+        Check(spanned[0].Listed.SequenceEqual(new[] { 0, 2, 4 }), "the setup lists and frames its members other than its detection spans (got " + String.Join(",", spanned[0].Listed) + ")");
+        Check(groups[0].Listed.SequenceEqual(groups[0].Members), "a setup without detection spans lists and frames every member");
+        // A setup whose only other members are detection spans is still a group of its objects; its list holds the controller.
+        var bare = GameDefinedGroups.Of(new[] { Object("Setup", "World", controller: true), Object("Island", "World/Setup", span: true) });
+        Check(Members(bare) == "GradeCrossingSetup:0,1" && bare[0].Listed.SequenceEqual(new[] { 0 }), "a setup of a controller and its spans lists the controller");
 
         // A whistle sign is its own object at any depth below the controller's root, and a track marker outside a
         // setup is no whistle sign of it.
@@ -122,6 +142,17 @@ static class GameDefinedGroupTests {
             "the group's frame surrounds the frames of all its objects");
         foreach (var frame in frames.Where(f => f != null))
             foreach (var point in frame.Outline) Check(ObjectMarkingGeometry.Contains(near.Outline, point.X, point.Y), "the group's frame holds every point of its objects' frames");
+        // The detection spans of a grade-crossing setup are members its frame and its bounds leave out: an approach
+        // span that stands 300 m along the track changes neither the group's distance, its marker nor its frame.
+        var span = new WorldPoint(200, 0, 1300);
+        var spanned = ObjectMarkingGeometry.GroupFrame(eye800, anchors.Concat(new[] { span }).ToArray(), frames.Concat(new ObjectMarkingFrame[] { null }).ToArray(), null, null, Camera(eye800), View,
+            new[] { true, true, true, false });
+        Check(Math.Abs(spanned.Distance - near.Distance) < 1e-9 && Math.Abs(spanned.Center.X - near.Center.X) < 1e-9 && Math.Abs(spanned.Center.Z - near.Center.Z) < 1e-9,
+            "a detection span does not count for the group's bounds (got " + spanned.Distance + ")");
+        Check(spanned.Frame.HasValue && Math.Abs(spanned.Frame.Value.X - g.X) < 1e-6 && Math.Abs(spanned.Frame.Value.Right - g.Right) < 1e-6 && Math.Abs(spanned.Frame.Value.Y - g.Y) < 1e-6 && Math.Abs(spanned.Frame.Value.Bottom - g.Bottom) < 1e-6,
+            "a detection span does not count for the group's frame");
+        var counted = ObjectMarkingGeometry.GroupFrame(eye800, anchors.Concat(new[] { span }).ToArray(), frames.Concat(new ObjectMarkingFrame[] { null }).ToArray(), null, null, Camera(eye800), View);
+        Check(counted.Frame.Value.Right > g.Right + 1, "without the listed members every object counts, the span included");
         // The frame is one box around the members, not the outline of the members: the place above the low post,
         // at the height of the mast's top, lies inside it, although no member reaches there.
         var above = Screen(new WorldPoint(10, 5.5, 999), eye800);
@@ -235,6 +266,14 @@ static class GameDefinedGroupTests {
         // does not bring the group with it.
         Check(Click(322, 300, Objects(), new PickGroup(T(0, 0, false, false), new[] { 0, 1, 2, 3 }, new[] { 3 })) == "3", "a candidate of a group out of view is picked on its own marker");
         Check(Click(2, 2, new[] { T(0, 0), T(50, 50), T(60, 60) }, new PickGroup(T(0, 0, false, false), new[] { 1, 2 })) == "0", "a marker where an unseen group would stand is picked alone");
+        // The detection spans of a grade-crossing setup take no part on their own while it shows as one, and its
+        // choice list leaves them out: objects 1 and 3 are spans here.
+        PickGroup Spanned(params int[] own) => new PickGroup(T(300, 300), new[] { 0, 1, 2, 3 }, own, new[] { 1, 3 });
+        Check(Click(300, 300, Objects(), Spanned()) == "0,2 g0", "a click on the setup's square marker lists its objects other than its detection spans (got " + Click(300, 300, Objects(), Spanned()) + ")");
+        Check(Click(290, 300, Objects(), Spanned()) == "0,2 g0" && Click(330, 300, Objects(), Spanned()) == "", "a detection span of a distant setup has no marker of its own to click");
+        Check(Click(300, 300, Objects(boardX: 306), Spanned()) == "0,2,5 g0", "with overlapping markers the list holds the setup's objects without its spans, and the other objects");
+        // A detection span that is the candidate or the inspected object, chosen in the outliner, shows its own marker.
+        Check(Click(322, 300, Objects(), Spanned(3)) == "3", "a detection span that is the candidate is picked on its own marker");
         // Without a group the rule is the click rule of one object each.
         Check(Click(402, 300, Objects()) == "4" && Click(402, 300, Objects(), new PickGroup[0]) == "4" && WorldPick.Resolve(0, 0, null, null).Objects.Count == 0, "without groups every object is picked by the click rule");
     }

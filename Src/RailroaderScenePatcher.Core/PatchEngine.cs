@@ -37,6 +37,28 @@ namespace RailroaderScenePatcher.Core {
         // Set for a track-following placement: Position and Rotation are then its evaluation at the anchor's current pose,
         // or null until it is evaluated. Null for a fixed placement.
         public TrackFollowing Following { get; internal set; }
+        // Set on a placement a scene reads for an object that stands in a frame that can move, such as a part of a baked
+        // scenery group in its group root, while no fixed placement holds the object: the map placement of that frame
+        // when the object was read. Position and Rotation stay map coordinates. Applied back, such a placement returns
+        // the object to its place in the frame. Null for every other placement.
+        public Placement Frame { get; internal set; }
+        // The placement that keeps this placement's place in its frame, evaluated at the frame's placement now.
+        internal Placement InFrame(Placement now) {
+            if (Frame == null || now?.Position == null || now.Rotation == null) return this;
+            var inverse = Quaternion.Conjugate(Quaternion.Normalize(Frame.Rotation));
+            var local = Quaternion.Rotate(inverse, new[] { Position[0] - Frame.Position[0], Position[1] - Frame.Position[1], Position[2] - Frame.Position[2] });
+            var turn = Quaternion.Normalize(now.Rotation);
+            var moved = Quaternion.Rotate(turn, local);
+            return new Placement(new[] { now.Position[0] + moved[0], now.Position[1] + moved[1], now.Position[2] + moved[2] },
+                Quaternion.Normalize(Quaternion.Multiply(turn, Quaternion.Multiply(inverse, Rotation)))) { Frame = new Placement((double[])now.Position.Clone(), (double[])now.Rotation.Clone()) };
+        }
+    }
+    // A scene whose objects can stand in a frame that moves, such as the parts of a baked scenery group in their group
+    // root. The engine evaluates such an object's underlying placement at the frame's placement now, so a removal returns
+    // the object to its place in the frame wherever the frame stands.
+    public interface IFramedScene {
+        // The map placement of the frame the object stands in now, or null when it stands in none.
+        Placement FramePlacement(object target);
     }
     // Desired or observed state of one object. A null member is left untouched by an application.
     public sealed class ObjectState {
@@ -65,6 +87,31 @@ namespace RailroaderScenePatcher.Core {
         // object to its group-driven activity, which releases an explicit disable.
         public bool LeavesActivity { get; private set; }
         public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true };
+    }
+    // A map context that holds map patches, as the native map editor's does while it edits a map patch. In a save a map
+    // patch is never in the map context.
+    public interface IMapPatchContext {
+        IEnumerable<string> MapPatchIds { get; }
+    }
+    // Whether a scene patch file's scene target map lets it apply in the map context, shared by the engine and scene patch
+    // editing.
+    public static class SceneTargetMapCheck {
+        public const string Mismatch = "The scene target map is neither the loaded map nor one of its layers";
+        // The maps a scene patch file can name in the scene's map context: its map IDs without the map patches.
+        public static string[] Valid(IScene scene) {
+            var patches = scene is IMapPatchContext context ? (context.MapPatchIds ?? Enumerable.Empty<string>()).ToArray() : new string[0];
+            return scene.MapIds.Where(id => !patches.Contains(id, StringComparer.Ordinal)).ToArray();
+        }
+        // Why a scene patch file naming mapId does not apply in the scene's map context, or null. A map patch in the native
+        // map editor's map context does not count: the game skips a scene patch file that names a map patch in play.
+        public static string Problem(IScene scene, string mapId) {
+            var maps = scene.MapIds.ToArray();
+            if (!maps.Contains(mapId, StringComparer.Ordinal)) return Mismatch;
+            if (scene is IMapPatchContext context && (context.MapPatchIds ?? Enumerable.Empty<string>()).Contains(mapId, StringComparer.Ordinal))
+                return "The scene target map " + mapId + " is a map patch. The game would skip this scene patch file in a save because a map patch is never the loaded map or one of its layers. Use the bottom map layer, "
+                    + PatchEditingSession.SceneTargetMapFor(maps) + ", as the scene target map";
+            return null;
+        }
     }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
@@ -189,14 +236,18 @@ namespace RailroaderScenePatcher.Core {
             return Apply(json, scenePatchFileKey, null);
         }
         public ScenePatchFileResult Apply(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
-            return ApplyScenePatchFile(json, scenePatchFileKey, inspectedTargets, null);
+            return ApplyScenePatchFile(json, scenePatchFileKey, inspectedTargets, null, false);
+        }
+        // An explicit file-version choice may retry this scene patch file's failed IDs, subject to the same cleanup guards.
+        internal ScenePatchFileResult ApplyFileVersion(string json, string scenePatchFileKey) {
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, null, true);
         }
         // The complete envelope is checked before selecting a dependency-free relationship repair for this native check.
         public ScenePatchFileResult BeforeNativeCheck(string json, string scenePatchFileKey, TargetIdentity target) {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            return ApplyScenePatchFile(json, scenePatchFileKey, null, target);
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, target, false);
         }
-        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget) {
+        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget, bool retryFailures) {
             if (scenePatchFileKey == null) throw new ArgumentNullException(nameof(scenePatchFileKey));
             Observe("document-dispatch", scenePatchFileKey);
             var result = new ScenePatchFileResult();
@@ -204,7 +255,8 @@ namespace RailroaderScenePatcher.Core {
             var scenePatchFile = ScenePatchFile.Load(json);
             if (!scenePatchFile.CanWrite) { result.Error = scenePatchFile.Error; result.MapEditorOnly = true; return result; }
             try {
-                if (!scene.MapIds.Contains((string)scenePatchFile.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.MapEditorOnly = true; return result; }
+                var mapProblem = SceneTargetMapCheck.Problem(scene, (string)scenePatchFile.Root["sourceMap"]["mapId"]);
+                if (mapProblem != null) { result.Error = mapProblem; result.MapEditorOnly = true; return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var entries = Entries(scenePatchFile.Modifications);
                 sharedAdditions = SharedAdditionIds(entries.Values);
@@ -216,7 +268,7 @@ namespace RailroaderScenePatcher.Core {
                         if (unavailable != null) result.EarlyRouteUnavailable = unavailable;
                         continue;
                     }
-                    Execute(id, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
+                    Execute(id, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets, retryFailures);
                 }
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
             finally { Unplan(); }
@@ -259,13 +311,17 @@ namespace RailroaderScenePatcher.Core {
                 } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + e.Message; return false; }
             } catch (InvalidOperationException) { return false; }
         }
-        Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
+        Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, bool retryFailures) {
             Outcome prior;
             if (outcomes.TryGetValue(id, out prior)) return prior;
             var outcome = new Outcome();
             if (!visiting.Add(id)) { outcome.Error = "The modification dependencies form a cycle"; outcome.Cause = FailureCause.InvalidDefinition; outcome.Failure = FailureKind.Refused; return outcome; }
             var key = scenePatchFileKey.Length + ":" + scenePatchFileKey + id;
             try {
+                if (failed.ContainsKey(key)) {
+                    var priorFailure = failed[key];
+                    if (retryFailures && (priorFailure.ResolvedTarget == null || !IsUnsafe(priorFailure.ResolvedTarget))) failed.Remove(key);
+                }
                 if (failed.ContainsKey(key)) {
                     Observe("retry-blocked", scenePatchFileKey, id);
                     var previous = failed[key];
@@ -287,7 +343,7 @@ namespace RailroaderScenePatcher.Core {
                 catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(e.Message); }
                 foreach (var dep in dependencies) {
                     if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the scene patch file");
-                    var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
+                    var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets, retryFailures);
                     if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new AttemptFailure(FailureKind.DependencyFailed, "A required modification failed: " + dep); }
                 }
                 Modification parsed;
@@ -367,11 +423,14 @@ namespace RailroaderScenePatcher.Core {
             outcomes[id] = outcome;
             return outcome;
         }
-        // The state this object had before any modification of this engine touched it.
+        // The state this object had before any modification of this engine touched it. An object that stood in a frame
+        // keeps its place in that frame: its placement follows the frame to where the frame stands now.
         internal ObjectState Underlying(object target) {
             ObjectState state;
             if (!underlying.TryGetValue(target, out state)) underlying.Add(target, state = scene.Read(target));
-            return state;
+            if (state?.Placement?.Frame == null || !(scene is IFramedScene framed)) return state;
+            var now = framed.FramePlacement(target);
+            return now == null ? state : new ObjectState(state.Placement.InFrame(now), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter);
         }
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;
@@ -706,7 +765,7 @@ namespace RailroaderScenePatcher.Core {
             return new CrossingCoverage(parsed);
         }
         // Explicit equipment additions to a crossing controller, keyed by a persistent ID unique in this scene patch file: each holds the
-        // required pattern, a loaded source and a fixed placement. An addition this scene patch file omits stays untouched.
+        // required pattern, a source and a fixed placement. An addition this scene patch file omits stays untouched.
         static CrossingEquipment ParseEquipment(JToken token) {
             var entries = token as JObject;
             if (entries == null || !entries.HasValues) throw new InvalidOperationException("Invalid relationship: crossingEquipment must be an object with at least one entry, keyed by equipment ID");
@@ -714,7 +773,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var property in entries.Properties()) {
                 if (!(property.Value is JObject known)) continue;
                 if (!Only(known, "pattern", "source", "placement")) throw new InvalidOperationException("Unsupported relationship content in equipment " + property.Name + (known["id"] != null ? ": an entry carries no id member; its ID is its key, " + property.Name : ""));
-                if (known["source"] is JObject source && !Only(source, "scene", "path")) throw new InvalidOperationException("Unsupported relationship content in the source of equipment " + property.Name);
+                if (known["source"] is JObject source && !Only(source, "scene", "path", "definition")) throw new InvalidOperationException("Unsupported relationship content in the source of equipment " + property.Name);
                 if (known["placement"] is JObject placement && !Only(placement, "mode", "position", "track", "offset", "rotation")) throw new InvalidOperationException("Unsupported relationship content in the placement of equipment " + property.Name);
             }
             var parsed = new List<EquipmentAddition>();
@@ -731,10 +790,18 @@ namespace RailroaderScenePatcher.Core {
                 var pattern = (string)addition["pattern"];
                 if (!EquipmentAddition.Patterns.Contains(pattern, StringComparer.Ordinal)) throw new InvalidOperationException("Unsupported crossing equipment pattern " + pattern + " in equipment " + id);
                 var source = addition["source"] as JObject;
-                if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                EquipmentSource from;
+                // A bell loads the audio of a bell definition; a light or gate copies a loaded device.
+                if (pattern == EquipmentAddition.BellPattern) {
+                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with the identifier of a bell definition under definition");
+                    from = EquipmentSource.ForDefinition((string)source["definition"]);
+                } else {
+                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                    from = new EquipmentSource((string)source["scene"], (string)source["path"]);
+                }
                 var placement = addition["placement"] as JObject;
                 if (placement == null || placement["mode"]?.Type != JTokenType.String || (string)placement["mode"] != "fixed" || !Only(placement, "mode", "position", "rotation")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a fixed placement");
-                parsed.Add(new EquipmentAddition(id, pattern, new EquipmentSource((string)source["scene"], (string)source["path"]), CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4))));
+                parsed.Add(new EquipmentAddition(id, pattern, from, CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4))));
             }
             return new CrossingEquipment(parsed, false);
         }

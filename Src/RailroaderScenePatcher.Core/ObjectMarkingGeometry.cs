@@ -113,6 +113,12 @@ namespace RailroaderScenePatcher.Core {
         // or the ballast of track that lies on that terrain. Track carried over the terrain, as on a bridge deck,
         // and track without terrain under it do not count: a bridge carries its track and stands in the terrain at
         // its ends. Null where there is no terrain.
+        // What a hit of the downward ray counts as: terrain on the terrain layer, ballast on the track layer, and
+        // nothing on a collider of an inventory object. The scene can put an object on the terrain layer, such as a coal
+        // heap that cars and characters stand on; it is still the object, not the ground it stands in, and taking it for
+        // the ground would raise the frame's lower face to the object's own top.
+        public enum SurfaceHit { None, Terrain, Ballast }
+        public static SurfaceHit HitKind(bool terrainLayer, bool inventoryObject) => inventoryObject ? SurfaceHit.None : terrainLayer ? SurfaceHit.Terrain : SurfaceHit.Ballast;
         public static double? Surface(double? terrain, IEnumerable<double> track) {
             if (!terrain.HasValue || !Finite(terrain.Value)) return null;
             var surface = terrain.Value;
@@ -234,12 +240,12 @@ namespace RailroaderScenePatcher.Core {
                 // One part: its own oriented box, which lies inside its world-aligned box, or the world-aligned
                 // box where the oriented one is unknown.
                 var part = standing[0].Key;
-                points = Project(stands ? standing[0].Value.Where(q => q.Above).ToList() : Whole(standing[0].Value), stands, project, view, out var finite);
+                points = Project(stands ? Standing(standing[0].Value) : Whole(standing[0].Value), false, project, view, out var finite);
                 // The world-aligned box stands in for an oriented box that gives nothing: one whose projection is
                 // not finite, or one that lies outside the view although its part does not.
                 if (points == null && part.Oriented != null && part.Oriented.Count == 8) {
                     var aligned = Pieces(BoxCorners(part), part.Ground);
-                    points = Project(stands ? aligned.Where(q => q.Above).ToList() : Whole(aligned), stands, project, view, out finite);
+                    points = Project(stands ? Standing(aligned) : Whole(aligned), false, project, view, out finite);
                 }
                 decisions?.Add(part.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
             } else if (standing.Count > 1) {
@@ -248,8 +254,8 @@ namespace RailroaderScenePatcher.Core {
                 var box = Enclose(standing.SelectMany(entry => CornersOf(entry.Key)), orientation ?? BasisOf(seed));
                 var ground = standing.Select(entry => entry.Key.Ground).FirstOrDefault(g => g != null);
                 var pieces = Pieces(box, ground);
-                var above = pieces.Where(q => q.Above).ToList();
-                points = Project(stands && above.Count != 0 ? above : Whole(pieces), stands && above.Count != 0, project, view, out var finite);
+                var above = pieces.Where(q => q.Above && !q.Whole).ToList();
+                points = Project(stands && above.Count != 0 ? Standing(pieces) : Whole(pieces), false, project, view, out var finite);
                 foreach (var entry in standing)
                     decisions?.Add(entry.Key.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
             }
@@ -300,11 +306,13 @@ namespace RailroaderScenePatcher.Core {
         // marker and frame, its one frame is the outline of one box around all its objects: around where they stand
         // and around the parts of their pieces, in the given orientation, that of the game component that anchors
         // the group, or the world's without one. Like the box of an object it is cut at the surface the group
-        // stands in, and framed whole when it lies wholly under the surface found from above.
+        // stands in, and framed whole when it lies wholly under the surface found from above. listed says, per
+        // object, whether it counts for the bounds and the box (GameDefinedGroup.Listed); without it every object does.
         public static GroupMarking GroupFrame(WorldPoint camera, IReadOnlyList<WorldPoint> anchors, IReadOnlyList<ObjectMarkingFrame> frames,
-            WorldBasis? orientation, Func<double, double, double?> ground, Func<WorldPoint, ClipPoint> project, ScreenRect view) {
+            WorldBasis? orientation, Func<double, double, double?> ground, Func<WorldPoint, ClipPoint> project, ScreenRect view, IReadOnlyList<bool> listed = null) {
             if (anchors == null) throw new ArgumentNullException(nameof(anchors));
             if (project == null) throw new ArgumentNullException(nameof(project));
+            anchors = Listed(anchors, listed); frames = frames == null ? null : Listed(frames, listed);
             double minX = Double.PositiveInfinity, minY = minX, minZ = minX, maxX = Double.NegativeInfinity, maxY = maxX, maxZ = maxX;
             void Include(WorldPoint p) {
                 if (!Valid(p)) return;
@@ -322,11 +330,16 @@ namespace RailroaderScenePatcher.Core {
             var box = Enclose(held, orientation ?? WorldBasis.World);
             if (box == null) return new GroupMarking(distance, center, null, null);
             var pieces = Pieces(box, ground);
-            var above = pieces.Where(q => q.Above).ToList();
-            var points = Project(above.Count != 0 ? above : Whole(pieces), above.Count != 0, project, view, out _);
+            var above = pieces.Where(q => q.Above && !q.Whole).ToList();
+            var points = Project(above.Count != 0 ? Standing(pieces) : Whole(pieces), false, project, view, out _);
             if (points == null || points.Count == 0) return new GroupMarking(distance, center, null, null);
             return new GroupMarking(distance, center, Rect(points.Min(q => q.X) - Margin, points.Min(q => q.Y) - Margin, points.Max(q => q.X) + Margin, points.Max(q => q.Y) + Margin), Grown(points, Margin));
         }
+        // The objects of a group that count for its bounds and its box: those its listed members name
+        // (GameDefinedGroup.Listed), by position; every object without them. The invisible detection spans of a
+        // grade-crossing setup do not count.
+        static IReadOnlyList<T> Listed<T>(IReadOnlyList<T> objects, IReadOnlyList<bool> listed) =>
+            listed == null ? objects : objects.Where((item, k) => k < listed.Count && listed[k]).ToArray();
         // The convex outline of points, with a margin on every side: the outline of a square of that half size
         // moved over each point.
         static IReadOnlyList<ScreenPoint> Grown(IEnumerable<ScreenPoint> points, double margin) {
@@ -393,7 +406,8 @@ namespace RailroaderScenePatcher.Core {
 
         // One piece of a part: its eight corners, the height of the surface under its centre when one is known, and
         // whether anything of it stands above that surface. Whole marks the part's undivided box.
-        sealed class Piece { internal WorldPoint[] Corners; internal double? Height; internal bool Above; internal bool Whole; }
+        // Range holds where a piece lies along the whole box's three axes, as fractions: from and to for each axis.
+        sealed class Piece { internal WorldPoint[] Corners; internal double? Height; internal bool Above; internal bool Whole; internal double[] Range; }
         // The pieces of a box along its own axes, read from its corners: corner 0 and the corners that differ from it
         // in bit 0, bit 1 and bit 2 give the three axes, whatever way the box is turned. The first piece is the whole
         // box, for an object that is framed whole.
@@ -414,11 +428,58 @@ namespace RailroaderScenePatcher.Core {
                 }
                 var height = ground(cx, cz);
                 if (height.HasValue && !Finite(height.Value)) height = null;
-                pieces.Add(new Piece { Corners = piece, Height = height, Above = !height.HasValue || top > height.Value });
+                pieces.Add(new Piece { Corners = piece, Height = height, Above = !height.HasValue || top > height.Value,
+                    Range = new[] { i / (double)counts[0], (i + 1) / (double)counts[0], j / (double)counts[1], (j + 1) / (double)counts[1], k / (double)counts[2], (k + 1) / (double)counts[2] } });
             }
             return pieces;
         }
         static List<Piece> Whole(List<Piece> pieces) => pieces.Where(q => q.Whole).ToList();
+        // What stands above the surface, as one box. The whole box shrinks along its own axes to the pieces that stand
+        // above the surface, so a part that runs into a bank loses what lies inside it. Its lower face, across its most
+        // upright axis, then rises to the lowest surface under those pieces. On a slope the box keeps some ground on its
+        // high side, but the frame stays the outline of one box and leaves nothing that stands above out. A box without
+        // an upright axis, turned on its edge, is not raised.
+        static List<Piece> Standing(List<Piece> pieces) {
+            var whole = pieces.First(q => q.Whole);
+            var above = pieces.Where(q => !q.Whole && q.Above && q.Range != null).ToList();
+            if (above.Count == 0) return new List<Piece> { whole };
+            var corners = whole.Corners;
+            WorldPoint o = corners[0];
+            var axes = new[] { 1, 2, 4 }.Select(bit => new WorldPoint(corners[bit].X - o.X, corners[bit].Y - o.Y, corners[bit].Z - o.Z)).ToArray();
+            // The range of the standing pieces along each axis, as fractions of the whole box.
+            var lower = new double[3]; var upper = new double[3];
+            for (int a = 0; a < 3; a++) { lower[a] = above.Min(q => q.Range[2 * a]); upper[a] = above.Max(q => q.Range[2 * a + 1]); }
+            var heights = above.Where(q => q.Height.HasValue).Select(q => q.Height.Value).ToList();
+            int upright = -1; double best = 0;
+            for (int a = 0; a < 3; a++) {
+                var length = Math.Sqrt(axes[a].X * axes[a].X + axes[a].Y * axes[a].Y + axes[a].Z * axes[a].Z);
+                var share = length > 0 ? Math.Abs(axes[a].Y) / length : 0;
+                if (share > best) { best = share; upright = a; }
+            }
+            if (heights.Count != 0 && upright >= 0 && best >= UprightAxis) {
+                // The fraction along the upright axis at which the box's centre line meets the lowest surface.
+                var ground = heights.Min();
+                var rest = o.Y;
+                for (int a = 0; a < 3; a++) if (a != upright) rest += axes[a].Y * (lower[a] + upper[a]) / 2;
+                var at = (ground - rest) / axes[upright].Y;
+                var span = upper[upright] - lower[upright];
+                if (axes[upright].Y > 0) lower[upright] = Math.Max(lower[upright], Math.Min(at, upper[upright] - span * (1 - MaxRaise)));
+                else upper[upright] = Math.Min(upper[upright], Math.Max(at, lower[upright] + span * (1 - MaxRaise)));
+            }
+            var box = new WorldPoint[8];
+            for (int c = 0; c < 8; c++) {
+                double x = o.X, y = o.Y, z = o.Z;
+                for (int a = 0; a < 3; a++) {
+                    var f = ((c >> a) & 1) == 0 ? lower[a] : upper[a];
+                    x += axes[a].X * f; y += axes[a].Y * f; z += axes[a].Z * f;
+                }
+                box[c] = new WorldPoint(x, y, z);
+            }
+            return new List<Piece> { new Piece { Corners = box, Whole = true, Above = true } };
+        }
+        // An axis counts as upright from about 60 degrees above the horizontal; the lower face rises at most this far
+        // along it, so a box keeps a sliver above a surface that reaches its top.
+        const double UprightAxis = 0.866, MaxRaise = 0.98;
         // The twelve edges of a box, as pairs of corners that differ in one bit.
         static readonly int[][] Edges = {
             new[] { 0, 1 }, new[] { 2, 3 }, new[] { 4, 5 }, new[] { 6, 7 }, new[] { 0, 2 }, new[] { 1, 3 }, new[] { 4, 6 }, new[] { 5, 7 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 }

@@ -173,7 +173,42 @@ static partial class CoverageTests {
         EditingRefusalAndFailureRestore();
         SaveAndReloadReproduceCoverageOnce();
         DependedCoverageKeepsItsLastEntry();
+        UnresolvedDetectionSpanIsAControllerProblem();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
+    }
+    // A circuit whose detection span no longer resolves to an existing track segment is a problem of its crossing
+    // controller, naming the circuit as the Connections tab does, the span by its Connections tab role and its ID,
+    // with the recovery the Connections tab offers for that kind of circuit.
+    static void UnresolvedDetectionSpanIsAControllerProblem() {
+        // The circuit keys come from the island span IDs and addition keys the coverage editing itself produces.
+        var f = new Fixture();
+        var result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr"), additions: Addition("siding"))));
+        Assert(result.Error == null && result.Outcomes["reroute"].Applied, "The fixture applies: " + result.Error + result.Outcomes["reroute"].Error);
+        var selectedIsland = f.Rerouted.Spans[1].Id; var added = f.Crossing.Circuits[2];
+        Assert(selectedIsland.StartsWith("CrankyAnt.ScenePatcher.", StringComparison.Ordinal) && added.Addition != null, "The fixture holds owned spans: " + selectedIsland);
+        Assert(CircuitSpanProblems.CircuitKey("Pipr", null) == "Pipr", "A native circuit is keyed by its island span's ID");
+        Assert(CircuitSpanProblems.CircuitKey(selectedIsland, null) == "Pipr", "A circuit with selected tracks keeps the key of its native island span (got " + CircuitSpanProblems.CircuitKey(selectedIsland, null) + ")");
+        Assert(CircuitSpanProblems.CircuitKey(selectedIsland + ".2", null) == "Pipr", "a numbered owned island span ID gives the same key");
+        Assert(CircuitSpanProblems.CircuitKey(added.Spans[1].Id, added.Addition) == added.Addition, "A detection addition is keyed by its addition key");
+
+        var segments = new HashSet<string>(new[] { "S1", "S2" }, StringComparer.Ordinal);
+        Assert(CircuitSpanProblems.Unresolved("Pipr", "island", "Pipr", "S1", "S2", segments) == null, "A span whose two ends resolve is no problem");
+        var missing = CircuitSpanProblems.Unresolved(CircuitSpanProblems.CircuitKey(selectedIsland, null), "approachA", f.Rerouted.Spans[0].Id, "S1", "Sgone", segments);
+        Assert(missing != null && !BindingRules.IsNote(missing), "A span with an end on a missing segment is a problem, not an inspection note: " + missing);
+        Assert(missing.StartsWith("Circuit Pipr Approach A span " + f.Rerouted.Spans[0].Id + " ", StringComparison.Ordinal) && missing.Contains("Sgone"),
+            "The problem names the circuit as the Connections tab does, the span by its role caption and ID, and the missing segment: " + missing);
+        Assert(missing.EndsWith("On the controller's Connections tab, select tracks for this circuit or detach it.", StringComparison.Ordinal), "A circuit's recovery is to select tracks or detach it: " + missing);
+        var empty = CircuitSpanProblems.Unresolved("Pipr", "approachB", "P1db", "", "S2", segments);
+        Assert(empty != null && !BindingRules.IsNote(empty) && empty.Contains("Approach B span P1db") && empty.Contains("Connections tab"), "A span with an end on no segment is a problem: " + empty);
+        var addition = CircuitSpanProblems.Unresolved(CircuitSpanProblems.CircuitKey(added.Spans[1].Id, added.Addition), "island", added.Spans[1].Id, "Sgone", "S2", segments);
+        Assert(addition.StartsWith("Detection addition siding Island span ", StringComparison.Ordinal), "A detection addition is named as on the Connections tab: " + addition);
+        Assert(addition.EndsWith("On the controller's Connections tab, select other tracks for this addition or delete it.", StringComparison.Ordinal) && addition.IndexOf("detach", StringComparison.OrdinalIgnoreCase) < 0,
+            "An addition's recovery is to select other tracks or delete it, not to detach it: " + addition);
+        // Without the track graph no span can be checked: one note for the controller, and an empty end stays a problem.
+        Assert(CircuitSpanProblems.Unresolved("Pipr", "island", "Pipr", "S1", "S2", null) == null, "Without the track graph a span with both ends set reports nothing of its own");
+        Assert(CircuitSpanProblems.Unresolved("Pipr", "island", "Pipr", "", "S2", null) != null, "Without the track graph an end without a segment is still a problem");
+        var unknown = CircuitSpanProblems.Unknown("graph unreadable");
+        Assert(unknown.StartsWith("Circuit span validity unknown. ", StringComparison.Ordinal) && BindingRules.IsNote(unknown) && unknown.Contains("graph unreadable"), "Without the track graph the controller has one inspection note: " + unknown);
     }
     static void ScenePatchFileDistinguishesOmittedSelectedAndDetached() {
         var f = new Fixture();

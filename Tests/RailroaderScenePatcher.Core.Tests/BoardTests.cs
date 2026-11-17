@@ -133,6 +133,18 @@ static class BoardTests {
         SaveRaisesMinimumForPatternBoards();
         InspectedOutputResolvesOncePerInspection();
         ChangedObjectsAreReadFromTheScenePatchFile();
+        FileVersionReportsInvalidBoardRotation();
+    }
+    static void FileVersionReportsInvalidBoardRotation() {
+        var initial = Doc(Mod("move", Place(Moved)));
+        var (world, board, boards, session, mapEditor, store) = PatchEditing(initial);
+        var invalid = Doc(Mod("move", Place(Moved, new[] { 1.0, 0.22025036811828613, 0.0, -0.9754433631896973 })));
+        store.Patch = invalid;
+        session.CheckFileVersion();
+        var choice = session.UseFileVersion();
+        var outcome = session.LastVersionApplication.Outcomes["move"];
+        Assert(choice.Applied && !outcome.Applied && outcome.Error.Contains("unit quaternion") && Near(board.Position, new FakeBoard().Position),
+            "Choosing a file with an invalid board rotation retains the file but reports the failed application and leaves the underlying placement: " + outcome.Error);
     }
     // The outliner marks every row this mod modifies. That reads the scene patch file alone and never searches the scene.
     static void ChangedObjectsAreReadFromTheScenePatchFile() {

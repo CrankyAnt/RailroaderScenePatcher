@@ -59,7 +59,7 @@ Omit `placement` or `relationships.trackMarker` to leave that setting to the sce
 
 ## Limits
 
-The automated tests use a controlled track graph; they do not load Railroader. They check placement, binding, detach, explicit disable of a group-driven post, and refusal of missing and ambiguous mileposts and replacement tracks. They also check map mismatch, order-independent dependencies, repetition, the origin cache entry, preflight refusal, failure after a change with restoration or guarded retry, Undo, Redo, clear, removal, Save and reload.
+The automated tests use a controlled track graph; they do not load Railroader. They check placement, binding, detach, explicit disable of a group-driven post, and refusal of missing and ambiguous mileposts and replacement tracks. They also check a scene target map that is not the loaded map, order-independent dependencies, repetition, the origin cache entry, preflight refusal, failure after a change with restoration or guarded retry, Undo, Redo, clear, removal, Save and reload.
 
 The patcher does not repair a milepost's binding before the game checks its track markers at world load. A broken milepost binding therefore still raises the game's "not on the track" warning once in that load, before the patcher applies the scene patch file and repairs it. The early repair described under [repair feedback](repairing-track-bindings.md#repair-feedback-in-the-native-map-editor) covers Generic track markers only.
 

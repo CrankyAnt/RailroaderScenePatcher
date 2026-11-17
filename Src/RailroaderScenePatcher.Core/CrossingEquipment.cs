@@ -6,24 +6,45 @@ using System.Globalization;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // A device already loaded in the selected map, named by its Unity scene and hierarchy path. The patcher never loads
-    // another scene to find it and never substitutes a different object.
+    // Where an addition comes from: a device already loaded in the selected map, named by its Unity scene and hierarchy path,
+    // or a definition of the game's content library, named by its identifier, such as the bell definition a bell player
+    // loads its audio through. The patcher never loads another scene to find a source and never substitutes another one.
     public sealed class EquipmentSource {
         public EquipmentSource(string scene, string path) {
             if (String.IsNullOrWhiteSpace(scene) || String.IsNullOrWhiteSpace(path)) throw new ArgumentException("A source needs a scene and a path");
             Scene = scene; Path = path;
         }
+        EquipmentSource(string definition) { Definition = definition; }
+        public static EquipmentSource ForDefinition(string identifier) {
+            if (String.IsNullOrWhiteSpace(identifier)) throw new ArgumentException("A definition source needs an identifier");
+            return new EquipmentSource(identifier);
+        }
+        // Null for a definition source.
         public string Scene { get; }
         public string Path { get; }
-        internal static bool Same(EquipmentSource a, EquipmentSource b) => a == null ? b == null : b != null && a.Scene == b.Scene && a.Path == b.Path;
-        public override string ToString() => Scene + "/" + Path;
+        // The content-library identifier of a definition source, or null for a loaded device.
+        public string Definition { get; }
+        public bool IsDefinition => Definition != null;
+        internal static bool Same(EquipmentSource a, EquipmentSource b) => a == null ? b == null : b != null && a.Scene == b.Scene && a.Path == b.Path && a.Definition == b.Definition;
+        public override string ToString() => IsDefinition ? "definition " + Definition : Scene + "/" + Path;
     }
     // One piece of crossing equipment a mod adds to an existing crossing controller: a copy of an eligible source built
     // with the required pattern and addressed by that controller. Its ID is persistent and unique within the supplying
     // mod's scene patch file; the scope is that mod's identifier, so two mods may use the same ID.
     public sealed class EquipmentAddition {
-        public const string LightGatePattern = "crossing-light-gate-v1";
-        public static readonly string[] Patterns = { LightGatePattern };
+        public const string LightGatePattern = "crossing-light-gate-v1", BellPattern = "crossing-bell-v1";
+        public static readonly string[] Patterns = { LightGatePattern, BellPattern };
+        // The audio priority of an added bell's player: the native crossing bell's own, so the game sorts both alike.
+        // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer.
+        public const int BellPriority = 9;
+        // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
+        // audio of a bell definition.
+        public static string SourceKindProblem(string pattern, EquipmentSource source) {
+            if (source == null) return "it needs a source";
+            if (pattern == BellPattern && !source.IsDefinition) return "pattern " + BellPattern + " requires a bell definition as its source; a loaded device cannot be used";
+            if (pattern == LightGatePattern && source.IsDefinition) return "pattern " + LightGatePattern + " requires a loaded device as its source; a definition cannot be used";
+            return null;
+        }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement) : this(id, pattern, source, placement, "") { }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement, string scope) {
             var problem = IdProblem(id);
@@ -44,7 +65,7 @@ namespace RailroaderScenePatcher.Core {
         // Null when the ID can name an addition: 1 to 64 letters, digits, '.', '_' or '-'.
         public static string IdProblem(string id) {
             if (String.IsNullOrEmpty(id) || id.Length > 64 || !id.All(c => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
-                return "An equipment ID needs 1 to 64 letters, digits, '.', '_' or '-'";
+                return "An equipment ID must contain 1 to 64 characters: letters, digits, '.', '_' or '-'";
             return null;
         }
         internal static bool SameBuild(EquipmentAddition a, EquipmentAddition b) => a.Key == b.Key && a.Pattern == b.Pattern && EquipmentSource.Same(a.Source, b.Source);
@@ -141,18 +162,18 @@ namespace RailroaderScenePatcher.Core {
         public static string Problem(DeviceFacts d, IReadOnlyList<string> keys) {
             if (d == null) throw new ArgumentNullException(nameof(d));
             if (keys == null || keys.Count == 0) throw new ArgumentException("The controller's keys are required", nameof(keys));
-            if (d.AddedByPatcher) return "it is equipment this patcher added; choose a device of the map";
+            if (d.AddedByPatcher) return "the patcher added this equipment; choose a device already present in the map";
             if (d.DestinationKeyValueObjects != 1) return "the destination crossing controller has " + (d.DestinationKeyValueObjects == 0 ? "no" : "several") + " key-value objects, so it cannot address the copy";
-            if (d.DestinationCullers > 1) return "the destination crossing controller holds several cullers, so the copy's culling would be ambiguous";
+            if (d.DestinationCullers > 1) return "the destination crossing controller has several cullers, so it is unclear which one should control the copy's visibility";
             if (d.ContainsDestination) return "it contains the destination crossing";
-            if (d.OtherScene) return "it lies in another scene than the destination crossing, which could unload it while the copy still uses its assets";
+            if (d.OtherScene) return "it is in a different Unity scene from the destination crossing and could unload while the copy still uses its assets";
             if (d.MissingScript) return "a script in its hierarchy is missing";
             if (d.Controllers > 0) return "it holds a crossing controller; a copy would be a second crossing";
             if (d.KeyValueObjects > 0) return "it holds its own key-value object, which would intercept the crossing controller's keys";
             if (d.Spans > 0) return "it holds a detection span";
             if (d.Cullers > 0) return "it holds its own culler";
-            if (d.Bells > 0) return "it holds a bell player; bells follow the controller-bound bell pattern";
-            if (d.Lamps.Count + d.Gates.Count == 0) return "it holds no lamp and no gate that observes the controller's " + String.Join(" or ", keys) + " key";
+            if (d.Bells > 0) return "it contains a bell player; add bells from a bell definition using the bell pattern";
+            if (d.Lamps.Count + d.Gates.Count == 0) return "it has no lamp or gate that observes the controller's " + String.Join(" or ", keys) + " key";
             foreach (var l in d.Lamps) {
                 if (!keys.Contains(l.Key)) return "lamp " + l.Name + " observes key '" + l.Key + "', which the crossing controller does not publish";
                 if (l.Targets == 0 || l.MissingTargets > 0) return "lamp " + l.Name + " has no lamp target";
@@ -164,6 +185,50 @@ namespace RailroaderScenePatcher.Core {
                 if (!keys.Contains(g.Key)) return "gate " + g.Name + " observes key '" + g.Key + "', which the crossing controller does not publish";
                 if (!g.Animator) return "gate " + g.Name + " has no Animator";
                 if (!g.Clip) return "gate " + g.Name + " has no animation clip";
+            }
+            return null;
+        }
+    }
+    // What the bell pattern reads from a candidate definition and its destination crossing controller. The native world
+    // fills it from the content library; the rules that judge it are BellPattern's.
+    public sealed class BellFacts {
+        // The definition's kind, such as Bell or Horn.
+        public string Kind = "Bell";
+        // The definition names an audio asset, and that asset resolves in the content library without loading anything.
+        public bool AudioNamed = true, AudioResolves = true;
+        public string Audio = "";
+        public double[] Indexes = new double[0];
+        public double Volume = 1;
+        public int DestinationKeyValueObjects = 1;
+    }
+    // The crossing-bell-v1 pattern: a separate bell player beneath the crossing controller that observes the bell key the
+    // controller publishes on its key-value object, and plays the audio of a bell definition the content library holds,
+    // loaded through the library and configured with the definition's indexes and volume, as the game's own crossing bell and
+    // locomotive bells do. The sound does not matter; the definition and loading mechanism do.
+    public static class BellPattern {
+        // Why a bell from the definition beneath the destination controller would not work, or null.
+        public static string Problem(BellFacts b) {
+            if (b == null) throw new ArgumentNullException(nameof(b));
+            if (b.DestinationKeyValueObjects != 1) return "the destination crossing controller has " + (b.DestinationKeyValueObjects == 0 ? "no" : "several") + " key-value objects, so it cannot address the bell";
+            if (b.Kind != "Bell") return "it is " + (String.IsNullOrEmpty(b.Kind) ? "a definition of unknown kind" : "a " + b.Kind + " definition") + ", not a bell definition";
+            if (!b.AudioNamed) return "its definition does not specify an audio asset";
+            if (!b.AudioResolves) return "its audio asset " + b.Audio + " cannot be found in the content library";
+            if (Double.IsNaN(b.Volume) || Double.IsInfinity(b.Volume) || b.Volume <= 0) return "its volume " + b.Volume.ToString(CultureInfo.InvariantCulture) + " must be a finite number greater than 0";
+            var indexes = b.Indexes ?? new double[0];
+            for (var i = 0; i < indexes.Length; i++)
+                if (Double.IsNaN(indexes[i]) || Double.IsInfinity(indexes[i]) || indexes[i] <= 0 || (i > 0 && indexes[i] <= indexes[i - 1])) return "its audio indexes must be finite times greater than 0, in strictly increasing order";
+            return null;
+        }
+        // Why the loaded clip does not fit the definition's indexes, or null: the player splits the clip at the sample of each
+        // index, so every part between them, the first and the last included, needs at least one sample.
+        public static string ClipProblem(int samples, int frequency, double[] indexes) {
+            if (samples <= 0 || frequency <= 0) return "its loaded audio clip is empty";
+            var previous = 0;
+            foreach (var index in indexes ?? new double[0]) {
+                var sample = (int)(index * frequency);
+                if (sample <= previous || sample >= samples)
+                    return "its audio index " + index.ToString("0.###", CultureInfo.InvariantCulture) + " s does not split its clip of " + ((double)samples / frequency).ToString("0.###", CultureInfo.InvariantCulture) + " s into parts of at least one sample";
+                previous = sample;
             }
             return null;
         }
@@ -183,7 +248,13 @@ namespace RailroaderScenePatcher.Core {
         public SourceCandidate(EquipmentSource source, string model, string problem, double[] position = null, double[] rotation = null) : this(source, model, problem, position, rotation, null, null, null, null) { }
         public SourceCandidate(EquipmentSource source, string model, string problem, double[] position, double[] rotation, string name, string crossing, double[] crossingPosition, double[] crossingRotation) {
             Source = source; Model = model; Problem = problem; Position = position; Rotation = rotation; Name = name; Crossing = crossing; CrossingPosition = crossingPosition; CrossingRotation = crossingRotation;
+            Pattern = source != null && source.IsDefinition ? EquipmentAddition.BellPattern : EquipmentAddition.LightGatePattern;
         }
+        // A bell definition the content library holds, with its definition name when it has one.
+        public static SourceCandidate Bell(string identifier, string name, string problem) =>
+            new SourceCandidate(EquipmentSource.ForDefinition(identifier), identifier, problem, null, null, String.IsNullOrWhiteSpace(name) ? null : name, null, null, null);
+        // The pattern an addition from this source is built with.
+        public string Pattern { get; }
         // The source's map placement, or null when it is unknown.
         public double[] Position { get; }
         public double[] Rotation { get; }
@@ -194,7 +265,9 @@ namespace RailroaderScenePatcher.Core {
         public double[] CrossingPosition { get; }
         public double[] CrossingRotation { get; }
         // "Signal 1 at Bryson Everett": the device and its crossing, which tell otherwise equal models apart.
-        public string Label => (Name ?? Model ?? Source.Path) + (String.IsNullOrEmpty(Crossing) ? "" : " at " + Crossing);
+        // A bell definition reads as its name and identifier, such as "Crossing Bell (rr/bell-uss-teardrop-crossing-rh)".
+        public string Label => Source.IsDefinition ? (Name == null || Name == Source.Definition ? Source.Definition : Name + " (" + Source.Definition + ")")
+            : (Name ?? Model ?? Source.Path) + (String.IsNullOrEmpty(Crossing) ? "" : " at " + Crossing);
         public EquipmentSource Source { get; }
         public string Model { get; }
         public string Problem { get; }
@@ -283,9 +356,13 @@ namespace RailroaderScenePatcher.Core {
         // Rechecks each addition's source: unique, loaded and conforming to its pattern for this controller.
         internal object Source(object controller, EquipmentAddition addition) {
             if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported");
+            var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
+            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind);
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
-            if (matches.Count == 0) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + addition.Source + " is not loaded in this map. The patcher neither substitutes another source nor loads another scene");
-            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + addition.Source + " is ambiguous; " + matches.Count + " loaded objects share that path");
+            if (matches.Count == 0) throw new InvalidOperationException(addition.Source.IsDefinition
+                ? "Equipment " + addition.Id + ": source " + addition.Source + " is not available in the content library. The patcher will not substitute another sound or load a scene to find it"
+                : "Equipment " + addition.Id + ": source " + addition.Source + " is not loaded in this map. The patcher will not substitute another source or load another scene");
+            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + addition.Source + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share that identifier" : " loaded objects share that path"));
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
             if (problem != null) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + addition.Source + " does not conform to " + addition.Pattern + ": " + problem);
             return matches[0];
@@ -296,11 +373,25 @@ namespace RailroaderScenePatcher.Core {
                 Source(controller, addition);
             }
         }
-        // Null when every present addition is built, addressed and culled as its pattern requires.
-        internal string Coherence(List<object> owned) {
+        // Null when every present addition is built, addressed and culled as its pattern requires. With a desired set, an
+        // addition that the change removes or rebuilds is not judged, so a faulty addition, such as a bell whose audio
+        // failed to load, can still be removed or replaced.
+        internal string Coherence(List<object> owned, CrossingEquipment desired = null) => Faulty(owned, desired, out _);
+        // Why an equipment change is refused before any change, with what the modder can do, or null. A faulty bell, such as
+        // one whose audio failed to load, can be removed or replaced; another fault needs a reload.
+        internal string Refusal(List<object> owned, CrossingEquipment desired) {
+            var difference = Faulty(owned, desired, out var pattern);
+            if (difference == null) return null;
+            return "The crossing's added equipment does not meet its pattern's requirements: " + difference + (pattern == EquipmentAddition.BellPattern
+                ? ". Remove or replace that bell. You can still edit crossing coverage" : ". Reload before editing the crossing's equipment. You can still edit crossing coverage");
+        }
+        string Faulty(List<object> owned, CrossingEquipment desired, out string pattern) {
+            pattern = null;
             foreach (var addition in owned.Where(world.Present)) {
+                var record = world.Describe(addition);
+                if (desired != null) { var want = desired.Find(record.Key); if (want == null || !EquipmentAddition.SameBuild(record, want)) continue; }
                 var problem = world.Problem(addition);
-                if (problem != null) return "added equipment " + world.Describe(addition).Id + ": " + problem;
+                if (problem != null) { pattern = record.Pattern; return "added equipment " + record.Id + ": " + problem; }
             }
             return null;
         }
@@ -320,7 +411,7 @@ namespace RailroaderScenePatcher.Core {
                 var built = world.Construct(controller, source, want) ?? throw new InvalidOperationException("Equipment " + want.Id + " was not constructed");
                 owned.Add(built);
                 var problem = world.Problem(built);
-                if (problem != null) throw new InvalidOperationException("Equipment " + want.Id + " did not verify: " + problem);
+                if (problem != null) throw new InvalidOperationException("Equipment " + want.Id + " failed validation: " + problem);
             }
         }
         // Releases every addition; returns the first failure, or null. Additions that stay present remain owned.
