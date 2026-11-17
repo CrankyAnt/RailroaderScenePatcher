@@ -45,9 +45,9 @@ Select **Disable** at the bottom of the **Object** tab. The group root is switch
 
 A part with a fixed placement keeps that placement in map coordinates when its group moves later. This holds for a group move in the same scene patch file or in another mod's, in either key order or load order, and during a **Gizmo** drag of the group. The group's placement applies first, then the placement of each part with a fixed placement. A part without a fixed placement moves with its group.
 
-**Remove modification** on a part returns it to the place it has in its group without the modification, wherever the group stands now, and the part moves with its group again.
+**Remove modification** on a part returns it to the place it has without the modification relative to the object directly above it, the group root or the part it stands below, wherever that object stands now. The part then moves with that object again. A part below a moved part keeps its place on that part, also when you disable and enable it or remove its own modification.
 
-**Disable** stays unavailable, with the reason, for a part that a culler of the game switches on and off by camera distance: the culler would switch the part on again.
+**Disable** stays unavailable, with the reason, for a part that a culler of the game switches on and off by camera distance. The culler would override a stored disable, so the patcher cannot hold it. A placement edit of such a part leaves it on or off as the culler switched it.
 
 ## Write the modification by hand
 
@@ -99,7 +99,7 @@ Before it touches a group, the patcher requires that the path names exactly one 
 
 For a part it requires that the path names exactly one listed part and that its group passes the same checks.
 
-After each group change it checks that the root has the mod's placement and activity, that every part kept its place relative to the root and, unless a culler switches it, its own activity, and that the culling sphere of every enabled culler in the group stands at its culler. A part with a fixed placement must stay at that placement instead. A disabled group holds no culling sphere. After each part change it checks the part's placement and activity, that the group root and every other part kept their placement and activity, and that what stands below the part kept its place relative to it. While any part of a group keeps a fixed placement of its own, the simple culler on the group root takes a radius that encloses the renderers of the group, and never one below the radius the scene gives it; the renderer culler on a moved part moves with it. Any difference fails the modification and restores the group or the part. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the group or part until **Recheck** succeeds or the world reloads.
+After each group change it checks that the root has the mod's placement and activity, that every part kept its place relative to the root and, unless a culler switches it, its own activity, and that the culling sphere of every enabled culler in the group stands at its culler. A part with a fixed placement must stay at that placement instead. A disabled group holds no culling sphere. After each part change it checks the part's placement and activity, that the group root and every other part kept their placement and activity, and that what stands below the part kept its place relative to it. While a part keeps a fixed placement of its own, every culler above it takes a radius that encloses the renderers it culls, and never one below the radius the scene gives it: the culler on the group root, a culler on a part above the held part, and a game-object culler that switches the held part or an object above it. Without a held part below it, a culler has the radius the scene gives it again. The culler on a moved part moves with it. Any difference fails the modification and restores the group or the part. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the group or part until **Recheck** succeeds or the world reloads.
 
 ## Limits
 
@@ -109,4 +109,4 @@ The automated tests check this behavior with a controlled group. Game runs on Ra
 
 Whether every culling sphere of a moved group encloses its renderers has not been measured. Other groups, groups with game logic or terrain shaping and multiplayer are not covered.
 
-The automated tests check part edits with a controlled group. A part edit has not yet been observed in a game run. A renderer culler on a part above a moved part keeps the radius the scene gives it, and a simple culler on a part keeps its radius.
+The automated tests check part edits with a controlled group. A part edit has not yet been observed in a game run.

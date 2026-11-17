@@ -35,6 +35,8 @@ static class Turn {
 // and the part it stands below. Switched: a game-object culler switches it by camera distance.
 class FakePart {
     public string Id; public double[] Offset; public double[] Rotation = { 0, 0, 0, 1 }; public bool Active = true; public bool Culled, Switched;
+    // For a switched part: whether its culler shows it now. Off while its culler hides it, it counts as on.
+    public bool Shown = true;
     public FakePart Parent; public FakeGroup Group;
 }
 // A culler in the group: where its culling sphere is registered, relative to the root, or null while it holds none.
@@ -66,8 +68,8 @@ class FakeGroupWorld : IGroupWorld {
     public string Refused, PartRefused;
     public int Mutations;
     public bool ThrowAfterPlacement, SkipCullingRefresh, LeavePartBehind, KeepPartBehind, KeepRootCulling, ThrowAfterPartPlacement, MoveSibling, KeepSiblingMoved;
-    // Whether the last culling refresh of a group enclosed its renderers.
-    public bool? Enclosed;
+    // The cullers the last culling refresh of a group let enclose their renderers.
+    public ICollection<string> Enclosed;
     double[] behind, sibling;
     public IReadOnlyList<object> Find(string scene, string path) => Objects.TryGetValue(path, out var found) ? found : new List<object>();
     public string Refusal(object group) => Refused;
@@ -78,14 +80,17 @@ class FakeGroupWorld : IGroupWorld {
     // A part's position in the scene: the root's position and rotation applied to its place relative to the root.
     static double[] ScenePosition(FakePart part) => Add(part.Group.Position, Turn.Rotate(part.Group.Rotation, part.Offset));
     static bool Enabled(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!p.Active) return false; return true; }
-    // The radius around the root that encloses the renderers of the enabled parts, each a metre across.
+    // The radius around the root, or around a part, that encloses the renderers of the enabled parts at or below it, each
+    // a metre across.
     static double Required(FakeGroup group) => group.Parts.Where(Enabled).Select(p => Math.Sqrt(p.Offset.Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
+    static double Required(FakePart above) => above.Group.Parts.Where(p => (p == above || IsBelow(p, above)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, above.Offset).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
+    static bool IsBelow(FakePart part, FakePart above) { for (var p = part.Parent; p != null; p = p.Parent) if (p == above) return true; return false; }
     double[] CullerAt(FakeGroup group, FakeCuller culler) => culler.On != null ? ScenePosition(culler.On) : Add(group.Position, culler.Offset);
     public GroupObservation Observe(object target) {
         var group = (FakeGroup)target;
         return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), group.Active),
             group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, p.Active, p.Culled, p, p.Parent)),
-            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.OnRoot ? c.Radius : (double?)null, c.OnRoot ? Required(group) : (double?)null)), group.Parent, group.RootCulling);
+            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, c.On != null ? Required(c.On) : Required(group), (object)c.On ?? group)), group.Parent, group.RootCulling);
     }
     public void SetActive(object target, bool active) {
         Mutations++; var group = (FakeGroup)target; group.Active = active;
@@ -101,12 +106,12 @@ class FakeGroupWorld : IGroupWorld {
         else if (LeavePartBehind && behind == null) { behind = group.Parts[0].Offset; group.Parts[0].Offset = new[] { 9.0, 9, 9 }; LeavePartBehind = false; }
         if (ThrowAfterPlacement) { ThrowAfterPlacement = false; throw new Exception("injected after placement"); }
     }
-    public void RefreshCulling(object target, bool enclose) {
+    public void RefreshCulling(object target, ICollection<string> enclose) {
         var group = (FakeGroup)target;
         Enclosed = enclose;
         if (SkipCullingRefresh) { SkipCullingRefresh = false; return; }
         foreach (var culler in group.Cullers) {
-            if (culler.OnRoot) culler.Radius = enclose ? Math.Max(culler.Authored, Required(group)) : culler.Authored;
+            culler.Radius = enclose.Contains(culler.Id) ? Math.Max(culler.Authored, culler.On != null ? Required(culler.On) : Required(group)) : culler.Authored;
             if (group.Active && (culler.On == null || Enabled(culler.On))) culler.Registered = CullerAt(group, culler);
         }
     }
@@ -115,7 +120,8 @@ class FakeGroupWorld : IGroupWorld {
     public string ActivityRefusal(object part) => ((FakePart)part).Switched ? "A culler of the game switches this part by camera distance" : null;
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;
-        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), part.Active), group, Observe(group), (object)part.Parent ?? group);
+        var parent = part.Parent == null ? new Placement(Map(group.Position), (double[])group.Rotation.Clone()) : new Placement(Map(ScenePosition(part.Parent)), Turn.Multiply(group.Rotation, part.Parent.Rotation));
+        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), part.Active || (part.Switched && !part.Shown)), group, Observe(group), (object)part.Parent ?? group, parent);
     }
     public void SetPartActive(object target, bool active) {
         Mutations++; var part = (FakePart)target; part.Active = active;
@@ -138,6 +144,7 @@ class FakeGroupWorld : IGroupWorld {
         else if (MoveSibling && sibling == null) { sibling = other.Offset; other.Offset = new[] { 7.0, 7, 7 }; MoveSibling = false; }
         if (ThrowAfterPartPlacement) { ThrowAfterPartPlacement = false; throw new Exception("injected after part placement"); }
     }
+    public bool Alive(object handle) => handle is FakeGroup group ? Objects.Values.Any(list => list.Contains(group)) : handle is FakePart part && part.Group.Parts.Contains(part);
     public bool Below(object target, object above) {
         if (!(target is FakePart part) || !part.Group.Parts.Contains(part)) return false;
         if (above is FakeGroup group) return part.Group == group;
