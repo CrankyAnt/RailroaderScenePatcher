@@ -459,13 +459,14 @@ namespace RailroaderScenePatcher {
         }
         // Added equipment keeps its stored wrapper name and identity. Only its visible name comes from the copy.
         static string ObjectName(SceneObservation item) {
-            var owned = (item.Handle as GameObject)?.GetComponent<OwnedEquipment>();
+            var go = item.Handle as GameObject;
+            var owned = go != null ? go.GetComponent<OwnedEquipment>() : null;
             return owned == null ? InventoryPresentationState.Name(item)
-                : owned.Copy == null ? "Added crossing equipment" : "Added " + owned.Copy.name;
+                : owned.DisplayName;
         }
         // One line under the name: the family and the object's states, in the native status colors.
         string StateLine(out string plain) {
-            if (selected == null) { plain = null; return "Use Outliner or Select in world."; }
+            if (selected == null) { plain = "Use the outliner or Select in world."; return plain; }
             var parts = new List<string> { Literal(selected.Family) };
             var text = new List<string> { selected.Family };
             if (!selected.Active) { parts.Add("Inactive"); text.Add("Inactive"); }
@@ -925,10 +926,10 @@ namespace RailroaderScenePatcher {
                 // A short purpose with the count on the first line, the candidate on its own line.
                 var purpose = choosingSnap ? "Pick the snap target" : pending.Kind == SelectionKind.SceneObject ? "Pick an object" : pending.Kind == SelectionKind.TrackSegment ? "Pick a track" : "Pick an endpoint";
                 // The choice takes the world's clicks: the native map editor does not select or drag until it ends.
-                state = (pending.Offers.Count > 1 ? Tint(Blue, pending.Offers.Count + (pending.Kind == SelectionKind.SceneObject ? " objects. " : " candidates. ")) + Literal(PendingSelection.SeveralOffers) : Literal(purpose + " in the world.")) + Literal(" Map Editor selection is paused; Cancel resumes it.") +
+                state = (pending.ListOpen ? Tint(Blue, pending.Offers.Count + (pending.Kind == SelectionKind.SceneObject ? " objects. " : " candidates. ")) + Literal(PendingSelection.SeveralOffers) : Literal(purpose + " in the world.")) + Literal(" Map Editor selection is paused; Cancel resumes it.") +
                     (pending.Problem == null || pending.Problem == PendingSelection.SeveralOffers ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
                     (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
-                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? " Confirm takes it; Apply then moves the object." : pending.Kind == SelectionKind.SceneObject ? " Confirm selects it." : " Confirm takes it.")) +
+                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? " Confirm takes it; Apply then moves the object." : pending.InspectOnly ? " Confirm selects it." : " Confirm takes it.")) +
                     // The footer's Details: the clicked candidate's identity and details, here in the message area.
                     (candidate == null || !candidateDetails ? "" : "\n" + Literal(candidate.Choice.Identity.ToString()) + (String.IsNullOrEmpty(candidate.Details) ? "" : "\n" + Literal(candidate.Details)));
             } else if (gizmo?.Active == true) { source = GizmoPlace; state = Literal(gizmo.State); }

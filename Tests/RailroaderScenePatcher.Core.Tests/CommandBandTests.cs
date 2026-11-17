@@ -340,8 +340,8 @@ static class CommandBandTests {
         Check(CommandBand.BindingAction("S9728", "A", 74.43612) == "Track binding to S9728 / a / 74.436", "The binding's log name uses the same form");
         foreach (var row in new[] { new[] { "end", "A", "a" }, new[] { "end", "b", "b" }, new[] { "end", null, "" }, new[] { "segment", "S9728", "S9728" } })
             Check(CommandBand.Shown(row[0], row[1]) == row[2], "The value " + row[0] + "=" + row[1] + " shows as " + row[2]);
-        // Several candidates on one spot are an instruction, not an error; a miss and a refusal are problems.
-        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point", "Several candidates on one spot and a click that met none read as ordinary text: nothing is broken");
+        // An offered list and a miss are instructions, not errors; a refusal is a problem.
+        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point", "An offered list and a click that met no candidate read as ordinary text: nothing is broken");
         Check(!PendingSelection.IsInstruction(null) && !PendingSelection.IsInstruction("The candidate changed or no longer resolves uniquely: it is no longer found. Pick again."), "A refusal stays a problem, in red");
         // The log line of a world choice names the candidates of the clicked spot, and the object the choice is for only when it is for one.
         var offered = new[] { "Crossing light: World/Roads/Everett/Signal 1/Signal 1", "Crossing gate: World/Roads/Everett/Signal 1/Signal 1/Wishbone" };

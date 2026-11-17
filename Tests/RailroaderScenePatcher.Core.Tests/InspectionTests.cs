@@ -493,12 +493,12 @@ static class InspectionTests {
 
     // The outliner rows: the search text and the All, Problems and Changed filters narrow the inventory, and none changes it.
     static void ProblemsFilterLimitsTheOutliner() {
-        SceneObservation Entry(string path, string family, params string[] problems) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), family, true,
-            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, "Inspection only");
+        SceneObservation Entry(string path, string family, string displayName = null, params string[] problems) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), family, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, "Inspection only", displayName: displayName);
         var fixture = new Fixture();
         fixture.Objects.Add(Entry("World/Board", "Independent board"));
-        fixture.Objects.Add(Entry("World/Sign", "Track marker", "Broken binding"));
-        fixture.Objects.Add(Entry("World/Post", "Track marker", "Segment missing"));
+        fixture.Objects.Add(Entry("World/Sign", "Track marker", "Added Alpha", "Broken binding"));
+        fixture.Objects.Add(Entry("World/Post", "Track marker", "Added Zulu", "Segment missing"));
         fixture.Objects.Add(Entry("World/Bridges/Ela", "Bridge"));
         var inventory = new SceneInventory(fixture); inventory.Refresh();
         Func<SceneObservation, bool> changed = entry => entry.Identity.Path == "World/Board" || entry.Identity.Path == "World/Post";
@@ -508,7 +508,8 @@ static class InspectionTests {
         Check(Paths("", modified).SequenceEqual(new[] { "World/Board", "World/Post" }), "The Changed filter limits the outliner to objects this mod modifies");
         Check(Paths("", all).SequenceEqual(new[] { "World/Board", "World/Sign", "World/Post", "World/Bridges/Ela" }), "All shows every inventory entry");
         Check(Paths("post", problems).SequenceEqual(new[] { "World/Post" }) && Paths("board", problems).Length == 0 && Paths("sign", modified).Length == 0, "Search narrows within a filter");
-        Check(Paths("marker", all).SequenceEqual(new[] { "World/Sign", "World/Post" }), "Search alone keeps its meaning");
+        Check(Paths("marker", all).SequenceEqual(new[] { "World/Sign", "World/Post" }) && Paths("Added Alpha", all).SequenceEqual(new[] { "World/Sign" })
+            && Paths("World/Post", all).SequenceEqual(new[] { "World/Post" }), "Search finds visible names while keeping the original identity path searchable");
         Check(inventory.Entries.Count == 4 && !inventory.IsStale, "Filtering changes neither the inventory nor its freshness");
         Check(RailroaderScenePatcher.InventoryPresentationState.Rows(null, "", problems, changed).Count == 0, "A missing inventory has no rows");
         // The Disabled filter lists the objects whose own active flag is off: not one that is inactive through a parent.
@@ -553,8 +554,9 @@ static class InspectionTests {
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed) == "2 of 4 objects", "The count line names how many objects the filters show: " + RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed));
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", all, changed) == "4 of 4 objects", "The unfiltered outliner counts every entry");
         var groups = RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", all, changed));
-        Check(groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))).SequenceEqual(new[] { "Bridge:Ela", "Independent board:Board", "Track marker:Post,Sign" }),
-            "Rows are grouped by family in name order, each row named by its object, rows in name order");
+        Check(groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))).SequenceEqual(new[] { "Bridge:Ela", "Independent board:Board", "Track marker:Added Alpha,Added Zulu" })
+            && groups.Last().Value.Select(row => row.Identity.Path).SequenceEqual(new[] { "World/Sign", "World/Post" }),
+            "Rows sort by their visible names within each family while retaining their original identity paths");
         var presentation = new RailroaderScenePatcher.InventoryPresentationState();
         Check(presentation.Observe(inventory, null, "", all, "1") && !presentation.Observe(inventory, null, "", all, "1"), "A settled outliner does not rebuild");
         Check(presentation.Observe(inventory, null, "", problems, "1"), "Switching a filter rebuilds the outliner");

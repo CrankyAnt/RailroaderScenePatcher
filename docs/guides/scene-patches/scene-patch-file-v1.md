@@ -166,7 +166,7 @@ When scene patch files of different mods each modify the same existing target, t
 
 ## Runtime failure reports
 
-The runtime reports a failed scene patch file or modification in a structured game warning, separate from the historical file log. A modification warning identifies the source as Railroader Scene Patcher and includes the supplying mod name, identifier and version, `Data/scene-patches.json`, operation, target when resolved, error, patcher version and game version. The warning also includes the supplied author and an HTTP or HTTPS website when present. It does not invent contact details.
+The runtime reports a failed scene patch file or modification in a structured game warning, separate from the historical file log. A modification warning identifies the source as Railroader Scene Patcher and includes the supplying mod name, identifier and version, `Data/scene-patches.json`, operation, target when resolved, error, patcher version and game version. The warning labels the supplied mod author as `Mod author` and includes an HTTP or HTTPS website when present. It does not invent contact details.
 
 Invalid supplied definitions are reported to the mod author. Unknown failures and demonstrated patcher faults are reported to the patcher maintainer. The runtime reports a given source and operation once per loaded world. Invalid or unsupported scene patch file content that requires recovery remains a scene patch editing matter; this reporting behavior adds no JSON fields or format version.
 

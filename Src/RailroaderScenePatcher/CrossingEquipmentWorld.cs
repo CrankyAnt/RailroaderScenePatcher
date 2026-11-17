@@ -16,6 +16,7 @@ namespace RailroaderScenePatcher {
         internal string Scope, Id, Pattern, SourceScene, SourcePath;
         internal GameObject Controller, Copy;
         internal bool Retired;
+        internal string DisplayName => Copy != null ? "Added " + Copy.name : "Added light or gate";
         // The addition this object belongs to, or null.
         internal static OwnedEquipment Of(GameObject go) {
             for (var t = go == null ? null : go.transform; t != null; t = t.parent) { var owned = t.GetComponent<OwnedEquipment>(); if (owned != null) return owned; }

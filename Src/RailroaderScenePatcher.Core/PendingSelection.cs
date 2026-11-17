@@ -121,7 +121,7 @@ namespace RailroaderScenePatcher.Core {
         // A click that met no candidate.
         public const string NoOffer = "No candidate at this point";
         // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks
-        // only what is broken. Several candidates on one spot and a click that met none are nothing broken.
+        // only what is broken. An offered list and a click that met no candidate are nothing broken.
         public static bool IsInstruction(string problem) => problem == SeveralOffers || problem == NoOffer;
         // The number a candidate carries among the offers, from 1; 0 for one that is not offered.
         public int Number(SelectionCandidate candidate) {

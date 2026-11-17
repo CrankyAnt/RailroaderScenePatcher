@@ -40,8 +40,8 @@ namespace RailroaderScenePatcher {
         internal static string Summary(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             Rows(inventory, search, filter, changed).Count + " of " + (inventory?.Entries.Count ?? 0) + " objects";
 
-        // The object's own name: the last part of its hierarchy path.
-        internal static string Name(SceneObservation entry) => entry.Identity.Path.Substring(entry.Identity.Path.LastIndexOf('/') + 1);
+        // The visible name observed with the object; the identity path stays available separately.
+        internal static string Name(SceneObservation entry) => entry.DisplayName;
 
         // The group of the objects that are inspection only: outside the family groups, after them, and absent while
         // it holds no entry.
