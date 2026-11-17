@@ -383,8 +383,8 @@ namespace RailroaderScenePatcher {
         // The name of a candidate among the offers of a world choice: its number when several are offered, the same
         // in the world label, the message and the panel's list.
         internal static string ChoiceTag(string word, int number, int offers) => offers > 1 && number > 0 ? word + " " + number : word;
-        internal static string ChoiceLine(string word, int number, int offers, string label, IEnumerable<string> offered) {
-            var text = ChoiceTag(word, number, offers) + ": " + ChoiceLabel(label, offered, 60).TrimEnd();
+        internal static string ChoiceLine(string word, int number, int offers, string label, IEnumerable<string> offered, SceneObservation observation = null) {
+            var text = ChoiceTag(word, number, offers) + ": " + ChoiceLabel(label, offered, 60, observation).TrimEnd();
             return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) ? text : text + ".";
         }
         // Whether a click on an outliner row clears the inspection: a click on the row that is inspected already.
@@ -393,16 +393,24 @@ namespace RailroaderScenePatcher {
         // is the same for neighbours, so the label leads with what tells them apart: the object's own name, with as
         // many parents as it needs to differ from the other offers, then "[inactive]" and the family. A label that is
         // too long is cut at its end, which is the family. Any other label, such as a track segment's, is kept.
-        internal static string ChoiceLabel(string label, IEnumerable<string> offered, int length = 40) {
+        internal static string ChoiceLabel(string label, IEnumerable<string> offered, int length = 40, SceneObservation observation = null) {
             if (label == null) return "";
             var text = label;
             if (Split(label, out var family, out var segments, out var inactive)) {
-                var depth = 1;
-                var others = new List<string[]>();
-                foreach (var other in offered ?? new string[0])
-                    if (other != null && other != label && Split(other, out _, out var path, out _)) others.Add(path);
-                while (depth < segments.Length && others.Exists(path => Tail(path, depth) == Tail(segments, depth))) depth++;
-                text = Tail(segments, depth) + (inactive ? " [inactive]" : "") + " (" + family + ")";
+                var observedPath = observation?.Identity.Path;
+                var visibleName = observation?.DisplayName;
+                // A presentation name is not another hierarchy segment. Prepending a wrapper parent for equal
+                // added names would hide that name again when the line is shortened; list numbers distinguish them.
+                if (observedPath != null && visibleName != observedPath.Substring(observedPath.LastIndexOf('/') + 1))
+                    text = visibleName + (inactive ? " [inactive]" : "") + " (" + family + ")";
+                else {
+                    var depth = 1;
+                    var others = new List<string[]>();
+                    foreach (var other in offered ?? new string[0])
+                        if (other != null && other != label && Split(other, out _, out var path, out _)) others.Add(path);
+                    while (depth < segments.Length && others.Exists(path => Tail(path, depth) == Tail(segments, depth))) depth++;
+                    text = Tail(segments, depth) + (inactive ? " [inactive]" : "") + " (" + family + ")";
+                }
             }
             return text.Length <= length ? text : text.Substring(0, Math.Max(1, length - 3)) + "...";
         }

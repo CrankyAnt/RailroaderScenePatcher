@@ -55,11 +55,7 @@ namespace RailroaderScenePatcher {
             var position = entry.Position.Count == 3
                 ? new[] { new Vector3((float)entry.Position[0], (float)entry.Position[1], (float)entry.Position[2]) }
                 : Array.Empty<Vector3>();
-            var path = entry.Identity.Path;
-            var name = path.Substring(path.LastIndexOf('/') + 1);
-            // Keep the identity path for the tooltip and duplicate-name context, while leading the choice with the visible name.
-            if (entry.DisplayName != name) path += "/" + entry.DisplayName;
-            var label = entry.Family + ": " + path + (entry.Active ? "" : " [inactive]");
+            var label = entry.Family + ": " + entry.Identity.Path + (entry.Active ? "" : " [inactive]");
             return new SpatialCandidate(new SelectionCandidate(entry.Handle, SelectionIdentity.SceneObject(entry.Identity), label),
                 position, String.Join("\n", entry.Bindings), entry);
         }

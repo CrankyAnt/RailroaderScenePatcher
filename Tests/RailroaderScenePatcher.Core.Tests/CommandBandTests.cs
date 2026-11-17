@@ -414,7 +414,20 @@ static class CommandBandTests {
         Check(CommandBand.ChoiceLabel(twins[0], twins) != CommandBand.ChoiceLabel(twins[1], twins), "The two labels differ");
         Check(CommandBand.ChoiceLabel("Track segment Sdb78", new[] { "Track segment Sdb78", "Track segment S9728" }) == "Track segment Sdb78", "A track's label is kept");
         Check(CommandBand.ChoiceLabel(offered[0], offered, 12) == "wh-e-wate...", "A label longer than its room is cut at the end");
-        Check(CommandBand.ChoiceLabel(null, offered) == "", "No label gives none");
+        Check(CommandBand.ChoiceLabel(null, offered) == "" && AddedChoicesKeepTheirVisibleName(), "No label gives none; added-object list rows and candidate captions keep their visible name");
+    }
+    static bool AddedChoicesKeepTheirVisibleName() {
+        SceneObservation Added(string id) => new SceneObservation(new object(),
+            new TargetIdentity("scene", "World/Roads Sylva/Grade Crossing - Allen/CrankyAnt Scene Patcher equipment crankyant:maptest " + id, "OwnedEquipment"),
+            "Added light or gate", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Inspection only", displayName: "Signal 1 (added)");
+        var entries = new[] { Added("signal-1-added-2"), Added("signal-1-added-3") };
+        var labels = entries.Select(entry => entry.Family + ": " + entry.Identity.Path).ToArray();
+        for (var i = 0; i < entries.Length; i++) {
+            if (CommandBand.ChoiceLabel(labels[i], labels, 60, entries[i]) != "Signal 1 (added) (Added light or gate)"
+                || CommandBand.ChoiceLine("Object", i + 1, 2, labels[i], labels, entries[i]) != "Object " + (i + 1) + ": Signal 1 (added) (Added light or gate).") return false;
+        }
+        return true;
     }
     static void AClickOnTheInspectedRowClearsTheInspection() {
         object inspected = new object(), other = new object();

@@ -439,7 +439,7 @@ namespace RailroaderScenePatcher {
                 // row of the choice list, in view or not.
                 if (groups.Hidden[index]) {
                     if (offered && several) shapes.Add(new Shape { Candidate = candidate, Listed = true, Color = Tone(CommandBand.CandidateMark(true, false)),
-                        Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60) });
+                        Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation) });
                     continue;
                 }
                 if (shape == null) continue;
@@ -453,7 +453,7 @@ namespace RailroaderScenePatcher {
                 // tells it from the others.
                 shape.Listed = offered && several;
                 shape.Strong = pending != null && (ReferenceEquals(candidate.Choice, pending.Highlight) || (labelled != null && ReferenceEquals(labelled, candidate.Choice)));
-                if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60)
+                if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation)
                     : (chosen ? "New: " : "Choice: ") + Short(candidate.Choice.Label);
                 // Every candidate of the mode carries its "+" marker without the pointer over it; a track within a
                 // distance of the camera, so that a wide view is not filled with them.
