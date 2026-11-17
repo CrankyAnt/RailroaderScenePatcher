@@ -319,7 +319,7 @@ namespace RailroaderScenePatcher {
         internal static string ChoiceLog(string forObject, string problem, IReadOnlyList<string> offers) =>
             LogLine("World choice", forObject, problem + (offers == null || offers.Count < 2 ? "" : " Candidates: " + String.Join("; ", offers.Select((label, i) => (i + 1) + " " + ChoiceLabel(label, offers, 80)))));
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
-        internal static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
+        internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
         // every mode. An object that cannot be edited keeps Numeric, which shows its placement, and has every other mode
         // inactive with the object's own reason.

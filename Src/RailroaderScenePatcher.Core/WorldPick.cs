@@ -18,12 +18,15 @@ namespace RailroaderScenePatcher.Core {
     // whether the pointer is inside the group's frame, the objects the group holds, as indices into the targets, and
     // those of them that show their own marker and frame: a candidate and the inspected object.
     public sealed class PickGroup {
-        public PickGroup(PickTarget target, IReadOnlyList<int> objects, IReadOnlyList<int> own = null) {
-            Target = target; Objects = objects ?? throw new ArgumentNullException(nameof(objects)); Own = own ?? Array.Empty<int>();
+        public PickGroup(PickTarget target, IReadOnlyList<int> objects, IReadOnlyList<int> own = null, IReadOnlyList<int> unlisted = null) {
+            Target = target; Objects = objects ?? throw new ArgumentNullException(nameof(objects)); Own = own ?? Array.Empty<int>(); Unlisted = unlisted ?? Array.Empty<int>();
         }
         public PickTarget Target { get; }
         public IReadOnlyList<int> Objects { get; }
         public IReadOnlyList<int> Own { get; }
+        // Objects of the group that its choice list leaves out, such as the detection spans of a grade-crossing setup.
+        // They still take no part on their own unless they show on their own.
+        public IReadOnlyList<int> Unlisted { get; }
     }
     // What a click selects among objects and groups: the objects, the winner's first, and the groups it picked, as
     // indices into the groups. The frame of a picked group is the one the pointer marks.
@@ -66,8 +69,8 @@ namespace RailroaderScenePatcher.Core {
         }
         // The click rule with game-defined groups that show as one. A group's square marker and frame take part as
         // those of one object, in place of its objects other than those that show on their own. Where the rule picks
-        // the group, its objects are picked, in their order; objects and groups that share the winner's spot come
-        // with it, and an object is listed once. Without groups this is the rule of one object each.
+        // the group, its objects other than its unlisted ones are picked, in their order; objects and groups that
+        // share the winner's spot come with it, and an object is listed once. Without groups this is the rule of one object each.
         public static WorldPickResult Resolve(double x, double y, IReadOnlyList<PickTarget> targets, IReadOnlyList<PickGroup> groups) {
             targets = targets ?? Array.Empty<PickTarget>(); groups = groups ?? Array.Empty<PickGroup>();
             var hidden = new HashSet<int>();
@@ -81,7 +84,8 @@ namespace RailroaderScenePatcher.Core {
                 var entry = entries[index];
                 if (entry >= 0) { if (!objects.Contains(entry)) objects.Add(entry); continue; }
                 picked.Add(-1 - entry);
-                foreach (var member in groups[-1 - entry].Objects) if (member >= 0 && member < targets.Count && !objects.Contains(member)) objects.Add(member);
+                var group = groups[-1 - entry];
+                foreach (var member in group.Objects) if (member >= 0 && member < targets.Count && !group.Unlisted.Contains(member) && !objects.Contains(member)) objects.Add(member);
             }
             return new WorldPickResult(objects, picked);
         }

@@ -37,6 +37,8 @@ To detach a circuit, select **Detach** at the bottom of the tab and apply it. To
 
 Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the scene patch file on every load, so a reload never duplicates them.
 
+A crossing controller reports a problem if one of its circuit spans refers to a track segment that no longer exists, for example after track is removed or rebuilt. The message identifies the circuit by its name on the **Connections** tab, the span by its role and ID, such as `Circuit Pipr Approach A span Pdlh`, and the missing segment. To repair it, open the controller's **Connections** tab and select tracks for the circuit or detach it, as described above. If the span belongs to a [detection addition](adding-crossing-detection.md), such as `Detection addition siding Island span …`, select other tracks for the addition or delete it. If the track graph cannot be read, the controller shows a single inspection note beginning `Circuit span validity unknown` instead of reporting a problem with the track.
+
 If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
 ## Write coverage in the scene patch file

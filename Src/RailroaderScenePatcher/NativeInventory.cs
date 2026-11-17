@@ -379,11 +379,27 @@ namespace RailroaderScenePatcher {
                 var sets = Field(controller, "circuitSets") as IEnumerable;
                 if (sets == null) throw new InvalidOperationException("Crossing circuit sets unavailable");
                 int index = 0;
+                // The controller itself reports a span of its circuit that no longer resolves to an existing track
+                // segment, under the circuit's name on its Connections tab. Without the track graph it has one note.
+                var own = ReferenceEquals(controller, c);
+                if (own && segmentIds == null) problems.Add(CircuitSpanProblems.Unknown(graphError));
                 foreach (var set in sets) {
-                    foreach (var role in new[] { "approachA", "island", "approachB" }) {
+                    string circuit = null;
+                    if (own) try {
+                        var island = Field(set, "island") as Component;
+                        circuit = island == null ? null : CircuitSpanProblems.CircuitKey(Text(Field(island, "id")), CrossingCoverageWorld.AdditionOf(set));
+                    } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
+                    foreach (var role in CircuitCoverage.Roles) {
                         var span = Field(set, role) as Component;
                         bindings.Add("Circuit " + index + " " + role + "=" + Label(span));
-                        if (span == null) problems.Add("Missing circuit " + index + " " + role);
+                        if (span == null) { problems.Add("Missing circuit " + index + " " + role); continue; }
+                        if (String.IsNullOrWhiteSpace(circuit)) continue;
+                        // A span that cannot be read is a note of its own, so the other spans and circuits stay listed.
+                        try {
+                            var problem = CircuitSpanProblems.Unresolved(circuit, role, Text(Field(span, "id")),
+                                Text(Field(Field(span, "_lower"), "segmentId")), Text(Field(Field(span, "_upper"), "segmentId")), segmentIds);
+                            if (problem != null) problems.Add(problem);
+                        } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
                     }
                     index++;
                 }
