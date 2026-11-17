@@ -90,6 +90,8 @@ static class BakedPartTests {
         CullerSwitchedPartKeepsTheCullersState();
         CullerAboveAHeldPartEnclosesIt();
         ReleaseAndDestroyedPartsLetTheCullingGo();
+        HiddenSwitchedPartStillCountsForEnclosure();
+        GameObjectCullerEnclosesOnlyWhatItSwitches();
         Console.WriteLine("PASS: baked scenery parts: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
@@ -332,11 +334,17 @@ static class BakedPartTests {
         Assert(session.Remove(PartId("Lamp")).Applied && f.Lamp.Active && Near(f.MapOf(f.Lamp).Position, new[] { 1097.0, 12, 20 }), "Removal returns the placement and leaves the culler's state: " + Where(f));
         // The activity captured with the part reads off while the culler has not switched it on yet; the culler switches
         // it on afterwards, and a placement edit leaves it on.
-        var g = new Fixture(); g.Lamp.Switched = true; g.Lamp.Active = false; var (_, _, edits) = Session(g);
+        var g = new Fixture(); g.Lamp.Switched = true; g.Lamp.Active = false; var (store, editor, edits) = Session(g);
         Assert(edits.Edit(PartId("Lamp"), new Placement(new[] { 1095.0, 12, 20 }, Identity), null).Applied && !g.Lamp.Active, "A placement edit of the lamp applies and leaves it off");
         g.Lamp.Active = true;
         outcome = edits.Edit(PartId("Lamp"), new Placement(new[] { 1094.0, 12, 20 }, Identity), null);
         Assert(outcome.Applied && g.Lamp.Active, "A placement edit does not switch the lamp off against its culler: " + outcome.Error);
+        // Save writes the placement and no activity, and a reload applies it without touching the culler's state.
+        Assert(editor.Save() == null, "Save succeeds");
+        var saved = JObject.Parse(store.Patch)["modifications"].Children<JProperty>().Single().Value;
+        Assert(saved["placement"] != null && saved["active"] == null, "The written modification holds no active key: " + saved);
+        var reloaded = new Fixture(); reloaded.Lamp.Switched = true; reloaded.Lamp.Active = false;
+        Assert(reloaded.Engine.Apply(store.Patch).Outcomes.Values.Single().Applied && !reloaded.Lamp.Active && Near(reloaded.MapOf(reloaded.Lamp).Position, new[] { 1094.0, 12, 20 }), "A reload places the lamp and leaves it as its culler switched it: " + Where(reloaded));
     }
 
     // A culler on a part above a held part encloses it while it holds, and takes its authored radius again afterwards.
@@ -358,6 +366,31 @@ static class BakedPartTests {
         Assert(g.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && gone.Radius > 60, "A far part enlarges the root culler");
         g.Group.Parts.Remove(g.Post); g.Group.Parts.Remove(g.Jetty); g.Group.Cullers.RemoveAll(c => c.On == g.Jetty);
         Assert(g.Engine.Apply(Doc(Group("move-mill", GroupTarget, GroupTurn))).Outcomes.Values.Single().Applied && gone.Radius == 10, "A destroyed part holds nothing: the group moves and its root culler takes its authored radius: " + gone.Radius);
+    }
+
+    // A culler that hides a part because the camera is far away does not take it out of what the cullers above a held
+    // part enclose: the held far part stays inside their spheres, whatever the camera does.
+    static void HiddenSwitchedPartStillCountsForEnclosure() {
+        foreach (var hideJetty in new[] { true, false }) {
+            var f = new Fixture(); var hidden = hideJetty ? f.Jetty : f.Post;
+            hidden.Switched = true; hidden.Active = false; hidden.Shown = false;
+            var outcome = f.Engine.Apply(Doc(Part("far-post", "Jetty/Post", new[] { 1160.0, 10, 14 })));
+            var jetty = f.Group.Cullers.Single(c => c.On == f.Jetty); var root = f.Group.Cullers.Single(c => c.OnRoot);
+            Assert(outcome.Outcomes.Values.Single().Applied && jetty.Radius > 50 && root.Radius > 60,
+                "With the " + (hideJetty ? "jetty" : "post") + " hidden by its culler, the jetty's and the root's cullers still enclose the held post: " + jetty.Radius + ", " + root.Radius);
+        }
+    }
+
+    // A game-object culler culls the parts it switches, not the parts below it: it encloses only while a held part
+    // separates it from a part it switches.
+    static void GameObjectCullerEnclosesOnlyWhatItSwitches() {
+        var f = new Fixture();
+        var lamps = new FakeCuller { Id = ".|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { f.Lamp }, Radius = 2, Authored = 2 }; f.Group.Cullers.Add(lamps);
+        Assert(f.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && lamps.Radius == 2, "A held part it does not switch leaves a root game-object culler at its authored radius: " + lamps.Radius);
+        Assert(f.Engine.Apply(Doc(Part("far-lamp", "Lamp", new[] { 1160.0, 12, 30 }))).Outcomes.Values.Single().Applied && lamps.Radius > 50, "A held part it switches is enclosed: " + lamps.Radius);
+        var g = new Fixture();
+        var ramp = new FakeCuller { Id = "Jetty|Helpers.Culling.GameObjectCuller", Switcher = true, On = g.Jetty, Lists = { g.Ramp } }; g.Group.Cullers.Add(ramp);
+        Assert(g.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && ramp.Radius > 50, "A game-object culler on a held part encloses the part it switches outside it: " + ramp.Radius);
     }
 
     static void PartsAreNamedWithTheirGroupAndDecorative() {

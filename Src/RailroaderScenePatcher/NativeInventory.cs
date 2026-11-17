@@ -395,7 +395,7 @@ namespace RailroaderScenePatcher {
             if (Get(go, BoardScene.CullerType) != null) dependencies.Add("Culling registration and origin-dependent position");
             if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output");
             if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root");
-            if (part) dependencies.Add("Culling and colliders follow the part; the simple culler on its group root encloses the group while a part keeps a fixed placement");
+            if (part) dependencies.Add("Culling and colliders follow the part; the cullers above the part enclose it while it keeps a fixed placement");
             if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling; separate construction scenery has its own placement");
             // Crossing equipment sits under objects that a culler switches off when the camera is far away, so whether it
             // is active in the game changes with every camera jump. Its activity is what the scene authored: every

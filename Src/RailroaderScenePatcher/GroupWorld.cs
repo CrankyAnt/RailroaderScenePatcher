@@ -234,7 +234,7 @@ namespace RailroaderScenePatcher {
             foreach (var type in new[] { renderer, switcher })
                 foreach (var culler in root.GetComponentsInChildren(type, true)) {
                     var switches = type == switcher ? Switches(culler) : new GameObject[0];
-                    cullers.Add(new GroupCuller(CullerId(t, culler), Registered(culler), Map(culler.transform.position, culler.transform), SphereRadius(culler), Enclosing(culler.transform, t, switches), culler.gameObject, switches));
+                    cullers.Add(new GroupCuller(CullerId(t, culler), Registered(culler), Map(culler.transform.position, culler.transform), SphereRadius(culler), Enclosing(culler.transform, t, switches, type != switcher), culler.gameObject, switches, type == switcher));
                 }
             var own = GroupOf(OwnSimple(root));
             return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled);
@@ -263,20 +263,21 @@ namespace RailroaderScenePatcher {
             }
             return (float)(culler.GetType() == switcher ? switcherRadius : rendererRadius).GetValue(culler);
         }
-        // The radius around the culler that encloses the renderers below it and below the objects it switches, whose
-        // objects are switched on below the group root, from their meshes' bounds, so a part that a culler or its group
-        // has switched off still counts.
-        static float Enclosing(Transform centre, Transform root, IEnumerable<GameObject> listed = null) {
+        // The radius around the culler that encloses the renderers it culls: those below its object (own), and those below
+        // the objects it switches. A renderer counts while every object from it up to the group root is on as the scene
+        // authored it, so an object that a culler hides only because the camera is far away still counts. The bounds
+        // come from the meshes, which an object that is switched off still has.
+        static float Enclosing(Transform centre, Transform root, IEnumerable<GameObject> listed = null, bool own = true) {
             var radius = 0f;
-            var shapes = centre.GetComponentsInChildren<Renderer>(true).Concat((listed ?? Enumerable.Empty<GameObject>()).SelectMany(go => go.GetComponentsInChildren<Renderer>(true))).Distinct();
+            var shapes = (own ? centre.GetComponentsInChildren<Renderer>(true) : new Renderer[0]).Concat((listed ?? Enumerable.Empty<GameObject>()).SelectMany(go => go.GetComponentsInChildren<Renderer>(true))).Distinct();
             foreach (var shape in shapes) {
-                if (shape == null || !BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false) || !SwitchedOnBelow(shape.transform, root)) continue;
+                if (shape == null || !BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false) || !AuthoredOnBelow(shape.transform, root)) continue;
                 foreach (var corner in Corners(shape)) radius = Math.Max(radius, (corner - centre.position).magnitude);
             }
             return radius;
         }
-        static bool SwitchedOnBelow(Transform t, Transform root) {
-            for (; t != null && t != root; t = t.parent) if (!t.gameObject.activeSelf) return false;
+        static bool AuthoredOnBelow(Transform t, Transform root) {
+            for (; t != null && t != root; t = t.parent) if (!Authored(t.gameObject)) return false;
             return t == root;
         }
         static IEnumerable<Vector3> Corners(Renderer shape) {
@@ -354,7 +355,7 @@ namespace RailroaderScenePatcher {
             }
             foreach (var type in new[] { renderer, switcher })
                 foreach (var culler in root.GetComponentsInChildren(type, true)) {
-                    var radius = Radius(culler, type == switcher ? switcherRadius : rendererRadius, enclose.Contains(CullerId(t, culler)), () => Enclosing(culler.transform, t, type == switcher ? Switches(culler) : null));
+                    var radius = Radius(culler, type == switcher ? switcherRadius : rendererRadius, enclose.Contains(CullerId(t, culler)), () => Enclosing(culler.transform, t, type == switcher ? Switches(culler) : null, type != switcher));
                     // A culler that registers again when it is enabled takes the field; a registered one takes the radius now.
                     var token = (type == switcher ? switcherToken : rendererToken).GetValue(culler);
                     if (token != null && !(bool)Native.Read(token, "IsRemoved")) tokenUpdate.Invoke(token, new object[] { culler.transform, (float?)radius });

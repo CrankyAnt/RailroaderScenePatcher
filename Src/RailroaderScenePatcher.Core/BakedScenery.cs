@@ -248,20 +248,22 @@ namespace RailroaderScenePatcher.Core {
     }
     // One culler in a group: the culling sphere it holds now and where the culler stands, both in map coordinates.
     public sealed class GroupCuller {
-        public GroupCuller(string id, IEnumerable<double> registered, IEnumerable<double> expected, double? radius = null, double? required = null, object handle = null, IEnumerable<object> listed = null) {
+        public GroupCuller(string id, IEnumerable<double> registered, IEnumerable<double> expected, double? radius = null, double? required = null, object handle = null, IEnumerable<object> listed = null, bool switches = false) {
             Id = id ?? throw new ArgumentNullException(nameof(id)); Registered = registered?.ToArray(); Expected = expected.ToArray(); Radius = radius; Required = required;
-            Handle = handle; Listed = (listed ?? Enumerable.Empty<object>()).ToArray();
+            Handle = handle; Listed = (listed ?? Enumerable.Empty<object>()).ToArray(); Switches = switches;
         }
         // The object the culler stands on: the group root or a part. Listed holds the objects a game-object culler switches.
         public object Handle { get; }
         public IReadOnlyList<object> Listed { get; }
+        // A game-object culler: it culls the objects it lists, not the objects below it.
+        public bool Switches { get; }
         public string Id { get; }
         // The centre of the culling sphere the game holds for it, or null while it holds none.
         public IReadOnlyList<double> Registered { get; }
         public IReadOnlyList<double> Expected { get; }
         // The radius of its culling sphere, and the radius around the culler that encloses the renderers it culls now:
-        // for a simple culler or a renderer culler those below its object, for a game-object culler also those below
-        // the objects it switches. Null when the culler holds no radius.
+        // for a simple culler or a renderer culler those below its object, for a game-object culler those of the objects
+        // it switches. Null when the culler holds no radius.
         public double? Radius { get; }
         public double? Required { get; }
     }
@@ -404,15 +406,21 @@ namespace RailroaderScenePatcher.Core {
             var inverse = Quaternion.Conjugate(Quaternion.Normalize(frame.RootRotation));
             return (Quaternion.Rotate(inverse, new[] { part.RootPosition[0] - frame.RootPosition[0], part.RootPosition[1] - frame.RootPosition[1], part.RootPosition[2] - frame.RootPosition[2] }), Quaternion.Multiply(inverse, part.RootRotation));
         }
-        // The cullers whose radius encloses their renderers now: a culler with a held part below the object it stands
-        // on, or below an object it switches. Every other culler keeps its authored radius.
-        internal static HashSet<string> Enclosed(IGroupWorld world, PartHolds holds, object group) {
+        // The cullers whose radius encloses their renderers now, every other culler keeping its authored radius. A
+        // simple or renderer culler encloses while a held part stands below its object. A game-object culler encloses
+        // while a held part separates it from an object it switches: the held part is that object, stands below or
+        // above it, or carries the culler. except leaves out a hold that is being released.
+        internal static HashSet<string> Enclosed(IGroupWorld world, PartHolds holds, object group, object except = null) {
             var ids = new HashSet<string>(StringComparer.Ordinal);
-            var held = holds.Below(world, group).Select(pair => pair.Key).ToList();
+            var held = holds.Below(world, group).Select(pair => pair.Key).Where(part => !ReferenceEquals(part, except)).ToList();
             if (held.Count == 0) return ids;
+            bool AtOrAbove(object part, object other) => ReferenceEquals(part, other) || world.Below(other, part);
             foreach (var culler in world.Observe(group).Cullers) {
                 if (culler.Radius == null || culler.Handle == null) continue;
-                if (held.Any(part => ReferenceEquals(culler.Handle, group) || world.Below(part, culler.Handle) || culler.Listed.Any(listed => ReferenceEquals(part, listed) || world.Below(part, listed)))) ids.Add(culler.Id);
+                var encloses = culler.Switches
+                    ? held.Any(part => culler.Listed.Any(listed => AtOrAbove(part, listed) || world.Below(part, listed)) || (culler.Listed.Count != 0 && AtOrAbove(part, culler.Handle)))
+                    : held.Any(part => ReferenceEquals(culler.Handle, group) || world.Below(part, culler.Handle));
+                if (encloses) ids.Add(culler.Id);
             }
             return ids;
         }
@@ -603,10 +611,11 @@ namespace RailroaderScenePatcher.Core {
         }
         // A part that no longer stands under its identity holds nothing any more, and the cullers of its group, when
         // the group still stands, let go of a radius they enlarged for it.
+        // The culling refresh comes first: when it fails the hold stays, and the next load attempt releases it again.
         public void Release(object target) {
             var group = holds.GroupOf(target);
+            if (group != null && world.Alive(group) && world.Refusal(group) == null) world.RefreshCulling(group, GroupChecks.Enclosed(world, holds, group, target));
             holds.Set(target, null);
-            if (group != null && world.Alive(group) && world.Refusal(group) == null) world.RefreshCulling(group, GroupChecks.Enclosed(world, holds, group));
         }
         public bool Unsettled(object target) => false;
         public string MinimumPatcherVersion(TargetIdentity target) => target != null && (target.Structure == Structure || (target.Structure == null && target.Component == ComponentType)) ? RequiredVersion : null;

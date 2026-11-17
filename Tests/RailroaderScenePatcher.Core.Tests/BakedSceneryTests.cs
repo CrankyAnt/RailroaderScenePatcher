@@ -41,7 +41,8 @@ class FakePart {
 }
 // A culler in the group: where its culling sphere is registered, relative to the root, or null while it holds none.
 // On names the part a renderer culler stands on. Radius is the sphere radius of the simple culler on the root.
-class FakeCuller { public string Id; public double[] Offset = { 0, 0, 0 }; public double[] Registered; public bool OnRoot; public FakePart On; public double Radius = 10, Authored = 10; }
+// Switcher: a game-object culler, which culls the parts it Lists rather than the parts below it.
+class FakeCuller { public string Id; public double[] Offset = { 0, 0, 0 }; public double[] Registered; public bool OnRoot, Switcher; public FakePart On; public double Radius = 10, Authored = 10; public List<FakePart> Lists = new List<FakePart>(); }
 class FakeGroup {
     public double[] Position = { 100, 10, 20 }, Rotation = { 0, 0, 0, 1 };
     public bool Active = true;
@@ -79,18 +80,27 @@ class FakeGroupWorld : IGroupWorld {
     double[] SceneOf(double[] map) => new[] { map[0] - Origin, map[1], map[2] };
     // A part's position in the scene: the root's position and rotation applied to its place relative to the root.
     static double[] ScenePosition(FakePart part) => Add(part.Group.Position, Turn.Rotate(part.Group.Rotation, part.Offset));
-    static bool Enabled(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!p.Active) return false; return true; }
+    // A part is on as the scene authored it while it and every part above it is on, or off only because its culler
+    // hides it.
+    static bool Enabled(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!(p.Active || (p.Switched && !p.Shown))) return false; return true; }
     // The radius around the root, or around a part, that encloses the renderers of the enabled parts at or below it, each
     // a metre across.
     static double Required(FakeGroup group) => group.Parts.Where(Enabled).Select(p => Math.Sqrt(p.Offset.Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
     static double Required(FakePart above) => above.Group.Parts.Where(p => (p == above || IsBelow(p, above)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, above.Offset).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
     static bool IsBelow(FakePart part, FakePart above) { for (var p = part.Parent; p != null; p = p.Parent) if (p == above) return true; return false; }
+    // What a culler encloses: a game-object culler its listed parts and what stands below them, any other culler the
+    // parts below its object.
+    static double Required(FakeGroup group, FakeCuller culler) {
+        if (!culler.Switcher) return culler.On != null ? Required(culler.On) : Required(group);
+        var at = culler.On != null ? culler.On.Offset : culler.Offset;
+        return group.Parts.Where(p => culler.Lists.Any(l => p == l || IsBelow(p, l)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, at).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
+    }
     double[] CullerAt(FakeGroup group, FakeCuller culler) => culler.On != null ? ScenePosition(culler.On) : Add(group.Position, culler.Offset);
     public GroupObservation Observe(object target) {
         var group = (FakeGroup)target;
         return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), group.Active),
             group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, p.Active, p.Culled, p, p.Parent)),
-            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, c.On != null ? Required(c.On) : Required(group), (object)c.On ?? group)), group.Parent, group.RootCulling);
+            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, Required(group, c), (object)c.On ?? group, c.Lists, c.Switcher)), group.Parent, group.RootCulling);
     }
     public void SetActive(object target, bool active) {
         Mutations++; var group = (FakeGroup)target; group.Active = active;
@@ -111,7 +121,7 @@ class FakeGroupWorld : IGroupWorld {
         Enclosed = enclose;
         if (SkipCullingRefresh) { SkipCullingRefresh = false; return; }
         foreach (var culler in group.Cullers) {
-            culler.Radius = enclose.Contains(culler.Id) ? Math.Max(culler.Authored, culler.On != null ? Required(culler.On) : Required(group)) : culler.Authored;
+            culler.Radius = enclose.Contains(culler.Id) ? Math.Max(culler.Authored, Required(group, culler)) : culler.Authored;
             if (group.Active && (culler.On == null || Enabled(culler.On))) culler.Registered = CullerAt(group, culler);
         }
     }
