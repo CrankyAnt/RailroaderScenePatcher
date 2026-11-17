@@ -181,8 +181,10 @@ namespace RailroaderScenePatcher.Core {
             if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
             verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.Group, null));
         }
-        // A renderer, collider or light at or below the node.
-        static bool Physical(IHierarchyNode node) => node.Physical || node.Children.Any(Physical);
+        // A renderer, collider or light at or below the node, on an object the scene serializes. What the game builds
+        // while it runs does not count: a storage pile builds its collider only while the camera is near, so counting
+        // it would list its group by camera distance.
+        static bool Physical(IHierarchyNode node) => node.Serialized && (node.Physical || node.Children.Any(Physical));
         // The coverage rules that keep an object below a listed group root out of the part entries.
         public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group";
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
@@ -221,7 +223,9 @@ namespace RailroaderScenePatcher.Core {
             Collect(node, types);
             return Exclusions.FirstOrDefault(e => types.Any(e.Matches));
         }
+        // Only the scene's own objects count, so a group's reason does not change with what the game builds while it runs.
         static void Collect(IHierarchyNode node, HashSet<string> types) {
+            if (!node.Serialized) return;
             foreach (var type in node.Components) if (type != null) types.Add(type);
             foreach (var child in node.Children) Collect(child, types);
         }

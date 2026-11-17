@@ -196,6 +196,7 @@ static class BakedSceneryTests {
         VersionHoldsWithoutTheCapability();
         SceneRootsAndBuiltSpansStayOut();
         EffectsGiveNoPresence();
+        ListingDoesNotFollowTheCamera();
         Console.WriteLine("PASS: baked scenery group rule, coverage rules, group placement and activity, refusal, restoration and scene patch editing");
     }
     // Every object below CTC and CTC Auxiliary is kept out, and a span the game builds from operations data is not
@@ -207,6 +208,26 @@ static class BakedSceneryTests {
             "Objects below World are listed, and starter placement markers in Setups keep their family; signal markers below CTC do not");
         Assert(!BakedSceneryRules.SpanListed(serialized: false, patcherOwned: false), "A span the game builds while it runs is not listed");
         Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true), "A scene span and the patcher's own spans are listed");
+    }
+    // A storage pile (Scenery.Pile) builds a "Pile Collider" child the scene does not save while its culling sphere is
+    // near the camera and destroys it when the camera moves away, as at Sylva Paperboard and Connelly. The group's
+    // verdict is the same with and without that child, so its listing never follows the camera.
+    static void ListingDoesNotFollowTheCamera() {
+        Node Paperboard(bool near) {
+            Node Pile(string name) {
+                var pile = new Node(name).With("Scenery.Pile");
+                if (near) { var collider = new Node("Pile Collider").With("UnityEngine.MeshCollider").Solid(); collider.Serialized = false; pile.Kids.Add(collider); }
+                return pile;
+            }
+            return new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Sylva Paperboard", Pile("Pile"), Pile("Pile (1)")).With("Scenery.BulkIndustryStorageSynchronizer"))));
+        }
+        GroupRootVerdict Verdict(bool near) => At(BakedSceneryRules.Classify(Paperboard(near)), "World/Large Scenery/Sylva/Sylva Paperboard");
+        Assert(Verdict(false).Disposition == GroupDisposition.NotListed && Verdict(false).Reason == BakedSceneryRules.NoPhysicalPresence, "Far away, the pile group has no physical presence of its own");
+        Assert(Verdict(true).Disposition == Verdict(false).Disposition && Verdict(true).Reason == Verdict(false).Reason, "Near the camera, the collider the pile builds does not list the group: " + Verdict(true).Disposition + " " + Verdict(true).Reason);
+        // A runtime child with a component of a kind a later ticket covers does not change the reason of a listed group.
+        var runtime = new Node("Spawned Marker").With("Track.TrackMarker").Solid(); runtime.Serialized = false;
+        var shed = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Shed", new Node("Wall").Solid(), runtime))))), "World/Large Scenery/Town/Shed");
+        Assert(shed.Disposition == GroupDisposition.Group, "A runtime child does not make a listed group inspection only: " + shed.Disposition);
     }
     // The components of World/Environment Effects/Fireflies * in the base-game map: a VFX Graph effect, whose VFXRenderer is a
     // renderer that nothing can run into. A particle system's renderer is the same; a mesh, collider or light is not.
