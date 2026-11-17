@@ -66,7 +66,17 @@ Save refuses to write the dependency when an existing constraint in `Info.json`,
 
 ## Retry after a failed edit
 
-A failed edit restores the object and the scene patch file and adds nothing to the history. If the patcher cannot verify that restoration, it blocks further edits of that object and says so. Select **Recheck** in the footer: the patcher compares the object with the scene patch file, applies the scene patch file's state if they differ, and unblocks the object once they agree. Reloading the native map editor also clears the block.
+The message area distinguishes three outcomes. Each message describes the problem and how to correct it.
+
+- `refused` means the patcher stopped before changing anything. The scene, scene patch file and history are unchanged. Correct the value or selection named in the message and apply again. If the message says the object changed or the inventory is stale, select **Refresh**, inspect the object again and repeat the action.
+- `failed and was undone` means the change started but failed. The patcher restored the object and confirmed the restoration. The scene patch file is unchanged and the history has no new step. Correct the cause and apply again. For a board, the message reads `was undone; waiting for terrain` instead. The object is restored, but the game is still regenerating the terrain at its restored placement. An edit before the terrain is updated gets the same message. Once the terrain is updated, edit again or select **Retry** on the **Changes** tab. Recheck is not needed.
+- `failed; cleanup is incomplete` means the patcher could not confirm that the object was restored. The message lists what remains, such as `Position: now 80, 2, 3, before 4, 2, 3` or `Owned spans still registered: ...`, or identifies the uncertain state. The footer repeats this information while you inspect the object. Further edits to that object are refused with `is blocked by incomplete cleanup`. Other objects remain editable, and your earlier edits stay in place.
+
+Select **Guide** in the footer to open the guide for the failed operation. **Guide** is unavailable when no failure is shown.
+
+To resolve an incomplete cleanup, select **Recheck** in the footer. Recheck finds and inspects the object again, compares it with the scene patch file and applies the file where they differ. Only what the file names remains. For example, Recheck removes a detection addition left half built by the failed edit and reuses an addition named in the file instead of building it again. When the object agrees with the file, the guard ends and you can edit the object again. If Recheck cannot make them agree, the message lists the remaining differences and the guard stays in place. Reloading the native map editor also ends the guard. **Refresh** only reads the scene; it changes nothing and does not end the guard.
+
+The scene patch editing session never retries a failed edit automatically. Each correction or Recheck checks the object, its prerequisites and its state again before changing anything.
 
 ## Leave the native map editor
 

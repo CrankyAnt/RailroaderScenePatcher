@@ -66,6 +66,9 @@ namespace RailroaderScenePatcher {
         // The labels a reason can carry where it is stored or shown on its own: under Supported edits, or in the
         // reason of a binding that cannot be set.
         static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Track binding unavailable: ", "Pad binding unavailable: " };
+        // Whether a failed action's message is a warning, in amber, rather than a failure that left something to correct, in
+        // red. The failure kind decides, not a word in the text: an edit that was undone and waits for its terrain is a warning.
+        internal static bool RecoveryWarning(FailureKind kind) => kind == FailureKind.AwaitingOutput;
         // A reason as one plain sentence after a label such as "Unavailable:", without a label of its own, starting with a
         // capital and ending with a full stop.
         internal static string Sentence(string reason) {
@@ -136,7 +139,7 @@ namespace RailroaderScenePatcher {
         // Every action row of the panel, for the table test of the rule: each row a list of buttons, each button its
         // label or the labels it changes between.
         internal static readonly string[][][] ActionRows = {
-            new[] { new[] { RemoveModification }, new[] { "Recheck" } },
+            new[] { new[] { RemoveModification }, new[] { "Recheck" }, new[] { "Guide" } },
             new[] { new[] { "Confirm" }, new[] { "Cancel" }, new[] { "Focus" }, new[] { "Details" } },
             new[] { new[] { "Cancel" } },
             new[] { new[] { "Disable", "Enable" }, new[] { ClearActivity } },
@@ -154,14 +157,14 @@ namespace RailroaderScenePatcher {
             new[] { new[] { "Fit" } },
         };
         // The widths of those labels in the native compact button's text, Montserrat-Medium 16, as the UI probe measured
-        // them in the game; Discard, Start and Clear location from the glyph advances fitted to the measured labels. The panel
+        // them in the game; Discard, Start, Guide and Clear location from the glyph advances fitted to the measured labels. The panel
         // measures its labels itself; this table lets the rule be checked without the game.
         internal static readonly Dictionary<string, float> LabelWidths = new Dictionary<string, float>(StringComparer.Ordinal) {
             { "Remove modification", 174.47f }, { "Remove", 66.76f }, { "Recheck", 70.02f }, { "Confirm", 65.75f }, { "Cancel", 55.19f }, { "Focus", 48.04f }, { "Details", 56.15f },
             { "Disable", 60.44f }, { "Enable", 56.36f }, { "Clear activity", 104.74f }, { "Apply", 46.95f }, { "Read", 41.67f }, { "Track", 43.46f }, { "Node", 43.86f },
             { "Discard", 61.5f }, { "Start", 39f }, { "Stop", 37.35f }, { "Set", 26.36f }, { "Detach", 59.13f }, { "Clear binding", 109.6f }, { "Clear location", 112.5f }, { "Picked", 55.25f },
             { "Preview", 64.68f }, { "Clear circuit", 96.93f }, { "Delete", 53.4f }, { "Retry", 43.8f }, { "Refresh", 62.15f }, { "Select in world", 119.96f }, { "Clear", 41.71f },
-            { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f } };
+            { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f }, { "Guide", 47f } };
         // One colour table for every world marking. Gold frames the inspected object. A candidate of a pick mode is
         // blue: saturated while the pointer is over it, lighter once it was clicked and until Confirm. A current
         // relation of the inspected object, native or set by a patch, is green, and more saturated under the pointer.

@@ -209,12 +209,12 @@ static class MilepostTests {
             var outcome = result.Outcomes["rebind"];
             if (injectedMileage) {
                 // The injected change of the mile value is not restored by the marker steps, so cleanup stays unverified.
-                Assert(!outcome.Applied && outcome.Error.Contains("mile value") && outcome.Error.Contains("cleanup is unverified"), "A changed mile value fails and cannot be verified as restored: " + outcome.Error);
-                var retry = engine.Apply(Doc(Item("rebind", Place(1040)))).Outcomes["rebind"];
-                Assert(!retry.Applied && retry.Error.Contains("cleanup") && t46.Position[0] == 20, "Retry of the unverified milepost is guarded: " + retry.Error);
+                Assert(!outcome.Applied && outcome.Error.Contains("mile value") && outcome.Error.Contains("Cleanup could not be verified"), "A changed mile value fails and cannot be verified as restored: " + outcome.Error);
+                var retry = engine.Apply(Doc(Item("retry", Place(1040)))).Outcomes["retry"];
+                Assert(!retry.Applied && retry.Error.IndexOf("cleanup", StringComparison.OrdinalIgnoreCase) >= 0 && t46.Position[0] == 20, "Retry of the unverified milepost is guarded: " + retry.Error);
                 continue;
             }
-            Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure after mutation is restored: " + index + " " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after mutation is restored: " + index + " " + outcome.Error);
             Assert(Entry(world, t46) == "Stvw|b|51.20403" && t46.Position[0] == 20 && ReferenceEquals(world.OriginCache["T"], t46) && Kept(world, t46) == "T|True|46|46|post-mesh", "The captured binding, registration, placement and cache return");
             Assert(keep.Applied && world.Registrations(t47).Count == 0 && t47.Segment == null, "Prior independent work survives");
         }
@@ -222,7 +222,7 @@ static class MilepostTests {
         w.StickyRegistration = true;
         var e = new PatchEngine(s);
         var sticky = e.Apply(Doc(Item("rebind", Bind(At("Stky0cg9c", "a", 5))))).Outcomes["rebind"];
-        Assert(!sticky.Applied && sticky.Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported: " + sticky.Error);
+        Assert(!sticky.Applied && sticky.Error.Contains("Cleanup could not be verified"), "Incomplete cleanup is reported: " + sticky.Error);
         w.StickyRegistration = false; var mutations = w.Mutations;
         Assert(!e.Apply(Doc(Item("other", Place(1040)))).Outcomes["other"].Applied && w.Mutations == mutations, "Another operation on the unverified milepost is blocked");
     }

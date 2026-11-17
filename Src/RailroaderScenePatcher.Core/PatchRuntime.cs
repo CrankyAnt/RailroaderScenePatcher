@@ -141,7 +141,7 @@ namespace RailroaderScenePatcher.Core {
             void Deliver(Action report) { try { report(); } catch (Exception e) { fault = fault ?? e; } }
             if (result.Error != null && !result.MapEditorOnly) Deliver(() => Report(source, "document", null, result.Error, FailureCause.Unknown, true));
             foreach (var item in result.Outcomes)
-                if (!item.Value.Applied && !item.Value.MapEditorOnly) Deliver(() => Report(source, item.Key, item.Value.Target, item.Value.Error, item.Value.Cause));
+                if (!item.Value.Applied && !item.Value.MapEditorOnly) Deliver(() => Report(source, item.Key, item.Value.Target, WithRemaining(item.Value), item.Value.Cause));
             if (fault != null) throw fault;
         }
         // Removes only the unchanged row attributed at the native check, after a separate observation of repaired state.
@@ -164,6 +164,9 @@ namespace RailroaderScenePatcher.Core {
             var row = matches[0];
             return ReferenceEquals(row.Token, original.Token) && row.Originator == original.Originator && row.Description == original.Description ? row : null;
         }
+        // An incomplete cleanup reports the state it left behind, so the report states what remains uncertain.
+        static string WithRemaining(Outcome outcome) => outcome.Remaining.Count == 0 || outcome.Failure != FailureKind.IncompleteCleanup ? outcome.Error
+            : outcome.Error.TrimEnd('.') + ". Remaining state: " + String.Join("; ", outcome.Remaining);
         void Report(PatchSource source, string operation, TargetIdentity target, string error, FailureCause cause, bool scenePatchFile = false) {
             var key = (scenePatchFile ? "document/" : "operation/") + Key(source, operation);
             if (reported.Contains(key)) return;

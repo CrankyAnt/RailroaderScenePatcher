@@ -196,16 +196,16 @@ static class TrackFollowingTests {
         scene.Poses["S1|a|10"] = new TrackPose(new[] { 210.0, 1, 0 }, Quarter);
         scene.FailNextApplies = 1;
         var failed = session.ReconcileTrackFollowing().Single().Value;
-        Assert(!failed.Applied && failed.Error.Contains("restored") && Near(box.Position, 5, 6, 7), "A failed reconciliation restores the captured placement: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("back as it was") && Near(box.Position, 5, 6, 7), "A failed reconciliation restores the captured placement: " + failed.Error);
         Assert(session.ReconcileTrackFollowing().Single().Value.Applied && Near(box.Position, 15, 6, 7), "A restored object follows on the next reconciliation");
         scene.Poses["S1|a|10"] = new TrackPose(new[] { 220.0, 1, 0 }, Quarter);
         // Restoration cannot verify while every application fails.
         scene.FailApply = true;
         var unverified = session.ReconcileTrackFollowing().Single().Value;
         scene.FailApply = false;
-        Assert(!unverified.Applied && unverified.Error.Contains("cleanup is unverified"), "An unverified restoration is reported: " + unverified.Error);
+        Assert(!unverified.Applied && unverified.Error.Contains("could not be verified"), "An unverified restoration is reported: " + unverified.Error);
         var blocked = session.ReconcileTrackFollowing().Single().Value;
-        Assert(!blocked.Applied && blocked.Error.Contains("unverified") && !session.Edit(P, null, false).Applied, "The guarded object is not retried by reconciliation or edited");
+        Assert(!blocked.Applied && blocked.Error.Contains("could not be verified") && !session.Edit(P, null, false).Applied, "The guarded object is not retried by reconciliation or edited");
         Assert(session.Recheck(P).Applied && Near(box.Position, 25, 6, 7), "Recheck reconciles the actual state with the followed track and unblocks it");
         scene.Poses.Remove("S1|a|10");
         var lost = session.ReconcileTrackFollowing().Single().Value;

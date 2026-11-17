@@ -929,6 +929,7 @@ namespace RailroaderScenePatcher {
             else if (selected != null && selection?.Confirmed is ConfirmedSelection confirmed && confirmed.Source != null && confirmed.Source.Equals(SelectionIdentity.SceneObject(selected.Identity))) {
                 source = "World choice"; state = Tint(Green, "Confirmed: " + confirmed.Identity + " in " + confirmed.MapIds[0]);
             } else if (selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
+            else if (CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
             // The area has a fixed height, so nothing outside it moves, and its entries stack from the top without gaps:
             // first what the window waits for now, then the messages, newest first, the older ones dimmed. Each names
             // the action group it came from. The area is a native scroll view: its content takes the height of its
@@ -940,7 +941,8 @@ namespace RailroaderScenePatcher {
                 if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
                 for (var i = 0; i < messages.Count; i++) {
                     var message = messages[i]; var older = i > 0;
-                    var tone = ToneOf(message.Text);
+                    // A failed action's message takes its colour from its failure kind; any other result from its words.
+                    var tone = message.Recovery != null ? (CommandBand.RecoveryWarning(message.Recovery.Kind) ? Amber : Red) : ToneOf(message.Text);
                     var text = WithoutSource(message);
                     MessageSlot(lines, message.Source, PathBreaks(tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text)), older);
                 }
@@ -1020,7 +1022,7 @@ namespace RailroaderScenePatcher {
         static string WithoutSource(EditFeedback.Message message) =>
             message.Text.StartsWith(message.Source + " ", StringComparison.OrdinalIgnoreCase) ? message.Text.Substring(message.Source.Length + 1) : message.Text;
         static string ToneOf(string text) {
-            foreach (var word in new[] { " refused", " failed", "unavailable", "could not", " stopped" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Red;
+            foreach (var word in new[] { " refused", " failed", "unavailable", "could not", " stopped", " blocked by" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Red;
             foreach (var word in new[] { " completed", " complete.", " copied", "requested again" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Green;
             foreach (var word in new[] { "Terrain updated" }) if (text.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0) return Green;
             if (text.IndexOf("outstanding", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("Terrain pending", StringComparison.OrdinalIgnoreCase) >= 0 || text.IndexOf("the column stops", StringComparison.OrdinalIgnoreCase) >= 0) return Amber;
@@ -1061,8 +1063,27 @@ namespace RailroaderScenePatcher {
                     if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
                     return removed;
                 }), null, 2),
-                Slot("Recheck", "Recheck the object after a failed edit.", block, () => Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection))),
-                Empty };
+                Slot("Recheck", "Compare the object with the scene patch file after a failed edit. Apply the file's settings wherever they differ.", block, () => {
+                    // Recheck finds and inspects the object again: the panel's own Refresh reads the scene first, so a failed
+                    // attempt that changed the object needs no separate Refresh before its Recheck.
+                    Inspect();
+                    Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection), guarded: false);
+                }),
+                GuideAct() };
+        }
+        // While the inspected object's cleanup is unverified: what remains and how the guard ends, or null. Read from the
+        // session's record without searching the scene, so it can run with every rebuild.
+        string CleanupState() {
+            var session = attachment?.Session;
+            if (session == null || selected == null || !session.CleanupUnverified(selected.Identity)) return null;
+            var left = session.RemainingState(selected.Identity);
+            return "Cleanup after a failed edit is incomplete" + (left.Count == 0 ? "" : ". What remains: " + String.Join("; ", left)) + ". Editing is blocked until Recheck confirms that the object matches the scene patch file, or you reload the Map Editor.";
+        }
+        // Opens the guide of the operation whose failure the message area shows; without a failure there is nothing to open.
+        Act GuideAct() {
+            var recovery = feedback.Recovery;
+            return Slot("Guide", recovery == null ? "Open the guide for the failed action." : "Open the guide for the failed action: " + recovery.GuideTitle + ".",
+                recovery == null ? "There is no failed action to show a guide for." : null, () => { var shown = feedback.Recovery; if (shown != null) Application.OpenURL(GuideRoot + shown.Guide); }, "Guide for the failed action");
         }
         // The actions of one tab, for its pinned row. They belong to the open tab and mode only.
         Act[] TabActs(string id) {
@@ -1142,7 +1163,7 @@ namespace RailroaderScenePatcher {
                         // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach too.
                         var last = none == null && CrossingCoverage.LastCovered(current, circuitKey);
                         var prepared = preparedCoverage != null && preparedCoverage.Circuit == circuitKey && preparedCoverage.Preview.Error == null ? preparedCoverage : null;
-                        Action apply = () => Edit(CoveragePlace, "Crossing coverage", (edit, inspection) => {
+                        Action apply = () => Edit(CoveragePlace, prepared?.Addition != null ? RecoveryGuidance.DetectionAddition : "Crossing coverage", (edit, inspection) => {
                             if (prepared.Addition == null) return edit.Cover(identity, prepared.Circuit, prepared.Value, inspection);
                             if (prepared.Value != null) return edit.AddDetection(identity, prepared.Addition, prepared.Value, inspection);
                             var deleted = edit.DeleteDetection(identity, prepared.Addition, inspection);
@@ -1331,8 +1352,8 @@ namespace RailroaderScenePatcher {
                     new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
                     new[] { "Current, Stale, Saved, Unsaved", "The two lamps above the outliner show the inventory and save state: green when good, amber otherwise. They are not buttons; their tooltips give the reasons." },
                     new[] { "* and +", "Before a name, * marks an object this mod changes and + an object it adds; the state line shows the same as CHANGED and ADDED. Neither means unsaved: only the Unsaved lamp does." },
-                    new[] { "Footer", "Below the messages, Remove modification and Recheck are the same on every tab. A tab's own actions stand in the row at the bottom of the tab." },
-                    new[] { "Failed edit", "A failed edit restores the object. If that cannot be verified, the object is blocked until Recheck succeeds or the Map Editor reloads." } },
+                    new[] { "Footer", "Remove modification, Recheck and Guide appear below the messages on every tab. Actions specific to a tab appear at the bottom of that tab." },
+                    new[] { "Failed edit", "A refused edit changes nothing. If an edit fails after it starts, the patcher restores the object to how it was. If it cannot verify that restoration, the message lists what remains and further edits are blocked until Recheck succeeds or you reload the Map Editor. Guide opens the guide for the failed action." } },
                 Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {

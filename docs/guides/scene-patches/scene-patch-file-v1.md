@@ -319,6 +319,17 @@ Fixed placement is the base minimum; other content in the scene patch file can r
 
 A target whose `structure` names a capability that is incompatible with the running game build fails with that reason; other modifications still apply. A target preflight or mutation failure is recorded for the current load and is not retried during that load. If mutation cleanup cannot be verified, later modifications that resolve to that target fail closed.
 
+## Failure isolation
+
+The runtime handles failures according to when they occur and whether cleanup succeeds:
+
+- The runtime skips a whole scene patch file if it cannot read the file, its `formatVersion` is unsupported, it has a repeated property name, its `modifications` value is not an object keyed by modification ID, or its target map is outside the loaded map context. None of the file's modifications runs.
+- A modification fails before mutation if it has an invalid value, its target resolves to no object or several objects, or a prerequisite fails. The object keeps its state. Every modification that lists the failed modification in `dependsOn`, directly or through another modification, fails as a dependency failure without mutation. Modifications that do not depend on it still apply.
+- If a modification fails after mutation starts, the patcher restores the state captured before mutation, including relationships and detection additions, and checks the restoration.
+- If that check fails, the report names the remaining or uncertain state, such as a position that differs from before or owned spans that remain registered. Later modifications of the same object fail closed until a later world load rebuilds the object.
+
+Work applied before a failure stays in place, and gameplay continues. The runtime does not retry a failed modification while that world stays loaded. The next world load reads and evaluates every scene patch file again. In the native map editor, **Recheck** compares the object with the scene patch file and ends the guard once they agree; see [retry after a failed edit](editing-placement-in-the-map-editor.md#retry-after-a-failed-edit). Failure handling adds no JSON fields or format version.
+
 ## Application on each peer
 
 Format version 1 has no multiplayer fields. The host and every client read `Data/scene-patches.json` from their own installed copy of the mod and apply it to their own scene. `sourceMap.mapId`, target identity and capability prerequisites are checked on each peer. `placement.position` is in map coordinates and is converted through each peer's own world origin. A repeated world-load callback reconciles the stored placement without accumulating offsets and does not retry failed modifications. A later load of the same map, including reconnect and same-map re-entry, starts a new load attempt. A target that still resolves under its identity keeps its applied state and any unverified-cleanup guard. A target that the game rebuilt gets the modification as new, and the patcher removes only what it owned for the old object, such as the spans of a detection addition. Failed modifications are retried once per load attempt. A cleanup failure is reported on that peer only and retried at the next load. Modification keys and addition IDs are the persistent identities across load attempts. In single-player, loading the same save again in one process rebuilt every modded object and added object, and each modification was applied once. The native behavior on reconnect has not been checked.
