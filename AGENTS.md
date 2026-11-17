@@ -73,3 +73,7 @@ One line per validation or test command and per CI workflow the repository runs.
 ## Code style
 
 Keep `README.md` user-facing. Describe the product, its audience and its availability; keep development plans, implementation decisions and unresolved development choices at their appropriate owners. Add usage instructions only when they describe established behavior.
+
+## Writing style
+
+User-facing text, in the product and in `docs/guides/`, follows the [Google developer documentation style guide](https://developers.google.com/style). Where it does not cover a case or its term does not fit, follow the [Microsoft Writing Style Guide](https://learn.microsoft.com/en-us/style-guide/welcome/); these two are the only style guides. Buttons are clicked; rows, items and objects are selected.
