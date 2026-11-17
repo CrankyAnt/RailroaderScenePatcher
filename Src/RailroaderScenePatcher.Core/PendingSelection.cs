@@ -115,9 +115,9 @@ namespace RailroaderScenePatcher.Core {
             Problem = Offers.Count == 0 ? NoOffer :
                 Offers.Count > 1 ? SeveralOffers : null;
         }
-        // Several candidates stand on one spot, where a click cannot tell them apart. The world lists them beside the
-        // click, numbered, and the same number names each wherever the panel lists it.
-        public const string SeveralOffers = "Several candidates stand on one spot. Choose one from the list beside the click.";
+        // A group's objects or overlapping markers offer a list beside the pointer. The same number names each
+        // offer wherever the panel lists it.
+        public const string SeveralOffers = "Choose from the list beside the pointer.";
         // A click that met no candidate.
         public const string NoOffer = "No candidate at this point";
         // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks

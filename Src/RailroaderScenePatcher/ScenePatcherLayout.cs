@@ -356,7 +356,7 @@ namespace RailroaderScenePatcher {
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
                     var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + group.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(group.Key));
-                    var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
+                    var repeated = new HashSet<string>(group.Value.GroupBy(ObjectName).Where(names => names.Count() > 1).Select(names => names.Key));
                     // A family whose objects the game itself tells apart shows them under subgroups; a family group
                     // only, never the Inspection only group.
                     var subgroups = groupKey.StartsWith("family:", StringComparison.Ordinal) ? InventoryPresentationState.Subgroups(group.Value) : null;
@@ -376,7 +376,7 @@ namespace RailroaderScenePatcher {
                             // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
                             if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; state.SetExpanded(groupKey, true); if (folderKeys.TryGetValue(item, out var folderKey)) state.SetExpanded(folderKey, true); }
                         }
-                        var name = InventoryPresentationState.Name(item);
+                        var name = ObjectName(item);
                         var changed = IsChanged(item); var added = IsAdded(item);
                         // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so
                         // that they stay visible when the end of a long name is cut off; they take room only on a row
@@ -418,7 +418,7 @@ namespace RailroaderScenePatcher {
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
-            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
+            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(ObjectName(row)).x).ToArray();
             var divider = NativePresentation.DividerWidth + 26;
             outlinerWidth = InventoryPresentationState.FitWidth(widths, RowDecoration, presentation.ContentWidth, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
             StoreOutlinerWidth(outlinerWidth);
@@ -430,14 +430,16 @@ namespace RailroaderScenePatcher {
         void DrawInspector(UIPanelBuilder builder) {
             builder.ConfigureLayout(4f);
             DrawRightBand(builder);
-            var name = selected == null ? "No Selection" : InventoryPresentationState.Name(selected);
+            var name = selected == null ? "No Selection" : ObjectName(selected);
             // The name takes the whole row and is cut only when the row itself is too short; its tooltip holds the
             // full path. The right end of this row is where the Inspector and Guided switch will stand: no control
             // stands there, and the name gives way to the switch when it exists.
             builder.HStack(row => {
                 Heading(row, Literal(name), "Object", selected == null ? null : selected.Identity.Path).FlexibleWidth();
             }).ChildrenKeepHeight();
-            var stateLine = Line(builder, StateLine(out var states), "State", states);
+            var state = StateLine(out var states);
+            // Reserve the heading's line height in both states so inspection does not move the tabs.
+            var stateLine = Line(builder, selected == null ? "<style=H3>" + state + "</style>" : state, "State", states, RowHeight);
             builder.AddTabbedPanels(inspectorTab, tabs => {
                 tabs.AddTab("Object", ObjectTab, body => Tab(body, ObjectTab, DrawObject));
                 tabs.AddTab("Placement", PlacementTab, body => Tab(body, PlacementTab, DrawPlacement));
@@ -455,9 +457,15 @@ namespace RailroaderScenePatcher {
             }
             DrawFooter(builder);
         }
+        // Added equipment keeps its stored wrapper name and identity. Only its visible name comes from the copy.
+        static string ObjectName(SceneObservation item) {
+            var owned = (item.Handle as GameObject)?.GetComponent<OwnedEquipment>();
+            return owned == null ? InventoryPresentationState.Name(item)
+                : owned.Copy == null ? "Added crossing equipment" : "Added " + owned.Copy.name;
+        }
         // One line under the name: the family and the object's states, in the native status colors.
         string StateLine(out string plain) {
-            if (selected == null) { plain = null; return "Select a row in the outliner, or use Select in world."; }
+            if (selected == null) { plain = null; return "Use Outliner or Select in world."; }
             var parts = new List<string> { Literal(selected.Family) };
             var text = new List<string> { selected.Family };
             if (!selected.Active) { parts.Add("Inactive"); text.Add("Inactive"); }
@@ -917,10 +925,10 @@ namespace RailroaderScenePatcher {
                 // A short purpose with the count on the first line, the candidate on its own line.
                 var purpose = choosingSnap ? "Pick the snap target" : pending.Kind == SelectionKind.SceneObject ? "Pick an object" : pending.Kind == SelectionKind.TrackSegment ? "Pick a track" : "Pick an endpoint";
                 // The choice takes the world's clicks: the native map editor does not select or drag until it ends.
-                state = (pending.Offers.Count > 1 ? Tint(Blue, pending.Offers.Count + " candidates") + " " : "") + Literal(purpose + " in the world. Native world clicks are suspended; Cancel restores them.") +
-                    (pending.Problem == null ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
+                state = (pending.Offers.Count > 1 ? Tint(Blue, pending.Offers.Count + (pending.Kind == SelectionKind.SceneObject ? " objects. " : " candidates. ")) + Literal(PendingSelection.SeveralOffers) : Literal(purpose + " in the world.")) + Literal(" Map Editor selection is paused; Cancel resumes it.") +
+                    (pending.Problem == null || pending.Problem == PendingSelection.SeveralOffers ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
                     (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
-                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag("Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? " Confirm takes it; Apply then moves the object." : " Confirm takes it.")) +
+                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? " Confirm takes it; Apply then moves the object." : pending.Kind == SelectionKind.SceneObject ? " Confirm selects it." : " Confirm takes it.")) +
                     // The footer's Details: the clicked candidate's identity and details, here in the message area.
                     (candidate == null || !candidateDetails ? "" : "\n" + Literal(candidate.Choice.Identity.ToString()) + (String.IsNullOrEmpty(candidate.Details) ? "" : "\n" + Literal(candidate.Details)));
             } else if (gizmo?.Active == true) { source = GizmoPlace; state = Literal(gizmo.State); }

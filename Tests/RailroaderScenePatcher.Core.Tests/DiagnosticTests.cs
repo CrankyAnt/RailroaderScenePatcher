@@ -32,7 +32,7 @@ static class DiagnosticTests {
         Check(failure.Message.StartsWith("Example Mod [example/mod; version 2.1].", StringComparison.Ordinal), "The description starts with the supplying mod; its separate originator supplies the diagnostic source once");
         Check(failure.Cause == FailureCause.Unknown && failure.ReportTo == "patcher maintainer", "An injected native mutation fault must not blame the supplying mod");
         Check(failure.Message.Contains("Example Mod") && failure.Message.Contains("example/mod") && failure.Message.Contains("2.1") && failure.Message.Contains("0.5.0") && failure.Message.Contains("game-build"), "Reports must include supplying identity and relevant versions");
-        Check(failure.Message.Contains("Example author") && failure.Message.Contains("https://example.com/mod"), "Reports retain supplied metadata");
+        Check(failure.Message.Contains("Mod author: Example author.") && failure.Message.Contains("https://example.com/mod"), "Reports name the mod author and retain the published website");
         InvalidDefinitionsAndEditingRecovery();
         EarlyCheckUsesCompleteScenePatchFileProtection();
         ExactFallbackRequiresVerifiedRepair();
@@ -191,7 +191,7 @@ static class DiagnosticTests {
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
         runtime.Apply(ScenePatchFile.Replace("\"active\":false", "\"active\":42"), source);
         Check(messages.Rows.Count == 1 && messages.Rows[0].Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "mod author", "A demonstrably invalid supplied value directs reports to its mod author");
-        Check(!messages.Rows[0].Message.Contains("Supplied author") && !messages.Rows[0].Message.Contains("Published website"), "Absent optional metadata must not be invented");
+        Check(!messages.Rows[0].Message.Contains("Mod author:") && !messages.Rows[0].Message.Contains("Published website"), "Absent optional metadata must not be invented");
         runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         runtime.Apply(ScenePatchFile.Replace("\"active\":false", "\"futureOperation\":true"), source);
         runtime.Apply("{broken", source);
