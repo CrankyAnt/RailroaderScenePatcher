@@ -15,42 +15,54 @@ An addition to Railroader that a player enables in the game's mod list, for a ne
 _Avoid_: Asset pack, MapMod
 
 **Map definition**:
-The game's identified definition of a selectable map, with its map data, referenced map layers and terrain tile sets. A definition and the mod that contains it are distinct. The native map editor edits only a map definition of the mod being developed.
+The game's identified definition of a map, which is either selectable or a map patch (see Map patch). A definition and the mod that contains it are distinct.
+
+**Map patch**:
+A map definition that the game marks as a map patch, which changes its patch target inside a save and holds only the differences from it. It applies while its mod is enabled, on a save of its patch target or of a map that has the patch target among its map layers, and is not selectable.
+_Avoid_: Patch, patch map
+
+**Patch target**:
+The map a map patch changes, the last entry of its map layers, which must be a map and not another map patch; the game's docs also call it the target or target map. A scene patch file's scene target map can differ, for example the bottom map layer when the patch target is a layered map.
 
 **Map layer**:
-A map definition referenced by another map definition as inherited map content. A map layer is source context, not another active edit target.
+A map definition referenced by another map definition as inherited map content, which is source context and not another active edit target. A map patch names its patch target and any map patches it builds on in its map layers.
 _Avoid_: Native map layer
 
 **Bottom map layer**:
-The lowest of all layers that the game composes for a map definition, including the layers of its map layers. A map definition without map layers is its own bottom map layer.
+The lowest of all layers that the game composes for a map definition, including the layers of its map layers. A map definition without map layers is its own bottom map layer; a map patch's is the bottom map layer of its patch target.
 
 **Terrain tile set**:
-A named set of terrain tiles that forms a map's ground. A map definition names every set it needs, including those of its map layers, and can use a set that another map definition brings.
+A named set of terrain tiles that forms a map's ground. A map definition that is not a map patch names every set it needs, including those of its map layers, and can use a set that another map definition brings.
 _Avoid_: Tile set, terrain source
 
 **Map**:
 The map definition a player chooses when starting a new game. The save keeps that map. In running text, "map" is the ordinary word unless it means a save's map.
 
 **Base-game map**:
-The map definition that Railroader itself supplies (`rr/bushnell-whittier`), with the game's own terrain tile set. Most map-changing mods apply to it.
-_Avoid_: Base map
+The map definition that Railroader itself supplies (`rr/bushnell-whittier`), with the game's own terrain tile set, shown in the New Game list as Railroader Base Map. A map patch can name it as its patch target, and most map-changing mods apply to it.
+_Avoid_: Base map, base layer
+
+**Layered map**:
+A selectable map definition that builds on other map definitions through its map layers. Terrain does not inherit through map layers, so a layered map must list every terrain tile set it needs, including those of its map layers.
+_Avoid_: Map edit
 
 **Whole new map**:
 A map definition that has no map layers and supplies its own terrain tile set.
 _Avoid_: Total conversion
 
 **Map-adding mod**:
-A mod that supplies a selectable map definition. A mod can be both map-adding and map-changing; a map-changing mod made in the native map editor is also map-adding, because the native map editor edits only a map definition.
+A mod that supplies a selectable map definition. A mod with only a map patch is map-changing, not map-adding.
 
 **Map-changing mod**:
-A mod whose content applies to a map it does not supply, such as the base-game map, through a map-changing script or through a scene patch file. A mod can be both map-changing and map-adding.
+A mod whose content applies to a map it does not supply, such as the base-game map, through a map patch, a map-changing script or a scene patch file. A mod can be both map-changing and map-adding.
 
 **Map-changing script**:
-A mod's script that the game runs each time it loads map data, outside the native map editor, to change that map data before the game reads it. It is how a mod's native changes reach a save on a map the mod does not supply: a mod's map definition and its map data take effect only on a save of that map or of a map that has it as a map layer, or in the native map editor. The project's name for the game's `modifyMap` handler.
+A mod's script that the game runs each time it loads map data, outside the native map editor, to change that map data before the game reads it; it is the project's name for the game's `modifyMap` handler. It is one of two ways a mod's native changes reach a save on a map it does not supply, the other being a map patch.
 _Avoid_: Merge script
 
-**Target map**:
-The map definition that a scene patch file names. The scene patch file applies when that map, or a map that inherits it as a map layer, is loaded.
+**Scene target map**:
+The map definition that a scene patch file names. A scene patch file that names a map patch is skipped in play.
+_Avoid_: Target map, target when it means a map
 
 **Native map editor**:
 The game's own map editor. It edits native map data, and only a map definition of the mod being developed.
@@ -60,7 +72,7 @@ A mod that adds code to the game itself rather than map content. The Scene Patch
 _Avoid_: Script mod
 
 **Load order**:
-The order in which Railroader loads enabled mods. It is distinct from the order in which map layers compose a map.
+The order in which Railroader loads enabled mods. For map patches, the game also orders the map patches a map patch lists above its patch target; load order decides where no listing does.
 _Avoid_: Native pack load order
 
 ### Unity terminology
@@ -86,11 +98,11 @@ Content generated for terrain tiles from the current scene state, including vege
 
 **Scene patch**:
 Desired changes that a supplying mod makes to supported scene objects and their relationships.
-_Avoid_: Patch history, movement script
+_Avoid_: Patch, patch history, movement script
 
 **Scene patch file**:
-The file in a mod, `Data/scene-patches.json`, that expresses the mod's scene patch.
-_Avoid_: Patch document, scene-patch document, patch history
+The file in a mod, `Data/scene-patches.json`, that expresses the mod's scene patch. It is not the map data file of a map patch.
+_Avoid_: Patch, patch document, scene-patch document, patch history
 
 **Equal content**:
 Two scene patch file texts have equal content when they say the same thing: the order of keys and members, spacing, comments, the written form of a number and the order of a modification's dependencies do not count.
@@ -151,14 +163,14 @@ A protected road crossing already present in the map, whose crossing coverage or
 _Avoid_: New standalone crossing
 
 **Map context**:
-The loaded map definition and its resolved map layers, against which a scene patch's targets, tracks included, are identified.
+The context against which a scene patch's targets, tracks included, are identified: in the native map editor, the edited map definition and its map layers. In a save, the map ids in play are the loaded map and its map layers, and an applied map patch's id is not one of them.
 
 **Supplying mod**:
 The mod that owns a scene patch file, regardless of which map definition or mod contains an existing target.
 _Avoid_: Supplying MapMod, target owner
 
 **Edited mod**:
-The supplying mod that owns the selected map definition being edited in the native map editor; it is always a map-adding mod. Other mods can supply map layers or terrain tile sets without becoming edit targets.
+The supplying mod that owns the selected map definition, a map or a map patch, being edited in the native map editor. Other mods can supply map layers or terrain tile sets without becoming edit targets.
 _Avoid_: Active edited MapMod
 
 **Load attempt**:
