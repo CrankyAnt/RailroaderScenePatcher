@@ -289,6 +289,7 @@ class Program {
         CoverageTests.RunRetained();
         SubscriptionTests.Run();
         EquipmentTests.Run();
+        BellTests.Run();
         FailureRecoveryTests.Run();
         FaultInjectionTests.Run();
         Console.WriteLine("PASS: complete scene patch file behavior"); return 0;

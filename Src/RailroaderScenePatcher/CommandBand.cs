@@ -254,14 +254,25 @@ namespace RailroaderScenePatcher {
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
         // The reason an object is inspection only, given as a whole clause.
         internal static string NotYetSupportedBecause(string reason) => NotYetSupportedPrefix + reason;
-        // The family of a light or gate this patcher added: a supported family whose edits live on its crossing's
-        // Connections tab, not on the object itself.
-        internal const string AddedEquipmentFamily = "Added light or gate";
-        internal static string AddedEquipmentOperations(string id, string scope) =>
-            "Added light or gate " + id + " of " + scope + ". Edit or remove it on its crossing controller's Connections tab";
+        // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
+        // crossing's Connections tab, not on the object itself.
+        internal const string AddedEquipmentFamily = "Added light or gate", AddedBellFamily = "Added bell";
+        // The guide link offered below a list of equipment sources: its label and the guide page with the anchor of its
+        // rejection reasons, or null while no source of the list is rejected. A list of bell definitions links to the bell
+        // guide, a list of devices to the light and gate guide.
+        internal static string[] RejectionGuide(IEnumerable<SourceCandidate> sources) {
+            var rejected = (sources ?? Enumerable.Empty<SourceCandidate>()).Where(s => s != null && !s.Eligible).ToList();
+            if (rejected.Count == 0) return null;
+            return rejected.Any(s => s.Source.IsDefinition)
+                ? new[] { "Why a bell definition is rejected", "adding-crossing-bells.md#rejected-bell-definitions" }
+                : new[] { "Why a device is rejected", "adding-crossing-equipment.md#rejected-sources" };
+        }
+        internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
+        internal static string AddedEquipmentOperations(string id, string scope, bool bell = false) =>
+            (bell ? "Added bell " : "Added light or gate ") + id + " of " + scope + ". Use its crossing controller's Connections tab to edit or remove it.";
         // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
-        // or an added light or gate, which its crossing edits.
-        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || family == AddedEquipmentFamily ? null : NotYetSupported("the " + family + " family");
+        // or an added light, gate or bell, which its crossing edits.
+        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) ? null : NotYetSupported("the " + family + " family");
         // The track element an object follows, as the world marks it: the anchor's node, or the segment of its
         // location. Null without a following placement.
         internal static SelectionIdentity Followed(TrackFollowing following) =>
@@ -322,7 +333,7 @@ namespace RailroaderScenePatcher {
         internal static string ChoiceLog(string forObject, string problem, IReadOnlyList<string> offers) =>
             LogLine("World choice", forObject, problem + (offers == null || offers.Count < 2 ? "" : " Candidates: " + String.Join("; ", offers.Select((label, i) => (i + 1) + " " + ChoiceLabel(label, offers, 80)))));
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
-        internal static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
+        internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
         // every mode. An object that cannot be edited keeps Numeric, which shows its placement, and has every other mode
         // inactive with the object's own reason.

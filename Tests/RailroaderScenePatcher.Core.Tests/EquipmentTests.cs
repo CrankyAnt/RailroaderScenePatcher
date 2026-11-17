@@ -18,12 +18,40 @@ class FakeDevice {
     };
     public FakeEquipmentWorld.Added Owner;
 }
-// Controlled equipment world: devices by scene and path, and additions the patcher owns beneath each crossing controller.
+// A bell definition of the content library: the facts the bell pattern reads from it. The production BellPattern judges
+// them. The default is the game's crossing bell, whose audio splits at two indexes.
+class FakeBell {
+    public string Identifier = "rr/bell-uss-teardrop-crossing-rh", Name = "Crossing Bell";
+    public BellFacts Facts = new BellFacts { Audio = "rr/bell-crossing", Indexes = new double[] { 0.4, 1.2 }, Volume = 0.8 };
+    public double ClipSeconds = 3;
+}
+// Controlled equipment world: devices by scene and path, bell definitions by identifier, and additions the patcher owns
+// beneath each crossing controller.
 class FakeEquipmentWorld : ICrossingEquipmentWorld {
     public static readonly string[] Keys = { "lights", "gates" };
     public sealed class Added {
         public FakeCrossing Controller; public FakeDevice Copy; public EquipmentAddition Record;
         public double[] Position, Rotation; public bool Destroyed, Culled, InCuller = true;
+        // A bell: its definition, whether its audio is loaded or failed to load, and the observers it holds on its
+        // controller's bell key.
+        public FakeBell Bell; public bool AudioLoaded; public string LoadProblem; public int Observers;
+    }
+    public readonly List<FakeBell> Bells = new List<FakeBell>();
+    // Loaded audio references the bells hold; each release lowers it. A bell that is built and loading holds none yet.
+    public int AudioReferences, PendingLoads;
+    // Loads complete later, as in the game, where the load continues on a later frame: FinishLoads stands for that frame.
+    public bool LoadsPending = true, FailLoads;
+    // The warnings a failed load raises, one per bell: its scope, ID, controller and reason.
+    public readonly List<string> Warnings = new List<string>();
+    public FakeBell Bell(string identifier = null, Action<FakeBell> setup = null) { var b = new FakeBell(); if (identifier != null) b.Identifier = identifier; setup?.Invoke(b); Bells.Add(b); return b; }
+    // Completes every pending load: a bell whose load succeeds holds one audio reference.
+    public void FinishLoads() {
+        foreach (var a in All.Where(a => a.Bell != null && !a.Destroyed && !a.AudioLoaded && a.LoadProblem == null)) {
+            if (FailLoads) a.LoadProblem = "the asset bundle failed";
+            else { var clip = BellPattern.ClipProblem((int)(a.Bell.ClipSeconds * 44100), 44100, a.Bell.Facts.Indexes); if (clip != null) a.LoadProblem = clip; else { a.AudioLoaded = true; AudioReferences++; } }
+            if (a.LoadProblem != null) Warnings.Add(a.Record.Scope + " " + a.Record.Id + " at " + "its crossing controller" + ": " + a.LoadProblem);
+            PendingLoads--;
+        }
     }
     public readonly List<FakeDevice> Devices = new List<FakeDevice>();
     public readonly List<Added> All = new List<Added>();
@@ -31,28 +59,42 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld {
     public int FailConstructAfter = -1;
     public bool StickyDestroy, FailSetPlacementOnce, CullerVisible = true;
     public FakeDevice Device(string path, Action<FakeDevice> setup = null) { var d = new FakeDevice { Path = path }; setup?.Invoke(d); Devices.Add(d); return d; }
-    public IReadOnlyList<object> ResolveSource(EquipmentSource source) => Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
+    public IReadOnlyList<object> ResolveSource(EquipmentSource source) => source.IsDefinition ? Bells.Where(b => b.Identifier == source.Definition).Cast<object>().ToArray()
+        : Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
     public string SourceProblem(object source, object controller, string pattern) {
+        if (source is FakeBell bell) return pattern != EquipmentAddition.BellPattern ? "the pattern " + pattern + " is not supported for a definition" : BellPattern.Problem(bell.Facts);
+        if (pattern == EquipmentAddition.BellPattern) return "a loaded device is no bell definition";
         var d = (FakeDevice)source;
         if (pattern != EquipmentAddition.LightGatePattern) return "the pattern " + pattern + " is not supported";
         d.Facts.AddedByPatcher = d.Owner != null;
         return LightGatePattern.Problem(d.Facts, Keys);
     }
     public IReadOnlyList<SourceCandidate> Candidates(object controller) =>
-        Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model, SourceProblem(d, controller, EquipmentAddition.LightGatePattern))).ToArray();
+        Devices.Where(d => d.Owner == null).Select(d => new SourceCandidate(new EquipmentSource(d.Scene, d.Path), d.Model, SourceProblem(d, controller, EquipmentAddition.LightGatePattern)))
+            .Concat(Bells.Select(b => SourceCandidate.Bell(b.Identifier, b.Name, SourceProblem(b, controller, EquipmentAddition.BellPattern)))).ToArray();
     public IReadOnlyList<object> Owned(object controller) => All.Where(a => ReferenceEquals(a.Controller, controller) && !a.Destroyed).Cast<object>().ToArray();
     public EquipmentAddition Describe(object addition) => ((Added)addition).Record;
     public object Construct(object controller, object source, EquipmentAddition addition) {
         Mutations++;
         if (FailConstructAfter == 0) { FailConstructAfter = -1; throw new Exception("construction injected"); }
         if (FailConstructAfter > 0) FailConstructAfter--;
+        if (source is FakeBell bell) {
+            var player = new Added { Controller = (FakeCrossing)controller, Record = addition, Position = (double[])addition.Placement.Position.Clone(), Rotation = (double[])addition.Placement.Rotation.Clone(), Bell = bell, Observers = 1 };
+            All.Add(player); Constructed++; PendingLoads++;
+            if (!LoadsPending) FinishLoads();
+            return player;
+        }
         var d = (FakeDevice)source;
         var added = new Added { Controller = (FakeCrossing)controller, Record = addition, Position = (double[])addition.Placement.Position.Clone(), Rotation = (double[])addition.Placement.Rotation.Clone(), Culled = !CullerVisible };
         added.Copy = new FakeDevice { Scene = d.Scene, Path = "owned/" + addition.Id, Model = d.Model, Owner = added };
         All.Add(added); Devices.Add(added.Copy); Constructed++;
         return added;
     }
-    public void Destroy(object addition) { Mutations++; if (StickyDestroy) return; var a = (Added)addition; a.Destroyed = true; a.InCuller = false; Devices.Remove(a.Copy); }
+    public void Destroy(object addition) {
+        Mutations++; if (StickyDestroy) return; var a = (Added)addition; a.Destroyed = true; a.InCuller = false; Devices.Remove(a.Copy);
+        // A bell releases its observer and its audio; a load still pending is cancelled.
+        if (a.Bell != null) { a.Observers = 0; if (a.AudioLoaded) { a.AudioLoaded = false; AudioReferences--; } else if (a.LoadProblem == null) PendingLoads--; }
+    }
     public bool Present(object addition) => !((Added)addition).Destroyed;
     public Placement Placement(object addition) { var a = (Added)addition; return new Placement((double[])a.Position.Clone(), (double[])a.Rotation.Clone()); }
     public void SetPlacement(object addition, Placement placement) {
@@ -60,8 +102,16 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld {
         a.Position = (double[])placement.Position.Clone(); a.Rotation = (double[])placement.Rotation.Clone();
         if (FailSetPlacementOnce) { FailSetPlacementOnce = false; throw new Exception("placement injected"); }
     }
-    public string Problem(object addition) { var a = (Added)addition; return a.InCuller ? null : "the copy is not in the controller's culler"; }
-    public string Status(object addition) => ((Added)addition).Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
+    public string Problem(object addition) {
+        var a = (Added)addition;
+        if (a.Bell != null) return a.LoadProblem != null ? "its audio failed to load: " + a.LoadProblem : a.Observers != 1 ? "it observes its controller's bell key " + a.Observers + " times" : null;
+        return a.InCuller ? null : "the copy is not in the controller's culler";
+    }
+    public string Status(object addition) {
+        var a = (Added)addition;
+        if (a.Bell != null) return a.LoadProblem != null ? "audio failed to load" : !a.AudioLoaded ? "audio loading" : "audio loaded; observing the controller's bell key";
+        return a.Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
+    }
     // Whether the live additions of this crossing show its lights and gates: each one observes the controller's keys.
     public IEnumerable<Added> Live(FakeCrossing crossing) => All.Where(a => ReferenceEquals(a.Controller, crossing) && !a.Destroyed);
 }
@@ -145,16 +195,16 @@ static class EquipmentTests {
         f.World.Device("World/Other/Gate Only", d => { d.Model = "Unexamined Gate"; d.Facts.Lamps.Clear(); });
         f.World.Device("World/Other/Gate Lamp", d => { d.Model = "Unexamined Gate Lamp"; d.Facts.Gates.Clear(); d.Facts.Lamps[0] = new LampFacts { Name = "Arm Lamp", Key = "gates", Targets = 1, Materials = 3, RendererUsesMaterial = true }; });
         var rejected = new Dictionary<string, KeyValuePair<Action<FakeDevice>, string>> {
-            ["bell"] = R(d => d.Facts.Bells = 1, "it holds a bell player; bells follow the controller-bound bell pattern"),
+            ["bell"] = R(d => d.Facts.Bells = 1, "it contains a bell player; add bells from a bell definition using the bell pattern"),
             ["owner"] = R(d => d.Facts.KeyValueObjects = 1, "it holds its own key-value object, which would intercept the crossing controller's keys"),
             ["controller"] = R(d => d.Facts.Controllers = 1, "it holds a crossing controller; a copy would be a second crossing"),
             ["span"] = R(d => d.Facts.Spans = 1, "it holds a detection span"),
             ["culler"] = R(d => d.Facts.Cullers = 1, "it holds its own culler"),
             ["script"] = R(d => d.Facts.MissingScript = true, "a script in its hierarchy is missing"),
-            ["scene"] = R(d => d.Facts.OtherScene = true, "it lies in another scene than the destination crossing"),
+            ["scene"] = R(d => d.Facts.OtherScene = true, "it is in a different Unity scene from the destination crossing"),
             ["contains"] = R(d => d.Facts.ContainsDestination = true, "it contains the destination crossing"),
             ["destination owner"] = R(d => d.Facts.DestinationKeyValueObjects = 0, "the destination crossing controller has no key-value objects"),
-            ["destination cullers"] = R(d => d.Facts.DestinationCullers = 2, "the destination crossing controller holds several cullers"),
+            ["destination cullers"] = R(d => d.Facts.DestinationCullers = 2, "the destination crossing controller has several cullers"),
             ["mode"] = R(d => d.Facts.Lamps[0].Key = "mode", "lamp Signal 1 observes key 'mode', which the crossing controller does not publish"),
             ["gate key"] = R(d => d.Facts.Gates[0].Key = "bell", "observes key 'bell', which the crossing controller does not publish"),
             ["no target"] = R(d => d.Facts.Lamps[0].Targets = 0, "lamp Signal 1 has no lamp target"),
@@ -165,7 +215,7 @@ static class EquipmentTests {
             ["renderer"] = R(d => d.Facts.Lamps[0].RendererUsesMaterial = false, "has no renderer under its targets that uses its lamp material"),
             ["animator"] = R(d => d.Facts.Gates[0].Animator = false, "has no Animator"),
             ["clip"] = R(d => d.Facts.Gates[0].Clip = false, "has no animation clip"),
-            ["empty"] = R(d => { d.Facts.Lamps.Clear(); d.Facts.Gates.Clear(); }, "it holds no lamp and no gate that observes the controller's lights or gates key"),
+            ["empty"] = R(d => { d.Facts.Lamps.Clear(); d.Facts.Gates.Clear(); }, "it has no lamp or gate that observes the controller's lights or gates key"),
         };
         foreach (var r in rejected) f.World.Device("World/Rejected/" + r.Key, r.Value.Key);
         var candidates = f.Scene.EquipmentCandidates(f.Crossing);
@@ -196,7 +246,7 @@ static class EquipmentTests {
             var error = result.Outcomes["bad"].Error ?? "";
             Assert(!result.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Live.Count == before, c.Key + " source is refused before any change: " + error);
             Assert(!f.World.Live(f.Crossing).Any(a => a.Record.Id == "west"), c.Key + " source is not replaced by another device");
-            if (c.Key == "missing" || c.Key == "absent scene") Assert(error.Contains("not loaded in this map") && error.Contains("neither substitutes another source nor loads another scene"), "A missing source neither substitutes nor loads a scene: " + error);
+            if (c.Key == "missing" || c.Key == "absent scene") Assert(error.Contains("not loaded in this map") && error.Contains("will not substitute another source or load another scene"), "A missing source neither substitutes nor loads a scene: " + error);
             if (c.Key == "ambiguous") Assert(error.Contains("ambiguous"), "An ambiguous source is named: " + error);
             if (c.Key == "nonconforming") Assert(error.Contains("does not conform to " + EquipmentAddition.LightGatePattern) && error.Contains("bell"), "A nonconforming source gives its reason: " + error);
         }
@@ -364,7 +414,7 @@ static class EquipmentTests {
         Assert(session.IncompleteOperation == null, "Undo and Redo of coverage edits run beside the faulty addition: " + session.IncompleteOperation);
         var mutations = f.World.Mutations;
         var refused = session.AddEquipment(Crossing, West(12));
-        Assert(!refused.Applied && refused.Error.Contains("Reload before editing its equipment") && f.World.Mutations == mutations && f.Live.Single().Position[0] == 10,
+        Assert(!refused.Applied && refused.Error.Contains("Reload before editing the crossing's equipment") && f.World.Mutations == mutations && f.Live.Single().Position[0] == 10,
             "An equipment edit is refused before any change: " + refused.Error);
         string Loc(double d) => "{\"segment\":\"Snew\",\"end\":\"a\",\"distance\":" + N(d) + "}";
         string Range(double a, double b) => "{\"from\":" + Loc(a) + ",\"to\":" + Loc(b) + "}";
@@ -375,7 +425,7 @@ static class EquipmentTests {
         var coverage = "\"cover\":{" + Target() + ",\"relationships\":{\"crossingCoverage\":{\"circuits\":{\"Pipr\":{\"approachA\":" + Range(308, 550) + ",\"island\":" + Range(292, 308) + ",\"approachB\":" + Range(292, 50) + "}}}},\"dependsOn\":[]}";
         var result = engine.Apply(Doc(coverage + "," + Equip("more", Addition("east", CrossingPath + "/Signal 2", 20))), "other/pack");
         Assert(result.Outcomes["cover"].Applied, "A scene patch file's coverage modification applies beside a faulty addition: " + result.Outcomes["cover"].Error);
-        Assert(!result.Outcomes["more"].Applied && result.Outcomes["more"].Error.Contains("Reload before editing its equipment"), "Its equipment modification is refused: " + result.Outcomes["more"].Error);
+        Assert(!result.Outcomes["more"].Applied && result.Outcomes["more"].Error.Contains("Reload before editing the crossing's equipment"), "Its equipment modification is refused: " + result.Outcomes["more"].Error);
     }
     // Use names each device with its crossing, proposes an ID the scene patch file does not use yet, and places the copy at the
     // inspected crossing as its source stands at its own crossing, five metres aside.

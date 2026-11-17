@@ -13,10 +13,10 @@ namespace RailroaderScenePatcher.Core {
     // One inventory object as the facts a group is decided from: the scene object it is on, the scene objects above
     // that one, nearest first, and what its components say it is.
     public sealed class GroupObject {
-        public GroupObject(object node, IEnumerable<object> above, bool crossingController = false, bool trackMarker = false) {
+        public GroupObject(object node, IEnumerable<object> above, bool crossingController = false, bool trackMarker = false, bool trackSpan = false) {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             Above = above ?? Enumerable.Empty<object>();
-            CrossingController = crossingController; TrackMarker = trackMarker;
+            CrossingController = crossingController; TrackMarker = trackMarker; TrackSpan = trackSpan;
         }
         public object Node { get; }
         public IEnumerable<object> Above { get; }
@@ -25,16 +25,23 @@ namespace RailroaderScenePatcher.Core {
         // The object is a track marker other than a crossing pad. The game has no component for a whistle sign: below
         // a crossing controller's root, such a marker is a whistle sign of that crossing.
         public bool TrackMarker { get; }
+        // The object is a track span. Below a crossing controller's root, such a span is a detection span of that
+        // crossing: a member of the setup that its controller manages.
+        public bool TrackSpan { get; }
     }
 
     // Scene objects that a game component holds together. Members are indices into the objects the group was decided
     // from, in their order.
     public sealed class GameDefinedGroup {
-        internal GameDefinedGroup(GameDefinedGroupKind kind, object anchor, IReadOnlyList<int> members) { Kind = kind; Anchor = anchor; Members = members; }
+        internal GameDefinedGroup(GameDefinedGroupKind kind, object anchor, IReadOnlyList<int> members, IReadOnlyList<int> listed) { Kind = kind; Anchor = anchor; Members = members; Listed = listed; }
         public GameDefinedGroupKind Kind { get; }
         // The scene object of the game component that holds the group together.
         public object Anchor { get; }
         public IReadOnlyList<int> Members { get; }
+        // The members that the group's choice list offers and its object frame surrounds: every member other than the
+        // invisible detection spans of a grade-crossing setup, which its controller manages. The spans stay members:
+        // they show as the group, not on their own, while the group shows as one.
+        public IReadOnlyList<int> Listed { get; }
     }
 
     public static class GameDefinedGroups {
@@ -58,7 +65,8 @@ namespace RailroaderScenePatcher.Core {
                 }
             // A group with one inventory object shows as that object: it is no group.
             return order.Where(root => members[root].Count > 1)
-                .Select(root => new GameDefinedGroup(GameDefinedGroupKind.GradeCrossingSetup, root, members[root].AsReadOnly())).ToArray();
+                .Select(root => new GameDefinedGroup(GameDefinedGroupKind.GradeCrossingSetup, root, members[root].AsReadOnly(),
+                    members[root].Where(i => !objects[i].TrackSpan).ToArray())).ToArray();
         }
 
         // Beyond this distance from the camera to a group's bounds, in metres, the group shows as one square marker

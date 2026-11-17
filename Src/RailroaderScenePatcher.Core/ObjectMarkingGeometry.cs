@@ -306,11 +306,13 @@ namespace RailroaderScenePatcher.Core {
         // marker and frame, its one frame is the outline of one box around all its objects: around where they stand
         // and around the parts of their pieces, in the given orientation, that of the game component that anchors
         // the group, or the world's without one. Like the box of an object it is cut at the surface the group
-        // stands in, and framed whole when it lies wholly under the surface found from above.
+        // stands in, and framed whole when it lies wholly under the surface found from above. listed says, per
+        // object, whether it counts for the bounds and the box (GameDefinedGroup.Listed); without it every object does.
         public static GroupMarking GroupFrame(WorldPoint camera, IReadOnlyList<WorldPoint> anchors, IReadOnlyList<ObjectMarkingFrame> frames,
-            WorldBasis? orientation, Func<double, double, double?> ground, Func<WorldPoint, ClipPoint> project, ScreenRect view) {
+            WorldBasis? orientation, Func<double, double, double?> ground, Func<WorldPoint, ClipPoint> project, ScreenRect view, IReadOnlyList<bool> listed = null) {
             if (anchors == null) throw new ArgumentNullException(nameof(anchors));
             if (project == null) throw new ArgumentNullException(nameof(project));
+            anchors = Listed(anchors, listed); frames = frames == null ? null : Listed(frames, listed);
             double minX = Double.PositiveInfinity, minY = minX, minZ = minX, maxX = Double.NegativeInfinity, maxY = maxX, maxZ = maxX;
             void Include(WorldPoint p) {
                 if (!Valid(p)) return;
@@ -333,6 +335,11 @@ namespace RailroaderScenePatcher.Core {
             if (points == null || points.Count == 0) return new GroupMarking(distance, center, null, null);
             return new GroupMarking(distance, center, Rect(points.Min(q => q.X) - Margin, points.Min(q => q.Y) - Margin, points.Max(q => q.X) + Margin, points.Max(q => q.Y) + Margin), Grown(points, Margin));
         }
+        // The objects of a group that count for its bounds and its box: those its listed members name
+        // (GameDefinedGroup.Listed), by position; every object without them. The invisible detection spans of a
+        // grade-crossing setup do not count.
+        static IReadOnlyList<T> Listed<T>(IReadOnlyList<T> objects, IReadOnlyList<bool> listed) =>
+            listed == null ? objects : objects.Where((item, k) => k < listed.Count && listed[k]).ToArray();
         // The convex outline of points, with a margin on every side: the outline of a square of that half size
         // moved over each point.
         static IReadOnlyList<ScreenPoint> Grown(IEnumerable<ScreenPoint> points, double margin) {

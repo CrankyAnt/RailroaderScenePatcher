@@ -145,7 +145,7 @@ namespace RailroaderScenePatcher {
         internal const string AddedEquipmentFamily = CommandBand.AddedEquipmentFamily;
         static string Family(Component c) {
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
-            if (c is OwnedEquipment) return AddedEquipmentFamily;
+            if (c is OwnedEquipment owned) return owned.Pattern == EquipmentAddition.BellPattern ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
             var type = TypeName(c); var go = c.gameObject;
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
             // editor helpers stays out; a starter placement marker below Setups keeps its family.
@@ -390,11 +390,27 @@ namespace RailroaderScenePatcher {
                 var sets = Field(controller, "circuitSets") as IEnumerable;
                 if (sets == null) throw new InvalidOperationException("Crossing circuit sets unavailable");
                 int index = 0;
+                // The controller itself reports a span of its circuit that no longer resolves to an existing track
+                // segment, under the circuit's name on its Connections tab. Without the track graph it has one note.
+                var own = ReferenceEquals(controller, c);
+                if (own && segmentIds == null) problems.Add(CircuitSpanProblems.Unknown(graphError));
                 foreach (var set in sets) {
-                    foreach (var role in new[] { "approachA", "island", "approachB" }) {
+                    string circuit = null;
+                    if (own) try {
+                        var island = Field(set, "island") as Component;
+                        circuit = island == null ? null : CircuitSpanProblems.CircuitKey(Text(Field(island, "id")), CrossingCoverageWorld.AdditionOf(set));
+                    } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
+                    foreach (var role in CircuitCoverage.Roles) {
                         var span = Field(set, role) as Component;
                         bindings.Add("Circuit " + index + " " + role + "=" + Label(span));
-                        if (span == null) problems.Add("Missing circuit " + index + " " + role);
+                        if (span == null) { problems.Add("Missing circuit " + index + " " + role); continue; }
+                        if (String.IsNullOrWhiteSpace(circuit)) continue;
+                        // A span that cannot be read is a note of its own, so the other spans and circuits stay listed.
+                        try {
+                            var problem = CircuitSpanProblems.Unresolved(circuit, role, Text(Field(span, "id")),
+                                Text(Field(Field(span, "_lower"), "segmentId")), Text(Field(Field(span, "_upper"), "segmentId")), segmentIds);
+                            if (problem != null) problems.Add(problem);
+                        } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); }
                     }
                     index++;
                 }
@@ -479,10 +495,10 @@ namespace RailroaderScenePatcher {
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
                 : pad ? CommandBand.NotEditable(padRefusal)
-                : coverageEditable ? "Crossing coverage, lights and gates: select tracks for, or detach, each circuit explicitly, add detection for explicitly selected extra tracks, or add eligible lights and gates the controller drives; native spans stay registered and the crossing itself does not move"
+                : coverageEditable ? "Select the tracks each circuit detects, or explicitly detach it. Add detection for extra tracks you explicitly select, or add eligible lights, gates and bells driven by the crossing controller. Native spans stay registered and the crossing itself does not move"
                 : CommandBand.NotEditable(coverageRefusal);
-            // An added light or gate is edited on its crossing's Connections tab, not as an object of its own.
-            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.Id, added.Scope); }
+            // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
+            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.Id, added.Scope, added.Pattern == EquipmentAddition.BellPattern); }
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {

@@ -2,7 +2,11 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Correct the detection coverage of an existing crossing
 
-This guide shows how to move the train detection of an existing grade crossing from an old route to the tracks you choose, or how to detach a circuit, in the native map editor or in `Data/scene-patches.json`. It applies to existing crossings only. To make a crossing detect a track it does not cover yet, see [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). To add lights and gates, see [add lights and gates to an existing crossing](adding-crossing-equipment.md). This guide does not create new crossings or change bells, models, signals, CTC or interlocking.
+You can change which tracks an existing grade crossing detects or detach one of its circuits, in the native map editor or in `Data/scene-patches.json`. This guide explains how to move detection from an old route to tracks you choose.
+
+For tracks the crossing does not cover yet, see [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). To add equipment, see [add lights and gates to an existing crossing](adding-crossing-equipment.md) or [add a bell to an existing crossing](adding-crossing-bells.md).
+
+These coverage edits apply only to existing crossings. They do not create crossings or change bells, models, signals, CTC or interlocking.
 
 ## How a crossing detects trains
 
@@ -36,6 +40,8 @@ The patcher never assigns coverage by proximity. A track near the crossing gets 
 To detach a circuit, select **Detach** at the bottom of the tab and apply it. To return a circuit to its coverage without this mod, select **Clear circuit** at the bottom of the tab and apply it. **Remove modification** in the footer returns every circuit of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including the spans the patcher created.
 
 Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the scene patch file on every load, so a reload never duplicates them.
+
+A crossing controller reports a problem if one of its circuit spans refers to a track segment that no longer exists, for example after track is removed or rebuilt. The message identifies the circuit by its name on the **Connections** tab, the span by its role and ID, such as `Circuit Pipr Approach A span Pdlh`, and the missing segment. To repair it, open the controller's **Connections** tab and select tracks for the circuit or detach it, as described above. If the span belongs to a [detection addition](adding-crossing-detection.md), such as `Detection addition siding Island span …`, select other tracks for the addition or delete it. If the track graph cannot be read, the controller shows a single inspection note beginning `Circuit span validity unknown` instead of reporting a problem with the track.
 
 If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 

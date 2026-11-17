@@ -158,7 +158,10 @@ namespace RailroaderScenePatcher {
             additions.Add(set, key);
             return set;
         }
-        public string AdditionKey(object circuit) => circuit != null && additions.TryGetValue(circuit, out var key) ? key : null;
+        public string AdditionKey(object circuit) => AdditionOf(circuit);
+        // The key of the detection addition the patcher built a circuit set for, or null for another set. Shared with
+        // the inventory, which names a circuit as the Connections tab does.
+        internal static string AdditionOf(object circuit) => circuit != null && additions.TryGetValue(circuit, out var key) ? key : null;
         public void SetSpans(object circuit, object approachA, object island, object approachB) {
             var values = new[] { approachA, island, approachB };
             if (values.Any(v => (v as UnityEngine.Object) == null)) throw new InvalidOperationException("A circuit needs three spans");
