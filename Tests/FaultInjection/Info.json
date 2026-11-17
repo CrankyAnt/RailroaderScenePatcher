@@ -1,0 +1,8 @@
+{
+  "identifier": "crankyant/scene-fault-switch",
+  "name": "Scene Fault Switch",
+  "author": "CrankyAnt",
+  "version": "0.1.0",
+  "assemblies": ["SceneFaultSwitch.dll"],
+  "dependencies": { "required": ["rr/game >=0.6.2", "crankyant/scene-patcher >=0.5.0"] }
+}

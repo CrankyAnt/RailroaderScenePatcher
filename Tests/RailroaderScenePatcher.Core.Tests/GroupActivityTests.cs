@@ -134,13 +134,13 @@ static class GroupActivityTests {
         var (world, sign, other, scene) = Setup();
         world.SkipObserve = true;
         var failed = new PatchEngine(scene).Apply(Doc(Item("rebind", ToExtension))).Outcomes["rebind"];
-        Assert(!failed.Applied && failed.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal) && failed.Error.Contains("group"), "A lost subscription fails the rebinding: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && failed.Error.Contains("group"), "A lost subscription fails the rebinding: " + failed.Error);
         Assert(Subscription(sign) == "ela|1" && sign.Active && Registered(world, sign) == "S9sc" && sign.Segment == "S9sc", "Restoration returns the location, registration and subscription: " + Subscription(sign));
         var (w2, s2, o2, session, mapEditor, store) = Session();
         Assert(session.Edit(Sign, null, false).Applied && s2.Held, "The follower is disabled");
         w2.FailHold = true; w2.SkipObserve = true;
         var unverified = session.ClearActivity(Sign);
-        Assert(!unverified.Applied && unverified.Error.Contains("cleanup is unverified") && Only(session)["active"] != null, "An unverifiable release of the hold is reported and the scene patch file keeps the disable: " + unverified.Error);
+        Assert(!unverified.Applied && unverified.Error.Contains("could not be verified") && Only(session)["active"] != null, "An unverifiable release of the hold is reported and the scene patch file keeps the disable: " + unverified.Error);
         Assert(!session.Edit(Sign, null, false).Applied, "The unverified follower refuses another edit");
         w2.FailHold = null;
         Assert(session.Recheck(Sign).Applied && s2.Held && !s2.Active, "Recheck reconciles the hold with the scene patch file before unblocking");

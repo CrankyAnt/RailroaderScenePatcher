@@ -139,20 +139,20 @@ static class SnapTests {
         var request = w.Prepare(node); var original = w.Session.ScenePatchFileText; var binding = w.Box.LogicalTrack;
         w.Scene.FailAfterDependentUpdate = 1;
         var result = w.Snap.Apply(request);
-        Assert(!result.Applied && result.Error.Contains("prior state was restored") && w.Box.X == 4 && w.Box.DependentX == 4 && ReferenceEquals(binding, w.Box.LogicalTrack),
+        Assert(!result.Applied && result.Error.Contains("The object is back as it was") && w.Box.X == 4 && w.Box.DependentX == 4 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Failed snap restores captured position and dependent state while retaining the logical reference: " + result.Error);
         Assert(w.Session.ScenePatchFileText == original && w.MapEditor.UndoGroups.Count == 0, "Failed snap preserves the complete prior scene patch file and history");
         w.Scene.FailAfterDependentUpdate = 2;
         result = w.Snap.Apply(request);
-        Assert(!result.Applied && result.Error.Contains("cleanup is unverified"), "Incomplete restoration is reported");
+        Assert(!result.Applied && result.Error.Contains("could not be verified"), "Incomplete restoration is reported");
         var calls = w.Scene.MutationCalls; result = w.Snap.Apply(w.Prepare(node));
-        Assert(!result.Applied && result.Error.Contains("cleanup is unverified") && w.Scene.MutationCalls == calls, "Unverified cleanup guards another snap");
+        Assert(!result.Applied && result.Error.Contains("could not be verified") && w.Scene.MutationCalls == calls, "Unverified cleanup guards another snap");
         Assert(w.Session.Recheck(ObjectId).Applied && w.Snap.Apply(w.Prepare(node)).Applied, "Explicit verified recovery permits a new snap");
         Assert(w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack), "Successful snap updates dependent state without changing logical track");
         var scenePatchFile = w.Session.ScenePatchFileText;
         w.Scene.FailAfterDependentUpdate = 1;
         var outcome = new PatchEngine(w.Scene).Apply(scenePatchFile).Outcomes.Values.Single();
-        Assert(!outcome.Applied && outcome.Error.Contains("restored") && w.Box.X == 20 && w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack),
+        Assert(!outcome.Applied && outcome.Error.Contains("back as it was") && w.Box.X == 20 && w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Complete scene patch file failed application also restores dependent state and binding");
         w.MapEditor.Save();
         Assert(w.Store.Patch == scenePatchFile, "Save after recovery writes only the successful snap result");

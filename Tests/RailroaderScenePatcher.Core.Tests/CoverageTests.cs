@@ -264,7 +264,7 @@ static partial class CoverageTests {
         Assert(f.NewRouteDetectsBothWays && f.Crossing.Circuits.Count == 1, "Both coverage edits take effect");
         f = new Fixture();
         result = new PatchEngine(f.Scene).Apply(Doc(Cover("dependent", Tracks("Pipr"), deps: "[\"base\"]") + "," + Cover("base", Tracks("Pzzz"), OtherPath)));
-        Assert(!result.Outcomes["dependent"].Applied && result.Outcomes["dependent"].Error.Contains("Dependency failed") && f.Native, "A coverage edit whose prerequisite fails changes nothing");
+        Assert(!result.Outcomes["dependent"].Applied && result.Outcomes["dependent"].Error.Contains("A required modification failed") && f.Native, "A coverage edit whose prerequisite fails changes nothing");
     }
     static void UnsupportedSettingsAreRefusedBeforeMutation() {
         var f = new Fixture();
@@ -308,7 +308,7 @@ static partial class CoverageTests {
             var f = new Fixture();
             inject(f.World);
             var result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr") + "," + Detached("P6id"))));
-            Assert(!result.Outcomes["reroute"].Applied && result.Outcomes["reroute"].Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure during mutation is restored: " + result.Outcomes["reroute"].Error);
+            Assert(!result.Outcomes["reroute"].Applied && result.Outcomes["reroute"].Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure during mutation is restored: " + result.Outcomes["reroute"].Error);
             Assert(f.Native && f.OldRouteDetects && f.RetainedDetectsBothWays, "Restoration returns membership, native references and registrations; no owned span remains");
         }
         // A failure while the crossing already holds patched coverage restores that coverage, not the native one.
@@ -325,10 +325,10 @@ static partial class CoverageTests {
         var engine = new PatchEngine(f.Scene);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         var result = engine.Apply(Doc(Cover("reroute", Tracks("Pipr"))));
-        Assert(!result.Outcomes["reroute"].Applied && result.Outcomes["reroute"].Error.StartsWith("Mutation failed; cleanup is unverified", StringComparison.Ordinal), "Owned spans that stay registered make cleanup unverified: " + result.Outcomes["reroute"].Error);
+        Assert(!result.Outcomes["reroute"].Applied && result.Outcomes["reroute"].Error.StartsWith("The change failed. Cleanup could not be verified. Reason:", StringComparison.Ordinal), "Owned spans that stay registered make cleanup unverified: " + result.Outcomes["reroute"].Error);
         f.World.StickyDestroy = false; f.World.Mutations = 0;
         var retry = engine.Apply(Doc(Cover("retry", Tracks("Pipr"))));
-        Assert(!retry.Outcomes["retry"].Applied && retry.Outcomes["retry"].Error.Contains("cleanup is unverified") && f.World.Mutations == 0, "Retry of the same crossing is guarded until cleanup verifies");
+        Assert(!retry.Outcomes["retry"].Applied && retry.Outcomes["retry"].Error.Contains("could not be verified") && f.World.Mutations == 0, "Retry of the same crossing is guarded until cleanup verifies");
         var independent = engine.Apply(Doc(Cover("other", Detached("Qi").Replace("\"detach\":true", "\"approachA\":" + Range("Sother", 1, 5) + ",\"island\":" + Range("Sother", 5, 6) + ",\"approachB\":" + Range("Sother", 6, 9)), OtherPath)));
         Assert(independent.Outcomes["other"].Applied, "Another crossing stays editable");
     }
@@ -381,10 +381,10 @@ static partial class CoverageTests {
         Assert(!session.Cover(Crossing, "Pipr", Selected("Smissing")).Applied && f.World.Mutations == 0 && f.Native && mapEditor.UndoGroups.Count == 0, "A missing selected track is refused without a history entry");
         f.World.FailSetSpansOnce = true;
         var failed = session.Cover(Crossing, "Pipr", Selected());
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}"), "A failed scene patch editing mutation restores coverage and the scene patch file: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("The edit failed. The object is back as it was. Reason:", StringComparison.Ordinal) && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}"), "A failed scene patch editing mutation restores coverage and the scene patch file: " + failed.Error);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         failed = session.Cover(Crossing, "Pipr", Selected());
-        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("could not be verified"), "Incomplete cleanup is reported: " + failed.Error);
         f.World.StickyDestroy = false;
         Assert(!session.Cover(Crossing, "Pipr", Selected()).Applied, "A further edit is guarded until a recheck");
         // The stuck owned spans stay registered until a recheck converges on the scene patch file.

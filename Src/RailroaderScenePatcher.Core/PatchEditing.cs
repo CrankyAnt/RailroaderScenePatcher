@@ -322,7 +322,7 @@ namespace RailroaderScenePatcher.Core {
                 var output = engine.Output(resolved);
                 if (output.Error != null) throw new InvalidOperationException(output.Error);
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { Fail(outcome, e); }
             return outcome;
         }
 
@@ -486,7 +486,7 @@ namespace RailroaderScenePatcher.Core {
                 outcome.ResolvedTarget = resolved;
                 var report = true;
                 try {
-                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before it follows the track again");
+                    if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before following the track again");
                     var mapContext = scene.MapIds.ToArray();
                     scene.Preflight(resolved);
                     var desired = engine.Desired(scenePatchFile.Modifications, resolved, scenePatchFileKey);
@@ -498,13 +498,15 @@ namespace RailroaderScenePatcher.Core {
                         FollowUpdate(resolved, desired);
                         if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
                     } catch (Exception e) {
-                        var restored = false;
-                        try { FollowUpdate(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch { }
-                        if (!restored) engine.SetUnsafe(resolved, true);
-                        throw new InvalidOperationException(restored ? "Following the track failed and the prior state was restored: " + e.Message : "Following the track failed; cleanup is unverified: " + e.Message);
+                        var restored = false; string restoreError = null;
+                        try { FollowUpdate(resolved, prior); restored = Same(scene.Read(resolved), prior); } catch (Exception r) { restoreError = r.Message; }
+                        if (restored) throw new AttemptFailure(FailureKind.Restored, "Following the track failed. The object is back as it was. Reason: " + e.Message);
+                        var left = Core.RemainingState.Describe(prior, () => scene.Read(resolved), restoreError);
+                        engine.SetUnsafe(resolved, true, left);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "Following the track failed. Cleanup could not be verified. Reason: " + e.Message, left);
                     }
                     outcome.Applied = true;
-                } catch (Exception e) { outcome.Error = e.Message; }
+                } catch (Exception e) { Fail(outcome, e); }
                 finally { if (report) results.Add(new KeyValuePair<string, Outcome>(parsed.Id, outcome)); }
             }
             return results;
@@ -553,10 +555,14 @@ namespace RailroaderScenePatcher.Core {
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
                 outcome.Applied = true;
             } catch (Exception e) {
-                var restored = false;
-                try { FollowUpdate(target, prior); restored = Same(scene.Read(target), prior); } catch { }
-                if (!restored) engine.SetUnsafe(target, true);
-                outcome.Error = restored ? "Following the track failed and the prior state was restored: " + e.Message : "Following the track failed; cleanup is unverified: " + e.Message;
+                var restored = false; string restoreError = null;
+                try { FollowUpdate(target, prior); restored = Same(scene.Read(target), prior); } catch (Exception r) { restoreError = r.Message; }
+                if (restored) Fail(outcome, new AttemptFailure(FailureKind.Restored, "Following the track failed. The object is back as it was. Reason: " + e.Message));
+                else {
+                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), restoreError);
+                    engine.SetUnsafe(target, true, left);
+                    Fail(outcome, new AttemptFailure(FailureKind.IncompleteCleanup, "Following the track failed. Cleanup could not be verified. Reason: " + e.Message, left));
+                }
             }
             return outcome;
         }
@@ -625,7 +631,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before another edit");
+                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
@@ -745,7 +751,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified. Recheck the object or reload before another edit");
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
@@ -868,7 +874,7 @@ namespace RailroaderScenePatcher.Core {
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
                 outcome.ResolvedTarget = resolved;
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException(engine.AwaitingOutput(resolved) ? "Target cleanup is unverified until the restored dependent output completes; edit again once it has" : "Target cleanup is unverified. Recheck the object or reload before another edit");
+                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
@@ -912,7 +918,32 @@ namespace RailroaderScenePatcher.Core {
                 Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation);
                 history.Register(() => Replay(name, slot, target, existing), name);
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { Fail(outcome, e); }
+            return outcome;
+        }
+        // Records a failure with its kind: a failure that names no mutation was refused before one started.
+        static void Fail(Outcome outcome, Exception e) {
+#if SCENE_PATCHER_FAULTS
+            FaultInjection.EndAttempt();
+#endif
+            outcome.Error = e.Message;
+            var attempt = e as AttemptFailure;
+            outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
+            if (attempt != null) outcome.Remaining = attempt.Remaining;
+        }
+        // Whether an earlier failure left the object's cleanup unverified, and the remaining or uncertain state it named.
+        // Read from the identities the engine resolved, without searching or mutating the scene, so the panel can ask
+        // every frame. Restored dependent output that is still pending is not an unverified cleanup.
+        public bool CleanupUnverified(TargetIdentity target) => engine.UnverifiedCleanup(target) != null;
+        public IReadOnlyList<string> RemainingState(TargetIdentity target) => engine.UnverifiedCleanup(target) ?? Array.Empty<string>();
+        // The refusal an edit of this object gets while an earlier failure guards it, as Blocked or AwaitingOutput, or null.
+        // It is read without searching the scene, so the panel checks it before it compares the scene: the object an
+        // incomplete cleanup left changed is refused for that cleanup, not as a stale inspection.
+        public Outcome GuardOutcome(TargetIdentity target) {
+            var guard = engine.GuardFor(target, "Target cleanup is unverified. Recheck the object or reload before another edit");
+            if (guard == null) return null;
+            var outcome = new Outcome();
+            Fail(outcome, guard);
             return outcome;
         }
         // The modification an edit stores: each setting the edit changed whose value equals the underlying value is
@@ -965,7 +996,7 @@ namespace RailroaderScenePatcher.Core {
             var current = scenePatchFile.Modifications[slot] as JObject;
             try {
                 var resolved = engine.ResolveUnique(target);
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified");
                 Commit(target, resolved, null, slot, current, value);
                 // Undo and Redo of this patcher's own step changed this object; the owner observes it again.
                 try { Replayed?.Invoke(target); } catch { }
@@ -1000,19 +1031,35 @@ namespace RailroaderScenePatcher.Core {
                 if (validateBeforeMutation != null) engine.GuardMutation(identity, target, mapContext, inspected);
                 mutating = true;
                 scene.Apply(target, desired);
+#if SCENE_PATCHER_FAULTS
+                FaultInjection.TripAfterMutation();
+#endif
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
             } catch (Exception e) {
                 scenePatchFile.Replace(key, current);
                 // A rejection before the mutation started changed nothing in the scene and needs no restoration.
                 if (!mutating) throw;
-                var restored = false;
-                try { scene.Apply(target, prior); restored = Same(scene.Read(target), prior); } catch { }
-                if (!restored) engine.SetUnsafe(target, true);
-                else if (engine.AwaitOutput(target)) throw new InvalidOperationException("Edit failed and the prior state was restored; its dependent output is still being regenerated, and the object accepts edits once it verifies: " + e.Message);
-                throw new InvalidOperationException(restored ? "Edit failed and the prior state was restored: " + e.Message : "Edit failed; cleanup is unverified: " + e.Message);
+                var restored = false; string restoreError = null;
+                try {
+#if SCENE_PATCHER_FAULTS
+                    FaultInjection.TripRestoration();
+#endif
+                    scene.Apply(target, prior); restored = Same(scene.Read(target), prior);
+                } catch (Exception r) { restoreError = r.Message; }
+                if (!restored) {
+                    var left = Core.RemainingState.Describe(prior, () => scene.Read(target), restoreError);
+                    engine.SetUnsafe(target, true, left);
+                    throw new AttemptFailure(FailureKind.IncompleteCleanup, "The edit failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                }
+                if (engine.AwaitOutput(target)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The edit failed and the object is back as it was. The game is still regenerating its dependent output. Editing can resume once that output is verified. Reason: " + e.Message);
+                throw new AttemptFailure(FailureKind.Restored, "The edit failed. The object is back as it was. Reason: " + e.Message);
             }
         }
-        // Explicit retry after unverified cleanup: rechecks the actual state against the scene patch file before unblocking.
+        // Explicit retry after unverified cleanup: rechecks the actual state against the scene patch file before unblocking. The
+        // target is resolved, inspected and preflighted afresh. The desired state comes from the scene patch file, so the persistent
+        // identities it names, such as addition IDs, decide what the object keeps: owned state that a failed or interrupted
+        // attempt left behind and the scene patch file no longer names is removed, and owned state it names is reused, before
+        // anything further is built.
         public Outcome Recheck(TargetIdentity target) { return Recheck(target, null); }
         public Outcome Recheck(TargetIdentity target, InspectedTarget inspected) {
             var outcome = new Outcome();
@@ -1026,8 +1073,15 @@ namespace RailroaderScenePatcher.Core {
                 var desired = engine.Desired(scenePatchFile.Modifications, resolved, scenePatchFileKey);
                 if (!Same(scene.Read(resolved), desired)) {
                     engine.GuardMutation(target, resolved, mapContext, inspected);
-                    scene.Apply(resolved, desired);
-                    if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("The object still differs from the scene patch file; reload before another edit");
+                    try {
+                        scene.Apply(resolved, desired);
+                        if (!Same(scene.Read(resolved), desired)) throw new InvalidOperationException("Applied state did not verify");
+                    } catch (Exception e) {
+                        // The scene patch file is the reference here: what still differs from it remains.
+                        var left = Core.RemainingState.Describe(desired, () => scene.Read(resolved), e.Message);
+                        engine.SetUnsafe(resolved, true, left);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The object still does not match the scene patch file. Reason: " + e.Message, left);
+                    }
                 }
                 engine.SetUnsafe(resolved, false);
                 // Restored dependent output that stopped is requested again; the object stays guarded until it verifies.
@@ -1035,7 +1089,7 @@ namespace RailroaderScenePatcher.Core {
                 if (output.Error != null && scene is IDependentOutputScene dependent) dependent.RetryOutput(resolved);
                 engine.AwaitOutput(resolved);
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; }
+            } catch (Exception e) { Fail(outcome, e); }
             return outcome;
         }
         // The keys of the other modifications whose dependsOn names the key, in ordinal order.
