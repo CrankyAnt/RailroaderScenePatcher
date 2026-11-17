@@ -436,7 +436,7 @@ namespace RailroaderScenePatcher {
             // stands there, and the name gives way to the switch when it exists.
             builder.HStack(row => {
                 Heading(row, Literal(name), "Object", selected == null ? null : selected.Identity.Path).FlexibleWidth();
-            }).ChildrenKeepHeight();
+            }).ChildrenKeepHeight().Height(RowHeight);
             var state = StateLine(out var states);
             // Reserve the heading's line height in both states so inspection does not move the tabs.
             var stateLine = Line(builder, selected == null ? "<style=H3>" + state + "</style>" : state, "State", states, RowHeight);
@@ -449,7 +449,16 @@ namespace RailroaderScenePatcher {
             // The native tab strip gives each tab the share of its label's width. In a narrow strip a title ends in an
             // ellipsis inside 8 units of padding; the four titles are never renamed.
             var tabView = stateLine.parent == null ? null : stateLine.parent.GetComponentInChildren<UI.TabView.TabView>(true);
+            if (tabView != null) {
+                // The native prefab leaves its title strip shrinkable. Reserve the strip and the tab body's
+                // minimum before the footer competes for height; only the scrolling body takes the remainder.
+                var tabsLayout = tabView.GetComponent<LayoutElement>() ?? tabView.gameObject.AddComponent<LayoutElement>();
+                tabsLayout.minHeight = 30 + TabBodyMinimumHeight + RowHeight + TabGap;
+                tabsLayout.flexibleHeight = 10000;
+            }
             if (tabView != null) foreach (var toggle in tabView.GetComponentsInChildren<Toggle>(true)) {
+                var strip = toggle.transform.parent as RectTransform;
+                if (strip != null && strip.parent == tabView.transform) strip.Height(30);
                 var title = toggle.GetComponentInChildren<TMP_Text>(true);
                 if (title == null) continue;
                 title.overflowMode = TextOverflowModes.Ellipsis; title.textWrappingMode = TextWrappingModes.NoWrap;
@@ -501,7 +510,7 @@ namespace RailroaderScenePatcher {
             // The body takes all free height: its least height shows one role of a coverage form under the tab's
             // first rows, and the window's least height leaves it that.
             var fill = view.GetComponent<LayoutElement>();
-            if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
+            if (fill != null) { fill.minHeight = fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
             ActionRow(builder, TabActs(id), ChoiceBlock);
             builder.Spacer(TabGap);
         }
@@ -929,7 +938,7 @@ namespace RailroaderScenePatcher {
                 state = (pending.ListOpen ? Tint(Blue, pending.Offers.Count + (pending.Kind == SelectionKind.SceneObject ? " objects. " : " candidates. ")) + Literal(PendingSelection.SeveralOffers) : Literal(purpose + " in the world.")) + Literal(" Map Editor selection is paused. Use Cancel to resume it.") +
                     (pending.Problem == null || pending.Problem == PendingSelection.SeveralOffers ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
                     (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
-                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? " Confirm chooses it. Apply moves the object." : pending.InspectOnly ? " Confirm inspects this object." : " Confirm chooses this target.")) +
+                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label))) + Literal(choosingSnap ? " Confirm chooses it. Apply moves the object." : pending.InspectOnly ? " Confirm inspects this object." : " Confirm chooses this target.")) +
                     // The footer's Details: the clicked candidate's identity and details, here in the message area.
                     (candidate == null || !candidateDetails ? "" : "\n" + Literal(candidate.Choice.Identity.ToString()) + (String.IsNullOrEmpty(candidate.Details) ? "" : "\n" + Literal(candidate.Details)));
             } else if (gizmo?.Active == true) { source = GizmoPlace; state = Literal(gizmo.State); }

@@ -383,7 +383,9 @@ static class CommandBandTests {
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.
         foreach (var row in new[] { new object[] { "Choice", 2, 3, "Choice 2" }, new object[] { "New", 1, 3, "New 1" }, new object[] { "Choose", 3, 3, "Choose 3" }, new object[] { "Candidate", 1, 1, "Candidate" }, new object[] { "Choice", 0, 3, "Choice" } })
-            Check(CommandBand.ChoiceTag((string)row[0], (int)row[1], (int)row[2]) == (string)row[3], "A candidate is named " + row[3]);
+            Check(CommandBand.ChoiceTag((string)row[0], (int)row[1], (int)row[2]) == (string)row[3]
+                && CommandBand.ChoiceLine((string)row[0], (int)row[1], (int)row[2], "Track segment Se6a", Array.Empty<string>()) == (string)row[3] + ": Track segment Se6a.",
+                "A candidate keeps its number and ends its label before the confirmation instruction: " + row[3]);
         Check(new[] { CommandBand.ClearActivity, CommandBand.DiscardPrepared, CommandBand.RemoveModification }.Distinct().Count() == 3, "The three controls that take something back have three names");
     }
     // The labels of overlapping candidates differ at their end, which is the object's own name: the short label leads

@@ -264,6 +264,10 @@ namespace RailroaderScenePatcher.Core {
         // Its initialization and culling state, for inspection.
         string Status(object addition);
     }
+    // Optional diagnostic sink for a failed equipment verification. It must not affect the edit or its refusal.
+    public interface ICrossingEquipmentVerificationDiagnostics {
+        void VerificationFailed(object controller, string detail);
+    }
     // A scene that can offer equipment sources and report additions, such as the crossing capability.
     public interface ICrossingEquipmentScene {
         IReadOnlyList<SourceCandidate> EquipmentCandidates(object target);
@@ -340,12 +344,29 @@ namespace RailroaderScenePatcher.Core {
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
-                if (now == null) return "equipment " + want.Id + " is missing";
-                if (!EquipmentAddition.Same(now, want)) return "equipment " + want.Id + " differs from the mod's source or placement";
+                if (now == null) { Diagnose(controller, want, null, "missing"); return "equipment " + want.Id + " is missing"; }
+                if (!EquipmentAddition.Same(now, want)) { Diagnose(controller, want, now, "mismatch"); return "equipment " + want.Id + " differs from the mod's source or placement"; }
             }
             var extra = observed.Additions.FirstOrDefault(a => desired.Find(a.Key) == null);
-            if (extra != null) return "equipment " + extra.Id + " remains although it was removed";
-            return Coherence(owned);
+            if (extra != null) { Diagnose(controller, null, extra, "extra"); return "equipment " + extra.Id + " remains although it was removed"; }
+            var problem = Coherence(owned);
+            if (problem != null) Diagnose(controller, null, null, "coherence: " + problem);
+            return problem;
+        }
+        static string Quoted(string value) => value == null ? "null" : "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
+        static string Values(IReadOnlyList<double> values) => values == null ? "null" : "[" + String.Join(",", values.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]";
+        static string Detail(EquipmentAddition a) => a == null ? "null" : "{scope=" + Quoted(a.Scope) + ",id=" + Quoted(a.Id) + ",pattern=" + Quoted(a.Pattern)
+            + ",sourceScene=" + Quoted(a.Source.Scene) + ",sourcePath=" + Quoted(a.Source.Path) + ",position=" + Values(a.Placement?.Position) + ",rotation=" + Values(a.Placement?.Rotation) + "}";
+        void Diagnose(object controller, EquipmentAddition want, EquipmentAddition now, string reason) {
+            if (!(world is ICrossingEquipmentVerificationDiagnostics sink)) return;
+            try {
+                var comparable = want != null && now != null;
+                var comparison = comparable ? " identity=" + EquipmentAddition.SameBuild(now, want).ToString().ToLowerInvariant()
+                    + " source=" + EquipmentSource.Same(now.Source, want.Source).ToString().ToLowerInvariant()
+                    + " position=" + PatchEditingSession.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
+                    + " rotation=" + PatchEditingSession.SameRotation(now.Placement?.Rotation, want.Placement?.Rotation).ToString().ToLowerInvariant() : "";
+                sink.VerificationFailed(controller, "reason=" + Quoted(reason) + comparison + " positionTolerance=0.0005-per-axis rotationTolerance=normalized-absolute-dot>=0.99999999 desired=" + Detail(want) + " observed=" + Detail(now));
+            } catch { /* Diagnostics must not change verification or restoration. */ }
         }
         internal IReadOnlyList<SourceCandidate> Candidates(object controller) => world.Candidates(controller) ?? Array.Empty<SourceCandidate>();
         internal string Status(List<object> owned, string scope, string id) {

@@ -31,7 +31,7 @@ namespace RailroaderScenePatcher {
     // restore notifier after it is enabled. The controller's GameObjectCuller switches the devices in its list on and off;
     // the copy joins that list and takes the culler's current state. Model, material and animation assets are shared with the
     // source and stay loaded with the map; the copy owns only its GameObjects.
-    internal sealed class CrossingEquipmentWorld : ICrossingEquipmentWorld {
+    internal sealed class CrossingEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificationDiagnostics {
         const string LampType = "Track.KeyValueLampMaterialController", GateType = "RollingStock.Controls.KeyValueBoolAnimator", OwnerType = "KeyValue.Runtime.KeyValueObject",
             CullerType = "Helpers.Culling.GameObjectCuller", SpanType = "Track.TrackSpan", BellType = "Audio.IntegerLoopingPlayer", AnimatorType = "UnityEngine.Animator", TransformerType = "Helpers.WorldTransformer";
         internal const string WrapperPrefix = "CrankyAnt Scene Patcher equipment ";
@@ -62,6 +62,10 @@ namespace RailroaderScenePatcher {
         }
         static FieldInfo Field(Type type, string name) => type.GetField(name, Native.Flags) ?? throw new MissingFieldException(type.FullName, name);
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
+        public void VerificationFailed(object target, string detail) {
+            var path = BoardScene.PathOf(((GameObject)target).transform).Replace("\r", "\\r").Replace("\n", "\\n");
+            Debug.LogWarning("Scene Patcher crossing equipment verification failed: destination=" + path + " " + detail);
+        }
         static Component[] All(GameObject root, Type type) => root.GetComponentsInChildren(type, true).Where(c => c != null).ToArray();
         static bool Inside(GameObject root, GameObject child) { for (var t = child == null ? null : child.transform; t != null; t = t.parent) if (t == root.transform) return true; return false; }
 

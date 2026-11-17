@@ -949,6 +949,7 @@ namespace RailroaderScenePatcher {
 
         void ConfirmSelection() {
             try {
+                var inspectOnly = selection.Pending?.InspectOnly == true;
                 var candidate = selection.Confirm();
                 // A refused confirmation says why in the footer, beside Confirm, and in the log (LogChoiceProblem).
                 if (candidate == null) { presentation?.RequestRefresh(); return; }
@@ -963,7 +964,7 @@ namespace RailroaderScenePatcher {
                         catch (Exception e) { feedback.Refuse(SnapPlace, "Snap target", e.GetBaseException().Message); }
                     });
                 }
-                if (candidate.Observation != null) {
+                if (inspectOnly && candidate.Observation != null) {
                     InspectObservation(candidate.Observation);
                     ReadPlacement();
                 }

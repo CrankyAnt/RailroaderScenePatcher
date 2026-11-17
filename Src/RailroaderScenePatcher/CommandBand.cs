@@ -369,6 +369,10 @@ namespace RailroaderScenePatcher {
         // The name of a candidate among the offers of a world choice: its number when several are offered, the same
         // in the world label, the message and the panel's list.
         internal static string ChoiceTag(string word, int number, int offers) => offers > 1 && number > 0 ? word + " " + number : word;
+        internal static string ChoiceLine(string word, int number, int offers, string label, IEnumerable<string> offered) {
+            var text = ChoiceTag(word, number, offers) + ": " + ChoiceLabel(label, offered, 60).TrimEnd();
+            return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) ? text : text + ".";
+        }
         // Whether a click on an outliner row clears the inspection: a click on the row that is inspected already.
         internal static bool ClearsInspection(object inspected, object clicked) => inspected != null && ReferenceEquals(inspected, clicked);
         // A short label for one of several offered choices. A scene object's full label is "Family: path", whose start

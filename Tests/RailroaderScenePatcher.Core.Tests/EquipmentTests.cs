@@ -19,7 +19,7 @@ class FakeDevice {
     public FakeEquipmentWorld.Added Owner;
 }
 // Controlled equipment world: devices by scene and path, and additions the patcher owns beneath each crossing controller.
-class FakeEquipmentWorld : ICrossingEquipmentWorld {
+class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificationDiagnostics {
     public static readonly string[] Keys = { "lights", "gates" };
     public sealed class Added {
         public FakeCrossing Controller; public FakeDevice Copy; public EquipmentAddition Record;
@@ -29,6 +29,9 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld {
     public readonly List<Added> All = new List<Added>();
     public int Constructed, Mutations;
     public int FailConstructAfter = -1;
+    public double ConstructOffset;
+    public readonly List<string> VerificationFailures = new List<string>();
+    public void VerificationFailed(object controller, string detail) => VerificationFailures.Add(detail);
     public bool StickyDestroy, FailSetPlacementOnce, CullerVisible = true;
     public FakeDevice Device(string path, Action<FakeDevice> setup = null) { var d = new FakeDevice { Path = path }; setup?.Invoke(d); Devices.Add(d); return d; }
     public IReadOnlyList<object> ResolveSource(EquipmentSource source) => Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
@@ -48,6 +51,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld {
         if (FailConstructAfter > 0) FailConstructAfter--;
         var d = (FakeDevice)source;
         var added = new Added { Controller = (FakeCrossing)controller, Record = addition, Position = (double[])addition.Placement.Position.Clone(), Rotation = (double[])addition.Placement.Rotation.Clone(), Culled = !CullerVisible };
+        added.Position[0] += ConstructOffset;
         added.Copy = new FakeDevice { Scene = d.Scene, Path = "owned/" + addition.Id, Model = d.Model, Owner = added };
         All.Add(added); Devices.Add(added.Copy); Constructed++;
         return added;
@@ -132,7 +136,12 @@ static class EquipmentTests {
         Assert(observed.Complete && observed.Additions.Count == 1 && observed.Additions[0].Id == "west", "The observed equipment lists every owned addition");
         engine.Apply(Doc(Equip("signals", Addition("west", x: 12))), "author/pack");
         Assert(f.Live.Count == 1 && f.World.Constructed == 1 && f.Live[0].Position[0] == 12, "A changed placement moves the owned addition instead of building another");
-        Assert(f.Crossing.Position.SequenceEqual(new double[] { 5, 0, 7 }) && f.Crossing.Circuits.Count == 1, "Adding equipment neither moves the crossing nor changes its coverage");
+        var failed = new Fixture(); failed.World.ConstructOffset = 0.125;
+        var refusal = new PatchEngine(failed.Scene).Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
+        Assert(f.Crossing.Position.SequenceEqual(new double[] { 5, 0, 7 }) && f.Crossing.Circuits.Count == 1
+            && refusal.Outcomes["signals"].Error == "Mutation failed and was restored: Applied crossing equipment did not verify: equipment west differs from the mod's source or placement"
+            && failed.World.VerificationFailures.Count == 1
+            && failed.World.VerificationFailures[0] == "reason=\"mismatch\" identity=true source=true position=false rotation=true positionTolerance=0.0005-per-axis rotationTolerance=normalized-absolute-dot>=0.99999999 desired={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10,0,7],rotation=[0,0,0,1]} observed={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10.125,0,7],rotation=[0,0,0,1]}", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
     }
     // Devices with other model values qualify through the same lamp and gate mechanisms, judged by the production
     // LightGatePattern; each rule that fails names its concrete gap.
