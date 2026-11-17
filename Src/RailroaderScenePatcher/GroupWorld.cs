@@ -164,16 +164,16 @@ namespace RailroaderScenePatcher {
         // Why a part cannot be edited, or null: what refuses its group refuses the part. Shared with the inventory.
         internal static string PartProblem(GameObject part) {
             if (!Loaded(part)) return "The part's scene is not loaded";
-            if (!IsPart(part)) return "This object is not a part of a listed baked scenery group";
+            if (!IsPart(part)) return "This object is not listed as a baked scenery part";
             var root = GroupRootOf(part);
-            return root == null ? "The part's group root is no longer listed" : Problem(root);
+            return root == null ? "The group root for this part is no longer listed" : Problem(root);
         }
         public string ActivityRefusal(object part) => SwitchedPart(part as GameObject);
         // Why the part's Enabled setting cannot be set, or null: a game-object culler switches the part on and off by
         // camera distance and would override a stored setting, so the patcher cannot hold it.
         internal static string SwitchedPart(GameObject part) {
             var root = GroupRootOf(part);
-            return root != null && ListingCuller(part, root) != null ? "A culler of the game switches this part on and off by camera distance and would override a stored Enabled setting, so the patcher cannot hold it" : null;
+            return root != null && ListingCuller(part, root) != null ? "The game's culler enables and disables this part based on camera distance. It would override a saved Enabled setting, so the patcher cannot keep that setting applied" : null;
         }
         // The game-object culler in the part's group that lists the object, or null.
         static Component ListingCuller(GameObject go, GameObject root) {
@@ -241,7 +241,7 @@ namespace RailroaderScenePatcher {
         }
         public PartObservation ObservePart(object target) {
             var part = PartObject(target);
-            var root = GroupRootOf(part) ?? throw new InvalidOperationException("The part's group root is no longer listed");
+            var root = GroupRootOf(part) ?? throw new InvalidOperationException("The group root for this part is no longer listed");
             var group = Observe(root);
             var position = NativeInventory.MapPosition(part.transform);
             // A part without a fixed placement keeps its place in the object directly above it.

@@ -184,7 +184,7 @@ namespace RailroaderScenePatcher.Core {
         // A renderer, collider or light at or below the node.
         static bool Physical(IHierarchyNode node) => node.Physical || node.Children.Any(Physical);
         // The coverage rules that keep an object below a listed group root out of the part entries.
-        public const string AmbiguousParts = "Sibling parts that share one path", LodLevels = "Levels of a LOD group";
+        public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group";
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
         // A part is one scene object, not a renderer or a component. An inspection-only group has no part entries.
         public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {
@@ -537,7 +537,7 @@ namespace RailroaderScenePatcher.Core {
             var refusal = world.PartRefusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
             var observed = world.ObservePart(target);
-            if (!GroupChecks.Finite(observed.Part.Placement) || !GroupChecks.Finite(observed.GroupState.Root.Placement)) throw new InvalidOperationException("The part's map coordinates are unavailable");
+            if (!GroupChecks.Finite(observed.Part.Placement) || !GroupChecks.Finite(observed.GroupState.Root.Placement)) throw new InvalidOperationException("Map coordinates are unavailable for the part or its group root");
         }
         // Without a fixed placement of its own the part stands in its group root: its placement says so, and applied back
         // it returns the part to its place in the group.
@@ -552,9 +552,9 @@ namespace RailroaderScenePatcher.Core {
         // A part stands in the object directly above it, so a part below a moved part keeps its place in that part.
         public Placement FramePlacement(object target) => world.ObservePart(target).ParentPlacement;
         public void CheckRelationships(object target, ObjectState state) {
-            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
-            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
+            if (state?.Marker != null) throw new InvalidOperationException("Baked scenery parts do not support track-marker relationships");
+            if (state?.Coverage != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-coverage relationships");
+            if (state?.Equipment != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-equipment relationships");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             var refusal = state?.Active == null ? null : world.ActivityRefusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
@@ -587,12 +587,12 @@ namespace RailroaderScenePatcher.Core {
         // active is null for a part whose activity a culler switches: its activity is not compared.
         void Verify(object target, PartObservation before, Placement placement, bool? active) {
             var after = world.ObservePart(target);
-            if (!GroupChecks.SamePlacement(after.Part.Placement, placement) || (active != null && after.Part.Active != active)) throw new InvalidOperationException("Applied part placement or activity did not verify");
+            if (!GroupChecks.SamePlacement(after.Part.Placement, placement) || (active != null && after.Part.Active != active)) throw new InvalidOperationException("The part's placement or activity does not match the requested state");
             var group = before.GroupState.Root; var now = after.GroupState.Root;
-            if (!ReferenceEquals(after.Group, before.Group) || !GroupChecks.SamePlacement(now.Placement, group.Placement) || now.Active != group.Active) throw new InvalidOperationException("The part edit changed its group root");
+            if (!ReferenceEquals(after.Group, before.Group) || !GroupChecks.SamePlacement(now.Placement, group.Placement) || now.Active != group.Active) throw new InvalidOperationException("Editing the part changed its group root");
             var difference = GroupChecks.Layout(before.GroupState, after.GroupState, h => ReferenceEquals(h, target) || holds.Contains(h), target)
                 ?? GroupChecks.Culling(after.GroupState, now.Active != false, GroupChecks.Enclosed(world, holds, after.Group));
-            if (difference != null) throw new InvalidOperationException("The part edit changed more than the part: " + difference);
+            if (difference != null) throw new InvalidOperationException("Editing the part changed more than the part itself: " + difference);
         }
         public bool Restore(object target, object snapshot) {
             var captured = (Snapshot)snapshot;

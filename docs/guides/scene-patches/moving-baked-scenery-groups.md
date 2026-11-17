@@ -2,21 +2,21 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move or disable a baked scenery group
 
-This guide shows how to move, rotate, disable and restore a whole baked scenery group, such as a platform, a lamp, a sign or a small building that the native map editor does not edit, and a single part inside such a group, such as a jetty at a sawmill or a lamp at a station. A group move is physical placement only: everything below the group root moves with it, culling and colliders follow, and the activity of the parts stays as it was. A part edit changes that part and what stands below it; the group root and the other parts stay where they are. Moving or disabling a group or a part changes no game function.
+This guide covers moving, rotating, disabling and restoring baked scenery groups and their individual parts. Groups include platforms, lamps, signs and small buildings that the native map editor does not edit. A part might be a sawmill jetty or a station lamp. Moving a group changes its physical placement: everything below the group root moves with it, culling and colliders follow, and each part keeps its activity. Editing a part affects it and the objects below it; the group root and other parts stay where they are. Moving or disabling a group or part changes no game function.
 
 A baked scenery group is saved with the map's scene. Props, masks and other objects of the map's `Map.json` are not baked scenery groups; the native map editor edits those. A baked scenery group target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Which groups are listed
 
-The **Baked scenery group** family in the outliner lists one entry per group root. A group root is a scene object one level below a folder of `World`, such as `World/Roads Barkers/1932 Chevy Truck LP`, and below `World/Large Scenery` one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`. A group is listed when the scene saves it, no other family lists it, and it holds at least one renderer, collider or light. An object without any of those, such as a spawn point under `World/POIs`, is not listed; the fireflies under `World/Environment Effects` are visual effects and are not listed either.
+The **Baked scenery group** family in the outliner lists one entry per group root. A group root is a scene object one level below a `World` folder, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, it is one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`. A group is listed when the scene saves it, no other family lists it, and it has a renderer, collider or light at or below its root. An object without any of those, such as a spawn point under `World/POIs`, is not listed; the fireflies under `World/Environment Effects` are visual effects and are not listed either.
 
-A group holds only what the scene saves below its root. Props, tanks, conveyors and terrain masks of the map's `Map.json` that stand beside a group are native map data: the native map editor moves them, and a group move leaves them where they are. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
+A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that hold game logic or terrain shaping wait for their own support. They stand in the **Inspection only** group with the reason, for example a group that holds a station click spot, a scene ground mask, a car loader, a lake surface, a log pond, storage piles, a spawn point, a map icon or a pickable toggle, and road bridges and rail bridge constructions outside Ela. A group that holds track markers stands there as well: the markers keep their own family, and moving such a group as a whole is not supported yet. Crossbucks at unprotected crossings stand there too. A group in the **Inspection only** group lists no parts.
+Groups containing game logic or terrain shaping need separate support. They appear under **Inspection only** with the reason. Examples include groups containing a station click spot, scene ground mask, car loader, lake surface, log pond, storage piles, spawn point, map icon or pickable toggle. Road bridges and rail bridge constructions outside Ela also appear there. So do groups containing track markers: the markers keep their own family, and moving the whole group is not yet supported. Crossbucks at unprotected crossings also appear under **Inspection only**. Groups there list no parts.
 
 ## Which parts are listed
 
-Each group in the **Baked scenery group** family lists its parts as entries of the same family; in name order they follow the group's own row. A part entry is named with its group: the group root's name, then the path from the root to the part, such as `Whittier Saw Mill / Jetty / Piece (2)`. A part is one scene object at any depth below the group root, not a renderer or a component, and it is listed when the scene saves it and it holds a renderer, collider or light at or below it. A part can hold other parts; moving it moves them with it.
+Each group in the **Baked scenery group** family lists its parts as entries in the same family. In name order, they follow the group's row. Each name combines the group root's name with the path to the part, for example `Whittier Saw Mill / Jetty / Piece (2)`. A part is a scene object at any depth below the root, rather than a renderer or component. It is listed when the scene saves it and it has a renderer, collider or light at or below it. A part can contain other parts, which move with it.
 
 Some objects below a group root are not listed as parts:
 
@@ -36,18 +36,18 @@ If **Supported edits** on the **Object** tab starts with **Not editable:**, the 
 
 ## Disable or enable a group
 
-Select **Disable** at the bottom of the **Object** tab. The group root is switched off, so the group disappears and its colliders stop colliding. The parts keep their own **Enabled** settings, so **Enable**, Undo or removal brings back the same group. A group whose root carries a simple culler, such as Bryson House Track, stays off while the camera comes near: the culler's switching pauses while the group is disabled and resumes when it is enabled. Enabled again, such a group shows only when its culler counts it as in view, as before it was disabled.
+Select **Disable** at the bottom of the **Object** tab. This switches off the group root, hides the group and stops its colliders from colliding. Parts keep their own **Enabled** settings, so **Enable**, Undo or removal restores the same group. If the root has a simple culler, as at Bryson House Track, the culler stops switching it while the group is disabled. The group stays off even when the camera comes near. Once enabled, the culler resumes switching it, and the group appears only when the culler considers it in view, as before.
 
 ## Move or disable a single part
 
 1. Select the part's row under **Baked scenery group**, for example `Bryson House Track / Ramp`. The **Identity** section of the **Object** tab shows the component `UnityEngine.Transform` and the structure `baked-scenery-part-v1`, and **Use in the game** says that the part is decorative.
 2. On the **Placement** tab, change the **Numeric** fields and select **Apply**, or use **Gizmo** or **Snap** as for other objects. Select **Disable** at the bottom of the **Object** tab to switch the part off.
 
-A part with a fixed placement keeps that placement in map coordinates when its group moves later. This holds for a group move in the same scene patch file or in another mod's, in either key order or load order, and during a **Gizmo** drag of the group. The group's placement applies first, then the placement of each part with a fixed placement. A part without a fixed placement moves with its group.
+A part with a fixed placement keeps its map coordinates when its group moves later, including during a **Gizmo** drag. This applies whether the group move is in the same scene patch file or another mod's, regardless of key or load order. The group placement applies first, followed by each fixed part placement. A part without a fixed placement moves with its group.
 
-**Remove modification** on a part returns it to the place it has without the modification relative to the object directly above it, the group root or the part it stands below, wherever that object stands now. The part then moves with that object again. A part below a moved part keeps its place on that part, also when you disable and enable it or remove its own modification.
+**Remove modification** returns a part to its unmodified placement relative to the object directly above it, whether that is the group root or another part, at that object's current placement. The part then moves with that object again. A part below a moved part keeps its place on that part when you disable and enable it or remove its own modification.
 
-**Disable** stays unavailable, with the reason, for a part that a culler of the game switches on and off by camera distance. The culler would override a stored disable, so the patcher cannot hold it. A placement edit of such a part leaves it on or off as the culler switched it.
+**Disable** is unavailable for a part that a game culler switches on and off by camera distance; the editor shows the reason. The culler would override a stored disable, so the patcher cannot maintain it. A placement edit leaves the part in the state set by the culler.
 
 ## Write the modification by hand
 
@@ -91,22 +91,28 @@ A part modification names the part's path and the structure `baked-scenery-part-
 }
 ```
 
-The placement is in map coordinates, not relative to the group.
+The part placement uses map coordinates, not coordinates relative to the group.
 
 ## What the patcher checks
 
 Before it touches a group, the patcher requires that the path names exactly one listed group root, that its scene is loaded, and that the group holds no missing script and no rigidbody. A path that names no group or several groups fails that modification and leaves the others to apply.
 
-For a part it requires that the path names exactly one listed part and that its group passes the same checks.
+For a part, the path must name exactly one listed part and its group must pass the same checks.
 
-After each group change it checks that the root has the mod's placement and activity, that every part kept its place relative to the root and, unless a culler switches it, its own activity, and that the culling sphere of every enabled culler in the group stands at its culler. A part with a fixed placement must stay at that placement instead. A disabled group holds no culling sphere. After each part change it checks the part's placement and activity, that the group root and every other part kept their placement and activity, and that what stands below the part kept its place relative to it. While a part keeps a fixed placement of its own, every culler above it takes a radius that encloses the renderers it culls, and never one below the radius the scene gives it: the culler on the group root and a culler on a part above the held part. A game-object culler culls the objects it switches, not the objects below it; it grows only while a held part is one of those objects, stands below or above one of them, or carries the culler. A renderer counts while it is on as the scene has it, also when a culler hides it because the camera is far away. Without such a held part, a culler has the radius the scene gives it again. The culler on a moved part moves with it. Any difference fails the modification and restores the group or the part. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the group or part until **Recheck** succeeds or the world reloads.
+After a group change, the patcher checks the root's placement and activity against the mod. It checks that every part kept its place relative to the root, except for parts with their own fixed placement, which must remain at that placement. It also checks each part's own activity unless a culler switches it, and checks that every enabled culler's sphere stands at its culler. A disabled group holds no culling sphere.
+
+After a part change, the patcher checks the part's placement and activity. It also checks that the group root and every other part kept their placement and activity, and that objects below the part kept their placement relative to it. A culler on a moved part moves with it.
+
+While a part has its own fixed placement, each culler above it, on the group root or a part above the fixed part, takes a radius that encloses the renderers it culls. The radius never falls below the radius the scene gives it. A renderer counts when it is on as the scene has it, including when a culler hides it because the camera is far away. A game-object culler culls the objects it switches, not the objects below it. It grows only while a fixed part is one of those objects, is below or above one of them, or carries the culler. Without such a fixed part, a culler returns to the radius the scene gives it.
+
+Any difference fails the modification and restores the group or part. If the patcher cannot verify restoration, it reports incomplete cleanup and refuses further edits of that group or part until **Recheck** succeeds or the world reloads.
 
 ## Limits
 
-Grass and other terrain detail under a group come from the terrain and its masks. A native mask of the map, such as `br-house-track` under Bryson House Track, keeps the ground clear at the group's original place; after a move, grass grows through the group at its new place until you move or add the mask in the native map editor.
+Grass and other terrain detail under a group come from the terrain and its masks. A native map mask, such as `br-house-track` under Bryson House Track, keeps the ground clear at the group's original position. After a move, grass grows through the group at its new position until you move or add the mask in the native map editor.
 
-The automated tests check this behavior with a controlled group. Game runs on Railroader 0.6.2 build 26335745 observed the following on the base map. Bryson House Track, Bryson Oil, Coal & Oil at Andrews and the inactive Alarka/Platform render at their new place at near distance and at 220 to 450 m, and Bryson Yard moves with all its posts and lamps; no part stayed at the old place. A player character stands on the moved Bryson House Track platform and is stopped at its edge, walks freely through its old place, and meets neither place while the group is disabled. A disabled group with a simple culler on its root stays off when the camera comes near, and after Enable it shows only when the camera comes near again. After a camera jump that shifted the floating origin, a moved group kept its map position, and the saved position holds no origin offset.
+Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. Bryson Yard moved with all its posts and lamps; no part remained at its old position. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
 
-Whether every culling sphere of a moved group encloses its renderers has not been measured. Other groups, groups with game logic or terrain shaping and multiplayer are not covered.
+The runs did not measure whether every culling sphere of a moved group encloses its renderers. They did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
 
 The automated tests check part edits with a controlled group. A part edit has not yet been observed in a game run.

@@ -398,7 +398,7 @@ static class BakedPartTests {
         var post = f.Discover().Single(o => ReferenceEquals(o.Handle, f.Post));
         Assert(InventoryPresentationState.Name(post) == "Whittier Saw Mill / Jetty / Post", "A part entry is named with its group: " + InventoryPresentationState.Name(post));
         Assert(InventoryPresentationState.Name(f.Discover().First()) == "Whittier Saw Mill", "The group entry keeps its own name");
-        Assert(CommandBand.PartDecorative == "Decorative. Moving or disabling this part changes no game function.", "The Object tab states that a part is decorative");
+        Assert(CommandBand.PartDecorative == "Decorative. Moving or disabling this part does not affect game functions.", "The Object tab states that a part is decorative");
         Assert(CommandBand.PartOperations.Contains("this part") && CommandBand.PartOperations.Contains("group"), "Supported edits name the part and its group: " + CommandBand.PartOperations);
     }
 }

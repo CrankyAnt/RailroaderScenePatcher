@@ -1366,7 +1366,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." },
-                    new[] { "Baked scenery groups", "A group moves as one, with its culling and colliders; its parts keep their own Enabled setting. A part with a fixed placement stays where it is when its group moves." } },
+                    new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." } },
                 Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
