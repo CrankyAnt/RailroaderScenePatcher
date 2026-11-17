@@ -46,12 +46,11 @@ static class CommandBandTests {
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
         }) {
             var tooltip = CommandBand.Tooltip("Does something.", row[0]);
-            var lines = tooltip.Split('\n');
-            Check(lines.Length == 2 && lines[0] == "Does something." && lines[1] == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
-            var reason = lines[1].Substring("Unavailable: ".Length);
+            Check(tooltip == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
+            var reason = tooltip.Substring("Unavailable: ".Length);
             Check(new[] { "Not editable:", "Not yet supported:", "binding unavailable:", "Unavailable:" }.All(label => reason.IndexOf(label, StringComparison.OrdinalIgnoreCase) < 0)
                 && (Char.IsUpper(reason[0]) || Char.IsDigit(reason[0])) && reason.EndsWith(".", StringComparison.Ordinal), "One label per tooltip, the reason a sentence: " + tooltip);
-            Check(CommandBand.Tooltip(null, row[0]) == row[1], "Without a description the tooltip is the sentence alone: " + CommandBand.Tooltip(null, row[0]));
+            Check(CommandBand.Tooltip(null, row[0]) == tooltip, "Without a description the tooltip is the same: " + CommandBand.Tooltip(null, row[0]));
         }
     }
     // A lamp shows green for Current and Saved and amber for Stale and Unsaved, and reserves its longer word.
@@ -117,7 +116,7 @@ static class CommandBandTests {
             Check(CommandBand.HidesTooltip((bool)row[0], (bool)row[1], (bool)row[2]) == (bool)row[3], "The tooltip, " + row[4]);
         Check(CommandBand.Clear(false, false) == "Nothing is inspected and no world choice is pending.", "Clear is disabled only when nothing is inspected and no world choice is pending");
         Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", CommandBand.Clear(false, false))
-            == "End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.\nUnavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear says what it does first");
+            == "Unavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear gives only why it cannot be used");
         Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
         Check(CommandBand.CopyId(true, "Invalid JSON. The scene patch file is protected from overwrite.") == "Invalid JSON. The scene patch file is protected from overwrite."
             && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the scene patch file cannot be read, and asks for an inspection first");
@@ -215,14 +214,12 @@ static class CommandBandTests {
         // The inventory notice names the supplied definitions for this state.
         Check(InventoryPresentationState.Notice(null, true).Contains("inspection is unavailable"), "Without an inventory the notice names that first");
     }
-    // A disabled control says what it would do and why it cannot now; an enabled one only what it does.
+    // An enabled control says what it does; a disabled one only why it cannot be used now.
     static void ADisabledControlKeepsItsDescription() {
         Check(CommandBand.Tooltip("Move the object with the native gizmo.", null) == "Move the object with the native gizmo.", "An enabled control shows its description");
-        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Move the object with the native gizmo.\nUnavailable: Inspect an object first.",
-            "A disabled control shows its description and then the reason");
-        Check(CommandBand.Tooltip("Rotate the object with the native gizmo.", "Inspect an object first.") != CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first."),
-            "Two controls disabled for one reason still differ");
-        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason stands alone");
+        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Unavailable: Inspect an object first.",
+            "A disabled control shows only the reason, without its description");
+        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Unavailable: Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason reads the same");
         Check(CommandBand.CandidateDetailsReason(0) == "Click a marking or track in the world first." && CommandBand.CandidateDetailsReason(1) == null && CommandBand.CandidateDetailsReason(3) == null,
             "The details of a world choice open only once something was clicked");
         Check(CommandBand.NotEditable("the marker is inside a crossing") == "Not editable: the marker is inside a crossing", "An object of a supported family that cannot be edited keeps its own reason");

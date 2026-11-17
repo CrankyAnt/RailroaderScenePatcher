@@ -10,7 +10,7 @@ Above the inspector are **Select in world**, **Focus**, **Clear** and **Copy ID*
 
 With the pointer over the window, Escape first closes an open choice list, then cancels a drag or a pending world choice, gizmo or snap, one action per press. It keeps the inspection. With the pointer over the world, Escape cancels a pending world choice or an active gizmo.
 
-Commands that cannot run remain in place, greyed out. **Select in world** is unavailable during a pending world choice; **Focus** and **Copy ID** are unavailable when nothing is inspected. **Copy ID** is also unavailable when the edited mod's scene patch file cannot be read, and **Clear** when nothing is inspected and no world choice is pending. The tooltip retains the command's description and adds the reason after **Unavailable:** as one plain sentence without a label of its own.
+Commands that cannot run remain in place, greyed out. **Select in world** is unavailable during a pending world choice; **Focus** and **Copy ID** are unavailable when nothing is inspected. **Copy ID** is also unavailable when the edited mod's scene patch file cannot be read, and **Clear** when nothing is inspected and no world choice is pending. Its tooltip then gives only the reason, after **Unavailable:**, as one plain sentence without a label of its own.
 
 Each **?** opens a separate help window beside the panel, at the height of that **?**, with an introduction, short explanations and links to the guides. Only one help window can be open at a time, and it never covers the panel's content. A tab's help closes when you open another tab. Close help with the **?**, which shows **x** while its help is open, or with the help window's close control.
 
