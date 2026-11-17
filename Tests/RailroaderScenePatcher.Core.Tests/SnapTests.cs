@@ -153,7 +153,7 @@ static class SnapTests {
         w.Scene.FailAfterDependentUpdate = 1;
         var outcome = new PatchEngine(w.Scene).Apply(scenePatchFile).Outcomes.Values.Single();
         Assert(!outcome.Applied && outcome.Error.Contains("restored") && w.Box.X == 20 && w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack),
-            "Complete-scene patch file failed application also restores dependent state and binding");
+            "Complete scene patch file failed application also restores dependent state and binding");
         w.MapEditor.Save();
         Assert(w.Store.Patch == scenePatchFile, "Save after recovery writes only the successful snap result");
     }
@@ -219,6 +219,6 @@ static class SnapTests {
         var fresh = new Scene { Origin = 110 }; var box = new Box(); fresh.Objects["p"] = new List<object> { box };
         var engine = new PatchEngine(fresh);
         Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 10, "Reload needs no graph lookup for a fixed snap result and uses the current origin");
-        Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 10, "Repeated whole-scene patch file application does not accumulate offsets");
+        Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 10, "Repeated whole scene patch file application does not accumulate offsets");
     }
 }

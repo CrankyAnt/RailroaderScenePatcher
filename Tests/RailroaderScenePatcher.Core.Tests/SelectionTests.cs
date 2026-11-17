@@ -52,8 +52,8 @@ static class SelectionTests {
         scenePatchFile["modifications"].First.First["target"] = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
         var result = new PatchEngine(scene).Apply(scenePatchFile.ToString());
         Check(result.Outcomes["move"].Applied && ReferenceEquals(result.Outcomes["move"].ResolvedTarget, replacement) && original.X == 7 && replacement.X == 12,
-            "Complete-scene patch file application uses the confirmed replacement identity and preserves the previous target");
-        Console.WriteLine("PASS: confirmed spatial scene-target identity and complete-scene patch file application");
+            "Complete scene patch file application uses the confirmed replacement identity and preserves the previous target");
+        Console.WriteLine("PASS: confirmed spatial scene-target identity and complete scene patch file application");
         UnresolvedSceneTargets(scene, scenePatchFile.ToString(), candidates, candidate, original, replacement);
         ReplacementChoices(scene, scenePatchFile.ToString(), candidates, candidate, result, original, replacement);
         PatchEditingHistory();
@@ -229,7 +229,7 @@ static class SelectionTests {
         session.Pending.Offer(new[] { candidate });
         session.Cancel();
         Check(session.Pending == null && session.Confirmed == null && saved.Write() == json && scene.MutationCalls == mutations &&
-            original.X == 7 && replacement.X == 12, "Cancelling a pending complete-scene patch file target choice preserves the scene patch file and world");
+            original.X == 7 && replacement.X == 12, "Cancelling a pending complete scene patch file target choice preserves the scene patch file and world");
 
         var duplicate = new Box { X = 25 };
         var duplicateCandidate = new SelectionCandidate(duplicate, candidate.Identity, "Duplicate board");
@@ -241,7 +241,7 @@ static class SelectionTests {
             "A hit does not authorize an identity with a duplicate elsewhere in the world");
         var rejected = new PatchEngine(scene).Apply(saved.Write());
         Check(!rejected.Outcomes["move"].Applied && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12 && duplicate.X == 25,
-            "The complete-scene patch file engine also refuses the ambiguous identity without moving either match");
+            "The complete scene patch file engine also refuses the ambiguous identity without moving either match");
         candidates.Items.Remove(duplicateCandidate);
         scene.Objects["replacement"].Remove(duplicate);
         session.Cancel();

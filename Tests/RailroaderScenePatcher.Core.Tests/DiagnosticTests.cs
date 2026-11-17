@@ -155,7 +155,7 @@ static class DiagnosticTests {
         runtime.Apply(ScenePatchFile, source);
         scene.Capability = Capability.Checked;
         runtime.Apply(ScenePatchFile.Replace("\"move\":{", "\"document\":{"), source);
-        Check(messages.Rows.Count == 2, "A modification named document is distinct from a scene patch file-level failure");
+        Check(messages.Rows.Count == 2, "A modification named document is distinct from a failure of the whole scene patch file");
     }
     static void ExactFallbackRequiresVerifiedRepair() {
         var scene = new Scene(); var box = new Box(); scene.Objects["sign"] = new List<object> { box };

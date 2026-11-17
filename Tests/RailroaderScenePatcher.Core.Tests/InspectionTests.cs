@@ -62,13 +62,13 @@ static class InspectionTests {
         var expected = mutationInventory.Pin(mutationInventory.Entries.Single());
         oldTarget.X = 8;
         result = new PatchEngine(mutable).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
-        Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == 0 && oldTarget.X == 8, "Changed placement since inspection rejects the complete-scene patch file edit");
+        Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == 0 && oldTarget.X == 8, "Changed placement since inspection rejects the complete scene patch file edit");
         mutationInventory.Refresh(); expected = mutationInventory.Pin(mutationInventory.Entries.Single());
         result = new PatchEngine(mutable).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
         Check(result.Outcomes["move"].Applied && oldTarget.X == 12, "Fresh inspected targets can apply the intended complete scene patch file");
         mutationInventory.Refresh();
         var definition = mutationInventory.InspectScenePatchFile(scenePatchFile.Replace("\"dependsOn\":[]", "\"dependsOn\":[\"missing-edit\"]")).Single();
-        Check(definition.MatchCount == 1 && definition.Problems.Any(p => p.Contains("missing-edit")), "Complete-scene patch file inspection reports missing dependencies without applying placement");
+        Check(definition.MatchCount == 1 && definition.Problems.Any(p => p.Contains("missing-edit")), "Complete scene patch file inspection reports missing dependencies without applying placement");
         definition = mutationInventory.InspectScenePatchFile(scenePatchFile.Replace("\"path\":\"p\"", "\"path\":\"missing-object\"")).Single();
         Check(definition.MatchCount == 0 && definition.Problems.Any(p => p.Contains("Target")), "A missing target leaves its referring definition inspectable");
         Check(mutationInventory.InspectScenePatchFile("{broken").Single().Problems.Any(p => p.Contains("Unreadable")) && mutable.MutationCalls == 1, "Invalid supplied scene patch files remain visible without mutation or rewrite");

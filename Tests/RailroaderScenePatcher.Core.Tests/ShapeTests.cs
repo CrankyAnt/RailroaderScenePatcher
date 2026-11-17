@@ -26,7 +26,7 @@ static class ShapeTests {
         KeyedScenePatchFileApplies();
         WholeScenePatchFileIsRejectedAndProtected();
         ModificationFaultsFailOnlyTheirModification();
-        Console.WriteLine("PASS: keyed shape, whole-scene patch file rejection with overwrite protection and faults isolated to their modification");
+        Console.WriteLine("PASS: keyed shape, whole scene patch file rejection with overwrite protection and faults isolated to their modification");
     }
     static void KeyedScenePatchFileApplies() {
         var w = new World();
