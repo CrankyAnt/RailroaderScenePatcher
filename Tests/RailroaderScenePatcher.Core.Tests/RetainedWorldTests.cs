@@ -67,7 +67,7 @@ static class RetainedWorldTests {
         scene.FailApply = false; scene.FailRestore = false;
         Assert(peer.Enter("map", "rebuilt-graph") == WorldEntry.Reentered && peer.LastReentry.Retained == 1 && peer.LastReentry.Released == 0, "Re-entry keeps the target that still stands under its identity");
         var guarded = peer.Engine.Apply(Doc(Item("move-board", "board")), "pack");
-        Assert(!guarded.Outcomes["move-board"].Applied && guarded.Outcomes["move-board"].Error.Contains("cleanup is unverified") && scene.MutationCalls == 1, "The unverified-cleanup guard of a retained target carries over into the new load attempt");
+        Assert(!guarded.Outcomes["move-board"].Applied && guarded.Outcomes["move-board"].Error.Contains("could not be verified") && scene.MutationCalls == 1, "The unverified-cleanup guard of a retained target carries over into the new load attempt");
         var replacement = new Box { Position = new[] { 1.0, 1.0, 1.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         scene.Objects["board"] = new List<object> { replacement };
         peer.Unload();
@@ -104,7 +104,7 @@ static class RetainedWorldTests {
         Assert(report.Retained == 1 && report.Released == 0 && report.Failures.Count == 1 && report.Failures[0].Contains("s/board") && report.Failures[0].Contains("could not be checked, so its state is kept"), "An object that cannot be checked is kept and reported for its target: " + String.Join("; ", report.Failures));
         Assert(peer.ReentryError == null && peer.Engine != null, "The world and its patcher state stay available");
         var guarded = peer.Engine.Apply(Doc(Item("move-board", "board")), "pack");
-        Assert(!guarded.Outcomes["move-board"].Applied && guarded.Outcomes["move-board"].Error.Contains("cleanup is unverified"), "The kept state includes the unverified-cleanup guard");
+        Assert(!guarded.Outcomes["move-board"].Applied && guarded.Outcomes["move-board"].Error.Contains("could not be verified"), "The kept state includes the unverified-cleanup guard");
         peer.Unload(); peer.Enter("map", "graph");
         Assert(peer.LastReentry.Failures.Count == 0 && peer.LastReentry.Retained == 1, "The next load attempt checks the object again");
     }

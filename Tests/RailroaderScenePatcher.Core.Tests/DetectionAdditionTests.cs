@@ -127,7 +127,7 @@ static partial class CoverageTests {
         // A dependent addition fails with its prerequisite; an independent one still applies.
         f = new Fixture();
         result = new PatchEngine(f.Scene).Apply(Doc(Add("dependent", Addition("spur", "Sspur"), OtherPath, "[\"base\"]") + "," + Add("base", Addition("siding", "Smissing"))));
-        Assert(!result.Outcomes["base"].Applied && !result.Outcomes["dependent"].Applied && result.Outcomes["dependent"].Error.Contains("Dependency failed") && f.Other.Circuits.Count == 1 && OwnedAnywhere(f) == 0, "An addition whose prerequisite fails adds nothing: " + result.Outcomes["dependent"].Error);
+        Assert(!result.Outcomes["base"].Applied && !result.Outcomes["dependent"].Applied && result.Outcomes["dependent"].Error.Contains("A required modification failed") && f.Other.Circuits.Count == 1 && OwnedAnywhere(f) == 0, "An addition whose prerequisite fails adds nothing: " + result.Outcomes["dependent"].Error);
         f = new Fixture();
         result = new PatchEngine(f.Scene).Apply(Doc(Add("dependent", Addition("spur", "Sspur"), OtherPath, "[\"absent\"]")));
         Assert(!result.Outcomes["dependent"].Applied && f.World.Mutations == 0, "An addition with an unknown prerequisite adds nothing");
@@ -164,7 +164,7 @@ static partial class CoverageTests {
             Assert(prior.Outcomes["other"].Applied, "The independent addition applies first");
             inject(f.World);
             var result = engine.Apply(Doc(Add("add", Addition("siding"), circuits: Detached("P6id"))));
-            Assert(!result.Outcomes["add"].Applied && result.Outcomes["add"].Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure during construction is restored: " + result.Outcomes["add"].Error);
+            Assert(!result.Outcomes["add"].Applied && result.Outcomes["add"].Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure during construction is restored: " + result.Outcomes["add"].Error);
             Assert(Untouched(f) && DetectsBothWays(f, f.Crossing, "Sold") && f.RetainedDetectsBothWays && DetectsNowhere(f, f.Crossing, "Snew"), "Restoration returns membership and native references and removes the partial circuit and spans");
             Assert(f.Other.Circuits.Count == 2 && OwnedAnywhere(f) == 3 && DetectsBothWays(f, f.Other, "Sspur"), "The earlier independent addition survives the failure");
         }
@@ -181,13 +181,13 @@ static partial class CoverageTests {
         var engine = new PatchEngine(f.Scene);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         var result = engine.Apply(Doc(Add("add", Addition("siding")) + "," + Add("dependent", Addition("spur", "Sspur"), OtherPath, "[\"add\"]")));
-        Assert(!result.Outcomes["add"].Applied && result.Outcomes["add"].Error.StartsWith("Mutation failed; cleanup is unverified", StringComparison.Ordinal), "Owned spans that stay registered make cleanup unverified: " + result.Outcomes["add"].Error);
+        Assert(!result.Outcomes["add"].Applied && result.Outcomes["add"].Error.StartsWith("The change failed. Cleanup could not be verified. Reason:", StringComparison.Ordinal), "Owned spans that stay registered make cleanup unverified: " + result.Outcomes["add"].Error);
         Assert(f.Crossing.Circuits.Count == 2 && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9" && DetectsNowhere(f, f.Crossing, "Snew"), "The partial circuit left the crossing although its spans remain");
         Assert(!result.Outcomes["dependent"].Applied && f.Other.Circuits.Count == 1, "The dependent addition is not attempted");
         Assert(f.Scene.Read(f.Crossing).Coverage.Residue.Count == 3, "The remaining owned spans are reported as residue");
         f.World.StickyDestroy = false; f.World.Mutations = 0;
         var retry = engine.Apply(Doc(Add("retry", Addition("siding"))));
-        Assert(!retry.Outcomes["retry"].Applied && retry.Outcomes["retry"].Error.Contains("cleanup is unverified") && f.World.Mutations == 0, "Retry at the same crossing is guarded until cleanup verifies");
+        Assert(!retry.Outcomes["retry"].Applied && retry.Outcomes["retry"].Error.Contains("could not be verified") && f.World.Mutations == 0, "Retry at the same crossing is guarded until cleanup verifies");
         var independent = engine.Apply(Doc(Add("other", Addition("spur", "Sspur"), OtherPath)));
         Assert(independent.Outcomes["other"].Applied && f.Other.Circuits.Count == 2, "Another crossing still takes an addition");
     }
@@ -260,10 +260,10 @@ static partial class CoverageTests {
         (f, session, mapEditor, store) = Session();
         f.World.FailSetSpansOnce = true;
         var failed = session.AddDetection(Crossing, "siding", Extra());
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && OwnedAnywhere(f) == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing addition restores coverage and the scene patch file: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("The edit failed. The object is back as it was. Reason:", StringComparison.Ordinal) && f.Native && OwnedAnywhere(f) == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing addition restores coverage and the scene patch file: " + failed.Error);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         failed = session.AddDetection(Crossing, "siding", Extra());
-        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified") && OwnedAnywhere(f) == 3, "Incomplete cleanup of an addition is reported: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("could not be verified") && OwnedAnywhere(f) == 3, "Incomplete cleanup of an addition is reported: " + failed.Error);
         f.World.StickyDestroy = false;
         Assert(!session.AddDetection(Crossing, "siding", Extra()).Applied, "A further edit is guarded until a recheck");
         var recheck = session.Recheck(Crossing);

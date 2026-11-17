@@ -153,7 +153,7 @@ static class BridgeTests {
             var engine = new PatchEngine(scene);
             var result = engine.Apply(Doc(Bridge("place-ela-bridge")));
             var outcome = result.Outcomes["place-ela-bridge"];
-            Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "Injected failure after mutation is restored: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "Injected failure after mutation is restored: " + outcome.Error);
             Assert(bridge.Position.SequenceEqual(new[] { 50.0, 5, 7 }) && bridge.Rotation.SequenceEqual(new[] { 0.0, 0, 0, 1 }) && Offsets(bridge).SequenceEqual(offsets), "Captured placement and collider layout are restored");
             world.ThrowAfterPlacement = world.DesyncOnPlacement = world.StaleBoundsOnPlacement = false;
             Assert(!engine.Apply(Doc(Bridge("place-ela-bridge"))).Outcomes["place-ela-bridge"].Applied, "A failed bridge operation is not retried in the same load");
@@ -165,11 +165,11 @@ static class BridgeTests {
             inject(world);
             var engine = new PatchEngine(scene);
             var outcome = engine.Apply(Doc(Bridge("place-ela-bridge"))).Outcomes["place-ela-bridge"];
-            Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "Incomplete bridge cleanup is reported: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "Incomplete bridge cleanup is reported: " + outcome.Error);
             world.DesyncOnPlacement = world.KeepDesync = world.MoveTrestleOnPlacement = false;
             var mutations = world.Mutations;
             var retry = engine.Apply(Doc(Bridge("another-edit", 1060))).Outcomes["another-edit"];
-            Assert(!retry.Applied && retry.Error.Contains("cleanup") && world.Mutations == mutations, "Another operation on the unverified bridge is blocked");
+            Assert(!retry.Applied && retry.Error.Contains("Cleanup") && world.Mutations == mutations, "Another operation on the unverified bridge is blocked");
         }
     }
     static void IncompatibleBridgeCapabilityIsIsolated() {

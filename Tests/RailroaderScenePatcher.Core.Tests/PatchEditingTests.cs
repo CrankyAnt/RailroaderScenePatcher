@@ -585,10 +585,10 @@ static class PatchEditingTests {
         var w = new World();
         w.Scene.FailNextApplies = 1;
         var outcome = w.Session.Edit(P, PlacementAt(112), null);
-        Assert(!outcome.Applied && outcome.Error.Contains("prior state was restored") && w.AtUnderlying && w.ScenePatchFile["modifications"].Count() == 0 && w.MapEditor.UndoGroups.Count == 0 && !w.MapEditor.IsDirty, "A failed edit restores world and scene patch file and leaves no history or dirty state");
+        Assert(!outcome.Applied && outcome.Error.Contains("The object is back as it was") && w.AtUnderlying && w.ScenePatchFile["modifications"].Count() == 0 && w.MapEditor.UndoGroups.Count == 0 && !w.MapEditor.IsDirty, "A failed edit restores world and scene patch file and leaves no history or dirty state");
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied, "A verified restoration permits a new edit");
         w.Scene.FailApply = true; outcome = w.Session.Edit(P, PlacementAt(140), null); w.Scene.FailApply = false;
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified") && (double)w.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 112, "Unverified cleanup is reported and the scene patch file keeps the prior desired state");
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified") && (double)w.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 112, "Unverified cleanup is reported and the scene patch file keeps the prior desired state");
         Assert(!w.Session.Edit(P, PlacementAt(150), null).Applied && !w.Session.Remove(P).Applied, "Further mutation of that object is blocked until it is rechecked");
         Assert(w.Session.Edit(Q, PlacementAt(160), null).Applied && w.Other.X == 60, "Independent objects remain editable");
         Assert(w.Session.Recheck(P).Applied && w.Box.X == 12 && w.Session.Edit(P, PlacementAt(150), null).Applied && w.Box.X == 50, "The guarded retry reconciles the actual state with the scene patch file before unblocking");

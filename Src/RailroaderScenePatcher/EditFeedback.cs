@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Linq;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
@@ -23,8 +24,12 @@ namespace RailroaderScenePatcher {
             internal bool General { get; }
             // Reported while nothing was inspected after the inspection was cleared: it stays until the next inspection.
             internal bool Kept { get; }
+            // The correction guidance of a failed action, with the guide of its operation, or null.
+            internal Recovery Recovery { get; set; }
             internal Message(string source, string text, bool followUp = false, bool general = false, bool kept = false) { Source = source; Text = text; FollowUp = followUp; General = general; Kept = kept; }
         }
+        // The guidance of the newest failed action still shown, or null. It goes with its message.
+        internal Recovery Recovery => messages.Select(m => m.Recovery).FirstOrDefault(r => r != null);
         // The places whose actions are the same on every tab, such as the footer's Remove modification and Recheck.
         // Every other place belongs to the tab and mode its result was reported in.
         internal readonly System.Collections.Generic.HashSet<string> GeneralPlaces = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
@@ -88,17 +93,30 @@ namespace RailroaderScenePatcher {
         // Runs one edit bound to the inspected observation. blocked is the reason the panel cannot edit now, or null.
         // Pinning compares the whole scene first, so a stale or changed inventory refuses the edit before it runs.
         // pin supplies the inspection token; without it the edit pins and compares the whole scene in this call.
-        internal bool Run(string place, string action, string blocked, SceneInventory inventory, SceneObservation selected, Func<InspectedTarget, Outcome> change, Func<SceneObservation, InspectedTarget> pin = null, string completed = null) {
+        internal bool Run(string place, string action, string blocked, SceneInventory inventory, SceneObservation selected, Func<InspectedTarget, Outcome> change, Func<SceneObservation, InspectedTarget> pin = null, string completed = null, Func<Outcome> guard = null) {
             if (blocked != null) { Refuse(place, action, blocked); return false; }
             if (inventory == null || selected == null) { Refuse(place, action, "no inspected object; refresh the inventory and inspect the object first"); return false; }
+            // An object an earlier failure guards is refused for that failure before the pin compares the scene: an
+            // incomplete cleanup leaves the object changed, so the comparison would call the inspection stale instead.
+            Outcome guarded = null;
+            try { guarded = guard?.Invoke(); } catch (Exception e) { Refuse(place, action, e.GetBaseException().Message); return false; }
+            if (guarded != null && !guarded.Applied) { ReportFailure(place, action, selected, guarded); return false; }
             Outcome outcome;
             try { outcome = change(pin != null ? pin(selected) : inventory.PinForEdit(selected)); }
             catch (Exception e) { Refuse(place, action, e.GetBaseException().Message); return false; }
-            if (outcome == null || !outcome.Applied) { Refuse(place, action, outcome?.Error ?? "the edit returned no outcome"); return false; }
+            if (outcome == null) { Refuse(place, action, "the edit returned no outcome"); return false; }
+            if (!outcome.Applied) { ReportFailure(place, action, selected, outcome); return false; }
             // completed is the result of an edit that applied without doing what its name says, such as the placement
             // of a crossing pad: it replaces "completed", so the result says what happened.
             Report(place, CommandBand.EditResult(action, outcome.Unchanged, outcome.Reverted, completed));
             return true;
+        }
+        // The result tells a refusal, a restored failure and an incomplete cleanup apart, and names the correction; the
+        // guidance keeps the operation's guide for the footer and its failure kind for the message colour.
+        void ReportFailure(string place, string action, SceneObservation selected, Outcome outcome) {
+            var recovery = RecoveryGuidance.For(outcome, place, action, selected.Identity?.Structure);
+            Report(place, recovery.Line(action));
+            messages[0].Recovery = recovery;
         }
     }
 }

@@ -277,7 +277,7 @@ static class CrossingPadTests {
             engine.Apply(Doc(Binding("rear", At("Sj7c", "a", 212), RearPath)));
             inject(world);
             var outcome = engine.Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)))).Outcomes["rebind"];
-            Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), name + ": the failure is restored: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), name + ": the failure is restored: " + outcome.Error);
             Assert(Entry(world, pad) == "Sj7c|a|185.9477" && pad.Distance == 185.9477 && Mesh(world, pad) == Baseline && world.Geometry(pad).CullingAligned, name + ": the captured binding, registration, geometry and culling return: " + Mesh(world, pad));
             Assert(Mesh(world, rear) == "Sj7c|a|212@1045", name + ": prior independent pad work survives");
             var mutations = world.Mutations;
@@ -290,16 +290,16 @@ static class CrossingPadTests {
         world.StaleCulling = true;
         var engine = new PatchEngine(scene);
         var outcome = engine.Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified") && outcome.Error.Contains("culling"), "Incomplete pad cleanup is reported: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified") && outcome.Error.Contains("culling"), "Incomplete pad cleanup is reported: " + outcome.Error);
         world.StaleCulling = false; var mutations = world.Mutations;
         var retry = engine.Apply(Doc(Binding("another", At("Sj7c", "a", 187)))).Outcomes["another"];
-        Assert(!retry.Applied && retry.Error.Contains("cleanup") && world.Mutations == mutations, "Another operation on the unverified pad is blocked");
+        Assert(!retry.Applied && retry.Error.Contains("Cleanup") && world.Mutations == mutations, "Another operation on the unverified pad is blocked");
         (world, pad, rear, scene) = Setup();
         world.FailRestoreLocation = true; world.Segments["Sjdl"] = new List<double> { 400 };
         pad.Segment = "Sjdl"; foreach (var b in world.Buckets.Values) b.Remove("Mg74"); world.Load(pad); world.Generated(pad);
         world.FailGenerate = true;
         outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "A failed restoration of the binding is reported as unverified: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "A failed restoration of the binding is reported as unverified: " + outcome.Error);
     }
     static readonly TargetIdentity Pad = new TargetIdentity("BushnellWhittier", PadPath, "Track.TrackMarker", CrossingPadScene.Structure);
     static readonly TargetIdentity Rear = new TargetIdentity("BushnellWhittier", RearPath, "Track.TrackMarker", CrossingPadScene.Structure);
@@ -335,10 +335,10 @@ static class CrossingPadTests {
         before = session.ScenePatchFileText;
         world.FailGenerate = true;
         var failed = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Mesh(world, pad) == Baseline && Entry(world, pad) == "Sj7c|a|185.9477" && session.ScenePatchFileText == before && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing rebinding restores binding and geometry: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("The edit failed. The object is back as it was. Reason:", StringComparison.Ordinal) && Mesh(world, pad) == Baseline && Entry(world, pad) == "Sj7c|a|185.9477" && session.ScenePatchFileText == before && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing rebinding restores binding and geometry: " + failed.Error);
         world.StaleCulling = true;
         failed = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
-        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("could not be verified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
         world.StaleCulling = false;
         Assert(!session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 187))).Applied, "The unverified pad refuses another edit");
         world.Generate(pad);

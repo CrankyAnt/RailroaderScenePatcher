@@ -449,9 +449,17 @@ namespace RailroaderScenePatcher.Core {
                 }
                 // New spans must be registered and cover their track before any circuit refers to them.
                 foreach (var span in created) if (!world.Registered(span) || !world.Covers(span)) throw new InvalidOperationException("The owned span " + world.SpanId(span) + " did not register or covers no track");
+#if SCENE_PATCHER_FAULTS
+                if (created.Count > 0 && additions.Any(a => a.Set == null)) FaultInjection.TripBetweenAdditionSteps();
+#endif
                 // A new circuit set stays outside the controller until its spans are set.
                 foreach (var addition in additions.Where(a => a.Set == null)) addition.Set = world.CreateCircuit(target, addition.Key) ?? throw new InvalidOperationException("The added circuit was not created");
+#if SCENE_PATCHER_FAULTS
+            // An injected interruption leaves the spans it built, as a stopped attempt would.
+            } catch (Exception e) when (!FaultInjection.IsInterruption(e)) {
+#else
             } catch {
+#endif
                 foreach (var span in created) { try { Retire(baseline, span); } catch { } }
                 throw;
             }

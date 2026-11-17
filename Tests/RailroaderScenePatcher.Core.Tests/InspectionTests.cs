@@ -315,8 +315,8 @@ static class InspectionTests {
             feedback.Result == "Placement refused. Injected edit failure." && log.Single() == feedback.Result, "A failing edit names its failure: " + feedback.Result);
         log.Clear();
         scene.FailApply = true;
-        Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 1 && feedback.Result.StartsWith("Placement refused. ", StringComparison.Ordinal) && feedback.Result.Length > "Placement refused. ".Length && log.Single() == feedback.Result,
-            "A refused outcome names the engine's reason: " + feedback.Result);
+        Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 1 && feedback.Result.StartsWith("Placement failed and was undone. The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && feedback.Recovery?.Kind == FailureKind.Restored && log.Single() == feedback.Result,
+            "A failure after mutation is reported as undone, not as a refusal, with the engine's reason: " + feedback.Result);
         scene.FailApply = false; log.Clear(); inventory.Refresh();
         feedback.Refuse("binding", "Track binding", "enter a segment ID");
         Check(feedback.Place == "binding" && feedback.Result == "Track binding refused. Enter a segment ID." && log.Single() == feedback.Result, "A refusal of entered values is logged like any other");

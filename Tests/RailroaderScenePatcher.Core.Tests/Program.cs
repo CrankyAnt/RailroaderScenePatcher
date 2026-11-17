@@ -26,8 +26,11 @@ class Scene : IScene, IInspectionScene {
     public object Capture(object target) { BeforeCapture?.Invoke(); var box = (Box)target; return new object[] { (double[])box.Position.Clone(), (double[])box.Rotation.Clone(), box.Active }; }
     public Action BeforeRead;
     public ObjectState Read(object target) { var hook = BeforeRead; BeforeRead = null; hook?.Invoke(); if (FailRead) throw new Exception("injected read"); var box = (Box)target; return new ObjectState(new Placement(new[] { box.Position[0] + Origin, box.Position[1], box.Position[2] }, (double[])box.Rotation.Clone()), box.Active); }
+    // Refuses a write before it changes anything, such as a restoration that cannot start.
+    public Func<ObjectState, bool> RefuseState;
     public void Apply(object target, ObjectState state) {
         MutationCalls++; MutationLog.Add(target); var box = (Box)target;
+        if (RefuseState?.Invoke(state) == true) throw new Exception("injected refusal before the write");
         if (state.Placement != null) { box.Position = new[] { state.Placement.Position[0] - Origin, state.Placement.Position[1], state.Placement.Position[2] }; box.Rotation = (double[])state.Placement.Rotation.Clone(); }
         if (state.Active != null) box.Active = state.Active.Value;
         if (FailNextApplies > 0) { FailNextApplies--; throw new Exception("injected once"); }
@@ -118,7 +121,7 @@ static class LocalWorldTests {
         guardedPeer.Apply(Doc(Item("move-board", "board")), "pack"); guarded.FailApply = false; guarded.FailRestore = false;
         guardedPeer.Enter("w");
         var retry = guardedPeer.Apply(Doc(Item("other", "board")), "pack");
-        Assert(!retry.Outcomes["other"].Applied && retry.Outcomes["other"].Error.Contains("cleanup"), "Unverified cleanup stays guarded through retained-world re-entry");
+        Assert(!retry.Outcomes["other"].Applied && retry.Outcomes["other"].Error.Contains("Cleanup"), "Unverified cleanup stays guarded through retained-world re-entry");
     }
     static void ChangedWorldStartsAFreshLoadAndReleasesThePrevious() {
         var scenes = new List<PeerScene>(); var boards = new List<Box>();
@@ -200,7 +203,7 @@ class Program {
         scene.FailApply = false; result = engine.Apply(Doc(Item("a", "p"))); Assert(!result.Outcomes["a"].Applied && box.X == 4, "Failure is not retried during the load");
         scene.FailApply = true; scene.FailRestore = true; engine = new PatchEngine(scene);
         result = engine.Apply(Doc(Item("a", "p"))); scene.FailApply = false; scene.FailRestore = false;
-        result = engine.Apply(Doc(Item("other", "p"))); Assert(!result.Outcomes["other"].Applied && result.Outcomes["other"].Error.Contains("cleanup"), "Unverified cleanup guards the target");
+        result = engine.Apply(Doc(Item("other", "p"))); Assert(!result.Outcomes["other"].Applied && result.Outcomes["other"].Error.Contains("Cleanup"), "Unverified cleanup guards the target");
         engine = new PatchEngine(scene); result = engine.Apply(Doc(Item("a", "p"))); result = engine.Apply(Doc(Item("a", "p")));
         Assert(result.Outcomes["a"].Applied && box.X == 12, "Repeated application reconciles absolute placement");
         result = new PatchEngine(scene).Apply(Doc(Item("future", "p", "[]", ",\"futureOperation\":true") + "," + Item("independent", "p"), "layer"));
@@ -285,6 +288,8 @@ class Program {
         CoverageTests.RunRetained();
         SubscriptionTests.Run();
         EquipmentTests.Run();
+        FailureRecoveryTests.Run();
+        FaultInjectionTests.Run();
         Console.WriteLine("PASS: complete scene patch file behavior"); return 0;
     }
 }

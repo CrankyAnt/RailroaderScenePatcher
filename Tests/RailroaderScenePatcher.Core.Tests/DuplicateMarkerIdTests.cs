@@ -122,10 +122,10 @@ static class DuplicateMarkerIdTests {
         var prior = failed.Registrations();
         failing.FailPlacement = true;
         var placed = failed.Session.Edit(Marker(WhistlePaths[1]), new Placement(new[] { 1041.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
-        Assert(!placed.Applied && placed.Error.Contains("prior state was restored") && failed.Whistles[1].Position[0] == 81 && failed.Registrations() == prior, "A failed placement edit of a holder is restored with every registration: " + placed.Error + " " + failed.Registrations());
+        Assert(!placed.Applied && placed.Error.Contains("The object is back as it was") && failed.Whistles[1].Position[0] == 81 && failed.Registrations() == prior, "A failed placement edit of a holder is restored with every registration: " + placed.Error + " " + failed.Registrations());
         failing.FailPlacement = true;
         var load = new PatchEngine(failed.Capabilities).Apply(Doc(Item("move-yard", YardPath, "\"placement\":{\"mode\":\"fixed\",\"position\":[1041,1,2],\"rotation\":[0,0,0,1]}")));
-        Assert(!load.Outcomes["move-yard"].Applied && load.Outcomes["move-yard"].Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal) && failed.Yard.Position[0] == 40 && failed.Registrations() == prior, "A failed placement at load is restored with every registration: " + load.Outcomes["move-yard"].Error + " " + failed.Registrations());
+        Assert(!load.Outcomes["move-yard"].Applied && load.Outcomes["move-yard"].Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && failed.Yard.Position[0] == 40 && failed.Registrations() == prior, "A failed placement at load is restored with every registration: " + load.Outcomes["move-yard"].Error + " " + failed.Registrations());
     }
     // A world whose next placement write fails after it moved the object.
     sealed class FailingPlacementWorld : FakeMarkerWorld, ITrackMarkerWorld {
@@ -331,14 +331,14 @@ static class DuplicateMarkerIdTests {
             var others = Others();
             if (registration) world.DropRegistration = true; else world.StaleCache = true;
             var edit = w.Session.Edit(Marker(WhistlePaths[0]), new Placement(new[] { 1090.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
-            Assert(!edit.Applied && edit.Error.StartsWith("Edit failed; cleanup is unverified", StringComparison.Ordinal) && Others() == others,
+            Assert(!edit.Applied && edit.Error.StartsWith("The edit failed. Cleanup could not be verified. Reason:", StringComparison.Ordinal) && Others() == others,
                 (registration ? "A lost registration" : "A stale cache") + " after a failed edit is not rewritten by marker id: " + edit.Error + " " + Others());
             var load = new World(world = new BreakingPlacementWorld());
             others = String.Join(" ", load.Whistles.Skip(1).Select(m => String.Join(",", load.Markers.Registrations(m).Where(r => r.HoldsMarker).Select(r => r.Bucket))));
             if (registration) world.DropRegistration = true; else world.StaleCache = true;
             var result = new PatchEngine(load.Capabilities).Apply(Doc(Item("move", WhistlePaths[0], "\"placement\":{\"mode\":\"fixed\",\"position\":[1090,1,2],\"rotation\":[0,0,0,1]}")));
             var after = String.Join(" ", load.Whistles.Skip(1).Select(m => String.Join(",", load.Markers.Registrations(m).Where(r => r.HoldsMarker).Select(r => r.Bucket))));
-            Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.StartsWith("Mutation failed; cleanup is unverified", StringComparison.Ordinal) && after == others,
+            Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.StartsWith("The change failed. Cleanup could not be verified. Reason:", StringComparison.Ordinal) && after == others,
                 (registration ? "A lost registration" : "A stale cache") + " after a failed modification is not rewritten by marker id: " + result.Outcomes["move"].Error + " " + after);
         }
     }
