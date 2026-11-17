@@ -25,8 +25,8 @@ namespace RailroaderScenePatcher {
         readonly Type post;
         readonly FieldInfo prefix, origin, mileage, originCache, synchronizerText;
         internal MilepostWorld() {
-            post = Native.Type(Milepost) ?? throw new InvalidOperationException("Milepost prerequisites unavailable");
-            var synchronizer = Native.Type(SynchronizerType) ?? throw new InvalidOperationException("Milepost text synchronizer unavailable");
+            post = Native.Type(Milepost) ?? throw new InvalidOperationException("The game's milepost type is unavailable");
+            var synchronizer = Native.Type(SynchronizerType) ?? throw new InvalidOperationException("The game's milepost text synchronizer is unavailable");
             prefix = Declared(post, "prefix", typeof(string)); origin = Declared(post, "origin", typeof(bool)); mileage = Declared(post, "mileage", typeof(float));
             synchronizerText = Declared(synchronizer, "text", typeof(string));
             originCache = post.GetField("_originMilePosts", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
@@ -34,9 +34,9 @@ namespace RailroaderScenePatcher {
             // The milepost's location listener calls UpdateMileage. The capability relies on that recalculating nothing; a build
             // whose listener or UpdateMileage does more is a different milepost and this capability is incompatible with it.
             var update = post.GetMethod("UpdateMileage", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null) ?? throw new MissingMethodException(Milepost, "UpdateMileage");
-            if (!EmptyBody(update.GetMethodBody()?.GetILAsByteArray())) throw new InvalidOperationException("Milepost UpdateMileage recalculates on this build; the milepost capability does not support it");
+            if (!EmptyBody(update.GetMethodBody()?.GetILAsByteArray())) throw new InvalidOperationException("The milepost capability expects an empty UpdateMileage method. This game build's implementation does not match");
             var listener = post.GetMethod("TrackMarkerOnOnLocationChanged", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, Type.EmptyTypes, null) ?? throw new MissingMethodException(Milepost, "TrackMarkerOnOnLocationChanged");
-            if (!CallsOnly(listener, update)) throw new InvalidOperationException("Milepost TrackMarkerOnOnLocationChanged does more than call UpdateMileage on this build; the milepost capability does not support it");
+            if (!CallsOnly(listener, update)) throw new InvalidOperationException("The milepost capability expects TrackMarkerOnOnLocationChanged to contain only a call to UpdateMileage. This game build's implementation does not match");
         }
         // The IL of an empty method: ret, optionally after one nop.
         internal static bool EmptyBody(byte[] il) => il != null && (il.SequenceEqual(new byte[] { 0x2A }) || il.SequenceEqual(new byte[] { 0x00, 0x2A }));
@@ -66,18 +66,18 @@ namespace RailroaderScenePatcher {
         public override string PlacementProblem(object target) => MilepostProblem(target as GameObject, null, null, true);
         // Why the object does not conform to the supported milepost pattern, or null. Shared with the inventory.
         internal static string MilepostProblem(GameObject go, ReferenceScan references, HolderIndex setups, bool placementOnly = false) {
-            if (!Loaded(go)) return "This object has no implemented milepost capability";
+            if (!Loaded(go)) return "This object is not loaded, so its milepost cannot be edited";
             var components = go.GetComponents<Component>();
             if (components.Any(c => c == null)) return "Missing script on the milepost object";
             var posts = components.Where(c => c.GetType().FullName == Milepost).ToArray();
-            if (posts.Length != 1) return posts.Length == 0 ? "The object holds no milepost" : "The object holds several mileposts";
+            if (posts.Length != 1) return posts.Length == 0 ? "The object has no milepost component" : "The object has more than one milepost component";
             var markers = components.Where(c => c.GetType().FullName == MarkerType).ToArray();
-            if (markers.Length != 1) return markers.Length == 0 ? "The milepost holds no track marker" : "The milepost holds several track markers";
-            if (Get(go, PadBuilder) != null) return "The milepost holds a crossing-pad builder; that combination is not supported";
-            if (Get(go, SynchronizerType) == null) return "The milepost holds no text synchronizer";
+            if (markers.Length != 1) return markers.Length == 0 ? "The milepost has no track marker" : "The milepost has more than one track marker";
+            if (Get(go, PadBuilder) != null) return "The milepost also has a crossing-pad builder. This combination is not supported";
+            if (Get(go, SynchronizerType) == null) return "The milepost has no text synchronizer";
             var m = markers[0];
             var type = System.Convert.ToString(Field(m, "type"));
-            if (type != "Generic") return "Only mileposts with a Generic track marker are supported; this marker is " + type;
+            if (type != "Generic") return "A milepost needs a Generic track marker for editing. This marker is " + type;
             var milepost = posts[0];
             // The milepost's own listener and property belong to the pattern, as the colocated relative position's reference does.
             return Consumers(go, m, references, setups,
@@ -86,7 +86,7 @@ namespace RailroaderScenePatcher {
         }
         MilepostState IMilepostWorld.Milepost(object target) {
             var go = (GameObject)target;
-            var component = go.GetComponent(post) ?? throw new InvalidOperationException("The object no longer holds a milepost");
+            var component = go.GetComponent(post) ?? throw new InvalidOperationException("The object no longer has a milepost component");
             var name = (string)prefix.GetValue(component);
             var cache = (IDictionary)originCache.GetValue(null);
             string cached;

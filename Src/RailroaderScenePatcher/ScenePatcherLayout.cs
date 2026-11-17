@@ -798,7 +798,7 @@ namespace RailroaderScenePatcher {
                     if (refusal != null) return CommandBand.Sentence(refusal);
                 }
             } catch { }
-            return "Track binding applies to Generic track markers, mileposts and crossing pads.";
+            return "Only Generic track markers, mileposts and crossing pads have editable track bindings.";
         }
         void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; for (var i = 0; i < coverageFields.Length; i++) coverageFields[i] = ""; }
         // The message that says a form is open. It leaves when the form closes or another one opens.
@@ -1374,7 +1374,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Detection addition", "Makes the crossing detect an extra track: a circuit of its own with three spans on tracks you select, under an ID you give it. Delete removes it again." },
                     new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and culls it with its own equipment. A rejected device names why it does not qualify." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
-                    new[] { "Milepost", "A milepost has the binding of its marker. Setting it registers the marker at that location; the post does not move and keeps its model and mile value." } },
+                    new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." } },
                 Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {

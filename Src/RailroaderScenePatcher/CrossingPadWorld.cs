@@ -74,7 +74,7 @@ namespace RailroaderScenePatcher {
             if (go.GetComponents<Component>().Any(c => c == null)) return "Missing script on the pad object";
             var builders = go.GetComponents<Component>().Where(c => c.GetType().FullName == PadBuilder).ToArray();
             if (builders.Length != 1) return builders.Length == 0 ? "The object holds no crossing-pad builder" : "The object holds several crossing-pad builders";
-            if (Get(go, Milepost) != null) return "Mileposts use the milepost capability; this pad operation does not apply";
+            if (Get(go, Milepost) != null) return "This operation is for crossing pads. Edit mileposts through the milepost capability";
             var m = markers[0];
             var type = System.Convert.ToString(Field(m, "type"));
             if (type != "Crossing" && type != "Generic") return "Only Crossing and Generic pad markers are supported; this marker is " + type;

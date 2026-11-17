@@ -35,10 +35,10 @@ namespace RailroaderScenePatcher.Core {
         public string Difference(MilepostState before) {
             if (before == null) return null;
             if (Prefix != before.Prefix) return "the milepost prefix changed from " + before.Prefix + " to " + Prefix;
-            if (Origin != before.Origin) return "the milepost origin flag changed";
+            if (Origin != before.Origin) return "the milepost's origin flag changed";
             if (Mileage != before.Mileage) return "the mile value changed from " + before.Mileage.ToString("R", CultureInfo.InvariantCulture) + " to " + Mileage.ToString("R", CultureInfo.InvariantCulture);
-            if (Text != before.Text) return "the displayed mile text changed from " + before.Text + " to " + Text;
-            if (before.ActiveInHierarchy && RenderedText != before.RenderedText) return "the rendered mile text changed from " + before.RenderedText + " to " + RenderedText;
+            if (Text != before.Text) return "the milepost's display text changed from " + before.Text + " to " + Text;
+            if (before.ActiveInHierarchy && RenderedText != before.RenderedText) return "the text rendered on the milepost changed from " + before.RenderedText + " to " + RenderedText;
             if (Model != before.Model) return "the milepost model changed";
             if (OriginCache != before.OriginCache) return "the origin cache for prefix " + Prefix + " changed from " + before.OriginCache + " to " + OriginCache;
             return null;
@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher.Core {
             var before = world.Milepost(target);
             write();
             var difference = world.Milepost(target).Difference(before);
-            if (difference != null) throw new InvalidOperationException("Applied milepost state did not verify: " + difference);
+            if (difference != null) throw new InvalidOperationException("The milepost edit changed a value that must stay unchanged: " + difference);
         }
         // The preserved milepost state is captured with the marker state, and restoration verifies that it returned.
         sealed class Preserved : IMarkerConsumer {
