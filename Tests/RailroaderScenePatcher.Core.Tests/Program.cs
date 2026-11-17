@@ -267,6 +267,7 @@ class Program {
         CommandBandTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
+        BakedPartTests.Run();
         SelectionTests.Run();
         GameDefinedGroupTests.Run();
         BoardTests.Run();

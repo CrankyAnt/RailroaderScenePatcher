@@ -37,6 +37,28 @@ namespace RailroaderScenePatcher.Core {
         // Set for a track-following placement: Position and Rotation are then its evaluation at the anchor's current pose,
         // or null until it is evaluated. Null for a fixed placement.
         public TrackFollowing Following { get; internal set; }
+        // Set on a placement a scene reads for an object that stands in a frame that can move, such as a part of a baked
+        // scenery group in its group root, while no fixed placement holds the object: the map placement of that frame
+        // when the object was read. Position and Rotation stay map coordinates. Applied back, such a placement returns
+        // the object to its place in the frame. Null for every other placement.
+        public Placement Frame { get; internal set; }
+        // The placement that keeps this placement's place in its frame, evaluated at the frame's placement now.
+        internal Placement InFrame(Placement now) {
+            if (Frame == null || now?.Position == null || now.Rotation == null) return this;
+            var inverse = Quaternion.Conjugate(Quaternion.Normalize(Frame.Rotation));
+            var local = Quaternion.Rotate(inverse, new[] { Position[0] - Frame.Position[0], Position[1] - Frame.Position[1], Position[2] - Frame.Position[2] });
+            var turn = Quaternion.Normalize(now.Rotation);
+            var moved = Quaternion.Rotate(turn, local);
+            return new Placement(new[] { now.Position[0] + moved[0], now.Position[1] + moved[1], now.Position[2] + moved[2] },
+                Quaternion.Normalize(Quaternion.Multiply(turn, Quaternion.Multiply(inverse, Rotation)))) { Frame = new Placement((double[])now.Position.Clone(), (double[])now.Rotation.Clone()) };
+        }
+    }
+    // A scene whose objects can stand in a frame that moves, such as the parts of a baked scenery group in their group
+    // root. The engine evaluates such an object's underlying placement at the frame's placement now, so a removal returns
+    // the object to its place in the frame wherever the frame stands.
+    public interface IFramedScene {
+        // The map placement of the frame the object stands in now, or null when it stands in none.
+        Placement FramePlacement(object target);
     }
     // Desired or observed state of one object. A null member is left untouched by an application.
     public sealed class ObjectState {
@@ -333,11 +355,14 @@ namespace RailroaderScenePatcher.Core {
             outcomes[id] = outcome;
             return outcome;
         }
-        // The state this object had before any modification of this engine touched it.
+        // The state this object had before any modification of this engine touched it. An object that stood in a frame
+        // keeps its place in that frame: its placement follows the frame to where the frame stands now.
         internal ObjectState Underlying(object target) {
             ObjectState state;
             if (!underlying.TryGetValue(target, out state)) underlying.Add(target, state = scene.Read(target));
-            return state;
+            if (state?.Placement?.Frame == null || !(scene is IFramedScene framed)) return state;
+            var now = framed.FramePlacement(target);
+            return now == null ? state : new ObjectState(state.Placement.InFrame(now), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter);
         }
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;

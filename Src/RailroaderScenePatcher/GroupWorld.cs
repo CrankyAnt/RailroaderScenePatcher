@@ -8,9 +8,9 @@ using RailroaderScenePatcher.Core;
 using UnityEngine;
 
 namespace RailroaderScenePatcher {
-    // The native operations of the baked scenery group capability: the group root's transform and activity, the game's
-    // cullers in the group and the physics state of its colliders. The rules live in Core's BakedSceneryRules and
-    // BakedSceneryGroups.
+    // The native operations of the baked scenery group and part capabilities: the transform and activity of a group root
+    // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
+    // BakedSceneryRules, BakedSceneryGroups and BakedSceneryParts.
     internal sealed class GroupWorld : IGroupWorld {
         internal const string SimpleCullerType = "Helpers.SimpleCuller", GameObjectCullerType = "Helpers.Culling.GameObjectCuller";
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
@@ -18,9 +18,10 @@ namespace RailroaderScenePatcher {
             rendererToken = renderer?.GetField("_cullingToken", Native.Flags), switcherToken = switcher?.GetField("_cullingToken", Native.Flags),
             managerSpheres = Native.Type("Helpers.Culling.CullingManager")?.GetField("_spheres", Native.Flags);
         static readonly MethodInfo simpleMoved = simple?.GetMethod("OnTransformDidChange", Native.Flags, null, Type.EmptyTypes, null);
+        static readonly FieldInfo simpleRadius = simple?.GetField("radius", Native.Flags);
         internal GroupWorld() {
             if (simple == null || renderer == null || switcher == null) throw new InvalidOperationException("Culler types unavailable");
-            if (cullingGroup?.FieldType != typeof(CullingGroup) || cullingSpheres?.FieldType != typeof(BoundingSphere[]) || simpleMoved == null) throw new MissingMemberException("Simple culler members unavailable");
+            if (cullingGroup?.FieldType != typeof(CullingGroup) || cullingSpheres?.FieldType != typeof(BoundingSphere[]) || simpleMoved == null || simpleRadius?.FieldType != typeof(float)) throw new MissingMemberException("Simple culler members unavailable");
             if (rendererToken == null || switcherToken == null || managerSpheres == null) throw new MissingMemberException("Culling registration members unavailable");
             if (renderer.GetMethod("RequestUpdateCullingPosition", Native.Flags) == null || switcher.GetMethod("RequestUpdateCullingPosition", Native.Flags) == null) throw new MissingMethodException("Culling refresh unavailable");
             var token = rendererToken.FieldType;
@@ -33,6 +34,8 @@ namespace RailroaderScenePatcher {
         // calls, and when the loaded scenes, their World roots or the objects down to the group roots change; a change
         // deeper inside a group waits for the next whole discovery.
         static Dictionary<GameObject, GroupRootVerdict> verdicts;
+        // The part rule's verdicts for the scene objects below the listed group roots, read with the group verdicts.
+        static Dictionary<GameObject, PartVerdict> partVerdicts = new Dictionary<GameObject, PartVerdict>();
         static string verdictKey;
         static int verdictFrame = -1;
         internal static void Invalidate() { verdicts = null; verdictKey = null; }
@@ -53,11 +56,24 @@ namespace RailroaderScenePatcher {
             var text = key.ToString();
             if (verdicts != null && verdictKey == text) return verdicts;
             var found = new Dictionary<GameObject, GroupRootVerdict>();
-            foreach (var world in worlds)
-                foreach (var verdict in BakedSceneryRules.Classify(new HierarchyNode(world.transform)))
-                    found[((HierarchyNode)verdict.Node).Transform.gameObject] = verdict;
-            verdictKey = text;
+            var parts = new Dictionary<GameObject, PartVerdict>();
+            foreach (var world in worlds) {
+                var classified = BakedSceneryRules.Classify(new HierarchyNode(world.transform));
+                foreach (var verdict in classified) found[((HierarchyNode)verdict.Node).Transform.gameObject] = verdict;
+                foreach (var part in BakedSceneryRules.Parts(classified)) parts[((HierarchyNode)part.Node).Transform.gameObject] = part;
+            }
+            verdictKey = text; partVerdicts = parts;
             return verdicts = found;
+        }
+        internal static PartVerdict PartVerdictOf(GameObject go) { if (go == null) return null; Verdicts(); return partVerdicts.TryGetValue(go, out var verdict) ? verdict : null; }
+        internal static bool IsPart(GameObject go) => PartVerdictOf(go)?.Disposition == PartDisposition.Part;
+        // The listed parts of the listed group roots, for the inventory.
+        internal static IEnumerable<GameObject> Parts() { Verdicts(); return partVerdicts.Where(pair => pair.Key != null && pair.Value.Disposition == PartDisposition.Part).Select(pair => pair.Key).ToArray(); }
+        // The listed group root a part stands in, or null.
+        internal static GameObject GroupRootOf(GameObject part) {
+            if (part == null) return null;
+            for (var t = part.transform.parent; t != null; t = t.parent) if (VerdictOf(t.gameObject)?.Disposition == GroupDisposition.Group) return t.gameObject;
+            return null;
         }
         // The identity of the objects from World down to the group roots: World, its folders, the town folders below
         // World/Large Scenery and the candidates below them.
@@ -69,15 +85,18 @@ namespace RailroaderScenePatcher {
             for (var i = 0; i < t.childCount; i++) Signature(t.GetChild(i), depth + 1, key, limit);
             key.Append('/');
         }
-        // One line per candidate of the rule, for evidence that compares the listed and unlisted group roots.
+        // One line per candidate of the rule and per scene object below a listed group root, for evidence that compares
+        // the listed and unlisted group roots and parts.
         internal static IEnumerable<string> Report() =>
             Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + p.Value.Disposition + (p.Value.Reason == null ? "" : "; " + p.Value.Reason) + (p.Value.Ticket == null ? "" : " (" + p.Value.Ticket + ")"))
+                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + (p.Value.Disposition == PartDisposition.Part ? "Part" : "Part " + p.Value.Disposition) + (p.Value.Reason == null ? "" : "; " + p.Value.Reason)))
                 .OrderBy(line => line, StringComparer.Ordinal);
         internal static GroupRootVerdict VerdictOf(GameObject go) => go != null && Verdicts().TryGetValue(go, out var verdict) ? verdict : null;
-        // The family an inspection-only candidate of the rule is listed under, or null when the rule lists none.
+        // The family an inspection-only candidate of the rule is listed under, or null when the rule lists none. A listed
+        // part stands in the family of its group.
         internal static string FamilyOf(GameObject go) {
             var verdict = VerdictOf(go);
-            if (verdict == null) return null;
+            if (verdict == null) return IsPart(go) ? BakedSceneryRules.Family : null;
             if (verdict.Disposition == GroupDisposition.Group) return BakedSceneryRules.Family;
             if (verdict.Disposition != GroupDisposition.InspectionOnly) return null;
             return verdict.Ticket == BakedSceneryRules.CrossbuckTicket ? "Crossbuck" : BakedSceneryRules.Family;
@@ -85,7 +104,18 @@ namespace RailroaderScenePatcher {
         // The rule's view of one loaded object; components and children are read once.
         sealed class HierarchyNode : IHierarchyNode {
             internal readonly Transform Transform;
-            string[] components; IHierarchyNode[] children; bool physical; bool? family;
+            string[] components; IHierarchyNode[] children; bool physical; bool? family, lod;
+            // Read only for the objects below a listed group root.
+            public bool LodLevel => lod ?? (lod = IsLodLevel(Transform)).Value;
+            // Every renderer at and below the object is one a LOD group on an object above it switches.
+            static bool IsLodLevel(Transform t) {
+                LODGroup holder = null;
+                for (var up = t.parent; up != null && holder == null; up = up.parent) holder = up.GetComponent<LODGroup>();
+                if (holder == null) return false;
+                var levels = new HashSet<Renderer>(holder.GetLODs().SelectMany(level => level.renderers ?? new Renderer[0]).Where(r => r != null));
+                var own = t.GetComponentsInChildren<Renderer>(true).Where(r => r != null && BakedSceneryRules.GivesPresence(r.GetType().FullName, true, false, false)).ToArray();
+                return own.Length != 0 && own.All(levels.Contains);
+            }
             internal HierarchyNode(Transform transform) { Transform = transform; }
             public string Name => Transform.name;
             void Read() {
@@ -110,6 +140,7 @@ namespace RailroaderScenePatcher {
         }
 
         static GameObject Root(object group) => group as GameObject ?? throw new InvalidOperationException("The group no longer exists");
+        static GameObject PartObject(object part) => part as GameObject ?? throw new InvalidOperationException("The part no longer exists");
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         public IReadOnlyList<object> Find(string scene, string path) =>
             BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && VerdictOf(g)?.Disposition == GroupDisposition.Group).Cast<object>().ToArray();
@@ -122,6 +153,23 @@ namespace RailroaderScenePatcher {
             if (components.Any(c => c == null)) return "Missing script in the group hierarchy";
             if (components.Any(c => c is Rigidbody)) return "The group holds a rigidbody; only static colliders are supported";
             return null;
+        }
+        public IReadOnlyList<object> FindParts(string scene, string path) =>
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && IsPart(g)).Cast<object>().ToArray();
+        public string PartRefusal(object part) => PartProblem(part as GameObject);
+        // Why a part cannot be edited, or null: what refuses its group refuses the part. Shared with the inventory.
+        internal static string PartProblem(GameObject part) {
+            if (!Loaded(part)) return "The part's scene is not loaded";
+            if (!IsPart(part)) return "This object is not a part of a listed baked scenery group";
+            var root = GroupRootOf(part);
+            return root == null ? "The part's group root is no longer listed" : Problem(root);
+        }
+        public string ActivityRefusal(object part) => SwitchedPart(part as GameObject);
+        // Why the part's Enabled setting cannot be set, or null: a game-object culler switches the part on and off by
+        // camera distance, so a disable would not hold.
+        internal static string SwitchedPart(GameObject part) {
+            var root = GroupRootOf(part);
+            return root != null && Listed(root).Contains(part) ? "A culler of the game switches this part on and off by camera distance, so an Enabled setting would not hold" : null;
         }
         // Whether a simple culler on the object switches the object itself by camera distance now.
         internal static bool SwitchesItself(GameObject go) { if (simple == null || cullingGroup == null) return false; var group = GroupOf(go.GetComponent(simple)); return group != null && group.enabled; }
@@ -138,36 +186,74 @@ namespace RailroaderScenePatcher {
         }
         static Component OwnSimple(GameObject root) => simple == null ? null : root.GetComponent(simple);
         static CullingGroup GroupOf(Component culler) => culler == null ? null : cullingGroup.GetValue(culler) as CullingGroup;
-        // The root's own activity as the scene authored it. A simple culler on the root switches the root off while the
-        // camera is far away; off while its culling group says it is out of view, the root counts as on.
+        // The object's own activity as the scene authored it. A simple culler on the object switches it off while the
+        // camera is far away; off while its culling group says it is out of view, the object counts as on.
         internal static bool Authored(GameObject root) {
             var group = GroupOf(OwnSimple(root));
             return AuthoredActivity.Enabled(root.activeSelf, group != null && group.enabled, group != null && group.enabled && group.IsVisible(0));
         }
+        static double[] Pose(Vector3 v) => new double[] { v.x, v.y, v.z };
+        static double[] Pose(Quaternion q) => new double[] { q.x, q.y, q.z, q.w };
         public GroupObservation Observe(object target) {
             var root = Root(target);
             Physics.SyncTransforms();
             var t = root.transform;
             var position = NativeInventory.MapPosition(t); var rotation = t.rotation;
-            var state = new ObjectState(new Placement(new double[] { position.x, position.y, position.z }, new double[] { rotation.x, rotation.y, rotation.z, rotation.w }), Authored(root));
+            var state = new ObjectState(new Placement(Pose(position), Pose(rotation)), Authored(root));
             var parts = new List<GroupPart>();
             var listed = Listed(root);
             foreach (var part in root.GetComponentsInChildren<Transform>(true)) {
                 if (part == t || Transient(part, t)) continue;
                 var local = t.InverseTransformPoint(part.position); var turn = Quaternion.Inverse(t.rotation) * part.rotation;
-                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), new double[] { local.x, local.y, local.z }, new double[] { turn.x, turn.y, turn.z, turn.w }, part.gameObject.activeSelf, Switched(part, listed)));
+                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Pose(local), Pose(turn), part.gameObject.activeSelf, Switched(part, listed), part.gameObject, part.parent == t ? null : part.parent.gameObject));
             }
             var cullers = new List<GroupCuller>();
             foreach (var culler in root.GetComponentsInChildren(simple, true)) {
                 var group = GroupOf(culler); var spheres = cullingSpheres.GetValue(culler) as BoundingSphere[];
                 var holds = group != null && group.enabled && spheres != null && spheres.Length > 0 && (culler.transform == t || culler.transform.parent.gameObject.activeInHierarchy);
-                cullers.Add(new GroupCuller(Relative(t, culler.transform) + "|" + SimpleCullerType, holds ? Map(spheres[0].position, culler.transform) : null, Map(culler.transform.position, culler.transform)));
+                // The simple culler on the root reports its radius and the radius that encloses the group's renderers.
+                double? radius = null, required = null;
+                if (culler.transform == t) { radius = spheres != null && spheres.Length > 0 ? spheres[0].radius : (float)simpleRadius.GetValue(culler); required = Enclosing(t); }
+                cullers.Add(new GroupCuller(Relative(t, culler.transform) + "|" + SimpleCullerType, holds ? Map(spheres[0].position, culler.transform) : null, Map(culler.transform.position, culler.transform), radius, required));
             }
             foreach (var type in new[] { renderer, switcher })
                 foreach (var culler in root.GetComponentsInChildren(type, true))
                     cullers.Add(new GroupCuller(Relative(t, culler.transform) + "|" + type.FullName, Registered(culler), Map(culler.transform.position, culler.transform)));
             var own = GroupOf(OwnSimple(root));
             return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled);
+        }
+        public PartObservation ObservePart(object target) {
+            var part = PartObject(target);
+            var root = GroupRootOf(part) ?? throw new InvalidOperationException("The part's group root is no longer listed");
+            var group = Observe(root);
+            var position = NativeInventory.MapPosition(part.transform);
+            return new PartObservation(new ObjectState(new Placement(Pose(position), Pose(part.transform.rotation)), Authored(part)), root, group, part.transform.parent == null ? null : part.transform.parent.gameObject);
+        }
+        // The radius around the root that encloses the renderers of the group whose objects are switched on below the
+        // root, from their meshes' bounds, so a part that a culler or its group has switched off still counts.
+        static float Enclosing(Transform root) {
+            var centre = root.position; var radius = 0f;
+            foreach (var shape in root.GetComponentsInChildren<Renderer>(true)) {
+                if (shape == null || !BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false) || !SwitchedOnBelow(shape.transform, root)) continue;
+                foreach (var corner in Corners(shape)) radius = Math.Max(radius, (corner - centre).magnitude);
+            }
+            return radius;
+        }
+        static bool SwitchedOnBelow(Transform t, Transform root) {
+            for (; t != null && t != root; t = t.parent) if (!t.gameObject.activeSelf) return false;
+            return t == root;
+        }
+        static IEnumerable<Vector3> Corners(Renderer shape) {
+            Bounds local; Matrix4x4 matrix;
+            if (shape is SkinnedMeshRenderer skinned) { local = skinned.localBounds; matrix = (skinned.rootBone != null ? skinned.rootBone : skinned.transform).localToWorldMatrix; }
+            else {
+                var filter = shape.GetComponent<MeshFilter>();
+                if (filter != null && filter.sharedMesh != null) { local = filter.sharedMesh.bounds; matrix = shape.transform.localToWorldMatrix; }
+                else if (shape.gameObject.activeInHierarchy) { local = shape.bounds; matrix = Matrix4x4.identity; }
+                else yield break;
+            }
+            for (var i = 0; i < 8; i++)
+                yield return matrix.MultiplyPoint3x4(local.center + Vector3.Scale(local.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
         }
         static bool Transient(Transform child, Transform root) {
             for (var t = child; t != null && t != root; t = t.parent) if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return true;
@@ -184,25 +270,34 @@ namespace RailroaderScenePatcher {
             if (index < 0 || index >= all.Length) throw new InvalidOperationException("Culling sphere index out of range");
             return Map(all[index].position, culler.transform);
         }
-        public void SetActive(object target, bool active) {
-            var root = Root(target);
-            // A simple culler on the root switches the root on when the camera comes near; while the group is disabled its
-            // culling group sends no events, and it resumes when the group is enabled.
-            var group = GroupOf(OwnSimple(root));
-            // Enabled again, the root takes the visibility its culling group holds, so a far group does not show until the
-            // camera comes near. A root whose culler has not started yet starts it now.
-            if (active) { if (group != null) group.enabled = true; root.SetActive(group == null || group.IsVisible(0)); }
-            else { if (group != null) group.enabled = false; root.SetActive(false); }
+        public void SetActive(object target, bool active) => Switch(Root(target), active);
+        public void SetPartActive(object target, bool active) => Switch(PartObject(target), active);
+        // A simple culler on the object switches it on when the camera comes near; while the object is disabled its
+        // culling group sends no events, and it resumes when the object is enabled.
+        static void Switch(GameObject go, bool active) {
+            var group = GroupOf(OwnSimple(go));
+            // Enabled again, the object takes the visibility its culling group holds, so a far object does not show until
+            // the camera comes near. An object whose culler has not started yet starts it now.
+            if (active) { if (group != null) group.enabled = true; go.SetActive(group == null || group.IsVisible(0)); }
+            else { if (group != null) group.enabled = false; go.SetActive(false); }
             Physics.SyncTransforms();
         }
-        public void SetPlacement(object target, Placement placement) {
-            var root = Root(target);
+        public void SetPlacement(object target, Placement placement) => Place(Root(target), placement);
+        public void SetPartPlacement(object target, Placement placement) => Place(PartObject(target), placement);
+        static void Place(GameObject go, Placement placement) {
             var map = new Vector3(Checked(placement.Position[0]), Checked(placement.Position[1]), Checked(placement.Position[2]));
             var rotation = new Quaternion(Checked(placement.Rotation[0]), Checked(placement.Rotation[1]), Checked(placement.Rotation[2]), Checked(placement.Rotation[3]));
-            var moves = NativeInventory.MovesWithOrigin(root.transform);
+            var moves = NativeInventory.MovesWithOrigin(go.transform);
             var scene = NativeInventory.ScenePosition(map, moves);
             if ((NativeInventory.MapPosition(scene, moves) - map).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
-            root.transform.SetPositionAndRotation(scene, rotation);
+            go.transform.SetPositionAndRotation(scene, rotation);
+            // Physics reads moved static colliders at the next simulation step; synchronise now so queries and checks agree.
+            Physics.SyncTransforms();
+        }
+        // The authored radius of each simple culler whose radius a part edit enlarged.
+        static readonly Dictionary<Component, float> authoredRadius = new Dictionary<Component, float>();
+        public void RefreshCulling(object target, bool enclose) {
+            var root = Root(target);
             // A renderer or game-object culler keeps its sphere where it registered it; an inactive one holds none and
             // registers at the current placement when it is enabled.
             foreach (var type in new[] { renderer, switcher })
@@ -212,9 +307,20 @@ namespace RailroaderScenePatcher {
             // A simple culler moves its sphere in its own Update, which does not run while the camera has culled it.
             foreach (var culler in root.GetComponentsInChildren(simple, true))
                 if (cullingSpheres.GetValue(culler) != null) simpleMoved.Invoke(culler, null);
-            // Physics reads moved static colliders at the next simulation step; synchronise now so queries and checks agree.
+            // The game sets the radius of a simple culler once, from its authored value. While a part keeps a fixed
+            // placement of its own the root's culler encloses the group's renderers, and never shrinks below that value.
+            var own = OwnSimple(root);
+            if (own != null) {
+                if (!authoredRadius.TryGetValue(own, out var authored)) authored = (float)simpleRadius.GetValue(own);
+                var radius = enclose ? Math.Max(authored, Enclosing(root.transform)) : authored;
+                if (enclose) authoredRadius[own] = authored; else authoredRadius.Remove(own);
+                simpleRadius.SetValue(own, radius);
+                if (cullingSpheres.GetValue(own) is BoundingSphere[] spheres && spheres.Length > 0) spheres[0].radius = radius;
+            }
             Physics.SyncTransforms();
         }
+        public bool Below(object target, object above) =>
+            target is GameObject part && part != null && above is GameObject over && over != null && part != over && part.transform.IsChildOf(over.transform);
         static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("Coordinate exceeds native precision"); return f; }
     }
 }

@@ -513,10 +513,11 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Inspection notes");
                 foreach (var note in selected.Notes) PlainLabel(builder, Breakable(note));
             }
-            // A group of the Baked scenery group family is decorative: the game reads nothing from where it stands.
+            // A group of the Baked scenery group family, and each part of it, is decorative: the game reads nothing from
+            // where it stands.
             if (selected.InspectionOnly == null && selected.Family == BakedSceneryRules.Family) {
                 Section(builder, "Use in the game");
-                PlainLabel(builder, CommandBand.Decorative);
+                PlainLabel(builder, selected.GroupPath != null ? CommandBand.PartDecorative : CommandBand.Decorative);
             }
             Section(builder, "State");
             var target = selected.Handle as GameObject;
@@ -1205,8 +1206,10 @@ namespace RailroaderScenePatcher {
                 default: {
                     var target = selected?.Handle as GameObject;
                     var enabled = target != null && (selected.Family == BakedSceneryRules.Family ? selected.Enabled : target.activeSelf);
+                    // A part that a culler of the game switches by camera distance cannot hold an Enabled setting.
+                    var switched = block == null && target != null && selected.GroupPath != null ? GroupWorld.SwitchedPart(target) : null;
                     return new[] {
-                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
+                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
                         Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
                             () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
@@ -1363,7 +1366,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." },
-                    new[] { "Baked scenery groups", "A group moves as one, with its culling and colliders; its parts keep their own Enabled setting." } },
+                    new[] { "Baked scenery groups", "A group moves as one, with its culling and colliders; its parts keep their own Enabled setting. A part with a fixed placement stays where it is when its group moves." } },
                 Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",

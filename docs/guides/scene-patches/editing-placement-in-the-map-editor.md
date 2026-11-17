@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit and save fixed placement in the native map editor
 
-This guide shows how to move, rotate, disable and restore a supported scene object in the native map editor, and how Save, Undo and Redo treat those edits. Scene patch editing currently supports independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), and baked scenery groups, described in [move or disable a baked scenery group](moving-baked-scenery-groups.md). The automated tests cover the behavior below with controlled scene, history and storage dependencies. A recorded journey in Railroader for these scene patch editing steps is not yet part of this guide.
+This guide shows how to move, rotate, disable and restore a supported scene object in the native map editor, and how Save, Undo and Redo treat those edits. Scene patch editing currently supports independent boards, described in [move a board with its terrain effects](moving-boards.md), the Ela bridge, described in [move or disable a bridge with its collision](placing-bridges.md), and baked scenery groups and their parts, described in [move or disable a baked scenery group](moving-baked-scenery-groups.md). The automated tests cover the behavior below with controlled scene, history and storage dependencies. A recorded journey in Railroader for these scene patch editing steps is not yet part of this guide.
 
 ## Before you start
 

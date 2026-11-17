@@ -149,10 +149,12 @@ namespace RailroaderScenePatcher.Core {
         // the native map editor does not edit it. Such an object is listed in the Inspection only group, shows no
         // problem and offers no edit; what would be a problem for a supported kind is a note here.
         public string InspectionOnly { get; }
+        // For a part of a baked scenery group, the hierarchy path of its group root; null for every other object.
+        public string GroupPath { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null) {
-            Enabled = enabled ?? active;
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string groupPath = null) {
+            Enabled = enabled ?? active; GroupPath = groupPath;
             InspectionOnly = inspectionOnly;
             var noted = (notes ?? Array.Empty<string>()).ToArray();
             if (inspectionOnly != null) { noted = noted.Concat(problems).ToArray(); problems = Array.Empty<string>(); }

@@ -244,6 +244,9 @@ namespace RailroaderScenePatcher {
         // The supported edits of a group root of the Baked scenery group family.
         internal const string GroupOperations = "Fixed placement and activity of the whole group; culling and colliders follow the group. Decorative: moving or disabling it changes no game function";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
+        // The supported edits of a part of a listed baked scenery group.
+        internal const string PartOperations = "Fixed placement and activity of this part; the group and its other parts stay as they are, and a fixed placement keeps the part where it is when the group moves. Decorative: moving or disabling it changes no game function";
+        internal const string PartDecorative = "Decorative. Moving or disabling this part changes no game function.";
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
         // The reason an object is inspection only, given as a whole clause.

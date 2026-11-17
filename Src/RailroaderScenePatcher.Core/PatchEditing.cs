@@ -266,6 +266,8 @@ namespace RailroaderScenePatcher.Core {
                     if (board != null) minimum = Max(minimum, board);
                     // A baked scenery group modification needs its capability whether or not it is available on this build.
                     if (target.Structure == BakedSceneryGroups.Structure) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
+                    // So does a modification of a part of a baked scenery group.
+                    if (target.Structure == BakedSceneryParts.Structure) minimum = Max(minimum, BakedSceneryParts.RequiredVersion);
                     if (!(scene is IVersionedScene versioned)) continue;
                     var required = versioned.MinimumPatcherVersion(target);
                     if (required != null) minimum = Max(minimum, required);
