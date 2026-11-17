@@ -26,7 +26,7 @@ namespace RailroaderScenePatcher.Core {
     }
     // A scene that knows which patcher version first supports a target.
     public interface IVersionedScene {
-        // Null when the target needs no version beyond the document's own requirements.
+        // Null when the target needs no version beyond the scene patch file's own requirements.
         string MinimumPatcherVersion(TargetIdentity target);
     }
 
@@ -236,7 +236,7 @@ namespace RailroaderScenePatcher.Core {
             }
         }
         public string MinimumPatcherVersion(TargetIdentity target) => RequiredVersion(target);
-        // The requirement holds for the document whether or not this capability is available in the current load.
+        // The requirement holds for the scene patch file whether or not this capability is available in the current load.
         public static string RequiredVersion(TargetIdentity target) =>
             target != null && target.Component == CullerType && (target.Structure == null || target.Structure == Structure) && (target.Scene != SylvaScene || target.Path != SylvaPath) ? PatternVersion : null;
         public void Dispose() { world.TileBuilt -= built; work.Clear(); }

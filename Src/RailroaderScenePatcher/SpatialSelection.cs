@@ -211,7 +211,7 @@ namespace RailroaderScenePatcher {
         }
 
         // The candidates a choice shows and offers: every candidate of its kind with a usable position, less those a
-        // patch could not name when the choice is for a document (SelectionOffers).
+        // patch could not name when the choice is for a scene patch file (SelectionOffers).
         SpatialCandidate[] Offered(SelectionKind kind, bool inspectOnly) {
             var all = scene.Scan(kind).Where(c => c.Points.Length != 0).ToArray();
             if (inspectOnly) return all;

@@ -17,15 +17,15 @@ static class DiagnosticTests {
         public void Remove(CurrentWarning row) { Rows.Remove(row); }
     }
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
-    const string Document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"board\"},\"dependsOn\":[],\"active\":false}}}";
+    const string ScenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"board\"},\"dependsOn\":[],\"active\":false}}}";
     public static void Run() {
         var scene = new Scene(); var box = new Box(); scene.Objects["sign"] = new List<object> { box };
         scene.FailApply = true;
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1", "Example author", "https://example.com/mod");
-        runtime.Apply(Document, source);
-        runtime.Apply(Document, source);
+        runtime.Apply(ScenePatchFile, source);
+        runtime.Apply(ScenePatchFile, source);
         Check(messages.Rows.Count == 1, "Repeated callbacks must retain one attributed failure per operation within a load");
         var failure = messages.Rows.Single();
         Check(failure.Source == "Railroader Scene Patcher" && failure.Operation == "move" && failure.ObjectPath == "sign", "Diagnostic source, operation and affected object must identify the failure");
@@ -34,9 +34,9 @@ static class DiagnosticTests {
         Check(failure.Message.Contains("Example Mod") && failure.Message.Contains("example/mod") && failure.Message.Contains("2.1") && failure.Message.Contains("0.5.0") && failure.Message.Contains("game-build"), "Reports must include supplying identity and relevant versions");
         Check(failure.Message.Contains("Example author") && failure.Message.Contains("https://example.com/mod"), "Reports retain supplied metadata");
         InvalidDefinitionsAndEditingRecovery();
-        EarlyCheckUsesCompleteDocumentProtection();
+        EarlyCheckUsesCompleteScenePatchFileProtection();
         ExactFallbackRequiresVerifiedRepair();
-        DocumentAndOperationDiagnosticsAreDistinct();
+        ScenePatchFileAndOperationDiagnosticsAreDistinct();
         IsolatedFailuresKeepIndependentWork();
         UnavailableEarlyPrerequisiteDefersWithoutFailingTheLoad();
         GroupActivityRefusalKeepsAccurateDiagnostics();
@@ -84,7 +84,7 @@ static class DiagnosticTests {
         var control = new CurrentWarning(new object(), "Control", "unrelated", "Control", "Keep this unrelated message");
         world.Messages.Rows.Add(control);
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
-        Check(engine.BeforeNativeCheck(json, "fixture", target).Outcomes["repair"].Applied, "The complete document repairs the native marker before its native check");
+        Check(engine.BeforeNativeCheck(json, "fixture", target).Outcomes["repair"].Applied, "The complete scene patch file repairs the native marker before its native check");
         Check(engine.Apply(json, "fixture").Outcomes["repair"].Applied, "The later world-load callback retains the same original underlying reference");
         var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(engine, mapEditor, new Store { Patch = json }); mapEditor.Session = session;
         var removed = session.Remove(target);
@@ -111,7 +111,7 @@ static class DiagnosticTests {
         var capabilities = new SceneCapabilities(() => world.MapIds); capabilities.Add(new TrackMarkerScene(world, Capability.Checked));
         var messages = new Messages(); var runtime = new PatchRuntime(new PatchEngine(capabilities), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
-        var json = Document.Replace("\"component\":\"board\"", "\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"").Replace("\"active\":false", "\"active\":true");
+        var json = ScenePatchFile.Replace("\"component\":\"board\"", "\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"").Replace("\"active\":false", "\"active\":true");
         var result = runtime.Apply(json, source);
         Check(!result.Outcomes["move"].Applied && world.Mutations == 0 && messages.Rows.Single().Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "mod author", "A state without a relationship still enforces group activity rules and reports the invalid supplied value accurately");
         runtime.Apply(json, source);
@@ -138,24 +138,24 @@ static class DiagnosticTests {
         var scene = new Scene(); var broken = new Box(); var independent = new Box();
         scene.Objects["sign"] = new List<object> { broken }; scene.Objects["other"] = new List<object> { independent };
         scene.FailingTarget = broken;
-        var json = JObject.Parse(Document); var entries = (JObject)json["modifications"];
+        var json = JObject.Parse(ScenePatchFile); var entries = (JObject)json["modifications"];
         var second = (JObject)entries["move"].DeepClone(); second["target"]["path"] = "other"; entries["independent"] = second;
         var messages = new Messages(); var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
         var result = runtime.Apply(json.ToString(), source);
-        Check(!result.Outcomes["move"].Applied && broken.Active && result.Outcomes["independent"].Applied && !independent.Active, "A failed operation restores its object while independent document work continues");
+        Check(!result.Outcomes["move"].Applied && broken.Active && result.Outcomes["independent"].Applied && !independent.Active, "A failed operation restores its object while independent scene patch file work continues");
         runtime.Apply(json.ToString(), source);
         Check(messages.Rows.Count == 1 && messages.Rows[0].Operation == "move", "Only the failed operation gets an attributed row, including after a repeated callback");
     }
-    static void DocumentAndOperationDiagnosticsAreDistinct() {
+    static void ScenePatchFileAndOperationDiagnosticsAreDistinct() {
         var scene = new Scene { Capability = Capability.Incompatible };
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
-        runtime.Apply(Document, source);
+        runtime.Apply(ScenePatchFile, source);
         scene.Capability = Capability.Checked;
-        runtime.Apply(Document.Replace("\"move\":{", "\"document\":{"), source);
-        Check(messages.Rows.Count == 2, "A modification named document is distinct from a document-level failure");
+        runtime.Apply(ScenePatchFile.Replace("\"move\":{", "\"document\":{"), source);
+        Check(messages.Rows.Count == 2, "A modification named document is distinct from a failure of the whole scene patch file");
     }
     static void ExactFallbackRequiresVerifiedRepair() {
         var scene = new Scene(); var box = new Box(); scene.Objects["sign"] = new List<object> { box };
@@ -167,7 +167,7 @@ static class DiagnosticTests {
         warnings.Rows.Add(row); warnings.Rows.Add(other);
         var attribution = new WarningAttribution(row, box, "Graph unavailable at the native check");
         Check(!runtime.Reconcile(source, "move", attribution, warnings, () => true), "Warning removal requires an applied operation");
-        runtime.Apply(Document, source);
+        runtime.Apply(ScenePatchFile, source);
         Check(!runtime.Reconcile(source, "move", attribution, warnings, () => false), "An applied result alone is insufficient without independent repair verification");
         Check(!runtime.Reconcile(source, "move", new WarningAttribution(row, box, null), warnings, () => true), "An available early route forbids fallback");
         var changed = new CurrentWarning(row.Token, "System", "marker-id", "Sign", "Changed warning");
@@ -182,24 +182,24 @@ static class DiagnosticTests {
         Check(!runtime.Reconcile(source, "move", attribution, warnings, () => true), "Repeated callback cannot remove anything else");
         warnings.Rows.Insert(0, row);
         runtime.Apply("{broken", source);
-        Check(!runtime.Reconcile(source, "move", attribution, warnings, () => true), "A later rejected complete document must invalidate its previous repair permission");
+        Check(!runtime.Reconcile(source, "move", attribution, warnings, () => true), "A later rejected complete scene patch file must invalidate its previous repair permission");
     }
     static void InvalidDefinitionsAndEditingRecovery() {
         var scene = new Scene();
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
-        runtime.Apply(Document.Replace("\"active\":false", "\"active\":42"), source);
+        runtime.Apply(ScenePatchFile.Replace("\"active\":false", "\"active\":42"), source);
         Check(messages.Rows.Count == 1 && messages.Rows[0].Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "mod author", "A demonstrably invalid supplied value directs reports to its mod author");
         Check(!messages.Rows[0].Message.Contains("Supplied author") && !messages.Rows[0].Message.Contains("Published website"), "Absent optional metadata must not be invented");
         runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
-        runtime.Apply(Document.Replace("\"active\":false", "\"futureOperation\":true"), source);
+        runtime.Apply(ScenePatchFile.Replace("\"active\":false", "\"futureOperation\":true"), source);
         runtime.Apply("{broken", source);
-        runtime.Apply(Document.Replace("\"formatVersion\":1", "\"formatVersion\":2"), source);
-        runtime.Apply(Document.Replace("\"mapId\":\"map\"", "\"mapId\":\"other\""), source);
+        runtime.Apply(ScenePatchFile.Replace("\"formatVersion\":1", "\"formatVersion\":2"), source);
+        runtime.Apply(ScenePatchFile.Replace("\"mapId\":\"map\"", "\"mapId\":\"other\""), source);
         Check(messages.Rows.Count == 1 && scene.MutationCalls == 0, "Unknown content, unreadable formats and inapplicable maps are reported only in the native map editor and never mutate");
     }
-    static void EarlyCheckUsesCompleteDocumentProtection() {
+    static void EarlyCheckUsesCompleteScenePatchFileProtection() {
         var world = new FakeMarkerWorld();
         var marker = new FakeMarker { Id = "sign", Segment = "missing" };
         world.Objects["sign"] = new List<object> { marker }; world.Segments["replacement"] = new List<double> { 100 };
@@ -210,7 +210,7 @@ static class DiagnosticTests {
         var json = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"repair\":{\"target\":{\"scene\":\"scene\",\"path\":\"sign\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"dependsOn\":[],\"relationships\":{\"trackMarker\":{\"segment\":\"replacement\",\"end\":\"a\",\"distance\":10}}}}}";
         var target = new TargetIdentity("scene", "sign", "Track.TrackMarker", "track-marker-v1");
         runtime.BeforeNativeCheck(json.Substring(0, json.Length - 2) + ",\"\":{}}}", source, target);
-        Check(marker.Segment == "missing", "An invalid complete document must not repair even a valid early entry");
+        Check(marker.Segment == "missing", "An invalid complete scene patch file must not repair even a valid early entry");
         var result = runtime.BeforeNativeCheck(json, source, target);
         // The controlled native check runs after the public callback and remains enabled for unresolved cases.
         Check(result.Outcomes["repair"].Applied && marker.Segment == "replacement" && world.Registrations(marker).Count == 1, "The original native check must observe the repaired binding and registration");

@@ -52,22 +52,22 @@ namespace RailroaderScenePatcher.Core {
             var offset = bytes.Length >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf ? 3 : 0;
             return Utf8.GetString(bytes, offset, bytes.Length - offset);
         }
-        public string ReadPatchDocument() => ReadText(PatchPath);
+        public string ReadScenePatchFile() => ReadText(PatchPath);
         public string ReadModInfo() => ReadText(InfoPath);
         string ReadText(string path) => files.Exists(path) ? Decode(files.Read(path)) : null;
-        public void WritePatchDocument(string text) {
+        public void WriteScenePatchFile(string text) {
             files.CreateDirectory(Path.GetDirectoryName(PatchPath));
             Publish(PatchPath, text);
-            // The owner learns the exact text that is on disk now: its own write is no outside change of the document.
+            // The owner learns the exact text that is on disk now: its own write is no outside change of the scene patch file.
             try { patchWritten?.Invoke(text); } catch { }
         }
         public void WriteModInfo(string text) { Publish(InfoPath, text); }
         // The digest of the bytes each backup of this storage secured, by backup path.
         readonly Dictionary<string, byte[]> backups = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         static byte[] Digest(byte[] bytes) { using (var sha = SHA256.Create()) return sha.ComputeHash(bytes); }
-        // Copies the patch document's exact bytes, also bytes that are not UTF-8, to a new file beside it whose name no
+        // Copies the scene patch file's exact bytes, also bytes that are not UTF-8, to a new file beside it whose name no
         // other file has, and reads the copy back before it counts as a backup. A failed copy is removed.
-        public string BackupPatchDocument() {
+        public string BackupScenePatchFile() {
             var original = files.Read(PatchPath);
             var backup = PatchPath + ".backup-" + Guid.NewGuid().ToString("N");
             if (files.Exists(backup)) throw new IOException("The backup name is already in use: " + backup);
@@ -99,7 +99,7 @@ namespace RailroaderScenePatcher.Core {
                 throw;
             }
         }
-        // Another process, such as a virus scanner, a sync client or the patcher's own periodic read of the document, can
+        // Another process, such as a virus scanner, a sync client or the patcher's own periodic read of the scene patch file, can
         // hold the file open for a moment; Windows then refuses to replace it. An I/O failure is tried again after a short
         // pause, a bounded number of times; any other failure, such as a read-only file, fails at once.
         void TakePlace(string pending, string path) {

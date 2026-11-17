@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher {
         // Focus is also disabled, with its reason, when the inspected object has no point to go to, such as a starter
         // placement marker whose track location does not resolve.
         internal static string Focus(bool inspected, string noTarget = null) => !inspected ? "Inspect an object first." : String.IsNullOrEmpty(noTarget) ? null : noTarget;
-        // Copy ID is also disabled, with the editing session's refusal, while the edited mod's patch document cannot be read.
+        // Copy ID is also disabled, with the editing session's refusal, while the edited mod's scene patch file cannot be read.
         internal static string CopyId(bool inspected, string refusal = null) => inspected ? refusal : "Inspect an object first.";
         // Clear ends the inspection and cancels a pending world choice: it is disabled only when there is neither.
         internal static string Clear(bool inspected, bool pending) => inspected || pending ? null : "Nothing is inspected and no world choice is pending.";
@@ -83,9 +83,9 @@ namespace RailroaderScenePatcher {
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
         // Why Clear location has nothing to clear: this mod sets no track location for the starter placement marker.
-        internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This MapMod sets no track location for this marker, so there is nothing to clear.";
+        internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This mod sets no track location for this marker, so there is nothing to clear.";
         // Why Clear activity cannot run for an object this mod sets no activity for, or null.
-        internal static string ClearActivityReason(bool hasValue) => hasValue ? null : "This MapMod sets no activity for this object, so there is nothing to clear.";
+        internal static string ClearActivityReason(bool hasValue) => hasValue ? null : "This mod sets no activity for this object, so there is nothing to clear.";
         // Why the footer's Details of a world choice cannot show anything, or null: it shows the clicked candidate.
         internal static string CandidateDetailsReason(int offered) => offered == 0 ? "Click a marking or track in the world first." : null;
         // The supported-edits text of an object the patcher cannot edit, with the reason that was found. It promises
@@ -188,7 +188,7 @@ namespace RailroaderScenePatcher {
         internal static int PlacementMode(bool followsTrack) => followsTrack ? FollowMode : NumericMode;
         // The result of a placement edit on a crossing pad. The pad's geometry is generated along its track binding, so
         // moving the pad object moves nothing the player sees: the result says so instead of "completed".
-        internal static string PadPlacement(string action) => action + " changed the pad object's pose only. The pad's geometry is generated along its track binding and did not move; change the binding on Connections to move the pad.";
+        internal static string PadPlacement(string action) => action + " changed the pad object's physical placement only. The pad's geometry is generated along its track binding and did not move; change the binding on Connections to move the pad.";
         // Terrain output in plain words, for an object that has terrain output at all.
         internal static string Terrain(string problem, string error, bool settled, string completed, string outstanding, bool anyCompleted) =>
             problem != null ? "Terrain state unknown: " + problem
@@ -296,7 +296,7 @@ namespace RailroaderScenePatcher {
             return Double.TryParse(entered, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value);
         }
         // A number inside a binding line, such as a distance, as the panel shows it; other text stays as it is.
-        // The end of a track location reads in lower case everywhere, as the document writes it: "a" or "b".
+        // The end of a track location reads in lower case everywhere, as the scene patch file writes it: "a" or "b".
         internal static string Shown(string key, string value) =>
             key == "end" ? (value ?? "").ToLowerInvariant() :
             (key == "distance" || key == "from" || key == "to") && Double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number) ? Number(number) : value;
@@ -315,7 +315,7 @@ namespace RailroaderScenePatcher {
         // is for one; a choice that only inspects names none.
         internal static string ChoiceLog(string forObject, string problem, IReadOnlyList<string> offers) =>
             LogLine("World choice", forObject, problem + (offers == null || offers.Count < 2 ? "" : " Candidates: " + String.Join("; ", offers.Select((label, i) => (i + 1) + " " + ChoiceLabel(label, offers, 80)))));
-        // The caption of a coverage role, in words: the document's "approachA" reads "Approach A".
+        // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
         // every mode. An object that cannot be edited keeps Numeric, which shows its placement, and has every other mode
@@ -364,7 +364,7 @@ namespace RailroaderScenePatcher {
         // plain result of an edit that did something else than its name says.
         internal static string EditResult(string action, bool unchanged, bool reverted, string completed) =>
             unchanged ? action + ": nothing changed; the object has this value already."
-            : reverted ? action + " completed. The value equals the object's value without this MapMod, so the modification no longer sets it."
+            : reverted ? action + " completed. The value equals the object's value without this mod, so the modification no longer sets it."
             : completed ?? action + " completed.";
         // The name of a candidate among the offers of a world choice: its number when several are offered, the same
         // in the world label, the message and the panel's list.

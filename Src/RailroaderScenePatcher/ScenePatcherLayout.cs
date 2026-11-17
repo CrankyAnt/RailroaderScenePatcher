@@ -70,7 +70,7 @@ namespace RailroaderScenePatcher {
             return button;
         }
         void PlainLabel(UIPanelBuilder builder, string value) => builder.AddLabel(value, text => text.richText = false);
-        // Scene and document text is shown literally inside the native text styles.
+        // Scene and scene patch file text is shown literally inside the native text styles.
         static string Literal(string value) => (value ?? "").Replace("<", "<noparse><</noparse>");
         static string Tint(string color, string value) => "<color=" + color + ">" + Literal(value) + "</color>";
         // A named value: the native field label above the value, left-aligned. Every tab uses this one form, so the same
@@ -274,7 +274,7 @@ namespace RailroaderScenePatcher {
                     .Tooltip("Clear", CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", clear));
                 var copy = CommandBand.CopyId(selected != null, attachment?.Session.CopyIdRefusal);
                 Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
-                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's target map, target identity and placement as patch-document JSON.", copy));
+                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's target map, target identity and placement as scene patch file JSON.", copy));
                 row.Spacer();
                 // The window's "?" belongs in the title bar; it stands here only when the title bar could not take it.
                 if (!presentation.TitleHelp) HelpButton(row, NativePresentation.WindowHelpRegion, "Window");
@@ -294,7 +294,7 @@ namespace RailroaderScenePatcher {
             if (attachment == null) { text = String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus; return false; }
             try {
                 var outstanding = attachment.Session.Outstanding(attachment.NativeDirty);
-                text = outstanding.Count == 0 ? "All required writes are saved." : "Unsaved: " + String.Join(", ", outstanding) + ". Use the editor's Save button.";
+                text = outstanding.Count == 0 ? "All required writes are saved." : "Unsaved: " + String.Join(", ", outstanding) + ". Use the Map Editor's Save button.";
                 return outstanding.Count != 0;
             } catch (Exception e) { text = "Outstanding work unknown: " + e.GetBaseException().Message; return true; }
         }
@@ -334,7 +334,7 @@ namespace RailroaderScenePatcher {
             builder.AddSegmentedControlCompact(segments => {
                 // All first, then the rest by name.
                 segments.AddSegment(CommandBand.AllFilter, outlinerFilter == OutlinerFilter.All, presentation.Action(() => outlinerFilter = OutlinerFilter.All)).Tooltip(CommandBand.AllFilter, "Show every observed object.");
-                segments.AddSegment(CommandBand.ChangedFilter, outlinerFilter == OutlinerFilter.Changed, presentation.Action(() => outlinerFilter = OutlinerFilter.Changed)).Tooltip(CommandBand.ChangedFilter, "Show the objects this MapMod changes.");
+                segments.AddSegment(CommandBand.ChangedFilter, outlinerFilter == OutlinerFilter.Changed, presentation.Action(() => outlinerFilter = OutlinerFilter.Changed)).Tooltip(CommandBand.ChangedFilter, "Show the objects this mod changes.");
                 segments.AddSegment(CommandBand.DisabledFilter, outlinerFilter == OutlinerFilter.Disabled, presentation.Action(() => outlinerFilter = OutlinerFilter.Disabled)).Tooltip(CommandBand.DisabledFilter, "Show the objects that are switched off themselves. A disabled object is never listed as a problem.");
                 segments.AddSegment(CommandBand.ProblemsFilter, outlinerFilter == OutlinerFilter.Problems, presentation.Action(() => outlinerFilter = OutlinerFilter.Problems)).Tooltip(CommandBand.ProblemsFilter, "Show the objects with a detected problem.");
             });
@@ -389,7 +389,7 @@ namespace RailroaderScenePatcher {
                         if (item.InspectionOnly != null) context += "  <alpha=#99>" + Literal(item.Family) + "<alpha=#FF>";
                         holder.AddChild(new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
                             (item.Active ? Literal(name) : "<i>" + Literal(name) + "</i>") + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly)) + (changed ? "\nChanged by this MapMod" : "") + (added ? "\nAdded by this MapMod" : "") +
+                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly)) + (changed ? "\nChanged by this mod" : "") + (added ? "\nAdded by this mod" : "") +
                                 (item.Problems.Count == 0 ? "" : "\n" + String.Join("\n", item.Problems))).Replace("<", "\\u003c").Replace(">", "\\u003e")
                         });
                     }
@@ -413,7 +413,7 @@ namespace RailroaderScenePatcher {
             builder.Spacer(4f);
             Line(builder, "<style=Footnote>Save, Undo, Redo: Map Editor</style>", "Save, Undo and Redo", "Use the Map Editor's own Save, Undo and Redo.");
             Line(builder, "<style=Footnote>Refresh after native edits</style>", "Refresh", "Refresh after Undo, Redo or a native edit.");
-            Line(builder, "<style=Footnote>Reload clears Undo history</style>", "Editor reload", "Reloading ends the Undo history.");
+            Line(builder, "<style=Footnote>Reload clears Undo history</style>", "Map Editor reload", "Reloading ends the Undo history.");
             builder.Spacer(4f);
         }
         void FitOutliner(TMP_Text measure) {
@@ -463,7 +463,7 @@ namespace RailroaderScenePatcher {
             if (!selected.Active) { parts.Add("Inactive"); text.Add("Inactive"); }
             // The native Map Editor's badges, as its inspector shows them beside the row marker.
             foreach (var badge in CommandBand.Badges(IsChanged(selected), IsAdded(selected))) {
-                parts.Add(badge.Markup); text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this MapMod" : "Added by this MapMod");
+                parts.Add(badge.Markup); text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this mod" : "Added by this mod");
             }
             if (selected.InspectionOnly != null) { parts.Add("Inspection only"); text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly)); }
             if (selected.Problems.Count != 0) {
@@ -578,7 +578,7 @@ namespace RailroaderScenePatcher {
                     .Tooltip("Track point", "Where the start setup places the front of this marker's car cut, in map coordinates. Focus goes here.");
             }
             var tips = new[] { "Enter a position in map coordinates and a rotation in degrees.", "Drag the native Move or Rotate gizmo in the world.",
-                "Move the object once onto a chosen track or endpoint.", "Keep the object's pose relative to a chosen track or endpoint." };
+                "Move the object once onto a chosen track or endpoint.", "Keep the object's placement relative to a chosen track or endpoint." };
             builder.AddSegmentedControlCompact(segments => {
                 for (var i = 0; i < PlacementModes.Length; i++) {
                     var mode = i;
@@ -614,7 +614,7 @@ namespace RailroaderScenePatcher {
                 var live = new TMP_Text[2];
                 for (var group = 0; group < 2; group++) {
                     if (group != 0) builder.Spacer(6f);
-                    live[group] = ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, placementFields, group * 3, "The object's pose now; it follows the gizmo while you drag.", null, column => true);
+                    live[group] = ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, placementFields, group * 3, "The object's placement now; it follows the gizmo while you drag.", null, column => true);
                 }
                 gizmoPlacement = live;
                 Line(builder, "<style=Footnote>" + Literal(block ?? ChoiceBlock ?? (gizmo?.Shown == true ? gizmo.State : "The gizmo appears on the object in the world.")) + "</style>", null, null);
@@ -637,7 +637,7 @@ namespace RailroaderScenePatcher {
                 }
                 if (picked != null) Field(builder, "Picked", picked.Identity.ToString());
                 if (following == null && picked == null) Field(builder, "Following", "Nothing");
-                Line(builder, "<style=Footnote>" + (picked != null ? "Next: Start keeps the object's pose relative to the picked track."
+                Line(builder, "<style=Footnote>" + (picked != null ? "Next: Start keeps the object's placement relative to the picked track."
                     : following != null ? "Stop ends following. Track or Node picks another track to follow."
                     : "Next: Track or Node, then click in the world, Confirm and Start.") + "</style>", null, null);
             }
@@ -710,13 +710,13 @@ namespace RailroaderScenePatcher {
                         var existing = circuits.Circuits.FirstOrDefault(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == id);
                         CloseEquipmentForm(); coverageAddition = id; coverageCircuit = existing.Key ?? DetectionAddition.Key("", id); preparedCoverage = null; ReadCoverage(existing.Value);
                         OpenedForm("Detection addition " + id + " is open at the top of this tab: select its tracks, then Preview.");
-                    }).Inactive(wait != null).Tooltip("Add detection with this ID", CommandBand.Tooltip("Make the crossing detect an extra track: give the addition an ID that is unique in this MapMod's patch document, then select its tracks.", wait));
+                    }).Inactive(wait != null).Tooltip("Add detection with this ID", CommandBand.Tooltip("Make the crossing detect an extra track: give the addition an ID that is unique in this mod's scene patch file, then select its tracks.", wait));
                 });
             }
         }
         // Lights and gates added to the crossing: copies of eligible devices already loaded in the crossing's scene, which the
         // crossing controller drives. The open form stands first; the tab's pinned row holds Preview, Remove and Apply for it.
-        // Every device the editor considers is listed: an eligible one with its Use button, a rejected one with its reason.
+        // Every device scene patch editing considers is listed: an eligible one with its Use button, a rejected one with its reason.
         // The open light or gate form stands first in the Connections tab, above the replacement targets it does not use,
         // so the scrolling tab body shows its ID and position at its least height; its source is one line with the full
         // path in the tooltip.
@@ -730,7 +730,7 @@ namespace RailroaderScenePatcher {
                 else {
                     var idInput = builder.AddInputField(equipmentFields[0] ?? "", value => equipmentFields[0] = value);
                     idInput.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => { equipmentFields[0] = value; preparedEquipment = null; FieldsChanged(); });
-                    idInput.Tooltip("Equipment ID", "The persistent ID of this light or gate in this MapMod's patch document: letters, digits, '.', '_' or '-'.");
+                    idInput.Tooltip("Equipment ID", "The persistent ID of this light or gate in this mod's scene patch file: letters, digits, '.', '_' or '-'.");
                 }
                 ValueRow(builder, "Position", "m", new[] { "X", "Y", "Z" }, equipmentFields, 1, block, "The copy's position in map coordinates.", column => true);
                 ValueRow(builder, "Rotation", "°", new[] { "X", "Y", "Z" }, equipmentFields, 4, block, "The copy's rotation in degrees.", column => true);
@@ -751,9 +751,9 @@ namespace RailroaderScenePatcher {
             if (attachment != null) try { current = attachment.Session.Equipment(identity); mine = attachment.Session.EquipmentEntries(identity); }
                 catch (Exception e) { builder.AddLabel(Tint(Red, "Lights and gates unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
             if (current != null) {
-                var others = current.Additions.Where(a => a.Scope != attachment.Session.DocumentKey).ToArray();
+                var others = current.Additions.Where(a => a.Scope != attachment.Session.ScenePatchFileKey).ToArray();
                 if (mine.Count == 0 && others.Length == 0) Line(builder, "None added", null, null);
-                // This mod's additions come from its document, so one whose build failed is listed with its reason and can
+                // This mod's additions come from its scene patch file, so one whose build failed is listed with its reason and can
                 // be edited or removed.
                 foreach (var entry in mine) {
                     var item = entry.Built ?? entry.Addition;
@@ -761,12 +761,12 @@ namespace RailroaderScenePatcher {
                     if (entry.Built != null) try { state = attachment.Session.EquipmentStatus(identity, item.Id); } catch (Exception e) { state = "state unknown: " + e.GetBaseException().Message; }
                     if (entry.Problem != null) FieldMarkup(builder, "Light or gate " + item.Id, Literal(Breakable(item.ToString()) + ".") + " " + Tint(Red, "Not built: " + CommandBand.Sentence(entry.Problem)));
                     else Field(builder, "Light or gate " + item.Id, Breakable(item.ToString()) + (state == null ? "" : ". " + CommandBand.Sentence(state)));
-                    var document = entry.Addition;
-                    Button(builder, "Edit " + item.Id, () => ReadEquipment(document)).Inactive(wait != null)
+                    var scenePatchFile = entry.Addition;
+                    Button(builder, "Edit " + item.Id, () => ReadEquipment(scenePatchFile)).Inactive(wait != null)
                         .Tooltip("Edit light or gate " + item.Id, CommandBand.Tooltip(entry.Problem == null ? "Change this copy's placement, or remove it." : "Correct this light or gate, or remove it.", wait));
                 }
                 foreach (var item in others)
-                    Field(builder, "Light or gate " + item.Id, Breakable(item.ToString()) + " (another MapMod's addition; read only)");
+                    Field(builder, "Light or gate " + item.Id, Breakable(item.ToString()) + " (another mod's addition; read only)");
             }
             Section(builder, "Add a light or gate");
             IReadOnlyList<SourceCandidate> candidates = null;
@@ -866,10 +866,10 @@ namespace RailroaderScenePatcher {
         }
         // The Changes tab: what this mod changes about the inspected object, and what that change still awaits.
         void DrawChanges(UIPanelBuilder builder) {
-            Section(builder, "This MapMod");
+            Section(builder, "This mod");
             var changed = IsChanged(selected);
             FieldMarkup(builder, "Object", changed ? ChangedBadge : "Unchanged")
-                .Tooltip("Changed", "Whether Data/scene-patches.json of the active MapMod holds a modification of this object.");
+                .Tooltip("Changed", "Whether Data/scene-patches.json of the edited mod holds a modification of this object.");
             // One short line per changed setting, with the value the object has without this modification.
             if (changed && attachment != null) {
                 IReadOnlyList<string> lines = null;
@@ -1053,10 +1053,10 @@ namespace RailroaderScenePatcher {
             // A starter placement marker's modification is removed or rechecked from every tab.
             var block = selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : EditBlock();
             var identity = selected?.Identity;
-            var unchanged = block ?? (IsChanged(selected) ? null : "This MapMod does not change this object.");
+            var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.");
             return new[] {
                 // The whole modification goes: the control says so in full and takes two cells.
-                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this MapMod's modification. Every circuit returns to its coverage without it, and its detection additions and lights and gates are deleted." : "Remove this MapMod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
+                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Every circuit returns to its coverage without it, and its detection additions and lights and gates are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
                     var removed = current.Remove(identity, inspection);
                     // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
                     if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
@@ -1099,7 +1099,7 @@ namespace RailroaderScenePatcher {
                         return new[] {
                             Slot("Track", "Choose the track to follow.", unavailable, () => BeginSelection(SelectionKind.TrackSegment, selected)),
                             Slot("Node", "Choose the track node, an endpoint, to follow.", unavailable, () => BeginSelection(SelectionKind.TrackNode, selected)),
-                            Slot("Start", "Start following: keep the current pose relative to the picked track or endpoint.", unavailable ?? (picked == null ? "Choose a track or endpoint and confirm it first." : null), () => {
+                            Slot("Start", "Start following: keep the current placement relative to the picked track or endpoint.", unavailable ?? (picked == null ? "Choose a track or endpoint and confirm it first." : null), () => {
                                 var maps = picked.MapIds.ToArray();
                                 Edit(FollowPlace, "Track following", (current, inspection) => {
                                     if (!maps.SequenceEqual(capabilities.MapIds)) throw new InvalidOperationException("Map context changed; select the track again");
@@ -1108,7 +1108,7 @@ namespace RailroaderScenePatcher {
                                     return current.Follow(identity, anchor, inspection);
                                 }, true);
                             }, "Start following"),
-                            Slot("Stop", "Stop following and keep the current pose.", unavailable ?? (following == null ? "This object does not follow a track." : null),
+                            Slot("Stop", "Stop following and keep the current placement.", unavailable ?? (following == null ? "This object does not follow a track." : null),
                                 () => Edit(FollowPlace, "Stop following", (current, inspection) => current.StopFollowing(identity, inspection)), "Stop following") };
                     }
                 case ConnectionsTab: {
@@ -1118,15 +1118,15 @@ namespace RailroaderScenePatcher {
                         var equipmentId = (equipmentFields[0] ?? "").Trim();
                         IReadOnlyList<EquipmentEntry> entries = Array.Empty<EquipmentEntry>();
                         try { entries = session.EquipmentEntries(identity); } catch { }
-                        // Removal applies to an addition the document holds, whether or not it was built.
-                        var inDocument = entries.Any(e => e.Addition.Id == equipmentId);
+                        // Removal applies to an addition the scene patch file holds, whether or not it was built.
+                        var inScenePatchFile = entries.Any(e => e.Addition.Id == equipmentId);
                         var prepared = preparedEquipment != null && preparedEquipment.Preview.Error == null ? preparedEquipment : null;
                         return new[] {
                             Slot("Preview", "Preview this light or gate.", null, () => {
                                 var value = ParseEquipment(out var problem);
                                 if (value == null) feedback.Refuse(EquipmentPlace, "Equipment preview", problem); else PrepareEquipment(session, identity, value, null);
                             }),
-                            Slot("Remove", "Preview removing this light or gate.", inDocument ? null : "This light or gate is not in the document yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
+                            Slot("Remove", "Preview removing this light or gate.", inScenePatchFile ? null : "This light or gate is not in the scene patch file yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
                             Empty,
                             Slot("Apply", "Apply the previewed change.", prepared == null ? "Preview a change first." : null, () => Edit(EquipmentPlace, "Lights and gates", (edit, inspection) => {
                                 var done = prepared.Addition != null ? edit.AddEquipment(identity, prepared.Addition, inspection) : edit.RemoveEquipment(identity, prepared.RemoveId, inspection);
@@ -1156,17 +1156,17 @@ namespace RailroaderScenePatcher {
                             if (value == null) feedback.Refuse(CoveragePlace, "Coverage preview", problem); else PrepareCoverage(session, identity, circuitKey, value, additionId);
                         });
                         if (additionId != null) {
-                            // Deleting applies to an addition the document holds; a crossing keeps at least one detection.
-                            var inDocument = current != null && current.Circuits.Any(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == additionId);
+                            // Deleting applies to an addition the scene patch file holds; a crossing keeps at least one detection.
+                            var inScenePatchFile = current != null && current.Circuits.Any(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == additionId);
                             return new[] { preview,
-                                Slot("Delete", "Preview deleting this detection addition.", !inDocument ? "This addition is not in the document yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null, () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
+                                Slot("Delete", "Preview deleting this detection addition.", !inScenePatchFile ? "This addition is not in the scene patch file yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null, () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
                                 Empty,
                                 Slot("Apply", "Apply the previewed coverage.", prepared == null ? "Preview a change first." : null, apply) };
                         }
                         return new[] { preview,
                             Slot("Detach", "Preview detaching this circuit.", none ?? (last ? "This is the crossing's last covered circuit; detaching it would leave the crossing without detection." : null), () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null), null, 1, 72),
                             // Every Clear in a tab names what it clears.
-                            Slot(CommandBand.ClearCircuit, "Preview clearing this MapMod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
+                            Slot(CommandBand.ClearCircuit, "Preview clearing this mod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
                             Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Preview a change first." : null), apply, null, 1, 62) };
                     }
                     if (structure == StarterPlacementScene.Structure) {
@@ -1176,8 +1176,8 @@ namespace RailroaderScenePatcher {
                             Typed(Slot("Set", "Place the front of the car cut at the entered track location. The whole cut is checked first; the object does not move.", null, ApplyStarterLocation, "Set track location", 1, 56),
                                 () => CommandBand.FieldReason(block, binding, CurrentBinding(), CommandBand.SameLocation, CommandBand.BindingIds)),
                             Slot("Detach", "Detach the marker from its track.", block ?? StarterPlacements.NoDetach, () => { }, "Detach track location", 1, 72),
-                            Slot(CommandBand.ClearLocation, "Clear this MapMod's value for the track location; the marker returns to its underlying track location.", block ?? CommandBand.ClearLocationReason(HasStarterTrack(identity)),
-                                () => Edit(BindingPlace, "Clearing the track location's MapMod value", (current, inspection) => current.ClearStarterTrack(identity, inspection)), null, 1, 124),
+                            Slot(CommandBand.ClearLocation, "Clear this mod's value for the track location; the marker returns to its underlying track location.", block ?? CommandBand.ClearLocationReason(HasStarterTrack(identity)),
+                                () => Edit(BindingPlace, "Clearing the track location's mod value", (current, inspection) => current.ClearStarterTrack(identity, inspection)), null, 1, 124),
                             Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment", 1, 70) };
                     }
                     var pad = structure == CrossingPadScene.Structure;
@@ -1188,7 +1188,7 @@ namespace RailroaderScenePatcher {
                     return new[] {
                         Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding", 1, 56), () => CommandBand.FieldReason(unavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds)),
                         Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : CurrentBinding()[0].Length == 0 ? CommandBand.AlreadyDetached : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)), "Detach binding", 1, 72),
-                        Slot(CommandBand.ClearBinding, "Clear this MapMod's value for the binding; the marker returns to its underlying binding.", unavailable, () => Edit(BindingPlace, "Clearing the binding's MapMod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
+                        Slot(CommandBand.ClearBinding, "Clear this mod's value for the binding; the marker returns to its underlying binding.", unavailable, () => Edit(BindingPlace, "Clearing the binding's mod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
                         Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70) };
                 }
                 case ChangesTab: {
@@ -1208,8 +1208,8 @@ namespace RailroaderScenePatcher {
                     return new[] {
                         Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
-                        Slot(CommandBand.ClearActivity, "Clear this MapMod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
-                            () => Edit(ActivityPlace, "Clearing the activity's MapMod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
+                        Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
+                            () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
                 }
             }
         }
@@ -1304,10 +1304,10 @@ namespace RailroaderScenePatcher {
                 if (session.IncompleteOperation != null) builder.AddLabel(Tint(Red, "Incomplete operation: " + session.IncompleteOperation));
                 if (attachment.Fault != null) builder.AddLabel(Tint(Red, attachment.Fault));
             }
-            DrawDocumentRecovery(builder);
+            DrawScenePatchFileRecovery(builder);
             Section(builder, "Supplied definitions");
-            if (String.IsNullOrEmpty(documentInspection)) Line(builder, definitionsStale ? "Not read yet; select Refresh" : "None", null, null);
-            else PlainLabel(builder, documentInspection);
+            if (String.IsNullOrEmpty(scenePatchFileInspection)) Line(builder, definitionsStale ? "Not read yet; select Refresh" : "None", null, null);
+            else PlainLabel(builder, scenePatchFileInspection);
             Section(builder, "Diagnostics");
             if (diagnostics.Count == 0 && presentation.EntryProblem == null) Line(builder, "None", null, null);
             if (presentation.EntryProblem != null) builder.AddLabel(Tint(Amber, presentation.EntryProblem));
@@ -1321,24 +1321,24 @@ namespace RailroaderScenePatcher {
             internal string[][] Terms, Guides;
         }
         static readonly Dictionary<string, HelpText> Help = new Dictionary<string, HelpText> {
-            ["main"] = new HelpText { Title = "Scene patches", Intro = "This help applies to the whole Scene patches window. Edit scene objects of the active MapMod here, then save through the Map Editor.",
+            ["main"] = new HelpText { Title = "Scene patches", Intro = "This help applies to the whole Scene patches window. Edit scene objects of the edited mod here, then save through the Map Editor.",
                 Terms = new[] {
-                    new[] { "Save", "The editor's Save button writes map data, Data/scene-patches.json and the patcher dependency in Info.json. Save never reloads." },
+                    new[] { "Save", "The Map Editor's Save button writes map data, Data/scene-patches.json and the patcher dependency in Info.json. Save never reloads." },
                     new[] { "Title bar", "The ? opens this help. The round arrow beside it puts the window at its default place and restores the outliner width. The page beside that opens the session details in their own window." },
                     new[] { "Help", "Every ? opens its help in a window beside it and shows x while that help is open. Close the help with the x or with its own close button." },
                     new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo or snap. A click on the inspected row, or Escape with the pointer over this window, does the same. With the pointer over the world, Escape cancels only a pending world choice or the gizmo. Changes that were made stay." },
-                    new[] { "Undo and Redo", "Every completed edit here is one step in the editor's own history: use the editor's Undo and Redo." },
+                    new[] { "Undo and Redo", "Every completed edit here is one step in the Map Editor's own history: use the Map Editor's Undo and Redo." },
                     new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after a native edit, Undo or Redo; a stale inventory refuses edits." },
-                    new[] { "Editor reload", "Reloading the editor ends the Undo and Redo history. Leaving the editor discards unsaved work." },
+                    new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
                     new[] { "Current, Stale, Saved, Unsaved", "The two lamps above the outliner show the inventory and save state: green when good, amber otherwise. They are not buttons; their tooltips give the reasons." },
-                    new[] { "* and +", "Before a name, * marks an object this MapMod changes and + an object it adds; the state line shows the same as CHANGED and ADDED. Neither means unsaved: only the Unsaved lamp does." },
+                    new[] { "* and +", "Before a name, * marks an object this mod changes and + an object it adds; the state line shows the same as CHANGED and ADDED. Neither means unsaved: only the Unsaved lamp does." },
                     new[] { "Footer", "Below the messages, Remove modification and Recheck are the same on every tab. A tab's own actions stand in the row at the bottom of the tab." },
-                    new[] { "Failed edit", "A failed edit restores the object. If that cannot be verified, the object is blocked until Recheck succeeds or the editor reloads." } },
-                Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-map-editor.md" }, new[] { "Document reference", "patch-document-v1.md" } } },
+                    new[] { "Failed edit", "A failed edit restores the object. If that cannot be verified, the object is blocked until Recheck succeeds or the Map Editor reloads." } },
+                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
-                    new[] { "Changed", "Objects this MapMod changes, marked *." },
+                    new[] { "Changed", "Objects this mod changes, marked *." },
                     new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
@@ -1354,14 +1354,14 @@ namespace RailroaderScenePatcher {
                     new[] { "Track group", "Some markers switch with their track group. For those, an explicit enable is refused." },
                     new[] { "Dependencies", "Culling, masks, graph registration and other state that follows an edit. Indirect references are not inspected." },
                     new[] { "Runtime state", "Enabled flags the game switches while it runs. They are shown and do not make the inventory stale." },
-                    new[] { "Copy ID", "Copies the identity with the target map as patch-document JSON." } },
+                    new[] { "Copy ID", "Copies the identity with the target map as scene patch file JSON." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {
                     new[] { "Numeric", "Position in map coordinates, rotation in degrees." },
-                    new[] { "Gizmo", "The native gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the pose and follow the drag." },
+                    new[] { "Gizmo", "The native gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
-                    new[] { "Follow", "Keeps the current pose relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
+                    new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." },
                     new[] { "Baked scenery groups", "A group moves as one, with its culling and colliders; its parts keep their own Enabled setting." } },
                 Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
@@ -1377,12 +1377,12 @@ namespace RailroaderScenePatcher {
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Other families", "Mileposts have their own operation." } },
                 Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
-            [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this MapMod changes on the object and complete outstanding work.",
+            [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {
-                    new[] { "Remove modification", "In the footer on every tab. Deletes this MapMod's modification. The object returns to its underlying state, not to an earlier patched position." },
-                    new[] { "Recheck", "In the footer on every tab. After a failed edit, compares the object with the document and unblocks it once they agree." },
+                    new[] { "Remove modification", "In the footer on every tab. Deletes this mod's modification. The object returns to its underlying state, not to an earlier patched position." },
+                    new[] { "Recheck", "In the footer on every tab. After a failed edit, compares the object with the scene patch file and unblocks it once they agree." },
                     new[] { "Terrain output", "The game regenerates terrain after a board move. Save does not write that output. Retry asks for it again." } },
-                Guides = new[] { new[] { "Editing in the editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
+                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {
             if (!Help.TryGetValue(region, out var help)) return;

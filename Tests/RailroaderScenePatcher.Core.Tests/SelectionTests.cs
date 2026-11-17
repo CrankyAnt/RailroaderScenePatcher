@@ -47,15 +47,15 @@ static class SelectionTests {
         Check(choice.Confirmed == null && choice.IsPending, "A spatial hit remains pending until its visible identity is explicitly confirmed");
         Check(choice.Confirm(), "One explicitly offered unique identity can be confirmed");
         Check(choice.Confirmed.Identity.Target.Path == "replacement" && !choice.IsPending, "Confirmation records the explicitly chosen scene identity");
-        var document = JObject.Parse("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"original\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}");
+        var scenePatchFile = JObject.Parse("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"original\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}");
         var target = choice.Confirmed.Identity.Target;
-        document["modifications"].First.First["target"] = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
-        var result = new PatchEngine(scene).Apply(document.ToString());
+        scenePatchFile["modifications"].First.First["target"] = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
+        var result = new PatchEngine(scene).Apply(scenePatchFile.ToString());
         Check(result.Outcomes["move"].Applied && ReferenceEquals(result.Outcomes["move"].ResolvedTarget, replacement) && original.X == 7 && replacement.X == 12,
-            "Complete-document application uses the confirmed replacement identity and preserves the previous target");
-        Console.WriteLine("PASS: confirmed spatial scene-target identity and complete-document application");
-        UnresolvedSceneTargets(scene, document.ToString(), candidates, candidate, original, replacement);
-        ReplacementChoices(scene, document.ToString(), candidates, candidate, result, original, replacement);
+            "Complete scene patch file application uses the confirmed replacement identity and preserves the previous target");
+        Console.WriteLine("PASS: confirmed spatial scene-target identity and complete scene patch file application");
+        UnresolvedSceneTargets(scene, scenePatchFile.ToString(), candidates, candidate, original, replacement);
+        ReplacementChoices(scene, scenePatchFile.ToString(), candidates, candidate, result, original, replacement);
         PatchEditingHistory();
         ConfirmationFindsOneIdentity();
     }
@@ -112,8 +112,8 @@ static class SelectionTests {
         Check(choice.Confirm() && choice.Problem == null, "An object that shares its identity can be chosen for inspection: " + choice.Problem);
         choice = new PendingSelection(scene, SelectionKind.SceneObject, "Replace scene target");
         choice.Offer(new[] { source });
-        Check(!choice.Confirm(), "A choice a document will name refuses the shared identity also without a source object");
-        // A choice a document must name offers no candidate with a shared identity; an inspecting choice offers all.
+        Check(!choice.Confirm(), "A choice a scene patch file will name refuses the shared identity also without a source object");
+        // A choice a scene patch file must name offers no candidate with a shared identity; an inspecting choice offers all.
         var twin = new SelectionCandidate(new object(), source.Identity, "Board");
         Check(SelectionOffers.For(new[] { source, twin, segment }, false).SequenceEqual(new[] { segment }) && SelectionOffers.For(new[] { source, twin, segment }, true).Count == 3
             && SelectionOffers.For(new[] { source, segment }, false).Count == 2 && SelectionOffers.For(null, false).Count == 0, "A replacement choice offers only candidates a patch can name");
@@ -169,7 +169,7 @@ static class SelectionTests {
         mapEditor.Undo();
         var undo = mapEditor.UndoGroups.ToArray();
         var redo = mapEditor.RedoGroups.ToArray();
-        var document = editing.DocumentText;
+        var scenePatchFile = editing.ScenePatchFileText;
         var saved = store.Patch;
         var dirty = mapEditor.IsDirty;
         var writes = store.PatchWrites;
@@ -179,8 +179,8 @@ static class SelectionTests {
         Check(ReferenceEquals(confirmed, choices.Confirmed) && choices.Pending == null &&
             mapEditor.UndoGroups.SequenceEqual(undo) && mapEditor.RedoGroups.SequenceEqual(redo) &&
             undo.Length > 0 && redo.Length > 0 && mapEditor.IsDirty == dirty &&
-            editing.DocumentText == document && store.Patch == saved && store.PatchWrites == writes && board.X == 12,
-            "Cancel preserves the earlier confirmation, patch and saved documents, placement, dirty state, and both history stacks");
+            editing.ScenePatchFileText == scenePatchFile && store.Patch == saved && store.PatchWrites == writes && board.X == 12,
+            "Cancel preserves the earlier confirmation, patch and saved scene patch files, placement, dirty state, and both history stacks");
         mapEditor.Undo();
         Check(board.X == 7, "The prior placement is still undoable after cancellation");
         mapEditor.Redo();
@@ -194,9 +194,9 @@ static class SelectionTests {
         var offered = new[] { source }.Concat(members).ToArray();
         var marker = new PickTarget(300, 300, true, false);
         var picked = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { new PickGroup(marker, new[] { 1, 2, 3 }) });
-        undo = mapEditor.UndoGroups.ToArray(); redo = mapEditor.RedoGroups.ToArray(); document = editing.DocumentText; saved = store.Patch; dirty = mapEditor.IsDirty; writes = store.PatchWrites;
+        undo = mapEditor.UndoGroups.ToArray(); redo = mapEditor.RedoGroups.ToArray(); scenePatchFile = editing.ScenePatchFileText; saved = store.Patch; dirty = mapEditor.IsDirty; writes = store.PatchWrites;
         var mutations = scene.MutationCalls;
-        bool Unchanged() => mapEditor.UndoGroups.SequenceEqual(undo) && mapEditor.RedoGroups.SequenceEqual(redo) && mapEditor.IsDirty == dirty && editing.DocumentText == document &&
+        bool Unchanged() => mapEditor.UndoGroups.SequenceEqual(undo) && mapEditor.RedoGroups.SequenceEqual(redo) && mapEditor.IsDirty == dirty && editing.ScenePatchFileText == scenePatchFile &&
             store.Patch == saved && store.PatchWrites == writes && scene.MutationCalls == mutations && board.X == 12 && parts.All(part => part.X == 40 && part.Active);
         choices.Begin(SelectionKind.SceneObject, "Select scene object", inspectOnly: true);
         choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
@@ -219,17 +219,17 @@ static class SelectionTests {
     }
 
     static void UnresolvedSceneTargets(Scene scene, string json, Candidates candidates, SelectionCandidate candidate, Box original, Box replacement) {
-        var saved = PatchDocument.Load(json);
+        var saved = ScenePatchFile.Load(json);
         var session = new SelectionSession(candidates);
         var mutations = scene.MutationCalls;
 
         session.Begin(SelectionKind.SceneObject, "Replace scene target");
         session.Pending.Offer(Array.Empty<SelectionCandidate>());
-        Check(!session.Confirm() && session.Pending.Candidate == null, "A world click without a hit leaves the document operation unresolved");
+        Check(!session.Confirm() && session.Pending.Candidate == null, "A world click without a hit leaves the scene patch file operation unresolved");
         session.Pending.Offer(new[] { candidate });
         session.Cancel();
         Check(session.Pending == null && session.Confirmed == null && saved.Write() == json && scene.MutationCalls == mutations &&
-            original.X == 7 && replacement.X == 12, "Cancelling a pending complete-document target choice preserves the document and world");
+            original.X == 7 && replacement.X == 12, "Cancelling a pending complete scene patch file target choice preserves the scene patch file and world");
 
         var duplicate = new Box { X = 25 };
         var duplicateCandidate = new SelectionCandidate(duplicate, candidate.Identity, "Duplicate board");
@@ -241,7 +241,7 @@ static class SelectionTests {
             "A hit does not authorize an identity with a duplicate elsewhere in the world");
         var rejected = new PatchEngine(scene).Apply(saved.Write());
         Check(!rejected.Outcomes["move"].Applied && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12 && duplicate.X == 25,
-            "The complete-document engine also refuses the ambiguous identity without moving either match");
+            "The complete scene patch file engine also refuses the ambiguous identity without moving either match");
         candidates.Items.Remove(duplicateCandidate);
         scene.Objects["replacement"].Remove(duplicate);
         session.Cancel();
@@ -259,12 +259,12 @@ static class SelectionTests {
             "An explicit choice can make the source the candidate without confirming it");
         session.Cancel();
         Check(saved.Write() == json && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12,
-            "Cancelling source-in-overlap choices preserves the whole document and both scene objects");
+            "Cancelling source-in-overlap choices preserves the whole scene patch file and both scene objects");
     }
 
-    static void ReplacementChoices(Scene scene, string json, Candidates candidates, SelectionCandidate source, DocumentResult completed,
+    static void ReplacementChoices(Scene scene, string json, Candidates candidates, SelectionCandidate source, ScenePatchFileResult completed,
         Box original, Box replacement) {
-        var document = PatchDocument.Load(json);
+        var scenePatchFile = ScenePatchFile.Load(json);
         var mutations = scene.MutationCalls;
         var first = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "S-original"), "Track segment S-original", "endpoints A/B");
         var intended = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "S-verified"), "Track segment S-verified", "endpoints B/C");
@@ -311,9 +311,9 @@ static class SelectionTests {
         session.Pending.Offer(new[] { moved });
         Check(session.Confirm() && session.Confirmed.Identity.Kind == SelectionKind.TrackNode && session.Confirmed.Identity.Identifier == "S-verified",
             "Confirmation records the node as a node even when its identifier text matches a segment");
-        Check(document.Write() == json && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12 &&
+        Check(scenePatchFile.Write() == json && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12 &&
             completed.Outcomes["move"].Applied && ReferenceEquals(completed.Outcomes["move"].ResolvedTarget, replacement),
-            "Replacement choices preserve the complete document, world state and previously applied edit");
+            "Replacement choices preserve the complete scene patch file, world state and previously applied edit");
         Console.WriteLine("PASS: explicit segment and node handoff, cancellation, ambiguity and revalidation");
     }
 }

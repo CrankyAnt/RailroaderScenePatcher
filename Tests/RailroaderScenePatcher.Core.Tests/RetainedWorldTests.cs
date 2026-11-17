@@ -85,7 +85,7 @@ static class RetainedWorldTests {
         peer.Engine.Apply(json, "pack");
         Assert(peer.Enter("map", "rebuilt-graph") == WorldEntry.Reentered && peer.Engine.Apply(json, "pack").Outcomes["move-board"].Applied && board.X == 112, "The retained board keeps its patched placement through re-entry");
         var mapEditor = new NativeMapEditor();
-        var session = new PatchEditingSession(peer.Engine, mapEditor, new Store { Patch = json }, documentKey: "pack"); mapEditor.Session = session;
+        var session = new PatchEditingSession(peer.Engine, mapEditor, new Store { Patch = json }, scenePatchFileKey: "pack"); mapEditor.Session = session;
         var removed = session.Remove(new TargetIdentity("s", "board", "c"));
         Assert(removed.Applied && board.X == 1 && board.Position[1] == 1 && board.Position[2] == 1, "Removal after re-entry returns the board to its native placement, not to the patched one: " + removed.Error + " at " + board.X);
     }
@@ -121,7 +121,7 @@ static class RetainedWorldTests {
         var entry = binding.Enter("map", "graph");
         Assert(binding.ReentryError != null && binding.ReentryError.Contains("Retained world reconciliation failed") && binding.ReentryError.Contains("injected reconciliation fault"), "The failure is recorded for local reporting: " + binding.ReentryError);
         Assert(entry == WorldEntry.Started && scenes.Count == 2 && scenes[0].Disposed && binding.State != null && !ReferenceEquals(binding.State, first) && binding.Error == null, "The failed state is released and a new state starts for the same map");
-        Assert(binding.State.Engine.Apply(Doc(Item("move-board", "board")), "pack").Outcomes["move-board"].Applied, "The new state applies the document");
+        Assert(binding.State.Engine.Apply(Doc(Item("move-board", "board")), "pack").Outcomes["move-board"].Applied, "The new state applies the scene patch file");
         Assert(binding.Enter("map", "graph") == WorldEntry.Repeated && binding.ReentryError != null, "Repeated callbacks in that load attempt keep the report");
         fail = false; binding.EndAttempt();
         Assert(binding.Enter("map", "graph") == WorldEntry.Reentered && binding.ReentryError == null && scenes.Count == 2, "The next load attempt reconciles normally and clears the report");

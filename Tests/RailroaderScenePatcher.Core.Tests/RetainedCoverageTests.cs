@@ -17,7 +17,7 @@ static partial class CoverageTests {
         FreshStateRefusesPatchedCircuitsAsNative();
         Console.WriteLine("PASS: retained crossing coverage reconciliation, owned cleanup, isolated cleanup failure, early checks over an unloaded scene and discarded state over a remaining scene");
     }
-    static string RetainedDocument => Doc(Cover("reroute", Tracks("Pipr")) + "," + Add("add", Addition("siding", "Sspur")));
+    static string RetainedScenePatchFile => Doc(Cover("reroute", Tracks("Pipr")) + "," + Add("add", Addition("siding", "Sspur")));
     static readonly string[] NativeSpanIds = { "Pcyi", "Pipr", "Pws9", "Pdlh", "P6id", "P1db", "Qa", "Qi", "Qb" };
     static bool NativeSpansRegistered(Fixture f) => NativeSpanIds.All(id => f.World.Graph.TryGetValue(id, out var s) && !s.Owned && !s.Destroyed);
     static bool NoSuffixedIds(Fixture f) => f.World.Graph.Keys.All(id => !id.EndsWith(".2", StringComparison.Ordinal));
@@ -33,11 +33,11 @@ static partial class CoverageTests {
         var f = new Fixture();
         var peer = new LocalPeer(() => f.Scene);
         peer.Enter("map", "graph");
-        var first = peer.Engine.Apply(RetainedDocument, "pack");
+        var first = peer.Engine.Apply(RetainedScenePatchFile, "pack");
         Assert(first.Outcomes.Values.All(o => o.Applied) && f.World.Created == 6 && OwnedAnywhere(f) == 6, "The reroute and the addition apply once: " + String.Join("; ", first.Outcomes.Values.Select(o => o.Error)));
         var circuits = f.Crossing.Circuits.ToArray();
         Assert(peer.Enter("map", "rebuilt-graph") == WorldEntry.Reentered && peer.LastReentry.Retained == 1 && peer.LastReentry.Released == 0, "The retained crossing keeps its state through re-entry");
-        var again = peer.Engine.Apply(RetainedDocument, "pack");
+        var again = peer.Engine.Apply(RetainedScenePatchFile, "pack");
         Assert(again.Outcomes.Values.All(o => o.Applied), "The retained world reconciles both modifications again: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
         Assert(f.World.Created == 6 && OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && f.Crossing.Circuits.SequenceEqual(circuits), "Reconciliation reuses the owned spans and circuits instead of adding others");
         Assert(f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.RetainedDetectsBothWays && DetectsBothWays(f, f.Crossing, "Sspur") && NativeSpansRegistered(f), "Detection stays on the selected and added tracks, and the native spans stay registered");
@@ -46,7 +46,7 @@ static partial class CoverageTests {
         var f = new Fixture();
         var peer = new LocalPeer(() => f.Scene);
         peer.Enter("map", "graph");
-        peer.Engine.Apply(RetainedDocument, "pack");
+        peer.Engine.Apply(RetainedScenePatchFile, "pack");
         var owned = f.World.Graph.Values.Where(s => s.Owned).ToArray();
         var otherCircuits = f.Other.Circuits.ToArray();
         var rebuilt = Rebuild(f);
@@ -54,7 +54,7 @@ static partial class CoverageTests {
         Assert(peer.Enter("map", "graph") == WorldEntry.Reentered && peer.LastReentry.Released == 1 && peer.LastReentry.Failures.Count == 0, "Re-entry releases the reconstructed crossing");
         Assert(owned.All(s => s.Destroyed && !f.World.Registered(s)) && OwnedAnywhere(f) == 0, "The owned spans of the reconstructed crossing are removed");
         Assert(NativeSpansRegistered(f) && f.Other.Circuits.SequenceEqual(otherCircuits) && rebuilt.Circuits.Count == 2, "Native spans, the rebuilt crossing and the unrelated crossing stay as they are");
-        var applied = peer.Engine.Apply(RetainedDocument, "pack");
+        var applied = peer.Engine.Apply(RetainedScenePatchFile, "pack");
         Assert(applied.Outcomes.Values.All(o => o.Applied) && OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && rebuilt.Circuits.Count == 3, "The rebuilt crossing gets one owned set under the original span IDs: " + String.Join("; ", applied.Outcomes.Values.Select(o => o.Error)));
         Assert(DetectsBothWays(f, rebuilt, "Snew") && DetectsBothWays(f, rebuilt, "Sspur") && !new[] { 500.0, 300, 100 }.Any(d => f.World.Detects(rebuilt, "Sold", d)), "The rebuilt crossing detects on the selected and added tracks only");
     }
@@ -62,7 +62,7 @@ static partial class CoverageTests {
         var f = new Fixture();
         var peer = new LocalPeer(() => f.Scene);
         peer.Enter("map", "graph");
-        peer.Engine.Apply(RetainedDocument, "pack");
+        peer.Engine.Apply(RetainedScenePatchFile, "pack");
         var owned = f.World.Graph.Values.Where(s => s.Owned).ToArray();
         Rebuild(f);
         f.World.StickyDestroy = true;
@@ -76,7 +76,7 @@ static partial class CoverageTests {
         f.World.StickyDestroy = false;
         peer.Unload(); peer.Enter("map", "graph");
         Assert(peer.LastReentry.Released == 1 && peer.LastReentry.Failures.Count == 0 && owned.All(s => !f.World.Registered(s)), "The next load attempt retries the release and removes the remaining owned spans");
-        Assert(peer.Engine.Apply(RetainedDocument, "pack").Outcomes.Values.All(o => o.Applied) && f.OwnedRegistered == 6 && NoSuffixedIds(f), "After the completed release the rebuilt crossing gets one owned set");
+        Assert(peer.Engine.Apply(RetainedScenePatchFile, "pack").Outcomes.Values.All(o => o.Applied) && f.OwnedRegistered == 6 && NoSuffixedIds(f), "After the completed release the rebuilt crossing gets one owned set");
     }
 
     // A native check opens the load attempt while the crossing's scene is not yet reported as loaded. The crossing still
@@ -86,7 +86,7 @@ static partial class CoverageTests {
         var peer = new LocalPeer(() => f.Scene);
         peer.Enter("map", "graph");
         var reroute = Doc(Cover("reroute", Tracks("Pipr")));
-        Assert(peer.Engine.Apply(RetainedDocument, "pack").Outcomes.Values.All(o => o.Applied), "The reroute and the addition apply");
+        Assert(peer.Engine.Apply(RetainedScenePatchFile, "pack").Outcomes.Values.All(o => o.Applied), "The reroute and the addition apply");
         var owned = f.World.Graph.Values.Where(s => s.Owned).ToArray();
         peer.Unload();
         f.Crossing.SceneLoaded = false;
@@ -95,7 +95,7 @@ static partial class CoverageTests {
         f.Crossing.SceneLoaded = true;
         Assert(peer.Enter("map", "graph") == WorldEntry.Reentered && peer.Reentries == 1, "The world-load callback joins the attempt the early check opened");
         Assert(owned.All(s => !s.Destroyed && f.World.Registered(s)) && f.NewRouteDetectsBothWays && !f.OldRouteDetects && DetectsBothWays(f, f.Crossing, "Sspur"), "Detection stays on the selected and added tracks");
-        var again = peer.Engine.Apply(RetainedDocument, "pack");
+        var again = peer.Engine.Apply(RetainedScenePatchFile, "pack");
         Assert(again.Outcomes.Values.All(o => o.Applied) && OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && f.World.Created == 6, "Re-application reuses the owned set: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
         // A crossing whose scene is loaded but which no longer stands under its identity is still released.
         var rebuilt = Rebuild(f);
@@ -118,7 +118,7 @@ static partial class CoverageTests {
         Assert(f.OldRouteDetects && f.RetainedDetectsBothWays && NativeSpansRegistered(f) && f.Scene.Read(f.Other).Coverage["Qi"].Kind == CircuitKind.Native, "Native detection returns and the unrelated crossing stays native");
         Assert(peer.Enter("map", "graph") == WorldEntry.Started, "The map starts a new state");
         var again = peer.Engine.Apply(doc, "pack");
-        Assert(again.Outcomes.Values.All(o => o.Applied), "The new state applies the same document: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
+        Assert(again.Outcomes.Values.All(o => o.Applied), "The new state applies the same scene patch file: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)));
         Assert(OwnedAnywhere(f) == 6 && NoSuffixedIds(f) && f.NewRouteDetectsBothWays && !f.OldRouteDetects && !f.RetainedDetectsBothWays && DetectsBothWays(f, f.Crossing, "Sspur"), "One owned set under the original span IDs carries the reroute, the detach and the addition");
         peer.Dispose();
         Assert(OwnedAnywhere(f) == 0 && f.Native, "Releasing the binding also restores the native coverage");

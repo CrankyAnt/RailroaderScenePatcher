@@ -4,7 +4,7 @@
 
 This guide shows how to move, rotate, disable and restore a whole baked scenery group, such as a platform, a lamp, a sign or a small building that the native map editor does not edit. A group move is physical placement only: everything below the group root moves with it, culling and colliders follow, and the activity of the parts stays as it was. Moving or disabling one of these groups changes no game function.
 
-A baked scenery group is saved with the map's scene. Props, masks and other objects of the map's `Map.json` are not baked scenery groups; the native map editor edits those. A baked scenery group target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the document's content; see [the document reference](patch-document-v1.md#dependency-minimum).
+A baked scenery group is saved with the map's scene. Props, masks and other objects of the map's `Map.json` are not baked scenery groups; the native map editor edits those. A baked scenery group target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Which groups are listed
 
@@ -30,7 +30,7 @@ Select **Disable** at the bottom of the **Object** tab. The group root is switch
 
 ## Write the modification by hand
 
-Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [scene patch file v1](scene-patch-file-v1.md):
 
 ```json
 "move-bryson-house-track": {

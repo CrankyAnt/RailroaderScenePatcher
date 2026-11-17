@@ -117,8 +117,8 @@ if($Action -eq 'SelectVariant') {
     $info=Get-Content (Join-Path $FixtureSource 'Info.json') -Raw | ConvertFrom-Json
     if($info.identifier -cne 'crankyant/fixed-placement-fixture'){throw 'Wrong variant identity'}
     $source=[IO.Path]::GetFullPath((Join-Path $FixtureSource 'Data/scene-patches.json'));Plain $source
-    $document=Get-Content -LiteralPath $source -Raw | ConvertFrom-Json
-    if($document.sourceMap.mapId -cne 'crankyant/fixed-placement-fixture-map'){throw 'Wrong variant map'}
+    $scenePatchFile=Get-Content -LiteralPath $source -Raw | ConvertFrom-Json
+    if($scenePatchFile.sourceMap.mapId -cne 'crankyant/fixed-placement-fixture-map'){throw 'Wrong variant map'}
     foreach($pair in @(@{source=$source;relative='ModDev/Issue39FixedPlacement/Data/scene-patches.json'}) + $(if($BaselineReference){@(@{source=[IO.Path]::GetFullPath($BaselineReference);relative='Mods/Issue39Observation/Baseline.json'})}else{@()})) {
         Plain $pair.source;$destination=Inside (Join-Path $homePath $pair.relative)
         $receipt.files[$pair.relative]=@{sourceSha256=(Get-FileHash -LiteralPath $pair.source).Hash};Write-Json $receipt $receiptPath

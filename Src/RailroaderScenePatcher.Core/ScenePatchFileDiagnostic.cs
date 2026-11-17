@@ -6,13 +6,13 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // One problem a read found in a patch document: where it is, the text there, and what the format expects.
-    public sealed class DocumentDiagnostic {
-        public const string FormatReference = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/patch-document-v1.md";
-        public const string RecoveryReference = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/recover-patch-documents.md";
+    // One problem a read found in a scene patch file: where it is, the text there, and what the format expects.
+    public sealed class ScenePatchFileDiagnostic {
+        public const string FormatReference = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/scene-patch-file-v1.md";
+        public const string RecoveryReference = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/recover-scene-patch-files.md";
         // The most lines and characters a fragment shows.
         public const int FragmentLines = 8, FragmentCharacters = 1200;
-        // The JSON path of the problem, such as modifications.place-board.placement; empty for the whole document.
+        // The JSON path of the problem, such as modifications.place-board.placement; empty for the whole scene patch file.
         public string Path { get; private set; }
         // The first and last line of the problem in the text; zero when the text has no line for it, such as a missing field.
         public int StartLine { get; private set; }
@@ -24,9 +24,9 @@ namespace RailroaderScenePatcher.Core {
         public string Expected { get; private set; }
         // The format reference that describes the expected structure and values.
         public string Reference => FormatReference;
-        // The guide that describes the corrections scene patch editing offers for a protected document.
+        // The guide that describes the corrections scene patch editing offers for a protected scene patch file.
         public string Corrections => RecoveryReference;
-        internal static DocumentDiagnostic Create(string text, string path, string message, string expected, JToken token = null, int line = 0) {
+        internal static ScenePatchFileDiagnostic Create(string text, string path, string message, string expected, JToken token = null, int line = 0) {
             var start = (token as IJsonLineInfo)?.HasLineInfo() == true ? ((IJsonLineInfo)token).LineNumber : line;
             var end = start;
             if (start > 0 && token is JContainer container)
@@ -39,9 +39,9 @@ namespace RailroaderScenePatcher.Core {
             // A problem longer than the fragment says that its text goes on.
             var cut = start > 0 && span > FragmentLines;
             if (cut) fragment += "\n... " + (span - FragmentLines) + " more " + (span - FragmentLines == 1 ? "line" : "lines") + ", to line " + end;
-            // A document written on one long line still shows a bounded fragment.
+            // A scene patch file written on one long line still shows a bounded fragment.
             if (fragment.Length > FragmentCharacters) { fragment = fragment.Substring(0, FragmentCharacters) + "..."; cut = true; }
-            return new DocumentDiagnostic { Path = path ?? "", StartLine = start, EndLine = end, Fragment = fragment, Message = message, Expected = expected, Truncated = cut };
+            return new ScenePatchFileDiagnostic { Path = path ?? "", StartLine = start, EndLine = end, Fragment = fragment, Message = message, Expected = expected, Truncated = cut };
         }
     }
 }

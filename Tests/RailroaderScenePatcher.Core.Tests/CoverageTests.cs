@@ -158,12 +158,12 @@ static partial class CoverageTests {
         public bool OldRouteStillOccupied => new[] { 500.0, 300, 100 }.All(d => World.Occupies("Sold", d));
     }
     public static void Run() {
-        DocumentDistinguishesOmittedSelectedAndDetached();
+        ScenePatchFileDistinguishesOmittedSelectedAndDetached();
         ExplicitAlternativeTransfersDetectionAndRetainsCoverage();
         DetachStopsDetectionAndKeepsOthers();
         RepetitionAndReplacementKeepOneOwnedSet();
         UnresolvedAndObsoleteReferencesChangeNothing();
-        MapMismatchRejectsWholeDocument();
+        MapMismatchRejectsWholeScenePatchFile();
         PrerequisitesResolveRegardlessOfOrder();
         UnsupportedSettingsAreRefusedBeforeMutation();
         PreflightRefusalLeavesCoverageUnchanged();
@@ -175,12 +175,12 @@ static partial class CoverageTests {
         DependedCoverageKeepsItsLastEntry();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
     }
-    static void DocumentDistinguishesOmittedSelectedAndDetached() {
+    static void ScenePatchFileDistinguishesOmittedSelectedAndDetached() {
         var f = new Fixture();
         var result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr") + "," + Detached("P6id"))));
         Assert(result.Error == null && result.Outcomes["reroute"].Applied, "Selected and detached circuits apply: " + result.Error + result.Outcomes["reroute"].Error);
         var observed = f.Scene.Read(f.Crossing).Coverage;
-        Assert(observed["Pipr"].Kind == CircuitKind.Tracks && observed["P6id"].Kind == CircuitKind.Detached, "The document distinguishes explicit selection from explicit detachment");
+        Assert(observed["Pipr"].Kind == CircuitKind.Tracks && observed["P6id"].Kind == CircuitKind.Detached, "The scene patch file distinguishes explicit selection from explicit detachment");
         f = new Fixture();
         result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr"))));
         observed = f.Scene.Read(f.Crossing).Coverage;
@@ -252,10 +252,10 @@ static partial class CoverageTests {
             Assert(result.Outcomes["other"].Applied, "An independent crossing still applies (" + reason + "): " + result.Outcomes["other"].Error);
         }
     }
-    static void MapMismatchRejectsWholeDocument() {
+    static void MapMismatchRejectsWholeScenePatchFile() {
         var f = new Fixture();
         var result = new PatchEngine(f.Scene).Apply(Doc(Cover("reroute", Tracks("Pipr")), "other-map"));
-        Assert(result.Error != null && result.Outcomes.Count == 0 && f.World.Mutations == 0 && f.Native, "A document for another map changes no coverage");
+        Assert(result.Error != null && result.Outcomes.Count == 0 && f.World.Mutations == 0 && f.Native, "A scene patch file for another map changes no coverage");
     }
     static void PrerequisitesResolveRegardlessOfOrder() {
         var f = new Fixture();
@@ -338,21 +338,21 @@ static partial class CoverageTests {
         var session = new PatchEditingSession(new PatchEngine(f.Scene), mapEditor, store); mapEditor.Session = session;
         return (f, session, mapEditor, store);
     }
-    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void EditingPreviewSelectUndoRedoAndRemoval() {
         var (f, session, mapEditor, store) = Session();
         var preview = session.PreviewCoverage(Crossing, "Pipr", Selected());
         Assert(preview.Error == null && preview.Lines.Count == 2, "The preview reports every circuit: " + preview.Error);
         Assert(preview.Lines[0].Contains("Snew end a 308 to 550 m") && preview.Lines[0].Contains("Pcyi, Pipr, Pws9 stay registered and stop triggering"), "The preview shows the selected tracks and the obsolete spans: " + preview.Lines[0]);
         Assert(preview.Lines[1].StartsWith("Circuit P6id: retained", StringComparison.Ordinal), "The preview shows the retained circuit: " + preview.Lines[1]);
-        Assert(f.World.Mutations == 0 && f.Native && session.DocumentText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
+        Assert(f.World.Mutations == 0 && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
         Assert(session.PreviewCoverage(Crossing, "Pzzz", Selected()).Error.Contains("not a circuit"), "The preview refuses an obsolete circuit");
         var select = session.Cover(Crossing, "Pipr", Selected());
         Assert(select.Applied && f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.RetainedDetectsBothWays, "A scene patch editing selection transfers detection: " + select.Error);
         var item = Only(session);
         var covered = (JObject)item["relationships"]["crossingCoverage"];
         Assert((double)covered["circuits"]["Pipr"]["approachB"]["to"]["distance"] == 50 && covered.Count == 1 && ((JObject)covered["circuits"]).Count == 1
-            && item["placement"] == null && item["active"] == null && item["id"] == null, "The document records only the explicit circuit under its island span: " + item);
+            && item["placement"] == null && item["active"] == null && item["id"] == null, "The scene patch file records only the explicit circuit under its island span: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "Crossing coverage requires the patcher version that introduced it");
         Assert(session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && f.Crossing.Circuits.Count == 1 && f.NewRouteDetectsBothWays, "A second circuit can be detached in the same modification");
         Assert(((JObject)Only(session)["relationships"]["crossingCoverage"]["circuits"]).Count == 2, "Both circuits are recorded in one modification");
@@ -364,7 +364,7 @@ static partial class CoverageTests {
         Assert(!last.Applied && last.Error.Contains("without detection") && f.NewRouteDetectsBothWays && mapEditor.UndoGroups.Count == groups, "Detaching the last covered circuit is refused without a history entry: " + last.Error);
         var owned = f.Rerouted.Spans.ToArray();
         mapEditor.Undo(); Assert(f.Crossing.Circuits.Count == 2 && f.Rerouted.Spans.SequenceEqual(owned) && f.RetainedDetectsBothWays, "Undo of the detach restores the circuit and keeps the selected coverage");
-        mapEditor.Undo(); Assert(f.Native && f.OldRouteDetects && session.DocumentText.Contains("\"modifications\": {}"), "Undo of the selection restores native coverage and registrations without owned spans");
+        mapEditor.Undo(); Assert(f.Native && f.OldRouteDetects && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Undo of the selection restores native coverage and registrations without owned spans");
         mapEditor.Redo(); Assert(f.NewRouteDetectsBothWays && !f.OldRouteDetects && f.OwnedRegistered == 3, "Redo reapplies the selection with one owned set");
         mapEditor.Redo(); Assert(f.Crossing.Circuits.Count == 1 && f.OwnedRegistered == 3, "Redo reapplies the detach");
         var cleared = session.Cover(Crossing, "P6id", null);
@@ -381,15 +381,15 @@ static partial class CoverageTests {
         Assert(!session.Cover(Crossing, "Pipr", Selected("Smissing")).Applied && f.World.Mutations == 0 && f.Native && mapEditor.UndoGroups.Count == 0, "A missing selected track is refused without a history entry");
         f.World.FailSetSpansOnce = true;
         var failed = session.Cover(Crossing, "Pipr", Selected());
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && session.DocumentText.Contains("\"modifications\": {}"), "A failed scene patch editing mutation restores coverage and the document: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}"), "A failed scene patch editing mutation restores coverage and the scene patch file: " + failed.Error);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         failed = session.Cover(Crossing, "Pipr", Selected());
         Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported: " + failed.Error);
         f.World.StickyDestroy = false;
         Assert(!session.Cover(Crossing, "Pipr", Selected()).Applied, "A further edit is guarded until a recheck");
-        // The stuck owned spans stay registered until a recheck converges on the document.
+        // The stuck owned spans stay registered until a recheck converges on the scene patch file.
         var recheck = session.Recheck(Crossing);
-        Assert(recheck.Applied && f.Native && f.OwnedRegistered == 0 && f.World.Graph.Values.Count(s => s.Owned) == 0, "Recheck converges on the document and clears the guard: " + recheck.Error);
+        Assert(recheck.Applied && f.Native && f.OwnedRegistered == 0 && f.World.Graph.Values.Count(s => s.Owned) == 0, "Recheck converges on the scene patch file and clears the guard: " + recheck.Error);
         Assert(session.Cover(Crossing, "Pipr", Selected()).Applied && f.OwnedRegistered == 3, "After recheck the edit applies");
     }
     // Clearing the last coverage entry would remove the modification; another modification names it in dependsOn, so
@@ -402,8 +402,8 @@ static partial class CoverageTests {
         var (_, session, mapEditor, store) = Session(text, f);
         var groups = mapEditor.UndoGroups.Count; var mutations = f.World.Mutations;
         var cleared = session.Cover(Crossing, "Pipr", null);
-        Assert(!cleared.Applied && cleared.Error.Contains("Modification reroute cannot leave the document because other names it in dependsOn") && f.NewRouteDetectsBothWays
-            && f.World.Mutations == mutations && mapEditor.UndoGroups.Count == groups && JObject.Parse(session.DocumentText)["modifications"]["reroute"]["relationships"]["crossingCoverage"]["circuits"]["Pipr"] != null,
+        Assert(!cleared.Applied && cleared.Error.Contains("Modification reroute cannot leave the scene patch file because other names it in dependsOn") && f.NewRouteDetectsBothWays
+            && f.World.Mutations == mutations && mapEditor.UndoGroups.Count == groups && JObject.Parse(session.ScenePatchFileText)["modifications"]["reroute"]["relationships"]["crossingCoverage"]["circuits"]["Pipr"] != null,
             "Clearing the last coverage entry of a depended modification is refused and changes nothing: " + cleared.Error);
         Assert(!session.Remove(Crossing).Applied && f.NewRouteDetectsBothWays, "Removing the depended crossing modification is refused as well");
     }
@@ -419,6 +419,6 @@ static partial class CoverageTests {
         engine.Apply(store.Patch);
         Assert(fresh.OwnedRegistered == 3 && fresh.World.Created == 3, "A repeated world-load callback leaves exactly one owned set");
         var (f2, reopened, e2, s2) = Session(store.Patch);
-        Assert(reopened.Blocked == null && reopened.Cover(Crossing, "P6id", null).Applied && f2.Crossing.Circuits.Count == 2, "A saved coverage document reopens for editing");
+        Assert(reopened.Blocked == null && reopened.Cover(Crossing, "P6id", null).Applied && f2.Crossing.Circuits.Count == 2, "A saved coverage scene patch file reopens for editing");
     }
 }

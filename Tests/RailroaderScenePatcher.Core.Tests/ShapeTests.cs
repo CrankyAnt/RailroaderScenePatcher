@@ -6,7 +6,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher.Core;
 
-// The keyed shape of format version 1: which documents are rejected as a whole and protected from overwrite, and which
+// The keyed shape of format version 1: which scene patch files are rejected as a whole and protected from overwrite, and which
 // faults fail only the modification that holds them.
 static class ShapeTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
@@ -23,17 +23,17 @@ static class ShapeTests {
         public bool Untouched => Box.Position.SequenceEqual(new[] { 7.0, 8.0, 9.0 }) && Box.Rotation.SequenceEqual(new[] { 1.0, 0.0, 0.0, 0.0 });
     }
     public static void Run() {
-        KeyedDocumentApplies();
-        WholeDocumentIsRejectedAndProtected();
+        KeyedScenePatchFileApplies();
+        WholeScenePatchFileIsRejectedAndProtected();
         ModificationFaultsFailOnlyTheirModification();
-        Console.WriteLine("PASS: keyed shape, whole-document rejection with overwrite protection and faults isolated to their modification");
+        Console.WriteLine("PASS: keyed shape, whole scene patch file rejection with overwrite protection and faults isolated to their modification");
     }
-    static void KeyedDocumentApplies() {
+    static void KeyedScenePatchFileApplies() {
         var w = new World();
         var result = new PatchEngine(w.Scene).Apply(Head + "{\"move-p\":" + Place("p") + ",\"move-q\":" + Place("q", 160) + "}}");
         Assert(result.Error == null && result.Outcomes.Count == 2 && result.Outcomes["move-p"].Applied && result.Outcomes["move-q"].Applied && w.Box.X == 12 && w.Other.X == 60, "Modifications are read from an object keyed by modification ID: " + result.Error);
     }
-    static void WholeDocumentIsRejectedAndProtected() {
+    static void WholeScenePatchFileIsRejectedAndProtected() {
         var valid = "\"valid\":" + Place("p");
         var cases = new[] {
             ("an array-form modifications of the earlier shape", Head + "[{\"id\":\"valid\"," + Place("p").Substring(1) + "]}"),
@@ -54,19 +54,19 @@ static class ShapeTests {
             var w = new World();
             var engine = new PatchEngine(w.Scene);
             var result = engine.Apply(text);
-            Assert(!String.IsNullOrEmpty(result.Error) && result.MapEditorOnly && result.Outcomes.Count == 0, scenario + ": the whole document is rejected as structurally invalid without individual outcomes: " + result.Error);
+            Assert(!String.IsNullOrEmpty(result.Error) && result.MapEditorOnly && result.Outcomes.Count == 0, scenario + ": the whole scene patch file is rejected as structurally invalid without individual outcomes: " + result.Error);
             Assert(w.Scene.ResolveCalls == 0 && w.Scene.MutationCalls == 0 && w.Untouched, scenario + ": no operation runs, including the valid modification");
-            var document = PatchDocument.Load(text);
+            var scenePatchFile = ScenePatchFile.Load(text);
             var wrote = true;
-            try { document.Write(); } catch (InvalidOperationException) { wrote = false; }
-            Assert(!document.CanWrite && document.Error != null && !wrote, scenario + ": the document is not writable");
-            var store = new Store { Patch = text }; var editor = new NativeMapEditor();
-            var session = new PatchEditingSession(engine, editor, store); editor.Session = session;
-            Assert(session.Blocked != null && session.Blocked.Contains("protected from overwrite"), scenario + ": scene patch editing reports the protected document: " + session.Blocked);
+            try { scenePatchFile.Write(); } catch (InvalidOperationException) { wrote = false; }
+            Assert(!scenePatchFile.CanWrite && scenePatchFile.Error != null && !wrote, scenario + ": the scene patch file is not writable");
+            var store = new Store { Patch = text }; var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
+            Assert(session.Blocked != null && session.Blocked.Contains("protected from overwrite"), scenario + ": scene patch editing reports the protected scene patch file: " + session.Blocked);
             var edit = session.Edit(P, new Placement(new[] { 130.0, 2.0, 3.0 }, new[] { 0.0, 0.0, 0.0, 1.0 }), null);
-            Assert(!edit.Applied && w.Untouched && editor.Save() == null && store.PatchWrites == 0 && ReferenceEquals(store.Patch, text), scenario + ": an edit is refused and a Save leaves the file's text as it is");
+            Assert(!edit.Applied && w.Untouched && mapEditor.Save() == null && store.PatchWrites == 0 && ReferenceEquals(store.Patch, text), scenario + ": an edit is refused and a Save leaves the file's text as it is");
         }
-        Assert(PatchDocument.Load(Head + "[]}").Error.Contains("keyed by modification ID"), "An array-form document is told what modifications must be: " + PatchDocument.Load(Head + "[]}").Error);
+        Assert(ScenePatchFile.Load(Head + "[]}").Error.Contains("keyed by modification ID"), "An array-form scene patch file is told what modifications must be: " + ScenePatchFile.Load(Head + "[]}").Error);
     }
     static void ModificationFaultsFailOnlyTheirModification() {
         var addition = "{\"additions\":{\"shared\":{" + Ranges + "}}}";
@@ -88,7 +88,7 @@ static class ShapeTests {
             var text = Head + "{\"bad\":" + bad + ",\"good\":" + Place("q", 160) + "}}";
             var engine = new PatchEngine(w.Scene);
             var result = engine.Apply(text);
-            Assert(result.Error == null && result.Outcomes.Count == 2, scenario + ": the document itself is read: " + result.Error);
+            Assert(result.Error == null && result.Outcomes.Count == 2, scenario + ": the scene patch file itself is read: " + result.Error);
             var outcome = result.Outcomes["bad"];
             Assert(!outcome.Applied && outcome.Cause == FailureCause.InvalidDefinition && !outcome.MapEditorOnly && outcome.Error.StartsWith("Invalid relationship", StringComparison.Ordinal) && w.Untouched,
                 scenario + ": the modification fails as an invalid definition before any mutation: " + outcome.Error);
@@ -96,7 +96,7 @@ static class ShapeTests {
             AssertPreserved(w, engine, text, scenario);
         }
 
-        // An addition ID names one addition in its document: two modifications that use it both fail, the third applies.
+        // An addition ID names one addition in its scene patch file: two modifications that use it both fail, the third applies.
         var shared = new World();
         var sharing = new PatchEngine(shared.Scene).Apply(Head + "{\"first\":" + Cover("p", addition) + ",\"second\":" + Cover("q", addition) + ",\"third\":" + Place("q", 160) + "}}");
         Assert(!sharing.Outcomes["first"].Applied && !sharing.Outcomes["second"].Applied && sharing.Outcomes["first"].Error.Contains("more than one modification") && sharing.Outcomes["second"].Error.Contains("more than one modification")
@@ -122,15 +122,15 @@ static class ShapeTests {
         Assert(applied.Outcomes["good"].Applied && left.Other.X == 60, "The modification beside a leftover id still applies");
         AssertPreserved(left, leftEngine, leftover, "a leftover id member");
     }
-    // Scene patch editing opens the document, edits the valid modification and saves; the failed modification is written back with the content it had.
+    // Scene patch editing opens the scene patch file, edits the valid modification and saves; the failed modification is written back with the content it had.
     static void AssertPreserved(World w, PatchEngine engine, string text, string scenario) {
-        var store = new Store { Patch = text }; var editor = new NativeMapEditor();
+        var store = new Store { Patch = text }; var mapEditor = new NativeMapEditor();
         store.Info = store.Info.Replace("\"rr/game >=0.6.2\"", "\"rr/game >=0.6.2\",\"crankyant/scene-patcher >=0.5.0\"");
-        var session = new PatchEditingSession(engine, editor, store); editor.Session = session;
-        Assert(session.Blocked == null, scenario + ": the document opens in scene patch editing: " + session.Blocked);
+        var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
+        Assert(session.Blocked == null, scenario + ": the scene patch file opens in scene patch editing: " + session.Blocked);
         var key = JObject.Parse(text)["modifications"].Children<JProperty>().First().Name;
         var edit = session.Edit(Q, new Placement(new[] { 170.0, 2.0, 3.0 }, new[] { 0.0, 0.0, 0.0, 1.0 }), null);
-        Assert(edit.Applied && w.Other.X == 70 && editor.Save() == null && store.PatchWrites == 1, scenario + ": the valid modification is edited and saved: " + edit.Error);
+        Assert(edit.Applied && w.Other.X == 70 && mapEditor.Save() == null && store.PatchWrites == 1, scenario + ": the valid modification is edited and saved: " + edit.Error);
         var saved = JObject.Parse(store.Patch)["modifications"];
         Assert(JToken.DeepEquals(saved[key], JObject.Parse(text)["modifications"][key]) && (double)saved["good"]["placement"]["position"][0] == 170, scenario + ": the failed modification is preserved through the Save: " + saved[key]);
     }

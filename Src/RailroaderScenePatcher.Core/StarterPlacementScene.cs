@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
-        // The track locations the document being checked sets for other markers, by the marker a car placement holds. The
+        // The track locations the scene patch file being checked sets for other markers, by the marker a car placement holds. The
         // whole-cut check judges those markers' cuts there, so the result does not depend on which modification runs first.
         Dictionary<object, TrackLocation> planned = new Dictionary<object, TrackLocation>();
         public void Plan(IReadOnlyDictionary<object, ObjectState> desired) {

@@ -51,8 +51,8 @@ static class InspectionTests {
         var mutable = new Scene(); var oldTarget = new Box { X = 7 }; var replacement = new Box { X = 9 };
         mutable.Objects["p"] = new List<object> { oldTarget };
         mutable.BeforeCapture = () => mutable.Objects["p"] = new List<object> { replacement };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
-        var result = new PatchEngine(mutable).Apply(document);
+        var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var result = new PatchEngine(mutable).Apply(scenePatchFile);
         Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == 0 && oldTarget.X == 7 && replacement.X == 9,
             "A replaced target between capture and mutation is rejected without moving either object");
         mutable.BeforeCapture = null; mutable.Objects["p"] = new List<object> { oldTarget };
@@ -61,17 +61,17 @@ static class InspectionTests {
         var mutationInventory = new SceneInventory(mutable); mutationInventory.Refresh();
         var expected = mutationInventory.Pin(mutationInventory.Entries.Single());
         oldTarget.X = 8;
-        result = new PatchEngine(mutable).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
-        Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == 0 && oldTarget.X == 8, "Changed placement since inspection rejects the complete-document edit");
+        result = new PatchEngine(mutable).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
+        Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == 0 && oldTarget.X == 8, "Changed placement since inspection rejects the complete scene patch file edit");
         mutationInventory.Refresh(); expected = mutationInventory.Pin(mutationInventory.Entries.Single());
-        result = new PatchEngine(mutable).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
-        Check(result.Outcomes["move"].Applied && oldTarget.X == 12, "Fresh inspected targets can apply the intended complete document");
+        result = new PatchEngine(mutable).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
+        Check(result.Outcomes["move"].Applied && oldTarget.X == 12, "Fresh inspected targets can apply the intended complete scene patch file");
         mutationInventory.Refresh();
-        var definition = mutationInventory.InspectDocument(document.Replace("\"dependsOn\":[]", "\"dependsOn\":[\"missing-edit\"]")).Single();
-        Check(definition.MatchCount == 1 && definition.Problems.Any(p => p.Contains("missing-edit")), "Complete-document inspection reports missing dependencies without applying placement");
-        definition = mutationInventory.InspectDocument(document.Replace("\"path\":\"p\"", "\"path\":\"missing-object\"")).Single();
+        var definition = mutationInventory.InspectScenePatchFile(scenePatchFile.Replace("\"dependsOn\":[]", "\"dependsOn\":[\"missing-edit\"]")).Single();
+        Check(definition.MatchCount == 1 && definition.Problems.Any(p => p.Contains("missing-edit")), "Complete scene patch file inspection reports missing dependencies without applying placement");
+        definition = mutationInventory.InspectScenePatchFile(scenePatchFile.Replace("\"path\":\"p\"", "\"path\":\"missing-object\"")).Single();
         Check(definition.MatchCount == 0 && definition.Problems.Any(p => p.Contains("Target")), "A missing target leaves its referring definition inspectable");
-        Check(mutationInventory.InspectDocument("{broken").Single().Problems.Any(p => p.Contains("Unreadable")) && mutable.MutationCalls == 1, "Invalid supplied documents remain visible without mutation or rewrite");
+        Check(mutationInventory.InspectScenePatchFile("{broken").Single().Problems.Any(p => p.Contains("Unreadable")) && mutable.MutationCalls == 1, "Invalid supplied scene patch files remain visible without mutation or rewrite");
         var mutationCount = mutable.MutationCalls;
         foreach (var change in new Action[] {
             () => mutable.Objects["p"] = new List<object>(),
@@ -80,7 +80,7 @@ static class InspectionTests {
         }) {
             mutable.Maps = new[] { "map", "layer" }; mutable.Objects["p"] = new List<object> { oldTarget };
             mutable.BeforeCapture = change;
-            result = new PatchEngine(mutable).Apply(document);
+            result = new PatchEngine(mutable).Apply(scenePatchFile);
             Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == mutationCount, "Missing, ambiguous and changed-map targets cannot mutate after capture");
         }
         mutable.BeforeCapture = null; mutable.Maps = new[] { "map", "layer" }; mutable.Objects["p"] = new List<object> { oldTarget };
@@ -89,7 +89,7 @@ static class InspectionTests {
             oldTarget.Position, oldTarget.Rotation, bindings, new string[0], new string[0], "Fixed placement") };
         mutationInventory.Refresh(); expected = mutationInventory.Pin(mutationInventory.Entries.Single());
         bindings[0] = "segment=rebound";
-        result = new PatchEngine(mutable).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
+        result = new PatchEngine(mutable).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = expected });
         Check(!result.Outcomes["move"].Applied && mutable.MutationCalls == mutationCount, "Changed binding after inspection cannot authorize a placement edit");
         SteppedFreshness();
         ComponentsLeavingDuringAPass();
@@ -295,11 +295,11 @@ static class InspectionTests {
         var scene = new Scene(); var box = new Box { X = 7 };
         scene.Objects["p"] = new List<object> { box };
         scene.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var log = new List<string>(); var calls = 0;
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
-        Func<InspectedTarget, Outcome> move = inspection => { calls++; return new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inspection }).Outcomes["move"]; };
+        Func<InspectedTarget, Outcome> move = inspection => { calls++; return new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inspection }).Outcomes["move"]; };
 
         box.X = 8;
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 0 && box.X == 8, "A stale inventory refuses the edit before it runs");
@@ -549,7 +549,7 @@ static class InspectionTests {
         Check(AuthoredActivity.Enabled(true, true, true) && AuthoredActivity.Enabled(true, true, false), "An object that is on is enabled, whatever its culler does");
         Check(AuthoredActivity.Enabled(false, true, false), "Off while its culler hides its objects: camera culling does not disable an object");
         Check(!AuthoredActivity.Enabled(false, true, true), "Off while its culler shows its objects: authored off or disabled by a patch");
-        Check(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", modified, null).Count == 0, "Without a document nothing is changed");
+        Check(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", modified, null).Count == 0, "Without a scene patch file nothing is changed");
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed) == "2 of 4 objects", "The count line names how many objects the filters show: " + RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed));
         Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", all, changed) == "4 of 4 objects", "The unfiltered outliner counts every entry");
         var groups = RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", all, changed));
@@ -559,7 +559,7 @@ static class InspectionTests {
         Check(presentation.Observe(inventory, null, "", all, "1") && !presentation.Observe(inventory, null, "", all, "1"), "A settled outliner does not rebuild");
         Check(presentation.Observe(inventory, null, "", problems, "1"), "Switching a filter rebuilds the outliner");
         Check(!presentation.Observe(inventory, null, "", problems, "1") && presentation.Observe(inventory, null, "", all, "1"), "Returning to All rebuilds the outliner once");
-        Check(presentation.Observe(inventory, null, "", all, "2") && !presentation.Observe(inventory, null, "", all, "2"), "A changed document rebuilds the outliner so its Changed markers follow Undo and Redo");
+        Check(presentation.Observe(inventory, null, "", all, "2") && !presentation.Observe(inventory, null, "", all, "2"), "A changed scene patch file rebuilds the outliner so its Changed markers follow Undo and Redo");
     }
 
     // State the game switches while it runs, such as a culled audio player's enabled flag, is shown but is no part of
@@ -629,19 +629,19 @@ static class InspectionTests {
         var scene = new Scene(); var box = new Box { X = 7 }; var scans = 0;
         scene.Objects["p"] = new List<object> { box };
         scene.Observations = () => { scans++; return new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") }; };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         scans = 0;
-        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinForEdit(inventory.Entries.Single()) });
+        var result = new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinForEdit(inventory.Entries.Single()) });
         Check(result.Outcomes["move"].Applied && box.X == 12 && scans == 2, "An edit pinned for immediate use scans the scene for the pin and for the guard: " + scans);
         inventory.Refresh(); scans = 0;
-        result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.Pin(inventory.Entries.Single()) });
+        result = new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.Pin(inventory.Entries.Single()) });
         Check(result.Outcomes["move"].Applied && scans == 3, "A pin kept for later validates at resolution as well: " + scans);
         // The guard still reads the scene: a change after the pin and before the mutation refuses the edit.
         inventory.Refresh(); box.X = 12; var mutations = scene.MutationCalls;
         var token = inventory.PinForEdit(inventory.Entries.Single());
         scene.BeforeCapture = () => box.Position[1] = 99;
-        result = new PatchEngine(scene).Apply(document.Replace("112", "120"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        result = new PatchEngine(scene).Apply(scenePatchFile.Replace("112", "120"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
         scene.BeforeCapture = null;
         Check(!result.Outcomes["move"].Applied && scene.MutationCalls == mutations, "A change between the pin and the mutation is still refused by the guard: " + result.Outcomes["move"].Error);
     }
@@ -653,7 +653,7 @@ static class InspectionTests {
         var scene = new Scene(); var box = new Box { X = 7 }; var scans = 0;
         scene.Objects["p"] = new List<object> { box };
         scene.Observations = () => { scans++; return new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") }; };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var passes = inventory.CompletedPasses;
         bool refused = false;
@@ -662,7 +662,7 @@ static class InspectionTests {
         while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
         Check(inventory.CompletedPasses == passes + 1 && !inventory.IsStale, "A pass over an unchanged scene completes");
         scans = 0;
-        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinAfterPass(inventory.Entries.Single(), passes) });
+        var result = new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinAfterPass(inventory.Entries.Single(), passes) });
         Check(result.Outcomes["move"].Applied && box.X == 12 && scans == 1, "After a completed pass the edit reads the scene once, in its guard: " + scans);
         // A difference found by the pass refuses the edit.
         inventory.Refresh(); passes = inventory.CompletedPasses; box.Position[2] = 50;
@@ -675,7 +675,7 @@ static class InspectionTests {
         while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
         var token = inventory.PinAfterPass(inventory.Entries.Single(), passes);
         scene.BeforeCapture = () => box.Position[1] = 99;
-        result = new PatchEngine(scene).Apply(document.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        result = new PatchEngine(scene).Apply(scenePatchFile.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
         scene.BeforeCapture = null;
         Check(!result.Outcomes["move"].Applied && scene.MutationCalls == mutations, "A change after the pass is still refused by the guard: " + result.Outcomes["move"].Error);
     }
@@ -722,12 +722,12 @@ static class InspectionTests {
         var scene = new TargetedScene(); var box = new Box { X = 7 };
         scene.Inner.Objects["p"] = new List<object> { box };
         scene.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var passes = inventory.CompletedPasses;
         while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
         scene.Discoveries = 0; scene.Observations = 0;
-        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinAfterPass(inventory.Entries.Single(), passes) });
+        var result = new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinAfterPass(inventory.Entries.Single(), passes) });
         Check(result.Outcomes["move"].Applied && box.X == 12 && scene.Discoveries == 0 && scene.Observations == 1, "The guard observes the target once and discovers nothing: " + scene.Discoveries + "/" + scene.Observations);
         var before = inventory.Entries.Single();
         var after = inventory.Reobserve(before);
@@ -740,7 +740,7 @@ static class InspectionTests {
         while (inventory.CompletedPasses == passes && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
         var token = inventory.PinAfterPass(inventory.Entries.Single(), passes);
         scene.Inner.BeforeCapture = () => box.Position[1] = 99;
-        result = new PatchEngine(scene).Apply(document.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        result = new PatchEngine(scene).Apply(scenePatchFile.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
         scene.Inner.BeforeCapture = null;
         Check(!result.Outcomes["move"].Applied && scene.Inner.MutationCalls == mutations, "A change between the pass and the mutation is refused: " + result.Outcomes["move"].Error);
         Check(inventory.Reobserve(before) == null, "An observation that is no longer an entry is not re-observed");
@@ -956,15 +956,15 @@ static class InspectionTests {
         var scene = new TargetedScene(); var box = new Box { X = 7 };
         scene.Inner.Objects["p"] = new List<object> { box };
         scene.Inner.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
-        var document = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
+        var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         scene.Discoveries = 0; scene.Observations = 0;
-        var result = new PatchEngine(scene).Apply(document, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinCompared(inventory.Entries.Single()) });
+        var result = new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inventory.PinCompared(inventory.Entries.Single()) });
         Check(result.Outcomes["move"].Applied && box.X == 12 && scene.Discoveries == 0 && scene.Observations >= 1, "The edit runs without a discovery and observes the target: " + scene.Discoveries + "/" + scene.Observations);
         var entry = inventory.Reobserve(inventory.Entries.Single());
         var token = inventory.PinCompared(entry); var mutations = scene.Inner.MutationCalls;
         scene.Inner.BeforeCapture = () => box.Position[1] = 99;
-        result = new PatchEngine(scene).Apply(document.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
+        result = new PatchEngine(scene).Apply(scenePatchFile.Replace("112", "130"), "pack", new Dictionary<string, InspectedTarget> { ["move"] = token });
         scene.Inner.BeforeCapture = null;
         Check(!result.Outcomes["move"].Applied && scene.Inner.MutationCalls == mutations, "A change of the target before the mutation is refused: " + result.Outcomes["move"].Error);
         // A preview validates once: after a pass, that one validation observes the target when asked to.

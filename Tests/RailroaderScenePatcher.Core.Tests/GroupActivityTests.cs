@@ -42,7 +42,7 @@ static class GroupActivityTests {
         TrackFollowingKeepsGroupActivity();
         SaveAndReloadReproduceTheHoldOnce();
         OmittedActivityKeepsAnotherModsDisable();
-        OmittedActivityKeepsADisableInTheSameDocument();
+        OmittedActivityKeepsADisableInTheSameScenePatchFile();
         GizmoPreviewKeepsTheDisable();
         Console.WriteLine("PASS: group subscriptions, explicit-disable precedence, native group activity and restoration");
     }
@@ -104,14 +104,14 @@ static class GroupActivityTests {
         var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store); mapEditor.Session = session;
         return (world, sign, other, session, mapEditor, store);
     }
-    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.DocumentText)["modifications"].Single().First;
+    static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void RemovingTheDisableReturnsActivityToTheGroup() {
         var (world, sign, other, session, mapEditor, store) = Session();
         Assert(!session.Edit(Sign, null, true).Applied && mapEditor.UndoGroups.Count == 0, "Scene patch editing refuses an explicit enable of a follower");
         Assert(session.Edit(Sign, null, false).Applied && !sign.Active && sign.Held && sign.Activations == 0, "Scene patch editing disables the follower with a hold");
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 5))).Applied && Subscription(sign) == "extension|1|held" && !sign.Active && sign.Activations == 0, "Rebinding a disabled follower moves the subscription and keeps the hold");
         world.SetGroupEnabled("extension", false);
-        Assert(session.HasActivityValue(Sign) && !session.HasActivityValue(Other), "The document sets an activity for the disabled object and none for the other");
+        Assert(session.HasActivityValue(Sign) && !session.HasActivityValue(Other), "The scene patch file sets an activity for the disabled object and none for the other");
         var cleared = session.ClearActivity(Sign);
         Assert(!session.HasActivityValue(Sign) && session.IsChanged(Sign), "After the clearing the modification stays without an activity value");
         Assert(cleared.Applied && !sign.Held && !sign.Active && Subscription(sign) == "extension|1", "Clearing the disable returns activity to the disabled group: " + cleared.Error);
@@ -140,10 +140,10 @@ static class GroupActivityTests {
         Assert(session.Edit(Sign, null, false).Applied && s2.Held, "The follower is disabled");
         w2.FailHold = true; w2.SkipObserve = true;
         var unverified = session.ClearActivity(Sign);
-        Assert(!unverified.Applied && unverified.Error.Contains("cleanup is unverified") && Only(session)["active"] != null, "An unverifiable release of the hold is reported and the document keeps the disable: " + unverified.Error);
+        Assert(!unverified.Applied && unverified.Error.Contains("cleanup is unverified") && Only(session)["active"] != null, "An unverifiable release of the hold is reported and the scene patch file keeps the disable: " + unverified.Error);
         Assert(!session.Edit(Sign, null, false).Applied, "The unverified follower refuses another edit");
         w2.FailHold = null;
-        Assert(session.Recheck(Sign).Applied && s2.Held && !s2.Active, "Recheck reconciles the hold with the document before unblocking");
+        Assert(session.Recheck(Sign).Applied && s2.Held && !s2.Active, "Recheck reconciles the hold with the scene patch file before unblocking");
         Assert(session.ClearActivity(Sign).Applied && !s2.Held && s2.Active, "The verified follower accepts edits again");
     }
     static void TrackFollowingKeepsGroupActivity() {
@@ -174,7 +174,7 @@ static class GroupActivityTests {
         engine.Apply(store.Patch);
         Assert(Subscription(freshSign) == "extension|1|held" && freshSign.Activations == 0 && fresh.Buckets.Values.Sum(b => b.Count) == 1, "A repeated world-load callback leaves one subscription and only the unrelated registration");
         var unloaded = Session(store.Patch.Replace(SignPath, "World/Absent"));
-        Assert(unloaded.session.MinimumPatcherVersion == "0.5.0", "The version follows the document even when the target is not loaded");
+        Assert(unloaded.session.MinimumPatcherVersion == "0.5.0", "The version follows the scene patch file even when the target is not loaded");
     }
     // A modification that omits active leaves the activity untouched: it never releases the disable of another mod.
     static void OmittedActivityKeepsAnotherModsDisable() {
@@ -193,8 +193,8 @@ static class GroupActivityTests {
             Assert(sign.Held && !sign.Active && sign.Activations == 0, "Repeated application keeps the disable without activating the object");
         }
     }
-    // Two modifications of one object in one document: the one without active leaves the other's disable, in either order.
-    static void OmittedActivityKeepsADisableInTheSameDocument() {
+    // Two modifications of one object in one scene patch file: the one without active leaves the other's disable, in either order.
+    static void OmittedActivityKeepsADisableInTheSameScenePatchFile() {
         var disable = Item("disable", "\"active\":false"); var move = Item("move", Moved);
         foreach (var items in new[] { disable + "," + move, move + "," + disable, disable + "," + move.Replace("\"dependsOn\":[]", "\"dependsOn\":[\"disable\"]") }) {
             var (world, sign, other, scene) = Setup();
@@ -205,7 +205,7 @@ static class GroupActivityTests {
                 Assert(sign.Held && !sign.Active && sign.Activations == 0 && Subscription(sign) == "ela|1|held", "A second modification without active keeps the disable and never activates the object: " + Subscription(sign) + " activations " + sign.Activations);
             }
             world.SetGroupEnabled("ela", false); world.SetGroupEnabled("ela", true);
-            Assert(!sign.Active && sign.Activations == 0, "Group activation after the document keeps the object inactive");
+            Assert(!sign.Active && sign.Activations == 0, "Group activation after the scene patch file keeps the object inactive");
         }
     }
     // A gizmo drag of an explicitly disabled follower previews the placement only: the hold stays through every preview.

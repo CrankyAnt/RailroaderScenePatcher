@@ -284,7 +284,7 @@ static class BindingTests {
         Assert(placed.Applied && whistle.Position[0] == 45 && Entry(world, whistle) == "S377|a|7.511661", "Its fixed placement is editable and keeps the binding: " + placed.Error);
         var disabled = session.Edit(sign, null, false);
         Assert(disabled.Applied && !whistle.Active && world.Registrations(whistle).Count == 0 && whistle.Segment == "S377" && whistle.Position[0] == 45, "It can be disabled, which withdraws its registration and keeps its binding and placement: " + disabled.Error);
-        Assert(Only(session)["active"] != null && !(bool)Only(session)["active"], "The document records the explicit disable");
+        Assert(Only(session)["active"] != null && !(bool)Only(session)["active"], "The scene patch file records the explicit disable");
         var enabled = session.Edit(sign, null, true);
         Assert(enabled.Applied && whistle.Active && Entry(world, whistle) == "S377|a|7.511661" && whistle.Position[0] == 45, "It can be enabled again, which registers it at its binding: " + enabled.Error);
         Assert(enabled.Reverted && Only(session)["active"] == null, "Enabling it again equals its native activity, so the modification no longer sets the activity");
@@ -426,7 +426,7 @@ static class BindingTests {
         var result = new PatchEngine(scene).Apply(Doc(Binding("dependent", Detach, OtherPath, "[\"base\"]") + "," + Binding("base", At("Smissing", "a", 1))));
         Assert(!result.Outcomes["dependent"].Applied && !result.Outcomes["base"].Applied && Entry(world, other) == "Sjdl|b|38.6", "A failed relationship isolates its dependents");
         result = new PatchEngine(scene).Apply(Doc(Binding("dependent", Detach, OtherPath, "[\"base\"]") + "," + Binding("base", At("Nnew", "a", 1))));
-        Assert(result.Outcomes["dependent"].Applied && result.Outcomes["base"].Applied && world.Registrations(other).Count == 0 && Entry(world, sign) == "Nnew|a|1", "Dependencies run regardless of document order");
+        Assert(result.Outcomes["dependent"].Applied && result.Outcomes["base"].Applied && world.Registrations(other).Count == 0 && Entry(world, sign) == "Nnew|a|1", "Dependencies run regardless of scene patch file order");
     }
     static void FailureAfterMutationRestoresRelationship() {
         foreach (var inject in new Action<FakeMarkerWorld>[] { w => w.ThrowAfterLocation = true, w => w.SkipRegister = true }) {
@@ -583,10 +583,10 @@ static class BindingTests {
             var runtime = new PatchEngine(new TrackMarkerScene(world, Capability.Unchecked)).Apply(Doc(Binding("rebind", At("Nnew", "a", 4)) + "," + Placed("move")));
             Assert(!runtime.Outcomes["rebind"].Applied && runtime.Outcomes["rebind"].Error.Contains(expected), name + ": runtime application refuses: " + runtime.Outcomes["rebind"].Error);
             Assert(!runtime.Outcomes["move"].Applied, name + ": a placement of the same marker is refused too, since its preflight shares the scan");
-            var before = session.DocumentText;
+            var before = session.ScenePatchFileText;
             var edit = session.Bind(Sign, MarkerBinding.Detached);
             Assert(!edit.Applied && edit.Error.Contains(expected), name + ": the scene patch editing binding refuses: " + edit.Error);
-            Assert(world.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && session.DocumentText == before && store.Patch == null, name + ": no mutation, history entry or document change");
+            Assert(world.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && session.ScenePatchFileText == before && store.Patch == null, name + ": no mutation, history entry or scene patch file change");
             Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && sign.Position[0] == 20 && Entry(world, other) == "Sjdl|b|38.6", name + ": reference, registration, dependent cache and placement stay");
             var incomplete = new[] { "unreadable relevant field", "unenumerable list", "unavailable fields", "unreadable generic list declaration", "unenumerable generic-only list" };
             Assert(session.Bind(Other, MarkerBinding.Detached).Applied == !incomplete.Contains(name),
@@ -601,26 +601,26 @@ static class BindingTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (world, sign, other, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void EditingSetReplaceDetachUndoRedo() {
         var (world, sign, other, session, mapEditor, store) = Session();
         var set = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12)));
         Assert(set.Applied && Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 20, "A scene patch editing binding sets the reference and registration without moving the object: " + set.Error);
         var item = Only(session);
         Assert((string)item["relationships"]["trackMarker"]["segment"] == "Nnew" && (string)item["relationships"]["trackMarker"]["end"] == "b" && (double)item["relationships"]["trackMarker"]["distance"] == 12
-            && item["placement"] == null && item["active"] == null, "The document records only the binding: " + item);
+            && item["placement"] == null && item["active"] == null, "The scene patch file records only the binding: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "A relationship requires the common delivery minimum");
         var moved = new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.Edit(Sign, moved, null).Applied && sign.Position[0] == 40 && Entry(world, sign) == "Nnew|b|12", "A later placement edit keeps the binding");
         Assert(Only(session)["relationships"] != null && Only(session)["placement"] != null, "The placement edit preserves this mod's relationship");
         Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Sjdl", "a", 3))).Applied && Entry(world, sign) == "Sjdl|a|3" && sign.Position[0] == 40, "A replacement binding changes only the binding");
         Assert(session.Bind(Sign, MarkerBinding.Detached).Applied && sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40, "A scene patch editing detach clears reference and registration");
-        Assert((bool)Only(session)["relationships"]["trackMarker"]["detach"], "The document records an explicit detach");
+        Assert((bool)Only(session)["relationships"]["trackMarker"]["detach"], "The scene patch file records an explicit detach");
         Assert(sign.CachedGroup == null, "Detach clears the dependent cache");
         mapEditor.Undo(); Assert(Entry(world, sign) == "Sjdl|a|3" && sign.CachedGroup == "alarka", "Undo of a detach restores the reference, registration and dependent cache");
         mapEditor.Undo(); Assert(Entry(world, sign) == "Nnew|b|12" && sign.Position[0] == 40 && sign.CachedGroup == "extension", "Undo of a replacement restores the prior binding and dependent cache");
         mapEditor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|b|12" && sign.CachedGroup == "extension", "Undo of the placement keeps the binding and dependent cache");
-        mapEditor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && session.DocumentText.Contains("\"modifications\": {}"), "Undo of the first binding restores the native relationship and dependent cache");
+        mapEditor.Undo(); Assert(Entry(world, sign) == "S9sc|a|225.6681" && sign.CachedGroup == "ela" && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Undo of the first binding restores the native relationship and dependent cache");
         mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
         Assert(sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40 && sign.CachedGroup == null, "Redo reapplies every relationship and placement edit");
         Assert(Entry(world, other) == "Sjdl|b|38.6" && other.CachedGroup == "alarka", "No scene patch editing operation touched the unrelated marker or its dependent cache");
@@ -641,18 +641,18 @@ static class BindingTests {
         // Clearing the only setting of a modification removes it.
         (world, sign, other, session, mapEditor, store) = Session();
         session.Bind(Sign, MarkerBinding.Detached);
-        Assert(session.Bind(Sign, null).Applied && session.DocumentText.Contains("\"modifications\": {}") && Entry(world, sign) == "S9sc|a|225.6681", "Clearing a binding-only modification removes it");
+        Assert(session.Bind(Sign, null).Applied && session.ScenePatchFileText.Contains("\"modifications\": {}") && Entry(world, sign) == "S9sc|a|225.6681", "Clearing a binding-only modification removes it");
     }
     static void EditingRefusalAndFailureRestore() {
         var (world, sign, other, session, mapEditor, store) = Session();
-        var before = session.DocumentText;
+        var before = session.ScenePatchFileText;
         foreach (var bad in new[] { new TrackLocation("Smissing", "a", 1), new TrackLocation("Nnew", "a", 999) }) {
             var refused = session.Bind(Sign, MarkerBinding.At(bad));
-            Assert(!refused.Applied && session.DocumentText == before && mapEditor.UndoGroups.Count == 0 && Entry(world, sign) == "S9sc|a|225.6681" && world.Mutations == 0, "An unresolved scene patch editing binding changes nothing and records no history: " + refused.Error);
+            Assert(!refused.Applied && session.ScenePatchFileText == before && mapEditor.UndoGroups.Count == 0 && Entry(world, sign) == "S9sc|a|225.6681" && world.Mutations == 0, "An unresolved scene patch editing binding changes nothing and records no history: " + refused.Error);
         }
         world.SkipRegister = true;
         var failed = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 1)));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Entry(world, sign) == "S9sc|a|225.6681" && session.DocumentText == before, "A failed scene patch editing binding restores reference and registration: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Entry(world, sign) == "S9sc|a|225.6681" && session.ScenePatchFileText == before, "A failed scene patch editing binding restores reference and registration: " + failed.Error);
         Assert(sign.CachedGroup == "ela" && other.CachedGroup == "alarka" && Entry(world, other) == "Sjdl|b|38.6", "A failed scene patch editing binding restores the dependent cache and leaves the unrelated marker's cache");
         world.StickyRegistration = true;
         failed = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 1)));
@@ -710,7 +710,7 @@ static class BindingTests {
         Assert(outcome.Applied && sign.Position[0] == 50 && sign.Rotation[3] == 1, "The snap moves the marker object to the endpoint and keeps its rotation: " + outcome.Error);
         Assert(Entry(world, sign) == "Nnew|a|9" && sign.Segment == "Nnew" && sign.CachedGroup == "extension", "The snap leaves the binding, registration and dependent cache");
         var item = Only(session);
-        Assert((string)item["placement"]["mode"] == "fixed" && (string)item["relationships"]["trackMarker"]["segment"] == "Nnew", "The document holds the fixed snapped placement beside the binding: " + item);
+        Assert((string)item["placement"]["mode"] == "fixed" && (string)item["relationships"]["trackMarker"]["segment"] == "Nnew", "The scene patch file holds the fixed snapped placement beside the binding: " + item);
         mapEditor.Undo(); Assert(sign.Position[0] == 20 && Entry(world, sign) == "Nnew|a|9", "Undo of the snap restores the position and keeps the binding");
         Assert(Entry(world, other) == "Sjdl|b|38.6" && other.Position[0] == 70, "The unrelated marker is untouched");
     }
@@ -725,8 +725,8 @@ static class BindingTests {
         Assert(reload.Outcomes.Values.All(o => o.Applied) && Entry(fresh, freshSign) == "Nnew|b|12.25" && fresh.Registrations(freshOther).Count == 0, "A reloaded world reproduces the saved binding and detachment");
         engine.Apply(store.Patch);
         Assert(Entry(fresh, freshSign) == "Nnew|b|12.25" && fresh.Buckets.Values.Sum(b => b.Count) == 1, "A repeated world-load callback leaves exactly one owned registration");
-        // An existing saved document reopens and edits its relationship.
+        // An existing saved scene patch file reopens and edits its relationship.
         var (w2, s2, o2, reopened, e2, st2) = Session(store.Patch);
-        Assert(reopened.Blocked == null && reopened.Bind(Sign, MarkerBinding.Detached).Applied && s2.Segment == null, "A saved relationship document reopens for editing");
+        Assert(reopened.Blocked == null && reopened.Bind(Sign, MarkerBinding.Detached).Applied && s2.Segment == null, "A saved relationship scene patch file reopens for editing");
     }
 }

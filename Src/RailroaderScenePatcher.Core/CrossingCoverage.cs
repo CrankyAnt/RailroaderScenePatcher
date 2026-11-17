@@ -18,8 +18,8 @@ namespace RailroaderScenePatcher.Core {
         static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
     }
     public enum CircuitKind { Native, Tracks, Detached, Added }
-    // The identity of a detection addition. Its ID is unique in the patch document of its supplying mod, and the
-    // key joins it with that document's key, so additions of different mods never share an identity.
+    // The identity of a detection addition. Its ID is unique in the scene patch file of its supplying mod, and the
+    // key joins it with that scene patch file's key, so additions of different mods never share an identity.
     public static class DetectionAddition {
         const string Prefix = "addition:";
         public static string Key(string owner, string id) {
@@ -99,7 +99,7 @@ namespace RailroaderScenePatcher.Core {
         // coverage removes the additions it does not list; applying any other coverage keeps them.
         internal bool Complete { get; private set; }
         internal CrossingCoverage AsComplete() { Complete = true; return this; }
-        // The coverage with every addition that has no owner yet given to the document that sets it.
+        // The coverage with every addition that has no owner yet given to the scene patch file that sets it.
         internal CrossingCoverage OwnedBy(string owner) {
             if (String.IsNullOrEmpty(owner) || !circuits.Any(c => c.Value.Kind == CircuitKind.Added)) return this;
             return new CrossingCoverage(circuits.Select(c => DetectionAddition.TryRead(c.Key, out var o, out var id) && o.Length == 0 ? new KeyValuePair<string, CircuitCoverage>(DetectionAddition.Key(owner, id), c.Value) : c), Residue) { Complete = Complete };
@@ -214,7 +214,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // Whether this crossing capability can add equipment.
         public bool EquipmentAvailable => equipment != null;
-        // The loaded devices the editor offers as equipment sources for the controller, eligible or with their rejection reason.
+        // The loaded devices scene patch editing offers as equipment sources for the controller, eligible or with their rejection reason.
         public IReadOnlyList<SourceCandidate> EquipmentCandidates(object target) {
             if (equipment == null) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
             BaselineOf(target);
@@ -393,7 +393,7 @@ namespace RailroaderScenePatcher.Core {
                 var difference = Verify(target, baseline, desired);
                 if (difference != null) throw new InvalidOperationException("Applied crossing coverage did not verify: " + difference);
             }
-            // A complete set replaces the additions; an authored set adds or replaces its own and leaves the others.
+            // A complete set replaces the additions; a mod's set adds or replaces its own and leaves the others.
             var change = EquipmentChange(target, baseline, state.Equipment);
             if (change != null) {
                 var desired = change;
@@ -495,7 +495,7 @@ namespace RailroaderScenePatcher.Core {
         // spans, followed by the additions the patcher owns in key order, every native span stays registered, and exactly the
         // owned spans in use are registered and cover track.
         // Residue left by an incomplete cleanup does not refuse an edit: the next application removes it, and until then the
-        // observed coverage differs from any document so a recheck applies it.
+        // observed coverage differs from any scene patch file so a recheck applies it.
         string Coherence(object target, Baseline baseline, bool residue) {
             var members = world.Circuits(target) ?? Array.Empty<object>();
             if (members.Any(m => !baseline.Circuits.Concat(baseline.Added).Any(c => ReferenceEquals(c.Set, m)))) return "the crossing evaluates a circuit that is not one of its own";

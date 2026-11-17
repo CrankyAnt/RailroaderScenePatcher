@@ -63,7 +63,7 @@ static class TrackFollowingTests {
         var doc = Doc(Follow("follow", NodeTrack, "[1,0,4]", "[0," + S.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + ",0," + S.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "]"));
         Assert(engine.Apply(doc).Outcomes["follow"].Applied && Near(box.Position, 201, 2, 54) && Near(box.Rotation, Quarter), "An endpoint anchor places the object relative to the node: " + String.Join(",", box.Position));
         for (var i = 0; i < 3; i++) Assert(engine.Apply(doc).Outcomes["follow"].Applied, "Repeated application succeeds");
-        Assert(Near(box.Position, 201, 2, 54) && Near(box.Rotation, Quarter), "Repeated application of the same document does not accumulate the offset or rotation");
+        Assert(Near(box.Position, 201, 2, 54) && Near(box.Rotation, Quarter), "Repeated application of the same scene patch file does not accumulate the offset or rotation");
         // A changed track pose yields the new absolute placement from the same relative values.
         scene.Poses["node:N1"] = new TrackPose(new[] { 400.0, 3, 0 }, Quarter);
         Assert(new PatchEngine(scene).Apply(doc).Outcomes["follow"].Applied && Near(box.Position, 304, 3, -1), "The next load follows the moved endpoint: " + String.Join(",", box.Position));
@@ -130,28 +130,28 @@ static class TrackFollowingTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (scene, box, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static double[] Numbers(Newtonsoft.Json.Linq.JToken token) => token.Select(v => (double)v).ToArray();
     static void EditingFollowKeepsPlacementAndFollowsTrackMoves() {
         var (scene, box, session, mapEditor, store) = Session();
         var follow = session.Follow(P, TrackAnchor.At(new TrackLocation("S1", "a", 10)));
         Assert(follow.Applied && Near(box.Position, 5, 6, 7) && Near(box.Rotation, 0, 0, 0, 1), "Choosing a followed track keeps the object where it is: " + follow.Error);
         var placement = Only(session)["placement"];
-        Assert((string)placement["mode"] == "trackFollowing" && (string)placement["track"]["segment"] == "S1" && (string)placement["track"]["end"] == "a" && (double)placement["track"]["distance"] == 10, "The document records the explicit track: " + placement);
+        Assert((string)placement["mode"] == "trackFollowing" && (string)placement["track"]["segment"] == "S1" && (string)placement["track"]["end"] == "a" && (double)placement["track"]["distance"] == 10, "The scene patch file records the explicit track: " + placement);
         // Map placement (105,6,7) relative to (200,1,0) turned a quarter: the offset in the track frame is (-7,5,-95).
-        Assert(Near(Numbers(placement["offset"]), -7, 5, -95), "The document records the offset in the track frame: " + placement["offset"]);
+        Assert(Near(Numbers(placement["offset"]), -7, 5, -95), "The scene patch file records the offset in the track frame: " + placement["offset"]);
         Assert(mapEditor.UndoGroups.Count == 1 && session.MinimumPatcherVersion == "0.5.0", "Following is one history entry and needs patcher 0.5.0");
         Assert(session.HasTrackFollowing && session.FollowingOf(P)?.Anchor.ToString() == "S1|a|10", "The session reports the followed track of the object");
-        var text = session.DocumentText; var mutations = scene.MutationCalls;
+        var text = session.ScenePatchFileText; var mutations = scene.MutationCalls;
         Assert(session.ReconcileTrackFollowing().Count == 0 && scene.MutationCalls == mutations, "Reconciliation without a track change mutates nothing");
         scene.Poses["S1|a|10"] = new TrackPose(new[] { 210.0, 2, 0 }, Quarter);
         var moved = session.ReconcileTrackFollowing();
         Assert(moved.Count == 1 && moved[0].Value.Applied && Near(box.Position, 15, 7, 7) && Near(box.Rotation, 0, 0, 0, 1), "A moved track carries the object by the same relative placement: " + String.Join(",", box.Position));
         scene.Poses["S1|a|10"] = new TrackPose(new[] { 210.0, 2, 0 }, new[] { 0.0, 0, 0, 1 });
         Assert(session.ReconcileTrackFollowing().Single().Value.Applied && Near(box.Position, 103, 7, -95) && Near(box.Rotation, 0, -S, 0, S), "A turned track turns the object's position and orientation with it: " + String.Join(",", box.Position) + " / " + String.Join(",", box.Rotation));
-        Assert(session.DocumentText == text && mapEditor.UndoGroups.Count == 1, "Following the track neither rewrites the stored relative values nor records history");
+        Assert(session.ScenePatchFileText == text && mapEditor.UndoGroups.Count == 1, "Following the track neither rewrites the stored relative values nor records history");
         mapEditor.Undo();
-        Assert(Near(box.Position, 5, 6, 7) && session.DocumentText.Contains("\"modifications\": {}"), "Undo removes the following and returns the underlying placement");
+        Assert(Near(box.Position, 5, 6, 7) && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Undo removes the following and returns the underlying placement");
         Assert(session.ReconcileTrackFollowing().Count == 0, "An object no longer following is not reconciled");
         Assert(!session.HasTrackFollowing && session.FollowingOf(P) == null, "After Undo nothing follows a track");
         mapEditor.Redo();
@@ -222,8 +222,8 @@ static class TrackFollowingTests {
         engine.Apply(store.Patch);
         Assert(Near(freshBox.Position, 55, 6, 7) && fresh.Objects["p"].Count == 1, "A repeated world-load callback converges without offset accumulation");
         var reopened = Session(store.Patch);
-        Assert(reopened.session.Blocked == null && reopened.session.StopFollowing(P).Applied, "A saved following document reopens for editing");
-        // The version follows the document content even when the target is not loaded.
+        Assert(reopened.session.Blocked == null && reopened.session.StopFollowing(P).Applied, "A saved following scene patch file reopens for editing");
+        // The version follows the scene patch file content even when the target is not loaded.
         var unloaded = Session(store.Patch.Replace("\"path\": \"p\"", "\"path\": \"absent\""));
         Assert(unloaded.session.MinimumPatcherVersion == "0.5.0", "An unloaded target's following placement still needs 0.5.0");
     }

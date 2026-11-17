@@ -12,7 +12,7 @@ You define an addition with three things:
 
 | Part | Meaning |
 | --- | --- |
-| ID | A name you choose. It is unique in your mod's patch document and stays the same across loads. Another mod can use the same ID without affecting yours. |
+| ID | A name you choose. It is unique in your mod's scene patch file and stays the same across loads. Another mod can use the same ID without affecting yours. |
 | Tracks | The track segments the three spans lie on. You name each segment. |
 | Area | The distances along those segments where each span starts and ends. |
 
@@ -38,11 +38,11 @@ To delete an addition, select **Edit Detection addition** with its ID, then **De
 
 Native Undo and Redo reverse and repeat each applied change. Undo of an addition removes its circuit and spans. Undo of a deletion builds them again.
 
-Save writes the addition to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the added circuit or its spans in map data. The patcher builds them from the document on every load, and a repeated load reuses what it already built.
+Save writes the addition to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the added circuit or its spans in map data. The patcher builds them from the scene patch file on every load, and a repeated load reuses what it already built.
 
 If an edit fails, the panel reports whether the prior state was restored. When the patcher cannot remove a span it built, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
-## Write an addition in the document
+## Write an addition in the scene patch file
 
 Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`. In the `additions` object of `relationships.crossingCoverage`, add a member whose key is the ID of the addition and whose value holds the three spans. The modification itself is a member of `modifications` under its ID:
 
@@ -69,16 +69,16 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
 }
 ```
 
-The scene, path and segment in this example are placeholders. Use the scene and path from the inspected crossing and the IDs of your own segments. The field rules are in the [patch document v1](patch-document-v1.md#detection-additions).
+The scene, path and segment in this example are placeholders. Use the scene and path from the inspected crossing and the IDs of your own segments. The field rules are in the [scene patch file v1](scene-patch-file-v1.md#detection-additions).
 
-To delete an addition, remove its member from `additions`; when it was the last one, remove `additions` too, because an empty `additions` object is invalid. An addition exists only while the document lists it. To make one modification wait for another, name it in `dependsOn`. The order of the keys in the file has no effect.
+To delete an addition, remove its member from `additions`; when it was the last one, remove `additions` too, because an empty `additions` object is invalid. An addition exists only while the scene patch file lists it. To make one modification wait for another, name it in `dependsOn`. The order of the keys in the file has no effect.
 
 ## Limits
 
-- An addition ID may appear in one modification of the document. If two modifications use the same ID, both fail and the other modifications still apply.
+- An addition ID may appear in one modification of the scene patch file. If two modifications use the same ID, both fail and the other modifications still apply.
 - A missing segment, a segment ID that matches more than one segment, a distance outside its segment and a span without length are refused before anything changes.
 - The patcher does not check whether trains occupy the affected spans. Make edits in scene patch editing with those spans clear.
 - The patcher does not check that your spans meet at the island or that the track is connected. It checks that each span resolves, registers and covers track.
-- The scene patch editing fields take one segment per span. A span that crosses segment boundaries can be written in the document with `from` and `to` on different segments.
+- The scene patch editing fields take one segment per span. A span that crosses segment boundaries can be written in the scene patch file with `from` and `to` on different segments.
 - A crossing whose circuits were changed by something other than this patcher is refused until the world reloads.
 - Research demonstrated added detection in both directions on one crossing and build. The patcher does not check warning time.

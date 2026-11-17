@@ -6,7 +6,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    // One loaded mod that carries a patch document, with the supplying metadata of its Info.json.
+    // One loaded mod that carries a scene patch file, with the supplying metadata of its Info.json.
     public sealed class LoadedMod {
         public const string PatcherId = "crankyant/scene-patcher";
         public LoadedMod(PatchSource source, string json, IEnumerable<string> dependencies, bool editTarget = false, string error = null) {
@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<string> Dependencies { get; }
         // The native map editor's edited mod, applied before Save has declared the patcher dependency.
         public bool EditTarget { get; }
-        // Set when the document or supplying metadata cannot be read; the mod is skipped as a whole.
+        // Set when the scene patch file or supplying metadata cannot be read; the mod is skipped as a whole.
         public string Error { get; }
         public bool DeclaresPatcher => Dependencies.Contains(PatcherId, StringComparer.Ordinal);
         public bool Applicable => Error == null && (EditTarget || DeclaresPatcher);
@@ -30,38 +30,38 @@ namespace RailroaderScenePatcher.Core {
                 var required = metadata["dependencies"]?["required"] as JArray;
                 var dependencies = required?.Where(d => d.Type == JTokenType.String).Select(d => ((string)d).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()) ?? Enumerable.Empty<string>();
                 var source = new PatchSource(identifier, Text(metadata, "name") ?? identifier, Text(metadata, "version"), Text(metadata, "author"), Text(metadata, "website"));
-                return new LoadedMod(source, json, dependencies, editTarget, json == null ? "Cannot read patch document" : null);
+                return new LoadedMod(source, json, dependencies, editTarget, json == null ? "Cannot read scene patch file" : null);
             } catch (Exception e) when (!(e is OutOfMemoryException)) {
-                return new LoadedMod(new PatchSource(identifier, identifier, null), json, null, editTarget, "Cannot read patch document or supplying metadata: " + e.GetType().Name);
+                return new LoadedMod(new PatchSource(identifier, identifier, null), json, null, editTarget, "Cannot read scene patch file or supplying metadata: " + e.GetType().Name);
             }
         }
         static string Text(JObject obj, string name) => obj[name]?.Type == JTokenType.String ? (string)obj[name] : null;
     }
     // What happened to one loaded mod during a load-order pass.
-    public sealed class LoadedDocument {
-        internal LoadedDocument(LoadedMod mod) { Mod = mod; }
+    public sealed class LoadedScenePatchFile {
+        internal LoadedScenePatchFile(LoadedMod mod) { Mod = mod; }
         public LoadedMod Mod { get; }
         // Null when the mod was not handed to the engine: unreadable or not applicable.
-        public DocumentResult Result { get; internal set; }
+        public ScenePatchFileResult Result { get; internal set; }
         public string Skipped { get; internal set; }
-        // A failure report or overlap notice that could not be delivered; the document's applied work is unaffected.
+        // A failure report or overlap notice that could not be delivered; the scene patch file's applied work is unaffected.
         public string PresentationError { get; internal set; }
-        // The map this document names as its source, or null when the document cannot be read that far. A document of
+        // The map this scene patch file names as its source, or null when the scene patch file cannot be read that far. A scene patch file of
         // another format version names no map this patcher can read, so its log line reports the version, not a map.
         public string MapId {
             get {
-                try { return Mod.Json == null || PatchDocument.FormatProblem(Mod.Json) != null ? null : (string)JObject.Parse(Mod.Json)["sourceMap"]?["mapId"]; }
+                try { return Mod.Json == null || ScenePatchFile.FormatProblem(Mod.Json) != null ? null : (string)JObject.Parse(Mod.Json)["sourceMap"]?["mapId"]; }
                 catch { return null; }
             }
         }
-        // What happened to this document in one load attempt, as one line for the log: the mod, the map the document
-        // is for, and the outcome. mapIds is the loaded map followed by its layers. A document for another map is
+        // What happened to this scene patch file in one load attempt, as one line for the log: the mod, the map the scene patch file
+        // is for, and the outcome. mapIds is the loaded map followed by its layers. A scene patch file for another map is
         // skipped without a failure, so this line is the only trace of it.
         public string LogLine(string patcherVersion, int attempt, IReadOnlyList<string> mapIds) {
             var maps = mapIds ?? Array.Empty<string>();
             var source = Mod.Source;
             var start = "Scene Patcher " + patcherVersion + ": load attempt " + attempt + ", map " + (maps.Count == 0 ? "unknown" : maps[0]) +
-                " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] document";
+                " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] scene patch file";
             var map = MapId;
             var named = start + (map == null ? "" : " for " + map);
             if (Result == null) return named + " skipped: " + (Skipped ?? "not handed to the patch engine");

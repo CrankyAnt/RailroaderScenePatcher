@@ -215,7 +215,7 @@ namespace RailroaderScenePatcher {
         // root, a whistle sign.
         const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
-        // Select in world and a choice for a document show one crossing the same way.
+        // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;
         // One group of the inventory: its objects that have a usable position, and the scene object of the game
         // component that anchors it, whose orientation the group's one box takes.

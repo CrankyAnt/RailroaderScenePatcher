@@ -70,20 +70,20 @@ static class SnapTests {
         FailedSnapRestoresAndGuardsRetry();
         CurveEndsAndInvalidGeometry();
         SnapAndGizmoShareFixedHistoryWithoutPersistingPreviews();
-        Console.WriteLine("PASS: explicit snap preflight, fixed documents, unchanged binding, persistence, repeat and restoration");
+        Console.WriteLine("PASS: explicit snap preflight, fixed scene patch files, unchanged binding, persistence, repeat and restoration");
     }
     static void SnapAndGizmoShareFixedHistoryWithoutPersistingPreviews() {
         var w = new World(); var node = Node(); w.Tracks.Items.Add(node);
         var binding = w.Box.LogicalTrack;
-        var request = w.Prepare(node); var document = w.Session.DocumentText;
+        var request = w.Prepare(node); var scenePatchFile = w.Session.ScenePatchFileText;
         var inventory = new SceneInventory(w.Scene); inventory.Refresh();
         var gesture = new PlacementGesture(w.Engine, w.Session, ObjectId, inventory.Pin(inventory.Entries.Single()));
         Assert(gesture.Preview(new Placement(new[] { 116.0, 8.0, 9.0 }, w.Box.Rotation)).Applied, "A gizmo preview uses the shared placement adapter");
         var calls = w.Scene.MutationCalls;
-        Assert(!w.Snap.Apply(request).Applied && w.Box.X == 16 && w.Scene.MutationCalls == calls && w.Session.DocumentText == document,
+        Assert(!w.Snap.Apply(request).Applied && w.Box.X == 16 && w.Scene.MutationCalls == calls && w.Session.ScenePatchFileText == scenePatchFile,
             "A snap prepared against the earlier inspection cannot overwrite a changed preview");
-        Assert(gesture.Cancel().Applied && w.Box.X == 4 && w.MapEditor.UndoGroups.Count == 0 && w.Session.DocumentText == document,
-            "Cancelling the preview preserves the original complete document and history");
+        Assert(gesture.Cancel().Applied && w.Box.X == 4 && w.MapEditor.UndoGroups.Count == 0 && w.Session.ScenePatchFileText == scenePatchFile,
+            "Cancelling the preview preserves the original complete scene patch file and history");
         Assert(w.Snap.Apply(w.Prepare(node)).Applied && w.Box.X == 20, "A fresh snap follows the cancelled gesture");
         inventory.Refresh();
         gesture = new PlacementGesture(w.Engine, w.Session, ObjectId, inventory.Pin(inventory.Entries.Single()));
@@ -92,7 +92,7 @@ static class SnapTests {
         Assert(w.Box.X == 35 && w.MapEditor.UndoGroups.Count == 2 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Snap and completed gesture each add one history operation and retain the logical binding");
         w.MapEditor.Undo(); Assert(w.Box.X == 20, "Undoing the gesture recovers the snapped placement");
-        w.MapEditor.Undo(); Assert(w.Box.X == 4 && JObject.Parse(w.Session.DocumentText)["modifications"].Count() == 0, "Undoing the snap recovers underlying placement and an empty document");
+        w.MapEditor.Undo(); Assert(w.Box.X == 4 && JObject.Parse(w.Session.ScenePatchFileText)["modifications"].Count() == 0, "Undoing the snap recovers underlying placement and an empty scene patch file");
         w.MapEditor.Redo(); w.MapEditor.Redo();
         Assert(w.Box.X == 35 && w.MapEditor.Save() == null, "Redo and shared Save persist the final gesture result");
         var fresh = new Scene(); var box = new Box(); fresh.Objects["p"] = new List<object> { box }; var engine = new PatchEngine(fresh);
@@ -114,7 +114,7 @@ static class SnapTests {
         foreach (var change in new[] { "missing", "ambiguous", "replacement", "geometry", "map", "object" }) {
             var w = new World(); var node = Node(); w.Tracks.Items.Add(node);
             Assert(w.Session.Edit(ObjectId, new Placement(new[] { 106.0, 8.0, 9.0 }, w.Box.Rotation), null).Applied, "Independent prior edit succeeds");
-            var request = w.Prepare(node); var document = w.Session.DocumentText; var calls = w.Scene.MutationCalls;
+            var request = w.Prepare(node); var scenePatchFile = w.Session.ScenePatchFileText; var calls = w.Scene.MutationCalls;
             switch (change) {
                 case "missing": w.Tracks.Items.Clear(); break;
                 case "ambiguous": w.Tracks.Items.Add(Node()); break;
@@ -126,22 +126,22 @@ static class SnapTests {
             var result = w.Snap.Apply(request);
             Assert(!result.Applied && result.Error != null && w.Scene.MutationCalls == calls && w.Box.X == 6,
                 change + " refuses snap without partial mutation or substitution: " + result.Error);
-            Assert(w.Session.DocumentText == document && w.MapEditor.UndoGroups.Count == 1, change + " preserves earlier work and history");
-            // A refused selection is not encoded into a fixed document. Replaying the retained
-            // complete document reproduces this mod's prior work, without a runtime graph resolver.
+            Assert(w.Session.ScenePatchFileText == scenePatchFile && w.MapEditor.UndoGroups.Count == 1, change + " preserves earlier work and history");
+            // A refused selection is not encoded into a fixed scene patch file. Replaying the retained
+            // complete scene patch file reproduces this mod's prior work, without a runtime graph resolver.
             var fresh = new Scene(); var box = new Box(); fresh.Objects["p"] = new List<object> { box };
-            Assert(new PatchEngine(fresh).Apply(document).Outcomes.Values.Single().Applied && box.X == 6,
-                change + " leaves the complete document valid with this mod's prior placement");
+            Assert(new PatchEngine(fresh).Apply(scenePatchFile).Outcomes.Values.Single().Applied && box.X == 6,
+                change + " leaves the complete scene patch file valid with this mod's prior placement");
         }
     }
     static void FailedSnapRestoresAndGuardsRetry() {
         var w = new World(); var node = Node(); w.Tracks.Items.Add(node);
-        var request = w.Prepare(node); var original = w.Session.DocumentText; var binding = w.Box.LogicalTrack;
+        var request = w.Prepare(node); var original = w.Session.ScenePatchFileText; var binding = w.Box.LogicalTrack;
         w.Scene.FailAfterDependentUpdate = 1;
         var result = w.Snap.Apply(request);
         Assert(!result.Applied && result.Error.Contains("prior state was restored") && w.Box.X == 4 && w.Box.DependentX == 4 && ReferenceEquals(binding, w.Box.LogicalTrack),
             "Failed snap restores captured position and dependent state while retaining the logical reference: " + result.Error);
-        Assert(w.Session.DocumentText == original && w.MapEditor.UndoGroups.Count == 0, "Failed snap preserves the complete prior document and history");
+        Assert(w.Session.ScenePatchFileText == original && w.MapEditor.UndoGroups.Count == 0, "Failed snap preserves the complete prior scene patch file and history");
         w.Scene.FailAfterDependentUpdate = 2;
         result = w.Snap.Apply(request);
         Assert(!result.Applied && result.Error.Contains("cleanup is unverified"), "Incomplete restoration is reported");
@@ -149,13 +149,13 @@ static class SnapTests {
         Assert(!result.Applied && result.Error.Contains("cleanup is unverified") && w.Scene.MutationCalls == calls, "Unverified cleanup guards another snap");
         Assert(w.Session.Recheck(ObjectId).Applied && w.Snap.Apply(w.Prepare(node)).Applied, "Explicit verified recovery permits a new snap");
         Assert(w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack), "Successful snap updates dependent state without changing logical track");
-        var document = w.Session.DocumentText;
+        var scenePatchFile = w.Session.ScenePatchFileText;
         w.Scene.FailAfterDependentUpdate = 1;
-        var outcome = new PatchEngine(w.Scene).Apply(document).Outcomes.Values.Single();
+        var outcome = new PatchEngine(w.Scene).Apply(scenePatchFile).Outcomes.Values.Single();
         Assert(!outcome.Applied && outcome.Error.Contains("restored") && w.Box.X == 20 && w.Box.DependentX == 20 && ReferenceEquals(binding, w.Box.LogicalTrack),
-            "Complete-document failed application also restores dependent state and binding");
+            "Complete scene patch file failed application also restores dependent state and binding");
         w.MapEditor.Save();
-        Assert(w.Store.Patch == document, "Save after recovery writes only the successful snap result");
+        Assert(w.Store.Patch == scenePatchFile, "Save after recovery writes only the successful snap result");
     }
     static void CurveEndsAndInvalidGeometry() {
         foreach (var x in new[] { 90.0, 115.0, 104.0 }) {
@@ -169,7 +169,7 @@ static class SnapTests {
         var invalid = new World(); var bad = Node(x: Double.NaN); invalid.Tracks.Items.Add(bad);
         try { invalid.Prepare(bad); throw new Exception("Nonfinite geometry accepted"); }
         catch (InvalidOperationException e) { Assert(e.Message.Contains("finite"), "Invalid geometry reports a concrete refusal"); }
-        Assert(invalid.Scene.MutationCalls == 0 && JObject.Parse(invalid.Session.DocumentText)["modifications"].Count() == 0, "Invalid geometry leaves the complete document and object untouched");
+        Assert(invalid.Scene.MutationCalls == 0 && JObject.Parse(invalid.Session.ScenePatchFileText)["modifications"].Count() == 0, "Invalid geometry leaves the complete scene patch file and object untouched");
     }
     static void SelectedCurveSuppliesTheClosestPoint() {
         var w = new World(); w.Box.Position = new[] { 2.16, 5.0, 6.3 };
@@ -179,22 +179,22 @@ static class SnapTests {
         var result = w.Snap.Apply(w.Prepare(curve));
         Assert(result.Applied && Math.Abs(w.Box.X - 2.16) < 0.000001 && Math.Abs(w.Box.Position[1]) < 0.000001 && Math.Abs(w.Box.Position[2] - 6.3) < 0.000001,
             "Selected cubic curve supplies its closest point rather than a sampled display vertex: " + result.Error);
-        var document = w.Session.DocumentText;
+        var scenePatchFile = w.Session.ScenePatchFileText;
         var other = new BoundBox(); w.Scene.Objects["p"] = new List<object> { other };
-        var replay = new PatchEngine(w.Scene).Apply(document).Outcomes.Values.Single();
+        var replay = new PatchEngine(w.Scene).Apply(scenePatchFile).Outcomes.Values.Single();
         Assert(replay.Applied && Math.Abs(other.Position[2] - 6.3) < 0.000001,
-            "The complete document reproduces the curve snap independently of selection: " + replay.Error);
+            "The complete scene patch file reproduces the curve snap independently of selection: " + replay.Error);
     }
     static void TrackChangeDuringObjectReadRefusesTheWholeEdit() {
         var w = new World();
         var node = new SnapGeometry(new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackNode, "node-a"), "Node A"),
             new[] { new[] { 120.0, 3.0, 5.0 } });
-        w.Tracks.Items.Add(node); var request = w.Prepare(node); var document = w.Session.DocumentText;
+        w.Tracks.Items.Add(node); var request = w.Prepare(node); var scenePatchFile = w.Session.ScenePatchFileText;
         w.Scene.BeforeRead = () => w.Tracks.Items.Clear();
         var result = w.Snap.Apply(request);
         Assert(!result.Applied && result.Error.Contains("Snap target is missing") && w.Scene.MutationCalls == 0 && w.Box.X == 4,
             "The track is rechecked after object callbacks and before mutation: " + result.Error);
-        Assert(w.Session.DocumentText == document && w.MapEditor.UndoGroups.Count == 0, "Pre-mutation refusal preserves the complete document and history");
+        Assert(w.Session.ScenePatchFileText == scenePatchFile && w.MapEditor.UndoGroups.Count == 0, "Pre-mutation refusal preserves the complete scene patch file and history");
     }
     static void EndpointPersistsAsFixedPlacement() {
         var w = new World();
@@ -203,22 +203,22 @@ static class SnapTests {
         w.Tracks.Items.Add(node);
         var binding = w.Box.LogicalTrack;
         var request = w.Prepare(node);
-        Assert(w.Box.X == 4 && w.MapEditor.UndoGroups.Count == 0 && JObject.Parse(w.Session.DocumentText)["modifications"].Count() == 0,
+        Assert(w.Box.X == 4 && w.MapEditor.UndoGroups.Count == 0 && JObject.Parse(w.Session.ScenePatchFileText)["modifications"].Count() == 0,
             "Preparing and inspecting a snap has no mutation, persistence or history side effects");
         var result = w.Snap.Apply(request);
         Assert(result.Applied && w.Box.Position.SequenceEqual(new[] { 20.0, 3.0, 5.0 }), "Endpoint snap uses the selected node's map coordinates: " + result.Error);
         Assert(w.Box.Rotation.SequenceEqual(new[] { 0.0, 1.0, 0.0, 0.0 }), "Snap preserves the object's rotation");
         Assert(ReferenceEquals(binding, w.Box.LogicalTrack) && w.Box.DependentX == 20, "Endpoint snap retains the actual logical reference and updates dependent state");
-        var item = JObject.Parse(w.Session.DocumentText)["modifications"].Single().First;
-        Assert((string)item["placement"]["mode"] == "fixed" && item["binding"] == null, "The complete canonical document stores fixed placement without a track binding");
+        var item = JObject.Parse(w.Session.ScenePatchFileText)["modifications"].Single().First;
+        Assert((string)item["placement"]["mode"] == "fixed" && item["binding"] == null, "The complete canonical scene patch file stores fixed placement without a track binding");
         Assert(w.MapEditor.UndoGroups.Count == 1, "One snap is one history operation");
         w.MapEditor.Undo(); Assert(w.Box.Position.SequenceEqual(new[] { 4.0, 8.0, 9.0 }), "Undo restores the original position");
         w.MapEditor.Redo(); Assert(w.Box.X == 20, "Redo restores this mod's snap result");
-        Assert(w.MapEditor.Save() == null && w.Store.Patch == w.Session.DocumentText, "Native Save participants persist the canonical snap document");
+        Assert(w.MapEditor.Save() == null && w.Store.Patch == w.Session.ScenePatchFileText, "Native Save participants persist the canonical snap scene patch file");
         w.Tracks.Items.Clear();
         var fresh = new Scene { Origin = 110 }; var box = new Box(); fresh.Objects["p"] = new List<object> { box };
         var engine = new PatchEngine(fresh);
         Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 10, "Reload needs no graph lookup for a fixed snap result and uses the current origin");
-        Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 10, "Repeated whole-document application does not accumulate offsets");
+        Assert(engine.Apply(w.Store.Patch).Outcomes.Values.Single().Applied && box.X == 10, "Repeated whole scene patch file application does not accumulate offsets");
     }
 }

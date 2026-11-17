@@ -27,7 +27,7 @@ namespace RailroaderScenePatcher {
             if (token.GetProperty("Index") == null || token.GetField("Manager") == null || token.GetProperty("IsRemoved") == null) throw new MissingMemberException("Culling token members unavailable");
             if (Native.Type("Helpers.WorldTransformer") == null) throw new InvalidOperationException("Floating origin unavailable");
         }
-        public IEnumerable<string> MapIds => ModDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
 
         // The rule's verdicts for every loaded World root. They are read again after Invalidate, which a whole discovery
         // calls, and when the loaded scenes, their World roots or the objects down to the group roots change; a change

@@ -7,7 +7,7 @@ using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher.Core;
 
 // The Saved rule, the canonical order a writing Save produces, the order in which the engine processes modifications, and
-// the guard against a patch document changed outside scene patch editing.
+// the guard against a scene patch file changed outside scene patch editing.
 static class CanonicalSaveTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
     static readonly TargetIdentity P = new TargetIdentity("s", "p", "c"), Q = new TargetIdentity("s", "q", "c");
@@ -20,7 +20,7 @@ static class CanonicalSaveTests {
         public Box Other = new Box { Position = new[] { -50.0, 0.0, 0.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         public Box Third = new Box { Position = new[] { -20.0, 0.0, 0.0 }, Rotation = new[] { 0.0, 0.0, 0.0, 1.0 } };
         public Store Store = new Store(); public NativeMapEditor MapEditor = new NativeMapEditor(); public PatchEditingSession Session;
-        public DocumentResult Applied;
+        public ScenePatchFileResult Applied;
         public World(string patch) {
             Scene.Objects["p"] = new List<object> { Box }; Scene.Objects["q"] = new List<object> { Other }; Scene.Objects["r"] = new List<object> { Third };
             Store.Patch = patch;
@@ -36,7 +36,7 @@ static class CanonicalSaveTests {
         ReadWithoutEditIsSaved();
         EqualValueInAnotherLiteralIsSaved();
         EditAndInverseAreSavedAndAnEditIsOutstanding();
-        WithoutDocumentSavedWhileEmpty();
+        WithoutScenePatchFileSavedWhileEmpty();
         SaveWritesCanonicalOrderByteForByte();
         EveryKnownObjectHasItsCanonicalOrder();
         UnchangedNumbersKeepTheirLiteralInsideAnEditedMember();
@@ -48,22 +48,22 @@ static class CanonicalSaveTests {
         Console.WriteLine("PASS: Saved rule, canonical Save byte for byte, order-independent application and the external-change guard");
     }
 
-    // A document in another member order and spacing than the canonical one, read and not edited, is Saved, and a Save writes nothing.
+    // A scene patch file in another member order and spacing than the canonical one, read and not edited, is Saved, and a Save writes nothing.
     static void ReadWithoutEditIsSaved() {
         var text = "{ \"modifications\" : {\n\t\"z\":{\"dependsOn\":[],  \"placement\":{\"rotation\":[0,0,0,1],\"position\":[160,2,3],\"mode\":\"fixed\"},\"target\":{\"component\":\"c\",\"path\":\"q\",\"scene\":\"s\"}},\n"
             + "\t\"a\":{\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[],\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"}} },\n \"sourceMap\":{\"mapId\":\"map\"}, \"formatVersion\":1 }";
         var w = new World(text);
-        Assert(w.Session.Blocked == null && w.Box.X == 12 && w.Other.X == 60, "The reordered document applies: " + w.Session.Blocked);
-        Assert(!w.PatchOutstanding && !w.MapEditor.IsDirty, "A reordered and re-spaced document that is read and not edited is Saved");
+        Assert(w.Session.Blocked == null && w.Box.X == 12 && w.Other.X == 60, "The reordered scene patch file applies: " + w.Session.Blocked);
+        Assert(!w.PatchOutstanding && !w.MapEditor.IsDirty, "A reordered and re-spaced scene patch file that is read and not edited is Saved");
         Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 0 && ReferenceEquals(w.Store.Patch, text), "A Save with no outstanding patch change writes nothing and leaves the file's bytes unchanged");
     }
 
-    // The file has 12; the edit writes 12.0. The values are equal, so the document stays Saved and a following Save writes nothing.
+    // The file has 12; the edit writes 12.0. The values are equal, so the scene patch file stays Saved and a following Save writes nothing.
     static void EqualValueInAnotherLiteralIsSaved() {
         var text = Doc(Mod("move-p", "p", "[112,12,3]"));
         var w = new World(text);
         var same = w.Session.Edit(P, PlacementAt(112.0, 12.0, 3.0), null);
-        Assert(same.Applied && !w.PatchOutstanding && w.Box.Position[1] == 12, "An edit that sets a number to the value it already has leaves the document Saved: " + same.Error);
+        Assert(same.Applied && !w.PatchOutstanding && w.Box.Position[1] == 12, "An edit that sets a number to the value it already has leaves the scene patch file Saved: " + same.Error);
         Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 0 && ReferenceEquals(w.Store.Patch, text), "The following Save writes nothing");
         // One changed coordinate is a change; the coordinates it leaves at their values keep their source literals.
         var literal = new World(Doc(Mod("move-p", "p", "[112,1.20E1,3.0]")));
@@ -77,23 +77,23 @@ static class CanonicalSaveTests {
         var w = new World(text);
         Assert(w.Session.Edit(P, PlacementAt(130), null).Applied && w.PatchOutstanding && w.MapEditor.IsDirty, "An edit is outstanding");
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied && !w.PatchOutstanding, "An edit followed by its inverse is Saved");
-        Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 0 && ReferenceEquals(w.Store.Patch, text) && !w.MapEditor.IsDirty, "Saving after the inverse writes no patch document");
-        Assert(w.Session.Edit(P, PlacementAt(140), null).Applied && w.PatchOutstanding && w.MapEditor.Save() == null && w.Store.PatchWrites == 1 && !w.PatchOutstanding && !w.MapEditor.IsDirty, "An outstanding edit is written by the Save, and the document is Saved again");
+        Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 0 && ReferenceEquals(w.Store.Patch, text) && !w.MapEditor.IsDirty, "Saving after the inverse writes no scene patch file");
+        Assert(w.Session.Edit(P, PlacementAt(140), null).Applied && w.PatchOutstanding && w.MapEditor.Save() == null && w.Store.PatchWrites == 1 && !w.PatchOutstanding && !w.MapEditor.IsDirty, "An outstanding edit is written by the Save, and the scene patch file is Saved again");
         // Removing a modification and adding it back with the same content is Saved too, wherever its key now stands.
         var two = new World(Doc(Mod("move-p", "p", "[112,2,3]") + "," + Mod("move-q", "q", "[160,2,3]")));
         Assert(two.Session.Remove(P).Applied && two.PatchOutstanding, "A removal is outstanding");
         two.MapEditor.Undo();
-        Assert(!two.PatchOutstanding && two.Box.X == 12, "Undo of the removal restores the modification under its key, and the document is Saved");
+        Assert(!two.PatchOutstanding && two.Box.X == 12, "Undo of the removal restores the modification under its key, and the scene patch file is Saved");
     }
 
-    static void WithoutDocumentSavedWhileEmpty() {
+    static void WithoutScenePatchFileSavedWhileEmpty() {
         var w = new World(null);
-        Assert(!w.PatchOutstanding && !w.MapEditor.IsDirty, "Without a patch document at load, the patch is Saved while it has no modification");
+        Assert(!w.PatchOutstanding && !w.MapEditor.IsDirty, "Without a scene patch file at load, the patch is Saved while it has no modification");
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied && w.PatchOutstanding, "The first modification is outstanding");
         Assert(w.Session.Remove(P).Applied && !w.PatchOutstanding && w.MapEditor.Save() == null && w.Store.Patch == null, "Without a modification it is Saved again and no file is written");
     }
 
-    // A document written in reverse order, with a literal in an untouched member of the modification that is edited and a nested
+    // A scene patch file written in reverse order, with a literal in an untouched member of the modification that is edited and a nested
     // unknown object. Reading does not reorder it; the Save that writes it produces the canonical order.
     static void SaveWritesCanonicalOrderByteForByte() {
         var source = """
@@ -217,11 +217,11 @@ static class CanonicalSaveTests {
 
             """.Replace("\r\n", "\n");
         var w = new World(source);
-        Assert(w.Session.Blocked == null && w.Applied.Outcomes.Values.All(o => o.Applied) && w.Box.X == 12 && w.Other.X == 60 && w.Third.X == -20, "The document in reverse order applies: " + w.Session.Blocked);
-        Assert(!w.PatchOutstanding && w.MapEditor.Save() == null && ReferenceEquals(w.Store.Patch, source), "Reading the document does not rewrite it in canonical order");
+        Assert(w.Session.Blocked == null && w.Applied.Outcomes.Values.All(o => o.Applied) && w.Box.X == 12 && w.Other.X == 60 && w.Third.X == -20, "The scene patch file in reverse order applies: " + w.Session.Blocked);
+        Assert(!w.PatchOutstanding && w.MapEditor.Save() == null && ReferenceEquals(w.Store.Patch, source), "Reading the scene patch file does not rewrite it in canonical order");
         var edit = w.Session.Edit(P, null, false);
         Assert(edit.Applied && !w.Box.Active && w.PatchOutstanding, "The modification is edited: " + edit.Error);
-        Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 1, "The Save writes the patch document");
+        Assert(w.MapEditor.Save() == null && w.Store.PatchWrites == 1, "The Save writes the scene patch file");
         Assert(w.Store.Patch == expected, "The saved file is the canonical text, byte for byte:\n" + w.Store.Patch);
         Assert(System.Text.Encoding.UTF8.GetBytes(w.Store.Patch).SequenceEqual(System.Text.Encoding.UTF8.GetBytes(expected)), "The bytes are equal");
         // The canonical text is a fixed point: reading it, editing back and forth and saving again writes the same bytes.
@@ -414,7 +414,7 @@ static class CanonicalSaveTests {
                 Member("dependsOn", deps) };
             return "\"" + id + "\":{" + String.Join(",", reversed ? members.Reverse() : members) + "}";
         }
-        string Document(bool reversed) {
+        string ScenePatchFile(bool reversed) {
             // Two modifications of the same object p, one of q that depends on a later key, and one of r.
             var items = new[] { Item("B-upper", "r", 190, "[]", reversed), Item("a-pose", "p", 112, "[]", reversed), Item("b-pose", "p", 150, "[]", reversed),
                 Item("c-dependent", "q", 160, reversed ? "[\"z-base\",\"a-pose\"]" : "[\"a-pose\",\"z-base\"]", reversed), Item("z-base", "r", 180, "[]", reversed) };
@@ -424,14 +424,14 @@ static class CanonicalSaveTests {
         var runs = new List<(string order, string state)>();
         foreach (var reversed in new[] { false, true }) {
             var w = new World(null);
-            var result = new PatchEngine(w.Scene).Apply(Document(reversed));
+            var result = new PatchEngine(w.Scene).Apply(ScenePatchFile(reversed));
             Assert(result.Error == null && result.Outcomes.Count == 5 && result.Outcomes.Values.All(o => o.Applied), "Every modification applies" + (reversed ? " in reverse text order: " : ": ") + result.Error);
             var order = String.Join(",", w.Scene.MutationLog.Select(t => ReferenceEquals(t, w.Box) ? "p" : ReferenceEquals(t, w.Other) ? "q" : "r"));
             runs.Add((order, w.Box.X + "|" + w.Other.X + "|" + w.Third.X));
         }
         // B-upper, a-pose, b-pose, then c-dependent after its dependencies a-pose (done) and z-base, which therefore runs before it.
-        Assert(runs[0].order == "r,p,p,r,q" && runs[0].state == "50|60|80", "The canonical document applies in ordinal key order with dependencies first: " + runs[0].order + " " + runs[0].state);
-        Assert(runs[1] == runs[0], "A document in another key and member order applies the same operations and produces the same scene state: " + runs[1].order + " " + runs[1].state);
+        Assert(runs[0].order == "r,p,p,r,q" && runs[0].state == "50|60|80", "The canonical scene patch file applies in ordinal key order with dependencies first: " + runs[0].order + " " + runs[0].state);
+        Assert(runs[1] == runs[0], "A scene patch file in another key and member order applies the same operations and produces the same scene state: " + runs[1].order + " " + runs[1].state);
     }
 
     static void ExternalChangeGuard() {
@@ -464,7 +464,7 @@ static class CanonicalSaveTests {
     // Equal content of two texts: numbers by the value they denote as a double, members without regard to their order.
     static void EqualContentOfTexts() {
         string Text(string members) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}," + members + "}";
-        bool Same(string a, string b) => PatchDocument.SameContent(Text(a), Text(b)) && PatchDocument.SameContent(Text(b), Text(a));
+        bool Same(string a, string b) => ScenePatchFile.SameContent(Text(a), Text(b)) && ScenePatchFile.SameContent(Text(b), Text(a));
         Assert(Same("\"n\":1e2", "\"n\":100") && Same("\"n\":1E+2", "\"n\":100.0"), "1e2 equals 100");
         Assert(Same("\"n\":-0", "\"n\":0") && Same("\"n\":-0.0", "\"n\":0"), "-0 equals 0");
         Assert(Same("\"n\":9007199254740993", "\"n\":9007199254740992"), "Integers that differ only beyond double precision are equal");
@@ -473,13 +473,13 @@ static class CanonicalSaveTests {
         // A key outside the Basic Multilingual Plane and a key in U+E000 to U+FFFF, in either order.
         Assert(Same("\"\uD83D\uDE00\":1,\"\uE000\":2", "\"\uE000\":2,\"\uD83D\uDE00\":1") && !Same("\"\uD83D\uDE00\":1,\"\uE000\":2", "\"\uD83D\uDE00\":2,\"\uE000\":1"), "Member order does not count, whatever the keys; their values do");
         Assert(Same("\"list\":[1,2]", "\"list\":[1.0,2e0]") && !Same("\"list\":[1,2]", "\"list\":[2,1]") && !Same("\"dependsOn\":[\"a\",\"b\"]", "\"dependsOn\":[\"b\",\"a\"]"), "An array outside a modification's dependsOn matches in order");
-        Assert(PatchDocument.SameContent(null, null) && !PatchDocument.SameContent(null, Text("\"n\":1")) && PatchDocument.SameContent("{broken", "{broken") && !PatchDocument.SameContent("{broken", "{ broken"), "A missing text equals a missing text, and an unparseable text only itself");
+        Assert(ScenePatchFile.SameContent(null, null) && !ScenePatchFile.SameContent(null, Text("\"n\":1")) && ScenePatchFile.SameContent("{broken", "{broken") && !ScenePatchFile.SameContent("{broken", "{ broken"), "A missing text equals a missing text, and an unparseable text only itself");
     }
 
     // Ordinal order compares UTF-16 code units: a character outside the Basic Multilingual Plane sorts by its surrogates, before U+E000 to U+FFFF.
     static void SurrogatePairsSortByTheirCodeUnits() {
         var w = new World("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"\uFFFD\":3,\"\uE000\":2,\"\uD83D\uDE00\":1,\"_\":0,\"Z\":0,\"a\":0,\"B\":0,\"ab\":0,\"modifications\":{" + Mod("move-p", "p", "[112,2,3]") + "}}");
-        Assert(w.Session.Blocked == null && w.Session.Edit(P, PlacementAt(130), null).Applied && w.MapEditor.Save() == null && w.Store.PatchWrites == 1, "The document with unknown root members is edited and saved: " + w.Session.Blocked);
+        Assert(w.Session.Blocked == null && w.Session.Edit(P, PlacementAt(130), null).Applied && w.MapEditor.Save() == null && w.Store.PatchWrites == 1, "The scene patch file with unknown root members is edited and saved: " + w.Session.Blocked);
         var names = JObject.Parse(w.Store.Patch).Properties().Select(p => p.Name).ToArray();
         Assert(names.SequenceEqual(new[] { "formatVersion", "sourceMap", "modifications", "B", "Z", "_", "a", "ab", "\uD83D\uDE00", "\uE000", "\uFFFD" }), "Unknown members are written in ordinal order: B before Z before _ before a, a prefix first, a surrogate pair before U+E000: " + String.Join(" ", names.Select(n => String.Join("", n.Select(c => c < 128 ? c.ToString() : "\\u" + ((int)c).ToString("X4"))))));
     }
@@ -499,7 +499,7 @@ static class CanonicalSaveTests {
         Assert(message != null && message.Contains("changed outside scene patch editing") && ReferenceEquals(g.Store.Patch, single), "A dependency list without the duplicate is other content: " + message);
         // A writing Save orders the values and keeps the duplicate.
         var kept = new World(With("[\"b\",\"a\",\"b\"]"));
-        Assert(kept.Session.Edit(P, PlacementAt(130), null).Applied && kept.MapEditor.Save() == null, "The document is saved");
+        Assert(kept.Session.Edit(P, PlacementAt(130), null).Applied && kept.MapEditor.Save() == null, "The scene patch file is saved");
         Assert(String.Join(",", JObject.Parse(kept.Store.Patch)["modifications"]["c"]["dependsOn"].Select(d => (string)d)) == "a,b,b", "A writing Save writes the dependencies in ordinal order with duplicates kept: " + kept.Store.Patch);
     }
 }

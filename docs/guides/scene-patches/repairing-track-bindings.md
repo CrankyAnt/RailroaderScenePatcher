@@ -4,7 +4,7 @@
 
 This guide shows how to set, replace or detach the track location of a Generic track marker, such as a yard-limit or station sign, and what changes with it. The binding is the location stored in the object's `Track.TrackMarker`: a segment ID, the segment end the distance counts from, and the distance in metres. The track graph registers the marker under that segment, and game code that looks the marker up by its ID finds it there.
 
-A binding edit never moves the object. Placement and activity are separate settings of the same modification; you can change them before, after or without a binding edit. Track-marker relationship and target capabilities require patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the document's content; see [the document reference](patch-document-v1.md#dependency-minimum).
+A binding edit never moves the object. Placement and activity are separate settings of the same modification; you can change them before, after or without a binding edit. Track-marker relationship and target capabilities require patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## What qualifies
 
@@ -36,7 +36,7 @@ After the check it removes the marker's graph registration, writes the new locat
 
 ## Detach the marker
 
-Select **Detach** at the bottom of the tab. The stored location becomes empty and the graph holds no registration for the marker, so a lookup by its ID no longer finds it. The object stays where it is and keeps its activity. The document records an explicit `"detach": true`; leaving the relationship out of the document would leave the binding untouched.
+Select **Detach** at the bottom of the tab. The stored location becomes empty and the graph holds no registration for the marker, so a lookup by its ID no longer finds it. The object stays where it is and keeps its activity. The scene patch file records an explicit `"detach": true`; leaving the relationship out of the scene patch file would leave the binding untouched.
 
 ## Undo, clear and remove
 
@@ -50,7 +50,7 @@ A disabled marker keeps its binding without a registration. When it is enabled, 
 
 ## Markers with a duplicate marker id
 
-Some scene markers hold a duplicate marker id: another scene marker holds the same marker id. In the base map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`, and six `Whistle Sign W` markers hold `Mkft`. The game removes a marker's graph registration by its marker id, and it removes that marker id from every segment. Disabling or rebinding one holder would therefore also remove the registration of the others.
+Some scene markers hold a duplicate marker id: another scene marker holds the same marker id. In the base-game map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`, and six `Whistle Sign W` markers hold `Mkft`. The game removes a marker's graph registration by its marker id, and it removes that marker id from every segment. Disabling or rebinding one holder would therefore also remove the registration of the others.
 
 The **Dependencies** section on the **Object** tab of such a marker starts with the duplicate marker id, the number of scene markers that hold it and why their edits are refused. One sentence per holder follows: first the inspected marker, as **This marker**, then the active holders and the inactive ones last, each with its scene and path, whether it is active, and where it has a registration under the marker id, or that it has none. A registration under the marker id that no scene marker holds gets a sentence of its own. A scene marker that is not loaded but still owns a registration under the marker id also counts as a holder.
 
@@ -60,11 +60,11 @@ Until the duplicate marker id is repaired, the patcher refuses these edits of ev
 - a binding change: a new location or a detach,
 - track following.
 
-The refusal stands in the message area of the footer, under the action group it came from, such as **Activity**: first the refused action, such as `Enable refused.`, then the duplicate marker id and every scene marker that holds it, with each one's activity, the edited marker first and inactive holders last. The patcher changes nothing: the scene, the patch document and every holder's registration stay as they were. Reloading the map does not help, because it registers the same markers under the same marker id again. Choosing another track does not help either, because the edit still removes the registrations under that marker id. A fixed placement of a holder stays editable, since it does not touch the registration, unless a map label below the marker caches another track group than its location: correcting that cache would register the marker again, so that edit is refused too. A value equal to the marker's current one, such as `"active": false` on an inactive marker, changes nothing and is accepted.
+The refusal stands in the message area of the footer, under the action group it came from, such as **Activity**: first the refused action, such as `Enable refused.`, then the duplicate marker id and every scene marker that holds it, with each one's activity, the edited marker first and inactive holders last. The patcher changes nothing: the scene, the scene patch file and every holder's registration stay as they were. Reloading the map does not help, because it registers the same markers under the same marker id again. Choosing another track does not help either, because the edit still removes the registrations under that marker id. A fixed placement of a holder stays editable, since it does not touch the registration, unless a map label below the marker caches another track group than its location: correcting that cache would register the marker again, so that edit is refused too. A value equal to the marker's current one, such as `"active": false` on an inactive marker, changes nothing and is accepted.
 
 ## Write the binding by hand
 
-Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [patch document v1](patch-document-v1.md):
+Copy the identity with **Copy ID** in the command band and add a modification to the `modifications` object of `Data/scene-patches.json`, under a key of your choice, as described in [scene patch file v1](scene-patch-file-v1.md):
 
 ```json
 "bind-station-1": {
@@ -89,9 +89,9 @@ When a marker binding edit is refused, read the scene patch editing feedback bes
 
 Some markers can emit a game warning before the patcher can apply a mod repair. The patcher attempts an early repair only for a dependency-free relationship-only operation, before the game's original `TrackMarker.OnEnable` check, when the target belongs to a valid scene and the track graph is populated. The game's check still runs. If that route is unavailable, the patcher can remove only the exact current warning row emitted by that check, and only after the applicable operation succeeds and the marker binding and dependent state pass a separate verification. Historical log entries are not changed. Unknown, changed, ambiguous or unrelated warnings remain. If the patcher cannot establish ownership of a warning window, it leaves the window open; you may close it manually. The patcher does not close player windows.
 
-Recover unknown content or document-format problems in the native map editor. Players should not create or edit JSON to resolve these reports.
+Recover unknown content or scene patch file format problems in the native map editor. Players should not create or edit JSON to resolve these reports.
 
-Remove a repair with **Remove modification** in the footer. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same document target the object, combine them into one before editing or removing it in the native map editor.
+Remove a repair with **Remove modification** in the footer. This restores the underlying reference even when its original track no longer exists. For an active marker the game's check reports that broken reference again. Undo restores the repaired binding and registration and reconciles only the unchanged warning emitted for that restoration; Redo restores the broken binding and its warning. Unrelated or subsequently changed warnings remain. If several modifications in the same scene patch file target the object, combine them into one before editing or removing it in the native map editor.
 
 ## Limits
 
@@ -109,6 +109,6 @@ The game reads a Generic marker's binding in these places:
 - The flare and planner queries read registrations of their own marker types, not of Generic markers.
 - `Track.TrackRelativePosition` moves its object only when its relative placement is configured again. In the game, map objects do that, not the inherited scene signs.
 
-The inherited Generic signs in the research inventory are the whistle signs M5pp near Sylva and Mm8w at `World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E`, the speed sign Mwp1 at `World/Large Scenery/Alarka Signs/Speed Sign`, the yard limit Mkwd at `World/Large Scenery/Alarka Signs/Yard Limit` and the station sign Mi4f at `World/Large Scenery/Ela/Signs/Station Sign (1)`. In that journey's inventory, M5pp, Mm8w, Mkwd and Mi4f carried `track-marker-v1`; Mwp1's activity follows its track group, so that patcher version refused it. Patcher 0.5.0 admits it with its group subscription. Only Mkwd was edited; the other admitted signs are unverified after a binding edit, a Save and a reload. Segment IDs are unique keys of the loaded track graph, so the game itself has no ambiguous segment target. The ambiguity refusal guards the document contract.
+The inherited Generic signs in the research inventory are the whistle signs M5pp near Sylva and Mm8w at `World/Large Scenery/Ela/Crossing Unprotected - Bryson Everett/Whistle Sign E`, the speed sign Mwp1 at `World/Large Scenery/Alarka Signs/Speed Sign`, the yard limit Mkwd at `World/Large Scenery/Alarka Signs/Yard Limit` and the station sign Mi4f at `World/Large Scenery/Ela/Signs/Station Sign (1)`. In that journey's inventory, M5pp, Mm8w, Mkwd and Mi4f carried `track-marker-v1`; Mwp1's activity follows its track group, so that patcher version refused it. Patcher 0.5.0 admits it with its group subscription. Only Mkwd was edited; the other admitted signs are unverified after a binding edit, a Save and a reload. Segment IDs are unique keys of the loaded track graph, so the game itself has no ambiguous segment target. The ambiguity refusal guards the scene patch file contract.
 
 A track-relative object does not move when its marker is rebound, and its terrain snap does not run. For an object whose activity follows its track group, rebinding moves the subscription and keeps an explicit disable in place. Multiplayer is not covered.

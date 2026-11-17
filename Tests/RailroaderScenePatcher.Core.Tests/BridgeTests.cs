@@ -87,7 +87,7 @@ static class BridgeTests {
     static void MapMismatchRejectsBeforeResolution() {
         var (world, bridge, scene) = Setup();
         var result = new PatchEngine(scene).Apply(Doc(Bridge("place-ela-bridge"), "other-map"));
-        Assert(result.Error != null && result.Outcomes.Count == 0 && world.Mutations == 0 && bridge.Position[0] == 50, "A document for another map is rejected without touching the bridge");
+        Assert(result.Error != null && result.Outcomes.Count == 0 && world.Mutations == 0 && bridge.Position[0] == 50, "A scene patch file for another map is rejected without touching the bridge");
     }
     static void TargetResolutionIsExact() {
         var (world, bridge, scene) = Setup();
@@ -190,8 +190,8 @@ static class BridgeTests {
         var identity = new TargetIdentity("BushnellWhittier-MapManager", BridgePath, "Helpers.Culling.RendererCuller", BridgeScene.Structure);
         var moved = new Placement(new[] { 1055.0, 5, 7 }, new[] { 0, 0.130526, 0, 0.991445 });
         Assert(session.Edit(identity, moved, null).Applied && bridge.Position[0] == 55 && Offsets(bridge).SequenceEqual(offsets), "A scene patch editing bridge placement moves the root with its colliders");
-        var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].First.First;
-        Assert((string)item["target"]["structure"] == BridgeScene.Structure && item["placement"] != null && item["active"] == null, "The document records bridge placement, not a binding or activity");
+        var item = (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].First.First;
+        Assert((string)item["target"]["structure"] == BridgeScene.Structure && item["placement"] != null && item["active"] == null, "The scene patch file records bridge placement, not a binding or activity");
         Assert(session.MinimumPatcherVersion == "0.5.0", "A bridge modification requires the common delivery minimum");
         Assert(session.Edit(identity, null, false).Applied && !bridge.Active, "A scene patch editing disable deactivates the bridge");
         mapEditor.Undo(); Assert(bridge.Active && bridge.Position[0] == 55, "Undo re-enables the moved bridge");
@@ -199,7 +199,7 @@ static class BridgeTests {
         mapEditor.Redo(); Assert(bridge.Position[0] == 55, "Redo reapplies the bridge placement");
         Assert(session.Remove(identity).Applied && bridge.Position[0] == 50 && bridge.Active && Offsets(bridge).SequenceEqual(offsets), "Removal returns the bridge to its effective underlying state");
         Assert(world.TrestlePosition.SequenceEqual(new[] { 60.0, 4, 7 }), "No scene patch editing route moves the separate trestle");
-        Assert(mapEditor.Save() == null && !store.Info.Contains("crankyant/scene-patcher"), "Save after removal writes no dependency for an empty document");
+        Assert(mapEditor.Save() == null && !store.Info.Contains("crankyant/scene-patcher"), "Save after removal writes no dependency for an empty scene patch file");
         mapEditor.Undo(); Assert(bridge.Position[0] == 55, "Undo of the removal restores this mod's bridge placement");
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0"), "Save raises the dependency to the bridge capability version: " + store.Info);
         var fresh = new FakeBridge(); var replay = new FakeBridgeWorld(); replay.Objects[BridgePath] = new List<object> { fresh };

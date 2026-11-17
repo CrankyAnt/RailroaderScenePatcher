@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher {
             foreach (var field in new[] { "controlPoints", "_beamMatrices", "_hasGenerated" }) if (FieldOf(trestle, field) == null) throw new MissingFieldException(TrestleType, field);
             foreach (var field in new[] { "segmentIds", "entries" }) if (FieldOf(scenery, field) == null) throw new MissingFieldException(SceneryType, field);
         }
-        public IEnumerable<string> MapIds => ModDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         static FieldInfo FieldOf(Type type, string name) {
             for (var t = type; t != null; t = t.BaseType) { var f = t.GetField(name, Native.Flags | BindingFlags.DeclaredOnly); if (f != null) return f; }
             return null;

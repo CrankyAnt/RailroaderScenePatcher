@@ -21,13 +21,13 @@ try {
         if ('crankyant/scene-patcher >=0.5.0' -notin $info.dependencies.required) {throw 'Every generated patch fixture must require the common delivery minimum'}
     }
     $valid=Get-Content (Join-Path $out 'Valid/Data/scene-patches.json') -Raw | ConvertFrom-Json
-    # A modification is read by its key; the generated documents hold an object keyed by modification ID, with no id member.
-    function Keys($Document) {
-        if ($Document.modifications -isnot [Management.Automation.PSCustomObject]) {throw 'modifications must be an object keyed by modification ID'}
-        return @($Document.modifications.PSObject.Properties.Name)
+    # A modification is read by its key; the generated scene patch files hold an object keyed by modification ID, with no id member.
+    function Keys($ScenePatchFile) {
+        if ($ScenePatchFile.modifications -isnot [Management.Automation.PSCustomObject]) {throw 'modifications must be an object keyed by modification ID'}
+        return @($ScenePatchFile.modifications.PSObject.Properties.Name)
     }
     if ((Keys $valid) -join ',' -cne 'place-sylva-board' -or $null -ne $valid.modifications.'place-sylva-board'.PSObject.Properties['id']) {throw 'The valid fixture must hold one modification under its key, without an id member'}
-    if ((@($valid.PSObject.Properties.Name) -join ',') -cne 'formatVersion,sourceMap,modifications' -or (@($valid.modifications.'place-sylva-board'.PSObject.Properties.Name) -join ',') -cne 'target,placement,dependsOn') {throw 'The generated document must be written in canonical member order'}
+    if ((@($valid.PSObject.Properties.Name) -join ',') -cne 'formatVersion,sourceMap,modifications' -or (@($valid.modifications.'place-sylva-board'.PSObject.Properties.Name) -join ',') -cne 'target,placement,dependsOn') {throw 'The generated scene patch file must be written in canonical member order'}
     if (($valid.modifications.'place-sylva-board'.placement.position -join ',') -ne '105,200,300') {throw 'The 5m map-X translation was not derived from the selected baseline'}
     $q=$valid.modifications.'place-sylva-board'.placement.rotation
     if ([math]::Abs($q[1]-0.7933533402912352) -gt 1e-10 -or [math]::Abs($q[3]-0.6087614290087207) -gt 1e-10) {throw 'Expected 105 degree map-Y quaternion'}

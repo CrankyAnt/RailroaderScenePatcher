@@ -30,9 +30,9 @@ static class RecoveryTests {
             Storage = storage;
             var engine = new PatchEngine(Scene);
             string text = null;
-            try { text = storage.ReadPatchDocument(); } catch (ArgumentException) { }
+            try { text = storage.ReadScenePatchFile(); } catch (ArgumentException) { }
             if (text != null) engine.Apply(text, "author/mod");
-            Session = new PatchEditingSession(engine, MapEditor, storage, documentKey: "author/mod");
+            Session = new PatchEditingSession(engine, MapEditor, storage, scenePatchFileKey: "author/mod");
             MapEditor.Session = Session;
         }
         public World(string patch) : this(new Store { Patch = patch, Info = Info("rr/game >=0.6.2", Patcher) }) { }
@@ -60,12 +60,12 @@ static class RecoveryTests {
         RereadAdoptsAnOutsideCorrection();
         FreshStartSecuresAVerifiedBackup();
         FreshStartRefusesWhatItCannotSecure();
-        DependedModificationsCannotLeaveTheDocument();
+        DependedModificationsCannotLeaveTheScenePatchFile();
         EditsOfIneffectiveModificationsAreRefused();
         Console.WriteLine("PASS: unknown runtime content, format version first, diagnostics, confirmed re-reading, backup-protected fresh start and dependsOn refusals");
     }
 
-    // A current-format document with unknown fields at the root, inside a modification and inside known content: the known
+    // A current-format scene patch file with unknown fields at the root, inside a modification and inside known content: the known
     // operations apply, nothing executes for the unknown content and the file keeps its bytes through reading,
     // application, opening scene patch editing and a native Save.
     static void RuntimeAppliesKnownOperationsBesideUnknownContent() {
@@ -78,26 +78,26 @@ static class RecoveryTests {
             scene.Objects["p"] = new List<object> { box }; scene.Objects["q"] = new List<object> { other };
             var messages = new Messages();
             var storage = new ModStorage(folder.Root);
-            var mod = LoadedMod.Read("author/mod", storage.ReadModInfo(), storage.ReadPatchDocument());
+            var mod = LoadedMod.Read("author/mod", storage.ReadModInfo(), storage.ReadScenePatchFile());
             var result = new PatchRuntime(new PatchEngine(scene), messages, "0.6.0", "game").ApplyLoaded(new[] { mod }, null).Single().Result;
             Assert(result.Error == null && result.Outcomes["known"].Applied && box.X == 12, "The known operation applies beside unknown content: " + result.Error);
             Assert(!result.Outcomes["future"].Applied && !result.Outcomes["nested"].Applied && other.X == -50, "Nothing executes for an unknown operation or an unknown field inside known content");
-            Assert(folder.Bytes.SequenceEqual(before), "Runtime application leaves the document's bytes unchanged");
+            Assert(folder.Bytes.SequenceEqual(before), "Runtime application leaves the scene patch file's bytes unchanged");
             var w = new World(storage);
-            Assert(w.Session.Blocked == null && w.Session.DocumentDiagnostics.Count == 2 && w.Session.DocumentDiagnostics.All(d => d.Message.Contains("is not executed")),
-                "Scene patch editing opens the document and names each modification it does not execute: " + String.Join(" | ", w.Session.DocumentDiagnostics.Select(d => d.Message)));
+            Assert(w.Session.Blocked == null && w.Session.ScenePatchFileDiagnostics.Count == 2 && w.Session.ScenePatchFileDiagnostics.All(d => d.Message.Contains("is not executed")),
+                "Scene patch editing opens the scene patch file and names each modification it does not execute: " + String.Join(" | ", w.Session.ScenePatchFileDiagnostics.Select(d => d.Message)));
             w.MapEditor.NativeEdit(1);
-            Assert(w.MapEditor.Save() == null && folder.Bytes.SequenceEqual(before), "A native Save without a patch edit leaves the document's bytes unchanged");
+            Assert(w.MapEditor.Save() == null && folder.Bytes.SequenceEqual(before), "A native Save without a patch edit leaves the scene patch file's bytes unchanged");
             Assert(w.Session.Edit(P, At(130), null).Applied && w.MapEditor.Save() == null, "A known modification beside unknown content is edited and saved");
-            var saved = JObject.Parse(storage.ReadPatchDocument());
+            var saved = JObject.Parse(storage.ReadScenePatchFile());
             Assert(JToken.DeepEquals(saved["futureRoot"], JObject.Parse(text)["futureRoot"]) && (bool)saved["sourceMap"]["futureMap"] && (int)saved["modifications"]["future"]["futureOperation"]["speed"] == 3
-                && (bool)saved["modifications"]["nested"]["placement"]["futureSnap"] && storage.ReadPatchDocument().Contains("1.50"), "Save keeps every unknown field with its exact content");
+                && (bool)saved["modifications"]["nested"]["placement"]["futureSnap"] && storage.ReadScenePatchFile().Contains("1.50"), "Save keeps every unknown field with its exact content");
         }
     }
 
-    // A missing, unrecognized or newer declared version applies none of the document's operations, also when the rest
-    // is valid for the current format or would not read as it; other applicable documents still apply, and scene patch
-    // editing protects the document with the version as the reason.
+    // A missing, unrecognized or newer declared version applies none of the scene patch file's operations, also when the rest
+    // is valid for the current format or would not read as it; other applicable scene patch files still apply, and scene patch
+    // editing protects the scene patch file with the version as the reason.
     static void FormatVersionIsCheckedBeforeAnyOtherContent() {
         var valid = Mod("move", "p", Fixed(112));
         var cases = new[] {
@@ -121,9 +121,9 @@ static class RecoveryTests {
             ("a leading zero on a later line", "{\r\n  \"sourceMap\": {\"mapId\": \"map\"},\r\n  \"formatVersion\": 01,\r\n  \"modifications\": {" + valid + "}\r\n}\r\n", "Unrecognized format version"),
         };
         foreach (var (name, text, reason) in cases) {
-            var document = PatchDocument.Load(text);
-            Assert(!document.CanWrite && document.Error.StartsWith(reason, StringComparison.Ordinal), name + ": the document is refused for its format version: " + document.Error);
-            Assert(document.Diagnostics.Count == 1 && document.Diagnostics[0].Path == "formatVersion", name + ": one diagnostic names formatVersion");
+            var scenePatchFile = ScenePatchFile.Load(text);
+            Assert(!scenePatchFile.CanWrite && scenePatchFile.Error.StartsWith(reason, StringComparison.Ordinal), name + ": the scene patch file is refused for its format version: " + scenePatchFile.Error);
+            Assert(scenePatchFile.Diagnostics.Count == 1 && scenePatchFile.Diagnostics[0].Path == "formatVersion", name + ": one diagnostic names formatVersion");
             var scene = new Scene(); var box = new Box(); var other = new Box();
             scene.Objects["p"] = new List<object> { box }; scene.Objects["other"] = new List<object> { other };
             var messages = new Messages();
@@ -132,116 +132,116 @@ static class RecoveryTests {
                 LoadedMod.Read("author/current", Info(Patcher), Doc(Mod("move", "other", Fixed(150)))) }, null);
             var versioned = results[0].Result;
             Assert(versioned.Error != null && versioned.Error.StartsWith(reason, StringComparison.Ordinal) && versioned.Outcomes.Count == 0 && box.X == 0 && scene.MutationCalls == 1,
-                name + ": runtime applies none of the document's operations: " + versioned.Error);
-            Assert(results[1].Result.Outcomes["move"].Applied && other.X == 50, name + ": another applicable document still applies");
+                name + ": runtime applies none of the scene patch file's operations: " + versioned.Error);
+            Assert(results[1].Result.Outcomes["move"].Applied && other.X == 50, name + ": another applicable scene patch file still applies");
             var line = results[0].LogLine("0.6.0", 1, new[] { "elsewhere" });
-            Assert(line.Contains("document not applied: " + reason) && !line.Contains("skipped"), name + ": the log reports the format version, whatever map the document names: " + line);
+            Assert(line.Contains("scene patch file not applied: " + reason) && !line.Contains("skipped"), name + ": the log reports the format version, whatever map the scene patch file names: " + line);
             var w = new World(text);
             Assert(w.Session.Blocked != null && w.Session.Blocked.StartsWith(reason, StringComparison.Ordinal) && w.Session.Blocked.Contains("protected from overwrite")
-                && !w.Session.Edit(P, At(112), null).Applied && w.Session.DocumentDiagnostics.Single().Path == "formatVersion", name + ": scene patch editing protects the document for its version: " + w.Session.Blocked);
+                && !w.Session.Edit(P, At(112), null).Applied && w.Session.ScenePatchFileDiagnostics.Single().Path == "formatVersion", name + ": scene patch editing protects the scene patch file for its version: " + w.Session.Blocked);
             w.MapEditor.NativeEdit(1);
-            Assert(w.MapEditor.Save() == null && w.Store.Patch == text && w.Store.PatchWrites == 0, name + ": Save does not overwrite the document");
+            Assert(w.MapEditor.Save() == null && w.Store.Patch == text && w.Store.PatchWrites == 0, name + ": Save does not overwrite the scene patch file");
         }
-        Assert(PatchDocument.Load(Doc(valid)).CanWrite, "Format version 1 reads");
-        Assert(PatchDocument.Load("{\"formatVersion\":1,\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}").Error.StartsWith("Unreadable", StringComparison.Ordinal), "A repeated current declaration is unreadable, not a version problem");
-        Assert(PatchDocument.Load("[1]").Error.StartsWith("Invalid document envelope", StringComparison.Ordinal) && PatchDocument.Load("{broken").Error.StartsWith("Unreadable", StringComparison.Ordinal), "Text that is no object, or no JSON, is not a version problem");
+        Assert(ScenePatchFile.Load(Doc(valid)).CanWrite, "Format version 1 reads");
+        Assert(ScenePatchFile.Load("{\"formatVersion\":1,\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}").Error.StartsWith("Unreadable", StringComparison.Ordinal), "A repeated current declaration is unreadable, not a version problem");
+        Assert(ScenePatchFile.Load("[1]").Error.StartsWith("Invalid scene patch file envelope", StringComparison.Ordinal) && ScenePatchFile.Load("{broken").Error.StartsWith("Unreadable", StringComparison.Ordinal), "Text that is no object, or no JSON, is not a version problem");
     }
 
     static void DiagnosticsLocateTheProblem() {
         var text = "{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\n    \"mapId\": \"\"\n  },\n  \"modifications\": {}\n}\n";
-        var d = PatchDocument.Load(text).Diagnostics.Single();
+        var d = ScenePatchFile.Load(text).Diagnostics.Single();
         Assert(d.Path == "sourceMap.mapId" && d.StartLine == 4 && d.EndLine == 4 && d.Fragment == "    \"mapId\": \"\"" && d.Expected.Contains("mapId") && d.Message.Contains("sourceMap needs a mapId"),
             "A wrong value is located by path, line and fragment with the expected value: " + d.Path + " " + d.StartLine + " " + d.Fragment);
-        Assert(d.Reference == DocumentDiagnostic.FormatReference && d.Reference.EndsWith("patch-document-v1.md", StringComparison.Ordinal) && d.Corrections.EndsWith("recover-patch-documents.md", StringComparison.Ordinal),
+        Assert(d.Reference == ScenePatchFileDiagnostic.FormatReference && d.Reference.EndsWith("scene-patch-file-v1.md", StringComparison.Ordinal) && d.Corrections.EndsWith("recover-scene-patch-files.md", StringComparison.Ordinal),
             "A diagnostic links the format reference and the corrections guide");
-        var missing = PatchDocument.Load("{\"formatVersion\":1,\"modifications\":{}}").Diagnostics.Single();
+        var missing = ScenePatchFile.Load("{\"formatVersion\":1,\"modifications\":{}}").Diagnostics.Single();
         Assert(missing.Path == "sourceMap.mapId" && missing.StartLine == 0 && missing.Fragment.Contains("no line"), "A missing field has no line: " + missing.StartLine);
-        var broken = PatchDocument.Load("{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n").Diagnostics.Single();
+        var broken = ScenePatchFile.Load("{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n").Diagnostics.Single();
         Assert(!broken.Message.Contains("..") && !broken.Message.Contains(": "), "A parser message is one sentence without a second label or full stop: " + broken.Message);
         Assert(broken.Message.StartsWith("Unreadable", StringComparison.Ordinal) && broken.StartLine >= 4, "Unreadable JSON is located at the line where reading stopped: " + broken.StartLine);
         var block = "{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n    \"later\": {\n" + String.Join(",\n", Enumerable.Range(0, 20).Select(i => "      \"f" + i + "\": " + i)) + "\n    }\n  }\n}\n";
-        var later = PatchDocument.Load(block);
+        var later = ScenePatchFile.Load(block);
         var unknown = later.Diagnostics.Single();
-        Assert(later.CanWrite && unknown.Path == "modifications.later" && unknown.StartLine == 5 && unknown.EndLine == 25 && unknown.Truncated && unknown.Fragment.Split('\n').Length == DocumentDiagnostic.FragmentLines + 1 && unknown.Fragment.EndsWith("... 13 more lines, to line 25", StringComparison.Ordinal),
-            "A modification that is not executed is located with a fragment of at most " + DocumentDiagnostic.FragmentLines + " lines: " + unknown.StartLine + "-" + unknown.EndLine);
+        Assert(later.CanWrite && unknown.Path == "modifications.later" && unknown.StartLine == 5 && unknown.EndLine == 25 && unknown.Truncated && unknown.Fragment.Split('\n').Length == ScenePatchFileDiagnostic.FragmentLines + 1 && unknown.Fragment.EndsWith("... 13 more lines, to line 25", StringComparison.Ordinal),
+            "A modification that is not executed is located with a fragment of at most " + ScenePatchFileDiagnostic.FragmentLines + " lines: " + unknown.StartLine + "-" + unknown.EndLine);
         Assert(!d.Truncated, "A fragment that shows the whole problem is not marked as cut");
         var nan = "{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n    \"a\": {\"target\": {\"scene\": \"s\", \"path\": \"p\", \"component\": \"c\"}, \"dependsOn\": [],\n      \"placement\": {\"mode\": \"fixed\", \"position\": [1, 2, 3], \"rotation\": [0, 0, 0, 1]}},\n    \"b\": {\"target\": {\"scene\": \"s\", \"path\": \"q\", \"component\": \"c\"}, \"dependsOn\": [],\n      \"placement\": {\"mode\": \"fixed\", \"position\": [NaN, 2, 3], \"rotation\": [0, 0, 0, 1]}}\n  }\n}\n";
-        var inexact = PatchDocument.Load(nan).Diagnostics.First(x => x.Message.StartsWith("Numeric content", StringComparison.Ordinal));
+        var inexact = ScenePatchFile.Load(nan).Diagnostics.First(x => x.Message.StartsWith("Numeric content", StringComparison.Ordinal));
         Assert(inexact.Path == "modifications.b.placement.position[0]" && inexact.StartLine == 8 && inexact.Fragment.Contains("NaN"), "A number that cannot be kept exactly is located: " + inexact.Path + " line " + inexact.StartLine);
         var wide = Doc("").Replace("\"mapId\":\"map\"", "\"mapId\":\"\",\"pad\":\"" + new string('x', 5000) + "\"");
-        Assert(PatchDocument.Load(wide).Diagnostics.Single().Fragment.Length == DocumentDiagnostic.FragmentCharacters + 3, "A fragment of one long line is bounded");
+        Assert(ScenePatchFile.Load(wide).Diagnostics.Single().Fragment.Length == ScenePatchFileDiagnostic.FragmentCharacters + 3, "A fragment of one long line is bounded");
         var w = new World(Doc(Mod("move", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"elsewhere\""));
-        Assert(w.Session.Blocked != null && w.Session.DocumentDiagnostics.Single().Path == "sourceMap.mapId" && w.Session.DocumentDiagnostics.Single().Expected.Contains("map, layer"),
+        Assert(w.Session.Blocked != null && w.Session.ScenePatchFileDiagnostics.Single().Path == "sourceMap.mapId" && w.Session.ScenePatchFileDiagnostics.Single().Expected.Contains("map, layer"),
             "A foreign target map is diagnosed with the maps this session knows");
     }
 
-    // A protected document corrected outside scene patch editing is read again after confirmation and becomes the
-    // session's document; the read writes nothing and changes nothing in the scene.
+    // A protected scene patch file corrected outside scene patch editing is read again after confirmation and becomes the
+    // session's scene patch file; the read writes nothing and changes nothing in the scene.
     static void RereadAdoptsAnOutsideCorrection() {
         var broken = Doc(Mod("move", "p", Fixed(112)), version: "2");
         using (var folder = new Folder(Utf8(broken))) {
             var w = new World(new ModStorage(folder.Root));
-            Assert(w.Session.Blocked != null, "The newer document is protected");
+            Assert(w.Session.Blocked != null, "The newer scene patch file is protected");
             var unconfirmed = w.Session.Reread(false);
             Assert(!unconfirmed.Applied && unconfirmed.Error.Contains("Confirm") && w.Session.Blocked != null, "Reading again needs confirmation");
             var still = w.Session.Reread(true);
-            Assert(!still.Applied && still.Error.Contains("Newer format version") && w.Session.Blocked != null && w.Session.DocumentDiagnostics.Single().Path == "formatVersion", "An uncorrected document stays protected with its diagnostics: " + still.Error);
+            Assert(!still.Applied && still.Error.Contains("Newer format version") && w.Session.Blocked != null && w.Session.ScenePatchFileDiagnostics.Single().Path == "formatVersion", "An uncorrected scene patch file stays protected with its diagnostics: " + still.Error);
             var corrected = Doc(Mod("move", "p", Fixed(112)) + "," + Mod("later", "q", "\"futureOperation\":true"), "\"futureRoot\":7,");
             File.WriteAllBytes(folder.PatchPath, Utf8(corrected));
             var reread = w.Session.Reread(true);
             Assert(reread.Applied && w.Session.Blocked == null && folder.Bytes.SequenceEqual(Utf8(corrected)) && folder.Backups.Length == 0,
-                "The corrected document is adopted without a write: " + reread.Error);
+                "The corrected scene patch file is adopted without a write: " + reread.Error);
             Assert(w.Box.X == 12 && w.Session.LastReread.Outcomes["move"].Applied && !w.Session.LastReread.Outcomes["later"].Applied && w.Other.X == -50,
-                "The adopted document's modifications are applied at once, and the one it does not execute is not");
-            Assert(w.Session.DocumentDiagnostics.Single().Path == "modifications.later" && !w.MapEditor.IsDirty, "The adopted document is Saved and still names the modification it does not execute");
-            Assert(w.Session.Edit(P, At(130), null).Applied && w.MapEditor.Save() == null, "The adopted document is edited and saved: " + w.Session.LastSave?.Error);
+                "The adopted scene patch file's modifications are applied at once, and the one it does not execute is not");
+            Assert(w.Session.ScenePatchFileDiagnostics.Single().Path == "modifications.later" && !w.MapEditor.IsDirty, "The adopted scene patch file is Saved and still names the modification it does not execute");
+            Assert(w.Session.Edit(P, At(130), null).Applied && w.MapEditor.Save() == null, "The adopted scene patch file is edited and saved: " + w.Session.LastSave?.Error);
             var saved = JObject.Parse(File.ReadAllText(folder.PatchPath));
             Assert((int)saved["futureRoot"] == 7 && (bool)saved["modifications"]["later"]["futureOperation"] && (double)saved["modifications"]["move"]["placement"]["position"][0] == 130, "Unknown content survives the recovered session's Save");
             Assert(!w.Session.Reread(true).Applied, "An editable session is not replaced by reading again");
         }
-        // The edit after Read again starts from the object as the panel reads it, which is the adopted document's state:
-        // changing Z alone keeps the document's X.
+        // The edit after Read again starts from the object as the panel reads it, which is the adopted scene patch file's state:
+        // changing Z alone keeps the scene patch file's X.
         using (var folder = new Folder(Utf8(Doc(Mod("move", "p", Fixed(112)), version: "2")))) {
             var w = new World(new ModStorage(folder.Root));
             File.WriteAllBytes(folder.PatchPath, Utf8(Doc(Mod("move", "p", Fixed(117.5)))));
-            Assert(w.Session.Reread(true).Applied, "The corrected document is read again");
+            Assert(w.Session.Reread(true).Applied, "The corrected scene patch file is read again");
             var shown = w.Scene.Read(w.Box).Placement;
-            Assert(shown.Position[0] == 117.5, "The panel reads the document's X after Read again: " + shown.Position[0]);
+            Assert(shown.Position[0] == 117.5, "The panel reads the scene patch file's X after Read again: " + shown.Position[0]);
             Assert(w.Session.Edit(P, new Placement(new[] { shown.Position[0], shown.Position[1], 13.0 }, shown.Rotation), null).Applied && w.MapEditor.Save() == null, "Z alone is edited and saved");
             var saved = (JArray)JObject.Parse(File.ReadAllText(folder.PatchPath))["modifications"]["move"]["placement"]["position"];
-            Assert((double)saved[0] == 117.5 && (double)saved[2] == 13, "Only the edited field changes in the document: " + saved.ToString(Newtonsoft.Json.Formatting.None));
+            Assert((double)saved[0] == 117.5 && (double)saved[2] == 13, "Only the edited field changes in the scene patch file: " + saved.ToString(Newtonsoft.Json.Formatting.None));
         }
         var dirty = new World(Doc("", version: "2"));
         dirty.MapEditor.NativeEdit(4);
         dirty.Store.Patch = Doc("");
         Assert(!dirty.Session.Reread(true, dirty.MapEditor.NativeDirty).Applied && !dirty.Session.Reread(true).Applied && dirty.Session.Blocked != null, "Reading again refuses unsaved native work and a changed history");
         var gone = new World(Doc("", version: "2")); gone.Store.Patch = null;
-        Assert(gone.Session.Reread(true).Error.Contains("no longer exists"), "A deleted document is not read again");
+        Assert(gone.Session.Reread(true).Error.Contains("no longer exists"), "A deleted scene patch file is not read again");
     }
 
     // Fresh start secures the original's exact bytes in a verified backup before Save replaces the original with an
-    // empty current-format document; the backup stays.
+    // empty current-format scene patch file; the backup stays.
     static void FreshStartSecuresAVerifiedBackup() {
         var original = new byte[] { 0x7b, 0x22, 0x66, 0xff, 0xfe, 0x22, 0x0a };
         using (var folder = new Folder(original)) {
             var w = new World(new ModStorage(folder.Root));
-            Assert(w.Session.Blocked != null && w.Session.Blocked.StartsWith("The edited mod's patch document cannot be read", StringComparison.Ordinal) && w.Session.CanStartFresh, "A document that is not UTF-8 is protected: " + w.Session.Blocked);
+            Assert(w.Session.Blocked != null && w.Session.Blocked.StartsWith("The edited mod's scene patch file cannot be read", StringComparison.Ordinal) && w.Session.CanStartFresh, "A scene patch file that is not UTF-8 is protected: " + w.Session.Blocked);
             var unconfirmed = w.Session.FreshStart(false);
             Assert(!unconfirmed.Applied && folder.Backups.Length == 0 && w.Session.Blocked != null, "Fresh start needs confirmation and secures nothing without it");
             var fresh = w.Session.FreshStart(true);
             Assert(fresh.Applied && w.Session.Blocked == null && w.Session.FreshStartPending && folder.Backups.Length == 1 && w.Session.LastBackup == folder.Backups[0], "Fresh start secures one backup: " + fresh.Error);
             Assert(File.ReadAllBytes(w.Session.LastBackup).SequenceEqual(original) && folder.Bytes.SequenceEqual(original), "The backup holds the original bytes and the original is not yet replaced");
-            Assert(w.MapEditor.IsDirty && w.Session.Outstanding(false).Contains(PatchEditingSession.PatchData), "The staged fresh document is outstanding until Save");
+            Assert(w.MapEditor.IsDirty && w.Session.Outstanding(false).Contains(PatchEditingSession.PatchData), "The staged fresh scene patch file is outstanding until Save");
             Assert(w.MapEditor.Save() == null && !w.Session.FreshStartPending && !w.MapEditor.IsDirty, "Save replaces the original: " + w.Session.LastSave?.Error);
             var written = JObject.Parse(File.ReadAllText(folder.PatchPath));
-            Assert((int)written["formatVersion"] == 1 && (string)written["sourceMap"]["mapId"] == "layer" && !((JObject)written["modifications"]).HasValues, "Save writes an empty current-format document naming the bottom map layer: " + written);
+            Assert((int)written["formatVersion"] == 1 && (string)written["sourceMap"]["mapId"] == "layer" && !((JObject)written["modifications"]).HasValues, "Save writes an empty current-format scene patch file naming the bottom map layer: " + written);
             Assert(File.ReadAllBytes(w.Session.LastBackup).SequenceEqual(original), "The backup stays after Save");
-            Assert(w.Session.Edit(P, At(112), null).Applied && w.MapEditor.Save() == null && folder.Backups.Length == 1, "Editing continues on the fresh document without another backup");
+            Assert(w.Session.Edit(P, At(112), null).Applied && w.MapEditor.Save() == null && folder.Backups.Length == 1, "Editing continues on the fresh scene patch file without another backup");
         }
         // The original or its backup changed after fresh start: Save refuses to replace either.
         using (var folder = new Folder(Utf8("{broken"))) {
             var w = new World(new ModStorage(folder.Root));
-            Assert(w.Session.FreshStart(true).Applied, "Fresh start of an unreadable document");
+            Assert(w.Session.FreshStart(true).Applied, "Fresh start of an unreadable scene patch file");
             File.WriteAllBytes(folder.PatchPath, Utf8("{changed"));
             var refusal = w.MapEditor.Save();
             Assert(refusal != null && refusal.Contains("changed after fresh start") && File.ReadAllText(folder.PatchPath) == "{changed" && w.Session.FreshStartPending, "A changed original is not replaced: " + refusal);
@@ -253,7 +253,7 @@ static class RecoveryTests {
     static void FreshStartRefusesWhatItCannotSecure() {
         var w = new World("{broken");
         var refused = w.Session.FreshStart(true);
-        Assert(!refused.Applied && refused.Error.Contains("cannot secure a backup") && w.Session.Blocked != null, "A storage without backups leaves the document protected");
+        Assert(!refused.Applied && refused.Error.Contains("cannot secure a backup") && w.Session.Blocked != null, "A storage without backups leaves the scene patch file protected");
         using (var folder = new Folder(Utf8("{broken"))) {
             var files = new FaultyFiles { FailWrite = "scene-patches.json.backup-" };
             var f = new World(new ModStorage(folder.Root, files));
@@ -263,8 +263,8 @@ static class RecoveryTests {
             Assert(!f.Session.FreshStart(true, f.MapEditor.NativeDirty).Applied && folder.Backups.Length == 0, "Fresh start refuses unsaved native work");
         }
         var editable = new World(Doc(""));
-        Assert(!editable.Session.FreshStart(true).Applied && !editable.Session.CanStartFresh, "Fresh start does not replace a readable document");
-        // Unreadable mod metadata blocks the session, but the patch document is not what blocks it: Start fresh is not offered.
+        Assert(!editable.Session.FreshStart(true).Applied && !editable.Session.CanStartFresh, "Fresh start does not replace a readable scene patch file");
+        // Unreadable mod metadata blocks the session, but the scene patch file is not what blocks it: Start fresh is not offered.
         using (var folder = new Folder(Utf8("{broken"))) {
             File.WriteAllBytes(Path.Combine(folder.Root, "Info.json"), new byte[] { 0x7b, 0xff, 0x7d });
             var m = new World(new ModStorage(folder.Root));
@@ -272,40 +272,40 @@ static class RecoveryTests {
             Assert(m.Session.Blocked != null && m.Session.Blocked.StartsWith("The edited mod's Info.json cannot be read", StringComparison.Ordinal) && !m.Session.Blocked.Contains("start fresh")
                 && !m.Session.CanStartFresh && !metadataRefusal.Applied && folder.Backups.Length == 0, "Unreadable Info.json does not offer or allow Start fresh: " + m.Session.Blocked + " / " + metadataRefusal.Error);
             File.WriteAllText(Path.Combine(folder.Root, "Info.json"), Info(Patcher));
-            Assert(!m.Session.Reread(true).Applied && m.Session.CanStartFresh, "Once Info.json reads, the document itself blocks the session and Start fresh is offered");
+            Assert(!m.Session.Reread(true).Applied && m.Session.CanStartFresh, "Once Info.json reads, the scene patch file itself blocks the session and Start fresh is offered");
         }
     }
 
     // Remove, Clear activity and other removals of a modification that another modification names in dependsOn are
     // refused with the dependents named; nothing changes.
-    static void DependedModificationsCannotLeaveTheDocument() {
+    static void DependedModificationsCannotLeaveTheScenePatchFile() {
         var text = Doc(Mod("base", "p", "\"active\":false") + "," + Mod("follow", "q", Fixed(130), "[\"base\"]") + "," + Mod("also", "q", "\"active\":true", "[\"base\",\"follow\"]").Replace("\"path\":\"q\"", "\"path\":\"q2\""));
         var w = new World(text);
         w.Scene.Objects["q2"] = new List<object> { new Box { Rotation = new[] { 0.0, 0, 0, 1 } } };
-        Assert(w.Session.Blocked == null && !w.Box.Active, "The document opens with base applied");
+        Assert(w.Session.Blocked == null && !w.Box.Active, "The scene patch file opens with base applied");
         foreach (var (name, attempt) in new (string, Func<Outcome>)[] { ("Remove", () => w.Session.Remove(P)), ("Clear activity", () => w.Session.ClearActivity(P)), ("an edit to the underlying value", () => w.Session.Edit(P, null, true)) }) {
             var groups = w.MapEditor.UndoGroups.Count; var mutations = w.Scene.MutationCalls;
             var outcome = attempt();
-            Assert(!outcome.Applied && outcome.Error.Contains("Modification base cannot leave the document because also, follow name it in dependsOn") && outcome.Error.Contains("Nothing was changed"),
+            Assert(!outcome.Applied && outcome.Error.Contains("Modification base cannot leave the scene patch file because also, follow name it in dependsOn") && outcome.Error.Contains("Nothing was changed"),
                 name + " of a depended modification is refused with its dependents: " + outcome.Error);
-            Assert(w.MapEditor.UndoGroups.Count == groups && w.Scene.MutationCalls == mutations && !w.Box.Active && JObject.Parse(w.Session.DocumentText)["modifications"]["base"] != null, name + " changes nothing");
+            Assert(w.MapEditor.UndoGroups.Count == groups && w.Scene.MutationCalls == mutations && !w.Box.Active && JObject.Parse(w.Session.ScenePatchFileText)["modifications"]["base"] != null, name + " changes nothing");
         }
         var single = w.Session.Remove(Q);
         Assert(!single.Applied && single.Error.Contains("because also names it in dependsOn; change or remove that modification first"), "One dependent is named in the singular: " + single.Error);
         foreach (var target in new[] { new TargetIdentity("s", "q2", "c"), Q, P }) {
             var removed = w.Session.Remove(target);
-            Assert(removed.Applied, "Once no modification names it, " + target.Path + " can leave the document: " + removed.Error);
+            Assert(removed.Applied, "Once no modification names it, " + target.Path + " can leave the scene patch file: " + removed.Error);
         }
-        Assert(w.Box.Active && w.Session.DocumentText.Contains("\"modifications\": {}"), "The removals return the objects to their underlying state");
+        Assert(w.Box.Active && w.Session.ScenePatchFileText.Contains("\"modifications\": {}"), "The removals return the objects to their underlying state");
     }
 
     // An edit of a modification that does not take effect because a dependency is missing, failed or cyclic is refused
     // with that reason instead of being reported as applied; removing it stays possible.
     static void EditsOfIneffectiveModificationsAreRefused() {
         var cases = new[] {
-            ("missing", Mod("move", "p", Fixed(112), "[\"gone\"]"), "dependency gone is missing from the document"),
+            ("missing", Mod("move", "p", Fixed(112), "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
             ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (Target must resolve uniquely)"),
-            ("failed deeper", Mod("move", "p", Fixed(112), "[\"middle\"]") + "," + Mod("middle", "q", "\"active\":true", "[\"gone\"]"), "dependency gone is missing from the document"),
+            ("failed deeper", Mod("move", "p", Fixed(112), "[\"middle\"]") + "," + Mod("middle", "q", "\"active\":true", "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
             ("cyclic", Mod("move", "p", Fixed(112), "[\"loop\"]") + "," + Mod("loop", "q", "\"active\":false", "[\"move\"]"), "its dependencies form the cycle move -> loop -> move"),
             ("self", Mod("move", "p", Fixed(112), "[\"move\"]"), "its dependencies form the cycle move -> move"),
         };
@@ -314,15 +314,15 @@ static class RecoveryTests {
             var x = w.Box.X; var groups = w.MapEditor.UndoGroups.Count;
             var edit = w.Session.Edit(P, At(150), null);
             Assert(!edit.Applied && edit.Error == "Modification move is not effective because " + reason + "; correct that first. Nothing was changed", name + ": the edit is refused with the reason: " + edit.Error);
-            Assert(w.Box.X == x && w.MapEditor.UndoGroups.Count == groups && (double)JObject.Parse(w.Session.DocumentText)["modifications"]["move"]["placement"]["position"][0] == 112, name + ": nothing changed");
+            Assert(w.Box.X == x && w.MapEditor.UndoGroups.Count == groups && (double)JObject.Parse(w.Session.ScenePatchFileText)["modifications"]["move"]["placement"]["position"][0] == 112, name + ": nothing changed");
             Assert(!w.Session.Edit(P, null, false).Applied, name + ": an activity edit is refused as well");
             var remove = w.Session.Remove(P);
             if (name != "cyclic") Assert(remove.Applied, name + ": the ineffective modification can be removed");
-            else Assert(!remove.Applied && remove.Error.Contains("because loop names it in dependsOn") && JObject.Parse(w.Session.DocumentText)["modifications"]["move"] != null && w.MapEditor.UndoGroups.Count == groups,
+            else Assert(!remove.Applied && remove.Error.Contains("because loop names it in dependsOn") && JObject.Parse(w.Session.ScenePatchFileText)["modifications"]["move"] != null && w.MapEditor.UndoGroups.Count == groups,
                 "In a cycle of two each member has a dependent, so neither can be removed; the cycle is broken in the file: " + remove.Error);
         }
         var runtime = new PatchEngine(new World(Doc("")).Scene).Apply(Doc(Mod("move", "p", Fixed(112), "[\"gone\"]")));
-        Assert(runtime.Outcomes["move"].Error == "Dependency gone is missing from the document" && runtime.Outcomes["move"].Target?.Path == "p",
+        Assert(runtime.Outcomes["move"].Error == "Dependency gone is missing from the scene patch file" && runtime.Outcomes["move"].Target?.Path == "p",
             "Runtime names the missing dependency and the object the modification is for: " + runtime.Outcomes["move"].Error);
         var effective = new World(Doc(Mod("move", "p", Fixed(112), "[\"base\"]") + "," + Mod("base", "q", "\"active\":false")));
         Assert(effective.Session.Edit(P, At(150), null).Applied && effective.Box.X == 50, "An edit of a modification whose dependencies take effect applies");

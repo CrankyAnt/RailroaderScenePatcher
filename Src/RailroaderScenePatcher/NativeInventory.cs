@@ -79,7 +79,7 @@ namespace RailroaderScenePatcher {
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
         const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile";
-        public IEnumerable<string> MapIds => ModDocuments.MapIds();
+        public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         // Why a board candidate cannot be edited, from the board capability; null when that capability is unavailable.
         readonly Func<GameObject, string> boardRefusal;
         internal NativeInventory(Func<GameObject, string> boardRefusal = null) { this.boardRefusal = boardRefusal; }

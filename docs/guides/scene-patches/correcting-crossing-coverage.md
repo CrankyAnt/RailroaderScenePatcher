@@ -23,7 +23,7 @@ The patcher never assigns coverage by proximity. A track near the crossing gets 
 - The native spans of a corrected or detached circuit stay registered and unchanged. A track that used to trigger the crossing still exists and other consumers still see its spans. The crossing simply stops evaluating them, so a train on the old route no longer starts the warning.
 - Circuits you do not edit keep their coverage and keep working in both travel directions.
 - The crossing object, its equipment and its activity do not move or change. A crossing-coverage modification accepts no `placement` or `active`.
-- At least one circuit or [detection addition](adding-crossing-detection.md) keeps detection. Detaching every circuit of a crossing without an addition is refused, also when earlier edits or modifications already detached the others. In the native map editor, **Detach** is unavailable for the last covered circuit and its tooltip says why; a document that would detach it fails that modification and leaves the coverage unchanged.
+- At least one circuit or [detection addition](adding-crossing-detection.md) keeps detection. Detaching every circuit of a crossing without an addition is refused, also when earlier edits or modifications already detached the others. In the native map editor, **Detach** is unavailable for the last covered circuit and its tooltip says why; a scene patch file that would detach it fails that modification and leaves the coverage unchanged.
 
 ## Edit coverage in the native map editor
 
@@ -35,11 +35,11 @@ The patcher never assigns coverage by proximity. A track near the crossing gets 
 
 To detach a circuit, select **Detach** at the bottom of the tab and apply it. To return a circuit to its coverage without this mod, select **Clear circuit** at the bottom of the tab and apply it. **Remove modification** in the footer returns every circuit of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including the spans the patcher created.
 
-Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the document on every load, so a reload never duplicates them.
+Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the scene patch file on every load, so a reload never duplicates them.
 
 If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
-## Write coverage in the document
+## Write coverage in the scene patch file
 
 Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`, and set the explicit circuits in the `circuits` object of `relationships.crossingCoverage`, each under the ID of its native island span. The modification itself is a member of `modifications` under its ID:
 
@@ -66,12 +66,12 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
 }
 ```
 
-The scene, path and segment in this example are placeholders; use the scene, path and circuit IDs from the inspected crossing. The field rules are in the [patch document v1](patch-document-v1.md#crossing-coverage).
+The scene, path and segment in this example are placeholders; use the scene, path and circuit IDs from the inspected crossing. The field rules are in the [scene patch file v1](scene-patch-file-v1.md#crossing-coverage).
 
 ## Limits
 
 - The patcher does not check whether trains occupy the affected spans, and it applies coverage while a train is parked on them. Coverage edits were validated with the affected spans clear of trains; make edits in scene patch editing with those spans clear.
-- A circuit named in the document must exist on the crossing in the loaded map. A circuit that does not exist, a missing segment, a segment ID that matches more than one segment and a distance outside its segment are refused before anything changes; other modifications still apply.
+- A circuit named in the scene patch file must exist on the crossing in the loaded map. A circuit that does not exist, a missing segment, a segment ID that matches more than one segment and a distance outside its segment are refused before anything changes; other modifications still apply.
 - A crossing whose circuits were changed by something other than this patcher, or whose native spans are no longer registered, is refused until the world reloads.
-- The scene patch editing fields take one segment per span. A span that crosses segment boundaries can be written in the document with `from` and `to` on different segments.
+- The scene patch editing fields take one segment per span. A span that crosses segment boundaries can be written in the scene patch file with `from` and `to` on different segments.
 - Detection was demonstrated on one crossing and build in research; the patcher checks span registration and crossing coverage, not warning time.

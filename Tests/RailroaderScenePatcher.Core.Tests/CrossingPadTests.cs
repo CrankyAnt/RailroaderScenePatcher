@@ -209,14 +209,14 @@ static class CrossingPadTests {
         {
             var (world, pad, rear, scene) = Setup();
             var mismatch = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)), "other"));
-            Assert(mismatch.Error != null && mismatch.Outcomes.Count == 0 && world.Mutations == 0 && Mesh(world, pad) == Baseline, "A map mismatch rejects the whole pad document before mutation");
+            Assert(mismatch.Error != null && mismatch.Outcomes.Count == 0 && world.Mutations == 0 && Mesh(world, pad) == Baseline, "A map mismatch rejects the whole pad scene patch file before mutation");
         }
         {
             var (world, pad, rear, scene) = Setup();
             var result = new PatchEngine(scene).Apply(Doc(Binding("dependent", At("Sj7c", "a", 212), RearPath, "[\"base\"]") + "," + Binding("base", At("Smissing", "a", 1))));
             Assert(!result.Outcomes["dependent"].Applied && Mesh(world, rear) == "Sj7c|a|210@1045", "A failed pad rebinding isolates its dependents");
             result = new PatchEngine(scene).Apply(Doc(Binding("dependent", At("Sj7c", "a", 212), RearPath, "[\"base\"]") + "," + Binding("base", At("Sj7c", "a", 186.9477))));
-            Assert(result.Outcomes["dependent"].Applied && Mesh(world, rear) == "Sj7c|a|212@1045" && Mesh(world, pad) == Rebound, "Pad dependencies run regardless of document order");
+            Assert(result.Outcomes["dependent"].Applied && Mesh(world, rear) == "Sj7c|a|212@1045" && Mesh(world, pad) == Rebound, "Pad dependencies run regardless of scene patch file order");
         }
     }
     static void DetachIsRefusedBeforeMutation() {
@@ -309,20 +309,20 @@ static class CrossingPadTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         return (world, pad, rear, session, mapEditor, store);
     }
-    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.DocumentText)["modifications"].Single().First;
+    static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void EditingRebindUndoRedoAndRemoval() {
         var (world, pad, rear, session, mapEditor, store) = Session();
-        var before = session.DocumentText;
+        var before = session.ScenePatchFileText;
         var detach = session.Bind(Pad, MarkerBinding.Detached);
-        Assert(!detach.Applied && detach.Error.Contains("cannot be detached") && mapEditor.UndoGroups.Count == 0 && session.DocumentText == before && world.Mutations == 0, "A scene patch editing detach of a pad is refused without history: " + detach.Error);
+        Assert(!detach.Applied && detach.Error.Contains("cannot be detached") && mapEditor.UndoGroups.Count == 0 && session.ScenePatchFileText == before && world.Mutations == 0, "A scene patch editing detach of a pad is refused without history: " + detach.Error);
         var set = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
         Assert(set.Applied && Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound && pad.Position[0] == 20, "A scene patch editing rebinding regenerates the pad geometry: " + set.Error);
         var item = Only(session);
-        Assert((string)item["target"]["structure"] == "crossing-pad-v1" && (double)item["relationships"]["trackMarker"]["distance"] == 186.9477 && item["placement"] == null, "The document records the pad binding under its structure: " + item);
+        Assert((string)item["target"]["structure"] == "crossing-pad-v1" && (double)item["relationships"]["trackMarker"]["distance"] == 186.9477 && item["placement"] == null, "The scene patch file records the pad binding under its structure: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "A pad modification requires the patcher version that introduced it: " + session.MinimumPatcherVersion);
         Assert(session.Bind(Pad, MarkerBinding.At(new TrackLocation("Nnew", "a", 8))).Applied && Mesh(world, pad) == "Nnew|a|8@1020", "A replacement regenerates again");
         mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|186.9477" && Mesh(world, pad) == Rebound, "Undo of the replacement restores the prior binding and geometry: " + Mesh(world, pad));
-        mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && session.DocumentText.Contains("\"modifications\": {}"), "Undo of the first rebinding restores the native binding and geometry: " + Mesh(world, pad));
+        mapEditor.Undo(); Assert(Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == Baseline && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Undo of the first rebinding restores the native binding and geometry: " + Mesh(world, pad));
         mapEditor.Redo(); mapEditor.Redo(); Assert(Entry(world, pad) == "Nnew|a|8" && Mesh(world, pad) == "Nnew|a|8@1020", "Redo reapplies both rebindings with their geometry");
         Assert(session.Edit(Pad, new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && Mesh(world, pad) == "Nnew|a|8@1030" && Entry(world, pad) == "Nnew|a|8", "A placement edit keeps the binding and regenerates on the track");
         Assert(session.Bind(Pad, null).Applied && Entry(world, pad) == "Sj7c|a|185.9477" && Mesh(world, pad) == "Sj7c|a|185.9477@1030", "Clearing this mod's binding returns the effective native binding with its geometry");
@@ -332,10 +332,10 @@ static class CrossingPadTests {
         Assert(Mesh(world, rear) == "Sj7c|a|210@1045" && Entry(world, rear) == "Sj7c|a|210", "No scene patch editing operation touched the rear pad");
         // A failed scene patch editing rebinding restores the captured geometry and records no history.
         (world, pad, rear, session, mapEditor, store) = Session();
-        before = session.DocumentText;
+        before = session.ScenePatchFileText;
         world.FailGenerate = true;
         var failed = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Mesh(world, pad) == Baseline && Entry(world, pad) == "Sj7c|a|185.9477" && session.DocumentText == before && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing rebinding restores binding and geometry: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Mesh(world, pad) == Baseline && Entry(world, pad) == "Sj7c|a|185.9477" && session.ScenePatchFileText == before && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing rebinding restores binding and geometry: " + failed.Error);
         world.StaleCulling = true;
         failed = session.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 186.9477)));
         Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
@@ -357,7 +357,7 @@ static class CrossingPadTests {
         engine.Apply(store.Patch);
         Assert(fresh.Generations == generations && Entry(fresh, freshPad) == "Sj7c|a|186.9477" && fresh.Buckets.Values.Sum(b => b.Count) == 2, "A repeated world-load callback leaves one registration per pad and no duplicate generation");
         var (w2, p2, r2, reopened, e2, st2) = Session(store.Patch);
-        Assert(reopened.Blocked == null && reopened.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 185.9477))).Applied && Mesh(w2, p2) == Baseline, "A saved pad document reopens for editing");
+        Assert(reopened.Blocked == null && reopened.Bind(Pad, MarkerBinding.At(new TrackLocation("Sj7c", "a", 185.9477))).Applied && Mesh(w2, p2) == Baseline, "A saved pad scene patch file reopens for editing");
     }
     // Culling toggles a generated renderer as the camera moves, and generation replaces it; neither changes the inspected
     // pad, so an edit bound to the inspection still applies. A marker change makes the inspection stale.

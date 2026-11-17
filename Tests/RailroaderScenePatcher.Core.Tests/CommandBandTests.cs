@@ -127,8 +127,8 @@ static class CommandBandTests {
         Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", CommandBand.Clear(false, false))
             == "End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.\nUnavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear says what it does first");
         Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
-        Check(CommandBand.CopyId(true, "Invalid JSON. The patch document is protected from overwrite.") == "Invalid JSON. The patch document is protected from overwrite."
-            && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the patch document cannot be read, and asks for an inspection first");
+        Check(CommandBand.CopyId(true, "Invalid JSON. The scene patch file is protected from overwrite.") == "Invalid JSON. The scene patch file is protected from overwrite."
+            && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the scene patch file cannot be read, and asks for an inspection first");
     }
     // The native outline appends its markers; the panel puts them before the name so that a cut-off name keeps them.
     static void MarkersStandBeforeTheName() {
@@ -146,7 +146,7 @@ static class CommandBandTests {
         Check(added.Text == "+ ADDED" && added.Color == "#7FB86B" && added.Markup == "<color=#7FB86B><b><size=90%>+ ADDED</size></b></color>", "The added badge is + ADDED, green, bold, at 90 percent: " + added.Markup);
         Check(CommandBand.Badges(true, true).Select(b => b.Text).SequenceEqual(new[] { "* CHANGED", "+ ADDED" }), "Both badges keep their order");
     }
-    // The supplied definitions are stale when a patch document changed outside scene patch editing, not when the patcher saved
+    // The supplied definitions are stale when a scene patch file changed outside scene patch editing, not when the patcher saved
     // it itself, and a refresh makes them current again. The lamp follows: Current, Stale, Current.
     static void OwnSaveKeepsTheDefinitionsCurrent() {
         RailroaderScenePatcher.Core.LoadedMod Loaded(string id, string json, string error = null) =>
@@ -156,7 +156,7 @@ static class CommandBandTests {
         Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "Before the first refresh the definitions are not read");
         definitions.Read(new[] { Loaded("pack", before) });
         definitions.Compare(new[] { Loaded("pack", before) });
-        Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "After a refresh the unchanged document is current");
+        Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "After a refresh the unchanged scene patch file is current");
         // The patcher saves: the file now holds what it wrote.
         definitions.Written("pack", written);
         definitions.Compare(new[] { Loaded("pack", written) });
@@ -165,22 +165,22 @@ static class CommandBandTests {
         Check(!definitions.Stale, "and they stay current on every later comparison");
         // The file is changed outside scene patch editing.
         definitions.Compare(new[] { Loaded("pack", outside) });
-        Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "A document changed outside scene patch editing marks the definitions stale");
+        Check(definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Stale", "A scene patch file changed outside scene patch editing marks the definitions stale");
         definitions.Compare(new[] { Loaded("pack", written) });
         Check(definitions.Stale, "Changing the file back does not clear it: only a refresh does");
         definitions.Read(new[] { Loaded("pack", outside) });
         Check(!definitions.Stale && CommandBand.Inventory(definitions.Stale).Word == "Current", "Refresh returns Current");
-        // A document reordered or re-spaced outside scene patch editing has equal content: it is not reported as changed.
+        // A scene patch file reordered or re-spaced outside scene patch editing has equal content: it is not reported as changed.
         const string keyed = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"a\":{\"active\":false,\"dependsOn\":[\"b\",\"c\"],\"x\":12},\"b\":{\"active\":true}}}";
         const string reordered = "{\n  \"modifications\": {\n    \"b\": { \"active\": true },\n    \"a\": { \"x\": 12.0, \"dependsOn\": [\"c\", \"b\"], \"active\": false }\n  },\n  \"sourceMap\": { \"mapId\": \"map\" },\n  \"formatVersion\": 1\n}\n";
         var form = new SuppliedDefinitions();
         form.Read(new[] { Loaded("pack", keyed) });
         form.Compare(new[] { Loaded("pack", reordered) });
-        Check(!form.Stale && CommandBand.Inventory(form.Stale).Word == "Current", "A reordered and re-spaced document with another number literal is not reported as changed");
+        Check(!form.Stale && CommandBand.Inventory(form.Stale).Word == "Current", "A reordered and re-spaced scene patch file with another number literal is not reported as changed");
         form.Compare(new[] { Loaded("pack", keyed) });
         Check(!form.Stale, "and neither is the first form when it returns");
         form.Compare(new[] { Loaded("pack", reordered.Replace("12.0", "13")) });
-        Check(form.Stale, "A changed value in the reordered document marks the definitions stale");
+        Check(form.Stale, "A changed value in the reordered scene patch file marks the definitions stale");
         form.Read(new[] { Loaded("pack", keyed) });
         form.Compare(new[] { Loaded("pack", keyed.Replace("[\"b\",\"c\"]", "[\"b\",\"b\",\"c\"]")) });
         Check(form.Stale, "A repeated dependency is other content");
@@ -189,20 +189,20 @@ static class CommandBandTests {
         Check(!form.Stale, "The same unparseable text is unchanged");
         form.Compare(new[] { Loaded("pack", "{ broken") });
         Check(form.Stale, "Another unparseable text marks them stale");
-        // The first Save creates the document: no mod carried one at the refresh.
+        // The first Save creates the scene patch file: no mod carried one at the refresh.
         var fresh = new SuppliedDefinitions();
         fresh.Read(new RailroaderScenePatcher.Core.LoadedMod[0]);
         fresh.Written("pack", written);
         fresh.Compare(new[] { Loaded("pack", written) });
-        Check(!fresh.Stale, "A document the patcher's own Save created is current");
+        Check(!fresh.Stale, "A scene patch file the patcher's own Save created is current");
         fresh.Compare(new[] { Loaded("pack", written), Loaded("other", before) });
-        Check(fresh.Stale, "A document that appears from elsewhere marks them stale");
-        // A document that can no longer be read, and one removed outside scene patch editing.
-        definitions.Compare(new[] { Loaded("pack", null, "Cannot read patch document") });
-        Check(definitions.Stale, "An unreadable document marks them stale");
+        Check(fresh.Stale, "A scene patch file that appears from elsewhere marks them stale");
+        // A scene patch file that can no longer be read, and one removed outside scene patch editing.
+        definitions.Compare(new[] { Loaded("pack", null, "Cannot read scene patch file") });
+        Check(definitions.Stale, "An unreadable scene patch file marks them stale");
         definitions.Read(new[] { Loaded("pack", outside) });
         definitions.Compare(new RailroaderScenePatcher.Core.LoadedMod[0]);
-        Check(definitions.Stale, "A removed document marks them stale");
+        Check(definitions.Stale, "A removed scene patch file marks them stale");
         // A write while already stale does not vouch for what else changed.
         definitions.Read(new[] { Loaded("pack", before) });
         definitions.Compare(new[] { Loaded("pack", outside) });
@@ -356,7 +356,7 @@ static class CommandBandTests {
         foreach (var row in new[] {
             new object[] { false, false, null, "Enable completed." },
             new object[] { true, false, null, "Enable: nothing changed; the object has this value already." },
-            new object[] { false, true, null, "Enable completed. The value equals the object's value without this MapMod, so the modification no longer sets it." },
+            new object[] { false, true, null, "Enable completed. The value equals the object's value without this mod, so the modification no longer sets it." },
             new object[] { false, false, "Enable did something else.", "Enable did something else." },
             new object[] { true, true, "x", "Enable: nothing changed; the object has this value already." } })
             Check(CommandBand.EditResult("Enable", (bool)row[0], (bool)row[1], (string)row[2]) == (string)row[3], "An edit's result reads: " + row[3]);
@@ -412,7 +412,7 @@ static class CommandBandTests {
     }
     static void ClearActivityNeedsAnActivityValue() {
         Check(CommandBand.ClearActivityReason(true) == null, "With an activity value Clear activity is enabled");
-        Check(CommandBand.ClearActivityReason(false) == "This MapMod sets no activity for this object, so there is nothing to clear.", "Without one it is disabled with that reason");
+        Check(CommandBand.ClearActivityReason(false) == "This mod sets no activity for this object, so there is nothing to clear.", "Without one it is disabled with that reason");
     }
     // A request waits for the comparison of the scene. Closing the panel or leaving the native map editor cancels it: it never
     // runs, and a refusal says why.
@@ -462,7 +462,7 @@ static class CommandBandTests {
         Check(CommandBand.PlacementMode(true) == CommandBand.FollowMode && CommandBand.PlacementMode(false) == CommandBand.NumericMode && CommandBand.FollowMode == 3 && CommandBand.GizmoMode == 1, "An object that follows a track opens in Follow, any other in Numeric");
         // No false success for a crossing pad's placement.
         var pad = CommandBand.PadPlacement("Gizmo placement");
-        Check(pad.StartsWith("Gizmo placement changed the pad object's pose only.") && !pad.Contains("completed") && pad.Contains("did not move"), "A pad's placement result says that the pad did not move: " + pad);
+        Check(pad.StartsWith("Gizmo placement changed the pad object's physical placement only.") && !pad.Contains("completed") && pad.Contains("did not move"), "A pad's placement result says that the pad did not move: " + pad);
         // Terrain output in plain words.
         Check(CommandBand.Terrain(null, null, true, "none", "none", false) == "Terrain unchanged." && CommandBand.Terrain(null, null, true, "tile 3", "none", true) == "Terrain updated: tile 3."
             && CommandBand.Terrain(null, null, false, "none", "tile 4", false).StartsWith("Terrain pending: ") && CommandBand.Terrain(null, "no tile", true, "a", "b", true).StartsWith("Terrain update stopped: no tile")

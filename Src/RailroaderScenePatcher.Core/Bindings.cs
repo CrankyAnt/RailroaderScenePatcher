@@ -17,7 +17,7 @@ namespace RailroaderScenePatcher.Core {
         internal static bool Same(TrackLocation a, TrackLocation b) =>
             a == null ? b == null : b != null && a.Segment == b.Segment && a.End == b.End && Math.Abs(a.Distance - b.Distance) <= DistanceTolerance;
         public override string ToString() => Segment + "|" + End + "|" + Distance.ToString("R", CultureInfo.InvariantCulture);
-        // The one form a track location is shown in: segment, end in lower case as the document writes it, and the
+        // The one form a track location is shown in: segment, end in lower case as the scene patch file writes it, and the
         // distance to three decimals.
         public string Display => Segment + " / " + (End ?? "").ToLowerInvariant() + " / " + Distance.ToString("0.###", CultureInfo.InvariantCulture);
     }

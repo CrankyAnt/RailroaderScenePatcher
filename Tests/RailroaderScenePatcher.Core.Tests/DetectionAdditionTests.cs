@@ -18,10 +18,10 @@ static partial class CoverageTests {
     static bool Untouched(Fixture f) => f.Crossing.Circuits.Count == 2 && ReferenceEquals(f.Crossing.Circuits[0], f.Rerouted) && ReferenceEquals(f.Crossing.Circuits[1], f.Retained)
         && f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9" && f.Spans(f.Retained) == "Pdlh,P6id,P1db";
     public static void RunAdditions() {
-        DocumentAddsDetectionForExplicitTracks();
+        ScenePatchFileAddsDetectionForExplicitTracks();
         InvalidAdditionsChangeNothing();
         UnresolvedTracksAndMapMismatchChangeNothing();
-        AdditionIdentityIsScopedToItsDocument();
+        AdditionIdentityIsScopedToItsScenePatchFile();
         AdditionDependenciesResolveRegardlessOfOrder();
         RepetitionReentryAndFreshWorldKeepOneOwnedSet();
         AdditionFailureRestoresAndPreservesIndependentWork();
@@ -32,7 +32,7 @@ static partial class CoverageTests {
         CoverageWritesLeaveNoEmptyObject();
         Console.WriteLine("PASS: detection additions with scoped identity, explicit tracks and area, convergence, deletion, refusal, restoration and scene patch editing");
     }
-    static void DocumentAddsDetectionForExplicitTracks() {
+    static void ScenePatchFileAddsDetectionForExplicitTracks() {
         var f = new Fixture();
         f.World.Segments["Snear"] = new List<double> { 600 };
         Assert(DetectsNowhere(f, f.Crossing, "Snew"), "Before the addition the extra track does not trigger the crossing");
@@ -84,7 +84,7 @@ static partial class CoverageTests {
         }
         var m = new Fixture();
         var mismatch = new PatchEngine(m.Scene).Apply(Doc(Add("add", Addition("siding")), "other-map"));
-        Assert(mismatch.Error != null && mismatch.Outcomes.Count == 0 && m.World.Mutations == 0 && m.Native, "A document for another map adds nothing");
+        Assert(mismatch.Error != null && mismatch.Outcomes.Count == 0 && m.World.Mutations == 0 && m.Native, "A scene patch file for another map adds nothing");
         var u = new Fixture();
         var unknown = new PatchEngine(u.Scene).Apply(Doc(Add("add", Addition("siding"), "World/Crossings/Gone")));
         Assert(!unknown.Outcomes["add"].Applied && unknown.Outcomes["add"].Error.Contains("resolve uniquely") && u.World.Mutations == 0, "An addition for a missing crossing is refused");
@@ -92,8 +92,8 @@ static partial class CoverageTests {
         var ambiguous = new PatchEngine(u.Scene).Apply(Doc(Add("add", Addition("siding"))));
         Assert(!ambiguous.Outcomes["add"].Applied && ambiguous.Outcomes["add"].Error.Contains("resolve uniquely") && u.World.Mutations == 0, "An addition for an ambiguous crossing is refused");
     }
-    static void AdditionIdentityIsScopedToItsDocument() {
-        // One document uses each addition ID once: the ID names one addition of its mod, wherever the entries stand.
+    static void AdditionIdentityIsScopedToItsScenePatchFile() {
+        // One scene patch file uses each addition ID once: the ID names one addition of its mod, wherever the entries stand.
         foreach (var items in new[] { Add("a", Addition("siding")) + "," + Add("b", Addition("siding", "Sspur"), OtherPath) + "," + Add("c", Addition("spur", "Sspur"), OtherPath, "[]"),
                 Add("c", Addition("spur", "Sspur"), OtherPath) + "," + Add("b", Addition("siding", "Sspur"), OtherPath) + "," + Add("a", Addition("siding")) }) {
             var f = new Fixture();
@@ -112,7 +112,7 @@ static partial class CoverageTests {
         var observed = g.Scene.Read(g.Crossing).Coverage;
         Assert(observed[DetectionAddition.Key("pack/a", "siding")].Ranges[0].From.Segment == "Snew" && observed[DetectionAddition.Key("pack/b", "siding")].Ranges[0].From.Segment == "Sspur", "Each addition is observed under its own mod");
         engine.Apply(Doc(Add("add", Addition("siding"))), "pack/a");
-        Assert(g.Crossing.Circuits.Count == 4 && g.World.Created == 6, "Repeating one mod's document leaves the other's addition alone");
+        Assert(g.Crossing.Circuits.Count == 4 && g.World.Created == 6, "Repeating one mod's scene patch file leaves the other's addition alone");
         // The order of the added circuits follows their identity, never the order they were written or applied in.
         var h = new Fixture();
         new PatchEngine(h.Scene).Apply(Doc(Add("add", Addition("b", "Sspur") + "," + Addition("a"))));
@@ -133,16 +133,16 @@ static partial class CoverageTests {
         Assert(!result.Outcomes["dependent"].Applied && f.World.Mutations == 0, "An addition with an unknown prerequisite adds nothing");
     }
     static void RepetitionReentryAndFreshWorldKeepOneOwnedSet() {
-        var document = Doc(Add("add", Addition("siding")));
+        var scenePatchFile = Doc(Add("add", Addition("siding")));
         var f = new Fixture();
         var engine = new PatchEngine(f.Scene);
-        engine.Apply(document);
+        engine.Apply(scenePatchFile);
         var set = f.Crossing.Circuits[2]; var spans = set.Spans.ToArray();
-        var again = engine.Apply(document);
+        var again = engine.Apply(scenePatchFile);
         Assert(again.Outcomes.Values.All(o => o.Applied) && f.Crossing.Circuits.Count == 3 && ReferenceEquals(f.Crossing.Circuits[2], set) && set.Spans.SequenceEqual(spans) && f.World.Created == 3 && OwnedAnywhere(f) == 3, "A repeated world-load callback reuses the added circuit and its spans");
         // A later lifecycle re-entry builds a new engine and adapter over the world that still holds the addition.
         var reentered = new CrossingCoverageScene(f.World, Capability.Unchecked);
-        var reentry = new PatchEngine(reentered).Apply(document);
+        var reentry = new PatchEngine(reentered).Apply(scenePatchFile);
         Assert(reentry.Outcomes.Values.All(o => o.Applied) && f.Crossing.Circuits.Count == 3 && ReferenceEquals(f.Crossing.Circuits[2], set) && set.Spans.SequenceEqual(spans) && f.World.Created == 3 && OwnedAnywhere(f) == 3, "Re-entry reconciles the retained addition instead of adding another: " + reentry.Outcomes["add"].Error);
         var observed = reentered.Read(f.Crossing).Coverage;
         Assert(observed.Circuits.Count == 3 && observed["Pipr"].Kind == CircuitKind.Native && observed["P6id"].Kind == CircuitKind.Native && observed[DetectionAddition.Key("", "siding")].Kind == CircuitKind.Added, "Re-entry tells the retained addition from the native circuits");
@@ -153,7 +153,7 @@ static partial class CoverageTests {
         Assert(moved.Outcomes["add"].Applied && ReferenceEquals(f.Crossing.Circuits[2], set) && OwnedAnywhere(f) == 3 && spans.All(s => s.Destroyed && !f.World.Registered(s)) && DetectsNowhere(f, f.Crossing, "Snew"), "Changed tracks replace the owned spans without leaving the earlier ones: " + moved.Outcomes["add"].Error);
         // A fresh world reconstructs the detection addition once.
         var fresh = new Fixture();
-        var rebuilt = new PatchEngine(fresh.Scene).Apply(document);
+        var rebuilt = new PatchEngine(fresh.Scene).Apply(scenePatchFile);
         Assert(rebuilt.Outcomes.Values.All(o => o.Applied) && fresh.Crossing.Circuits.Count == 3 && fresh.World.Created == 3 && DetectsBothWays(fresh, fresh.Crossing, "Snew"), "A fresh world reconstructs the addition without duplicates");
     }
     static void AdditionFailureRestoresAndPreservesIndependentWork() {
@@ -191,7 +191,7 @@ static partial class CoverageTests {
         var independent = engine.Apply(Doc(Add("other", Addition("spur", "Sspur"), OtherPath)));
         Assert(independent.Outcomes["other"].Applied && f.Other.Circuits.Count == 2, "Another crossing still takes an addition");
     }
-    static JObject Coverage(PatchEditingSession session, string id) => (JObject)JObject.Parse(session.DocumentText)["modifications"][id]["relationships"]["crossingCoverage"];
+    static JObject Coverage(PatchEditingSession session, string id) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"][id]["relationships"]["crossingCoverage"];
     // The circuits and additions the modification sets, counted together.
     static int Entries(PatchEditingSession session, string id) => Coverage(session, id).Properties().Sum(p => ((JObject)p.Value).Count);
     static void EditingPreviewAddUndoRedoAndDelete() {
@@ -200,23 +200,23 @@ static partial class CoverageTests {
         Assert(preview.Error == null && preview.Lines.Count == 3, "The preview reports every circuit and the addition: " + preview.Error);
         Assert(preview.Lines[0].StartsWith("Circuit Pipr: retained", StringComparison.Ordinal) && preview.Lines[1].StartsWith("Circuit P6id: retained", StringComparison.Ordinal), "The preview shows the native circuits retained: " + preview.Lines[0]);
         Assert(preview.Lines[2].StartsWith("Added detection siding: new", StringComparison.Ordinal) && preview.Lines[2].Contains("Snew end a 308 to 550 m") && preview.Lines[2].Contains("Snew end a 292 to 308 m"), "The preview shows the addition's tracks and area: " + preview.Lines[2]);
-        Assert(f.World.Mutations == 0 && f.Native && session.DocumentText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
+        Assert(f.World.Mutations == 0 && f.Native && session.ScenePatchFileText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A preview changes nothing");
         Assert(session.PreviewAddition(Crossing, "siding", Extra("Smissing")).Error.Contains("missing") && session.PreviewAddition(Crossing, " ", Extra()).Error != null, "The preview refuses a missing track and an unnamed addition");
         // Only an explicit addition creates membership: a track without one stays undetected.
         Assert(!session.AddDetection(Crossing, "siding", null).Applied && !session.AddDetection(Crossing, "siding", Selected()).Applied && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0, "An addition without explicitly selected tracks is refused");
         var add = session.AddDetection(Crossing, "siding", Extra());
         Assert(add.Applied && f.Crossing.Circuits.Count == 3 && DetectsBothWays(f, f.Crossing, "Snew") && DetectsBothWays(f, f.Crossing, "Sold") && f.RetainedDetectsBothWays, "A scene patch editing addition detects on the selected tracks and keeps the native circuits: " + add.Error);
-        var only = (JProperty)JObject.Parse(session.DocumentText)["modifications"].Single();
+        var only = (JProperty)JObject.Parse(session.ScenePatchFileText)["modifications"].Single();
         var item = (JObject)only.Value;
         var entry = (JObject)item["relationships"]["crossingCoverage"]["additions"]["siding"];
         Assert(only.Name.StartsWith("cover-", StringComparison.Ordinal) && item["id"] == null && item["relationships"]["crossingCoverage"]["circuits"] == null && (double)entry["approachA"]["to"]["distance"] == 550
-            && (string)entry["island"]["from"]["segment"] == "Snew" && item["placement"] == null && item["active"] == null, "The document records the addition's ID, tracks and area: " + item);
+            && (string)entry["island"]["from"]["segment"] == "Snew" && item["placement"] == null && item["active"] == null, "The scene patch file records the addition's ID, tracks and area: " + item);
         Assert(session.MinimumPatcherVersion == "0.5.0", "An addition requires the patcher version of crossing coverage");
         var id = only.Name;
         var set = f.Crossing.Circuits[2]; var spans = set.Spans.ToArray();
         // The same modification still corrects native circuits beside the addition.
         Assert(session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && f.Crossing.Circuits.Count == 2 && ReferenceEquals(f.Crossing.Circuits[1], set) && Entries(session, id) == 2, "A native circuit can be detached beside the addition");
-        // An addition ID names one addition in the document.
+        // An addition ID names one addition in the scene patch file.
         var groups = mapEditor.UndoGroups.Count;
         var twice = session.AddDetection(Other, "siding", Extra("Sspur"));
         Assert(!twice.Applied && twice.Error.Contains("already used") && f.Other.Circuits.Count == 1 && mapEditor.UndoGroups.Count == groups, "The same ID at another crossing is refused without a history entry: " + twice.Error);
@@ -238,7 +238,7 @@ static partial class CoverageTests {
         mapEditor.Undo();
         // Back through the whole history: every owned addition is gone and the native state returns.
         while (mapEditor.CanUndo) mapEditor.Undo();
-        Assert(f.Native && OwnedAnywhere(f) == 0 && f.Other.Circuits.Count == 1 && session.DocumentText.Contains("\"modifications\": {}"), "Undoing every edit leaves no owned addition behind");
+        Assert(f.Native && OwnedAnywhere(f) == 0 && f.Other.Circuits.Count == 1 && session.ScenePatchFileText.Contains("\"modifications\": {}"), "Undoing every edit leaves no owned addition behind");
         while (mapEditor.CanRedo) mapEditor.Redo();
         Assert(f.Crossing.Circuits.Count == 1 && DetectsNowhere(f, f.Crossing, "Snew") && f.Other.Circuits.Count == 2 && OwnedAnywhere(f) == 3, "Redoing every edit, the deletion included, leaves one owned addition");
         mapEditor.Undo(); Assert(f.Crossing.Circuits.Count == 2 && DetectsBothWays(f, f.Crossing, "Snew") && OwnedAnywhere(f) == 6, "Undo of the redone deletion rebuilds the addition once");
@@ -256,11 +256,11 @@ static partial class CoverageTests {
         var last = session.DeleteDetection(Crossing, "siding");
         Assert(!last.Applied && last.Error.Contains("without detection") && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == groups && f.Crossing.Circuits.Count == 1, "Deleting the last detection is refused before mutation: " + last.Error);
         Assert(session.PreviewAddition(Crossing, "siding", null).Error.Contains("without detection"), "The preview names why the deletion is refused");
-        // A failure during construction restores the scene and the document.
+        // A failure during construction restores the scene and the scene patch file.
         (f, session, mapEditor, store) = Session();
         f.World.FailSetSpansOnce = true;
         var failed = session.AddDetection(Crossing, "siding", Extra());
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && OwnedAnywhere(f) == 0 && session.DocumentText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing addition restores coverage and the document: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Native && OwnedAnywhere(f) == 0 && session.ScenePatchFileText.Contains("\"modifications\": {}") && mapEditor.UndoGroups.Count == 0, "A failed scene patch editing addition restores coverage and the scene patch file: " + failed.Error);
         f.World.FailSetSpansOnce = true; f.World.StickyDestroy = true;
         failed = session.AddDetection(Crossing, "siding", Extra());
         Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified") && OwnedAnywhere(f) == 3, "Incomplete cleanup of an addition is reported: " + failed.Error);
@@ -273,9 +273,9 @@ static partial class CoverageTests {
     // Scene patch editing removes circuits or additions with its last entry and crossingCoverage with both; it never writes one of them empty.
     static void CoverageWritesLeaveNoEmptyObject() {
         var (f, session, mapEditor, store) = Session();
-        JObject Relationships() => (JObject)((JObject)JObject.Parse(session.DocumentText)["modifications"]).PropertyValues().Single()["relationships"];
+        JObject Relationships() => (JObject)((JObject)JObject.Parse(session.ScenePatchFileText)["modifications"]).PropertyValues().Single()["relationships"];
         void NoEmptyObject(string step) {
-            var text = session.DocumentText;
+            var text = session.ScenePatchFileText;
             Assert(!text.Contains("\"circuits\": {}") && !text.Contains("\"additions\": {}") && !text.Contains("\"crossingCoverage\": {}") && !text.Contains("\"relationships\": {}"), step + ": no empty coverage object is written:\n" + text);
         }
         Assert(session.AddDetection(Crossing, "siding", Extra()).Applied, "An addition is set");
@@ -290,18 +290,18 @@ static partial class CoverageTests {
         Assert(session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && session.DeleteDetection(Crossing, "siding").Applied, "A circuit is set and the last addition deleted");
         NoEmptyObject("last addition deleted");
         Assert(Relationships()["crossingCoverage"]["additions"] == null && Relationships()["crossingCoverage"]["circuits"]["P6id"] != null, "additions leaves with its last entry; circuits stays");
-        Assert(session.Cover(Crossing, "P6id", null).Applied && session.DocumentText.Contains("\"modifications\": {}"), "With both gone crossingCoverage leaves, and with it the modification that set nothing else");
+        Assert(session.Cover(Crossing, "P6id", null).Applied && session.ScenePatchFileText.Contains("\"modifications\": {}"), "With both gone crossingCoverage leaves, and with it the modification that set nothing else");
         Assert(mapEditor.Save() == null && store.Patch == null, "Nothing is left to write");
         // Saved text: a coverage that ends with only circuits is written without an additions object.
         Assert(session.AddDetection(Crossing, "siding", Extra()).Applied && session.Cover(Crossing, "P6id", CircuitCoverage.Detached).Applied && session.DeleteDetection(Crossing, "siding").Applied && mapEditor.Save() == null, "A coverage is saved after its addition was deleted");
-        Assert(!store.Patch.Contains("additions") && !store.Patch.Contains("{}") && JObject.Parse(store.Patch)["modifications"].Single().First["relationships"]["crossingCoverage"]["circuits"]["P6id"] != null, "The saved document holds the circuits object alone:\n" + store.Patch);
+        Assert(!store.Patch.Contains("additions") && !store.Patch.Contains("{}") && JObject.Parse(store.Patch)["modifications"].Single().First["relationships"]["crossingCoverage"]["circuits"]["P6id"] != null, "The saved scene patch file holds the circuits object alone:\n" + store.Patch);
     }
     static void SaveAndReloadReproduceAdditionOnce() {
         var (f, session, mapEditor, store) = Session();
         session.AddDetection(Crossing, "siding", Extra());
         session.Cover(Crossing, "P6id", CircuitCoverage.Detached);
         Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=0.5.0") && JObject.Parse(store.Patch)["modifications"].First.First["relationships"]["crossingCoverage"]["additions"]["siding"] != null, "Save writes the addition and the dependency: " + store.Info);
-        // The world load applies the saved document under its mod's key; the scene patch editing session then edits the same addition.
+        // The world load applies the saved scene patch file under its mod's key; the scene patch editing session then edits the same addition.
         var fresh = new Fixture();
         var engine = new PatchEngine(fresh.Scene);
         var reload = engine.Apply(store.Patch, "author/pack");
@@ -309,7 +309,7 @@ static partial class CoverageTests {
         engine.Apply(store.Patch, "author/pack");
         Assert(OwnedAnywhere(fresh) == 3 && fresh.World.Created == 3 && fresh.Crossing.Circuits.Count == 2, "A repeated world-load callback leaves exactly one owned addition");
         var reopenedMapEditor = new NativeMapEditor();
-        var reopened = new PatchEditingSession(engine, reopenedMapEditor, new Store { Patch = store.Patch }, documentKey: "author/pack"); reopenedMapEditor.Session = reopened;
+        var reopened = new PatchEditingSession(engine, reopenedMapEditor, new Store { Patch = store.Patch }, scenePatchFileKey: "author/pack"); reopenedMapEditor.Session = reopened;
         var set = fresh.Crossing.Circuits[1];
         Assert(reopened.Blocked == null && reopened.Cover(Crossing, "P6id", null).Applied && fresh.Crossing.Circuits.Count == 3 && ReferenceEquals(fresh.Crossing.Circuits[2], set) && fresh.World.Created == 3, "The reopened session edits beside the loaded addition without rebuilding it");
         Assert(reopened.DeleteDetection(Crossing, "siding").Applied && fresh.Native && OwnedAnywhere(fresh) == 0, "The reopened session deletes the loaded addition and leaves nothing owned");

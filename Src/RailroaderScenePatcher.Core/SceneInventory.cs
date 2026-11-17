@@ -246,12 +246,12 @@ namespace RailroaderScenePatcher.Core {
             maps = scene.MapIds.ToArray(); Entries = Array.AsReadOnly(observations); IsStale = false; StaleReason = null;
         }
         public IEnumerable<SceneObservation> Search(string text) => Entries.Where(e => e.SearchText.IndexOf(text ?? "", StringComparison.OrdinalIgnoreCase) >= 0);
-        public IReadOnlyList<DefinitionInspection> InspectDocument(string json) {
-            var document = PatchDocument.Load(json);
-            if (!document.CanWrite) return new[] { new DefinitionInspection(null, 0, Array.Empty<string>(), new[] { document.Error }) };
-            if (!maps.Contains((string)document.Root["sourceMap"]["mapId"], StringComparer.Ordinal))
+        public IReadOnlyList<DefinitionInspection> InspectScenePatchFile(string json) {
+            var scenePatchFile = ScenePatchFile.Load(json);
+            if (!scenePatchFile.CanWrite) return new[] { new DefinitionInspection(null, 0, Array.Empty<string>(), new[] { scenePatchFile.Error }) };
+            if (!maps.Contains((string)scenePatchFile.Root["sourceMap"]["mapId"], StringComparer.Ordinal))
                 return new[] { new DefinitionInspection(null, 0, Array.Empty<string>(), new[] { "Map context mismatch; targets were not resolved" }) };
-            var entries = PatchEngine.Entries(document.Modifications);
+            var entries = PatchEngine.Entries(scenePatchFile.Modifications);
             var results = new List<DefinitionInspection>();
             foreach (var entry in entries) {
                 var problems = new List<string>(); var matches = 0; var id = entry.Key; var item = entry.Value;

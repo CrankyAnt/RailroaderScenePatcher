@@ -19,7 +19,7 @@ function Save-Json($Value,[string]$Path) {
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path)) | Out-Null
     [IO.File]::WriteAllText($Path,($Value | ConvertTo-Json -Depth 60).Replace("`r`n","`n")+"`n",[Text.UTF8Encoding]::new($false))
 }
-# The modifications of a document, keyed by modification ID, in the order the pairs are given.
+# The modifications of a scene patch file, keyed by modification ID, in the order the pairs are given.
 function Keyed {
     $modifications=[ordered]@{}
     for($i=0;$i -lt $args.Count;$i+=2){$modifications[[string]$args[$i]]=$args[$i+1]}
@@ -88,7 +88,7 @@ $s=[math]::Sin([math]::PI/24);$c=[math]::Cos([math]::PI/24)
 $turned=@(($c*$q[0]+$s*$q[2]),($c*$q[1]+$s*$q[3]),($c*$q[2]-$s*$q[0]),($c*$q[3]-$s*$q[1]))
 $target=@{scene='BushnellWhittier-MapManager';path=$boardPath;component='Helpers.Culling.RendererCuller';structure='independent-board-v1'}
 $target=[ordered]@{scene=$target.scene;path=$target.path;component=$target.component;structure=$target.structure}
-# A modification without its ID: the ID is its key in the document.
+# A modification without its ID: the ID is its key in the scene patch file.
 function Modification([double]$Dx,[array]$Rotation,[array]$Depends=@(),[switch]$Missing) {
     $identity=[ordered]@{};foreach($name in $target.Keys){$identity[$name]=$target[$name]};if($Missing){$identity.path=$boardPath+'/__missing_issue39'}
     return [ordered]@{target=$identity;placement=[ordered]@{mode='fixed';position=@(($p[0]+$Dx),$p[1],$p[2]);rotation=$Rotation};dependsOn=$Depends}
