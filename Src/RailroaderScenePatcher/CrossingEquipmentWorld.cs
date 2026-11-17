@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher {
     // Marks the patcher's own wrapper of one equipment addition beneath a crossing controller and records what it was built
     // from, so a later application in the same world reconciles it instead of building another.
     internal sealed class OwnedEquipment : MonoBehaviour {
-        internal string Scope, Id, Pattern, SourceScene, SourcePath;
+        internal string Scope, Id, Pattern, SourceScene, SourcePath, SourceDefinition;
         internal GameObject Controller, Copy;
         internal bool Retired;
         // The addition this object belongs to, or null.
@@ -38,6 +38,10 @@ namespace RailroaderScenePatcher {
         readonly FieldInfo lampKey, lampTargets, lampMaterials, gateKey, gateClip, cullerObjects, cullerState, lampObserver, gateObserver;
         readonly FieldInfo materialShared, materialProperty;
         readonly string[] keys;
+        // The controller-bound bell pattern, or null with the reason when this build lacks one of its prerequisites; lights
+        // and gates stay available either way.
+        readonly CrossingBells bells;
+        readonly string bellsUnavailable;
         internal CrossingEquipmentWorld() {
             controller = Native.Type(CrossingCoverageScene.ComponentType); lamp = Native.Type(LampType); gate = Native.Type(GateType); keyOwner = Native.Type(OwnerType);
             culler = Native.Type(CullerType); span = Native.Type(SpanType); bell = Native.Type(BellType); animator = Native.Type(AnimatorType); transformer = Native.Type(TransformerType);
@@ -58,13 +62,21 @@ namespace RailroaderScenePatcher {
             }).ToArray();
             foreach (var method in new[] { "WorldToGame", "GameToWorld" })
                 if (transformer.GetMethods(Native.Flags).Count(m => m.Name == method && m.GetParameters().Length == 1) != 1) throw new MissingMethodException(TransformerType, method);
+            try { bells = new CrossingBells(controller); } catch (Exception e) { bellsUnavailable = e.GetBaseException().Message; }
         }
+        // Why bells are unavailable on this build, or null.
+        internal string BellsUnavailable => bellsUnavailable;
+        // Raises the warning of a bell whose audio fails to load after the apply: key, message and originator.
+        internal Action<string, string, string> Warn { set { if (bells != null) bells.Warn = value; } }
+        sealed class UnavailableBell { }
         static FieldInfo Field(Type type, string name) => type.GetField(name, Native.Flags) ?? throw new MissingFieldException(type.FullName, name);
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         static Component[] All(GameObject root, Type type) => root.GetComponentsInChildren(type, true).Where(c => c != null).ToArray();
         static bool Inside(GameObject root, GameObject child) { for (var t = child == null ? null : child.transform; t != null; t = t.parent) if (t == root.transform) return true; return false; }
 
         public IReadOnlyList<object> ResolveSource(EquipmentSource source) {
+            // A missing bell capability resolves to a placeholder, so the refusal names the capability, not a missing definition.
+            if (source.IsDefinition) return bells == null ? new object[] { new UnavailableBell() } : bells.Resolve(source.Definition).Cast<object>().ToArray();
             var names = source.Path.Split('/');
             var found = new List<GameObject>();
             for (var i = 0; i < SceneManager.sceneCount; i++) {
@@ -77,6 +89,15 @@ namespace RailroaderScenePatcher {
             return found.Where(g => OwnedEquipment.Of(g) == null).Cast<object>().ToArray();
         }
         public string SourceProblem(object source, object target, string pattern) {
+            if (source is UnavailableBell) return "crossing bells are unavailable on this game build: " + bellsUnavailable;
+            if (source is BellSource bell) {
+                if (pattern != EquipmentAddition.BellPattern) return "pattern " + pattern + " cannot use a definition as its source";
+                var controllerObject = target as GameObject;
+                if (!Loaded(controllerObject)) return "the destination crossing is not loaded";
+                if (!controllerObject.activeInHierarchy) return "the destination crossing controller is inactive, so an added bell would not start";
+                return BellPattern.Problem(bells.Facts(bell, controllerObject));
+            }
+            if (pattern == EquipmentAddition.BellPattern) return "a loaded device is not a bell definition";
             var go = source as GameObject;
             if (!Loaded(go)) return "it is not a loaded object";
             if (pattern != EquipmentAddition.LightGatePattern) return "the pattern " + pattern + " is not supported";
@@ -131,6 +152,16 @@ namespace RailroaderScenePatcher {
                         position, rotation, child.name, CrossingEquipment.Place(owner.name, Ancestors(owner.transform)), crossingPosition, crossingRotation));
                 }
             }
+            // Every bell definition of the content library, eligible or with its reason, for the inspected controller.
+            // A failure to read them leaves the devices listed and names the reason in one rejected entry.
+            if (bells == null) result.Add(SourceCandidate.Bell("bell definitions", null, "crossing bells are unavailable on this game build: " + bellsUnavailable));
+            else if (target is GameObject destination && Loaded(destination)) {
+                try {
+                    var found = new List<SourceCandidate>();
+                    foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
+                    result.AddRange(found);
+                } catch (Exception e) { result.Add(SourceCandidate.Bell("bell definitions", null, "cannot read bell definitions from the content library: " + e.GetBaseException().Message)); }
+            }
             return result;
         }
         // A map placement, or nulls when the floating origin cannot convert it.
@@ -146,7 +177,8 @@ namespace RailroaderScenePatcher {
         }
         public EquipmentAddition Describe(object addition) {
             var owned = (OwnedEquipment)addition;
-            return new EquipmentAddition(owned.Id, owned.Pattern, new EquipmentSource(owned.SourceScene, owned.SourcePath), null, owned.Scope);
+            var source = owned.SourceDefinition != null ? EquipmentSource.ForDefinition(owned.SourceDefinition) : new EquipmentSource(owned.SourceScene, owned.SourcePath);
+            return new EquipmentAddition(owned.Id, owned.Pattern, source, null, owned.Scope);
         }
         static string Safe(string text) => new string(text.Select(c => c == '/' ? ':' : c).ToArray());
         Component CullerOf(GameObject target) {
@@ -157,6 +189,7 @@ namespace RailroaderScenePatcher {
         // Builds the wrapper and copy disabled, checks the copy, joins the culler and enables the wrapper last, so the copy
         // initializes through the controller only when it is complete.
         public object Construct(object target, object source, EquipmentAddition addition) {
+            if (addition.Pattern == EquipmentAddition.BellPattern) return ConstructBell((GameObject)target, source, addition);
             var destination = (GameObject)target; var device = (GameObject)source;
             var problem = SourceProblem(device, destination, addition.Pattern);
             if (problem != null) throw new InvalidOperationException("The source does not conform: " + problem);
@@ -193,6 +226,34 @@ namespace RailroaderScenePatcher {
                 throw;
             }
         }
+        // Builds the bell disabled: its wrapper at the placement, the player bound to the controller's bell key with its audio
+        // loading, then enables the wrapper. A bell joins no culler, as the controller's own bell player does not.
+        object ConstructBell(GameObject destination, object source, EquipmentAddition addition) {
+            var problem = SourceProblem(source, destination, addition.Pattern);
+            if (problem != null) throw new InvalidOperationException("The source does not conform: " + problem);
+            var bell = (BellSource)source;
+            // Unity releases a bell's audio on scene unload only for a bell that was active, so a bell is built only beneath
+            // an active controller. SourceProblem refuses that before any change; this guards the construction itself.
+            if (!destination.activeInHierarchy) throw new InvalidOperationException("The crossing controller is inactive, so an added bell would not start");
+            var wrapper = new GameObject(WrapperPrefix + Safe(addition.Scope) + " " + addition.Id) { hideFlags = HideFlags.DontSave };
+            wrapper.SetActive(false);
+            GameObject player = null;
+            try {
+                wrapper.transform.SetParent(destination.transform, false);
+                var owned = wrapper.AddComponent<OwnedEquipment>();
+                owned.Scope = addition.Scope; owned.Id = addition.Id; owned.Pattern = addition.Pattern; owned.SourceDefinition = bell.Identifier; owned.Controller = destination;
+                Place(wrapper, addition.Placement);
+                player = bells.Construct(wrapper, destination, bell, addition.Scope, addition.Id);
+                owned.Copy = player;
+                wrapper.SetActive(true);
+                return owned;
+            } catch {
+                player?.GetComponent<OwnedBell>()?.Release();
+                wrapper.SetActive(false);
+                UnityEngine.Object.Destroy(wrapper);
+                throw;
+            }
+        }
         static float Ratio(float a, float b) => Math.Abs(b) < 1e-6f ? a : a / b;
         // Why the copy is not a separate working device addressed by the destination controller, or null.
         string CopyProblem(GameObject source, GameObject copy, GameObject destination) {
@@ -215,6 +276,8 @@ namespace RailroaderScenePatcher {
             var owned = (OwnedEquipment)addition;
             if (owned == null) return;
             var copy = owned.Copy;
+            // A bell stops, gives up its observer and its audio reference, and cancels a load still running.
+            if (copy != null) copy.GetComponent<OwnedBell>()?.Release();
             if (owned.Controller != null && copy != null) foreach (var c in owned.Controller.GetComponents(culler)) (cullerObjects.GetValue(c) as IList)?.Remove(copy);
             owned.Retired = true;
             var wrapper = owned.gameObject;
@@ -245,6 +308,7 @@ namespace RailroaderScenePatcher {
             var copy = owned.Copy;
             if (copy == null || copy.transform.parent != owned.transform) return "its copy is missing";
             if (!owned.gameObject.activeSelf) return "it is disabled";
+            if (owned.Pattern == EquipmentAddition.BellPattern) return bells == null ? "crossing bells are unavailable on this game build: " + bellsUnavailable : bells.Problem(copy.GetComponent<OwnedBell>(), owned.Controller);
             var device = LightGatePattern.Problem(Facts(copy, owned.Controller, false), keys);
             if (device != null) return "the copy " + device;
             var nearest = NearestOwner(copy.transform);
@@ -263,6 +327,7 @@ namespace RailroaderScenePatcher {
             var owned = (OwnedEquipment)addition;
             var copy = owned.Copy;
             if (copy == null) return "copy missing";
+            if (owned.Pattern == EquipmentAddition.BellPattern) return bells == null ? "crossing bells are unavailable" : bells.Status(copy.GetComponent<OwnedBell>(), owned.Controller);
             if (!copy.activeInHierarchy) return "culled with its crossing; it initializes when visible";
             int Registered(Type type, FieldInfo observer) => observer == null ? -1 : All(copy, type).Count(c => observer.GetValue(c) != null);
             var lamps = All(copy, lamp).Length; var gates = All(copy, gate).Length;

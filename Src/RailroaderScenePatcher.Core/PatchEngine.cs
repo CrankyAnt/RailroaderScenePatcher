@@ -706,7 +706,7 @@ namespace RailroaderScenePatcher.Core {
             return new CrossingCoverage(parsed);
         }
         // Explicit equipment additions to a crossing controller, keyed by a persistent ID unique in this scene patch file: each holds the
-        // required pattern, a loaded source and a fixed placement. An addition this scene patch file omits stays untouched.
+        // required pattern, a source and a fixed placement. An addition this scene patch file omits stays untouched.
         static CrossingEquipment ParseEquipment(JToken token) {
             var entries = token as JObject;
             if (entries == null || !entries.HasValues) throw new InvalidOperationException("Invalid relationship: crossingEquipment must be an object with at least one entry, keyed by equipment ID");
@@ -714,7 +714,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var property in entries.Properties()) {
                 if (!(property.Value is JObject known)) continue;
                 if (!Only(known, "pattern", "source", "placement")) throw new InvalidOperationException("Unsupported relationship content in equipment " + property.Name + (known["id"] != null ? ": an entry carries no id member; its ID is its key, " + property.Name : ""));
-                if (known["source"] is JObject source && !Only(source, "scene", "path")) throw new InvalidOperationException("Unsupported relationship content in the source of equipment " + property.Name);
+                if (known["source"] is JObject source && !Only(source, "scene", "path", "definition")) throw new InvalidOperationException("Unsupported relationship content in the source of equipment " + property.Name);
                 if (known["placement"] is JObject placement && !Only(placement, "mode", "position", "track", "offset", "rotation")) throw new InvalidOperationException("Unsupported relationship content in the placement of equipment " + property.Name);
             }
             var parsed = new List<EquipmentAddition>();
@@ -731,10 +731,18 @@ namespace RailroaderScenePatcher.Core {
                 var pattern = (string)addition["pattern"];
                 if (!EquipmentAddition.Patterns.Contains(pattern, StringComparer.Ordinal)) throw new InvalidOperationException("Unsupported crossing equipment pattern " + pattern + " in equipment " + id);
                 var source = addition["source"] as JObject;
-                if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                EquipmentSource from;
+                // A bell loads the audio of a bell definition; a light or gate copies a loaded device.
+                if (pattern == EquipmentAddition.BellPattern) {
+                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with the identifier of a bell definition under definition");
+                    from = EquipmentSource.ForDefinition((string)source["definition"]);
+                } else {
+                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                    from = new EquipmentSource((string)source["scene"], (string)source["path"]);
+                }
                 var placement = addition["placement"] as JObject;
                 if (placement == null || placement["mode"]?.Type != JTokenType.String || (string)placement["mode"] != "fixed" || !Only(placement, "mode", "position", "rotation")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a fixed placement");
-                parsed.Add(new EquipmentAddition(id, pattern, new EquipmentSource((string)source["scene"], (string)source["path"]), CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4))));
+                parsed.Add(new EquipmentAddition(id, pattern, from, CheckPlacement(Numbers(placement["position"], 3), Numbers(placement["rotation"], 4))));
             }
             return new CrossingEquipment(parsed, false);
         }

@@ -788,7 +788,7 @@ namespace RailroaderScenePatcher.Core {
         // An entry of crossingEquipment in canonical order: pattern, source, placement.
         static JObject EquipmentJson(EquipmentAddition addition) {
             var placement = PatchEngine.CheckPlacement(addition.Placement?.Position, addition.Placement?.Rotation);
-            return new JObject { ["pattern"] = addition.Pattern, ["source"] = new JObject { ["scene"] = addition.Source.Scene, ["path"] = addition.Source.Path }, ["placement"] = FixedJson(placement) };
+            return new JObject { ["pattern"] = addition.Pattern, ["source"] = addition.Source.IsDefinition ? new JObject { ["definition"] = addition.Source.Definition } : new JObject { ["scene"] = addition.Source.Scene, ["path"] = addition.Source.Path }, ["placement"] = FixedJson(placement) };
         }
         // Clears this mod's activity value of the object: it returns to its effective underlying activity, which for an
         // object following a track group is group-driven again. Placement and relationships keep their mod values.

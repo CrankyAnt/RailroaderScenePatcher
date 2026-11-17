@@ -138,7 +138,7 @@ namespace RailroaderScenePatcher {
         internal const string AddedEquipmentFamily = CommandBand.AddedEquipmentFamily;
         static string Family(Component c) {
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
-            if (c is OwnedEquipment) return AddedEquipmentFamily;
+            if (c is OwnedEquipment owned) return owned.Pattern == EquipmentAddition.BellPattern ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
             var type = TypeName(c); var go = c.gameObject;
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
             // editor helpers stays out; a starter placement marker below Setups keeps its family.
@@ -480,10 +480,10 @@ namespace RailroaderScenePatcher {
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
                 : pad ? CommandBand.NotEditable(padRefusal)
-                : coverageEditable ? "Crossing coverage, lights and gates: select tracks for, or detach, each circuit explicitly, add detection for explicitly selected extra tracks, or add eligible lights and gates the controller drives; native spans stay registered and the crossing itself does not move"
+                : coverageEditable ? "Select the tracks each circuit detects, or explicitly detach it. Add detection for extra tracks you explicitly select, or add eligible lights, gates and bells driven by the crossing controller. Native spans stay registered and the crossing itself does not move"
                 : CommandBand.NotEditable(coverageRefusal);
-            // An added light or gate is edited on its crossing's Connections tab, not as an object of its own.
-            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.Id, added.Scope); }
+            // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
+            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.Id, added.Scope, added.Pattern == EquipmentAddition.BellPattern); }
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
