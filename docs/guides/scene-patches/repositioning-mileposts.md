@@ -24,7 +24,7 @@ The inventory shows such an object in the `Milepost` family with the structure `
 ## Move, rotate or disable the milepost in the native map editor
 
 1. Open **Scene patches** and select the milepost's row in the outliner, in the folder **Milepost**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
-2. Move or rotate the post on the **Placement** tab with **Numeric**, **Gizmo** or **Snap**, as described in [edit placement in the map editor](editing-placement-in-the-map-editor.md) and [use the transform gizmos](using-transform-gizmos.md). The binding stays as it is.
+2. Move or rotate the post on the **Placement** tab with **Numeric**, **Gizmo** or **Snap**, as described in [edit placement in the map editor](editing-placement-in-the-map-editor.md) and [use the transform gizmos](using-transform-gizmos.md). The binding stays as it is. **Follow** is inactive for a milepost: it takes a fixed placement.
 3. To hide the post, select **Disable** at the bottom of the **Object** tab. A milepost whose activity follows its track group stays off when the group is enabled later. **Enable** is refused for such a post; **Clear activity** returns it to its group, as described in [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
 ## Set, replace or detach the binding in the native map editor
@@ -60,5 +60,7 @@ Omit `placement` or `relationships.trackMarker` to leave that setting to the sce
 ## Limits
 
 The automated tests check placement, binding, detach, explicit disable of a group-driven post, refusal of missing and ambiguous mileposts and replacement tracks, map mismatch, order-independent dependencies, repetition, the origin cache entry, preflight refusal, failure after a change with restoration or guarded retry, Undo, Redo, clear, removal, Save and reload against a controlled track graph. They do not load Railroader.
+
+A milepost's binding is not repaired before the game checks its track markers at world load. A broken milepost binding therefore still raises the game's "not on the track" warning once in that load, before the patcher applies the scene patch file and repairs the binding. The early repair before that check, described under [repair feedback](repairing-track-bindings.md#repair-feedback-in-the-native-map-editor), covers Generic track markers only.
 
 Research on Railroader 0.6.2 rebound the origin milepost T-46 from `Stvw` to T-47's location on `Stky0cg9c`, repeated that and restored it, with the T prefix cache populated. The cache kept the same T-46 object, T-47 kept T-46 as its origin, and the displayed `47` and both mile values stayed as they were. That trial did not test an entry that existed before it, other prefixes, a group change, reload or persistence.

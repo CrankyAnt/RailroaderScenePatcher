@@ -318,10 +318,12 @@ namespace RailroaderScenePatcher {
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => role == "approachA" ? "Approach A" : role == "approachB" ? "Approach B" : role == "island" ? "Island" : role;
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
-        // every mode. An object that cannot be edited keeps Numeric, which shows its placement, and has every other mode
-        // inactive with the object's own reason.
-        internal static string ModeBlock(int mode, bool pad, bool editable, string operations) =>
-            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : null;
+        // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
+        // placement, and has every other mode inactive with the object's own reason.
+        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false) =>
+            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : null;
+        // Why Follow is inactive for a milepost: the milepost capability covers fixed placement, activity and the binding.
+        internal const string MilepostNoFollow = "A milepost takes a fixed placement. Its track binding is set under Connections.";
         // A target confirmed in the world and not yet used is the one green relation: the relations it would replace,
         // the followed and the bound track, are not drawn beside it, and return once it is used or withdrawn.
         internal static bool ShowsCurrentRelations(bool confirmedShown) => !confirmedShown;

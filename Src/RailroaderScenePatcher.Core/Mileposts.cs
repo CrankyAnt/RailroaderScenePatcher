@@ -13,24 +13,32 @@ namespace RailroaderScenePatcher.Core {
         // The cache entry for the prefix, by the scene and path of the post it holds; NotCached when the prefix has no entry.
         public const string NotCached = "not cached";
         public static string CachedAs(string origin) => "cached as " + (origin ?? "no origin milepost");
-        public MilepostState(string prefix, bool origin, double mileage, string text, string model, string originCache) {
-            Prefix = prefix; Origin = origin; Mileage = mileage; Text = text; Model = model; OriginCache = originCache;
+        public MilepostState(string prefix, bool origin, double mileage, string text, string renderedText, string model, string originCache, bool activeInHierarchy) {
+            Prefix = prefix; Origin = origin; Mileage = mileage; Text = text; RenderedText = renderedText; Model = model; OriginCache = originCache; ActiveInHierarchy = activeInHierarchy;
         }
         public string Prefix { get; }
         public bool Origin { get; }
         public double Mileage { get; }
-        // The displayed text, as the post's text synchronizer and its rendered texts hold it.
+        // The displayed text as the post's text synchronizer holds it.
         public string Text { get; }
-        // A signature of the post's model: its meshes and materials.
+        // What the post's rendered texts show. A text object that has never been awake shows nothing yet and fills in when
+        // the post first becomes active.
+        public string RenderedText { get; }
+        // A signature of the post's model: its meshes and materials, without those of its rendered texts, which a text
+        // object creates when it wakes.
         public string Model { get; }
         public string OriginCache { get; }
-        // What differs from the earlier state, or null when nothing does.
+        // Whether the post was active in the hierarchy when this state was read.
+        public bool ActiveInHierarchy { get; }
+        // What differs from the earlier state, or null when nothing does. The rendered texts count only when the post was
+        // active before: a post that was inactive may wake during the write and fill them in.
         public string Difference(MilepostState before) {
             if (before == null) return null;
             if (Prefix != before.Prefix) return "the milepost prefix changed from " + before.Prefix + " to " + Prefix;
             if (Origin != before.Origin) return "the milepost origin flag changed";
             if (Mileage != before.Mileage) return "the mile value changed from " + before.Mileage.ToString("R", CultureInfo.InvariantCulture) + " to " + Mileage.ToString("R", CultureInfo.InvariantCulture);
             if (Text != before.Text) return "the displayed mile text changed from " + before.Text + " to " + Text;
+            if (before.ActiveInHierarchy && RenderedText != before.RenderedText) return "the rendered mile text changed from " + before.RenderedText + " to " + RenderedText;
             if (Model != before.Model) return "the milepost model changed";
             if (OriginCache != before.OriginCache) return "the origin cache for prefix " + Prefix + " changed from " + before.OriginCache + " to " + OriginCache;
             return null;

@@ -9,7 +9,9 @@ using RailroaderScenePatcher.Core;
 // prefix, origin flag, mile value, displayed text and model, and the game's origin cache, which maps a prefix to the
 // origin milepost object once something has looked it up.
 class FakeMilepostWorld : FakeMarkerWorld, IMilepostWorld, ITargetConfirmation, IPlacementPattern {
-    public sealed class Post { public string Prefix = "T"; public bool Origin; public double Mileage; public string Text, Model = "post-mesh"; }
+    // Text is the synchronizer's text; Rendered is what its rendered texts show, null until the text object first wakes.
+    // TextModel is the mesh a 3D text creates when it wakes; like the native adapter, the model signature leaves it out.
+    public sealed class Post { public string Prefix = "T"; public bool Origin; public double Mileage; public string Text, Rendered, Model = "post-mesh", TextModel; }
     public readonly Dictionary<FakeMarker, Post> Posts = new Dictionary<FakeMarker, Post>();
     // The game's origin cache by prefix: absent, or the origin milepost it found, which may be none.
     public readonly Dictionary<string, FakeMarker> OriginCache = new Dictionary<string, FakeMarker>();
@@ -28,10 +30,17 @@ class FakeMilepostWorld : FakeMarkerWorld, IMilepostWorld, ITargetConfirmation, 
         if (ChangeMileageOnLocation) { ChangeMileageOnLocation = false; Posts[m].Mileage += 1; }
         if (DropCacheOnLocation) { DropCacheOnLocation = false; OriginCache.Remove(Posts[m].Prefix); }
     }
-    public MilepostState Milepost(object target) {
+    // The first activation of a post that has never been awake creates its text mesh and fills its rendered texts.
+    public new void SetActive(object target, bool active) {
+        base.SetActive(target, active);
         var post = Posts[(FakeMarker)target];
-        return new MilepostState(post.Prefix, post.Origin, post.Mileage, post.Text, post.Model,
-            OriginCache.TryGetValue(post.Prefix, out var origin) ? MilepostState.CachedAs(origin == null ? null : NameOf(origin)) : MilepostState.NotCached);
+        if (active && post.Rendered == null) { post.Rendered = post.Text; post.TextModel = "tmp-mesh-" + post.Text; }
+    }
+    public MilepostState Milepost(object target) {
+        var m = (FakeMarker)target;
+        var post = Posts[m];
+        return new MilepostState(post.Prefix, post.Origin, post.Mileage, post.Text, post.Rendered, post.Model,
+            OriginCache.TryGetValue(post.Prefix, out var origin) ? MilepostState.CachedAs(origin == null ? null : NameOf(origin)) : MilepostState.NotCached, m.Active);
     }
     string NameOf(FakeMarker m) => Objects.First(o => o.Value.Contains(m)).Key;
 }
@@ -53,8 +62,8 @@ static class MilepostTests {
         var t46 = new FakeMarker { Id = "Mdow", Segment = "Stvw", End = "b", Distance = 51.20403 };
         var t47 = new FakeMarker { Id = "Mnau", Segment = "Stky0cg9c", End = "b", Distance = 266.9192, Position = new double[] { 60, 1, 2 } };
         world.Objects[T46] = new List<object> { t46 }; world.Objects[T47] = new List<object> { t47 };
-        world.Posts[t46] = new FakeMilepostWorld.Post { Origin = true, Mileage = 46, Text = "46" };
-        world.Posts[t47] = new FakeMilepostWorld.Post { Mileage = 47, Text = "47" };
+        world.Posts[t46] = new FakeMilepostWorld.Post { Origin = true, Mileage = 46, Text = "46", Rendered = "46" };
+        world.Posts[t47] = new FakeMilepostWorld.Post { Mileage = 47, Text = "47", Rendered = "47" };
         foreach (var m in new[] { t46, t47 }) { world.LoadFollower(m); world.Relative(m); }
         world.Mutations = 0;
         return (world, t46, t47, new MilepostScene(world, Capability.Unchecked));
@@ -81,6 +90,9 @@ static class MilepostTests {
         RemovalRecomputesUnderlyingState();
         SaveAndReloadReproduceTheOperationOnce();
         VersionHoldsWithoutTheCapability();
+        FirstActivationOfASleepingPostApplies();
+        DuplicateMarkerIdRefusesRebindButNotPlacement();
+        FollowModeIsInactiveForAMilepost();
         Console.WriteLine("PASS: milepost placement, activity and track binding");
     }
     static void PlacementAndBindingAreSeparateSettings() {
@@ -279,5 +291,54 @@ static class MilepostTests {
         Assert(Kept(fresh, f46) == "T|True|46|46|post-mesh", "The reloaded post keeps its mile value");
         var (w2, r46, r47, reopened, e2, st2) = Session(store.Patch);
         Assert(reopened.Blocked == null && reopened.Bind(Post46, MarkerBinding.Detached).Applied && r46.Segment == null, "A saved milepost scene patch file reopens for editing");
+    }
+    // A post that was inactive since load has never been awake: its first activation creates the text mesh and fills the
+    // rendered texts. Neither counts as a changed model or text, so Enable, Undo and Remove modification apply.
+    const string T48 = "World/Mile Posts/T-48";
+    static void FirstActivationOfASleepingPostApplies() {
+        var (world, t46, t47, scene) = Setup();
+        var t48 = new FakeMarker { Id = "Mt48", Segment = "Stvw", End = "a", Distance = 10, Active = false, Position = new double[] { 80, 1, 2 } };
+        world.Objects[T48] = new List<object> { t48 };
+        world.Posts[t48] = new FakeMilepostWorld.Post { Mileage = 48, Text = "48" };
+        world.Load(t48); world.Mutations = 0;
+        var outcome = new PatchEngine(scene).Apply(Doc(Item("enable", ",\"active\":true", T48))).Outcomes["enable"];
+        Assert(outcome.Applied && t48.Active && world.Posts[t48].Rendered == "48" && world.Posts[t48].TextModel == "tmp-mesh-48", "The first activation of a sleeping post applies: " + outcome.Error);
+        Assert(Entry(world, t48) == "Stvw|a|10", "The enabled post registers at its binding");
+        var post48 = new TargetIdentity("BushnellWhittier", T48, "Helpers.MilePost", MilepostScene.Structure);
+        var (w2, s46, s47, scene2) = Setup();
+        var u48 = new FakeMarker { Id = "Mt48", Segment = "Stvw", End = "a", Distance = 10, Active = false, Position = new double[] { 80, 1, 2 } };
+        w2.Objects[T48] = new List<object> { u48 };
+        w2.Posts[u48] = new FakeMilepostWorld.Post { Mileage = 48, Text = "48" };
+        w2.Load(u48); w2.Mutations = 0;
+        var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene2), mapEditor, new Store()); mapEditor.Session = session;
+        var enabled = session.Edit(post48, null, true);
+        Assert(enabled.Applied && u48.Active, "Enable of a sleeping post applies in scene patch editing: " + enabled.Error);
+        mapEditor.Undo(); Assert(!u48.Active && w2.Registrations(u48).Count == 0, "Undo disables the post again");
+        mapEditor.Redo(); Assert(u48.Active, "Redo enables it");
+        var removed = session.Remove(post48);
+        Assert(removed.Applied && !u48.Active, "Remove modification returns the post to its underlying inactive state: " + removed.Error);
+        Assert(w2.Posts[u48].Mileage == 48 && w2.Posts[u48].Text == "48", "The mile value and the synchronizer text stay");
+    }
+    // Follow keeps a placement relative to a track; this capability covers fixed placement, activity and binding only.
+    static void FollowModeIsInactiveForAMilepost() {
+        var follow = RailroaderScenePatcher.CommandBand.ModeBlock(RailroaderScenePatcher.CommandBand.FollowMode, false, true, RailroaderScenePatcher.CommandBand.MilepostOperations, milepost: true);
+        Assert(follow == RailroaderScenePatcher.CommandBand.MilepostNoFollow, "Follow is inactive for a milepost with its reason: " + follow);
+        foreach (var mode in new[] { RailroaderScenePatcher.CommandBand.NumericMode, RailroaderScenePatcher.CommandBand.GizmoMode, RailroaderScenePatcher.CommandBand.SnapMode })
+            Assert(RailroaderScenePatcher.CommandBand.ModeBlock(mode, false, true, RailroaderScenePatcher.CommandBand.MilepostOperations, milepost: true) == null, "Mode " + mode + " stays open for a milepost");
+    }
+    // Two mileposts share a marker id: a rebind of one would remove the other's registration and is refused before
+    // mutation; a fixed placement touches no registration and applies.
+    static void DuplicateMarkerIdRefusesRebindButNotPlacement() {
+        var (world, t46, t47, scene) = Setup();
+        var twin = new FakeMarker { Id = "Mdow", Segment = "Stky0cg9c", End = "a", Distance = 30, Position = new double[] { 90, 1, 2 } };
+        world.Objects[T48] = new List<object> { twin };
+        world.Posts[twin] = new FakeMilepostWorld.Post { Mileage = 48, Text = "48", Rendered = "48" };
+        world.Mutations = 0;
+        var rebind = new PatchEngine(scene).Apply(Doc(Item("rebind", Bind(At("Stky0cg9c", "b", 5))))).Outcomes["rebind"];
+        Assert(!rebind.Applied && rebind.Error.Contains("Duplicate marker id Mdow") && world.Mutations == 0 && t46.Segment == "Stvw", "A rebind of a milepost with a duplicate marker id is refused before mutation: " + rebind.Error);
+        var placed = new PatchEngine(scene).Apply(Doc(Item("move", Place(1030)))).Outcomes["move"];
+        Assert(placed.Applied && t46.Position[0] == 30 && t46.Segment == "Stvw", "A placement-only edit of that milepost applies: " + placed.Error);
+        Assert(twin.Segment == "Stky0cg9c" && twin.Position[0] == 90, "The other holder is untouched");
     }
 }
