@@ -254,7 +254,7 @@ static class BakedSceneryTests {
             var offsets = Offsets(group); inject(world);
             var engine = new PatchEngine(scene);
             var outcome = engine.Apply(Doc(Group("move-house", extra: extra))).Outcomes["move-house"];
-            Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure after mutation is restored: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after mutation is restored: " + outcome.Error);
             Assert(group.Position.SequenceEqual(new[] { 100.0, 10, 20 }) && group.Rotation[3] == 1 && group.Active && Offsets(group).SequenceEqual(offsets) && group.Cullers.All(c => c.Registered.SequenceEqual(new[] { 100.0, 10, 20 })),
                 "The captured placement, activity, parts and culling are restored");
         }
@@ -264,11 +264,11 @@ static class BakedSceneryTests {
         world.LeavePartBehind = world.KeepPartBehind = true;
         var engine = new PatchEngine(scene);
         var outcome = engine.Apply(Doc(Group("move-house"))).Outcomes["move-house"];
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported explicitly: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "Incomplete cleanup is reported explicitly: " + outcome.Error);
         world.LeavePartBehind = world.KeepPartBehind = false;
         var mutations = world.Mutations;
         var retry = engine.Apply(Doc(Group("again", 1120))).Outcomes["again"];
-        Assert(!retry.Applied && retry.Error.Contains("cleanup") && world.Mutations == mutations, "A retry on the affected group is blocked until cleanup is verified or the world reloads");
+        Assert(!retry.Applied && retry.Error.Contains("Cleanup") && world.Mutations == mutations, "A retry on the affected group is blocked until cleanup is verified or the world reloads");
     }
     static readonly TargetIdentity Identity = new TargetIdentity(Scene, HousePath, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
     static void EditingHistoryRemovalAndSave() {

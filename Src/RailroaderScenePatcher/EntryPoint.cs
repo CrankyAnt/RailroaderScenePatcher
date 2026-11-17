@@ -1067,11 +1067,14 @@ namespace RailroaderScenePatcher {
         // An edit that does not run names its reason in the panel and the log, like one that is refused.
         // consumes says the edit uses the target confirmed in the world: once it completed, that confirmation is used
         // up, and its "Confirmed" line leaves the message area.
-        void Edit(string place, string action, Func<PatchEditingSession, InspectedTarget, Outcome> change, bool consumes = false) {
+        // guarded says the edit is refused while an earlier failure guards the object; Recheck, which ends that guard, is not.
+        void Edit(string place, string action, Func<PatchEditingSession, InspectedTarget, Outcome> change, bool consumes = false, bool guarded = true) {
             Queue(place, action, pin => {
                 // A completed edit changed the observed values; observe them again so the next edit binds to them.
                 var truthful = IsPad && (place == PlacementPlace || place == SnapPlace || place == FollowPlace) ? CommandBand.PadPlacement(action) : null;
-                if (feedback.Run(place, action, null, inventory, selected, inspection => change(attachment.Session, inspection), pin, truthful)) {
+                var target = selected?.Identity;
+                Func<Outcome> guard = guarded && target != null ? () => attachment.Session.GuardOutcome(target) : (Func<Outcome>)null;
+                if (feedback.Run(place, action, null, inventory, selected, inspection => change(attachment.Session, inspection), pin, truthful, guard)) {
                     if (consumes) selection?.Consume();
                     OwnChange(); RefreshAfterEdit();
                 }

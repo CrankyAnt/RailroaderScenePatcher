@@ -307,7 +307,7 @@ static class StarterTrackLocationTests {
             inject(world);
             var engine = new PatchEngine(scene);
             var outcome = engine.Apply(Doc(Starter("move-hopper", HopperPath, At("S2", "a", 80)))).Outcomes["move-hopper"];
-            Check(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure after the write is restored: " + outcome.Error);
+            Check(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after the write is restored: " + outcome.Error);
             Check(hopper.Segment == "S2" && hopper.Distance == 90 && Entry(world, hopper) == "S2|a|90", "The captured track location and registration return");
             Check(!engine.Apply(Doc(Starter("move-hopper", HopperPath, At("S2", "a", 80)))).Outcomes["move-hopper"].Applied, "A failed starter placement is not retried in the same load");
         }
@@ -319,10 +319,10 @@ static class StarterTrackLocationTests {
         world.StickyRegistration = true;
         var engine = new PatchEngine(scene);
         var outcome = engine.Apply(Doc(Starter("move-hopper", HopperPath, At("S1", "a", 80)))).Outcomes["move-hopper"];
-        Check(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "Unverified cleanup is reported explicitly: " + outcome.Error);
+        Check(!outcome.Applied && outcome.Error.Contains("could not be verified"), "Unverified cleanup is reported explicitly: " + outcome.Error);
         world.StickyRegistration = false; var mutations = world.Mutations;
         var retry = engine.Apply(Doc(Starter("other", HopperPath, At("S2", "a", 95)))).Outcomes["other"];
-        Check(!retry.Applied && retry.Error.Contains("cleanup is unverified") && world.Mutations == mutations, "Another operation on the marker is blocked until cleanup is verified: " + retry.Error);
+        Check(!retry.Applied && retry.Error.Contains("could not be verified") && world.Mutations == mutations, "Another operation on the marker is blocked until cleanup is verified: " + retry.Error);
         // In scene patch editing the retry stays blocked; Recheck refuses while the registration is wrong, and verifies
         // the cleanup and lifts the block once it is right.
         (world, _, _, hopper, scene) = Setup();
@@ -330,7 +330,7 @@ static class StarterTrackLocationTests {
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         world.StickyRegistration = true;
         var failed = session.PlaceStarter(Hopper, new TrackLocation("S1", "a", 80));
-        Check(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "A failed edit with unverified cleanup says so: " + failed.Error);
+        Check(!failed.Applied && failed.Error.Contains("could not be verified"), "A failed edit with unverified cleanup says so: " + failed.Error);
         world.StickyRegistration = false;
         var blocked = session.PlaceStarter(Hopper, new TrackLocation("S2", "a", 95));
         Check(!blocked.Applied && blocked.Error.Contains("Recheck"), "The retry is blocked until Recheck: " + blocked.Error);

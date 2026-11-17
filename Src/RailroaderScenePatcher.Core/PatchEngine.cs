@@ -111,6 +111,10 @@ namespace RailroaderScenePatcher.Core {
         // An edit in scene patch editing whose value equals the object's value without this mod: the modification no longer holds
         // that setting, so the edit acted as a revert of it.
         public bool Reverted { get; internal set; }
+        // What a failure did to the scene: refused before mutation, restored, or left with incomplete cleanup.
+        public FailureKind Failure { get; internal set; }
+        // For an incomplete cleanup: the remaining or uncertain state, one line per setting.
+        public IReadOnlyList<string> Remaining { get; internal set; } = Array.Empty<string>();
     }
     // A capability that keeps state for the objects it resolved. Release drops that state for an object that no longer
     // stands under its identity in a later load attempt, and removes only what the patcher owns for it; native state is
@@ -141,9 +145,11 @@ namespace RailroaderScenePatcher.Core {
     public sealed class PatchEngine {
         readonly IScene scene;
         readonly Dictionary<string, Outcome> failed = new Dictionary<string, Outcome>();
-        readonly HashSet<object> unsafeTargets = new HashSet<object>();
+        readonly HashSet<object> unsafeTargets = new HashSet<object>(new ByReference());
+        // The remaining or uncertain state each unsafe target was left with, for the recovery guidance.
+        readonly Dictionary<object, IReadOnlyList<string>> remainingState = new Dictionary<object, IReadOnlyList<string>>(new ByReference());
         // Restored targets whose dependent output, such as regenerated terrain, has not yet verified.
-        readonly HashSet<object> awaitingOutput = new HashSet<object>();
+        readonly HashSet<object> awaitingOutput = new HashSet<object>(new ByReference());
         readonly Dictionary<object, ObjectState> underlying = new Dictionary<object, ObjectState>();
         // The identity each object was resolved under, in resolution order, so a later load attempt can tell a retained
         // object from a reconstructed one.
@@ -194,7 +200,7 @@ namespace RailroaderScenePatcher.Core {
                 try { (scene as IRetainedScene)?.Release(target); }
                 catch (Exception e) { failures.Add(Describe(identity) + ": owned state of the reconstructed object remains: " + e.Message); continue; }
                 identities.Remove(target); resolutionOrder.Remove(target);
-                underlying.Remove(target); unsafeTargets.Remove(target); awaitingOutput.Remove(target);
+                underlying.Remove(target); unsafeTargets.Remove(target); awaitingOutput.Remove(target); remainingState.Remove(target);
                 released++;
             }
             return new ReentryResult(retained, released, failures);
@@ -279,7 +285,7 @@ namespace RailroaderScenePatcher.Core {
             Outcome prior;
             if (outcomes.TryGetValue(id, out prior)) return prior;
             var outcome = new Outcome();
-            if (!visiting.Add(id)) { outcome.Error = "Dependency cycle"; outcome.Cause = FailureCause.InvalidDefinition; return outcome; }
+            if (!visiting.Add(id)) { outcome.Error = "The modification dependencies form a cycle"; outcome.Cause = FailureCause.InvalidDefinition; outcome.Failure = FailureKind.Refused; return outcome; }
             var key = scenePatchFileKey.Length + ":" + scenePatchFileKey + id;
             try {
                 if (failed.ContainsKey(key)) {
@@ -287,6 +293,7 @@ namespace RailroaderScenePatcher.Core {
                     var previous = failed[key];
                     outcome.Error = "Operation already failed during this load: " + previous.Error;
                     outcome.Cause = previous.Cause; outcome.MapEditorOnly = previous.MapEditorOnly; outcome.Target = previous.Target;
+                    outcome.Failure = FailureKind.AlreadyFailed; outcome.Remaining = previous.Remaining;
                     outcomes[id] = outcome;
                     return outcome;
                 }
@@ -303,7 +310,7 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var dep in dependencies) {
                     if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the scene patch file");
                     var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
-                    if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new InvalidOperationException("Dependency failed: " + dep); }
+                    if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new AttemptFailure(FailureKind.DependencyFailed, "A required modification failed: " + dep); }
                 }
                 Modification parsed;
                 try { outcome.Target = ParseTarget(item["target"] as JObject); parsed = Parse(item, scenePatchFileKey, id); }
@@ -325,7 +332,7 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidOperationException("An inspected target is required for every edited modification");
                 expected?.Validate(scene, identity, resolved);
                 outcome.ResolvedTarget = resolved;
-                if (IsUnsafe(resolved)) throw new InvalidOperationException("Target cleanup is unverified");
+                if (IsUnsafe(resolved)) throw Guarded(resolved, "Cleanup for this object could not be verified");
                 Observe("preflight", scenePatchFileKey, id, identity.Path);
                 scene.Preflight(resolved);
                 // One modification's own state: an omitted active leaves the activity another modification set.
@@ -333,24 +340,51 @@ namespace RailroaderScenePatcher.Core {
                 CheckRelationships(resolved, state);
                 Observe("capture", scenePatchFileKey, id, identity.Path);
                 Underlying(resolved);
+                // The state before this attempt, to name what an unverified restoration leaves behind. A read that fails
+                // leaves that comparison uncertain; it does not stop the attempt.
+                ObjectState before;
+                try { before = scene.Read(resolved); } catch { before = null; }
                 var snapshot = scene.Capture(resolved);
                 // Capture and preflight may invoke native callbacks. Never redirect to a new match.
                 GuardMutation(identity, resolved, mapContext, expected);
                 try {
                     Observe("mutation", scenePatchFileKey, id, identity.Path);
                     scene.Apply(resolved, state);
+#if SCENE_PATCHER_FAULTS
+                    FaultInjection.TripAfterMutation();
+#endif
                     Observe("applied", scenePatchFileKey, id, identity.Path);
                 } catch (Exception e) {
-                    bool restored = false;
+                    bool restored = false; string restoreError = null;
                     Observe("restore-request", scenePatchFileKey, id, identity.Path);
-                    try { restored = scene.Restore(resolved, snapshot); } catch { }
+                    try {
+#if SCENE_PATCHER_FAULTS
+                        FaultInjection.TripRestoration();
+#endif
+                        restored = scene.Restore(resolved, snapshot);
+                    } catch (Exception r) { restoreError = r.Message; }
                     Observe("restore-result", scenePatchFileKey, id, identity.Path, restored ? "verified" : "unverified");
-                    if (!restored) unsafeTargets.Add(resolved);
-                    else if (AwaitOutput(resolved)) throw new InvalidOperationException("Mutation failed and was restored; the restored dependent output is still being regenerated, and this target waits until it verifies: " + e.Message);
-                    throw new InvalidOperationException(restored ? "Mutation failed and was restored: " + e.Message : "Mutation failed; cleanup is unverified: " + e.Message);
+                    if (!restored) {
+                        var left = RemainingState.Describe(before, () => scene.Read(resolved), restoreError);
+                        SetUnsafe(resolved, true, left);
+                        throw new AttemptFailure(FailureKind.IncompleteCleanup, "The change failed. Cleanup could not be verified. Reason: " + e.Message, left);
+                    }
+                    if (AwaitOutput(resolved)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The change failed and the object is back as it was. The game is still regenerating its dependent output. Further changes must wait until that output is verified. Reason: " + e.Message);
+                    throw new AttemptFailure(FailureKind.Restored, "The change failed. The object is back as it was. Reason: " + e.Message);
                 }
                 outcome.Applied = true;
-            } catch (Exception e) { outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition; failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message); }
+            } catch (Exception e) {
+#if SCENE_PATCHER_FAULTS
+                FaultInjection.EndAttempt();
+#endif
+                outcome.Error = e.Message; if (e is InvalidPatchDefinitionException) outcome.Cause = FailureCause.InvalidDefinition;
+                if (outcome.Failure == FailureKind.None) {
+                    var attempt = e as AttemptFailure;
+                    outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
+                    if (attempt != null) outcome.Remaining = attempt.Remaining;
+                }
+                failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message);
+            }
             finally { visiting.Remove(id); }
             outcomes[id] = outcome;
             return outcome;
@@ -403,7 +437,40 @@ namespace RailroaderScenePatcher.Core {
             awaitingOutput.Remove(target);
             return false;
         }
-        internal void SetUnsafe(object target, bool value) { if (value) unsafeTargets.Add(target); else { unsafeTargets.Remove(target); awaitingOutput.Remove(target); } }
+        internal void SetUnsafe(object target, bool value, IReadOnlyList<string> remaining = null) {
+            if (value) { unsafeTargets.Add(target); remainingState[target] = remaining ?? Array.Empty<string>(); }
+            else { unsafeTargets.Remove(target); awaitingOutput.Remove(target); remainingState.Remove(target); }
+        }
+        // The remaining state of every target whose cleanup is unverified, by the identity it was resolved under, without
+        // searching the scene. Restored targets that only wait for their dependent output are not listed.
+        internal IReadOnlyList<string> UnverifiedCleanup(TargetIdentity identity) {
+            if (identity == null) return null;
+            foreach (var target in unsafeTargets) {
+                if (awaitingOutput.Contains(target) || !ResolvedUnder(target, identity)) continue;
+                return Remaining(target);
+            }
+            return null;
+        }
+        // The refusal of an operation on the object resolved under this identity while it is guarded, or null. Read from
+        // the engine's record without searching the scene, so a caller can check the guard before anything that compares
+        // the scene: an incomplete cleanup leaves the object changed, and the guard, not that change, is the reason.
+        internal Exception GuardFor(TargetIdentity identity, string blocked) {
+            if (identity == null) return null;
+            foreach (var target in unsafeTargets.Concat(awaitingOutput).ToArray())
+                if (ResolvedUnder(target, identity) && IsUnsafe(target)) return Guarded(target, blocked);
+            return null;
+        }
+        // Whether the object was resolved under this identity. An identity without a structure matches any structure.
+        bool ResolvedUnder(object target, TargetIdentity identity) =>
+            identities.TryGetValue(target, out var known) && known.Scene == identity.Scene && known.Path == identity.Path && known.Component == identity.Component
+            && (known.Structure == null || identity.Structure == null || known.Structure == identity.Structure);
+        // The refusal of an operation on a guarded target: a restored target that waits for its dependent output is
+        // not an incomplete cleanup and needs no Recheck; any other guard is.
+        internal Exception Guarded(object target, string blocked) => AwaitingOutput(target)
+            ? new AttemptFailure(FailureKind.AwaitingOutput, "An earlier failed attempt was undone. The game is still regenerating dependent output, such as terrain. This object can be changed again once that output is complete")
+            : (Exception)new AttemptFailure(FailureKind.Blocked, blocked, Remaining(target));
+        // The remaining or uncertain state an unverified cleanup left on the target, or empty.
+        internal IReadOnlyList<string> Remaining(object target) => target != null && unsafeTargets.Contains(target) && remainingState.TryGetValue(target, out var lines) ? lines : Array.Empty<string>();
         internal bool AwaitingOutput(object target) { return awaitingOutput.Contains(target); }
         internal DependentOutput Output(object target) { return target != null && scene is IDependentOutputScene dependent ? dependent.Output(target) ?? DependentOutput.None : DependentOutput.None; }
         // After a verified restoration: keeps the target guarded until its dependent output verifies. True when it waits.

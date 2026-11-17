@@ -326,7 +326,7 @@ static class BindingTests {
         (world, sign, other, scene) = Setup();
         world.SkipDependentRefresh = true;
         var outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Nnew", "a", 4)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal) && outcome.Error.Contains("track group"), "A stale dependent cache fails the binding: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && outcome.Error.Contains("track group"), "A stale dependent cache fails the binding: " + outcome.Error);
         Assert(sign.Segment == "S9sc" && sign.CachedGroup == "ela" && Entry(world, sign) == "S9sc|a|225.6681", "Restoration returns reference, registration and dependent cache");
     }
     static string Placed(string id, string extra = "") =>
@@ -434,7 +434,7 @@ static class BindingTests {
             inject(world);
             var engine = new PatchEngine(scene);
             var outcome = engine.Apply(Doc(Binding("rebind", At("Nnew", "a", 5)) + "," + Binding("then-keep", Detach, OtherPath))).Outcomes["rebind"];
-            Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure after the relationship write is restored: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after the relationship write is restored: " + outcome.Error);
             Assert(sign.Segment == "S9sc" && sign.End == "a" && sign.Distance == 225.6681 && Entry(world, sign) == "S9sc|a|225.6681", "The captured reference and registration return");
             Assert(sign.CachedGroup == "ela", "The captured dependent cache returns: " + sign.CachedGroup);
             Assert(world.Registrations(other).Count == 0 && other.CachedGroup == null && other.Segment == null, "Prior independent work survives the restoration with its own dependent cache");
@@ -447,15 +447,15 @@ static class BindingTests {
         world.StickyRegistration = true;
         var engine = new PatchEngine(scene);
         var outcome = engine.Apply(Doc(Binding("rebind", At("Nnew", "a", 5)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "Unverified relationship cleanup is reported: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "Unverified relationship cleanup is reported: " + outcome.Error);
         world.StickyRegistration = false; var mutations = world.Mutations;
         var retry = engine.Apply(Doc(Binding("another", Detach))).Outcomes["another"];
-        Assert(!retry.Applied && retry.Error.Contains("cleanup") && world.Mutations == mutations, "Another operation on the unverified marker is blocked");
+        Assert(!retry.Applied && retry.Error.Contains("Cleanup") && world.Mutations == mutations, "Another operation on the unverified marker is blocked");
         (world, sign, other, scene) = Setup();
         world.ThrowAfterLocation = true; world.FailRestoreLocation = true;
         sign.Segment = "Sjdl"; sign.Distance = 1; foreach (var b in world.Buckets.Values) b.Remove("Mi4f"); world.Load(sign);
         outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Nnew", "a", 5)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "A failed restoration of the reference is reported as unverified: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "A failed restoration of the reference is reported as unverified: " + outcome.Error);
     }
     // A scanned field whose relevance comes from its declared type, as the native adapter derives it.
     static ReferenceField Declared(string name, Type declared, Func<object> read) => new ReferenceField(name, ReferenceScan.CanHold(declared, typeof(FakeMarker)), read);
@@ -652,11 +652,11 @@ static class BindingTests {
         }
         world.SkipRegister = true;
         var failed = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 1)));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && Entry(world, sign) == "S9sc|a|225.6681" && session.ScenePatchFileText == before, "A failed scene patch editing binding restores reference and registration: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.StartsWith("The edit failed. The object is back as it was. Reason:", StringComparison.Ordinal) && Entry(world, sign) == "S9sc|a|225.6681" && session.ScenePatchFileText == before, "A failed scene patch editing binding restores reference and registration: " + failed.Error);
         Assert(sign.CachedGroup == "ela" && other.CachedGroup == "alarka" && Entry(world, other) == "Sjdl|b|38.6", "A failed scene patch editing binding restores the dependent cache and leaves the unrelated marker's cache");
         world.StickyRegistration = true;
         failed = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 1)));
-        Assert(!failed.Applied && failed.Error.Contains("cleanup is unverified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("could not be verified"), "Incomplete scene patch editing cleanup is reported: " + failed.Error);
         world.StickyRegistration = false;
         Assert(!session.Bind(Sign, MarkerBinding.Detached).Applied, "The unverified marker refuses another edit");
         foreach (var b in world.Buckets.Values) b.Remove("Mi4f");

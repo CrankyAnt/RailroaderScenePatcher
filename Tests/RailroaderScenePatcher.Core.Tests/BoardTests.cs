@@ -267,17 +267,17 @@ static class BoardTests {
         var original = (double[])board.Position.Clone();
         world.FailRebuildCount = 1;
         var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
-        Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains("restored"), "A failure after the placement changed reports restoration: " + result.Outcomes["move"].Error);
+        Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains("back as it was"), "A failure after the placement changed reports restoration: " + result.Outcomes["move"].Error);
         Assert(Near(board.Position, original) && Consistent(world, board) && world.Registrations == 1, "Restoration recovers the captured placement and its registrations");
     }
     static void UnverifiedRestorationGuardsRetry() {
         var (world, board, boards, engine) = Setup();
         world.FailRebuild = true;
         var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
-        Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains("unverified"), "A restoration that cannot refresh the mask reports incomplete cleanup: " + result.Outcomes["move"].Error);
+        Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.Contains("could not be verified"), "A restoration that cannot refresh the mask reports incomplete cleanup: " + result.Outcomes["move"].Error);
         world.FailRebuild = false;
         result = engine.Apply(Doc(Mod("again", Place(Moved))), "author/pack");
-        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Error.Contains("cleanup"), "Retry on the same board is blocked until cleanup is verified");
+        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Error.Contains("Cleanup"), "Retry on the same board is blocked until cleanup is verified");
     }
     static void TerrainOutputFollowsTheEdit() {
         var (world, board, boards, engine) = Setup();
@@ -317,9 +317,9 @@ static class BoardTests {
         var (world, board, boards, engine) = Setup();
         world.FailRebuildCount = 1;
         var result = engine.Apply(Doc(Mod("move", Place(Moved))), "author/pack");
-        Assert(result.Outcomes["move"].Error.Contains("restored"), "Restored placement and registrations verify immediately");
+        Assert(result.Outcomes["move"].Error.Contains("back as it was"), "Restored placement and registrations verify immediately");
         result = engine.Apply(Doc(Mod("again", Place(Moved))), "author/pack");
-        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Error.Contains("cleanup"), "Retry waits while restored terrain output is outstanding");
+        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Failure == FailureKind.AwaitingOutput, "Retry waits while restored terrain output is outstanding, without counting as an incomplete cleanup: " + result.Outcomes["again"].Error);
         world.BuildTiles(); boards.Poll();
         result = engine.Apply(Doc(Mod("later", Place(Moved))), "author/pack");
         Assert(result.Outcomes["later"].Applied && Near(board.Position, Moved), "Verified terrain output lifts the cleanup guard: " + result.Outcomes["later"].Error);
@@ -365,10 +365,10 @@ static class BoardTests {
         var original = (double[])board.Position.Clone();
         world.FailRebuildCount = 1;
         var failed = session.Edit(Sylva, PlacementAt(Moved), null);
-        Assert(!failed.Applied && failed.Error.Contains("restored") && Near(board.Position, original) && Consistent(world, board), "A failed edit restores the board and its registrations: " + failed.Error);
+        Assert(!failed.Applied && failed.Error.Contains("back as it was") && Near(board.Position, original) && Consistent(world, board), "A failed edit restores the board and its registrations: " + failed.Error);
         Assert(JObject.Parse(session.ScenePatchFileText)["modifications"].Count() == 0 && mapEditor.UndoGroups.Count == 0, "A failed edit leaves the scene patch file and history unchanged");
         var blocked = session.Edit(Sylva, PlacementAt(Moved), null);
-        Assert(!blocked.Applied && blocked.Error.Contains("cleanup"), "The board waits for the restored terrain output before the next edit");
+        Assert(!blocked.Applied && blocked.Failure == FailureKind.AwaitingOutput && !session.CleanupUnverified(Sylva), "The board waits for the restored terrain output before the next edit, without counting as an incomplete cleanup: " + blocked.Error);
         world.PendingTiles.Clear(); world.Clock = IndependentBoards.OutputTimeout + 1; boards.Poll();
         Assert(session.Output(Sylva).Error != null && !session.Edit(Sylva, PlacementAt(Moved), null).Applied, "Restored terrain output that stopped keeps the board guarded");
         Assert(session.Recheck(Sylva).Applied && world.Invalidated.Count > 0 && !session.Edit(Sylva, PlacementAt(Moved), null).Applied, "Recheck requests the restored output again and keeps the guard until it verifies");

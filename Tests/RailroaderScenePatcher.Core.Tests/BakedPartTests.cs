@@ -252,7 +252,7 @@ static class BakedPartTests {
         // A culling refresh that does not happen fails the edit, which restores the part.
         var g = new Fixture(); g.World.SkipCullingRefresh = true;
         var outcome = g.Engine.Apply(Doc(Part("far-jetty", "Jetty", far))).Outcomes["far-jetty"];
-        Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal) && Near(g.MapOf(g.Jetty).Position, new[] { 1100.0, 10, 14 }), "A culler that did not follow fails and restores the part: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && Near(g.MapOf(g.Jetty).Position, new[] { 1100.0, 10, 14 }), "A culler that did not follow fails and restores the part: " + outcome.Error);
         Assert(g.Group.Cullers.Single(c => c.OnRoot).Radius == 10 && Near(g.Group.Cullers.Single(c => c.On == g.Jetty).Registered, new[] { 100.0, 10, 14 }), "The restoration returns the culling as it was");
     }
 
@@ -271,7 +271,7 @@ static class BakedPartTests {
         foreach (var (inject, active) in cases) {
             var f = new Fixture(); var platform = (double[])f.Platform.Offset.Clone(); inject(f.World);
             var outcome = f.Engine.Apply(Doc(Part("move-jetty", "Jetty", JettyTarget, JettyTurn, active))).Outcomes["move-jetty"];
-            Assert(!outcome.Applied && outcome.Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A failure after mutation is restored: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after mutation is restored: " + outcome.Error);
             Assert(Near(f.MapOf(f.Jetty).Position, new[] { 1100.0, 10, 14 }) && SameTurn(f.MapOf(f.Jetty).Rotation, Identity) && f.Jetty.Active && Near(f.Platform.Offset, platform), "The captured placement and activity of the part are restored: " + Where(f));
             Assert(Near(f.Engine.Apply(Doc(Group("move-mill", GroupTarget, GroupTurn))).Outcomes.Values.Single().Applied ? f.MapOf(f.Jetty).Position : new double[3], InGroup(GroupTarget, GroupTurn, new[] { 0.0, 0, -6 })), "The restored part holds no fixed placement: " + Where(f));
         }
@@ -280,10 +280,10 @@ static class BakedPartTests {
     static void IncompleteCleanupBlocksTheRetry() {
         var f = new Fixture(); f.World.MoveSibling = f.World.KeepSiblingMoved = true;
         var outcome = f.Engine.Apply(Doc(Part("move-jetty", "Jetty", JettyTarget))).Outcomes["move-jetty"];
-        Assert(!outcome.Applied && outcome.Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported explicitly: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "Incomplete cleanup is reported explicitly: " + outcome.Error);
         f.World.KeepSiblingMoved = false; var mutations = f.World.Mutations;
         var retry = f.Engine.Apply(Doc(Part("again", "Jetty", new[] { 1120.0, 10, 30 }))).Outcomes["again"];
-        Assert(!retry.Applied && retry.Error.Contains("cleanup") && f.World.Mutations == mutations, "A retry on the affected part is blocked until cleanup is verified or the world reloads: " + retry.Error);
+        Assert(!retry.Applied && retry.Error.Contains("Cleanup") && f.World.Mutations == mutations, "A retry on the affected part is blocked until cleanup is verified or the world reloads: " + retry.Error);
     }
 
     static void ActivityOfACullerSwitchedPartIsRefused() {

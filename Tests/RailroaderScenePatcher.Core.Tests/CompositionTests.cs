@@ -71,9 +71,9 @@ static class CompositionTests {
         w = new World();
         w.Boards.FailRebuildCount = 1;
         var result = w.Engine.Apply(Doc(Board("board", Moved)), "author/pack");
-        Assert(result.Outcomes["board"].Error.Contains("restored") && w.BoardConsistent, "A failed board mutation restores through the composite: " + result.Outcomes["board"].Error);
+        Assert(result.Outcomes["board"].Error.Contains("back as it was") && w.BoardConsistent, "A failed board mutation restores through the composite: " + result.Outcomes["board"].Error);
         result = w.Engine.Apply(Doc(Board("again", Moved) + "," + Bridge("bridge")), "author/pack");
-        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Error.Contains("cleanup") && result.Outcomes["bridge"].Applied, "The board waits for its restored output while the bridge still applies");
+        Assert(!result.Outcomes["again"].Applied && result.Outcomes["again"].Failure == FailureKind.AwaitingOutput && result.Outcomes["bridge"].Applied, "The board waits for its restored output while the bridge still applies");
         w.Boards.BuildTiles(); w.BoardCapability.Poll();
         result = w.Engine.Apply(Doc(Board("later", Moved)), "author/pack");
         Assert(result.Outcomes["later"].Applied, "Verified restored output lifts the board's guard");

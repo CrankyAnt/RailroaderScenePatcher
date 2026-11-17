@@ -235,7 +235,7 @@ static class EquipmentTests {
         engine.Apply(Doc(Equip("first", Addition("west"))), "author/pack");
         f.World.FailConstructAfter = 1;
         var result = engine.Apply(Doc(Equip("second", Addition("west", x: 15) + "," + Addition("east", CrossingPath + "/Signal 2", 20) + "," + Addition("north", x: 25))), "author/pack");
-        Assert(!result.Outcomes["second"].Applied && result.Outcomes["second"].Error.StartsWith("Mutation failed and was restored", StringComparison.Ordinal), "A construction failure is restored: " + result.Outcomes["second"].Error);
+        Assert(!result.Outcomes["second"].Applied && result.Outcomes["second"].Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A construction failure is restored: " + result.Outcomes["second"].Error);
         Assert(f.Live.Count == 1 && f.Live[0].Record.Id == "west" && f.Live[0].Position[0] == 10, "The captured additions and placements return; the partial addition is released");
         Assert(f.World.All.Where(a => a.Record.Id == "east").All(a => a.Destroyed && !a.InCuller), "The partially built addition leaves the controller and its culling");
     }
@@ -244,10 +244,10 @@ static class EquipmentTests {
         var engine = new PatchEngine(f.Scene);
         f.World.FailConstructAfter = 1; f.World.StickyDestroy = true;
         var result = engine.Apply(Doc(Equip("pair", Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20))), "author/pack");
-        Assert(!result.Outcomes["pair"].Applied && result.Outcomes["pair"].Error.Contains("cleanup is unverified"), "Incomplete cleanup is reported: " + result.Outcomes["pair"].Error);
+        Assert(!result.Outcomes["pair"].Applied && result.Outcomes["pair"].Error.Contains("could not be verified"), "Incomplete cleanup is reported: " + result.Outcomes["pair"].Error);
         f.World.StickyDestroy = false;
         var retry = engine.Apply(Doc(Equip("other", Addition("north", x: 30))), "author/pack");
-        Assert(!retry.Outcomes["other"].Applied && retry.Outcomes["other"].Error.Contains("cleanup is unverified") && f.World.Live(f.Crossing).Count() == 1, "A retry on the uncertain controller is blocked: " + retry.Outcomes["other"].Error);
+        Assert(!retry.Outcomes["other"].Applied && retry.Outcomes["other"].Error.Contains("could not be verified") && f.World.Live(f.Crossing).Count() == 1, "A retry on the uncertain controller is blocked: " + retry.Outcomes["other"].Error);
     }
     static void SupplyingModsKeepSeparateIdentities() {
         var f = new Fixture();
@@ -313,7 +313,7 @@ static class EquipmentTests {
         session.AddEquipment(Crossing, West());
         f.World.FailConstructAfter = 0;
         var failed = session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east"));
-        Assert(!failed.Applied && failed.Error.StartsWith("Edit failed and the prior state was restored", StringComparison.Ordinal) && f.Live.Single().Record.Id == "west" && ((JObject)Only(session)["relationships"]["crossingEquipment"]).Count == 1,
+        Assert(!failed.Applied && failed.Error.StartsWith("The edit failed. The object is back as it was. Reason:", StringComparison.Ordinal) && f.Live.Single().Record.Id == "west" && ((JObject)Only(session)["relationships"]["crossingEquipment"]).Count == 1,
             "A failed construction restores the prior equipment and scene patch file: " + failed.Error);
         f.World.FailSetPlacementOnce = true; f.World.StickyDestroy = true;
         failed = session.AddEquipment(Crossing, West(30));
