@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher {
     // The serialized location is the relationship; the track graph's named-location bucket for that segment is its
     // registration, which the native marker adds when it is enabled and removes when it is disabled. Setting the
     // location does not change that registration, so this adapter performs the matching remove and add steps.
-    // Crossing pads use CrossingPadWorld; mileposts keep their own later slice; Crossing-type and signal markers are outside
+    // Crossing pads use CrossingPadWorld; mileposts use MilepostWorld; Crossing-type and signal markers are outside
     // this pattern. A Generic marker inside a crossing setup, such as a whistle sign, is an ordinary Generic marker.
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
@@ -97,17 +97,17 @@ namespace RailroaderScenePatcher {
         // The loaded objects at the path that hold a marker. Starting from the marker components avoids building the path of
         // every loaded object; an object with several markers is one match, as before.
         // Crossing pads belong to the crossing-pad capability, so the two capabilities never claim the same object.
-        public IReadOnlyList<object> Resolve(TargetIdentity identity) => Markers(identity, Belongs);
+        public virtual IReadOnlyList<object> Resolve(TargetIdentity identity) => Markers(identity, Belongs);
         protected virtual bool Belongs(GameObject g) => Get(g, PadBuilder) == null;
         // The held object still exists in its loaded scene at the identity's path and still belongs to this capability.
         // This reads one object, never the scene; uniqueness is checked again by the next resolution.
-        public bool StillIdentifies(object target, TargetIdentity identity) {
+        public virtual bool StillIdentifies(object target, TargetIdentity identity) {
             var g = target as GameObject;
             return g != null && identity.Component == MarkerType && Loaded(g) && g.scene.name == identity.Scene && g.GetComponent(marker) != null && Belongs(g)
                 && BoardScene.PathOf(g.transform) == identity.Path;
         }
-        protected IReadOnlyList<object> Markers(TargetIdentity identity, Func<GameObject, bool> belongs) {
-            if (identity.Component != MarkerType) return Array.Empty<object>();
+        protected IReadOnlyList<object> Markers(TargetIdentity identity, Func<GameObject, bool> belongs, string component = MarkerType) {
+            if (identity.Component != component) return Array.Empty<object>();
             // The walk goes down the identity's path. While a marker is being enabled its scene is not loaded yet and the
             // scene manager does not list it: then every marker component is searched.
             if (enablingTarget == null) return BoardScene.LoadedAt(identity.Scene, identity.Path).Where(g => Loaded(g) && g.GetComponent(marker) != null && belongs(g)).Cast<object>().ToArray();
@@ -203,10 +203,10 @@ namespace RailroaderScenePatcher {
         // group-driven activity, new-game car placements and direct holders other than the allowed colocated ones.
         // A placement-only check reads this object alone: the setup placements and the direct-reference scan concern
         // consumers of the marker's location, which a placement update does not change.
-        internal static string Consumers(GameObject go, Component m, ReferenceScan references, HolderIndex setups, Func<object, string, bool> allowed, bool placementOnly = false) {
+        internal static string Consumers(GameObject go, Component m, ReferenceScan references, HolderIndex setups, Func<object, string, bool> allowed, bool placementOnly = false, Func<Delegate, bool> allowedListener = null) {
             if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID; its graph registration cannot be identified";
-            // A listener of location changes is a dependent consumer this adapter does not refresh.
-            if (Field(m, "OnLocationChanged") is Delegate listeners && listeners.GetInvocationList().Length != 0) return "Another component consumes this marker's location changes; its dependent state is not supported";
+            // A listener of location changes is a dependent consumer this adapter does not refresh, unless the pattern owns it.
+            if (Field(m, "OnLocationChanged") is Delegate listeners && listeners.GetInvocationList().Any(l => allowedListener == null || !allowedListener(l))) return "Another component consumes this marker's location changes; its dependent state is not supported";
             var relative = Get(go, Relative);
             if (relative != null && Field(relative, "targetActiveFollowsTrackGroup") is bool follows && follows) {
                 // The adapter supports a follower whose relative position activates this object itself, through the native step or the hold.

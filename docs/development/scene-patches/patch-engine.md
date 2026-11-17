@@ -86,6 +86,19 @@ For a track-following pad, `MarkerRelationship.Apply` passes `following` to the 
 
 Sources: `Track.TrackCurveMeshBuilder.GetCurves`, `BezierCurveMesh.CurveMeshBuilderBase.Generate`, `OnEnable`, `CullingSphereStateChanged` and `RequestUpdateCullingPosition`, `Helpers.TransformExtensions.DestroyAllChildren`, which destroys the old children at the end of the frame, and `Helpers.Culling.CullingManager.Update`.
 
+## Implement the milepost capability
+
+`MilepostScene` implements `IScene`, `IRelationshipScene`, `IVersionedScene`, `ITargetConfirmation`, `IPlacementPreflight` and `IFollowUpdateScene` over `IMilepostWorld`, which extends `ITrackMarkerWorld` with `Milepost`, the state an edit preserves (`MilepostState`: prefix, origin flag, mile value, displayed text, a model signature and the origin cache entry for the prefix). It holds a `MarkerRelationship`, so placement, activity, the track binding, its registration and the group-activity rules are those of the Generic marker. Its target component is `Helpers.MilePost`, not `Track.TrackMarker`, so the milepost keeps the identity of its inventory row and a track-marker target never resolves to it as a milepost. `Apply` and `ApplyFollowUpdate` read `Milepost` before and after the write and throw when `MilepostState.Difference` reports a change, so the engine restores the captured state. The relationship's consumer captures the same state and `Restored` compares it, so a restoration that leaves a changed mile value or cache entry is unverified and guards the target.
+
+`MilepostWorld` derives from `TrackMarkerWorld`:
+
+- `Resolve` and `StillIdentifies` accept the `Helpers.MilePost` component and objects that hold one; `Belongs` selects objects with a milepost.
+- `MilepostProblem` is the pattern check shared with the inventory. It requires one milepost, one Generic marker and a text synchronizer, no missing script and no pad builder, and passes `TrackMarkerWorld.Consumers` the colocated milepost as an allowed holder of the marker and its `TrackMarkerOnOnLocationChanged` handler as an allowed location listener.
+- The constructor checks the fields it reads and that `MilePost.UpdateMileage`, which the location listener calls, has an empty body on the running build. A build whose milepost recalculates its mile value makes the capability unavailable.
+- `Milepost` reads `prefix`, `origin` and `mileage`, the `Helpers.TextSynchronizer.text` and every `TMPro.TMP_Text` below the post, the instance IDs of the shared meshes and materials below it, and the entry of the static `MilePost._originMilePosts` for the prefix, named by the scene and path of the post it holds.
+
+Sources: `Helpers.MilePost` (its `Origin` getter fills `_originMilePosts` from the first origin post it finds; `UpdateMileage` is empty on Railroader 0.6.2), `Helpers.TextSynchronizer.ApplyText`, and the [milepost trial](https://github.com/CrankyAnt/RailroaderScenePatcher/blob/5e99c72dee551762316c0b8cf5aafec5bf40b748/Research/SceneOperationBatch/Evidence/Boot02/Milepost/Report.md).
+
 ## Implement the crossing-coverage capability
 
 `CrossingCoverageScene` implements `IScene`, `IRelationshipScene` and `IVersionedScene` over `ICrossingCoverageWorld`, which `CrossingCoverageWorld` implements with Unity. Coverage is the core `CrossingCoverage`: an ordered list of circuits keyed by native island span ID, each a `CircuitCoverage` that is `Native` (span IDs), `Tracks` (three `SpanRange` values) or `Detached`. `ObjectState.Coverage` carries it; This mod's coverage lists only explicit circuits, observed coverage lists every circuit plus any `Residue`, owned spans left registered by an incomplete cleanup. `PatchEngine.Desired` overlays this mod's circuits on the underlying coverage per circuit, so omission keeps a circuit's effective coverage.

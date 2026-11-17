@@ -259,6 +259,8 @@ namespace RailroaderScenePatcher.Core {
                     if (item["starterPlacement"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == StarterPlacementScene.Structure)) minimum = Max(minimum, StarterPlacementScene.RequiredVersion);
                     // Crossing-pad rebinding needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingPadScene.Structure) minimum = Max(minimum, CrossingPadScene.RequiredVersion);
+                    // A milepost modification needs its capability whether or not it is available on this build.
+                    if (((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == MilepostScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == MilepostScene.Component)) minimum = Max(minimum, MilepostScene.RequiredVersion);
                     TargetIdentity target;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
                     // Board placement beyond the Sylva board needs its capability whether or not it is available on this build.

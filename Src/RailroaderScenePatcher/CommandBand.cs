@@ -331,6 +331,8 @@ namespace RailroaderScenePatcher {
         // that placement relative to a track without binding the marker to it. The binding is set under Connections.
         internal const string PadFollowsTrack = "A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections.";
         internal static string PadModeBlock(int mode) => mode == NumericMode || mode == GizmoMode || mode == SnapMode || mode == FollowMode ? PadFollowsTrack : null;
+        // What a milepost's Supported edits says: placement, activity and binding as separate settings, and what stays unchanged.
+        internal const string MilepostOperations = "Milepost: fixed placement, activity and track binding as separate settings; the binding sets, replaces or detaches the marker location with its graph registration. The model, mile value and displayed text stay unchanged";
         // What a crossing pad's Supported edits says: its binding and its activity, and no placement of its own.
         internal const string PadOperations = "Pad binding: set or replace the marker location with its graph registration and regenerate the pad geometry and culling; activity is a separate setting. The pad follows its track, so it has no placement of its own";
         // Whether the fields of an edit hold the object's current values: the edit would change nothing, so its
