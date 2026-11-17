@@ -248,6 +248,16 @@ static class CommandBandTests {
         var listed = InventoryPresentationState.Groups(new[] { added, light });
         Check(listed.Count == 2 && listed[0].Key == CommandBand.AddedEquipmentFamily && listed[0].Value.Single() == added && listed[1].Key == InventoryPresentationState.InspectionOnlyGroup && listed[1].Value.Single() == light,
             "The added light or gate has its own family folder; only the light without an edit is Inspection only: " + String.Join(", ", listed.Select(g => g.Key)));
+        // An added bell is a supported family of its own, edited on its crossing's Connections tab as well.
+        var bellOperations = CommandBand.AddedEquipmentOperations("crossing-bell-added", "author/pack", true);
+        Check(CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false) == null && CommandBand.IsAddedFamily(CommandBand.AddedBellFamily) && !CommandBand.IsAddedFamily("Crossing bell")
+            && bellOperations.StartsWith("Added bell crossing-bell-added of author/pack", StringComparison.Ordinal) && bellOperations.Contains("Connections tab") && CommandBand.Refusal(bellOperations) == null,
+            "An added bell is not inspection only and names where it is edited: " + bellOperations);
+        var bell = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/CrankyAnt Scene Patcher equipment author:pack crossing-bell-added", "RailroaderScenePatcher.OwnedEquipment"), CommandBand.AddedBellFamily, true,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], bellOperations, null, null, null, CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false));
+        var withBell = InventoryPresentationState.Groups(new[] { added, bell, light });
+        Check(withBell.Any(g => g.Key == CommandBand.AddedBellFamily && g.Value.Single() == bell) && withBell.Single(g => g.Key == InventoryPresentationState.InspectionOnlyGroup).Value.Single() == light,
+            "The added bell has its own family folder: " + String.Join(", ", withBell.Select(g => g.Key)));
         // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
         Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
         Check(CommandBand.SharedPath(2) == "2 objects share this hierarchy path and component, so a patch cannot name one of them"

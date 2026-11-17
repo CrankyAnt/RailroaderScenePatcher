@@ -351,9 +351,10 @@ namespace RailroaderScenePatcher.Core {
                 if (equipment == null) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
                 equipment.Check(target, state.Equipment);
                 var baseline = BaselineOf(target);
-                if (EquipmentChange(target, baseline, state.Equipment) != null) {
-                    var difference = equipment.Coherence(baseline.Equipment);
-                    if (difference != null) throw new InvalidOperationException("The crossing's added equipment differs from its pattern: " + difference + ". Reload before editing its equipment; coverage edits stay available");
+                var change = EquipmentChange(target, baseline, state.Equipment);
+                if (change != null) {
+                    var refusal = equipment.Refusal(baseline.Equipment, change);
+                    if (refusal != null) throw new InvalidOperationException(refusal);
                 }
             }
             if (state.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);

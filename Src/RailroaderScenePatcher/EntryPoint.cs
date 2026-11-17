@@ -158,7 +158,9 @@ namespace RailroaderScenePatcher {
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = "Gizmo", SnapPlace = "Snap", ActivityPlace = "Activity",
-            ModificationPlace = "Modification", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", EquipmentPlace = "Lights and gates";
+            ModificationPlace = "Modification", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells";
+        // The place of the open equipment form's messages: its bells or its lights and gates.
+        string EquipmentPlace => equipmentSource?.IsDefinition == true ? BellPlace : LightGatePlace;
         bool staleLogged = true;
         NativeTrackPoses trackPoses;
         float nextTrackFollow;
@@ -239,7 +241,7 @@ namespace RailroaderScenePatcher {
                     context.Log.Info("Scene Patcher " + Version + ": starter placement capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 CrossingEquipmentWorld equipmentWorld = null;
-                try { equipmentWorld = new CrossingEquipmentWorld(); }
+                try { equipmentWorld = new CrossingEquipmentWorld { Warn = Report }; }
                 catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": crossing-equipment capability incompatible or unavailable: " + e.GetBaseException().Message); }
                 try { capabilities.Add(new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld)); }
                 catch (Exception e) {
@@ -555,7 +557,8 @@ namespace RailroaderScenePatcher {
                 if (inventory != null) foreach (var identity in replayed.ToArray()) {
                     var entry = inventory.Entries.FirstOrDefault(e => e.Identity.Scene == identity.Scene && e.Identity.Path == identity.Path && e.Identity.Component == identity.Component);
                     var updated = entry == null ? null : inventory.ReobserveRelated(entry);
-                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) ReadPlacement(); }
+                    // An Undo or Redo of this patcher's step: the fields show the object, and an open equipment form its addition, as they are now.
+                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) { ReadPlacement(); ReadOpenEquipment(); } }
                 }
                 // Objects a follow update moved: every entry of the object takes its new observation, and the fields of
                 // the inspected one take its new placement.
@@ -1116,22 +1119,26 @@ namespace RailroaderScenePatcher {
         }
         // The preview compares the scene as an edit does: without a blocking scan.
         void PrepareEquipment(PatchEditingSession session, TargetIdentity identity, EquipmentAddition addition, string removeId) {
-            Queue(EquipmentPlace, "Equipment preview", pin => {
+            var place = EquipmentPlace;
+            Queue(place, "Equipment preview", pin => {
                 EquipmentPreview preview;
                 try { preview = session.PreviewEquipment(identity, addition, removeId, pin(selected)); }
-                catch (Exception e) { feedback.Refuse(EquipmentPlace, "Equipment preview", e.GetBaseException().Message); preparedEquipment = null; return; }
+                catch (Exception e) { feedback.Refuse(place, "Equipment preview", e.GetBaseException().Message); preparedEquipment = null; return; }
                 preparedEquipment = new PreparedEquipment { Addition = addition, RemoveId = removeId, Preview = preview };
-                if (preview.Error != null) feedback.Refuse(EquipmentPlace, "Equipment preview", preview.Error);
-                else feedback.Report(EquipmentPlace, "Equipment preview completed. Select Apply to apply it.");
+                if (preview.Error != null) feedback.Refuse(place, "Equipment preview", preview.Error);
+                else feedback.Report(place, "Equipment preview completed. Select Apply to apply it.");
                 presentation?.RequestRefresh();
             });
         }
         // Opens the form for a new copy of the source: an ID from the device's name that the scene patch file does not use yet, and
         // the device's placement relative to its own crossing carried over to the inspected crossing, five metres aside.
+        // A bell has no placement of its own to carry over: it starts at the inspected crossing, five metres aside, and its ID
+        // comes from the definition's name or identifier.
         void UseSource(PatchEditingSession session, SourceCandidate candidate) {
-            CloseCoverageForm(); feedback.ClearPlace(EquipmentPlace);
-            equipmentSource = candidate.Source; preparedEquipment = null; equipmentOwn = null;
-            var name = candidate.Name ?? candidate.Source.Path.Substring(candidate.Source.Path.LastIndexOf('/') + 1);
+            CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
+            equipmentSource = candidate.Source; preparedEquipment = null; equipmentOwn = null; equipmentEdited = null;
+            var path = candidate.Source.Path ?? candidate.Source.Definition;
+            var name = candidate.Name ?? path.Substring(path.LastIndexOf('/') + 1);
             equipmentFields[0] = session.NewEquipmentId(name.ToLowerInvariant().Replace(' ', '-') + "-added");
             for (var i = 1; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0";
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
@@ -1139,9 +1146,9 @@ namespace RailroaderScenePatcher {
         }
         // Opens the form for an addition of this mod as the scene patch file holds it.
         void ReadEquipment(EquipmentAddition addition) {
-            CloseCoverageForm(); feedback.ClearPlace(EquipmentPlace);
+            CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
             equipmentSource = addition.Source; preparedEquipment = null; equipmentOwn = null;
-            equipmentFields[0] = addition.Id;
+            equipmentFields[0] = addition.Id; equipmentEdited = addition.Id;
             if (addition.Placement?.Position != null && addition.Placement.Rotation != null) FillEquipment(addition.Placement);
         }
         // The exact placement the form was filled from: a field the modder leaves as it shows keeps that value, and a
@@ -1155,7 +1162,21 @@ namespace RailroaderScenePatcher {
             equipmentAngles = new double[] { angles.x, angles.y, angles.z };
             for (var i = 0; i < 3; i++) { equipmentFields[i + 1] = CommandBand.Number(placement.Position[i]); equipmentFields[i + 4] = CommandBand.Number(equipmentAngles[i]); }
         }
-        void CloseEquipmentForm() { equipmentSource = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
+        // The ID of the addition the open form edits, or null for a new addition from Use.
+        string equipmentEdited;
+        // After a native history step the open form for an addition shows that addition as the scene patch file now holds
+        // it, as the placement fields show the object's current placement. An addition the step removed leaves the form as
+        // it is; a new addition's form keeps the modder's values.
+        void ReadOpenEquipment() {
+            if (equipmentSource == null || equipmentEdited == null || attachment == null || selected?.Identity.Structure != CrossingCoverageScene.Structure) return;
+            try {
+                var entry = attachment.Session.EquipmentEntries(selected.Identity).FirstOrDefault(e => e.Addition.Id == equipmentEdited);
+                if (entry == null) return;
+                equipmentSource = entry.Addition.Source; preparedEquipment = null; equipmentOwn = null; equipmentFields[0] = entry.Addition.Id;
+                if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement);
+            } catch (Exception) { }
+        }
+        void CloseEquipmentForm() { equipmentEdited = null; equipmentSource = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
         EquipmentAddition ParseEquipment(out string problem) {
             var id = (equipmentFields[0] ?? "").Trim();
             problem = EquipmentAddition.IdProblem(id);
@@ -1170,7 +1191,7 @@ namespace RailroaderScenePatcher {
             double[] rotation;
             if (!turned) rotation = (double[])equipmentOwn.Rotation.Clone();
             else { var q = Quaternion.Euler((float)angles[0], (float)angles[1], (float)angles[2]); rotation = new double[] { q.x, q.y, q.z, q.w }; }
-            return new EquipmentAddition(id, EquipmentAddition.LightGatePattern, equipmentSource, new Placement(position, rotation));
+            return new EquipmentAddition(id, equipmentSource.IsDefinition ? EquipmentAddition.BellPattern : EquipmentAddition.LightGatePattern, equipmentSource, new Placement(position, rotation));
         }
         // Fills the fields from the selected tracks of a circuit or addition; a circuit with native spans or detached, and a new
         // addition, start empty.
