@@ -54,15 +54,17 @@ namespace RailroaderScenePatcher {
         // refusal of a request that waited for the object, stays until an object is inspected again.
         internal void Released() { messages.Clear(); inspected = released; }
         static readonly object released = new object();
+        // Refresh removes earlier results without changing the inspected object or view.
+        internal void Refreshed() { messages.Clear(); }
         // A new load attempt starts without the messages of the one before.
         internal void Clear() { messages.Clear(); inspected = null; context = null; }
         string context;
         // The view a result was reported in: the open tab and, on the Placement tab, its mode. A result of a tab's
         // action in another view no longer describes what is on screen, so a change of view removes it. A general
-        // result and a refusal kept for the next inspection stay.
-        internal void View(string key) {
+        // result and a refusal kept for the next inspection stay. Restoring a view can preserve the current result.
+        internal void View(string key, bool preserve = false) {
             if (key == context) return;
-            if (context != null) messages.RemoveAll(m => !m.General && !m.Kept);
+            if (context != null && !preserve) messages.RemoveAll(m => !m.General && !m.Kept);
             context = key;
         }
         // The native map editor's history moved by Undo or Redo: what the last action completed may be undone. A refusal kept

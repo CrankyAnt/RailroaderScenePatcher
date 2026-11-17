@@ -12,6 +12,8 @@ Open **Scene patches** and its session details (the page icon in the title bar).
 
 ## Set a numeric placement
 
+For a step-by-step edit that keeps the same object selected and lets you review changes before **Apply**, see [complete an edit with a guided task](completing-guided-tasks.md).
+
 1. Find the object in the [outliner](inspect-scene-objects.md) or [select it in the world](select-world-targets.md) and confirm its identity. For an object with a fixed-placement adapter, the six fields of **Numeric** mode on the **Placement** tab show its inspected position in map coordinates and its rotation in degrees: a **Position (m)** row and a **Rotation (deg)** row, each with **X**, **Y** and **Z** in front of its box, as the native map editor shows a position. Other objects cannot be edited: they show the same values as two running lines of text, such as `X 4361.091  Y 528.405  Z 5380.431 (m)`, and the amber **Editing** message gives the object's own reason. Every number reads to three decimals, never in scientific notation; a field you do not change stands for the object's exact value, so changing X alone changes neither the other axes nor the rotation. **Apply** is inactive while the fields hold the object's current placement and follows your typing: it becomes available at the keystroke that makes a value differ, without Enter or leaving the field, and inactive again when the value equals the current one, and a placement equal to the object's placement without this mod removes the placement from the modification; **Supported edits** on the **Object** tab says why.
 2. Change the values. Use a decimal point.
 3. Select **Apply** at the bottom of the tab.

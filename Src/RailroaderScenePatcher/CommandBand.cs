@@ -219,9 +219,6 @@ namespace RailroaderScenePatcher {
         internal const string AllFilter = "All", ChangedFilter = "Changed", DisabledFilter = "Disabled", ProblemsFilter = "Problems";
         internal static readonly float[] FilterSegments = { 20.64f + 12, 74.67f + 12, 71.2f + 12, 77.88f + 12 };
         internal const float OutlinerWidth = 296;
-        // Whether Escape does what Clear does: with the pointer over the open panel, while an object is inspected or a
-        // world choice is pending. Elsewhere Escape cancels a pending choice or the gizmo, or opens the pause menu.
-        internal static bool EscapeClears(bool overPanel, bool inspected, bool pending) => overPanel && (inspected || pending);
         // Whether the tooltip callout is hidden now: the game is paused, and either the panel is open or the tooltip
         // was hidden already in this pause. It so stays hidden until the pause menu closes, whatever the panel does.
         internal static bool HidesTooltip(bool paused, bool panelOpen, bool hidden) => paused && (panelOpen || hidden);
@@ -232,17 +229,16 @@ namespace RailroaderScenePatcher {
         internal static bool FieldHasFocus(int frame, int lastFocused) => lastFocused >= 0 && frame - lastFocused <= FocusFrames;
         // What one press of Escape does, first that applies. The native map editor's Escape cancels its first armed
         // interaction, does nothing while a text field has the focus, and otherwise leaves Escape to the pause
-        // menu; it never clears a selection. Here: while a field of the panel has the focus Escape is left alone;
-        // the list beside the click closes alone, as a native dropdown does, and the choice stays pending; over the
-        // panel Escape does what Clear does; a pending world choice or a gizmo drag is an armed interaction and is
-        // cancelled; anything else, such as a gizmo that merely stands, leaves Escape to the pause menu.
-        internal enum EscapeStep { None, CloseList, Clear, CancelChoice, CancelDrag }
-        internal static EscapeStep Escape(bool fieldFocused, bool listOpen, bool overPanel, bool inspected, bool pending, bool dragging) =>
+        // menu; it never clears a selection. A list closes before an interaction is cancelled. The caller supplies
+        // standing gizmo and prepared snap only while the pointer is over the panel.
+        internal enum EscapeStep { None, CloseList, CancelDrag, CancelChoice, CancelGizmo, CancelSnap }
+        internal static EscapeStep Escape(bool fieldFocused, bool listOpen, bool pending, bool dragging, bool gizmo, bool snap) =>
             fieldFocused ? EscapeStep.None
             : listOpen ? EscapeStep.CloseList
-            : EscapeClears(overPanel, inspected, pending) ? EscapeStep.Clear
-            : pending ? EscapeStep.CancelChoice
             : dragging ? EscapeStep.CancelDrag
+            : pending ? EscapeStep.CancelChoice
+            : gizmo ? EscapeStep.CancelGizmo
+            : snap ? EscapeStep.CancelSnap
             : EscapeStep.None;
         // The supported edits of a group root of the Baked scenery group family.
         internal const string GroupOperations = "Fixed placement and activity of the whole group; culling and colliders follow the group. Decorative: moving or disabling it changes no game function";
@@ -372,7 +368,7 @@ namespace RailroaderScenePatcher {
         internal static string FieldReason(string block, IReadOnlyList<string> entered, IReadOnlyList<string> current, string same, params int[] exact) =>
             block ?? (SameFields(entered, current, exact) ? same : null);
         internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.",
-            SameLocation = "The fields hold the marker's current track location.";
+            SameLocation = "The fields hold the marker's current track location.", SameActivity = "The object already has the selected enabled or disabled state.";
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the
         // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.
