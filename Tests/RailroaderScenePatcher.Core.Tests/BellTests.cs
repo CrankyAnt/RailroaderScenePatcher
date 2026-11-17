@@ -107,6 +107,12 @@ static class BellTests {
         Assert(candidates.Single(c => c.Source.Definition == CrossingBell).Label == "Crossing Bell (" + CrossingBell + ")" && candidates.Single(c => c.Source.Definition == "modder/bell-unexamined").Label == "modder/bell-unexamined",
             "A bell reads as its name and identifier, or its identifier alone");
         Assert(f.Scene.EquipmentCandidates(f.Crossing).Single(c => c.Source.Path == SignalPath).Pattern == EquipmentAddition.LightGatePattern, "A loaded device keeps the light/gate pattern");
+        // A rejected bell definition comes with the link to the bell guide's rejection reasons; a list without one has no link.
+        var guide = RailroaderScenePatcher.CommandBand.RejectionGuide(candidates);
+        Assert(guide != null && guide[0] == "Why a bell definition is rejected" && guide[1] == "adding-crossing-bells.md#rejected-bell-definitions", "A rejected bell definition offers the bell guide's rejection reasons: " + (guide == null ? "none" : String.Join(" -> ", guide)));
+        Assert(RailroaderScenePatcher.CommandBand.RejectionGuide(candidates.Where(c => c.Eligible)) == null, "Only eligible bell definitions offer no rejection link");
+        var devices = RailroaderScenePatcher.CommandBand.RejectionGuide(new[] { new SourceCandidate(new EquipmentSource("s", "World/Bell device"), "Bell", "it holds a bell player") });
+        Assert(devices != null && devices[1] == "adding-crossing-equipment.md#rejected-sources", "A rejected device keeps the light and gate guide's link");
         var result = new PatchEngine(f.Scene).Apply(Doc(Equip("bells", Bell("brass", "rr/bell-loco-brass") + "," + Bell("clang", "modder/bell-unexamined", 30) + "," + Bell("native", CrossingBell, 40))));
         f.World.FinishLoads();
         Assert(result.Outcomes["bells"].Applied && f.Bells.Count == 3 && f.World.AudioReferences == 3 && f.Observers == 3, "Unexamined definitions conforming to the pattern build bells without a per-sound list: " + result.Outcomes["bells"].Error);

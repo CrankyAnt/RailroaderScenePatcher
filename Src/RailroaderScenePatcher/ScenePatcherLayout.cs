@@ -786,8 +786,9 @@ namespace RailroaderScenePatcher {
                     .Tooltip("Use " + source.Source.Path, CommandBand.Tooltip("Copy this device to this crossing. Its lamps and gates work through the crossing controller's lights and gates keys.", wait));
                 else Field(builder, "Rejected " + source.Label, Breakable(source.Source.Path) + ": " + CommandBand.Sentence(source.Problem));
             }
-            if (candidates.Any(c => !c.Eligible))
-                Button(builder, "Why a device is rejected", () => Application.OpenURL(GuideRoot + "adding-crossing-equipment.md#rejected-sources")).Tooltip("Why a device is rejected", "Open the rejection reasons in the guide in the browser.");
+            var deviceGuide = CommandBand.RejectionGuide(candidates);
+            if (deviceGuide != null)
+                Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open the rejection reasons in the guide in the browser.");
             // Bells: every bell definition of the content library, with the bell pattern's reason for a rejected one.
             Section(builder, "Add a bell");
             Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " rejected bell definitions in the content library", null, null);
@@ -797,8 +798,9 @@ namespace RailroaderScenePatcher {
                     .Tooltip("Use " + source.Source.Definition, CommandBand.Tooltip("Add a bell to this crossing using this definition's sound. It rings when the crossing controller rings its own bell.", wait));
                 else Field(builder, "Rejected " + source.Label, CommandBand.Sentence(source.Problem));
             }
-            if (bells.Any(c => !c.Eligible))
-                Button(builder, "Why a bell definition is rejected", () => Application.OpenURL(GuideRoot + "adding-crossing-bells.md#rejected-bell-definitions")).Tooltip("Why a bell definition is rejected", "Open the guide's rejection reasons in your browser.");
+            var bellGuide = CommandBand.RejectionGuide(bells);
+            if (bellGuide != null)
+                Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open the guide's rejection reasons in your browser.");
         }
         static string Kind(EquipmentAddition item) => item.Source.IsDefinition ? "Bell" : "Light or gate";
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
