@@ -397,7 +397,7 @@ namespace RailroaderScenePatcher.Core {
                 }
             }
             // An underlying state that was read without an activity is one whose track group switches the object.
-            if (state.Active.HasValue) lines.Add("Enabled: from " + (before == null ? "unknown" : before.Active == null ? "set by its track group" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
+            if (state.Active.HasValue) lines.Add("Enabled: from " + (before == null ? "unknown" : before.Active == null ? "controlled by its track group" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
             if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
             if (state.Starter?.Track != null) lines.Add("Track location: from " + Location(before?.Starter?.Track) + " to " + Location(state.Starter.Track));
             if (state.Coverage != null) foreach (var circuit in state.Coverage.Circuits)

@@ -105,7 +105,7 @@ namespace RailroaderScenePatcher {
         // Why the activity control cannot run, or null. The patcher refuses an explicit enable of an object whose activity
         // follows its track group, so Enable is inactive with that reason beforehand; Disable stays available.
         internal static string ActivityReason(bool enable, bool followsGroup) => enable && followsGroup ? GroupEnableReason : null;
-        internal const string GroupEnableReason = "The track group switches this object on. Clear activity returns it to the group.";
+        internal const string GroupEnableReason = "The track group controls this object's activity. Use Clear activity to let the object follow its group again.";
         // Whether the open help closes on a tab switch: the help of a tab that is no longer the open tab. The help of
         // the outliner or of the window stays.
         internal static bool ClosesHelp(string openRegion, string tab, IEnumerable<string> tabs) {

@@ -328,7 +328,7 @@ static class MilepostTests {
         var (world, t46, t47, session, mapEditor, store) = Session();
         Assert(session.Edit(Post46, null, false).Applied, "The group-driven post is disabled");
         var lines = session.Changes(Post46);
-        Assert(lines.SequenceEqual(new[] { "Enabled: from set by its track group to No" }), "Changes names the track group as the earlier activity: " + String.Join(" | ", lines));
+        Assert(lines.SequenceEqual(new[] { "Enabled: from controlled by its track group to No" }), "Changes names the track group as the earlier activity: " + String.Join(" | ", lines));
         Assert(PatchEditingSession.ChangeLines(new ObjectState(null, false), null).SequenceEqual(new[] { "Enabled: from unknown to No" }), "An underlying state that was never read stays unknown");
     }
     // Enable of an object whose activity follows its track group is refused, so the control is inactive with the reason
