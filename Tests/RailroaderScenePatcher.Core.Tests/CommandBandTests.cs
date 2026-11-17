@@ -46,12 +46,11 @@ static class CommandBandTests {
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
         }) {
             var tooltip = CommandBand.Tooltip("Does something.", row[0]);
-            var lines = tooltip.Split('\n');
-            Check(lines.Length == 2 && lines[0] == "Does something." && lines[1] == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
-            var reason = lines[1].Substring("Unavailable: ".Length);
+            Check(tooltip == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);
+            var reason = tooltip.Substring("Unavailable: ".Length);
             Check(new[] { "Not editable:", "Not yet supported:", "binding unavailable:", "Unavailable:" }.All(label => reason.IndexOf(label, StringComparison.OrdinalIgnoreCase) < 0)
                 && (Char.IsUpper(reason[0]) || Char.IsDigit(reason[0])) && reason.EndsWith(".", StringComparison.Ordinal), "One label per tooltip, the reason a sentence: " + tooltip);
-            Check(CommandBand.Tooltip(null, row[0]) == row[1], "Without a description the tooltip is the sentence alone: " + CommandBand.Tooltip(null, row[0]));
+            Check(CommandBand.Tooltip(null, row[0]) == tooltip, "Without a description the tooltip is the same: " + CommandBand.Tooltip(null, row[0]));
         }
     }
     // A lamp shows green for Current and Saved and amber for Stale and Unsaved, and reserves its longer word.
@@ -88,32 +87,24 @@ static class CommandBandTests {
         Check(CommandBand.Focus(true) == null && CommandBand.CopyId(true) == null, "Focus and Copy ID are enabled for an inspected object, also while a world choice is pending");
         Check(CommandBand.Clear(true, false) == null && CommandBand.Clear(false, true) == null && CommandBand.Clear(true, true) == null,
             "Clear is enabled for an inspected object and for a pending world choice without one");
-        // Escape over the panel does what Clear does, in the states where Clear is enabled.
-        Check(CommandBand.EscapeClears(true, true, false) && CommandBand.EscapeClears(true, false, true) && CommandBand.EscapeClears(true, true, true), "Escape over the panel clears an inspection and a pending choice");
-        Check(!CommandBand.EscapeClears(true, false, false) && !CommandBand.EscapeClears(false, true, true) && !CommandBand.EscapeClears(false, true, false), "Escape clears nothing with nothing to clear, or with the pointer over the world");
-        // One press of Escape does one thing. Columns: a field has the focus, the list beside the click is open, the
-        // pointer is over the panel, an object is inspected, a world choice is pending, a gizmo drag is in progress.
+        // One press of Escape does one thing. Columns: field focus, open list, pending choice, drag, gizmo, snap.
         foreach (var row in new[] {
-            new object[] { false, false, false, true, false, false, CommandBand.EscapeStep.None, "over the world with a gizmo that merely stands: the pause menu, as without the mod" },
-            new object[] { false, false, false, false, false, false, CommandBand.EscapeStep.None, "nothing to end: the pause menu" },
-            new object[] { false, false, true, true, false, false, CommandBand.EscapeStep.Clear, "over the panel with an inspected object: the inspection is cleared" },
-            new object[] { false, false, true, false, true, false, CommandBand.EscapeStep.Clear, "over the panel with a pending choice: cleared as Clear does" },
-            new object[] { false, false, true, false, false, false, CommandBand.EscapeStep.None, "over the panel with nothing to clear: the pause menu" },
-            new object[] { false, false, false, true, true, false, CommandBand.EscapeStep.CancelChoice, "over the world with a pending choice: the choice is cancelled, as the native map editor disarms a tool" },
-            new object[] { false, false, false, true, false, true, CommandBand.EscapeStep.CancelDrag, "during a gizmo drag: the placement is restored" },
-            new object[] { false, true, false, true, true, false, CommandBand.EscapeStep.CloseList, "the list beside the click is open, pointer over the world: only the list closes" },
-            new object[] { false, true, true, true, true, false, CommandBand.EscapeStep.CloseList, "the list is open, pointer over the panel: the list closes first, the inspection stays" },
-            new object[] { true, true, true, true, true, true, CommandBand.EscapeStep.None, "a field has the focus: Escape is left alone, as in the native map editor" } })
+            new object[] { false, false, false, false, false, false, CommandBand.EscapeStep.None, "with nothing pending leaves the inspection alone" },
+            new object[] { false, true, true, true, true, true, CommandBand.EscapeStep.CloseList, "closes the list before cancelling anything" },
+            new object[] { false, false, true, true, true, true, CommandBand.EscapeStep.CancelDrag, "cancels a drag before a pending choice" },
+            new object[] { false, false, true, false, true, true, CommandBand.EscapeStep.CancelChoice, "cancels a pending choice before a gizmo" },
+            new object[] { false, false, false, false, true, true, CommandBand.EscapeStep.CancelGizmo, "cancels a standing gizmo before a prepared snap" },
+            new object[] { false, false, false, false, false, true, CommandBand.EscapeStep.CancelSnap, "cancels a prepared snap" },
+            new object[] { true, true, true, true, true, true, CommandBand.EscapeStep.None, "leaves everything alone when a field has focus" } })
             Check(CommandBand.Escape((bool)row[0], (bool)row[1], (bool)row[2], (bool)row[3], (bool)row[4], (bool)row[5]) == (CommandBand.EscapeStep)row[6], "Escape " + row[7]);
         // A field that had the focus when Escape went down has given it up by the time the panel is asked: the
         // focus counts for the frame it was last seen in and the two after it.
         foreach (var row in new[] { new[] { 100, 100, 1 }, new[] { 101, 100, 1 }, new[] { 102, 100, 1 }, new[] { 103, 100, 0 }, new[] { 100, -1, 0 }, new[] { 1, -1, 0 }, new[] { 500, 100, 0 } })
             Check(CommandBand.FieldHasFocus(row[0], row[1]) == (row[2] == 1), "In frame " + row[0] + " a field last focused in frame " + row[1] + " " + (row[2] == 1 ? "has" : "does not have") + " the keyboard");
         Check(CommandBand.FocusFrames == 2, "The focus counts for two frames after it was last seen");
-        // With a field focused, Escape does nothing to the patcher in any state: the inspection, a pending choice, an
-        // open list and a drag all stay.
-        foreach (var state in new[] { new[] { false, true, true, false, false }, new[] { true, true, true, true, false }, new[] { false, false, true, true, true }, new[] { true, false, false, true, false } })
-            Check(CommandBand.Escape(true, state[0], state[1], state[2], state[3], state[4]) == CommandBand.EscapeStep.None, "Escape with the caret in a field clears and cancels nothing");
+        // Field focus takes precedence over every combination of patcher interactions.
+        for (var state = 0; state < 32; state++)
+            Check(CommandBand.Escape(true, (state & 1) != 0, (state & 2) != 0, (state & 4) != 0, (state & 8) != 0, (state & 16) != 0) == CommandBand.EscapeStep.None, "Escape with the caret in a field cancels nothing: " + state);
         // The tooltip stays hidden through one pause, whatever the panel does meanwhile.
         foreach (var row in new[] {
             new object[] { true, true, false, true, "paused with the panel open: hidden" },
@@ -125,7 +116,7 @@ static class CommandBandTests {
             Check(CommandBand.HidesTooltip((bool)row[0], (bool)row[1], (bool)row[2]) == (bool)row[3], "The tooltip, " + row[4]);
         Check(CommandBand.Clear(false, false) == "Nothing is inspected and no world choice is pending.", "Clear is disabled only when nothing is inspected and no world choice is pending");
         Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", CommandBand.Clear(false, false))
-            == "End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.\nUnavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear says what it does first");
+            == "Unavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear gives only why it cannot be used");
         Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
         Check(CommandBand.CopyId(true, "Invalid JSON. The scene patch file is protected from overwrite.") == "Invalid JSON. The scene patch file is protected from overwrite."
             && CommandBand.CopyId(false, "Invalid JSON.") == "Inspect an object first.", "Copy ID is disabled with the session's refusal while the scene patch file cannot be read, and asks for an inspection first");
@@ -223,14 +214,12 @@ static class CommandBandTests {
         // The inventory notice names the supplied definitions for this state.
         Check(InventoryPresentationState.Notice(null, true).Contains("inspection is unavailable"), "Without an inventory the notice names that first");
     }
-    // A disabled control says what it would do and why it cannot now; an enabled one only what it does.
+    // An enabled control says what it does; a disabled one only why it cannot be used now.
     static void ADisabledControlKeepsItsDescription() {
         Check(CommandBand.Tooltip("Move the object with the native gizmo.", null) == "Move the object with the native gizmo.", "An enabled control shows its description");
-        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Move the object with the native gizmo.\nUnavailable: Inspect an object first.",
-            "A disabled control shows its description and then the reason");
-        Check(CommandBand.Tooltip("Rotate the object with the native gizmo.", "Inspect an object first.") != CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first."),
-            "Two controls disabled for one reason still differ");
-        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason stands alone");
+        Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Unavailable: Inspect an object first.",
+            "A disabled control shows only the reason, without its description");
+        Check(CommandBand.Tooltip(null, "Inspect an object first.") == "Unavailable: Inspect an object first." && CommandBand.Tooltip("", null) == "", "Without a description the reason reads the same");
         Check(CommandBand.CandidateDetailsReason(0) == "Click a marking or track in the world first." && CommandBand.CandidateDetailsReason(1) == null && CommandBand.CandidateDetailsReason(3) == null,
             "The details of a world choice open only once something was clicked");
         Check(CommandBand.NotEditable("the marker is inside a crossing") == "Not editable: the marker is inside a crossing", "An object of a supported family that cannot be edited keeps its own reason");

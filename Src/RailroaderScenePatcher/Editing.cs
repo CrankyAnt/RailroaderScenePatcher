@@ -6,27 +6,111 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using HarmonyLib;
 using RailroaderScenePatcher.Core;
+using UI.Builder;
 
 namespace RailroaderScenePatcher {
+    // The native Map Editor row builds Save inside a compiler-generated callback. Patch only the
+    // Disable call belonging to that button and leave the other native controls untouched.
+    internal static class NativeSaveGuard {
+        const string Id = "crankyant.scene-patcher.save-guard";
+        static Harmony harmony;
+        static MethodBase target;
+        static FieldInfo mapEditorField;
+        internal static string Error { get; private set; }
+        static IEnumerable<Type> Nested(Type type) {
+            foreach (var nested in type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)) {
+                yield return nested;
+                foreach (var child in Nested(nested)) yield return child;
+            }
+        }
+        static int SaveDisable(System.Collections.Generic.IList<CodeInstruction> code) {
+            var matches = new System.Collections.Generic.List<int>();
+            for (var i = 0; i < code.Count; i++) {
+                if (code[i].opcode != OpCodes.Ldstr || !Equals(code[i].operand, "Save")) continue;
+                for (var j = i + 1; j < code.Count; j++) {
+                    if (code[j].opcode == OpCodes.Ldstr) break;
+                    if (code[j].operand is MethodInfo method && method.Name == "Disable") {
+                        var p = method.GetParameters();
+                        if (!method.IsStatic && method.DeclaringType == typeof(IConfigurableElement) && method.ReturnType == typeof(IConfigurableElement) && p.Length == 1 && p[0].ParameterType == typeof(bool)) matches.Add(j);
+                        break;
+                    }
+                }
+            }
+            return matches.Count == 1 ? matches[0] : -1;
+        }
+        internal static void Install() {
+            if (harmony != null || Error != null) return;
+            var patcher = new Harmony(Id);
+            try {
+                var window = Native.Type("Game.MapEditor.MapEditorWindow") ?? throw new MissingMemberException("Native map editor window unavailable");
+                var candidates = Nested(window).SelectMany(t => t.GetMethods(Native.Flags | BindingFlags.DeclaredOnly))
+                    .Where(m => m.GetMethodBody() != null)
+                    .Where(m => { try { return SaveDisable(PatchProcessor.GetOriginalInstructions(m)) >= 0; } catch { return false; } }).ToArray();
+                if (candidates.Length != 1) throw new MissingMethodException("Native Save control could not be identified uniquely");
+                target = candidates[0];
+                var mapEditor = Native.Type("Game.MapEditor.MapEditor");
+                var fields = target.DeclaringType.GetFields(Native.Flags).Where(f => !f.IsStatic && f.FieldType == mapEditor).ToArray();
+                if (target.IsStatic || mapEditor == null || fields.Length != 1) throw new MissingMemberException("Native Save control Map Editor identity unavailable");
+                mapEditorField = fields[0];
+                patcher.Patch(target, transpiler: new HarmonyMethod(typeof(NativeSaveGuard).GetMethod(nameof(Transpile), Native.Flags)));
+                harmony = patcher;
+            } catch (Exception e) {
+                patcher.UnpatchAll(Id); target = null; mapEditorField = null;
+                Error = "The Map Editor Save control is unavailable: " + e.GetBaseException().Message;
+            }
+        }
+        internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; target = null; mapEditorField = null; }
+        static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions) {
+            var code = instructions.ToList();
+            var index = SaveDisable(code);
+            if (index < 0) throw new InvalidOperationException("Native Save control changed");
+            var loadOwner = new CodeInstruction(OpCodes.Ldarg_0);
+            loadOwner.labels.AddRange(code[index].labels); code[index].labels.Clear();
+            code.Insert(index, loadOwner);
+            code[index + 1].opcode = OpCodes.Call;
+            code[index + 1].operand = typeof(NativeSaveGuard).GetMethod(nameof(ConfigureSave), Native.Flags);
+            return code;
+        }
+        static IConfigurableElement ConfigureSave(IConfigurableElement element, bool disabled, object owner) {
+            var current = Hooks.Current;
+            var reason = current != null && ReferenceEquals(mapEditorField?.GetValue(owner), current.MapEditor) ? current.Session.SaveRefusal : null;
+            var configured = element.Disable(disabled || reason != null);
+            if (reason != null) configured.Tooltip("Save", reason);
+            return configured;
+        }
+    }
     // The native map editor's own undo manager, read through the internal members this capability checks.
-    internal sealed class NativeHistory : INativeHistory {
+    internal sealed class NativeHistory : INativeHistory, INativeHistoryActions {
         readonly object manager;
         readonly FieldInfo undo, redo;
         readonly MethodInfo register;
+        readonly Type groupType;
+        readonly PropertyInfo actions;
         internal NativeHistory(object manager) {
             this.manager = manager;
             var type = manager.GetType();
             undo = type.GetField("_undoStack", Native.Flags); redo = type.GetField("_redoStack", Native.Flags);
             register = type.GetMethod("RegisterUndo", new[] { typeof(Action), typeof(string) });
+            groupType = type.GetNestedType("UndoGroup", BindingFlags.Public | BindingFlags.NonPublic);
+            actions = groupType?.GetProperty("Actions", BindingFlags.Public | BindingFlags.Instance);
             if (undo == null || redo == null || register == null || !(undo.GetValue(manager) is IEnumerable) || !(redo.GetValue(manager) is IEnumerable))
                 throw new MissingMemberException("Native undo history members unavailable");
+            if (groupType == null || actions == null || !typeof(IEnumerable<Action>).IsAssignableFrom(actions.PropertyType))
+                throw new MissingMemberException("Native undo group actions unavailable");
+            foreach (var group in ((IEnumerable)undo.GetValue(manager)).Cast<object>().Concat(((IEnumerable)redo.GetValue(manager)).Cast<object>())) GroupActions(group);
         }
         // The native stacks enumerate newest first.
         static IReadOnlyList<object> Oldest(object stack) { var items = ((IEnumerable)stack).Cast<object>().ToList(); items.Reverse(); return items; }
         public IReadOnlyList<object> UndoGroups => Oldest(undo.GetValue(manager));
         public IReadOnlyList<object> RedoGroups => Oldest(redo.GetValue(manager));
+        public IReadOnlyList<Action> GroupActions(object group) {
+            if (group == null || !groupType.IsInstanceOfType(group) || !(actions.GetValue(group) is IEnumerable<Action> values))
+                throw new InvalidOperationException("Native undo group actions unavailable");
+            return values.ToArray();
+        }
         public void Register(Action inverse, string name) { register.Invoke(manager, new object[] { inverse, name }); }
     }
     // One attached native map editor: its session, history and files.
@@ -36,25 +120,44 @@ namespace RailroaderScenePatcher {
         internal readonly string PatchPath;
         internal string Fault;
         internal Action<string> Log = _ => { };
+        internal Action VersionChanged = () => { };
         internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list); }
         readonly EventInfo changed;
         readonly Action handler;
+        readonly NativeDirtyTracker nativeDirty;
+        int ChangeCount => Convert.ToInt32(Native.Read(Manager, "ChangeCount"));
         internal MapEditorAttachment(PatchEngine engine, object mapEditor) {
             MapEditor = mapEditor; Manager = Native.Read(mapEditor, "UndoManager");
             if (Manager == null) throw new MissingMemberException("Native undo manager unavailable");
             Native.Read(mapEditor, "_cleanChangeCount"); Native.Read(mapEditor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
             var storage = ModScenePatchFiles.ActiveStorage(); PatchPath = storage.PatchPath;
-            Session = new PatchEditingSession(engine, new NativeHistory(Manager), storage, ModScenePatchFiles.PatcherId, ModScenePatchFiles.EditedModId());
+            var history = new NativeHistory(Manager);
+            Session = new PatchEditingSession(engine, history, storage, ModScenePatchFiles.PatcherId, ModScenePatchFiles.EditedModId());
+            var cleanCount = Convert.ToInt32(Native.Read(MapEditor, "_cleanChangeCount"));
+            nativeDirty = new NativeDirtyTracker(history, ChangeCount, ChangeCount != cleanCount, cleanCount);
             changed = Manager.GetType().GetEvent("DidChange", Native.Flags);
             if (changed == null || changed.EventHandlerType != typeof(Action)) throw new MissingMemberException("Native history notification unavailable");
-            handler = Session.HistoryChanged;
+            handler = () => {
+                try { Session.HistoryChanged(); var ignored = NativeDirty; }
+                catch (Exception e) { Fault = "Could not track a change to the Map Editor history: " + e.GetBaseException().Message; }
+            };
             changed.AddEventHandler(Manager, handler);
         }
         // The native map editor values every change of the outstanding work passes through: an edit, Undo and Redo move the change
         // count, a completed Save moves the clean count.
         internal string ChangeKey => Native.Read(MapEditor, "_upgradedOnLoad") + "|" + Native.Read(Manager, "ChangeCount") + "|" + Native.Read(MapEditor, "_cleanChangeCount");
-        // The native map editor's own change-count answer, without the patcher's accounting.
-        internal bool NativeDirty => (bool)Native.Read(MapEditor, "_upgradedOnLoad") || Convert.ToInt32(Native.Read(Manager, "ChangeCount")) != Convert.ToInt32(Native.Read(MapEditor, "_cleanChangeCount"));
+        // Tracks native work separately from patch-only history and retains unexplained count changes until Save.
+        internal bool NativeDirty {
+            get {
+                var initialPending = nativeDirty.InitialDirtyPending;
+                var dirty = nativeDirty.Observe(ChangeCount, (bool)Native.Read(MapEditor, "_upgradedOnLoad"));
+                if (initialPending && !nativeDirty.InitialDirtyPending) Session.AlignNativeCleanHistory();
+                return dirty;
+            }
+        }
+        internal void BeginHistoryExecution() { nativeDirty.BeginHistoryExecution(); Session.BeginHistoryExecution(); }
+        internal void EndHistoryExecution(Exception error) { try { Session.EndHistoryExecution(error); } finally { nativeDirty.EndHistoryExecution(); } }
+        internal void NativeSaved() => nativeDirty.Saved(ChangeCount);
         // The native title and Save button read the dirty state when they are built; rebuild them after the accounting changed.
         internal void RefreshChrome() {
             try {
@@ -104,11 +207,17 @@ namespace RailroaderScenePatcher {
         static MapEditorAttachment For(object mapEditor) { var current = Current; return current != null && ReferenceEquals(current.MapEditor, mapEditor) ? current : null; }
         static MapEditorAttachment ForManager(object manager) { var current = Current; return current != null && ReferenceEquals(current.Manager, manager) ? current : null; }
         // Runs before the native map write. A failing patcher write aborts the Save and reaches the native Save Failed alert.
-        static void BeforeSave(object __instance) { For(__instance)?.Session.BeginSave(); }
+        static void BeforeSave(object __instance) {
+            var current = For(__instance);
+            if (current == null) return;
+            try { var ignored = current.NativeDirty; current.Session.BeginSave(); }
+            finally { current.VersionChanged(); }
+        }
         static void AfterSave(object __instance) {
             var current = For(__instance);
             if (current == null) return;
             current.Session.CompleteNativeSave();
+            current.NativeSaved();
             current.Log("Save completed: " + String.Join(", ", current.Session.LastSave.Completed) + "; outstanding: " + current.Outstanding());
         }
         static Exception SaveFinalizer(object __instance, Exception __exception) {
@@ -123,14 +232,14 @@ namespace RailroaderScenePatcher {
         static void AfterIsDirty(object __instance, ref bool __result) {
             var current = For(__instance);
             if (current == null) return;
-            try { __result = current.Session.IsDirty(__result); }
+            try { __result = current.Session.IsDirty(current.NativeDirty); }
             catch (Exception e) { __result = true; current.Fault = "Outstanding work could not be determined; the native map editor is treated as unsaved: " + e.GetBaseException().Message; }
         }
-        static void BeforeHistory(object __instance) { ForManager(__instance)?.Session.BeginHistoryExecution(); }
+        static void BeforeHistory(object __instance) { ForManager(__instance)?.BeginHistoryExecution(); }
         static Exception HistoryFinalizer(object __instance, Exception __exception) {
             var current = ForManager(__instance);
             if (current != null) {
-                current.Session.EndHistoryExecution(__exception);
+                current.EndHistoryExecution(__exception);
                 // Native Undo and Redo rebuild the chrome before the history identity is settled here.
                 current.RefreshChrome();
                 try { current.Log("Native history executed" + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; outstanding: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
@@ -138,7 +247,7 @@ namespace RailroaderScenePatcher {
             }
             return __exception;
         }
-        static MethodInfo PresentMethod() {
+        internal static MethodInfo PresentMethod() {
             var alerts = Native.Type("UI.Common.ModalAlertController");
             var present = alerts?.GetMethods(BindingFlags.Public | BindingFlags.Static).SingleOrDefault(m => m.Name == "Present" && m.IsGenericMethodDefinition && m.GetParameters().Length == 4 && m.GetParameters()[1].ParameterType == typeof(string));
             var mode = Native.Type("UI.CarEditor.DefinitionEditorModeController");
@@ -150,15 +259,16 @@ namespace RailroaderScenePatcher {
             var current = Current;
             if (current == null) return true;
             try {
-                var warning = current.Session.ExitWarning(current.NativeDirty);
-                if (warning == null) return true;
+                current.Session.CheckFileVersion();
+                var message = current.Session.ExitPrompt(current.NativeDirty);
+                if (message == null) return true;
                 Action<int> choose = choice => {
                     var mode = Native.Type("UI.CarEditor.DefinitionEditorModeController");
                     if (choice == 1 && (bool)Native.Read(mode, "IsEditing")) Native.Call(mode, "ExitEditorMode");
                 };
-                PresentMethod().Invoke(null, new object[] { "Exit Map Editor", "Exit the Map Editor? " + warning + " Exit discards it; Cancel returns to the Map Editor.", new[] { (0, "Cancel"), (1, "Exit") }, choose });
+                PresentMethod().Invoke(null, new object[] { "Exit Map Editor", message, new[] { (0, "Cancel"), (1, "Exit") }, choose });
                 return false;
-            } catch (Exception e) { current.Fault = "Exit confirmation fell back to the native text: " + e.GetBaseException().Message; return true; }
+            } catch (Exception e) { current.Fault = "Exit cancelled because outstanding work could not be confirmed. " + e.GetBaseException().Message; return false; }
         }
     }
 }

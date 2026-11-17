@@ -211,14 +211,18 @@ namespace RailroaderScenePatcher.Core {
             return Apply(json, scenePatchFileKey, null);
         }
         public ScenePatchFileResult Apply(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
-            return ApplyScenePatchFile(json, scenePatchFileKey, inspectedTargets, null);
+            return ApplyScenePatchFile(json, scenePatchFileKey, inspectedTargets, null, false);
+        }
+        // An explicit file-version choice may retry this scene patch file's failed IDs, subject to the same cleanup guards.
+        internal ScenePatchFileResult ApplyFileVersion(string json, string scenePatchFileKey) {
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, null, true);
         }
         // The complete envelope is checked before selecting a dependency-free relationship repair for this native check.
         public ScenePatchFileResult BeforeNativeCheck(string json, string scenePatchFileKey, TargetIdentity target) {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            return ApplyScenePatchFile(json, scenePatchFileKey, null, target);
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, target, false);
         }
-        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget) {
+        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget, bool retryFailures) {
             if (scenePatchFileKey == null) throw new ArgumentNullException(nameof(scenePatchFileKey));
             Observe("document-dispatch", scenePatchFileKey);
             var result = new ScenePatchFileResult();
@@ -238,7 +242,7 @@ namespace RailroaderScenePatcher.Core {
                         if (unavailable != null) result.EarlyRouteUnavailable = unavailable;
                         continue;
                     }
-                    Execute(id, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
+                    Execute(id, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets, retryFailures);
                 }
             } catch (Exception e) { result.Error = "Scene check failed: " + e.Message; }
             finally { Unplan(); }
@@ -281,13 +285,17 @@ namespace RailroaderScenePatcher.Core {
                 } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + e.Message; return false; }
             } catch (InvalidOperationException) { return false; }
         }
-        Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets) {
+        Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, bool retryFailures) {
             Outcome prior;
             if (outcomes.TryGetValue(id, out prior)) return prior;
             var outcome = new Outcome();
             if (!visiting.Add(id)) { outcome.Error = "The modification dependencies form a cycle"; outcome.Cause = FailureCause.InvalidDefinition; outcome.Failure = FailureKind.Refused; return outcome; }
             var key = scenePatchFileKey.Length + ":" + scenePatchFileKey + id;
             try {
+                if (failed.ContainsKey(key)) {
+                    var priorFailure = failed[key];
+                    if (retryFailures && (priorFailure.ResolvedTarget == null || !IsUnsafe(priorFailure.ResolvedTarget))) failed.Remove(key);
+                }
                 if (failed.ContainsKey(key)) {
                     Observe("retry-blocked", scenePatchFileKey, id);
                     var previous = failed[key];
@@ -309,7 +317,7 @@ namespace RailroaderScenePatcher.Core {
                 catch (InvalidOperationException e) { throw new InvalidPatchDefinitionException(e.Message); }
                 foreach (var dep in dependencies) {
                     if (!entries.ContainsKey(dep)) throw new InvalidPatchDefinitionException("Dependency " + dep + " is missing from the scene patch file");
-                    var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets);
+                    var dependency = Execute(dep, entries, outcomes, visiting, scenePatchFileKey, inspectedTargets, retryFailures);
                     if (!dependency.Applied) { outcome.Cause = dependency.Cause; outcome.MapEditorOnly = dependency.MapEditorOnly; throw new AttemptFailure(FailureKind.DependencyFailed, "A required modification failed: " + dep); }
                 }
                 Modification parsed;
