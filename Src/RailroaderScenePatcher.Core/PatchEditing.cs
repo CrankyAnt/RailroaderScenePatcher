@@ -266,6 +266,8 @@ namespace RailroaderScenePatcher.Core {
                     if (item["starterPlacement"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == StarterPlacementScene.Structure)) minimum = Max(minimum, StarterPlacementScene.RequiredVersion);
                     // Crossing-pad rebinding needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingPadScene.Structure) minimum = Max(minimum, CrossingPadScene.RequiredVersion);
+                    // A milepost modification needs its capability whether or not it is available on this build.
+                    if (((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == MilepostScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == MilepostScene.Component)) minimum = Max(minimum, MilepostScene.RequiredVersion);
                     TargetIdentity target;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); } catch (InvalidOperationException) { continue; }
                     // Board placement beyond the Sylva board needs its capability whether or not it is available on this build.
@@ -403,7 +405,8 @@ namespace RailroaderScenePatcher.Core {
                     if (!moved && !turned) lines.Add("Placement: set to the placement the object has without this mod");
                 }
             }
-            if (state.Active.HasValue) lines.Add("Enabled: from " + (before?.Active == null ? "unknown" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
+            // An underlying state that was read without an activity is one whose track group switches the object.
+            if (state.Active.HasValue) lines.Add("Enabled: from " + (before == null ? "unknown" : before.Active == null ? "controlled by its track group" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
             if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
             if (state.Starter?.Track != null) lines.Add("Track location: from " + Location(before?.Starter?.Track) + " to " + Location(state.Starter.Track));
             if (state.Coverage != null) foreach (var circuit in state.Coverage.Circuits)

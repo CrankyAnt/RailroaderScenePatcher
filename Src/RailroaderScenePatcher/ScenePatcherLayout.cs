@@ -614,7 +614,7 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) placementMode = mode; })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
@@ -833,22 +833,21 @@ namespace RailroaderScenePatcher {
         }
         static string Kind(EquipmentAddition item) => item.Source.IsDefinition ? "Bell" : "Light or gate";
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
-        // adapter refuses, such as a milepost's, or that the operation is for markers and pads. It is one plain sentence
+        // adapter refuses, or that the operation is for markers, mileposts and pads. It is one plain sentence
         // (CommandBand.Sentence): the tooltip's Unavailable: and the section it stands in name what is unavailable.
         string BindingUnavailable() {
             // A marker or pad the adapter refuses says why under Supported edits; so does a starter placement marker.
             var family = selected?.Family;
-            if ((family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker") && CommandBand.Refusal(selected.Operations) is string reason)
+            if ((family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker" || family == "Milepost") && CommandBand.Refusal(selected.Operations) is string reason)
                 return CommandBand.Sentence(reason);
-            // A milepost holds a marker too, but the inventory lists it as a milepost and records no binding problem for
-            // it: ask the marker adapter why it refuses this object.
+            // Another object that holds a marker: ask the marker adapter why it refuses this object.
             try {
                 if (selected?.Handle is GameObject target && target != null && target.GetComponents<Component>().Any(c => c != null && c.GetType().FullName == TrackMarkerWorld.MarkerType)) {
                     var refusal = TrackMarkerWorld.Problem(target, NativeInventory.LastReferrers, null);
                     if (refusal != null) return CommandBand.Sentence(refusal);
                 }
             } catch { }
-            return "Track binding applies to Generic track markers and crossing pads.";
+            return "Only Generic track markers, mileposts and crossing pads have editable track bindings.";
         }
         void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; for (var i = 0; i < coverageFields.Length; i++) coverageFields[i] = ""; }
         // The message that says a form is open. It leaves when the form closes or another one opens.
@@ -865,7 +864,7 @@ namespace RailroaderScenePatcher {
             var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
             // A crossing pad has the binding of its marker: setting it regenerates the pad along the track there.
             var pad = selected.Identity.Structure == CrossingPadScene.Structure;
-            var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure;
+            var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure;
             var block = marker ? EditBlock() : BindingUnavailable();
             if (coverage && coverageCircuit == null && equipmentSource != null) DrawEquipmentForm(builder);
             Section(builder, "Replacement targets");
@@ -1309,7 +1308,7 @@ namespace RailroaderScenePatcher {
                     }
                     var pad = structure == CrossingPadScene.Structure;
                     // An object without a binding names that first; why it cannot be edited in general comes second.
-                    var unavailable = pad || structure == TrackMarkerScene.Structure ? block : selected == null ? block : BindingUnavailable();
+                    var unavailable = pad || structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure ? block : selected == null ? block : BindingUnavailable();
                     var confirmed = selection?.Confirmed?.Identity;
                     var segment = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
                     return new[] {
@@ -1335,7 +1334,7 @@ namespace RailroaderScenePatcher {
                     // A part that a culler of the game switches by camera distance cannot hold an Enabled setting.
                     var switched = block == null && target != null && selected.GroupPath != null ? GroupWorld.SwitchedPart(target) : null;
                     return new[] {
-                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched, () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
+                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
                         Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
                             () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
@@ -1520,8 +1519,8 @@ namespace RailroaderScenePatcher {
                     new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and culls it with its own equipment. A rejected device names why it does not qualify." },
                     new[] { "Bells", "Adds a bell with sound from a bell definition in the content library. It rings when the crossing controller rings its own bell. Rejected definitions show why they cannot be used." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
-                    new[] { "Other families", "Mileposts have their own operation." } },
-                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
+                    new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." } },
+                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {
                     new[] { "Remove modification", "In the footer on every tab. Deletes this mod's modification. The object returns to its underlying state, not to an earlier patched position." },

@@ -299,6 +299,7 @@ class Program {
         CompositionTests.Run();
         BindingTests.Run();
         CrossingPadTests.Run();
+        MilepostTests.Run();
         DuplicateMarkerIdTests.Run();
         DiagnosticTests.Run();
         MultipleModTests.Run();

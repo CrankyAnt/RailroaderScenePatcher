@@ -467,6 +467,11 @@ namespace RailroaderScenePatcher {
             if (pad) Read(() => padRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : CrossingPadWorld.PadProblem(go, markerReferrers, setups));
             var padEditable = pad && padRefusal == null;
+            var milepost = family == "Milepost";
+            string milepostRefusal = milepost ? "the milepost capability is unavailable" : null;
+            if (milepost) Read(() => milepostRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
+                : MilepostWorld.MilepostProblem(go, markerReferrers, setups));
+            var milepostEditable = milepost && milepostRefusal == null;
             string groupRefusal = null; GroupRootVerdict verdict = null;
             if (groupRoot) Read(() => { verdict = GroupWorld.VerdictOf(go); groupRefusal = GroupWorld.Problem(go); });
             string partRefusal = null, groupPath = null;
@@ -486,15 +491,17 @@ namespace RailroaderScenePatcher {
             });
             else if (part) { }
             else if (groupRoot) { if (verdict?.Disposition != GroupDisposition.Group) only = verdict?.ReasonIsSentence == true ? CommandBand.NotYetSupportedBecause(verdict.Reason) : CommandBand.NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant()); }
-            else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter);
+            else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost);
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
+            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
             var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight" : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
                 : pad ? CommandBand.NotEditable(padRefusal)
+                : milepostEditable ? CommandBand.MilepostOperations
+                : milepost ? CommandBand.NotEditable(milepostRefusal)
                 : coverageEditable ? "Select the tracks each circuit detects, or explicitly detach it. Add detection for extra tracks you explicitly select, or add eligible lights, gates and bells driven by the crossing controller. Native spans stay registered and the crossing itself does not move"
                 : CommandBand.NotEditable(coverageRefusal);
             // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.

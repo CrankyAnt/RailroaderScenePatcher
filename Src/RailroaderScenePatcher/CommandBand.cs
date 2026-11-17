@@ -108,6 +108,10 @@ namespace RailroaderScenePatcher {
         internal static string TrackGroup(bool editable) => editable
             ? "Activity follows the track group. Disable holds it inactive; Clear activity returns it to the group; an explicit enable is refused."
             : "Activity follows the track group.";
+        // Why the activity control cannot run, or null. The patcher refuses an explicit enable of an object whose activity
+        // follows its track group, so Enable is inactive with that reason beforehand; Disable stays available.
+        internal static string ActivityReason(bool enable, bool followsGroup) => enable && followsGroup ? GroupEnableReason : null;
+        internal const string GroupEnableReason = "The track group controls this object's activity. Use Clear activity to let the object follow its group again.";
         // Whether the open help closes on a tab switch: the help of a tab that is no longer the open tab. The help of
         // the outliner or of the window stays.
         internal static bool ClosesHelp(string openRegion, string tab, IEnumerable<string> tabs) {
@@ -337,10 +341,12 @@ namespace RailroaderScenePatcher {
         // The caption of a coverage role, in words: the scene patch file's "approachA" reads "Approach A".
         internal static string RoleCaption(string role) => CircuitCoverage.RoleCaption(role);
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
-        // every mode. An object that cannot be edited keeps Numeric, which shows its placement, and has every other mode
-        // inactive with the object's own reason.
-        internal static string ModeBlock(int mode, bool pad, bool editable, string operations) =>
-            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : null;
+        // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
+        // placement, and has every other mode inactive with the object's own reason.
+        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false) =>
+            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : null;
+        // Why Follow is inactive for a milepost: the milepost capability covers fixed placement, activity and the binding.
+        internal const string MilepostNoFollow = "Mileposts use fixed placement. Set the track binding under Connections.";
         // A target confirmed in the world and not yet used is the one green relation: the relations it would replace,
         // the followed and the bound track, are not drawn beside it, and return once it is used or withdrawn.
         internal static bool ShowsCurrentRelations(bool confirmedShown) => !confirmedShown;
@@ -350,6 +356,8 @@ namespace RailroaderScenePatcher {
         // that placement relative to a track without binding the marker to it. The binding is set under Connections.
         internal const string PadFollowsTrack = "A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections.";
         internal static string PadModeBlock(int mode) => mode == NumericMode || mode == GizmoMode || mode == SnapMode || mode == FollowMode ? PadFollowsTrack : null;
+        // What a milepost's Supported edits says: placement, activity and binding as separate settings, and what stays unchanged.
+        internal const string MilepostOperations = "Edit the milepost's fixed placement and activity, or set, replace or detach its track binding. These are separate settings. Binding edits update the marker's location and track-graph registration. The model, mile value and displayed text stay unchanged";
         // What a crossing pad's Supported edits says: its binding and its activity, and no placement of its own.
         internal const string PadOperations = "Pad binding: set or replace the marker location with its graph registration and regenerate the pad geometry and culling; activity is a separate setting. The pad follows its track, so it has no placement of its own";
         // Whether the fields of an edit hold the object's current values: the edit would change nothing, so its

@@ -301,6 +301,18 @@ After a change the patcher verifies the track-marker rules. It also checks that 
 
 One native journey on Railroader 0.6.2 with patcher commit `a282015` observed the pad Mg74 shift along the track after a rebinding, refusal of a missing segment and an out-of-range distance, native Undo and Redo, removal, and Save with a native map editor reload that reproduced one modification and one registration. A second journey with commit `ab2816f` measured that the rebinding changed the pad's vertex hash and moved its culling sphere 0.993 metres along the track while the sphere stayed aligned with the new bounds, and that native Undo and Remove modification restored the original vertex hash, bounds and culling sphere exactly. A pad that holds a duplicate marker id follows the rule under Markers with a duplicate marker id. See [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md) for editing instructions and limits.
 
+### Milepost
+
+The milepost adapter recognizes an object with one `Helpers.MilePost`, the Generic `Track.TrackMarker` it requires and its `Helpers.TextSynchronizer`. Set the target `component` to `Helpers.MilePost` and `structure` to `milepost-v1`. A milepost target named with `Track.TrackMarker` or `track-marker-v1` does not resolve to the milepost. A Generic-marker target on a milepost is refused before mutation. The track-marker adapter's consumer rules apply, except that the milepost itself may hold its marker and listen to its location changes. The object must have no missing script and no `Track.TrackCurveMeshBuilder`. A modification may set `relationships.trackMarker`, `placement`, `active`, or any combination. Each is a separate setting.
+
+A `trackMarker` setting writes the milepost marker's serialized location and graph registration as for a Generic marker, including the track-group subscription when the milepost's activity follows its track group. A detach leaves no registration. Placement moves the milepost root and refreshes its renderer cullers without changing the binding. `active: false` is an explicit disable. For a milepost whose activity follows its track group, `active: true` is refused before mutation, as under Markers with group-driven activity.
+
+No setting changes the milepost's model, mile value (`mileage`), prefix, origin flag or displayed text, or recalculates a mile value. The first time something asks a milepost for its origin, the game caches the origin milepost object for that prefix. The cache holds the object, not its location. A placement or binding edit leaves the entry unchanged: it remains absent or present with the same object.
+
+After a change, the adapter verifies the track-marker rules and checks that the prefix, origin flag, mile value, displayed text, model and origin cache entry match their values before the change. It checks rendered texts only if the milepost was active before the change, because text that has never been awake fills in when the milepost first becomes active. A difference fails the modification and restores the captured location, registration, subscription, placement and activity. If the restored milepost state still differs from the captured state, the patcher reports incomplete cleanup and blocks further operations on that milepost for the load.
+
+The capability is incompatible with a game build whose milepost does more than call an empty `UpdateMileage` when its marker's location changes. The patcher does not repair a milepost binding before the game's marker check at world load. A broken binding therefore still raises the game's warning once in that load; the patcher repairs it during normal application. A milepost with a duplicate marker id follows the rule under Markers with a duplicate marker id. See [reposition or rebind a milepost](repositioning-mileposts.md) for the editing route and limits.
+
 ### Crossing
 
 The patcher recognizes an object holding one `Track.Crossings.GradeCrossingController` whose circuit list is non-empty and whose circuits each hold an approach A, island and approach B span with an ID. The target `component` is `Track.Crossings.GradeCrossingController`; set `structure` to `crossing-coverage-v1`. A modification may set only `relationships.crossingCoverage` and `relationships.crossingEquipment`; `placement`, `active` and `trackMarker` are refused before changing anything.
@@ -404,6 +416,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification with `relationships.crossingCoverage`, including a detection addition, a `Track.Crossings.GradeCrossingController` target component, or target `structure` `crossing-coverage-v1` | `0.5.0` |
 | Any modification with `relationships.crossingEquipment` | `0.5.0` |
 | Any modification whose target `structure` is `crossing-pad-v1` | `0.5.0` |
+| A modification with `Helpers.MilePost` as its target component or `milepost-v1` as its target `structure` | `0.5.0` |
 | Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |
 | Any modification whose target `structure` is `baked-scenery-group-v1` | `0.5.0` |
 | A modification whose target `structure` is `baked-scenery-part-v1` | `0.5.0` |
