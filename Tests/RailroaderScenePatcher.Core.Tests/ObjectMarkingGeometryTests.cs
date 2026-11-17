@@ -35,6 +35,12 @@ static class ObjectMarkingGeometryTests {
         ObjectMarkingGeometry.Frame(anchor, Eye, parts, Camera, View, new List<string>());
     static bool Inside(ScreenRect r, double x, double y) => x >= r.X && x <= r.Right && y >= r.Y && y <= r.Bottom;
 
+    // The frame of one part with the given box and no ground, for comparing a cut frame with the box it should be.
+    static ObjectMarkingFrame Unground(WorldPoint center, WorldPoint extents) => ObjectMarkingGeometry.Frame(new WorldPoint(center.X, center.Y, center.Z), Eye,
+        new[] { new ObjectMarkingPart("box", center, extents, null, ObjectMarkingPartKind.Mesh, null) }, Camera, View, new List<string>());
+    // Two outlines are the same when each point of one lies within a hundredth of a pixel of a point of the other.
+    static bool SameOutline(IReadOnlyList<ScreenPoint> a, IReadOnlyList<ScreenPoint> b) =>
+        a != null && b != null && a.Count == b.Count && a.All(p => b.Any(q => Math.Abs(p.X - q.X) < .01 && Math.Abs(p.Y - q.Y) < .01));
     public static void Run() {
         // A 10 m shed 100 m ahead: its front face, 95 m away, is 10/95 of the half view high, about 76 pixels, and a
         // margin of 4 pixels on each side.
@@ -270,17 +276,32 @@ static class ObjectMarkingGeometryTests {
         var wideWhole = Post(null, 8).Frame.Value; var wideCut = Post(0, 8).Frame.Value;
         Check(wideCut.Y == wideWhole.Y && wideCut.Bottom < wideWhole.Bottom - 20, "a wide part is cut at the surface like a narrow one");
         // A platform 40 m long on a slope: the ground rises from 2 m under the camera's height at its left end to 2 m
-        // above it at its right end. The platform reaches from 3 m under to 3 m above. Cut piece by piece, the frame
-        // reaches lower at the left end, where more of the platform stands above the ground, than at the right end.
+        // above it at its right end. The platform reaches from 3 m under to 3 m above. Its frame is one box: the
+        // platform's box with its lower face raised to the lowest ground under the pieces that stand above it, 1.5 m
+        // under the camera's height under the leftmost of its four 10 m pieces. Both ends reach equally low.
         Func<double, double, double?> slope = (x, z) => x / 10;
         var platform = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
             new[] { new ObjectMarkingPart("platform", new WorldPoint(0, 0, 100), new WorldPoint(20, 3, 2), null, ObjectMarkingPartKind.Mesh, slope) }, Camera, View, new List<string>());
         var level = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
             new[] { new ObjectMarkingPart("platform", new WorldPoint(0, 0, 100), new WorldPoint(20, 3, 2), null, ObjectMarkingPartKind.Mesh, (x, z) => 0) }, Camera, View, new List<string>());
         double Lowest(ObjectMarkingFrame frame, bool leftHalf) { var mid = (frame.Frame.Value.X + frame.Frame.Value.Right) / 2; return frame.Outline.Where(q => leftHalf ? q.X < mid - 40 : q.X > mid + 40).Max(q => q.Y); }
-        Check(Lowest(platform, true) > Lowest(platform, false) + 10, "a long platform on a slope is cut along the slope: its frame reaches lower at the downhill end (" + Lowest(platform, true) + " and " + Lowest(platform, false) + ")");
+        Check(Math.Abs(Lowest(platform, true) - Lowest(platform, false)) < 1, "a long platform on a slope is framed by one box: both ends reach equally low (" + Lowest(platform, true) + " and " + Lowest(platform, false) + ")");
         Check(Math.Abs(Lowest(level, true) - Lowest(level, false)) < 1, "on level ground both ends are cut at one height");
-        Check(Lowest(platform, true) > Lowest(level, true) + 5 && Lowest(platform, false) < Lowest(level, false) - 2, "the downhill end shows more and the uphill end less than on level ground: " + Lowest(platform, true) + " " + Lowest(level, true) + " " + Lowest(platform, false) + " " + Lowest(level, false));
+        Check(Lowest(platform, true) > Lowest(level, true) + 5, "the box keeps all that stands above the lowest ground, more than on level ground: " + Lowest(platform, true) + " " + Lowest(level, true));
+        Check(SameOutline(platform.Outline, Unground(new WorldPoint(0, .75, 100), new WorldPoint(20, 2.25, 2)).Outline), "the platform's frame is the outline of its box raised to 1.5 m under the camera's height");
+        // A heap 16 m wide, half buried in a slope that rises along both X and Z: the ground under its four pieces lies
+        // at -1, 0, 0 and +1 m; it reaches from 2.5 m under to 0.5 m above. The piece on the high corner lies wholly under
+        // the ground; the others stand above it. The frame is one box from the lowest of those grounds, -1 m, to the
+        // heap's top, never a hull that follows the slope.
+        Func<double, double, double?> tilted = (x, z) => (x + (z - 100)) / 8;
+        var heap = ObjectMarkingGeometry.Frame(new WorldPoint(0, -1, 100), Eye,
+            new[] { new ObjectMarkingPart("heap", new WorldPoint(0, -1, 100), new WorldPoint(8, 1.5, 8), null, ObjectMarkingPartKind.Mesh, tilted) }, Camera, View, new List<string>());
+        Check(SameOutline(heap.Outline, Unground(new WorldPoint(0, -.25, 100), new WorldPoint(8, .75, 8)).Outline), "a half-buried heap on a slope is framed by one box from the lowest ground under what stands above to its top");
+        // A grouped object on the same slope: one box around both parts, cut the same way.
+        var pair = ObjectMarkingGeometry.Frame(new WorldPoint(0, -1, 100), Eye, new[] {
+            new ObjectMarkingPart("heap", new WorldPoint(-4, -1, 100), new WorldPoint(4, 1.5, 8), null, ObjectMarkingPartKind.Mesh, tilted),
+            new ObjectMarkingPart("heap (1)", new WorldPoint(4, -1, 100), new WorldPoint(4, 1.5, 8), null, ObjectMarkingPartKind.Mesh, tilted) }, Camera, View, new List<string>());
+        Check(SameOutline(pair.Outline, heap.Outline), "two parts on a slope are framed by the same one box as the part that covers them both");
         // A bridge over a valley: the ground lies far under its middle and at deck height under its ends. Nothing of
         // the deck above the ground is lost, and the frame is as wide as the whole bridge.
         Func<double, double, double?> valley = (x, z) => Math.Abs(x) > 15 ? -1 : -30;
@@ -320,7 +341,7 @@ static class ObjectMarkingGeometryTests {
         // A rail bridge with track on its deck: a truss 40 m long from 2 m under the rail to 6 m above it. The terrain
         // lies at rail height under its two ends and 30 m lower under the span; the track lies on the deck all along.
         // A surface that took the track for the ground would cut the truss at rail level. The truss keeps its lower
-        // chords over the valley and is cut only where it meets the terrain at its ends.
+        // chords over the valley: its frame is one box, and the lowest terrain under it, in the valley, raises nothing.
         Func<double, double, double?> underBridge = (x, z) => ObjectMarkingGeometry.Surface(Math.Abs(x) > 12 ? 0 : -30, new[] { 0.3 });
         Func<double, double, double?> trackAsGround = (x, z) => 0.3;
         ObjectMarkingFrame Truss(Func<double, double, double?> ground) => ObjectMarkingGeometry.Frame(new WorldPoint(0, 2, 100), Eye,
@@ -328,8 +349,7 @@ static class ObjectMarkingGeometryTests {
         var trussWhole = Truss(null).Frame.Value; var truss = Truss(underBridge); var trussWrong = Truss(trackAsGround).Frame.Value;
         Check(Math.Abs(truss.Frame.Value.Bottom - trussWhole.Bottom) < .01 && truss.Frame.Value.X == trussWhole.X && truss.Frame.Value.Right == trussWhole.Right && truss.Frame.Value.Y == trussWhole.Y, "a truss with track on its deck keeps its lower chords over the valley");
         Check(trussWrong.Bottom < trussWhole.Bottom - 10, "the same truss cut at the track on its deck would lose them, which is what the surface rule prevents");
-        double EndLowest(ObjectMarkingFrame frame, bool leftEnd) => frame.Outline.Where(q => leftEnd ? q.X < frame.Frame.Value.X + 30 : q.X > frame.Frame.Value.Right - 30).Max(q => q.Y);
-        Check(EndLowest(truss, true) < trussWhole.Bottom - 10 && EndLowest(truss, false) < trussWhole.Bottom - 10, "at its two ends the truss is cut where it meets the terrain: " + EndLowest(truss, true) + " and " + EndLowest(truss, false) + " against " + trussWhole.Bottom);
+        Check(SameOutline(truss.Outline, Truss(null).Outline), "the truss is framed by its one whole box, not notched where it meets the terrain at its ends");
         // Burial is decided for the object. A sign on a post with a footing that lies wholly under the ground: the
         // footing is not framed, and the frame ends at the ground.
         Func<double, double, double?> flat = (x, z) => 0;
@@ -348,14 +368,17 @@ static class ObjectMarkingGeometryTests {
         var tunnelled = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Part("post", 2, 3, .5, roof), Part("footing", -3, 1, 1.5, roof) }, Camera, View, new List<string>());
         var uncut = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Part("post", 2, 3, .5, null), Part("footing", -3, 1, 1.5, null) }, Camera, View, new List<string>());
         Check(tunnelled.Frame.Value.Bottom == uncut.Frame.Value.Bottom && tunnelled.Frame.Value.Y == uncut.Frame.Value.Y && tunnelled.Frame.Value.Width == uncut.Frame.Value.Width, "an object wholly under the surface above it, as in a tunnel, is framed whole with all its parts");
-        // A box turned 45 degrees and 40 m long is divided along its own length, read from its corners: on ground
-        // that rises along that length it is cut along the slope. Read along the world axes instead, its pieces
-        // would not follow it.
+        // A box turned 45 degrees and 40 m long is divided along its own length, read from its corners. On ground that
+        // rises along that length, 1.5 m under the camera's height under its lowest piece, it stays one box turned with
+        // it: its lower face rises to that lowest ground. Read along the world axes instead, its pieces would not
+        // follow it.
         Func<double, double, double?> diagonal = (x, z) => (x + (z - 100)) / 14.142;
         ObjectMarkingFrame TurnedBox(Func<double, double, double?> ground) => ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
             new[] { new ObjectMarkingPart("turned", new WorldPoint(0, 0, 100), new WorldPoint(15.6, 3, 15.6), Turned(0, 0, 100, 20, 2, 3), ObjectMarkingPartKind.Mesh, ground) }, Camera, View, new List<string>());
         var turnedSlope = TurnedBox(diagonal); var turnedLevel = TurnedBox(flat); var turnedWhole = TurnedBox(null);
-        Check(Lowest(turnedSlope, true) > Lowest(turnedLevel, true) + 3 && Lowest(turnedSlope, false) < Lowest(turnedLevel, false) - 1, "a turned box is cut along the slope under its own length: lower at its low end, higher at its high end (" + Lowest(turnedSlope, true) + ", " + Lowest(turnedLevel, true) + ", " + Lowest(turnedSlope, false) + ", " + Lowest(turnedLevel, false) + ")");
+        var turnedRaised = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye,
+            new[] { new ObjectMarkingPart("turned", new WorldPoint(0, .75, 100), new WorldPoint(15.6, 2.25, 15.6), Turned(0, .75, 100, 20, 2, 2.25), ObjectMarkingPartKind.Mesh, null) }, Camera, View, new List<string>());
+        Check(SameOutline(turnedSlope.Outline, turnedRaised.Outline), "a turned box on a slope under its own length is framed by one box turned with it, raised to the lowest ground under it");
         Check(turnedLevel.Frame.Value.X == turnedWhole.Frame.Value.X && turnedLevel.Frame.Value.Right == turnedWhole.Frame.Value.Right && turnedLevel.Frame.Value.Y == turnedWhole.Frame.Value.Y && turnedLevel.Frame.Value.Bottom < turnedWhole.Frame.Value.Bottom, "cut on level ground, the turned box keeps its width and top and loses what lies under the ground");
         // Dividing a box changes nothing where nothing is cut: the outline of the pieces is the outline of the box.
         var far = TurnedBox((x, z) => -100);
