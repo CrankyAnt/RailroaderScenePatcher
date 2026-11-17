@@ -267,7 +267,9 @@ class Program {
         InspectionTests.Run();
         StarterPlacementTests.Run();
         StarterTrackLocationTests.Run();
+        GuidedTaskTests.Run();
         CommandBandTests.Run();
+        EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
         SelectionTests.Run();
