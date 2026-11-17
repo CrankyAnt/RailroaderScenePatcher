@@ -14,6 +14,7 @@ class Node : IHierarchyNode {
     public bool Serialized { get; set; } = true;
     public bool HasFamily { get; set; }
     public bool LodLevel { get; set; }
+    public bool Animated { get; set; }
     public IReadOnlyList<string> Components => Own;
     public IReadOnlyList<IHierarchyNode> Children => Kids;
     public Node(string name, params Node[] children) { Name = name; Kids.AddRange(children); }
@@ -21,6 +22,7 @@ class Node : IHierarchyNode {
     public Node Solid() { Physical = true; return this; }
     public Node Family() { HasFamily = true; return this; }
     public Node Lod() { LodLevel = true; return this; }
+    public Node Driven() { Animated = true; return this; }
 }
 // Quaternions in x, y, z, w order for the controlled worlds.
 static class Turn {
@@ -35,6 +37,8 @@ static class Turn {
 // and the part it stands below. Switched: a game-object culler switches it by camera distance.
 class FakePart {
     public string Id; public double[] Offset; public double[] Rotation = { 0, 0, 0, 1 }; public bool Active = true; public bool Culled, Switched;
+    // The game turns or moves this part while it runs, as a gauge needle turns a clock hand.
+    public bool Animated;
     // For a switched part: whether its culler shows it now. Off while its culler hides it, it counts as on.
     public bool Shown = true;
     public FakePart Parent; public FakeGroup Group;
@@ -99,7 +103,7 @@ class FakeGroupWorld : IGroupWorld {
     public GroupObservation Observe(object target) {
         var group = (FakeGroup)target;
         return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), group.Active),
-            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, p.Active, p.Culled, p, p.Parent)),
+            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, p.Active, p.Culled, p, p.Parent, p.Animated)),
             group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, Required(group, c), (object)c.On ?? group, c.Lists, c.Switcher)), group.Parent, group.RootCulling);
     }
     public void SetActive(object target, bool active) {

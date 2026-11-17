@@ -72,7 +72,7 @@ namespace RailroaderScenePatcher.Core {
             this.patcherVersion = patcherVersion; this.gameVersion = gameVersion;
         }
         // Applies the scene patch files of loaded mods in the given native load order. Only a mod that declares the patcher
-        // dependency, or the native map editor's edit target, reaches the engine, which checks whether its target map is in the map context.
+        // dependency, or the native map editor's edit target, reaches the engine, which checks whether its scene target map is in the map context.
         public IReadOnlyList<LoadedScenePatchFile> ApplyLoaded(IEnumerable<LoadedMod> loadOrder, IOverlapNotices notices) {
             if (loadOrder == null) throw new ArgumentNullException(nameof(loadOrder));
             var scenePatchFiles = new List<LoadedScenePatchFile>();

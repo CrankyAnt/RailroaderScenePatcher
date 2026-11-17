@@ -5,7 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 namespace UnityEngine { sealed class SerializeField : Attribute { } }
-class Scene : IScene, IInspectionScene {
+class Scene : IScene, IInspectionScene, IMapPatchContext {
+    // The map patches in the map context, as while the native map editor edits a map patch.
+    public string[] MapPatches = new string[0];
+    public IEnumerable<string> MapPatchIds => MapPatches;
     public Func<IEnumerable<SceneObservation>> Observations;
     public IEnumerable<SceneObservation> Discover() => Observations == null ? Array.Empty<SceneObservation>() : Observations();
     public IEnumerable<string> MapIds => Maps;
@@ -243,7 +246,7 @@ class Program {
         AssertWholeScenePatchFileRejected(Doc(validIndependent + ",\" \":{}"), "Missing modification identity after a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent + "," + Item("independent", "p")), "Duplicate modification identity after a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent + ",\"number\":42"), "Non-object modification after a valid entry");
-        AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid target map with a valid entry");
+        AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid scene target map with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"), "Duplicate envelope property with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":2"), "Unsupported scene patch file version with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Substring(0, Doc(validIndependent).Length - 1), "Unreadable truncated scene patch file containing a valid entry");

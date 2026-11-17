@@ -42,6 +42,8 @@ namespace RailroaderScenePatcher {
         static Dictionary<GameObject, PartVerdict> partVerdicts = new Dictionary<GameObject, PartVerdict>();
         static string verdictKey;
         static int verdictFrame = -1;
+        // The transforms the game animates below the loaded World roots, read with the verdicts.
+        static HashSet<Transform> driven = new HashSet<Transform>();
         internal static void Invalidate() { verdicts = null; verdictKey = null; }
         internal static IReadOnlyDictionary<GameObject, GroupRootVerdict> Verdicts() {
             // One check of the hierarchy per frame serves every question asked in it.
@@ -61,12 +63,14 @@ namespace RailroaderScenePatcher {
             if (verdicts != null && verdictKey == text) return verdicts;
             var found = new Dictionary<GameObject, GroupRootVerdict>();
             var parts = new Dictionary<GameObject, PartVerdict>();
+            var drivenNow = new HashSet<Transform>();
+            foreach (var world in worlds) AddDriven(world.transform, drivenNow);
             foreach (var world in worlds) {
-                var classified = BakedSceneryRules.Classify(new HierarchyNode(world.transform));
+                var classified = BakedSceneryRules.Classify(new HierarchyNode(world.transform, drivenNow));
                 foreach (var verdict in classified) found[((HierarchyNode)verdict.Node).Transform.gameObject] = verdict;
                 foreach (var part in BakedSceneryRules.Parts(classified)) parts[((HierarchyNode)part.Node).Transform.gameObject] = part;
             }
-            verdictKey = text; partVerdicts = parts;
+            verdictKey = text; partVerdicts = parts; driven = drivenNow;
             return verdicts = found;
         }
         internal static PartVerdict PartVerdictOf(GameObject go) { if (go == null) return null; Verdicts(); return partVerdicts.TryGetValue(go, out var verdict) ? verdict : null; }
@@ -108,6 +112,7 @@ namespace RailroaderScenePatcher {
         // The rule's view of one loaded object; components and children are read once.
         sealed class HierarchyNode : IHierarchyNode {
             internal readonly Transform Transform;
+            readonly HashSet<Transform> driven;
             string[] components; IHierarchyNode[] children; bool physical; bool? family, lod;
             // Read only for the objects below a listed group root.
             public bool LodLevel => lod ?? (lod = IsLodLevel(Transform)).Value;
@@ -120,7 +125,7 @@ namespace RailroaderScenePatcher {
                 var own = t.GetComponentsInChildren<Renderer>(true).Where(r => r != null && BakedSceneryRules.GivesPresence(r.GetType().FullName, true, false, false)).ToArray();
                 return own.Length != 0 && own.All(levels.Contains);
             }
-            internal HierarchyNode(Transform transform) { Transform = transform; }
+            internal HierarchyNode(Transform transform, HashSet<Transform> driven) { Transform = transform; this.driven = driven; }
             public string Name => Transform.name;
             void Read() {
                 if (components != null) return;
@@ -135,9 +140,10 @@ namespace RailroaderScenePatcher {
             // Read only where the rule asks: for candidates and the children of crossings.
             public bool HasFamily => family ?? (family = Transform.GetComponents<Component>().Any(c => c != null && !(c is Transform) && NativeInventory.FamilyOf(c) != null)).Value;
             public bool Serialized => (Transform.gameObject.hideFlags & HideFlags.DontSave) == 0;
+            public bool Animated => driven.Contains(Transform);
             public IReadOnlyList<IHierarchyNode> Children {
                 get {
-                    if (children == null) { children = new IHierarchyNode[Transform.childCount]; for (var i = 0; i < children.Length; i++) children[i] = new HierarchyNode(Transform.GetChild(i)); }
+                    if (children == null) { children = new IHierarchyNode[Transform.childCount]; for (var i = 0; i < children.Length; i++) children[i] = new HierarchyNode(Transform.GetChild(i), driven); }
                     return children;
                 }
             }
@@ -218,10 +224,11 @@ namespace RailroaderScenePatcher {
             var state = new ObjectState(new Placement(Coordinates(position), Coordinates(rotation)), Authored(root));
             var parts = new List<GroupPart>();
             var listed = Listed(root);
+            Verdicts();
             foreach (var part in root.GetComponentsInChildren<Transform>(true)) {
                 if (part == t || Transient(part, t)) continue;
                 var local = t.InverseTransformPoint(part.position); var turn = Quaternion.Inverse(t.rotation) * part.rotation;
-                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), part.gameObject.activeSelf, Switched(part, listed), part.gameObject, part.parent == t ? null : part.parent.gameObject));
+                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), part.gameObject.activeSelf, Switched(part, listed), part.gameObject, part.parent == t ? null : part.parent.gameObject, Animated(part, t)));
             }
             var cullers = new List<GroupCuller>();
             foreach (var culler in root.GetComponentsInChildren(simple, true)) {
@@ -291,6 +298,24 @@ namespace RailroaderScenePatcher {
             }
             for (var i = 0; i < 8; i++)
                 yield return matrix.MultiplyPoint3x4(local.center + Vector3.Scale(local.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+        }
+        // The game's components that turn or move a transform of baked scenery while it runs. Railroader 0.6.3: a
+        // RollingStock.GaugeNeedle rotates its needle whenever its value changes, and the depot clock's ClockController
+        // sets the value of one for each hand every frame. The needle can be any transform, wherever the gauge stands. One
+        // detection serves the part rule and the group observation: every gauge below a loaded World root, and the
+        // transform its needle field names.
+        static readonly Type gaugeNeedle = Native.Type("RollingStock.GaugeNeedle");
+        static readonly FieldInfo needleField = gaugeNeedle?.GetField("needle", Native.Flags);
+        static void AddDriven(Transform world, HashSet<Transform> found) {
+            if (needleField == null || needleField.FieldType != typeof(Transform)) return;
+            foreach (var gauge in world.GetComponentsInChildren(gaugeNeedle, true))
+                if (gauge != null && needleField.GetValue(gauge) is Transform needle && needle != null) found.Add(needle);
+        }
+        // The part or an object above it, below the root, is a transform the game animates.
+        static bool Animated(Transform part, Transform root) {
+            if (driven.Count == 0) return false;
+            for (var t = part; t != null && t != root; t = t.parent) if (driven.Contains(t)) return true;
+            return false;
         }
         static bool Transient(Transform child, Transform root) {
             for (var t = child; t != null && t != root; t = t.parent) if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return true;

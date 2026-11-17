@@ -50,7 +50,13 @@ static class BellTests {
         AudioLivesAsLongAsItsBell();
         EditingOffersBellsAndUndoRedoRemoveThem();
         SaveAndReloadReproduceOneBell();
+        AddedBellsSortLikeTheNativeCrossingBell();
         Console.WriteLine("PASS: controller-bound crossing bell eligibility, construction, audio lifetime, refusal, restoration and scene patch editing");
+    }
+    // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer gives its crossing bell player audio
+    // priority 9 (0.6.2: 10). An added bell's player uses the same priority, so the game sorts it like the native bell.
+    static void AddedBellsSortLikeTheNativeCrossingBell() {
+        Assert(EquipmentAddition.BellPriority == 9, "An added bell uses the native crossing bell's audio priority");
     }
     static void ABellIsBuiltFromItsDefinitionAndBoundToTheController() {
         var f = new Fixture();

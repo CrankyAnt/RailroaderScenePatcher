@@ -185,35 +185,35 @@ namespace RailroaderScenePatcher.Core {
         // Set when native Undo or Redo threw. The native manager then keeps an open partial group, so later
         // native edits reach neither its stack nor its change count. No Save in this session can prove a clean state.
         string unrecovered;
-        // The target map a new scene patch file names: the lowest map layer the game composes for the edited map definition,
+        // The scene target map a new scene patch file names: the lowest map layer the game composes for the edited map definition,
         // or that definition itself when it has no map layers. mapIds is the loaded map context as the game resolves it,
         // the edited map definition followed by all its map layers, layers of layers included, topmost first, so the last
-        // entry is the bottom layer. An existing scene patch file keeps the target map it names; see ADR 0006.
-        public static string TargetMapFor(IEnumerable<string> mapIds) {
+        // entry is the bottom layer. An existing scene patch file keeps the scene target map it names; see ADR 0006.
+        public static string SceneTargetMapFor(IEnumerable<string> mapIds) {
             var last = (mapIds ?? throw new ArgumentNullException(nameof(mapIds))).LastOrDefault();
             if (String.IsNullOrWhiteSpace(last)) throw new InvalidOperationException("Loaded map context unavailable");
             return last;
         }
-        // The target map of the edited mod's scene patch file, or, while that scene patch file does not exist, the target map
+        // The scene target map of the edited mod's scene patch file, or, while that scene patch file does not exist, the scene target map
         // scene patch editing would write for it. Null while the session cannot read the scene patch file. Copy ID names this map.
-        public string TargetMap => scenePatchFile == null ? null : (string)scenePatchFile.Root["sourceMap"]["mapId"];
+        public string SceneTargetMap => scenePatchFile == null ? null : (string)scenePatchFile.Root["sourceMap"]["mapId"];
         // Why Copy ID is unavailable in this session, or null: the session's own refusal while it cannot read the
-        // edited mod's scene patch file, because that scene patch file names a target map the session does not know.
+        // edited mod's scene patch file, because that scene patch file names a scene target map the session does not know.
         public string CopyIdRefusal => scenePatchFile == null ? Blocked ?? "The scene patch file is unavailable" : null;
-        // The inspected object's target map, target identity and placement as scene patch file JSON: what Copy ID copies.
+        // The inspected object's scene target map, target identity and placement as scene patch file JSON: what Copy ID copies.
         public string CopyId(SceneObservation entry) {
             var refusal = CopyIdRefusal;
             if (refusal != null) throw new InvalidOperationException(refusal);
-            return CopyId(TargetMap, entry);
+            return CopyId(SceneTargetMap, entry);
         }
-        // Copy ID without scene patch editing names the target map a new scene patch file would name for the loaded map context.
-        public static string CopyId(IEnumerable<string> mapIds, SceneObservation entry) => CopyId(TargetMapFor(mapIds), entry);
-        static string CopyId(string targetMap, SceneObservation entry) {
+        // Copy ID without scene patch editing names the scene target map a new scene patch file would name for the loaded map context.
+        public static string CopyId(IEnumerable<string> mapIds, SceneObservation entry) => CopyId(SceneTargetMapFor(mapIds), entry);
+        static string CopyId(string sceneTargetMap, SceneObservation entry) {
             if (entry == null) throw new ArgumentNullException(nameof(entry));
             var target = new JObject { ["scene"] = entry.Identity.Scene, ["path"] = entry.Identity.Path, ["component"] = entry.Identity.Component };
             if (entry.Identity.Structure != null) target["structure"] = entry.Identity.Structure;
             return new JObject {
-                ["sourceMap"] = new JObject { ["mapId"] = targetMap },
+                ["sourceMap"] = new JObject { ["mapId"] = sceneTargetMap },
                 ["target"] = target,
                 ["placement"] = new JObject { ["mode"] = "fixed", ["position"] = new JArray(entry.Position), ["rotation"] = new JArray(entry.Rotation) }
             }.ToString();
@@ -232,7 +232,7 @@ namespace RailroaderScenePatcher.Core {
             if (metadataError != null) { Blocked = "The edited mod's Info.json cannot be read. " + ScenePatchFile.Sentence(metadataError) + MetadataSuffix; return; }
             if (scenePatchFileError != null) Blocked = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(scenePatchFileError);
             else try {
-                if (diskText == null) { scenePatchFile = ScenePatchFile.Create(TargetMapFor(scene.MapIds)); return; }
+                if (diskText == null) { scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); return; }
                 var loaded = ScenePatchFile.Load(diskText);
                 Blocked = Refusal(loaded, diskText);
                 if (Blocked == null) { scenePatchFile = loaded; saved = PreservingJson.Parse(diskText).Root; }
@@ -1159,7 +1159,10 @@ namespace RailroaderScenePatcher.Core {
             unrecovered = "Native Undo or Redo stopped on an error: " + error.Message + ". The native history is unrecovered and may no longer record edits. Save still writes the current state, but the native map editor stays unsaved until it is reloaded.";
             IncompleteOperation = unrecovered;
         }
-        public void HistoryChanged() { identity.Observe(); nativeIdentity?.Observe(); }
+        // Raised after a history change outside native Undo and Redo was accounted, such as a patch-only edit, so the native
+        // title and Save button can be rebuilt from IsDirty. Undo and Redo refresh once their history identity settled.
+        public Action OutstandingMayHaveChanged;
+        public void HistoryChanged() { identity.Observe(); nativeIdentity?.Observe(); if (!historyExecuting) OutstandingMayHaveChanged?.Invoke(); }
         // The native editor reached its pre-attachment clean state for the first time.
         public void AlignNativeCleanHistory() {
             if (historyExecuting) alignNativeCleanPending = true;
@@ -1210,13 +1213,33 @@ namespace RailroaderScenePatcher.Core {
             return "Unsaved work: " + String.Join(", ", outstanding) + "." + (IncompleteOperation == null ? "" : " " + IncompleteOperation);
         }
 
+        // Why Save is refused now, or null: the file is checked again first, so a pending version choice, a file that needs
+        // repair, an original or backup that changed after a fresh start or a version backup, and an Info.json the dependency
+        // check cannot raise are all found before the native Save button writes terrain or map data.
+        public string SaveRefusalBeforeWrite() {
+            if (scenePatchFile == null) return null;
+            CheckFileVersion();
+            if (SaveRefusal != null) return SaveRefusal;
+            if (replacementBackup != null) {
+                try { CheckReplacement(); }
+                catch (Exception e) { var reason = e.Message; return reason.Length == 0 ? reason : Char.ToUpperInvariant(reason[0]) + reason.Substring(1); }
+            }
+            return DependencyRefusal();
+        }
+        // A dry run of the dependency write on a fresh read of Info.json: why it would fail, or null. Save reads and raises the
+        // file again when it writes.
+        string DependencyRefusal() {
+            if (scenePatchFile.Modifications.Count == 0) return null;
+            try { DependencyMetadata.Raise(storage.ReadModInfo(), modId, MinimumPatcherVersion); return null; }
+            catch (Exception e) { return "Dependency metadata was not written: " + e.Message; }
+        }
         // The Save route. BeginSave runs before the native map write and throws when a patcher write fails;
         // CompleteNativeSave follows the native write; FailSave follows any exception of the attempt.
         public void BeginSave() {
             written.Clear();
+            var refusal = SaveRefusalBeforeWrite();
+            if (refusal != null) throw new InvalidOperationException(refusal);
             if (scenePatchFile == null) return;
-            CheckFileVersion();
-            if (!CanSaveForReload) throw new InvalidOperationException(SaveRefusal);
             if (scenePatchFile.Modifications.Count != 0) {
                 try {
                     var fresh = storage.ReadModInfo();

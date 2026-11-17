@@ -111,6 +111,7 @@ static class BakedPartTests {
         EditOfAPartWithAChildLeavesTheInventoryCurrent();
         SearchMatchesThePartNameAsShown();
         RefreshClearsTheStaleRefusal();
+        PartsTheGameAnimatesDoNotMakeTheInventoryStale();
         Console.WriteLine("PASS: baked scenery parts: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
@@ -432,6 +433,46 @@ static class BakedPartTests {
                 Assert(!inventory.IsStale, "After " + name + " the inventory stays current: " + inventory.StaleReason);
             }
         }
+    }
+
+    // Railroader 0.6.3 turns the hands of the Bryson depot clock while the editor runs: a ClockController sets the value of a
+    // GaugeNeedle, which rotates its needle transform. Such a transform and everything below it is no part, so its
+    // rotation never makes the inventory stale, and the group's layout guard does not count it, so the group still moves.
+    // The hand stays in its group and moves with it. A native edit of a sibling part still makes the inventory stale.
+    static void PartsTheGameAnimatesDoNotMakeTheInventoryStale() {
+        var world = new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Saw Mill",
+            new Node("Ramp").Solid(),
+            new Node("Clock", new Node("Minutes", new Node("Hand", new Node("Tip").Solid()).Solid().Driven())).Solid()))));
+        var parts = BakedSceneryRules.Parts(BakedSceneryRules.Classify(world));
+        PartVerdict At(string name) => parts.SingleOrDefault(v => v.Path == Mill + "/" + name);
+        Assert(At("Clock/Minutes/Hand")?.Disposition == PartDisposition.NotListed && At("Clock/Minutes/Hand")?.Reason == BakedSceneryRules.AnimatedParts
+            && At("Clock/Minutes/Hand/Tip")?.Reason == BakedSceneryRules.AnimatedParts, "A transform the game animates, and what moves with it, is no part");
+        Assert(At("Clock")?.Disposition == PartDisposition.Part && At("Ramp")?.Disposition == PartDisposition.Part, "Its still siblings and ancestors stay parts");
+
+        // The fixture lists the parts the rule lists; the hand stands in the group without an entry.
+        var f = new Fixture(); var (_, _, session) = Session(f);
+        var hand = f.Group.Add(new FakePart { Id = "Clock/Minutes/Hand#7", Offset = new[] { 2.0, 3, 0 }, Animated = true });
+        var inventory = new SceneInventory(f); inventory.Refresh();
+        Assert(!inventory.Entries.Any(e => ReferenceEquals(e.Handle, hand)), "The animated hand has no inventory entry");
+        hand.Rotation = Turn.Yaw(90); inventory.CheckFreshness();
+        Assert(!inventory.IsStale, "The game turning the hand leaves the inventory current: " + inventory.StaleReason);
+        Assert(session.Edit(GroupId, new Placement(GroupTarget, GroupTurn), null).Applied, "The group still moves after the hand turned");
+        hand.Rotation = Turn.Yaw(180);
+        Assert(session.Edit(GroupId, new Placement(Plus(GroupTarget, new[] { 1.0, 0, 0 }), GroupTurn), null).Applied, "A hand that turned between two edits does not stop the group");
+        Assert(inventory.ReobserveRelated(inventory.Entries.Single(e => ReferenceEquals(e.Handle, f.Group))) != null, "The moved group is observed again");
+        inventory.CheckFreshness();
+        Assert(!inventory.IsStale, "After the group moves the inventory stays current: " + inventory.StaleReason);
+        var groups = new BakedSceneryGroups(f.World, holds: f.Holds);
+        var captured = groups.Capture(f.Group);
+        hand.Rotation = Turn.Yaw(270);
+        Assert(groups.Restore(f.Group, captured), "A group restores to a snapshot taken before the hand turned");
+        f.Ramp.Offset = new[] { 4.0, 0, 2 };
+        Assert(!groups.Restore(f.Group, captured), "A sibling that moved still fails the restore check");
+        f.Ramp.Offset = new[] { 4.0, 0, 0 };
+        inventory.CheckFreshness();
+        Assert(!inventory.IsStale, "The inventory is current before the native edit: " + inventory.StaleReason);
+        f.Ramp.Offset = new[] { 4.0, 0, 2 }; inventory.CheckFreshness();
+        Assert(inventory.IsStale && inventory.StaleReason.Contains("Ramp"), "A native edit of a sibling part still makes the inventory stale: " + inventory.StaleReason);
     }
 
     static void SearchMatchesThePartNameAsShown() {

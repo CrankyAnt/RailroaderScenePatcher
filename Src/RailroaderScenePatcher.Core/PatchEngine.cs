@@ -88,6 +88,31 @@ namespace RailroaderScenePatcher.Core {
         public bool LeavesActivity { get; private set; }
         public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true };
     }
+    // A map context that holds map patches, as the native map editor's does while it edits a map patch. In a save a map
+    // patch is never in the map context.
+    public interface IMapPatchContext {
+        IEnumerable<string> MapPatchIds { get; }
+    }
+    // Whether a scene patch file's scene target map lets it apply in the map context, shared by the engine and scene patch
+    // editing.
+    public static class SceneTargetMapCheck {
+        public const string Mismatch = "The scene target map is neither the loaded map nor one of its layers";
+        // The maps a scene patch file can name in the scene's map context: its map IDs without the map patches.
+        public static string[] Valid(IScene scene) {
+            var patches = scene is IMapPatchContext context ? (context.MapPatchIds ?? Enumerable.Empty<string>()).ToArray() : new string[0];
+            return scene.MapIds.Where(id => !patches.Contains(id, StringComparer.Ordinal)).ToArray();
+        }
+        // Why a scene patch file naming mapId does not apply in the scene's map context, or null. A map patch in the native
+        // map editor's map context does not count: the game skips a scene patch file that names a map patch in play.
+        public static string Problem(IScene scene, string mapId) {
+            var maps = scene.MapIds.ToArray();
+            if (!maps.Contains(mapId, StringComparer.Ordinal)) return Mismatch;
+            if (scene is IMapPatchContext context && (context.MapPatchIds ?? Enumerable.Empty<string>()).Contains(mapId, StringComparer.Ordinal))
+                return "The scene target map " + mapId + " is a map patch. The game would skip this scene patch file in a save because a map patch is never the loaded map or one of its layers. Use the bottom map layer, "
+                    + PatchEditingSession.SceneTargetMapFor(maps) + ", as the scene target map";
+            return null;
+        }
+    }
     public interface IScene {
         IEnumerable<string> MapIds { get; }
         Capability Capability { get; }
@@ -230,7 +255,8 @@ namespace RailroaderScenePatcher.Core {
             var scenePatchFile = ScenePatchFile.Load(json);
             if (!scenePatchFile.CanWrite) { result.Error = scenePatchFile.Error; result.MapEditorOnly = true; return result; }
             try {
-                if (!scene.MapIds.Contains((string)scenePatchFile.Root["sourceMap"]["mapId"], StringComparer.Ordinal)) { result.Error = "Target map does not match the loaded map context"; result.MapEditorOnly = true; return result; }
+                var mapProblem = SceneTargetMapCheck.Problem(scene, (string)scenePatchFile.Root["sourceMap"]["mapId"]);
+                if (mapProblem != null) { result.Error = mapProblem; result.MapEditorOnly = true; return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var entries = Entries(scenePatchFile.Modifications);
                 sharedAdditions = SharedAdditionIds(entries.Values);

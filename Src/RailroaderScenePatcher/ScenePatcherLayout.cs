@@ -289,7 +289,7 @@ namespace RailroaderScenePatcher {
                     .Tooltip("Clear", CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Applied changes stay. During guided Values or Review, only cancel a pending world choice and keep the target and draft.", clear));
                 var copy = CommandBand.CopyId(selected != null, attachment?.Session.CopyIdRefusal);
                 Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
-                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's target map, target identity and placement as scene patch file JSON.", copy));
+                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the inspected object's scene target map, target identity and placement as scene patch file JSON.", copy));
                 row.Spacer();
                 // The window's "?" belongs in the title bar; it stands here only when the title bar could not take it.
                 if (!presentation.TitleHelp) HelpButton(row, NativePresentation.WindowHelpRegion, "Window");
@@ -1427,7 +1427,6 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Scene patch file");
                 PlainLabel(builder, FullDiagnosis(attachment.Session));
                 Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(attachment.Session));
-                if (NativeSaveGuard.Error != null) PlainLabel(builder, NativeSaveGuard.Error);
                 Button(builder, "Reload Map Editor...", () => MapEditorReload.Request(attachment, MapEditorReload.ActiveMapId))
                     .Disable(MapEditorReload.Error != null);
                 if (MapEditorReload.Error != null) PlainLabel(builder, MapEditorReload.Error);
@@ -1454,8 +1453,7 @@ namespace RailroaderScenePatcher {
             if (String.IsNullOrEmpty(scenePatchFileInspection)) Line(builder, definitionsStale ? "Not read yet; select Refresh" : "None", null, null);
             else PlainLabel(builder, scenePatchFileInspection);
             Section(builder, "Diagnostics");
-            if (diagnostics.Count == 0 && presentation.EntryProblem == null && NativeSaveGuard.Error == null) Line(builder, "None", null, null);
-            if (NativeSaveGuard.Error != null) builder.AddLabel(Tint(Amber, NativeSaveGuard.Error));
+            if (diagnostics.Count == 0 && presentation.EntryProblem == null) Line(builder, "None", null, null);
             if (presentation.EntryProblem != null) builder.AddLabel(Tint(Amber, presentation.EntryProblem));
             foreach (var diagnostic in diagnostics) PlainLabel(builder, diagnostic);
         }
@@ -1500,7 +1498,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Track group", "Some markers switch with their track group. For those, an explicit enable is refused." },
                     new[] { "Dependencies", "Culling, masks, graph registration and other state that follows an edit. Indirect references are not inspected." },
                     new[] { "Runtime state", "Enabled flags the game switches while it runs. They are shown and do not make the inventory stale." },
-                    new[] { "Copy ID", "Copies the identity with the target map as scene patch file JSON." } },
+                    new[] { "Copy ID", "Copies the identity with the scene target map as scene patch file JSON." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {

@@ -19,8 +19,8 @@ namespace RailroaderScenePatcher {
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
-            context = value; Hooks.Install(); NativeSaveGuard.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this);
-            if (NativeSaveGuard.Error != null) context.Log.Info(NativeSaveGuard.Error);
+            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this);
+            if (NativeSaveClick.Problem != null) context.Log.Info(NativeSaveClick.Problem);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
@@ -94,7 +94,7 @@ namespace RailroaderScenePatcher {
             NativeRepairHooks.Reset();
             world?.Release();
             ReleaseReporter();
-            MapEditorReload.Remove(); NativeSaveGuard.Remove(); Hooks.Remove(); NativeRepairHooks.Remove();
+            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove();
         }
         void ReleaseReporter() {
             if (reporter == null) return;
@@ -157,11 +157,11 @@ namespace RailroaderScenePatcher {
         // stay through a tab switch.
         static EditFeedback NewFeedback() {
             var created = new EditFeedback();
-            foreach (var place in new[] { ModificationPlace, "Copy ID", "Fit" }) created.GeneralPlaces.Add(place);
+            foreach (var place in new[] { ModificationPlace, SavePlace, "Copy ID", "Fit" }) created.GeneralPlaces.Add(place);
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = "Gizmo", SnapPlace = "Snap", ActivityPlace = "Activity",
-            ModificationPlace = "Modification", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells";
+            ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells";
         // The place of the open equipment form's messages: its bells or its lights and gates.
         string EquipmentPlace => equipmentSource?.IsDefinition == true ? BellPlace : LightGatePlace;
         bool staleLogged = true;
@@ -271,7 +271,8 @@ namespace RailroaderScenePatcher {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
-            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native);
+            ModScenePatchFiles.Log = message => context?.Log.Info(message);
+            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             engine = new PatchEngine(capabilities);
@@ -443,6 +444,11 @@ namespace RailroaderScenePatcher {
             try {
                 attachment = new MapEditorAttachment(engine, found); Hooks.Current = attachment;
                 attachment.VersionChanged = VersionChanged;
+                attachment.SaveRefused = reason => {
+                    feedback.Refuse(SavePlace, "Save", reason);
+                    var alert = CommandBand.SaveRefusalAlert(presentation != null && presentation.IsOpen, reason);
+                    if (alert != null) UI.Common.ModalAlertController.PresentOkay(alert.Value.Title, alert.Value.Message);
+                };
                 attachment.Session.Replayed = identity => replayed.Add(identity);
                 attachment.Session.HistoryNotice = feedback.QueueHistoryNotice;
                 // The patcher's own Save writes the scene patch file: that text is what the definitions on disk now are, so it
@@ -1384,7 +1390,7 @@ namespace RailroaderScenePatcher {
                 status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
-        // Copy ID names the target map of the edited mod's scene patch file, or the one scene patch editing would write for it.
+        // Copy ID names the scene target map of the edited mod's scene patch file, or the one scene patch editing would write for it.
         string Identity(SceneObservation entry) =>
             attachment != null ? attachment.Session.CopyId(entry) : PatchEditingSession.CopyId(ModScenePatchFiles.MapIds(), entry);
         // Focus needs the inspected object, not a fresh inventory: it moves the camera to where the object is now. It

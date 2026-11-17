@@ -13,7 +13,10 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IDisposable {
+    public sealed class SceneCapabilities : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
+        // Supplied by the host: the map patches in the map context, which only the native map editor's context holds.
+        public Func<IEnumerable<string>> MapPatches { get; set; }
+        public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();
         // The frame belongs to the adapter that resolved the object; an adapter without frames reports none.
         public Placement FramePlacement(object target) => target != null && owners.TryGetValue(target, out var owner) && owner is IFramedScene framed ? framed.FramePlacement(target) : null;
         // The observation of one object, when the inspection source can make it.

@@ -101,4 +101,5 @@ The scene, path and coordinates are placeholders. Use the values the editor show
 - Bells have a fixed map placement. Track-following placement, the transform gizmo and snapping are not available for bells.
 - The crossing's own bell is not edited, moved or silenced.
 - A bell definition supplied by another mod makes your mod depend on that mod. The patcher does not declare that dependency; declare it yourself in your mod's `Info.json`.
+- In Railroader 0.6.3, an added bell has the same audio priority as the crossing's own bell.
 - The pattern and its checks come from Railroader 0.6.2 build 26335745, where the crossing controller's own bell and the locomotive bell load their definitions through the same route. Expected native behavior for other definitions is based on this checked mechanism, without an individual trial of every sound.

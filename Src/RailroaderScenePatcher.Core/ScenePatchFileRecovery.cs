@@ -40,10 +40,11 @@ namespace RailroaderScenePatcher.Core {
             if (!loaded.CanWrite) return loaded.Error;
             if (loaded.EditError != null) return loaded.EditError;
             var map = loaded.Root["sourceMap"]["mapId"];
-            if (scene.MapIds.Contains((string)map, StringComparer.Ordinal)) return null;
-            const string message = "Target map does not match the loaded map context";
-            ScenePatchFileDiagnostics = loaded.Diagnostics.Concat(new[] { ScenePatchFileDiagnostic.Create(text, "sourceMap.mapId", message,
-                "The ID of the edited map or one of its map layers, which are " + String.Join(", ", scene.MapIds), map) }).ToArray();
+            var message = SceneTargetMapCheck.Problem(scene, (string)map);
+            if (message == null) return null;
+            var expected = message == SceneTargetMapCheck.Mismatch ? "The ID of the edited map or one of its map layers, excluding any map patch. Valid IDs: " + String.Join(", ", SceneTargetMapCheck.Valid(scene))
+                : "The bottom map layer's ID: " + SceneTargetMapFor(scene.MapIds);
+            ScenePatchFileDiagnostics = loaded.Diagnostics.Concat(new[] { ScenePatchFileDiagnostic.Create(text, "sourceMap.mapId", message, expected, map) }).ToArray();
             return message;
         }
         // Recovery replaces a protected session's scene patch file only before anything else happened in it: no unsaved native
@@ -91,7 +92,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!ScenePatchFileExists()) throw new InvalidOperationException("The scene patch file no longer exists; reopen the native map editor to start a new one");
                 var backup = recovery.BackupScenePatchFile();
                 if (String.IsNullOrWhiteSpace(backup) || !recovery.MatchesPatchBackup(backup)) throw new InvalidOperationException("The backup of the original scene patch file could not be verified; the original stays protected");
-                scenePatchFile = ScenePatchFile.Create(TargetMapFor(scene.MapIds));
+                scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds));
                 replacementBackup = backup; LastBackup = backup; saved = null; comparedVersion = -1;
                 ScenePatchFileDiagnostics = Array.Empty<ScenePatchFileDiagnostic>();
                 Blocked = null;

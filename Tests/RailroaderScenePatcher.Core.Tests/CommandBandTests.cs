@@ -9,6 +9,7 @@ static class CommandBandTests {
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     internal static void Run() {
         LampsShowOneWordAndColourPerState();
+        ARefusedSaveIsShownEvenWithTheWindowClosed();
         LampWordsFitOrMoveIntoTheTooltip();
         CommandsAreDisabledOnlyForTheirOwnReason();
         MarkersStandBeforeTheName();
@@ -23,6 +24,16 @@ static class CommandBandTests {
         SharedRulesHoldAtEveryCallSite();
         ReasonsReadAsOnePlainSentence();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    // The Map Editor's Save button stays enabled. A refused Save shows its reason in the message area of the open window; with
+    // the window closed, a native alert in the style of Save Failed shows it, so the click never looks ignored.
+    static void ARefusedSaveIsShownEvenWithTheWindowClosed() {
+        const string reason = "The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version.";
+        Check(CommandBand.SaveRefusalAlert(true, reason) == null, "The open window shows the refusal in its message area, without an alert");
+        var alert = CommandBand.SaveRefusalAlert(false, reason);
+        Check(alert != null && alert.Value.Title == "Save refused" && alert.Value.Message == "Nothing was saved. " + reason, "The closed window's alert gives the reason: " + alert);
+        var lower = CommandBand.SaveRefusalAlert(false, "the original scene patch file or its backup changed after fresh start");
+        Check(lower.Value.Message == "Nothing was saved. The original scene patch file or its backup changed after fresh start.", "The reason reads as one sentence: " + lower.Value.Message);
     }
     // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
     // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.

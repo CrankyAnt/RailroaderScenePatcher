@@ -83,6 +83,11 @@ namespace RailroaderScenePatcher {
             text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
             return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
         }
+        // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
+        // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
+        // ignored click.
+        internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason) =>
+            windowOpen ? ((string Title, string Message)?)null : ("Save refused", "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";

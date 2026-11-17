@@ -12,74 +12,59 @@ using RailroaderScenePatcher.Core;
 using UI.Builder;
 
 namespace RailroaderScenePatcher {
-    // The native Map Editor row builds Save inside a compiler-generated callback. Patch only the
-    // Disable call belonging to that button and leave the other native controls untouched.
-    internal static class NativeSaveGuard {
-        const string Id = "crankyant.scene-patcher.save-guard";
+    // The native Map Editor's Save button stays enabled with its own unsaved tint and tooltip. Its click callback writes the
+    // edited terrain before MapEditor.Save, so a Save refusal runs before that callback: it reports the patcher's reason in the
+    // scene patch editing feedback, or in a native alert while the Scene patches window is closed, and skips the callback,
+    // which leaves no native Save Failed alert. Without this hook the edited terrain tiles are already written when the
+    // refusal stops the map write from the Save prefix, and the refusal reaches the native Save Failed alert.
+    internal static class NativeSaveClick {
+        const string Id = "crankyant.scene-patcher.save-click";
         static Harmony harmony;
-        static MethodBase target;
         static FieldInfo mapEditorField;
-        internal static string Error { get; private set; }
+        // Why the click hook is not installed, for the log only, or null.
+        internal static string Problem { get; private set; }
         static IEnumerable<Type> Nested(Type type) {
             foreach (var nested in type.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)) {
                 yield return nested;
                 foreach (var child in Nested(nested)) yield return child;
             }
         }
-        static int SaveDisable(System.Collections.Generic.IList<CodeInstruction> code) {
-            var matches = new System.Collections.Generic.List<int>();
-            for (var i = 0; i < code.Count; i++) {
-                if (code[i].opcode != OpCodes.Ldstr || !Equals(code[i].operand, "Save")) continue;
-                for (var j = i + 1; j < code.Count; j++) {
-                    if (code[j].opcode == OpCodes.Ldstr) break;
-                    if (code[j].operand is MethodInfo method && method.Name == "Disable") {
-                        var p = method.GetParameters();
-                        if (!method.IsStatic && method.DeclaringType == typeof(IConfigurableElement) && method.ReturnType == typeof(IConfigurableElement) && p.Length == 1 && p[0].ParameterType == typeof(bool)) matches.Add(j);
-                        break;
-                    }
-                }
-            }
-            return matches.Count == 1 ? matches[0] : -1;
+        static bool CallsSave(MethodBase method, MethodInfo save) {
+            try { return PatchProcessor.GetOriginalInstructions(method).Any(i => (i.opcode == OpCodes.Call || i.opcode == OpCodes.Callvirt) && Equals(i.operand, save)); }
+            catch { return false; }
         }
         internal static void Install() {
-            if (harmony != null || Error != null) return;
+            if (harmony != null || Problem != null) return;
             var patcher = new Harmony(Id);
             try {
                 var window = Native.Type("Game.MapEditor.MapEditorWindow") ?? throw new MissingMemberException("Native map editor window unavailable");
+                var mapEditor = Native.Type("Game.MapEditor.MapEditor") ?? throw new MissingMemberException("Native map editor unavailable");
+                var save = mapEditor.GetMethod("Save", Native.Flags, null, Type.EmptyTypes, null) ?? throw new MissingMethodException("Native map editor Save unavailable");
                 var candidates = Nested(window).SelectMany(t => t.GetMethods(Native.Flags | BindingFlags.DeclaredOnly))
-                    .Where(m => m.GetMethodBody() != null)
-                    .Where(m => { try { return SaveDisable(PatchProcessor.GetOriginalInstructions(m)) >= 0; } catch { return false; } }).ToArray();
-                if (candidates.Length != 1) throw new MissingMethodException("Native Save control could not be identified uniquely");
-                target = candidates[0];
-                var mapEditor = Native.Type("Game.MapEditor.MapEditor");
-                var fields = target.DeclaringType.GetFields(Native.Flags).Where(f => !f.IsStatic && f.FieldType == mapEditor).ToArray();
-                if (target.IsStatic || mapEditor == null || fields.Length != 1) throw new MissingMemberException("Native Save control Map Editor identity unavailable");
+                    .Where(m => !m.IsStatic && m.GetParameters().Length == 0 && m.GetMethodBody() != null && CallsSave(m, save)).ToArray();
+                if (candidates.Length != 1) throw new MissingMethodException("Native Save click could not be identified uniquely");
+                var fields = candidates[0].DeclaringType.GetFields(Native.Flags).Where(f => !f.IsStatic && f.FieldType == mapEditor).ToArray();
+                if (fields.Length != 1) throw new MissingMemberException("Native Save click Map Editor identity unavailable");
                 mapEditorField = fields[0];
-                patcher.Patch(target, transpiler: new HarmonyMethod(typeof(NativeSaveGuard).GetMethod(nameof(Transpile), Native.Flags)));
+                patcher.Patch(candidates[0], prefix: new HarmonyMethod(typeof(NativeSaveClick).GetMethod(nameof(BeforeClick), Native.Flags)));
                 harmony = patcher;
             } catch (Exception e) {
-                patcher.UnpatchAll(Id); target = null; mapEditorField = null;
-                Error = "The Map Editor Save control is unavailable: " + e.GetBaseException().Message;
+                try { patcher.UnpatchAll(Id); } catch { }
+                mapEditorField = null;
+                Problem = "The patcher could not add its checks to the Save button. Refused saves will show the game's Save Failed alert. Details: " + e.GetBaseException().Message;
             }
         }
-        internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; target = null; mapEditorField = null; }
-        static IEnumerable<CodeInstruction> Transpile(IEnumerable<CodeInstruction> instructions) {
-            var code = instructions.ToList();
-            var index = SaveDisable(code);
-            if (index < 0) throw new InvalidOperationException("Native Save control changed");
-            var loadOwner = new CodeInstruction(OpCodes.Ldarg_0);
-            loadOwner.labels.AddRange(code[index].labels); code[index].labels.Clear();
-            code.Insert(index, loadOwner);
-            code[index + 1].opcode = OpCodes.Call;
-            code[index + 1].operand = typeof(NativeSaveGuard).GetMethod(nameof(ConfigureSave), Native.Flags);
-            return code;
-        }
-        static IConfigurableElement ConfigureSave(IConfigurableElement element, bool disabled, object owner) {
+        internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; mapEditorField = null; }
+        static bool BeforeClick(object __instance) {
             var current = Hooks.Current;
-            var reason = current != null && ReferenceEquals(mapEditorField?.GetValue(owner), current.MapEditor) ? current.Session.SaveRefusal : null;
-            var configured = element.Disable(disabled || reason != null);
-            if (reason != null) configured.Tooltip("Save", reason);
-            return configured;
+            if (current == null || !ReferenceEquals(mapEditorField?.GetValue(__instance), current.MapEditor)) return true;
+            string refusal;
+            try { refusal = current.Session.SaveRefusalBeforeWrite(); }
+            catch (Exception e) { refusal = "The scene patch file could not be checked before saving: " + e.GetBaseException().Message; }
+            if (refusal == null) return true;
+            try { current.Log("Save refused: " + refusal); current.SaveRefused(refusal); }
+            finally { current.VersionChanged(); current.RefreshChrome(); }
+            return false;
         }
     }
     // The native map editor's own undo manager, read through the internal members this capability checks.
@@ -121,6 +106,7 @@ namespace RailroaderScenePatcher {
         internal string Fault;
         internal Action<string> Log = _ => { };
         internal Action VersionChanged = () => { };
+        internal Action<string> SaveRefused = _ => { };
         internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list); }
         readonly EventInfo changed;
         readonly Action handler;
@@ -137,6 +123,9 @@ namespace RailroaderScenePatcher {
             nativeDirty = new NativeDirtyTracker(history, ChangeCount, ChangeCount != cleanCount, cleanCount);
             changed = Manager.GetType().GetEvent("DidChange", Native.Flags);
             if (changed == null || changed.EventHandlerType != typeof(Action)) throw new MissingMemberException("Native history notification unavailable");
+            // The native controller rebuilds the title and Save button on this notification before this handler accounts for
+            // the change, so a patch-only edit refreshes them again. Undo and Redo refresh once their history identity settled.
+            Session.OutstandingMayHaveChanged = RefreshChrome;
             handler = () => {
                 try { Session.HistoryChanged(); var ignored = NativeDirty; }
                 catch (Exception e) { Fault = "Could not track a change to the Map Editor history: " + e.GetBaseException().Message; }
@@ -206,7 +195,8 @@ namespace RailroaderScenePatcher {
         static HarmonyMethod Method(string name) => new HarmonyMethod(typeof(Hooks).GetMethod(name, Native.Flags));
         static MapEditorAttachment For(object mapEditor) { var current = Current; return current != null && ReferenceEquals(current.MapEditor, mapEditor) ? current : null; }
         static MapEditorAttachment ForManager(object manager) { var current = Current; return current != null && ReferenceEquals(current.Manager, manager) ? current : null; }
-        // Runs before the native map write. A failing patcher write aborts the Save and reaches the native Save Failed alert.
+        // Runs before the native map write. A refusal the Save click did not catch first, and a failing patcher write, abort the
+        // Save and reach the native Save Failed alert.
         static void BeforeSave(object __instance) {
             var current = For(__instance);
             if (current == null) return;

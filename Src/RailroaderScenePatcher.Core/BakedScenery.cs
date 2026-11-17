@@ -19,6 +19,8 @@ namespace RailroaderScenePatcher.Core {
         // A level of a LOD group on an object above it: every renderer at and below this object is one the LOD group
         // switches by camera distance.
         bool LodLevel { get; }
+        // The game turns or moves this object's transform while it runs, such as the clock hand a gauge needle turns.
+        bool Animated { get; }
         IReadOnlyList<IHierarchyNode> Children { get; }
     }
     public enum PartDisposition { Part, ExistingFamily, NotListed }
@@ -186,7 +188,8 @@ namespace RailroaderScenePatcher.Core {
         // it would list its group by camera distance.
         static bool Physical(IHierarchyNode node) => node.Serialized && (node.Physical || node.Children.Any(Physical));
         // The coverage rules that keep an object below a listed group root out of the part entries.
-        public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group";
+        public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group",
+            AnimatedParts = "Parts the game moves while running";
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
         // A part is one scene object, not a renderer or a component. An inspection-only group has no part entries.
         public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {
@@ -203,6 +206,9 @@ namespace RailroaderScenePatcher.Core {
                 var path = parentPath + "/" + child.Name;
                 if (rule != null) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, rule)); Walk(child, path, groupPath, rule, found); continue; }
                 if (!child.Serialized) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, RuntimeObject)); continue; }
+                // A transform the game animates, such as a clock hand, changes while nothing edits it, and so does
+                // everything below it: as a part it would make the inventory stale by itself. It moves with its group.
+                if (child.Animated) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, AnimatedParts)); Walk(child, path, groupPath, AnimatedParts, found); continue; }
                 if (shared.Contains(child.Name)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, AmbiguousParts)); Walk(child, path, groupPath, AmbiguousParts, found); continue; }
                 // A level of a LOD group belongs to the entry of the object that holds the LOD group.
                 if (child.LodLevel) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, LodLevels)); continue; }
@@ -233,10 +239,12 @@ namespace RailroaderScenePatcher.Core {
 
     // One scene object below a group root, observed with copied values.
     public sealed class GroupPart {
-        public GroupPart(string id, IEnumerable<double> rootPosition, IEnumerable<double> rootRotation, bool activeSelf, bool cullerSwitched, object handle = null, object parent = null) {
+        public GroupPart(string id, IEnumerable<double> rootPosition, IEnumerable<double> rootRotation, bool activeSelf, bool cullerSwitched, object handle = null, object parent = null, bool animated = false) {
             Id = id ?? throw new ArgumentNullException(nameof(id)); RootPosition = rootPosition.ToArray(); RootRotation = rootRotation.ToArray();
-            ActiveSelf = activeSelf; CullerSwitched = cullerSwitched; Handle = handle; Parent = parent;
+            ActiveSelf = activeSelf; CullerSwitched = cullerSwitched; Handle = handle; Parent = parent; Animated = animated;
         }
+        // The game animates this object or one above it below the root, so its placement is no part of the invariant.
+        public bool Animated { get; }
         // Stable for the loaded object: hierarchy path below the root and instance.
         public string Id { get; }
         // Placement relative to the group root.
@@ -372,10 +380,10 @@ namespace RailroaderScenePatcher.Core {
     // The checks that the group and part capabilities share.
     static class GroupChecks {
         internal const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01, RegistrationTolerance = 0.1;
-        // Every part keeps its identity and its place in its frame, and, unless a culler switches it, its activity. The
-        // frame of a part is the nearest part at or above it that framed names; a framed part keeps its map placement,
-        // a part below one keeps its place relative to it, and every other part keeps its place relative to the root.
-        // skip names a part that the edit changes itself.
+        // Every part keeps its identity and its place in its frame, and, unless a culler switches it, its activity; a part the
+        // game animates keeps only its identity and activity. The frame of a part is the nearest part at or above it that
+        // framed names; a framed part keeps its map placement, a part below one keeps its place relative to it, and every
+        // other part keeps its place relative to the root. skip names a part that the edit changes itself.
         internal static string Layout(GroupObservation expected, GroupObservation current, Func<object, bool> framed, object skip = null) {
             if (!expected.Parts.Select(p => p.Id).SequenceEqual(current.Parts.Select(p => p.Id))) return "the parts of the group changed";
             var index = new Dictionary<object, int>(new Identity());
@@ -384,6 +392,10 @@ namespace RailroaderScenePatcher.Core {
                 var a = expected.Parts[i]; var b = current.Parts[i];
                 if (skip != null && ReferenceEquals(b.Handle, skip)) continue;
                 var frame = -1;
+                if (a.Animated || b.Animated) {
+                    if (!a.CullerSwitched && !b.CullerSwitched && a.ActiveSelf != b.ActiveSelf) return "the activity of " + b.Id + " changed";
+                    continue;
+                }
                 for (var at = i; at >= 0; at = current.Parts[at].Parent != null && index.TryGetValue(current.Parts[at].Parent, out var up) ? up : -1)
                     if (current.Parts[at].Handle != null && framed(current.Parts[at].Handle)) { frame = at; break; }
                 double[] wasPosition, wasRotation, nowPosition, nowRotation;
