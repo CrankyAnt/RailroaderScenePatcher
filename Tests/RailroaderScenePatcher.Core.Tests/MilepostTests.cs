@@ -93,6 +93,8 @@ static class MilepostTests {
         FirstActivationOfASleepingPostApplies();
         DuplicateMarkerIdRefusesRebindButNotPlacement();
         FollowModeIsInactiveForAMilepost();
+        GroupDrivenActivityReadsAsSuch();
+        EnableIsInactiveForAGroupFollower();
         Console.WriteLine("PASS: milepost placement, activity and track binding");
     }
     static void PlacementAndBindingAreSeparateSettings() {
@@ -319,6 +321,23 @@ static class MilepostTests {
         var removed = session.Remove(post48);
         Assert(removed.Applied && !u48.Active, "Remove modification returns the post to its underlying inactive state: " + removed.Error);
         Assert(w2.Posts[u48].Mileage == 48 && w2.Posts[u48].Text == "48", "The mile value and the synchronizer text stay");
+    }
+    // A milepost whose activity follows its track group has no activity of its own without this mod: Changes says the
+    // group set it, not that it is unknown.
+    static void GroupDrivenActivityReadsAsSuch() {
+        var (world, t46, t47, session, mapEditor, store) = Session();
+        Assert(session.Edit(Post46, null, false).Applied, "The group-driven post is disabled");
+        var lines = session.Changes(Post46);
+        Assert(lines.SequenceEqual(new[] { "Enabled: from set by its track group to No" }), "Changes names the track group as the earlier activity: " + String.Join(" | ", lines));
+        Assert(PatchEditingSession.ChangeLines(new ObjectState(null, false), null).SequenceEqual(new[] { "Enabled: from unknown to No" }), "An underlying state that was never read stays unknown");
+    }
+    // Enable of an object whose activity follows its track group is refused, so the control is inactive with the reason
+    // beforehand; Disable stays available.
+    static void EnableIsInactiveForAGroupFollower() {
+        var reason = RailroaderScenePatcher.CommandBand.ActivityReason(enable: true, followsGroup: true);
+        Assert(reason == RailroaderScenePatcher.CommandBand.GroupEnableReason, "Enable is inactive for a group follower with its reason: " + reason);
+        Assert(RailroaderScenePatcher.CommandBand.ActivityReason(enable: false, followsGroup: true) == null, "Disable stays available for a group follower");
+        Assert(RailroaderScenePatcher.CommandBand.ActivityReason(enable: true, followsGroup: false) == null, "Enable stays available for an object without group-driven activity");
     }
     // Follow keeps a placement relative to a track; this capability covers fixed placement, activity and binding only.
     static void FollowModeIsInactiveForAMilepost() {

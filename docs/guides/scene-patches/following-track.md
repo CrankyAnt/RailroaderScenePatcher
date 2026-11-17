@@ -34,7 +34,7 @@ Some Generic marker objects, such as the Alarka speed sign, carry a `Track.Track
 
 - **Disable** at the bottom of the tab of the **Object** tab writes `active: false`. The patcher holds the object inactive. When the game enables that track group later, the object stays inactive; the hold also prevents a brief activation while the patch is applied again.
 - Without an `active` mod value, the game keeps switching the object with its track group. A modification without `active` never releases a disable that another modification of the same object or another mod sets.
-- **Enable** is refused for such an object. Its activity belongs to its track group; use **Clear activity** instead.
+- **Enable** is unavailable for such an object, and its tooltip gives the reason. Its activity belongs to its track group; use **Clear activity** instead. A scene patch file that sets `"active": true` for it is refused.
 - **Clear activity** removes `active` from the modification. The object follows its track group again and takes the group's current state: it is active when the group is enabled and inactive when it is not.
 - **Remove modification** also releases the hold and returns the binding, the group subscription and group-driven activity of the object without this mod's modification.
 
