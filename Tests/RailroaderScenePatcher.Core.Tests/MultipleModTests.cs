@@ -42,9 +42,9 @@ static class MultipleModTests {
             LoadedMod.Read("d/layer", Info("Layer", "crankyant/scene-patcher"), Doc(Move("m", "layer", 5), "layer")),
         };
         var scenePatchFiles = runtime.ApplyLoaded(mods, null);
-        Check(declared.X == 5 && layer.X == 5, "A loaded mod that declares the patcher dependency and whose target map or map layer applies is applied");
+        Check(declared.X == 5 && layer.X == 5, "A loaded mod that declares the patcher dependency and whose scene target map or map layer applies is applied");
         Check(undeclared.X == 0, "A loaded mod without the required patcher dependency is not considered");
-        Check(otherMap.X == 0, "A mod whose scene patch file names a target map outside the map context is not applied");
+        Check(otherMap.X == 0, "A mod whose scene patch file names a scene target map outside the map context is not applied");
         Check(scenePatchFiles.Single(d => d.Mod.Source.Identifier == "b/undeclared").Result == null, "An undeclared mod is never handed to the engine");
         Check(messages.Rows.Count == 0, "Neither a missing dependency nor a map mismatch is a player-facing application failure");
         // One log line per scene patch file per load attempt names the mod, the scene patch file's map and the outcome.

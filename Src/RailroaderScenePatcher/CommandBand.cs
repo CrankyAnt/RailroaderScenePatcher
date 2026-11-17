@@ -58,11 +58,12 @@ namespace RailroaderScenePatcher {
         internal static string CopyId(bool inspected, string refusal = null) => inspected ? refusal : "Inspect an object first.";
         // Clear ends the inspection and cancels a pending world choice: it is disabled only when there is neither.
         internal static string Clear(bool inspected, bool pending) => inspected || pending ? null : "Nothing is inspected and no world choice is pending.";
-        // The tooltip of a control: what it does, and when it cannot be used now, also why. A disabled control keeps its
-        // description, so two disabled controls with one reason still say what each would do.
-        // The reason follows the one label Unavailable: as a plain sentence (Sentence), without a label of its own.
+        // The tooltip of a control: what it does while it can be used, and otherwise only why it cannot now. The
+        // description is left out of a disabled control's tooltip, since it applies only while the control can be used;
+        // the tooltip's title still names the control. The reason follows the one label Unavailable: as a plain sentence
+        // (Sentence), without a label of its own.
         internal static string Tooltip(string description, string reason) =>
-            String.IsNullOrEmpty(reason) ? description : String.IsNullOrEmpty(description) ? Sentence(reason) : description + "\nUnavailable: " + Sentence(reason);
+            String.IsNullOrEmpty(reason) ? description : "Unavailable: " + Sentence(reason);
         // The labels a reason can carry where it is stored or shown on its own: under Supported edits, or in the
         // reason of a binding that cannot be set.
         static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Track binding unavailable: ", "Pad binding unavailable: " };
@@ -82,6 +83,11 @@ namespace RailroaderScenePatcher {
             text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
             return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
         }
+        // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
+        // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
+        // ignored click.
+        internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason) =>
+            windowOpen ? ((string Title, string Message)?)null : ("Save refused", "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
@@ -243,6 +249,9 @@ namespace RailroaderScenePatcher {
         // The supported edits of a group root of the Baked scenery group family.
         internal const string GroupOperations = "Fixed placement and activity of the whole group; culling and colliders follow the group. Decorative: moving or disabling it changes no game function";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
+        // The supported edits of a part of a listed baked scenery group.
+        internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves. Moving or disabling it does not affect game functions";
+        internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
         // The reason an object is inspection only, given as a whole clause.

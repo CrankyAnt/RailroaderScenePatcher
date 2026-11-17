@@ -5,7 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 namespace UnityEngine { sealed class SerializeField : Attribute { } }
-class Scene : IScene, IInspectionScene {
+class Scene : IScene, IInspectionScene, IMapPatchContext {
+    // The map patches in the map context, as while the native map editor edits a map patch.
+    public string[] MapPatches = new string[0];
+    public IEnumerable<string> MapPatchIds => MapPatches;
     public Func<IEnumerable<SceneObservation>> Observations;
     public IEnumerable<SceneObservation> Discover() => Observations == null ? Array.Empty<SceneObservation>() : Observations();
     public IEnumerable<string> MapIds => Maps;
@@ -175,7 +178,16 @@ class Program {
     }
     static string Item(string id, string path, string deps = "[]", string extra = "") => "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":" + deps + extra + "}";
     static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
-    static int Main() {
+    static int Main(string[] args) {
+        if (args.Length != 0) {
+            if (args.Length != 2 || args[0] != "--suite" || !args[1].EndsWith("Tests", StringComparison.Ordinal)) return 2;
+            var suite = typeof(Program).Assembly.GetType(args[1], false);
+            var run = suite?.GetMethod("Run", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (run == null || run.GetParameters().Length != 0) return 2;
+            run.Invoke(null, null);
+            Console.WriteLine("PASS: " + args[1]);
+            return 0;
+        }
         var doc = ScenePatchFile.Load(Doc("")); Assert(doc.CanWrite, "Valid scene patch file must be writable");
         Assert(!ScenePatchFile.Load(Doc("\"\":{}")).CanWrite, "Unidentifiable modifications must protect the scene patch file");
         var scene = new Scene(); var box = new Box(); scene.Objects["p"] = new List<object> { box };
@@ -234,7 +246,7 @@ class Program {
         AssertWholeScenePatchFileRejected(Doc(validIndependent + ",\" \":{}"), "Missing modification identity after a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent + "," + Item("independent", "p")), "Duplicate modification identity after a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent + ",\"number\":42"), "Non-object modification after a valid entry");
-        AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid target map with a valid entry");
+        AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"mapId\":\"map\"", "\"mapId\":null"), "Invalid scene target map with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"), "Duplicate envelope property with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":2"), "Unsupported scene patch file version with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Substring(0, Doc(validIndependent).Length - 1), "Unreadable truncated scene patch file containing a valid entry");
@@ -259,6 +271,14 @@ class Program {
         ObjectMarkingGeometryTests.RunBoxes();
         ShapeTests.Run();
         PatchEditingTests.Run();
+        ReloadDecisionTests.Run();
+        ReloadReturnTests.Run();
+        FileVersionTests.Run();
+        NativeDirtyTests.Run();
+        ReceiptFeedbackTests.Run();
+        ReceiptPriorityTests.Run();
+        ReloadRequestTests.Run();
+        ExitPromptTests.Run();
         RecoveryTests.Run();
         CanonicalSaveTests.Run();
         SnapTests.Run();
@@ -272,6 +292,7 @@ class Program {
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
+        BakedPartTests.Run();
         SelectionTests.Run();
         GameDefinedGroupTests.Run();
         BoardTests.Run();

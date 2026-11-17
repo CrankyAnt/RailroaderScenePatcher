@@ -2,41 +2,55 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Recover a protected scene patch file
 
-Use this guide when scene patch editing reports that the edited mod's `Data/scene-patches.json` is protected from overwrite. A scene patch file is protected when it cannot be read, declares a missing, unrecognized or newer format version, names another map, or holds numbers whose text cannot be kept exactly. The native map editor's Save then never writes it. When the mod's `Info.json` cannot be read, scene patch editing is unavailable as well; correct `Info.json` and use **Read again**. **Start fresh** is not offered then, because the scene patch file is not the problem.
+Use this guide when **Scene patches** reports that the edited mod's `Data/scene-patches.json` is protected from overwrite. The patcher protects a scene patch file if it cannot read it, its format version is missing, unrecognized or newer, it names another map, or it contains numbers whose written form cannot be preserved exactly. The native map editor's Save will not overwrite a protected scene patch file. If the mod's `Info.json` cannot be read, editing is also unavailable. Correct `Info.json` and click **Read again**. **Start fresh** is unavailable because the problem is in `Info.json`.
+
+If a readable scene patch file changes outside the editing session, you can choose **Use file version** or **Keep editor version**. If it is malformed, unreadable or has an unsupported version, **Scene patches** shows **File needs repair**. Before **Keep editor version** allows Save to overwrite that file, the patcher must create and verify a backup.
+
+If the scene patch file was deleted outside the editing session, **Keep editor version** needs no backup. The next Save writes the editor version.
 
 ## Read what is wrong
 
-1. Open **Scene patches** in the native map editor and open its session details with the page icon in the title bar.
-2. The **Scene patch file** section starts with the reason the scene patch file is protected. Below it, each problem shows:
+1. Open **Scene patches** in the native map editor, then click the page icon to open its session details.
+2. Read the reason for protection in the **Scene patch file** section. Each problem lists:
    - the JSON path, such as `sourceMap.mapId` or `modifications.place-board`;
    - the line or lines in the file, or **none** when a field is missing;
-   - **Text there**: the lines at that place, at most eight lines and 1,200 characters; a longer passage ends with the number of lines left out;
+   - **Text there**: up to eight lines and 1,200 characters from that place, followed by the number of omitted lines if the passage is longer;
    - **Expected**: the structure or value the format expects.
-3. Select **Format reference** to open the [scene patch file reference](scene-patch-file-v1.md) and **Recovery guide** to open this guide.
+3. Click **Format reference** to open the [scene patch file reference](scene-patch-file-v1.md) or **Recovery guide** to open this guide.
 
-The section also lists modifications of a readable scene patch file that the patcher does not execute, for example content a newer patcher version wrote. Those modifications stay in the scene patch file unchanged.
+For a readable scene patch file, the section also lists modifications the patcher cannot apply, such as content written by a newer patcher version. It preserves those modifications unchanged.
 
 ## Correct the file and read it again
 
-1. Save your native map work and reopen the native map editor if you edited the map in this session. Recovery refuses unsaved native work and a session whose Undo history has changed, so no history is replaced.
-2. Correct `Data/scene-patches.json` in a text editor. The patcher guesses no target and substitutes no nearby object: for a missing or ambiguous target, check the intended object with its [inventory identity](inspect-scene-objects.md). For a scene patch file of a newer format version, use the patcher version that wrote it if you need its content. Keep content you do not understand unless you mean to remove it.
-3. In the **Scene patch file** section, select **Read again**. Read the review, then select **Read again** to confirm, or **Cancel** to change nothing.
+1. If you edited the map in this session, save your native map work and reopen the native map editor. Recovery is unavailable if native map work is unsaved or the session's Undo history has changed. This prevents recovery from replacing history.
+2. Correct `Data/scene-patches.json` in a text editor. If an object is missing or its identity matches several objects, check the intended object's [inventory identity](inspect-scene-objects.md). The patcher does not guess which object you mean or substitute a nearby one. If you need content from a newer format version, use the patcher version that wrote it. Keep content you do not understand unless you intend to remove it.
+3. Click **Read again** and read the review. Click **Read again** to confirm or **Cancel** to leave everything unchanged.
 
-When the corrected scene patch file reads, it becomes the scene patch file of this session and its modifications are applied to the objects at once, as when the native map editor opens. The footer says how many applied and names those that did not. The file is not written. You can edit and save the scene patch file; an edit changes only the field you edit and keeps the scene patch file's other values. The inventory and the supplied definitions are read again. When the scene patch file still has a problem, it stays protected and the section shows the new diagnostics.
+If the patcher can read the corrected scene patch file, the session adopts it and applies its modifications immediately. The result reports how many modifications applied and names any that did not. Reading the scene patch file does not write it. You can then edit and save it. Each edit changes only the field you edit and preserves the other values. The patcher also rereads the inventory and the supplied definitions. If the scene patch file still has a problem, it remains protected and the diagnostics show the current problems.
 
 ## Start fresh
 
-Start fresh only when you mean to remove all content of the scene patch file, also content this patcher does not understand.
+Start fresh only if you intend to remove everything in the scene patch file, including content this patcher does not understand.
 
 1. Save your native map work and reopen the native map editor if you edited the map in this session.
-2. In the **Scene patch file** section, select **Start fresh**. Read the review, then select **Back up and start fresh**, or **Cancel** to change nothing.
-3. The patcher copies the original file byte for byte to `scene-patches.json.backup-<id>` beside it and checks the copy before anything else happens. This also works when the file is not valid text. When the copy fails, the scene patch file stays protected. The section and the footer show the backup path.
-4. Select the native map editor's **Save**. Save replaces the original with an empty scene patch file of format version 1 that names the bottom map layer of your map. The backup stays; the patcher never deletes or restores it.
+2. Click **Start fresh** and read the review. Click **Back up and start fresh** to confirm or **Cancel** to leave everything unchanged.
+3. The patcher makes a byte-for-byte copy of the original beside it, named `scene-patches.json.backup-<id>`, and verifies the copy before proceeding. This works even if the original is not valid text. If the copy fails, the scene patch file remains protected. The backup path appears in the **Scene patch file** section and the result message.
+4. Click the native map editor's **Save**. It replaces the original with an empty scene patch file in format version 1, naming your map's bottom map layer. The patcher keeps the backup and never deletes or restores it.
 
-When the original or the backup changed after **Back up and start fresh**, Save refuses to replace the original and keeps both files. Reopen the native map editor to read the scene patch file again.
+If the original or the backup changes after **Back up and start fresh**, Save is refused and shows the reason. It writes nothing. Both files remain, and your map and terrain work stays unsaved. Reopen the native map editor to read the scene patch file again.
 
 ## Keep content you do not understand
 
-Unknown fields at the scene patch file root and inside known objects, and modifications the patcher does not execute, survive every read, edit and Save. A modification with such content cannot be edited or removed in the native map editor; correct or remove it in the file and read the scene patch file again.
+Every read, edit and Save preserves unknown fields at the scene patch file root and inside known objects, along with modifications the patcher cannot apply. You cannot edit or remove a modification with such content in the native map editor. Correct or remove it in the scene patch file, then read the scene patch file again.
 
-Save adds or raises the patcher dependency in `Info.json` only when the scene patch file needs it. It keeps a stricter minimum and every other constraint, adds no upper bound, and reports a constraint that excludes the needed version instead of changing it.
+Save adds or raises the patcher dependency in `Info.json` only if the scene patch file requires it. It preserves a stricter minimum and every other constraint, and adds no upper bound. If a constraint excludes the required version, Save reports it without changing the constraint.
+
+## Keep the editor version while the file needs repair
+
+Choose **Keep editor version** if the scene patch file needs repair and you want to replace it with the scene patch file loaded in this session, including your edits. The review shows the relative path where the patcher will back up the current file before overwriting it. Confirm only if the backup should be kept with the mod.
+
+The patcher writes a byte-for-byte copy beside the changed file and verifies it before Save can overwrite the original. If it cannot write or verify the backup, the original remains protected. The review shows a new backup path before you retry. After a successful backup, the diagnosis stays visible and its line numbers refer to the backup. Click **Copy to clipboard** to copy the full diagnosis. Later checks do not return the scene patch file to **File needs repair** unless its content changes again. If a check finds that the file is readable but still has outside changes, **Scene patches** says `The file is readable again.` and offers the normal version choice.
+
+After the backup, **Scene patches** says `Scene Patcher will not change the backup. Delete it when you no longer need it. It will be published with the mod while it remains there.` The backup stays beside the scene patch file and is included when the mod is published. The patcher does not delete it. Delete it when you no longer need it. Save writes the full editor version, including the scene patch file's content at the start of the session, any unknown content and your scene patch edits. The backup remains in place.
+
+If the original changes after the backup is written, review its new version before saving. Changing or deleting the verified backup does not return the file to repair while the original stays unchanged.

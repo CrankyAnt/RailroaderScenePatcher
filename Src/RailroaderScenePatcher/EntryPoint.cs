@@ -19,7 +19,8 @@ namespace RailroaderScenePatcher {
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
-            context = value; Hooks.Install(); NativeRepairHooks.Install(this);
+            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this);
+            if (NativeSaveClick.Problem != null) context.Log.Info(NativeSaveClick.Problem);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
@@ -93,7 +94,7 @@ namespace RailroaderScenePatcher {
             NativeRepairHooks.Reset();
             world?.Release();
             ReleaseReporter();
-            Hooks.Remove(); NativeRepairHooks.Remove();
+            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove();
         }
         void ReleaseReporter() {
             if (reporter == null) return;
@@ -145,6 +146,8 @@ namespace RailroaderScenePatcher {
         readonly InventoryPresentationState inventoryPresentation = new InventoryPresentationState();
         internal const string Version = "0.5.0";
         MapEditorAttachment attachment;
+        string reloadRequirement;
+        float nextReloadCheck;
         object refusedMapEditor;
         string editingStatus = "";
         // The last edit results, shown in the message area above the action slots and written to the log. A place is the
@@ -154,11 +157,11 @@ namespace RailroaderScenePatcher {
         // stay through a tab switch.
         static EditFeedback NewFeedback() {
             var created = new EditFeedback();
-            foreach (var place in new[] { ModificationPlace, "Copy ID", "Fit" }) created.GeneralPlaces.Add(place);
+            foreach (var place in new[] { ModificationPlace, SavePlace, "Copy ID", "Fit" }) created.GeneralPlaces.Add(place);
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = "Gizmo", SnapPlace = "Snap", ActivityPlace = "Activity",
-            ModificationPlace = "Modification", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells";
+            ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells";
         // The place of the open equipment form's messages: its bells or its lights and gates.
         string EquipmentPlace => equipmentSource?.IsDefinition == true ? BellPlace : LightGatePlace;
         bool staleLogged = true;
@@ -227,9 +230,14 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new BakedSceneryGroups(new GroupWorld())); }
-                catch (Exception e) {
+                // Groups and their parts share one world and the fixed placements that hold parts when their group moves.
+                try {
+                    var groupWorld = new GroupWorld(); var holds = new PartHolds();
+                    capabilities.Add(new BakedSceneryGroups(groupWorld, Capability.Unchecked, holds));
+                    capabilities.Add(new BakedSceneryParts(groupWorld, holds));
+                } catch (Exception e) {
                     capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
+                    capabilities.AddUnavailable(BakedSceneryParts.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": baked scenery group capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
@@ -263,7 +271,8 @@ namespace RailroaderScenePatcher {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
-            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native);
+            ModScenePatchFiles.Log = message => context?.Log.Info(message);
+            capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             engine = new PatchEngine(capabilities);
@@ -434,7 +443,14 @@ namespace RailroaderScenePatcher {
             if (Hooks.Error != null) { refusedMapEditor = found; editingStatus = Hooks.Error; return; }
             try {
                 attachment = new MapEditorAttachment(engine, found); Hooks.Current = attachment;
+                attachment.VersionChanged = VersionChanged;
+                attachment.SaveRefused = reason => {
+                    feedback.Refuse(SavePlace, "Save", reason);
+                    var alert = CommandBand.SaveRefusalAlert(presentation != null && presentation.IsOpen, reason);
+                    if (alert != null) UI.Common.ModalAlertController.PresentOkay(alert.Value.Title, alert.Value.Message);
+                };
                 attachment.Session.Replayed = identity => replayed.Add(identity);
+                attachment.Session.HistoryNotice = feedback.QueueHistoryNotice;
                 // The patcher's own Save writes the scene patch file: that text is what the definitions on disk now are, so it
                 // is no change from outside and the inventory lamp stays Current.
                 ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
@@ -447,6 +463,8 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
         }
         void Detach() {
+            reloadRequirement = null;
+            presentation?.SetRepairMode(false);
             CancelGuided();
             pickedTrackLocation = null; pickedTrackSelection = null;
             ClearSnap(); snap = null;
@@ -519,9 +537,38 @@ namespace RailroaderScenePatcher {
         }
         // After the game's own tooltip update of the frame.
         void LateUpdate() { presentation?.PauseTooltip(); }
+        bool applicationFocused, fileCheckAfterFocus;
+        float nextFileVersionCheck;
+        void OnApplicationFocus(bool focused) {
+            applicationFocused = focused;
+            if (focused) fileCheckAfterFocus = true;
+        }
+        void CheckFileVersion() {
+            if (attachment == null) return;
+            try {
+                if (feedback.CheckFileVersion(attachment.Session, RecoveryPlace)) VersionChanged();
+            } catch (Exception e) { attachment.Fault = "Could not check the scene patch file: " + e.GetBaseException().Message; }
+        }
+        void VersionChanged() {
+            if (attachment != null) feedback.ObserveFileVersion(attachment.Session, RecoveryPlace);
+            var repair = attachment?.Session.VersionState == FileVersionState.Repair;
+            if (repair) {
+                CancelGizmo(); ClearSnap();
+                selection?.Cancel();
+                CancelRequest("the scene patch file needs repair");
+            }
+            presentation?.SetRepairMode(repair);
+            attachment?.RefreshChrome();
+            presentation?.RequestRefresh();
+        }
         void Update() {
             FlushWarnings();
             if (!Initialized || engine == null) return;
+            // Focus callbacks can arrive before the editor attachment is ready. Keep the check pending until Update
+            // has attached it, and also observe the focus edge when Unity does not deliver the callback to this host.
+            var focused = Application.isFocused;
+            if (focused && !applicationFocused) fileCheckAfterFocus = true;
+            applicationFocused = focused;
             // A request waits only while its panel is open: a closed window does no per-frame work.
             if (Requests.Pending && !(presentation != null && presentation.IsOpen)) CancelRequest("the panel was closed before the request ran");
             if (Requests.Pending) {
@@ -609,6 +656,21 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { escapeHeld = escapable; context?.Log.Info("Escape handling for the world choice and the gizmo is unavailable: " + e.GetBaseException().Message); }
             try { Attach(); }
             catch (Exception e) { editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
+            if (fileCheckAfterFocus && applicationFocused && attachment != null) {
+                fileCheckAfterFocus = false;
+                CheckFileVersion();
+            }
+            if (attachment != null && Time.unscaledTime >= nextFileVersionCheck) {
+                nextFileVersionCheck = Time.unscaledTime + 2f;
+                CheckFileVersion();
+            }
+            MapEditorReload.Poll(attachment);
+            if (attachment != null && Time.unscaledTime >= nextReloadCheck) {
+                reloadRequirement = attachment.Session.ReloadRequirement;
+                nextReloadCheck = Time.unscaledTime + 1f;
+            }
+            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene patches" : "Scene patches: reload",
+                reloadRequirement ?? "Open scene-patch inspection and editing.");
             bool open = presentation != null && presentation.IsOpen;
             if (!open) CancelGizmo();
             SyncInputRegions();
@@ -627,6 +689,7 @@ namespace RailroaderScenePatcher {
                 // A history that moved without this patcher's own edit is a native edit, Undo or Redo: what the last
                 // action completed may no longer hold, so its result goes.
                 if (key != idleKey) { idleKey = key; urgentCheck = true; nextInventoryCheck = 0; feedback.HistoryMoved(); }
+                feedback.FlushHistoryNotice();
                 // No pass runs between this patcher's own change and the observation of the changed objects: it would
                 // compare them with what they were before.
                 // While a gizmo is active the placement of its target is this patcher's own preview: a pass would compare it
@@ -720,8 +783,8 @@ namespace RailroaderScenePatcher {
                 scenePatchFileInspection, String.Join("\n", diagnostics), selectionProblem, inputBlocker?.WorldInputProblem,
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
-                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, TerrainSnapshot(),
-                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(),
+                selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, reloadRequirement, MapEditorReload.Error, TerrainSnapshot(),
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage,
                 equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
         // Computing the outstanding work serializes the scene patch file and reads the dependency metadata. Its inputs change
@@ -1020,7 +1083,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Refuse(BindingPlace, action, e.GetBaseException().Message + "; enter end and distance by hand"); }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure || selected.Identity.Structure == BakedSceneryParts.Structure) && selected.Handle is GameObject;
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
         // A starter placement marker is edited on the Connections tab only, where it is placed on the track; on every other
         // tab its object's placement and activity stay disabled with the reason.
@@ -1305,6 +1368,7 @@ namespace RailroaderScenePatcher {
             try {
                 if (inventory == null) throw new InvalidOperationException("Inspection is unavailable");
                 inventory.Refresh();
+                feedback.InventoryCurrent();
                 LogGroupVerdicts();
                 // A refresh read the whole scene: the snapshot is compared for the history as it is now.
                 comparedKey = idleKey = ChangeStamp(); comparedAt = Time.unscaledTime;
@@ -1327,7 +1391,7 @@ namespace RailroaderScenePatcher {
                 status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
-        // Copy ID names the target map of the edited mod's scene patch file, or the one scene patch editing would write for it.
+        // Copy ID names the scene target map of the edited mod's scene patch file, or the one scene patch editing would write for it.
         string Identity(SceneObservation entry) =>
             attachment != null ? attachment.Session.CopyId(entry) : PatchEditingSession.CopyId(ModScenePatchFiles.MapIds(), entry);
         // Focus needs the inspected object, not a fresh inventory: it moves the camera to where the object is now. It

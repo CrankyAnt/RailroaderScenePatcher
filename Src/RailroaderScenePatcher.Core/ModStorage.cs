@@ -31,7 +31,7 @@ namespace RailroaderScenePatcher.Core {
         public virtual void CreateDirectory(string path) { Directory.CreateDirectory(path); }
     }
     // The two files of the edited mod that the patcher writes: Data/scene-patches.json and Info.json.
-    public sealed class ModStorage : IStorage, IRecoveryStorage {
+    public sealed class ModStorage : IStorage, IRecoveryStorage, IVersionBackupStorage {
         public static readonly Encoding Utf8 = new UTF8Encoding(false, true);
         readonly IModFiles files;
         readonly Action<string> patchWritten;
@@ -64,27 +64,45 @@ namespace RailroaderScenePatcher.Core {
         public void WriteModInfo(string text) { Publish(InfoPath, text); }
         // The digest of the bytes each backup of this storage secured, by backup path.
         readonly Dictionary<string, byte[]> backups = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        public string ReserveVersionBackup() => PatchPath + ".backup-" + Guid.NewGuid().ToString("N");
+        public string RelativeVersionBackup(string path) => "Data/" + Path.GetFileName(path);
+        public string VersionFingerprint() => files.Exists(PatchPath) ? Convert.ToBase64String(Digest(files.Read(PatchPath))) : null;
+        public string BackupScenePatchFile(string path) => BackupScenePatchFile(path, false);
+        string BackupScenePatchFile(string path, bool removePartial) {
+            var original = files.Read(PatchPath);
+            if (files.Exists(path)) throw new IOException("The backup name is already in use: " + path);
+            try {
+                files.Write(path, original);
+                if (!files.Read(path).SequenceEqual(original)) throw new IOException("The backup does not match the original file: " + path);
+            } catch (Exception error) {
+                var mayRemain = true;
+                try {
+                    if (files.Exists(path) && (removePartial || Digest(files.Read(path)).SequenceEqual(Digest(original)))) files.Delete(path);
+                    mayRemain = files.Exists(path);
+                } catch { }
+                if (mayRemain) throw new IOException("The failed backup may remain at " + path + ". Delete it when you no longer need it. " + error.Message, error);
+                throw;
+            }
+            backups[path] = Digest(original);
+            return path;
+        }
         static byte[] Digest(byte[] bytes) { using (var sha = SHA256.Create()) return sha.ComputeHash(bytes); }
+        public void RemoveVersionBackupIfUnchanged(string path) {
+            try {
+                if (backups.TryGetValue(path, out var digest) && files.Exists(path) && Digest(files.Read(path)).SequenceEqual(digest)) files.Delete(path);
+                if (files.Exists(path)) throw new IOException("The failed backup remains at " + path + ". Delete it when you no longer need it.");
+            } finally { backups.Remove(path); }
+        }
         // Copies the scene patch file's exact bytes, also bytes that are not UTF-8, to a new file beside it whose name no
         // other file has, and reads the copy back before it counts as a backup. A failed copy is removed.
         public string BackupScenePatchFile() {
-            var original = files.Read(PatchPath);
-            var backup = PatchPath + ".backup-" + Guid.NewGuid().ToString("N");
-            if (files.Exists(backup)) throw new IOException("The backup name is already in use: " + backup);
-            try {
-                files.Write(backup, original);
-                if (!files.Read(backup).SequenceEqual(original)) throw new IOException("The backup does not hold the original bytes: " + backup);
-            } catch {
-                try { if (files.Exists(backup)) files.Delete(backup); } catch { }
-                throw;
-            }
-            backups[backup] = Digest(original);
-            return backup;
+            return BackupScenePatchFile(ReserveVersionBackup(), true);
         }
         public bool MatchesPatchBackup(string backup) {
             if (backup == null || !backups.TryGetValue(backup, out var digest) || !files.Exists(backup) || !files.Exists(PatchPath)) return false;
             return Digest(files.Read(backup)).SequenceEqual(digest) && Digest(files.Read(PatchPath)).SequenceEqual(digest);
         }
+        public bool VersionBackupExists(string path) => path != null && files.Exists(path);
         // The new content is written completely beside the file first and only then takes the file's place, so a write that
         // stops midway leaves the previous file, or no file, as it was. The beside file has one fixed name per file: a
         // leftover of an interrupted Save is replaced by the next attempt and removed after a failure, never published.

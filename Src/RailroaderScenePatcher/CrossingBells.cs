@@ -172,7 +172,7 @@ namespace RailroaderScenePatcher {
             var bell = go.AddComponent<OwnedBell>();
             try {
                 var component = go.AddComponent(player);
-                mixerGroup.SetValue(component, bellGroup); priority.SetValue(component, 10); audioDistance.SetValue(component, distant); play.SetValue(component, false);
+                mixerGroup.SetValue(component, bellGroup); priority.SetValue(component, EquipmentAddition.BellPriority); audioDistance.SetValue(component, distant); play.SetValue(component, false);
                 bell.Player = component; bell.PlayField = play; bell.ReadBool = v => (bool)boolValue.GetValue(v, null);
                 bell.Scope = scope; bell.Id = id; bell.ControllerPath = destination.scene.name + "/" + BoardScene.PathOf(destination.transform); bell.Fail = Failed;
                 bell.Indexes = facts.Indexes; bell.Volume = (float)facts.Volume;

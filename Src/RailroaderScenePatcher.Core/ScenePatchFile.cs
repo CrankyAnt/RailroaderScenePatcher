@@ -182,9 +182,9 @@ namespace RailroaderScenePatcher.Core {
             static readonly Shape Modification = new Shape { Known = new[] { "target", "relationships", "starterPlacement", "placement", "dependsOn", "active" },
                 Member = name => name == "target" ? Target : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
             static readonly Shape Modifications = new Shape { Member = name => Modification };
-            static readonly Shape TargetMap = new Shape { Known = new[] { "mapId" } };
+            static readonly Shape SceneTargetMap = new Shape { Known = new[] { "mapId" } };
             internal static readonly Shape ScenePatchFile = new Shape { Known = new[] { "formatVersion", "sourceMap", "modifications" },
-                Member = name => name == "sourceMap" ? TargetMap : name == "modifications" ? Modifications : Unknown };
+                Member = name => name == "sourceMap" ? SceneTargetMap : name == "modifications" ? Modifications : Unknown };
         }
         static void Write(JsonWriter writer, JToken token, Shape shape) {
             if (token is JObject obj) {
@@ -245,8 +245,8 @@ namespace RailroaderScenePatcher.Core {
                 var root = source.Root as JObject;
                 if (root == null)
                     return Protected(json, "Invalid scene patch file envelope. The scene patch file must be a JSON object", "", "A JSON object with formatVersion, sourceMap and modifications", source.Root);
-                if (!(root["sourceMap"] is JObject targetMap) || targetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)targetMap["mapId"]))
-                    return Protected(json, "Invalid scene patch file map context or modifications. The sourceMap needs a mapId", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the target map>\" } with the ID of the edited map or one of its map layers", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
+                if (!(root["sourceMap"] is JObject sceneTargetMap) || sceneTargetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)sceneTargetMap["mapId"]))
+                    return Protected(json, "Invalid scene patch file map context or modifications. The sourceMap needs a mapId", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the scene target map>\" } with the ID of the edited map or one of its map layers. Use a map definition that is not a map patch, normally the bottom map layer", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
                 if (!(root["modifications"] is JObject modifications))
                     return Protected(json, "Invalid scene patch file map context or modifications. The modifications must be an object keyed by modification ID", "modifications", "\"modifications\": { \"<modification ID>\": { ... } }", root["modifications"]);
                 foreach (var property in modifications.Properties())
@@ -268,7 +268,7 @@ namespace RailroaderScenePatcher.Core {
             }
         }
         // Why the text's declared format version keeps any of its content from being read, or null. Before this answer
-        // is null, no other member of the text, such as its target map, has a meaning.
+        // is null, no other member of the text, such as its scene target map, has a meaning.
         public static string FormatProblem(string json) => DeclaredVersion(json)?.Problem;
         sealed class Declaration { internal string Problem; internal int Line; }
         // Reads only the top-level formatVersion of the text, without the checks of the full read, so a scene patch file of

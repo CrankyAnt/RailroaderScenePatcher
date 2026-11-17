@@ -172,7 +172,7 @@ static class RecoveryTests {
         Assert(ScenePatchFile.Load(wide).Diagnostics.Single().Fragment.Length == ScenePatchFileDiagnostic.FragmentCharacters + 3, "A fragment of one long line is bounded");
         var w = new World(Doc(Mod("move", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"elsewhere\""));
         Assert(w.Session.Blocked != null && w.Session.ScenePatchFileDiagnostics.Single().Path == "sourceMap.mapId" && w.Session.ScenePatchFileDiagnostics.Single().Expected.Contains("map, layer"),
-            "A foreign target map is diagnosed with the maps this session knows");
+            "A foreign scene target map is diagnosed with the maps this session knows");
     }
 
     // A protected scene patch file corrected outside scene patch editing is read again after confirmation and becomes the
@@ -243,10 +243,13 @@ static class RecoveryTests {
             var w = new World(new ModStorage(folder.Root));
             Assert(w.Session.FreshStart(true).Applied, "Fresh start of an unreadable scene patch file");
             File.WriteAllBytes(folder.PatchPath, Utf8("{changed"));
-            var refusal = w.MapEditor.Save();
+            var refusal = w.MapEditor.ClickSave();
             Assert(refusal != null && refusal.Contains("changed after fresh start") && File.ReadAllText(folder.PatchPath) == "{changed" && w.Session.FreshStartPending, "A changed original is not replaced: " + refusal);
+            Assert(w.MapEditor.TerrainWrites == 0 && w.MapEditor.NativeWrites == 0 && w.MapEditor.Alerts == 0, "The refusal is decided before the Save button writes terrain or map data, without a Save Failed alert");
+            refusal = w.MapEditor.Save();
+            Assert(refusal != null && refusal.Contains("changed after fresh start") && File.ReadAllText(folder.PatchPath) == "{changed", "The Save route itself still refuses: " + refusal);
             File.WriteAllBytes(folder.PatchPath, Utf8("{broken")); File.WriteAllBytes(w.Session.LastBackup, Utf8("{tampered"));
-            Assert(w.MapEditor.Save() != null && File.ReadAllText(folder.PatchPath) == "{broken", "A changed backup blocks the replacement");
+            Assert(w.MapEditor.ClickSave() != null && w.MapEditor.TerrainWrites == 0 && w.MapEditor.Alerts == 0 && File.ReadAllText(folder.PatchPath) == "{broken", "A changed backup blocks the replacement before anything is written");
         }
     }
 

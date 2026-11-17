@@ -1,12 +1,16 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
-    // Native input has separate EventSystem and WindowManager hit-test gates.
+    // Native input has separate EventSystem and WindowManager hit-test gates. A world click follows the native picker's
+    // gates too: a press on a popup blocker, such as the one behind an open context menu, is no world click, and neither
+    // is a press the native map editor claims for itself. The claim is made after this component's Update, so a candidate
+    // press is confirmed in LateUpdate and published as WorldClick in the next frame.
     [DefaultExecutionOrder(-20000)]
     public sealed class InspectionInputBlocker : MonoBehaviour {
         GameObject canvasRoot;
@@ -20,13 +24,26 @@ namespace RailroaderScenePatcher {
         internal bool WorldPicking { get; set; }
         internal Action RefreshRegions { get; set; }
         internal Vector2? WorldClick { get; private set; }
-        internal string WorldInputProblem { get; private set; }
+        Vector2? candidate, confirmed;
+        MethodInfo overUiPoint;
+        FieldInfo pressInput, primaryState, pressClaimed, pressStarted;
+        // The UI gate's problem, kept until the gate answers again, and the press claim's, kept until the claim reads again.
+        string gateProblem, claimProblem;
+        internal string WorldInputProblem => gateProblem ?? claimProblem;
         internal bool Available => isActiveAndEnabled && canvasRoot != null && canvasRoot.activeInHierarchy && nativeWindow != null && nativeWindow.gameObject.activeInHierarchy && EventSystem.current != null;
 
         internal void Initialize() {
             var input = Native.Type("UI.GameInput");
             if (input == null || input.GetMethod("IsMouseOverUI", Native.Flags) == null)
                 throw new InvalidOperationException("Native UI pointer gate unavailable");
+            overUiPoint = input.GetMethod("IsScreenPointOverUI", Native.Flags, null, new[] { typeof(Vector2), typeof(bool) }, null);
+            pressInput = input.GetField("pressInput", Native.Flags);
+            primaryState = pressInput?.FieldType.GetField("_primaryState", Native.Flags);
+            pressClaimed = primaryState?.FieldType.GetField("_pressClaimed", Native.Flags);
+            pressStarted = primaryState?.FieldType.GetField("_startedThisFrame", Native.Flags);
+            if (overUiPoint == null || !overUiPoint.IsStatic || overUiPoint.ReturnType != typeof(bool) || input.GetProperty("Shared", Native.Flags) == null
+                || pressClaimed == null || pressClaimed.FieldType != typeof(bool) || pressStarted == null || pressStarted.FieldType != typeof(bool))
+                throw new InvalidOperationException("Native popup blocker and press claim gates unavailable");
             var layer = Convert.ToInt32(Native.Read(Native.Type("Helpers.Layers"), "UI"));
             if (layer < 0 || layer > 31) throw new InvalidOperationException("Native UI layer unavailable");
             canvasRoot = new GameObject("CrankyAnt Scene Patcher pointer regions", typeof(RectTransform), typeof(Canvas), typeof(GraphicRaycaster));
@@ -105,7 +122,7 @@ namespace RailroaderScenePatcher {
             region.gameObject.SetActive(active);
         }
         void Update() {
-            WorldClick = null;
+            WorldClick = confirmed; confirmed = null; candidate = null;
             if (canvasRoot == null) return;
             RefreshRegions?.Invoke();
             var position = Input.mousePosition;
@@ -130,30 +147,49 @@ namespace RailroaderScenePatcher {
                     // Arm the shield before the click, and hide it while checking for native UI underneath.
                     dragImage.raycastTarget = false;
                     var input = Native.Type("UI.GameInput");
-                    bool overUi = (bool)Native.Call(input, "IsMouseOverUI", null, null);
+                    bool overUi = (bool)Native.Call(input, "IsMouseOverUI", null, null)
+                        || (bool)overUiPoint.Invoke(null, new object[] { (Vector2)position, true });
                     bool overWorld = (bool)Native.Call(input, "IsMouseOverGameWindow", new object[] { null });
                     if (!overUi && overWorld) {
                         worldHoverShield = true;
                         if (Input.GetMouseButtonDown(0)) {
                             worldCaptured = true;
-                            WorldClick = point;
+                            candidate = point;
                         }
                     }
-                    WorldInputProblem = null;
+                    gateProblem = null;
                 } catch (Exception e) {
-                    WorldInputProblem = "World selection input unavailable: " + e.GetBaseException().Message;
+                    gateProblem = "Cannot select in the world: " + e.GetBaseException().Message;
                 } finally { dragImage.raycastTarget = true; }
             }
             SetRegions(panelOpen, panel, toggle);
             // Only panel drags need the full native window shield for wheel input.
             SetNativeWindow(captured || overButton || overPanel, captured ? new Rect(0, 0, Screen.width, Screen.height) : overPanel ? panel : toggle);
         }
-        void OnDisable() { captured = worldCaptured = worldHoverShield = false; WorldClick = null; SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false); }
+        // The native map editor and picker claim the primary press during their Update, which runs after this component's. A
+        // claim counts only for a press the native input started this frame: the claim flag is reset only when a press starts,
+        // so without a started press, as while a text field has focus, the flag still holds an earlier press's claim.
+        void LateUpdate() {
+            if (candidate == null) return;
+            var point = candidate; candidate = null;
+            try {
+                var shared = Native.Read(Native.Type("UI.GameInput"), "Shared");
+                var press = shared == null ? null : pressInput.GetValue(shared);
+                var state = press == null ? null : primaryState.GetValue(press);
+                if (state == null) throw new InvalidOperationException("Native primary press state unavailable");
+                var claimed = (bool)pressStarted.GetValue(state) && (bool)pressClaimed.GetValue(state);
+                claimProblem = null;
+                if (!claimed) confirmed = point;
+            } catch (Exception e) {
+                claimProblem = "Cannot select in the world: " + e.GetBaseException().Message;
+            }
+        }
+        void OnDisable() { captured = worldCaptured = worldHoverShield = false; WorldClick = candidate = confirmed = null; SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false); }
         void OnEnable() { if (canvasRoot != null) canvasRoot.SetActive(true); }
         internal void Release() {
             RefreshRegions = null;
             captured = worldCaptured = worldHoverShield = WorldPicking = false;
-            WorldClick = null;
+            WorldClick = candidate = confirmed = null;
             if (nativeWindow != null) {
                 var root = nativeWindow.gameObject;
                 if (root.activeInHierarchy) Native.Call(nativeWindow, "CloseWindow");

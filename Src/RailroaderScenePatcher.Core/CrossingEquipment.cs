@@ -34,6 +34,9 @@ namespace RailroaderScenePatcher.Core {
     public sealed class EquipmentAddition {
         public const string LightGatePattern = "crossing-light-gate-v1", BellPattern = "crossing-bell-v1";
         public static readonly string[] Patterns = { LightGatePattern, BellPattern };
+        // The audio priority of an added bell's player: the native crossing bell's own, so the game sorts both alike.
+        // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer.
+        public const int BellPriority = 9;
         // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {

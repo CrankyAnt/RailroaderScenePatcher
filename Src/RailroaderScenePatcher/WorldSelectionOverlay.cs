@@ -128,8 +128,9 @@ namespace RailroaderScenePatcher {
                     var mask = (1 << terrainLayer) | (trackLayer >= 0 ? 1 << trackLayer : 0);
                     double? terrain = null; List<double> track = null;
                     foreach (var hit in Physics.RaycastAll(new Vector3((float)x, 5000f, (float)z), Vector3.down, 10000f, mask)) {
-                        if (hit.collider.gameObject.layer == terrainLayer) terrain = terrain.HasValue ? Math.Max(terrain.Value, hit.point.y) : hit.point.y;
-                        else (track ?? (track = new List<double>())).Add(hit.point.y);
+                        var kind = ObjectMarkingGeometry.HitKind(hit.collider.gameObject.layer == terrainLayer, OfInventory(hit.collider.transform));
+                        if (kind == ObjectMarkingGeometry.SurfaceHit.Terrain) terrain = terrain.HasValue ? Math.Max(terrain.Value, hit.point.y) : hit.point.y;
+                        else if (kind == ObjectMarkingGeometry.SurfaceHit.Ballast) (track ?? (track = new List<double>())).Add(hit.point.y);
                     }
                     return ObjectMarkingGeometry.Surface(terrain, track);
                 } catch { return (double?)null; }
@@ -137,6 +138,12 @@ namespace RailroaderScenePatcher {
             if (grounds.Count > 50000) grounds.Clear();
             grounds[key] = height;
             return height;
+        }
+        // Whether a collider belongs to an inventory object: the object itself or anything below one.
+        bool OfInventory(Transform t) {
+            if (IsInventory == null) return false;
+            for (; t != null; t = t.parent) if (IsInventory(t.gameObject)) return true;
+            return false;
         }
         // The surface may have changed: an edit, a terrain output that completed, or a track change. The heights are
         // read again.

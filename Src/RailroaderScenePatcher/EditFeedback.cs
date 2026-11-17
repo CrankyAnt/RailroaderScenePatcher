@@ -13,6 +13,13 @@ namespace RailroaderScenePatcher {
     // reported after the inspection was cleared stays until an object is inspected again. UI-independent, shared with
     // controlled replay.
     internal sealed class EditFeedback {
+        internal enum PrimaryMessage { None, VersionChoice, BackupDiagnosis, Working, WorldChoice }
+        internal static PrimaryMessage Primary(PatchEditingSession session, bool working, bool worldChoice) =>
+            Primary(session != null && session.VersionState != FileVersionState.None,
+                session?.LastBackup != null && session.VersionMessage != null && session.ScenePatchFileDiagnostics.Count != 0, working, worldChoice);
+        internal static PrimaryMessage Primary(bool versionChoice, bool backupDiagnosis, bool working, bool worldChoice) =>
+            versionChoice ? PrimaryMessage.VersionChoice : working ? PrimaryMessage.Working
+            : worldChoice ? PrimaryMessage.WorldChoice : backupDiagnosis ? PrimaryMessage.BackupDiagnosis : PrimaryMessage.None;
         // One result with the action group it came from, such as Placement or Track binding.
         internal sealed class Message {
             internal string Source { get; }
@@ -42,6 +49,9 @@ namespace RailroaderScenePatcher {
         internal string Place => messages.Count == 0 ? null : messages[0].Source;
         internal string Result => messages.Count == 0 ? "" : messages[0].Text;
         internal Action<string> Log;
+        string pendingHistoryNotice;
+        internal void QueueHistoryNotice(string message) { pendingHistoryNotice = message; }
+        internal void FlushHistoryNotice() { if (pendingHistoryNotice == null) return; var message = pendingHistoryNotice; pendingHistoryNotice = null; Report("Undo/Redo", message); }
         object inspected;
         // A result is about the object inspected when it was reported: inspecting another object clears it. An object
         // that is no longer present clears nothing.
@@ -57,7 +67,7 @@ namespace RailroaderScenePatcher {
         // Refresh removes earlier results without changing the inspected object or view.
         internal void Refreshed() { messages.Clear(); }
         // A new load attempt starts without the messages of the one before.
-        internal void Clear() { messages.Clear(); inspected = null; context = null; }
+        internal void Clear() { messages.Clear(); pendingHistoryNotice = null; inspected = null; context = null; observedSession = null; observedState = FileVersionState.None; observedMessage = null; observedBackup = null; }
         string context;
         // The view a result was reported in: the open tab and, on the Placement tab, its mode. A result of a tab's
         // action in another view no longer describes what is on screen, so a change of view removes it. A general
@@ -73,6 +83,8 @@ namespace RailroaderScenePatcher {
         // A world choice starts: it is a new action, so the result or refusal of the action before it goes, as it
         // goes when another action reports. A refusal kept for the next inspection stays.
         internal void ChoiceStarted() { messages.RemoveAll(m => !m.Kept); }
+        // A refresh made the inventory current: a refusal because it was stale no longer holds and goes.
+        internal void InventoryCurrent() { messages.RemoveAll(m => m.Text.IndexOf(SceneInventory.StaleRefusal, StringComparison.Ordinal) >= 0); }
         // The result of an action. It takes the place of the result before it and of that result's follow-ups.
         internal void Report(string place, string message) {
             messages.Clear();
@@ -85,7 +97,23 @@ namespace RailroaderScenePatcher {
             messages.Insert(0, New(place, message, true));
             try { Log?.Invoke(Result); } catch { }
         }
-        // Removes a message that announced a state which has ended, such as a form that closed. Results stay.
+        // Track file state even when another caller performs the check, such as Save.
+        PatchEditingSession observedSession;
+        FileVersionState observedState;
+        string observedMessage, observedBackup;
+        internal bool ObserveFileVersion(PatchEditingSession session, string place) {
+            var changed = !ReferenceEquals(observedSession, session) || observedState != session.VersionState
+                || observedMessage != session.VersionMessage || observedBackup != session.LastBackup;
+            if (changed)
+                messages.RemoveAll(m => m.Source == place);
+            observedSession = session; observedState = session.VersionState;
+            observedMessage = session.VersionMessage; observedBackup = session.LastBackup;
+            return changed;
+        }
+        internal bool CheckFileVersion(PatchEditingSession session, string place) {
+            session.CheckFileVersion();
+            return ObserveFileVersion(session, place);
+        }
         // Removes the messages of one place, as a new form of that place starts.
         internal void ClearPlace(string place) { messages.RemoveAll(m => m.Source == place && !m.Kept); }
         internal void Withdraw(string place, string message) { messages.RemoveAll(m => m.Source == place && m.Text == message); }
