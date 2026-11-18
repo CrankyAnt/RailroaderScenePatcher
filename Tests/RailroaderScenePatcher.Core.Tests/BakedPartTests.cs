@@ -32,7 +32,7 @@ static class BakedPartTests {
     // the jetty and a simple culler on the root.
     // As an inspection scene it observes what belongs with an edited group root or part: the object and every part
     // below it, as the native inventory does. ObjectOnly observes the object alone, as the native inventory did before.
-    sealed class Fixture : IRelatedInspectionScene {
+    internal sealed class Fixture : IRelatedInspectionScene {
         public bool ObjectOnly;
         public readonly FakeGroupWorld World = new FakeGroupWorld();
         public readonly FakeGroup Group = new FakeGroup();
@@ -45,7 +45,7 @@ static class BakedPartTests {
             Platform = Group.Parts[0]; Ramp = Group.Parts[1]; Lamp = Group.Parts[2];
             Jetty = Group.Add(new FakePart { Id = "Jetty#4", Offset = new[] { 0.0, 0, -6 } });
             Post = Group.Add(new FakePart { Id = "Jetty/Post#5", Offset = new[] { 1.0, 0, -6 }, Parent = Jetty });
-            Group.Cullers.Add(new FakeCuller { Id = "Jetty|Helpers.Culling.RendererCuller", On = Jetty });
+            Group.Cullers.Add(new FakeCuller { Id = "Jetty|Helpers.Culling.RendererCuller", On = Jetty, Renders = { Jetty.Renderer, Post.Renderer } });
             World.Objects[Mill] = new List<object> { Group };
             foreach (var (name, part) in new[] { ("Platform", Platform), ("Ramp", Ramp), ("Lamp", Lamp), ("Jetty", Jetty), ("Jetty/Post", Post) }) World.PartsAt[Mill + "/" + name] = new List<object> { part };
             World.SetActive(Group, true); World.Mutations = 0;
@@ -58,14 +58,16 @@ static class BakedPartTests {
             yield return Of(Group);
             foreach (var pair in World.PartsAt) yield return Of(pair.Value[0]);
         }
-        // An object's observation; a part is active while it and every part above it are on.
+        // An object's observation; a part is active while it and every part above it are on, as the scene or the
+        // modder set them: what the camera makes of a part through its culling is no part of it.
         SceneObservation Of(object handle) {
+            var observed = World.Observe(Group);
             if (handle == Group) {
-                var root = World.Observe(Group).Root;
+                var root = observed.Root;
                 return new SceneObservation(Group, GroupId, BakedSceneryRules.Family, root.Active == true, root.Placement.Position, root.Placement.Rotation, new string[0], new string[0], new string[0], "group");
             }
             var part = (FakePart)handle; var state = World.ObservePart(part).Part; var path = World.PartsAt.Single(p => p.Value.Contains(part)).Key;
-            var active = Group.Active; for (var p = part; p != null; p = p.Parent) active &= p.Active;
+            var active = observed.Root.Active == true; for (var p = part; p != null; p = p.Parent) active &= observed.Parts.Single(o => ReferenceEquals(o.Handle, p)).ActiveSelf;
             return new SceneObservation(part, new TargetIdentity(SceneName, path, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure), BakedSceneryRules.Family,
                 active, state.Placement.Position, state.Placement.Rotation, new string[0], new string[0], new string[0], "part", groupPath: Mill);
         }
@@ -104,10 +106,6 @@ static class BakedPartTests {
         PartsAreNamedWithTheirGroupAndDecorative();
         NestedPartKeepsItsPlaceInItsParent();
         CullerSwitchedPartKeepsTheCullersState();
-        CullerAboveAHeldPartEnclosesIt();
-        ReleaseAndDestroyedPartsLetTheCullingGo();
-        HiddenSwitchedPartStillCountsForEnclosure();
-        GameObjectCullerEnclosesOnlyWhatItSwitches();
         EditOfAPartWithAChildLeavesTheInventoryCurrent();
         SearchMatchesThePartNameAsShown();
         RefreshClearsTheStaleRefusal();
@@ -220,6 +218,7 @@ static class BakedPartTests {
         Assert(Near(f.MapOf(f.Jetty).Position, InGroup(GroupTarget, GroupTurn, new[] { 0.0, 0, -6 })) && SameTurn(f.MapOf(f.Jetty).Rotation, GroupTurn), "The part returns to its unedited placement relative to its group: " + Where(f));
         Assert(Near(f.MapOf(f.Post).Position, InGroup(GroupTarget, GroupTurn, new[] { 1.0, 0, -6 })), "What stands below the part returns with it: " + Where(f));
         Assert(f.Group.Cullers.Single(c => c.OnRoot).Radius == 10, "Without a fixed part the root culler keeps its authored radius");
+        Assert(f.World.Native.Registered.Count == 0, "Remove modification releases the part's own culling spheres");
         Assert(session.Edit(GroupId, new Placement(new[] { 1120.0, 10, 20 }, GroupTurn), null).Applied && Near(f.MapOf(f.Jetty).Position, InGroup(new[] { 1120.0, 10, 20 }, GroupTurn, new[] { 0.0, 0, -6 })), "The returned part moves with its group again: " + Where(f));
         mapEditor.Undo(); mapEditor.Undo();
         Assert(Near(f.MapOf(f.Jetty).Position, JettyTarget), "Undo of the removal holds the part at its fixed placement again: " + Where(f));
@@ -243,18 +242,21 @@ static class BakedPartTests {
         Assert(new PatchEngine(f.Scene).Apply(doc).Outcomes.Values.All(o => o.Applied) && Near(f.MapOf(f.Jetty).Position, JettyTarget), "A load at another origin reaches the same map placements: " + Where(f));
     }
 
+    // A part moved out of the root culler's sphere leaves that culler at the radius the scene gives it and gets a
+    // sphere of its own; the cullers on the part move with it.
     static void CullingFollowsAPartMove() {
         var f = new Fixture();
         var far = new[] { 1160.0, 10, 20 };
         Assert(f.Engine.Apply(Doc(Part("far-jetty", "Jetty", far))).Outcomes["far-jetty"].Applied, "A far part move applies");
         var root = f.Group.Cullers.Single(c => c.OnRoot); var jetty = f.Group.Cullers.Single(c => c.On == f.Jetty);
-        Assert(f.World.Enclosed.Contains(root.Id) && root.Radius > 60 && root.Radius >= f.World.Observe(f.Group).Cullers.Single(c => c.Id == root.Id).Required, "The simple culler on the root re-derives its sphere from the current renderers: " + root.Radius);
+        Assert(root.Radius == 10 && jetty.Radius == 10, "Every culler keeps the radius the scene gives it: " + root.Radius + ", " + jetty.Radius);
+        Assert(f.World.Plan.Regions.Any(r => r.CullerId == root.Id && r.Owner == f.Jetty) && f.World.Native.Registered.Any(r => r.Culler == root && r.Owner == f.Jetty), "The moved part gets a culling sphere of its own");
         Assert(Near(jetty.Registered, new[] { 160.0, 10, 20 }), "The renderer culler on the moved part is refreshed: " + N(jetty.Registered));
         // A culling refresh that does not happen fails the edit, which restores the part.
         var g = new Fixture(); g.World.SkipCullingRefresh = true;
         var outcome = g.Engine.Apply(Doc(Part("far-jetty", "Jetty", far))).Outcomes["far-jetty"];
         Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && Near(g.MapOf(g.Jetty).Position, new[] { 1100.0, 10, 14 }), "A culler that did not follow fails and restores the part: " + outcome.Error);
-        Assert(g.Group.Cullers.Single(c => c.OnRoot).Radius == 10 && Near(g.Group.Cullers.Single(c => c.On == g.Jetty).Registered, new[] { 100.0, 10, 14 }), "The restoration returns the culling as it was");
+        Assert(g.Group.Cullers.Single(c => c.OnRoot).Radius == 10 && Near(g.Group.Cullers.Single(c => c.On == g.Jetty).Registered, new[] { 100.0, 10, 14 }) && g.World.Native.Registered.Count == 0, "The restoration returns the culling as it was");
     }
 
     static void PreflightRefusalLeavesSceneAndScenePatchFileUnchanged() {
@@ -365,52 +367,6 @@ static class BakedPartTests {
         Assert(saved["placement"] != null && saved["active"] == null, "The written modification holds no active key: " + saved);
         var reloaded = new Fixture(); reloaded.Lamp.Switched = true; reloaded.Lamp.Active = false;
         Assert(reloaded.Engine.Apply(store.Patch).Outcomes.Values.Single().Applied && !reloaded.Lamp.Active && Near(reloaded.MapOf(reloaded.Lamp).Position, new[] { 1094.0, 12, 20 }), "A reload places the lamp and leaves it as its culler switched it: " + Where(reloaded));
-    }
-
-    // A culler on a part above a held part encloses it while it holds, and takes its authored radius again afterwards.
-    static void CullerAboveAHeldPartEnclosesIt() {
-        var f = new Fixture(); var (_, _, session) = Session(f);
-        var jetty = f.Group.Cullers.Single(c => c.On == f.Jetty);
-        Assert(session.Edit(PartId("Jetty/Post"), new Placement(new[] { 1160.0, 10, 14 }, Identity), null).Applied, "The post moves far from the jetty");
-        Assert(jetty.Radius > 50 && f.World.Enclosed.Contains(jetty.Id), "The renderer culler on the jetty encloses the held post: " + jetty.Radius);
-        Assert(session.Remove(PartId("Jetty/Post")).Applied && jetty.Radius == 10 && f.Group.Cullers.Single(c => c.OnRoot).Radius == 10, "Without a held part below it the culler takes its authored radius again");
-    }
-
-    // A released part, and a part that no longer exists, leave no enlarged culling behind.
-    static void ReleaseAndDestroyedPartsLetTheCullingGo() {
-        var f = new Fixture(); var root = f.Group.Cullers.Single(c => c.OnRoot);
-        Assert(f.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && root.Radius > 60, "A far part enlarges the root culler");
-        f.Parts.Release(f.Jetty);
-        Assert(root.Radius == 10, "Releasing the part returns the root culler to its authored radius: " + root.Radius);
-        var g = new Fixture(); var gone = g.Group.Cullers.Single(c => c.OnRoot);
-        Assert(g.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && gone.Radius > 60, "A far part enlarges the root culler");
-        g.Group.Parts.Remove(g.Post); g.Group.Parts.Remove(g.Jetty); g.Group.Cullers.RemoveAll(c => c.On == g.Jetty);
-        Assert(g.Engine.Apply(Doc(Group("move-mill", GroupTarget, GroupTurn))).Outcomes.Values.Single().Applied && gone.Radius == 10, "A destroyed part holds nothing: the group moves and its root culler takes its authored radius: " + gone.Radius);
-    }
-
-    // A culler that hides a part because the camera is far away does not take it out of what the cullers above a held
-    // part enclose: the held far part stays inside their spheres, whatever the camera does.
-    static void HiddenSwitchedPartStillCountsForEnclosure() {
-        foreach (var hideJetty in new[] { true, false }) {
-            var f = new Fixture(); var hidden = hideJetty ? f.Jetty : f.Post;
-            hidden.Switched = true; hidden.Active = false; hidden.Shown = false;
-            var outcome = f.Engine.Apply(Doc(Part("far-post", "Jetty/Post", new[] { 1160.0, 10, 14 })));
-            var jetty = f.Group.Cullers.Single(c => c.On == f.Jetty); var root = f.Group.Cullers.Single(c => c.OnRoot);
-            Assert(outcome.Outcomes.Values.Single().Applied && jetty.Radius > 50 && root.Radius > 60,
-                "With the " + (hideJetty ? "jetty" : "post") + " hidden by its culler, the jetty's and the root's cullers still enclose the held post: " + jetty.Radius + ", " + root.Radius);
-        }
-    }
-
-    // A game-object culler culls the parts it switches, not the parts below it: it encloses only while a held part
-    // separates it from a part it switches.
-    static void GameObjectCullerEnclosesOnlyWhatItSwitches() {
-        var f = new Fixture();
-        var lamps = new FakeCuller { Id = ".|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { f.Lamp }, Radius = 2, Authored = 2 }; f.Group.Cullers.Add(lamps);
-        Assert(f.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && lamps.Radius == 2, "A held part it does not switch leaves a root game-object culler at its authored radius: " + lamps.Radius);
-        Assert(f.Engine.Apply(Doc(Part("far-lamp", "Lamp", new[] { 1160.0, 12, 30 }))).Outcomes.Values.Single().Applied && lamps.Radius > 50, "A held part it switches is enclosed: " + lamps.Radius);
-        var g = new Fixture();
-        var ramp = new FakeCuller { Id = "Jetty|Helpers.Culling.GameObjectCuller", Switcher = true, On = g.Jetty, Lists = { g.Ramp } }; g.Group.Cullers.Add(ramp);
-        Assert(g.Engine.Apply(Doc(Part("far-jetty", "Jetty", new[] { 1160.0, 10, 20 }))).Outcomes.Values.Single().Applied && ramp.Radius > 50, "A game-object culler on a held part encloses the part it switches outside it: " + ramp.Radius);
     }
 
     // The edit of a part moves and switches the parts below it, and the edit of a group root every part: those entries

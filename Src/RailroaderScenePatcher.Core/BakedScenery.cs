@@ -223,6 +223,11 @@ namespace RailroaderScenePatcher.Core {
             if (groupPath == null || path == null || !path.StartsWith(groupPath + "/", StringComparison.Ordinal)) return path?.Substring(path.LastIndexOf('/') + 1);
             return groupPath.Substring(groupPath.LastIndexOf('/') + 1) + " / " + path.Substring(groupPath.Length + 1).Replace("/", " / ");
         }
+        // What the inspector says about the culling of a part.
+        public const string PartCullingDependency = "Culling and colliders move with the part. A part moved outside the sphere of a culler above it keeps its own culling, and that culler keeps its radius";
+        // The inventory note for a simple culler whose handler other code replaced while the patcher listened to it: the
+        // patcher's handler stays in the chain and only passes the game's events on. Information, not a warning.
+        public static string LeftoverWrapper(string culler) => "Own culling left a pass-through handler on " + culler + " because another handler was installed after it";
         // The first exclusion, in the order of the list, that a component at or below the node matches.
         static Exclusion FirstExclusion(IHierarchyNode node) {
             var types = new HashSet<string>(StringComparer.Ordinal);
@@ -250,6 +255,8 @@ namespace RailroaderScenePatcher.Core {
         // Placement relative to the group root.
         public IReadOnlyList<double> RootPosition { get; }
         public IReadOnlyList<double> RootRotation { get; }
+        // The part's own activity as the scene or the modder set it: for a part that own culling switches, the value
+        // own culling holds for it, never what the camera made of it.
         public bool ActiveSelf { get; }
         // A culler of the game switches this part by camera distance, so its own activity is no part of the invariant.
         public bool CullerSwitched { get; }
@@ -260,24 +267,28 @@ namespace RailroaderScenePatcher.Core {
     }
     // One culler in a group: the culling sphere it holds now and where the culler stands, both in map coordinates.
     public sealed class GroupCuller {
-        public GroupCuller(string id, IEnumerable<double> registered, IEnumerable<double> expected, double? radius = null, double? required = null, object handle = null, IEnumerable<object> listed = null, bool switches = false) {
-            Id = id ?? throw new ArgumentNullException(nameof(id)); Registered = registered?.ToArray(); Expected = expected.ToArray(); Radius = radius; Required = required;
-            Handle = handle; Listed = (listed ?? Enumerable.Empty<object>()).ToArray(); Switches = switches;
+        public GroupCuller(string id, IEnumerable<double> registered, IEnumerable<double> expected, double? radius = null, double? authored = null, object handle = null, IEnumerable<object> listed = null,
+            CullerKind kind = CullerKind.Simple, object culler = null, IEnumerable<ObservedRegion> regions = null) {
+            Id = id ?? throw new ArgumentNullException(nameof(id)); Registered = registered?.ToArray(); Expected = expected.ToArray(); Radius = radius; Authored = authored;
+            Handle = handle; Listed = (listed ?? Enumerable.Empty<object>()).ToArray(); Kind = kind; Culler = culler; Regions = (regions ?? Enumerable.Empty<ObservedRegion>()).ToArray();
         }
-        // The object the culler stands on: the group root or a part. Listed holds the objects a game-object culler switches.
+        // The object the culler stands on: the group root or a part. Listed holds the objects a game-object culler
+        // switches: those in its list and those own culling took out of it.
         public object Handle { get; }
         public IReadOnlyList<object> Listed { get; }
-        // A game-object culler: it culls the objects it lists, not the objects below it.
-        public bool Switches { get; }
+        public CullerKind Kind { get; }
+        // The culler itself, as own culling addresses it.
+        public object Culler { get; }
+        // The own spheres of moved parts that left this culler's sphere.
+        public IReadOnlyList<ObservedRegion> Regions { get; }
         public string Id { get; }
         // The centre of the culling sphere the game holds for it, or null while it holds none.
         public IReadOnlyList<double> Registered { get; }
         public IReadOnlyList<double> Expected { get; }
-        // The radius of its culling sphere, and the radius around the culler that encloses the renderers it culls now:
-        // for a simple culler or a renderer culler those below its object, for a game-object culler those of the objects
-        // it switches. Null when the culler holds no radius.
+        // The radius of its culling sphere now, and the radius the scene gives the culler. They are equal: no edit
+        // changes a culler's radius. Null when the culler holds no radius.
         public double? Radius { get; }
-        public double? Required { get; }
+        public double? Authored { get; }
     }
     public sealed class GroupObservation {
         public GroupObservation(ObjectState root, IEnumerable<GroupPart> parts, IEnumerable<GroupCuller> cullers, object parent, bool? rootCulling = null) {
@@ -333,10 +344,12 @@ namespace RailroaderScenePatcher.Core {
         void SetPartActive(object part, bool active);
         // Sets the part's placement and synchronises the physics state; everything below the part moves with it.
         void SetPartPlacement(object part, Placement placement);
-        // Moves the culling sphere of every culler in the group to its culler. The radius of each culler that enclose
-        // names by id encloses the renderers it culls, and never drops below its authored radius; every other culler
-        // takes its authored radius.
-        void RefreshCulling(object group, ICollection<string> enclose);
+        // Moves the culling sphere of every culler in the group to its culler, each at the radius the scene gives it,
+        // and brings the own culling of moved parts to the plan.
+        void RefreshCulling(object group, CullingPlan plan);
+        // The corners, in map coordinates, of the renderer, collider and light bounds at and below a part, leaving out
+        // the named parts and what stands below them.
+        IReadOnlyList<IReadOnlyList<double>> Presence(object part, IReadOnlyList<object> without);
         // Whether the part stands below the object, a group root or another part, and still exists.
         bool Below(object part, object above);
         // Whether the object, a group root or a part, still exists.
@@ -351,14 +364,29 @@ namespace RailroaderScenePatcher.Core {
             public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
         }
         readonly Dictionary<object, Placement> held = new Dictionary<object, Placement>(new ByReference());
-        // The group root of each held part, so a released part's group can let go of its enlarged culling.
+        // The group root of each held part, so a released part's group can let go of the part's own culling.
         readonly Dictionary<object, object> groups = new Dictionary<object, object>(new ByReference());
+        // Where each held part stood in the object above it before it was held: the placement the scene gives it.
+        readonly Dictionary<object, Placement> authored = new Dictionary<object, Placement>(new ByReference());
         internal Placement Of(object part) => held.TryGetValue(part, out var placement) ? placement : null;
         internal object GroupOf(object part) => groups.TryGetValue(part, out var group) ? group : null;
-        internal void Set(object part, Placement placement, object group = null) {
-            if (placement == null) { held.Remove(part); groups.Remove(part); return; }
+        internal Placement AuthoredOf(object part) => authored.TryGetValue(part, out var placement) ? placement : null;
+        internal void Set(object part, Placement placement, object group = null, Placement scene = null) {
+            if (placement == null) { held.Remove(part); groups.Remove(part); authored.Remove(part); return; }
             held[part] = new Placement((double[])placement.Position.Clone(), (double[])placement.Rotation.Clone());
             if (group != null) groups[part] = group;
+            if (scene != null) authored[part] = scene; else authored.Remove(part);
+        }
+        // The held parts of the group whose placement differs from the placement the scene gives them: only these can
+        // get culling of their own. A held part whose scene placement is not known counts as moved.
+        internal IReadOnlyList<object> Moved(IGroupWorld world, object group, GroupObservation observed, object except = null) {
+            var moved = new List<object>();
+            foreach (var pair in Below(world, group)) {
+                if (ReferenceEquals(pair.Key, except)) continue;
+                var scene = AuthoredOf(pair.Key); var now = GroupChecks.InParent(observed, pair.Key);
+                if (scene == null || now == null || !GroupChecks.SamePlacement(scene, now)) moved.Add(pair.Key);
+            }
+            return moved;
         }
         internal bool Contains(object part) => part != null && held.ContainsKey(part);
         // Drops the holds of parts that no longer exist, such as those of a world that was unloaded.
@@ -422,33 +450,40 @@ namespace RailroaderScenePatcher.Core {
             var inverse = Quaternion.Conjugate(Quaternion.Normalize(frame.RootRotation));
             return (Quaternion.Rotate(inverse, new[] { part.RootPosition[0] - frame.RootPosition[0], part.RootPosition[1] - frame.RootPosition[1], part.RootPosition[2] - frame.RootPosition[2] }), Quaternion.Multiply(inverse, part.RootRotation));
         }
-        // The cullers whose radius encloses their renderers now, every other culler keeping its authored radius. A
-        // simple or renderer culler encloses while a held part stands below its object. A game-object culler encloses
-        // while a held part separates it from an object it switches: the held part is that object, stands below or
-        // above it, or carries the culler. except leaves out a hold that is being released.
-        internal static HashSet<string> Enclosed(IGroupWorld world, PartHolds holds, object group, object except = null) {
-            var ids = new HashSet<string>(StringComparer.Ordinal);
-            var held = holds.Below(world, group).Select(pair => pair.Key).Where(part => !ReferenceEquals(part, except)).ToList();
-            if (held.Count == 0) return ids;
-            bool AtOrAbove(object part, object other) => ReferenceEquals(part, other) || world.Below(other, part);
-            foreach (var culler in world.Observe(group).Cullers) {
-                if (culler.Radius == null || culler.Handle == null) continue;
-                var encloses = culler.Switches
-                    ? held.Any(part => culler.Listed.Any(listed => AtOrAbove(part, listed) || world.Below(part, listed)) || (culler.Listed.Count != 0 && AtOrAbove(part, culler.Handle)))
-                    : held.Any(part => ReferenceEquals(culler.Handle, group) || world.Below(part, culler.Handle));
-                if (encloses) ids.Add(culler.Id);
-            }
-            return ids;
+        // A part's placement in the object directly above it, the group root or another part; null for an unknown part.
+        internal static Placement InParent(GroupObservation observed, object handle) {
+            var part = observed.Parts.FirstOrDefault(p => ReferenceEquals(p.Handle, handle));
+            if (part == null) return null;
+            var above = part.Parent == null ? null : observed.Parts.FirstOrDefault(p => ReferenceEquals(p.Handle, part.Parent));
+            if (above == null) return new Placement(part.RootPosition.ToArray(), part.RootRotation.ToArray());
+            var (position, rotation) = Relative(above, part);
+            return new Placement(position, rotation);
         }
-        // An enabled group's culling spheres stand at their cullers; a disabled group's cullers hold none. Each culler
-        // that enclose names encloses its renderers.
-        internal static string Culling(GroupObservation current, bool active, ICollection<string> enclose = null) {
+        // The own culling the group needs now: a sphere of its own for each moved part that left a culler's sphere.
+        // except leaves out a hold that is being released.
+        internal static CullingPlan Plan(IGroupWorld world, PartHolds holds, object group, object except = null) {
+            var observed = world.Observe(group);
+            return CullingPlan.Compute(group, observed, holds.Moved(world, group, observed, except), world.Presence);
+        }
+        // An enabled group's culling spheres stand at their cullers, each at the radius the scene gives it, and every
+        // moved part the plan names has its own sphere at the part, enclosing it. A disabled group holds no sphere.
+        internal static string Culling(GroupObservation current, bool active, CullingPlan plan) {
             foreach (var culler in current.Cullers) {
-                if (enclose != null && enclose.Contains(culler.Id) && active && culler.Required != null && (culler.Radius ?? 0) + PositionTolerance < culler.Required) return "the culling sphere of " + culler.Id + " does not enclose the renderers it culls";
+                if (culler.Radius != null && culler.Authored != null && Math.Abs(culler.Radius.Value - culler.Authored.Value) > PositionTolerance) return "the culling sphere of " + culler.Id + " left the radius the scene gives it";
+                foreach (var region in culler.Regions) {
+                    var planned = !active ? null : plan?.Regions.FirstOrDefault(r => r.Id == region.Id);
+                    if (planned == null) return region.Id + " still holds a culling sphere of its own";
+                    // A sphere that waits for the game's culler to start is registered at the next update.
+                    if (region.Pending) continue;
+                    if (region.Centre == null || !Near(region.Centre, planned.Centre, RegistrationTolerance) || region.Radius + PositionTolerance < planned.Radius) return "the own culling sphere " + region.Id + " does not stand at its part";
+                }
                 if (culler.Registered == null) continue;
                 if (!active) return culler.Id + " still holds a culling sphere";
                 if (!Near(culler.Registered, culler.Expected, RegistrationTolerance)) return "the culling sphere of " + culler.Id + " did not follow the group";
             }
+            if (active && plan != null)
+                foreach (var planned in plan.Regions)
+                    if (!current.Cullers.Any(c => c.Regions.Any(r => r.Id == planned.Id))) return "the moved part has no culling sphere of its own: " + planned.Id;
             return null;
         }
         // A simple culler on the root switches an enabled group and pauses for a disabled one.
@@ -477,13 +512,15 @@ namespace RailroaderScenePatcher.Core {
     }
     // Baked scenery groups: places and enables or disables a group root with everything below it. A group move is
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
-    public sealed class BakedSceneryGroups : IScene, IVersionedScene {
+    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IDisposable {
         public const string Structure = "baked-scenery-group-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
         public BakedSceneryGroups(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds();
         }
+        // The capability ends: the world gives back what its own culling of moved parts took over from the game.
+        public void Dispose() => (world as IDisposable)?.Dispose();
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -501,10 +538,13 @@ namespace RailroaderScenePatcher.Core {
         void Place(object target, Placement placement) {
             world.SetPlacement(target, placement);
             holds.Reassert(world, target);
-            world.RefreshCulling(target, Enclose(target));
         }
-        // A culler encloses its renderers while a part below it keeps a fixed placement of its own.
-        HashSet<string> Enclose(object target) => GroupChecks.Enclosed(world, holds, target);
+        // The cullers follow the group, and each moved part outside its culler's sphere keeps a sphere of its own.
+        CullingPlan Refresh(object target) {
+            var plan = GroupChecks.Plan(world, holds, target);
+            world.RefreshCulling(target, plan);
+            return plan;
+        }
         public void Apply(object target, ObjectState state) {
             var before = world.Observe(target);
             if (state.Placement != null) GroupChecks.CheckPlacement(state.Placement);
@@ -512,9 +552,10 @@ namespace RailroaderScenePatcher.Core {
             if (active && before.Root.Active != true) world.SetActive(target, true);
             if (state.Placement != null) Place(target, state.Placement);
             if (!active && before.Root.Active != false) world.SetActive(target, false);
+            var plan = Refresh(target);
             var after = world.Observe(target);
             if (!GroupChecks.SamePlacement(after.Root.Placement, state.Placement ?? before.Root.Placement) || after.Root.Active != active) throw new InvalidOperationException("Applied group placement or activity did not verify");
-            var difference = GroupChecks.Layout(before, after, holds.Contains) ?? GroupChecks.Culling(after, active, Enclose(target)) ?? GroupChecks.RootCuller(after, active);
+            var difference = GroupChecks.Layout(before, after, holds.Contains) ?? GroupChecks.Culling(after, active, plan) ?? GroupChecks.RootCuller(after, active);
             if (difference != null) throw new InvalidOperationException("The group did not move as one: " + difference);
         }
         public bool Restore(object target, object snapshot) {
@@ -525,9 +566,10 @@ namespace RailroaderScenePatcher.Core {
                 if (root.Active == true) world.SetActive(target, true);
                 if (root.Placement != null) Place(target, root.Placement);
                 if (root.Active == false) world.SetActive(target, false);
+                var plan = Refresh(target);
                 var current = world.Observe(target);
                 return GroupChecks.SamePlacement(current.Root.Placement, root.Placement) && current.Root.Active == root.Active && GroupChecks.Layout(captured, current, holds.Contains) == null
-                    && GroupChecks.Culling(current, root.Active != false, Enclose(target)) == null && current.RootCulling == captured.RootCulling;
+                    && GroupChecks.Culling(current, root.Active != false, plan) == null && current.RootCulling == captured.RootCulling;
             } catch { return false; }
         }
         public string MinimumPatcherVersion(TargetIdentity target) => target != null && (target.Structure == Structure || (target.Structure == null && target.Component == ComponentType)) ? RequiredVersion : null;
@@ -575,15 +617,20 @@ namespace RailroaderScenePatcher.Core {
             var refusal = state?.Active == null ? null : world.ActivityRefusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
-        sealed class Snapshot { internal PartObservation Observed; internal Placement Held; }
-        public object Capture(object target) => new Snapshot { Observed = world.ObservePart(target), Held = holds.Of(target) };
-        // The part's placement applies, then every held part below it is put back at its fixed placement, and the cullers
-        // of the group follow.
-        void Place(object target, object group, Placement placement, Placement held) {
-            holds.Set(target, held, group);
+        sealed class Snapshot { internal PartObservation Observed; internal Placement Held, Scene; }
+        public object Capture(object target) => new Snapshot { Observed = world.ObservePart(target), Held = holds.Of(target), Scene = holds.AuthoredOf(target) };
+        // The part's placement applies, then every held part below it is put back at its fixed placement. scene is where
+        // the part stood in the object above it before any hold.
+        void Place(object target, object group, Placement placement, Placement held, Placement scene) {
+            holds.Set(target, held, group, scene);
             world.SetPartPlacement(target, placement);
             holds.Reassert(world, target);
-            world.RefreshCulling(group, GroupChecks.Enclosed(world, holds, group));
+        }
+        // The cullers of the group follow, and each moved part outside its culler's sphere keeps a sphere of its own.
+        CullingPlan Refresh(object group, object except = null) {
+            var plan = GroupChecks.Plan(world, holds, group, except);
+            world.RefreshCulling(group, plan);
+            return plan;
         }
         public void Apply(object target, ObjectState state) {
             var before = world.ObservePart(target);
@@ -595,19 +642,19 @@ namespace RailroaderScenePatcher.Core {
             var active = state.Active ?? before.Part.Active ?? true;
             if (!switched && active && before.Part.Active != true) world.SetPartActive(target, true);
             // A placement read in its parent returns the part there; any other placement is a fixed placement that holds it.
-            if (desired != null) Place(target, before.Group, desired, desired.Frame == null ? desired : null);
+            // A part that is not held yet stands where the scene has it in the object above it.
+            if (desired != null) Place(target, before.Group, desired, desired.Frame == null ? desired : null, holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.InParent(before.GroupState, target));
             if (!switched && !active && before.Part.Active != false) world.SetPartActive(target, false);
-            if (!switched && desired == null && active != before.Part.Active) world.RefreshCulling(before.Group, GroupChecks.Enclosed(world, holds, before.Group));
-            Verify(target, before, desired ?? before.Part.Placement, switched ? (bool?)null : active);
+            Verify(target, before, desired ?? before.Part.Placement, switched ? (bool?)null : active, Refresh(before.Group));
         }
         // active is null for a part whose activity a culler switches: its activity is not compared.
-        void Verify(object target, PartObservation before, Placement placement, bool? active) {
+        void Verify(object target, PartObservation before, Placement placement, bool? active, CullingPlan plan) {
             var after = world.ObservePart(target);
             if (!GroupChecks.SamePlacement(after.Part.Placement, placement) || (active != null && after.Part.Active != active)) throw new InvalidOperationException("The part's placement or activity does not match the requested state");
             var group = before.GroupState.Root; var now = after.GroupState.Root;
             if (!ReferenceEquals(after.Group, before.Group) || !GroupChecks.SamePlacement(now.Placement, group.Placement) || now.Active != group.Active) throw new InvalidOperationException("Editing the part changed its group root");
             var difference = GroupChecks.Layout(before.GroupState, after.GroupState, h => ReferenceEquals(h, target) || holds.Contains(h), target)
-                ?? GroupChecks.Culling(after.GroupState, now.Active != false, GroupChecks.Enclosed(world, holds, after.Group));
+                ?? GroupChecks.Culling(after.GroupState, now.Active != false, plan);
             if (difference != null) throw new InvalidOperationException("Editing the part changed more than the part itself: " + difference);
         }
         public bool Restore(object target, object snapshot) {
@@ -618,19 +665,18 @@ namespace RailroaderScenePatcher.Core {
                 var part = captured.Observed.Part;
                 var switched = world.ActivityRefusal(target) != null;
                 if (!switched && part.Active == true) world.SetPartActive(target, true);
-                if (part.Placement != null) Place(target, captured.Observed.Group, part.Placement, captured.Held);
+                if (part.Placement != null) Place(target, captured.Observed.Group, part.Placement, captured.Held, captured.Scene);
                 if (!switched && part.Active == false) world.SetPartActive(target, false);
-                world.RefreshCulling(captured.Observed.Group, GroupChecks.Enclosed(world, holds, captured.Observed.Group));
-                Verify(target, captured.Observed, part.Placement, switched ? (bool?)null : part.Active != false);
+                Verify(target, captured.Observed, part.Placement, switched ? (bool?)null : part.Active != false, Refresh(captured.Observed.Group));
                 return true;
             } catch { return false; }
         }
-        // A part that no longer stands under its identity holds nothing any more, and the cullers of its group, when
-        // the group still stands, let go of a radius they enlarged for it.
+        // A part that no longer stands under its identity holds nothing any more, and its group, when the group still
+        // stands, lets go of the part's own culling.
         // The culling refresh comes first: when it fails the hold stays, and the next load attempt releases it again.
         public void Release(object target) {
             var group = holds.GroupOf(target);
-            if (group != null && world.Alive(group) && world.Refusal(group) == null) world.RefreshCulling(group, GroupChecks.Enclosed(world, holds, group, target));
+            if (group != null && world.Alive(group) && world.Refusal(group) == null) Refresh(group, target);
             holds.Set(target, null);
         }
         public bool Unsettled(object target) => false;

@@ -42,11 +42,32 @@ class FakePart {
     // For a switched part: whether its culler shows it now. Off while its culler hides it, it counts as on.
     public bool Shown = true;
     public FakePart Parent; public FakeGroup Group;
+    // The edge of the cube its renderer, collider and light bounds fill around its position.
+    public double Size = 1;
+    // The renderer on the part, for the renderer cullers that list it.
+    public readonly FakeRenderer Renderer;
+    public FakePart() { Renderer = new FakeRenderer { On = this }; }
 }
+class FakeRenderer { public FakePart On; public bool Enabled = true; }
 // A culler in the group: where its culling sphere is registered, relative to the root, or null while it holds none.
-// On names the part a renderer culler stands on. Radius is the sphere radius of the simple culler on the root.
+// On names the part a culler stands on; without it the culler stands on the root. A culler is a simple culler on the
+// root and a renderer culler on a part unless Simple says otherwise.
 // Switcher: a game-object culler, which culls the parts it Lists rather than the parts below it.
-class FakeCuller { public string Id; public double[] Offset = { 0, 0, 0 }; public double[] Registered; public bool OnRoot, Switcher; public FakePart On; public double Radius = 10, Authored = 10; public List<FakePart> Lists = new List<FakePart>(); }
+class FakeCuller {
+    public string Id; public double[] Offset = { 0, 0, 0 }; public double[] Registered; public bool OnRoot, Switcher; public FakePart On; public double Radius = 10, Authored = 10; public List<FakePart> Lists = new List<FakePart>();
+    public bool? Simple;
+    public CullerKind Kind => Switcher ? CullerKind.GameObject : (Simple ?? OnRoot) ? CullerKind.Simple : CullerKind.Renderer;
+    // Whether the game's culler has started: a simple culler has its culling group, a renderer culler its renderer list.
+    public bool Started = true;
+    // A simple culler: whether its sphere is visible, and the handler its culling group calls when that changes. Null
+    // stands for the game's own handler, which switches the culler's object.
+    public bool Visible = true;
+    public Action Handler;
+    // A renderer or game-object culler: whether its state shows what it culls, and the renderers a renderer culler switches.
+    public bool Shows = true;
+    public List<FakeRenderer> Renders = new List<FakeRenderer>();
+
+}
 class FakeGroup {
     public double[] Position = { 100, 10, 20 }, Rotation = { 0, 0, 0, 1 };
     public bool Active = true;
@@ -62,9 +83,14 @@ class FakeGroup {
     public FakeGroup() { foreach (var part in Parts) part.Group = this; }
     public FakePart Add(FakePart part) { part.Group = this; Parts.Add(part); return part; }
 }
+// One sphere own culling registered with a culling manager of the controlled world.
+class FakeRegistration { public FakeCuller Culler; public CullerKind Kind; public FakePart Owner; public double[] Centre; public double Radius; public Action<bool> Changed; public bool Removed; }
 // Controlled world: map coordinates are scene coordinates plus Origin on X. A culling refresh moves every culler of an
-// active group to where it stands; a disabled group holds no culling registration.
-class FakeGroupWorld : IGroupWorld {
+// active group to where it stands; a disabled group holds no culling registration. The world runs the real own-culling
+// controller over controlled cullers, culling managers, renderers and lists.
+class FakeGroupWorld : IGroupWorld, IDisposable {
+    // The patcher's state for the world ends while the scene stays.
+    public void Dispose() => Culling.ReleaseAll();
     public string[] Maps = { "map" };
     public IEnumerable<string> MapIds => Maps;
     public Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();
@@ -73,43 +99,61 @@ class FakeGroupWorld : IGroupWorld {
     public string Refused, PartRefused;
     public int Mutations;
     public bool ThrowAfterPlacement, SkipCullingRefresh, LeavePartBehind, KeepPartBehind, KeepRootCulling, ThrowAfterPartPlacement, MoveSibling, KeepSiblingMoved;
-    // The cullers the last culling refresh of a group let enclose their renderers.
-    public ICollection<string> Enclosed;
+    // The plan of the last culling refresh.
+    public CullingPlan Plan;
+    public readonly PartCullingController Culling;
+    public readonly Host Native;
+    public FakeGroupWorld() { Native = new Host(this); Culling = new PartCullingController(Native); }
     double[] behind, sibling;
     public IReadOnlyList<object> Find(string scene, string path) => Objects.TryGetValue(path, out var found) ? found : new List<object>();
     public string Refusal(object group) => Refused;
     static double[] Add(double[] a, double[] b) => a.Zip(b, (x, y) => x + y).ToArray();
     static double[] Sub(double[] a, double[] b) => a.Zip(b, (x, y) => x - y).ToArray();
     double[] Map(double[] scene) => new[] { scene[0] + Origin, scene[1], scene[2] };
-    double[] SceneOf(double[] map) => new[] { map[0] - Origin, map[1], map[2] };
+    double[] SceneOf(IReadOnlyList<double> map) => new[] { map[0] - Origin, map[1], map[2] };
     // A part's position in the scene: the root's position and rotation applied to its place relative to the root.
     static double[] ScenePosition(FakePart part) => Add(part.Group.Position, Turn.Rotate(part.Group.Rotation, part.Offset));
     // A part is on as the scene authored it while it and every part above it is on, or off only because its culler
     // hides it.
     static bool Enabled(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!(p.Active || (p.Switched && !p.Shown))) return false; return true; }
-    // The radius around the root, or around a part, that encloses the renderers of the enabled parts at or below it, each
-    // a metre across.
-    static double Required(FakeGroup group) => group.Parts.Where(Enabled).Select(p => Math.Sqrt(p.Offset.Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
-    static double Required(FakePart above) => above.Group.Parts.Where(p => (p == above || IsBelow(p, above)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, above.Offset).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
     static bool IsBelow(FakePart part, FakePart above) { for (var p = part.Parent; p != null; p = p.Parent) if (p == above) return true; return false; }
-    // What a culler encloses: a game-object culler its listed parts and what stands below them, any other culler the
-    // parts below its object.
-    static double Required(FakeGroup group, FakeCuller culler) {
-        if (!culler.Switcher) return culler.On != null ? Required(culler.On) : Required(group);
-        var at = culler.On != null ? culler.On.Offset : culler.Offset;
-        return group.Parts.Where(p => culler.Lists.Any(l => p == l || IsBelow(p, l)) && Enabled(p)).Select(p => Math.Sqrt(Sub(p.Offset, at).Sum(v => v * v)) + 1).DefaultIfEmpty(0).Max();
-    }
     double[] CullerAt(FakeGroup group, FakeCuller culler) => culler.On != null ? ScenePosition(culler.On) : Add(group.Position, culler.Offset);
+    static FakeCuller SimpleOn(FakeGroup group, FakePart part) => group.Cullers.FirstOrDefault(c => c.Kind == CullerKind.Simple && c.On == part);
+    // The parts a game-object culler switches: those in its list and those own culling took out of it.
+    IReadOnlyList<object> Listed(FakeCuller culler) => ListedObjects.Union(culler.Lists, Culling.HandedOver(culler));
+    bool ListedPart(FakePart part) => part.Group.Cullers.Any(c => c.Switcher && Listed(c).Contains(part));
+    // A part's own activity as the scene or the modder set it: what own culling holds for a part it switches, and on
+    // for a part that is off only because a culler of the game hides it.
+    bool Authored(FakePart part) {
+        var own = SimpleOn(part.Group, part);
+        var hidden = part.Group.Cullers.Any(c => c.Switcher && !c.Shows && Listed(c).Contains(part));
+        return CullingActivity.Desired(part.Active || (part.Switched && !part.Shown) || (own != null && !own.Visible) || hidden, Culling.Desired(part));
+    }
+    bool Authored(FakeGroup group) {
+        var own = SimpleOn(group, null);
+        return CullingActivity.Desired(group.Active || (own != null && group.RootCulling == true && !own.Visible), Culling.Desired(group));
+    }
     public GroupObservation Observe(object target) {
         var group = (FakeGroup)target;
-        return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), group.Active),
-            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, p.Active, p.Culled, p, p.Parent, p.Animated)),
-            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, Required(group, c), (object)c.On ?? group, c.Lists, c.Switcher)), group.Parent, group.RootCulling);
+        var regions = Culling.Regions(group);
+        return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), Authored(group)),
+            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, Authored(p), p.Culled || ListedPart(p), p, p.Parent, p.Animated)),
+            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, c.Authored, (object)c.On ?? group, Listed(c), c.Kind, c, regions.Where(r => ReferenceEquals(r.Culler, c)))), group.Parent, group.RootCulling);
+    }
+    // The game's renderer and game-object cullers hold a sphere only while their object is on in the scene.
+    void Registrations(FakeGroup group) {
+        foreach (var culler in group.Cullers.Where(c => c.Kind != CullerKind.Simple)) {
+            var on = group.Active && (culler.On == null || Enabled(culler.On));
+            culler.Registered = on ? culler.Registered ?? CullerAt(group, culler) : null;
+        }
     }
     public void SetActive(object target, bool active) {
-        Mutations++; var group = (FakeGroup)target; group.Active = active;
+        Mutations++; var group = (FakeGroup)target;
+        var own = SimpleOn(group, null);
+        // Enabled again, the root takes the visibility its culling group holds.
+        if (!Culling.SetDesired(group, active)) group.Active = active && (own == null || own.Visible);
         if (group.RootCulling != null && !KeepRootCulling) group.RootCulling = active;
-        foreach (var culler in group.Cullers) culler.Registered = active && (culler.On == null || Enabled(culler.On)) ? CullerAt(group, culler) : null;
+        foreach (var culler in group.Cullers) culler.Registered = active && group.Active && (culler.On == null || Enabled(culler.On)) ? CullerAt(group, culler) : null;
     }
     public void SetPlacement(object target, Placement placement) {
         Mutations++; var group = (FakeGroup)target;
@@ -120,25 +164,36 @@ class FakeGroupWorld : IGroupWorld {
         else if (LeavePartBehind && behind == null) { behind = group.Parts[0].Offset; group.Parts[0].Offset = new[] { 9.0, 9, 9 }; LeavePartBehind = false; }
         if (ThrowAfterPlacement) { ThrowAfterPlacement = false; throw new Exception("injected after placement"); }
     }
-    public void RefreshCulling(object target, ICollection<string> enclose) {
+    public void RefreshCulling(object target, CullingPlan plan) {
         var group = (FakeGroup)target;
-        Enclosed = enclose;
+        Plan = plan;
         if (SkipCullingRefresh) { SkipCullingRefresh = false; return; }
-        foreach (var culler in group.Cullers) {
-            culler.Radius = enclose.Contains(culler.Id) ? Math.Max(culler.Authored, Required(group, culler)) : culler.Authored;
+        foreach (var culler in group.Cullers)
             if (group.Active && (culler.On == null || Enabled(culler.On))) culler.Registered = CullerAt(group, culler);
+        Culling.Apply(group, plan);
+    }
+    // The corners of the cube around the part and around every part below it, leaving out the named parts and what
+    // stands below them.
+    public IReadOnlyList<IReadOnlyList<double>> Presence(object target, IReadOnlyList<object> without) {
+        var part = (FakePart)target; var corners = new List<IReadOnlyList<double>>();
+        foreach (var p in part.Group.Parts.Where(p => p == part || IsBelow(p, part))) {
+            if (without != null && without.Any(w => w == p || (w is FakePart above && IsBelow(p, above)))) continue;
+            var at = Map(ScenePosition(p));
+            for (var i = 0; i < 8; i++) corners.Add(new[] { at[0] + ((i & 1) == 0 ? -1 : 1) * p.Size / 2, at[1] + ((i & 2) == 0 ? -1 : 1) * p.Size / 2, at[2] + ((i & 4) == 0 ? -1 : 1) * p.Size / 2 });
         }
+        return corners;
     }
     public IReadOnlyList<object> FindParts(string scene, string path) => PartsAt.TryGetValue(path, out var found) ? found : new List<object>();
     public string PartRefusal(object part) => PartRefused;
-    public string ActivityRefusal(object part) => ((FakePart)part).Switched ? "A culler of the game switches this part by camera distance" : null;
+    public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;
         var parent = part.Parent == null ? new Placement(Map(group.Position), (double[])group.Rotation.Clone()) : new Placement(Map(ScenePosition(part.Parent)), Turn.Multiply(group.Rotation, part.Parent.Rotation));
-        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), part.Active || (part.Switched && !part.Shown)), group, Observe(group), (object)part.Parent ?? group, parent);
+        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), Authored(part)), group, Observe(group), (object)part.Parent ?? group, parent);
     }
     public void SetPartActive(object target, bool active) {
-        Mutations++; var part = (FakePart)target; part.Active = active;
+        Mutations++; var part = (FakePart)target;
+        if (!Culling.SetDesired(part, active)) part.Active = active;
         foreach (var culler in part.Group.Cullers.Where(c => c.On != null && (c.On == part || Below(c.On, part)))) culler.Registered = active && part.Group.Active && Enabled(culler.On) ? CullerAt(part.Group, culler) : null;
     }
     // Everything below the part keeps its place relative to it.
@@ -164,6 +219,76 @@ class FakeGroupWorld : IGroupWorld {
         if (above is FakeGroup group) return part.Group == group;
         for (var p = part.Parent; p != null; p = p.Parent) if (p == above) return true;
         return false;
+    }
+    // The camera shows or hides a simple culler's sphere: its culling group calls the installed handler, or the game's
+    // own, which switches the culler's object.
+    public void See(FakeGroup group, FakeCuller culler, bool visible) {
+        culler.Visible = visible;
+        if (culler.Handler != null) culler.Handler(); else Native.Game(group, culler);
+    }
+    // The game's culler starts: it creates its culling group with its own handler.
+    public void Start(FakeCuller culler) { culler.Started = true; culler.Handler = null; }
+    // The camera shows or hides an own sphere; the culling manager tells its handler.
+    public void Show(FakeRegistration registration, bool shows) => registration.Changed(shows);
+
+    // The culling side of the controlled world, as own culling reaches it.
+    public sealed class Host : ICullingHost {
+        readonly FakeGroupWorld world;
+        internal Host(FakeGroupWorld world) { this.world = world; }
+        // Every sphere own culling registered and did not release.
+        public readonly List<FakeRegistration> Registered = new List<FakeRegistration>();
+        // Unloading: the map unloads. ManagersGone: the culling managers were destroyed. NoManager: none exists yet.
+        public bool Unloading, ManagersGone, NoManager, FailWrites;
+        // Calls that reach a culling manager, and writes of an object's activity or a renderer's state.
+        public int ManagerCalls, Writes;
+        sealed class HookToken { internal Action Before, Installed; }
+        public bool Available => !Unloading;
+        FakeGroup GroupOf(FakeCuller culler) => world.Objects.Values.SelectMany(list => list).OfType<FakeGroup>().FirstOrDefault(g => g.Cullers.Contains(culler));
+        public bool Alive(object target) =>
+            target is FakeCuller culler ? GroupOf(culler) != null && (culler.On == null || world.Alive(culler.On)) : target is FakeRenderer renderer ? world.Alive(renderer.On) : world.Alive(target);
+        public bool Started(object culler) => ((FakeCuller)culler).Started;
+        public bool Visible(object simpleCuller) => ((FakeCuller)simpleCuller).Visible;
+        // The game's own handler of a simple culler: it switches the culler's object.
+        internal void Game(FakeGroup group, FakeCuller culler) { if (culler.On != null) culler.On.Active = culler.Visible; else group.Active = culler.Visible; }
+        public object Hook(object simpleCuller, bool replace, Func<bool> changed) {
+            var culler = (FakeCuller)simpleCuller; var before = culler.Handler; var group = GroupOf(culler);
+            var token = new HookToken { Before = before };
+            void Before() { if (before != null) before(); else Game(group, culler); }
+            // The game's handler runs first when own culling only listens, and in its place when own culling no longer owns the hook.
+            token.Installed = () => { if (!replace) Before(); if (!changed() && replace) Before(); };
+            culler.Handler = token.Installed;
+            return token;
+        }
+        public bool Unhook(object simpleCuller, object hook) {
+            var culler = (FakeCuller)simpleCuller; var token = (HookToken)hook;
+            if (culler.Handler != token.Installed) return false;
+            culler.Handler = token.Before;
+            return true;
+        }
+        public object Register(object culler, CullerKind kind, object owner, IReadOnlyList<double> centre, double radius, Action<bool> changed) {
+            if (NoManager) return null;
+            ManagerCalls++;
+            var registration = new FakeRegistration { Culler = (FakeCuller)culler, Kind = kind, Owner = (FakePart)owner, Centre = world.SceneOf(centre), Radius = radius, Changed = changed };
+            Registered.Add(registration);
+            return registration;
+        }
+        public bool Live(object registration) => !((FakeRegistration)registration).Removed && !ManagersGone;
+        public void Move(object registration, IReadOnlyList<double> centre, double radius) { ManagerCalls++; var r = (FakeRegistration)registration; r.Centre = world.SceneOf(centre); r.Radius = radius; }
+        public void Release(object registration) { ManagerCalls++; var r = (FakeRegistration)registration; r.Removed = true; Registered.Remove(r); }
+        public IReadOnlyList<double> Sphere(object registration) { ManagerCalls++; var r = (FakeRegistration)registration; var map = world.Map(r.Centre); return new[] { map[0], map[1], map[2], r.Radius }; }
+        public void SetActive(object node, bool active) {
+            if (FailWrites) throw new Exception("injected write failure");
+            Writes++;
+            if (node is FakeGroup group) { group.Active = active; world.Registrations(group); }
+            else { var part = (FakePart)node; part.Active = active; world.Registrations(part.Group); }
+        }
+        public IReadOnlyList<object> Renderers(object rendererCuller) => ((FakeCuller)rendererCuller).Renders.ToArray();
+        public void SetRenderers(object rendererCuller, IReadOnlyList<object> renderers) => ((FakeCuller)rendererCuller).Renders = renderers.Cast<FakeRenderer>().ToList();
+        public bool Shows(object culler) => ((FakeCuller)culler).Shows;
+        public void SetEnabled(object renderer, bool enabled) { Writes++; ((FakeRenderer)renderer).Enabled = enabled; }
+        public bool Under(object renderer, object node) { var on = ((FakeRenderer)renderer).On; return on == node || (node is FakePart above && IsBelow(on, above)); }
+        public int Unlist(object gameObjectCuller, object node) { var list = ((FakeCuller)gameObjectCuller).Lists; var index = list.IndexOf((FakePart)node); if (index >= 0) list.RemoveAt(index); return index; }
+        public void Relist(object gameObjectCuller, object node, int index) { var list = ((FakeCuller)gameObjectCuller).Lists; if (!list.Contains((FakePart)node)) list.Insert(Math.Min(index, list.Count), (FakePart)node); }
     }
 }
 static class BakedSceneryTests {

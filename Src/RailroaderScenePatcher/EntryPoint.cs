@@ -25,6 +25,7 @@ namespace RailroaderScenePatcher {
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
         public void OnWorldLoad() {
+            GroupWorld.WorldLoaded();
             object map, attempt;
             try { map = MapContext(); attempt = AttemptIdentity(); }
             catch (Exception e) { Unbound("Local world context unavailable: " + e.GetBaseException().Message + ". Report to the patcher maintainer."); return; }
@@ -569,6 +570,10 @@ namespace RailroaderScenePatcher {
         void Update() {
             FlushWarnings();
             if (!Initialized || engine == null) return;
+            // Own culling of moved parts installs what waited for a game culler to start. What it could not take out
+            // again is information for the log, not a warning.
+            GroupWorld.Tick();
+            foreach (var note in GroupWorld.CullingNotes()) context?.Log.Info("Scene inventory: " + note);
             // Focus callbacks can arrive before the editor attachment is ready. Keep the check pending until Update
             // has attached it, and also observe the focus edge when Unity does not deliver the callback to this host.
             var focused = Application.isFocused;

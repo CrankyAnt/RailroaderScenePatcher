@@ -293,6 +293,7 @@ class Program {
         BridgeTests.Run();
         BakedSceneryTests.Run();
         BakedPartTests.Run();
+        PartCullingTests.Run();
         SelectionTests.Run();
         GameDefinedGroupTests.Run();
         BoardTests.Run();

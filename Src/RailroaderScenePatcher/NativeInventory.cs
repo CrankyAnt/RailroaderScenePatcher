@@ -243,6 +243,9 @@ namespace RailroaderScenePatcher {
                 },
                 () => {
                     if (walk != null) markerReferrers = walk.Finish();
+                    // An object own culling took out of a culler's list for a moved part is still one that culler
+                    // switches: the walk no longer finds it in the list, so the registry adds it.
+                    foreach (var item in GroupWorld.HandedOver()) { culled[item.Item1] = Label(item.Item2); if (!item.Item3) hidden.Add(item.Item1); }
                     // The setups first, so the classification below never uses those of an earlier discovery.
                     ReadStarters();
                     LastReferrers = referrerError == null ? markerReferrers : null;
@@ -290,7 +293,7 @@ namespace RailroaderScenePatcher {
             var groupRoot = c is Transform && !part;
             // The object's own active flag. What a culler switches off by camera distance is no disabling; an object
             // that is off while its culler shows its objects was switched off by the scene or by a patch.
-            var enabled = AuthoredActivity.Enabled(go.activeSelf, culled.ContainsKey(go), !hidden.Contains(go));
+            var enabled = AuthoredActivity.Enabled(GroupWorld.OwnActivity(go), culled.ContainsKey(go), !hidden.Contains(go));
             // What the game reads whatever the object's activity: listed as a problem also for a disabled object.
             var anyway = new List<string>();
             // The game enables and disables child behaviours while it runs, for example a crossing bell's audio player
@@ -418,7 +421,7 @@ namespace RailroaderScenePatcher {
             if (Get(go, BoardScene.CullerType) != null) dependencies.Add("Culling registration and origin-dependent position");
             if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output");
             if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root");
-            if (part) dependencies.Add("Culling and colliders move with the part. While the part has a fixed placement, the cullers above it expand as needed to enclose it");
+            if (part) dependencies.Add(BakedSceneryRules.PartCullingDependency);
             if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling; separate construction scenery has its own placement");
             // Crossing equipment sits under objects that a culler switches off when the camera is far away, so whether it
             // is active in the game changes with every camera jump. Its activity is what the scene authored: every
@@ -432,7 +435,8 @@ namespace RailroaderScenePatcher {
                 for (var t = go.transform; t != null; t = t.parent) {
                     var switched = culled.TryGetValue(t.gameObject, out var by);
                     if (!switched && GroupWorld.SwitchesItself(t.gameObject)) { switched = true; by = GroupWorld.SimpleCullerType; }
-                    chain.Add(new KeyValuePair<bool, bool>(t.gameObject.activeSelf, switched));
+                    // An object that own culling switches for a moved part counts as the scene or the modder set it.
+                    chain.Add(new KeyValuePair<bool, bool>(GroupWorld.OwnActivity(t.gameObject), switched));
                     if (switched) runtime.Add("Culled by " + by + ": " + BoardScene.PathOf(t) + " active=" + t.gameObject.activeSelf);
                 }
                 active = AuthoredActivity.Of(chain);

@@ -11,7 +11,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the baked scenery group and part capabilities: the transform and activity of a group root
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // BakedSceneryRules, BakedSceneryGroups and BakedSceneryParts.
-    internal sealed class GroupWorld : IGroupWorld {
+    internal sealed class GroupWorld : IGroupWorld, IDisposable {
         internal const string SimpleCullerType = "Helpers.SimpleCuller", GameObjectCullerType = "Helpers.Culling.GameObjectCuller";
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -20,18 +20,60 @@ namespace RailroaderScenePatcher {
         static readonly MethodInfo simpleMoved = simple?.GetMethod("OnTransformDidChange", Native.Flags, null, Type.EmptyTypes, null);
         static readonly FieldInfo simpleRadius = simple?.GetField("radius", Native.Flags), rendererRadius = renderer?.GetField("radius", Native.Flags), switcherRadius = switcher?.GetField("radius", Native.Flags),
             switcherState = switcher?.GetField("_cullingState", Native.Flags);
-        // Token.UpdatePosition(Transform, float?): moves a renderer or game-object culler's sphere and, with a radius, sets it.
-        static readonly MethodInfo tokenUpdate = renderer?.GetField("_cullingToken", Native.Flags)?.FieldType.GetMethod("UpdatePosition", new[] { typeof(Transform), typeof(float?) });
+        // Own culling of moved parts: one controller for the loaded world, so the readers of the inventory and the
+        // inspector see what it holds. A new world replaces it.
+        static PartCullingHost host;
+        static PartCullingController culling;
+        static readonly List<string> reported = new List<string>();
         internal GroupWorld() {
             if (simple == null || renderer == null || switcher == null) throw new InvalidOperationException("Culler types unavailable");
             if (cullingGroup?.FieldType != typeof(CullingGroup) || cullingSpheres?.FieldType != typeof(BoundingSphere[]) || simpleMoved == null || simpleRadius?.FieldType != typeof(float)) throw new MissingMemberException("Simple culler members unavailable");
             if (rendererToken == null || switcherToken == null || managerSpheres == null) throw new MissingMemberException("Culling registration members unavailable");
             if (renderer.GetMethod("RequestUpdateCullingPosition", Native.Flags) == null || switcher.GetMethod("RequestUpdateCullingPosition", Native.Flags) == null) throw new MissingMethodException("Culling refresh unavailable");
-            if (rendererRadius?.FieldType != typeof(float) || switcherRadius?.FieldType != typeof(float) || switcherState == null || tokenUpdate == null) throw new MissingMemberException("Culling radius members unavailable");
+            if (rendererRadius?.FieldType != typeof(float) || switcherRadius?.FieldType != typeof(float) || switcherState == null) throw new MissingMemberException("Culling radius members unavailable");
             var token = rendererToken.FieldType;
             if (token.GetProperty("Index") == null || token.GetField("Manager") == null || token.GetProperty("IsRemoved") == null) throw new MissingMemberException("Culling token members unavailable");
             if (Native.Type("Helpers.WorldTransformer") == null) throw new InvalidOperationException("Floating origin unavailable");
+            // The private culling fields that own culling reads and writes are checked here: a missing one fails the
+            // adapter with its name, not a scene edit.
+            var next = new PartCullingHost();
+            // An earlier world's own culling goes back to the game before this one starts.
+            culling?.ReleaseAll(); host?.Dispose();
+            host = next; culling = new PartCullingController(host); reported.Clear();
+            own = culling; ownHost = host;
+            var current = culling;
+            host.Unloaded = () => { current.Unload(); reported.Clear(); };
+            culling.Fault = message => Debug.LogWarning("Scene Patcher: " + message);
         }
+        readonly PartCullingController own;
+        readonly PartCullingHost ownHost;
+        // The patcher's state for this world ends. While the scene stays loaded, every handler, renderer list, object
+        // list and activity that own culling took over goes back to the game, and its spheres are released.
+        bool disposed;
+        public void Dispose() {
+            if (disposed) return;
+            disposed = true;
+            try { own.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling release failed: " + e.GetBaseException().Message); }
+            ownHost.Dispose();
+            if (ReferenceEquals(culling, own)) { culling = null; host = null; reported.Clear(); }
+        }
+        // Every frame: installs own culling that waited for a game culler to start.
+        internal static void Tick() { try { culling?.Tick(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling update failed: " + e.GetBaseException().Message); } }
+        // A world load started.
+        internal static void WorldLoaded() => host?.WorldLoaded();
+        // Notes for the inventory diagnostics, each once: a handler the patcher could not take out of a simple culler.
+        internal static IEnumerable<string> CullingNotes() {
+            if (culling == null || culling.Leftovers.Count == reported.Count) return Array.Empty<string>();
+            var fresh = culling.Leftovers.Where(id => !reported.Contains(id)).ToArray();
+            reported.AddRange(fresh);
+            return fresh.Select(BakedSceneryRules.LeftoverWrapper).ToArray();
+        }
+        // The objects own culling took out of a game-object culler's list, with that culler and whether the object's
+        // own sphere shows it now.
+        internal static IEnumerable<Tuple<GameObject, Component, bool>> HandedOver() =>
+            culling == null ? new Tuple<GameObject, Component, bool>[0] : culling.HandedOver().Where(item => item.Item1 as GameObject != null && item.Item2 as Component != null).Select(item => Tuple.Create((GameObject)item.Item1, (Component)item.Item2, item.Item3)).ToArray();
+        // The object's own activity as the scene or the modder set it: what own culling holds for an object it switches.
+        internal static bool OwnActivity(GameObject go) => CullingActivity.Desired(go.activeSelf, culling?.Desired(go));
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
 
         // The rule's verdicts for every loaded World root. They are read again after Invalidate, which a whole discovery
@@ -185,8 +227,7 @@ namespace RailroaderScenePatcher {
         static Component ListingCuller(GameObject go, GameObject root) {
             if (switcher == null || switchedObjects == null || root == null) return null;
             foreach (var culler in root.GetComponentsInChildren(switcher, true))
-                if (switchedObjects.GetValue(culler) is System.Collections.IEnumerable objects)
-                    foreach (var item in objects) if (item is GameObject listed && listed == go) return culler;
+                if (Switches(culler).Contains(go)) return culler;
             return null;
         }
         // Whether a simple culler on the object switches the object itself by camera distance now.
@@ -198,8 +239,7 @@ namespace RailroaderScenePatcher {
             var listed = new HashSet<GameObject>();
             if (switcher == null || switchedObjects == null) return listed;
             foreach (var culler in root.GetComponentsInChildren(switcher, true))
-                if (switchedObjects.GetValue(culler) is System.Collections.IEnumerable objects)
-                    foreach (var item in objects) if (item is GameObject go && go != null) listed.Add(go);
+                foreach (var go in Switches(culler)) listed.Add(go);
             return listed;
         }
         static Component OwnSimple(GameObject root) => simple == null ? null : root.GetComponent(simple);
@@ -208,6 +248,9 @@ namespace RailroaderScenePatcher {
         // its group that lists it, switches it off while the camera is far away; off while that culler hides it, the
         // object counts as on, as AuthoredActivity.Enabled reads it for the inventory.
         internal static bool Authored(GameObject go) {
+            // An object own culling switches reads what the scene or the modder set, whatever the camera made of it.
+            var desired = culling?.Desired(go);
+            if (desired != null) return desired.Value;
             if (go.activeSelf) return true;
             var group = GroupOf(OwnSimple(go));
             if (AuthoredActivity.Enabled(false, group != null && group.enabled, group != null && group.enabled && group.IsVisible(0))) return true;
@@ -228,20 +271,24 @@ namespace RailroaderScenePatcher {
             foreach (var part in root.GetComponentsInChildren<Transform>(true)) {
                 if (part == t || Transient(part, t)) continue;
                 var local = t.InverseTransformPoint(part.position); var turn = Quaternion.Inverse(t.rotation) * part.rotation;
-                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), part.gameObject.activeSelf, Switched(part, listed), part.gameObject, part.parent == t ? null : part.parent.gameObject, Animated(part, t)));
+                var switched = Switched(part, listed);
+                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), switched ? Authored(part.gameObject) : OwnActivity(part.gameObject), switched, part.gameObject, part.parent == t ? null : part.parent.gameObject, Animated(part, t)));
             }
             var cullers = new List<GroupCuller>();
+            var regions = culling == null ? new ObservedRegion[0] : culling.Regions(root);
             foreach (var culler in root.GetComponentsInChildren(simple, true)) {
                 var group = GroupOf(culler); var spheres = cullingSpheres.GetValue(culler) as BoundingSphere[];
                 var holds = group != null && group.enabled && spheres != null && spheres.Length > 0 && (culler.transform == t || culler.transform.parent.gameObject.activeInHierarchy);
-                // Each culler reports its radius and the radius that encloses the renderers it culls.
-                var radius = spheres != null && spheres.Length > 0 ? spheres[0].radius : (float)simpleRadius.GetValue(culler);
-                cullers.Add(new GroupCuller(CullerId(t, culler), holds ? Map(spheres[0].position, culler.transform) : null, Map(culler.transform.position, culler.transform), radius, Enclosing(culler.transform, t), culler.gameObject));
+                // Each culler reports the radius of its sphere and the radius the scene gives it.
+                var authored = (float)simpleRadius.GetValue(culler);
+                var radius = spheres != null && spheres.Length > 0 ? spheres[0].radius : authored;
+                cullers.Add(new GroupCuller(CullerId(t, culler), holds ? Map(spheres[0].position, culler.transform) : null, Map(culler.transform.position, culler.transform), radius, authored, culler.gameObject, null, CullerKind.Simple, culler, regions.Where(r => ReferenceEquals(r.Culler, culler))));
             }
             foreach (var type in new[] { renderer, switcher })
                 foreach (var culler in root.GetComponentsInChildren(type, true)) {
                     var switches = type == switcher ? Switches(culler) : new GameObject[0];
-                    cullers.Add(new GroupCuller(CullerId(t, culler), Registered(culler), Map(culler.transform.position, culler.transform), SphereRadius(culler), Enclosing(culler.transform, t, switches, type != switcher), culler.gameObject, switches, type == switcher));
+                    cullers.Add(new GroupCuller(CullerId(t, culler), Registered(culler), Map(culler.transform.position, culler.transform), SphereRadius(culler), (float)(type == switcher ? switcherRadius : rendererRadius).GetValue(culler), culler.gameObject, switches,
+                        type == switcher ? CullerKind.GameObject : CullerKind.Renderer, culler, regions.Where(r => ReferenceEquals(r.Culler, culler))));
                 }
             var own = GroupOf(OwnSimple(root));
             return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled);
@@ -257,8 +304,9 @@ namespace RailroaderScenePatcher {
             return new PartObservation(new ObjectState(new Placement(Coordinates(position), Coordinates(part.transform.rotation)), Authored(part)), root, group, parent == null ? null : parent.gameObject, parentPlacement);
         }
         static string CullerId(Transform root, Component culler) => Relative(root, culler.transform) + "|" + culler.GetType().FullName;
+        // The objects a game-object culler switches: those in its list and those own culling took out of it.
         static GameObject[] Switches(Component culler) =>
-            switchedObjects.GetValue(culler) is System.Collections.IEnumerable objects ? objects.OfType<GameObject>().Where(go => go != null).ToArray() : new GameObject[0];
+            ListedObjects.Union(switchedObjects?.GetValue(culler) is System.Collections.IEnumerable objects ? objects.Cast<object>() : null, culling?.HandedOver(culler)).OfType<GameObject>().Where(go => go != null).ToArray();
         // The radius a renderer or game-object culler's sphere holds in its culling manager, or its authored radius while
         // it holds none.
         static double SphereRadius(Component culler) {
@@ -270,23 +318,38 @@ namespace RailroaderScenePatcher {
             }
             return (float)(culler.GetType() == switcher ? switcherRadius : rendererRadius).GetValue(culler);
         }
-        // The radius around the culler that encloses the renderers it culls: those below its object (own), and those below
-        // the objects it switches. A renderer counts while every object from it up to the group root is on as the scene
-        // authored it, so an object that a culler hides only because the camera is far away still counts. The bounds
-        // come from the meshes, which an object that is switched off still has.
-        static float Enclosing(Transform centre, Transform root, IEnumerable<GameObject> listed = null, bool own = true) {
-            var radius = 0f;
-            var shapes = (own ? centre.GetComponentsInChildren<Renderer>(true) : new Renderer[0]).Concat((listed ?? Enumerable.Empty<GameObject>()).SelectMany(go => go.GetComponentsInChildren<Renderer>(true))).Distinct();
-            foreach (var shape in shapes) {
-                if (shape == null || !BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false) || !AuthoredOnBelow(shape.transform, root)) continue;
-                foreach (var corner in Corners(shape)) radius = Math.Max(radius, (corner - centre.position).magnitude);
+        // The corners of the renderer, collider and light bounds at and below the part. The bounds come from the meshes
+        // and collider shapes, which an object that is switched off still has. A visual effect gives no presence, and a
+        // light counts only for a part without renderers.
+        public IReadOnlyList<IReadOnlyList<double>> Presence(object target, IReadOnlyList<object> without) {
+            var part = PartObject(target).transform;
+            var skip = (without ?? new object[0]).OfType<GameObject>().Where(go => go != null).Select(go => go.transform).ToArray();
+            bool Counts(Component c) => c != null && !skip.Any(c.transform.IsChildOf);
+            var points = new List<Vector3>();
+            foreach (var shape in part.GetComponentsInChildren<Renderer>(true))
+                if (Counts(shape) && BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false)) points.AddRange(Corners(shape));
+            var shapes = points.Count;
+            foreach (var collider in part.GetComponentsInChildren<Collider>(true)) if (Counts(collider)) points.AddRange(Corners(collider));
+            if (shapes == 0) foreach (var light in part.GetComponentsInChildren<Light>(true)) if (Counts(light)) points.Add(light.transform.position);
+            if (points.Count == 0) points.Add(part.position);
+            var moves = NativeInventory.MovesWithOrigin(part);
+            return points.Select(point => { var map = NativeInventory.MapPosition(point, moves); return (IReadOnlyList<double>)new double[] { map.x, map.y, map.z }; }).ToArray();
+        }
+        static IEnumerable<Vector3> Corners(Collider collider) {
+            Bounds local;
+            if (collider is BoxCollider box) local = new Bounds(box.center, box.size);
+            else if (collider is SphereCollider sphere) local = new Bounds(sphere.center, Vector3.one * sphere.radius * 2);
+            else if (collider is CapsuleCollider capsule) { var size = Vector3.one * capsule.radius * 2; size[capsule.direction] = Math.Max(capsule.height, capsule.radius * 2); local = new Bounds(capsule.center, size); }
+            else if (collider is MeshCollider mesh && mesh.sharedMesh != null) local = mesh.sharedMesh.bounds;
+            else {
+                // Any other collider reports bounds only while it is on.
+                if (collider.enabled && collider.gameObject.activeInHierarchy) { var b = collider.bounds; for (var i = 0; i < 8; i++) yield return b.center + Vector3.Scale(b.extents, Sign(i)); }
+                yield break;
             }
-            return radius;
+            var matrix = collider.transform.localToWorldMatrix;
+            for (var i = 0; i < 8; i++) yield return matrix.MultiplyPoint3x4(local.center + Vector3.Scale(local.extents, Sign(i)));
         }
-        static bool AuthoredOnBelow(Transform t, Transform root) {
-            for (; t != null && t != root; t = t.parent) if (!Authored(t.gameObject)) return false;
-            return t == root;
-        }
+        static Vector3 Sign(int i) => new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1);
         static IEnumerable<Vector3> Corners(Renderer shape) {
             Bounds local; Matrix4x4 matrix;
             if (shape is SkinnedMeshRenderer skinned) { local = skinned.localBounds; matrix = (skinned.rootBone != null ? skinned.rootBone : skinned.transform).localToWorldMatrix; }
@@ -336,8 +399,10 @@ namespace RailroaderScenePatcher {
         public void SetPartActive(object target, bool active) => Switch(PartObject(target), active);
         // A simple culler on the object switches it on when the camera comes near; while the object is disabled its
         // culling group sends no events, and it resumes when the object is enabled.
-        static void Switch(GameObject go, bool active) {
+        void Switch(GameObject go, bool active) {
             var group = GroupOf(OwnSimple(go));
+            // An object own culling switches takes the value as its desired activity and shows by its spheres.
+            if (!disposed && own.SetDesired(go, active)) { if (group != null) group.enabled = active; Physics.SyncTransforms(); return; }
             // Enabled again, the object takes the visibility its culling group holds, so a far object does not show until
             // the camera comes near. An object whose culler has not started yet starts it now.
             if (active) { if (group != null) group.enabled = true; go.SetActive(group == null || group.IsVisible(0)); }
@@ -356,12 +421,10 @@ namespace RailroaderScenePatcher {
             // Physics reads moved static colliders at the next simulation step; synchronise now so queries and checks agree.
             Physics.SyncTransforms();
         }
-        // The authored radius of each culler whose radius a part edit enlarged.
-        static readonly Dictionary<Component, float> authoredRadius = new Dictionary<Component, float>();
-        public void RefreshCulling(object target, ICollection<string> enclose) {
+        public void RefreshCulling(object target, CullingPlan plan) {
+            // A world whose patcher state ended gave its own culling back to the game and takes none again.
+            if (disposed) return;
             var root = Root(target);
-            // A culler of an unloaded world holds nothing any more.
-            foreach (var gone in authoredRadius.Keys.Where(c => c == null).ToList()) authoredRadius.Remove(gone);
             // A renderer or game-object culler keeps its sphere where it registered it; an inactive one holds none and
             // registers at the current placement when it is enabled.
             foreach (var type in new[] { renderer, switcher })
@@ -371,29 +434,10 @@ namespace RailroaderScenePatcher {
             // A simple culler moves its sphere in its own Update, which does not run while the camera has culled it.
             foreach (var culler in root.GetComponentsInChildren(simple, true))
                 if (cullingSpheres.GetValue(culler) != null) simpleMoved.Invoke(culler, null);
-            // The game sets the radius of a culler once, from its authored value. While a part below it keeps a fixed
-            // placement of its own a culler encloses the renderers it culls, and never shrinks below that value.
-            var t = root.transform;
-            foreach (var culler in root.GetComponentsInChildren(simple, true)) {
-                var radius = Radius(culler, simpleRadius, enclose.Contains(CullerId(t, culler)), () => Enclosing(culler.transform, t));
-                if (cullingSpheres.GetValue(culler) is BoundingSphere[] spheres && spheres.Length > 0) spheres[0].radius = radius;
-            }
-            foreach (var type in new[] { renderer, switcher })
-                foreach (var culler in root.GetComponentsInChildren(type, true)) {
-                    var radius = Radius(culler, type == switcher ? switcherRadius : rendererRadius, enclose.Contains(CullerId(t, culler)), () => Enclosing(culler.transform, t, type == switcher ? Switches(culler) : null, type != switcher));
-                    // A culler that registers again when it is enabled takes the field; a registered one takes the radius now.
-                    var token = (type == switcher ? switcherToken : rendererToken).GetValue(culler);
-                    if (token != null && !(bool)Native.Read(token, "IsRemoved")) tokenUpdate.Invoke(token, new object[] { culler.transform, (float?)radius });
-                }
+            // Every culler keeps the radius the scene gives it. A moved part outside a culler's sphere gets a sphere of
+            // its own instead, as the plan names it.
+            own.Apply(root, plan);
             Physics.SyncTransforms();
-        }
-        // Sets the culler's radius field: enclosing its renderers, never below the authored radius, or the authored radius.
-        static float Radius(Component culler, FieldInfo field, bool enclose, Func<float> enclosing) {
-            if (!authoredRadius.TryGetValue(culler, out var authored)) authored = (float)field.GetValue(culler);
-            var radius = enclose ? Math.Max(authored, enclosing()) : authored;
-            if (enclose) authoredRadius[culler] = authored; else authoredRadius.Remove(culler);
-            field.SetValue(culler, radius);
-            return radius;
         }
         public bool Below(object target, object above) =>
             target is GameObject part && part != null && above is GameObject over && over != null && part != over && part.transform.IsChildOf(over.transform);

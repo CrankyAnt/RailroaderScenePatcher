@@ -100,11 +100,15 @@ Before it touches a group, the patcher requires that the path names exactly one 
 
 For a part, the path must name exactly one listed part and its group must pass the same checks.
 
-After a group change, the patcher checks the root's placement and activity against the mod. It checks that every part kept its place relative to the root, except for parts with their own fixed placement, which must remain at that placement. It also checks each part's own activity unless a culler switches it, and checks that every enabled culler's sphere stands at its culler. A disabled group holds no culling sphere.
+After a group change, the patcher checks the root's placement and activity against the mod. It checks that every part kept its place relative to the root, except for parts with their own fixed placement, which must remain at that placement. It also checks each part's own activity unless a culler switches it, and checks that every enabled culler's sphere stands at its culler with the radius the scene gives it. A disabled group holds no culling sphere.
 
 After a part change, the patcher checks the part's placement and activity. It also checks that the group root and every other part kept their placement and activity, and that objects below the part kept their placement relative to it. A culler on a moved part moves with it.
 
-While a part has its own fixed placement, each culler above it, on the group root or a part above the fixed part, takes a radius that encloses the renderers it culls. The radius never falls below the radius the scene gives it. A renderer counts when it is on as the scene has it, including when a culler hides it because the camera is far away. A game-object culler culls the objects it switches, not the objects below it. It grows only while a fixed part is one of those objects, is below or above one of them, or carries the culler. Without such a fixed part, a culler returns to the radius the scene gives it.
+A culler of the game hides what it culls when its sphere leaves the camera's view. A part that you move outside the sphere of a culler above it keeps its own culling sphere. The patcher registers that sphere, centered on the part's renderers, colliders and lights and enclosing them, with the game's culling manager. The part shows while its own sphere is in view, at any distance from its group. The culler keeps the radius the scene gives it, and the other parts of the group keep the culler's sphere. Objects between the culler and the moved part stay on while either sphere is in view.
+
+A part that you move inside the culler's sphere, and a part that you never moved, get no sphere of their own. Moving the part back inside returns it to the culler. A disabled part has no own sphere, and disabling the group pauses the own spheres of its parts. A part with a culler of its own keeps that culler, which moves with the part. The scene patch file has no field for any of this: the patcher derives the own spheres from the placements each time it applies them.
+
+After a part change the patcher also checks that every moved part outside a culler's sphere has its own sphere at the part.
 
 Any difference fails the modification and restores the group or part. If the patcher cannot verify restoration, it reports incomplete cleanup and refuses further edits of that group or part until **Recheck** succeeds or the world reloads.
 
@@ -114,6 +118,6 @@ Grass and other terrain detail under a group come from the terrain and its masks
 
 Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. Bryson Yard moved with all its posts and lamps; no part remained at its old position. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
 
-The runs did not measure whether every culling sphere of a moved group encloses its renderers. They did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
+The runs did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
 
-The automated tests check part edits with a controlled group. A part edit has not yet been observed in a game run.
+The automated tests check part edits and the own culling sphere of a moved part with a controlled group. A game run has not yet observed a part edit or a part's own culling sphere.

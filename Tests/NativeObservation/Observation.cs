@@ -139,7 +139,83 @@ public sealed class Observation : MonoBehaviour {
         } catch (Exception e) { if (ready && GuardStillValid()) Emit("focus-error", new JObject { ["error"] = e.GetBaseException().Message }); status = "Focus failed: " + e.GetBaseException().Message; }
     }
     void Replay() { try { Guard(); if (!ready) throw new InvalidOperationException("Not ready"); var type = TypeNamed("RailroaderScenePatcher.PatcherBehaviour"); var matches = Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(c => c != null).ToArray(); if (matches.Length != 1) throw new InvalidOperationException("Patcher count=" + matches.Length); var p = matches[0]; var engine = Read(p, "engine"); if (engine == null) throw new InvalidOperationException("No engine"); Emit("replay-start", new JObject { ["patcherInstanceId"] = p.GetInstanceID(), ["engineIdentity"] = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(engine) }); Call(p, "ApplyScenePatchFiles"); Emit("replay-end", new JObject { ["engineSame"] = ReferenceEquals(engine, Read(p, "engine")) }); status = "Replay callback completed"; } catch (Exception e) { if (ready && GuardStillValid()) Emit("replay-error", new JObject { ["error"] = e.GetBaseException().ToString() }); status = "Replay failed: " + e.GetBaseException().Message; } }
+    // The culling readout serves any map in the isolated home: it needs the home and the observer's mod folder, not the
+    // fixed-placement fixture. It writes Evidence/culling/readout.jsonl under the mod folder.
+    string cullingPath = "World/Large Scenery/Whittier/Whittier Saw Mill", cullingLabel = "", cullingStatus = "No readout yet"; long cullingSequence;
+    Rect cullingWindow = new Rect(740, 330, 380, 170);
+    bool HomeValid() {
+        try {
+            var args = Environment.GetCommandLineArgs(); var ix = Enumerable.Range(0, args.Length).Where(i => String.Equals(args[i], "-homedir", StringComparison.OrdinalIgnoreCase)).ToArray();
+            return ix.Length == 1 && ix[0] + 1 < args.Length && Same(args[ix[0] + 1], Home) && Same(directory, Mod);
+        } catch { return false; }
+    }
+    static object Field(object o, string name) { for (var t = o.GetType(); t != null; t = t.BaseType) { var f = t.GetField(name, F | BindingFlags.DeclaredOnly); if (f != null) return f.GetValue(o); } return null; }
+    JObject Sphere(Vector3 position, float radius) => new JObject { ["scenePosition"] = V(position), ["mapPosition"] = V(ConvertPosition("WorldToGame", position)), ["radius"] = radius };
+    // One game culler: the radius the scene gives it, the sphere it holds, and whether that sphere is visible.
+    JObject GameCuller(Component c) {
+        var type = c.GetType().FullName; var j = new JObject { ["path"] = PathOf(c.transform), ["type"] = type, ["authoredRadius"] = JToken.FromObject(Read(c, "radius")), ["activeSelf"] = c.gameObject.activeSelf, ["activeInHierarchy"] = c.gameObject.activeInHierarchy };
+        if (type == "Helpers.SimpleCuller") {
+            var group = Field(c, "_cullingGroup") as CullingGroup; var spheres = Field(c, "_cullingSpheres") as BoundingSphere[];
+            j["started"] = group != null;
+            if (group != null) { j["groupEnabled"] = group.enabled; j["visible"] = group.IsVisible(0); j["handler"] = group.onStateChanged == null ? null : group.onStateChanged.Method.DeclaringType.FullName + "." + group.onStateChanged.Method.Name; }
+            if (spheres != null && spheres.Length > 0) j["sphere"] = Sphere(spheres[0].position, spheres[0].radius);
+            return j;
+        }
+        j["state"] = Convert.ToString(Field(c, "_cullingState")); j["visibleDistanceBand"] = JToken.FromObject(Read(c, "visibleDistanceBand")); j["manager"] = Convert.ToString(Field(c, "cullingManagerName"));
+        var token = Field(c, "_cullingToken"); j["tokenPresent"] = token != null;
+        if (token != null && !(bool)Read(token, "IsRemoved")) { var index = Convert.ToInt32(Read(token, "Index")); var all = (BoundingSphere[])Read(Read(token, "Manager"), "_spheres"); if (all != null && index >= 0 && index < all.Length) j["sphere"] = Sphere(all[index].position, all[index].radius); }
+        if (type == "Helpers.Culling.RendererCuller") { var list = Field(c, "_cullRenderers") as Renderer[]; j["renderers"] = list == null ? null : new JArray(list.Where(r => r != null).Select(r => new JObject { ["path"] = PathOf(r.transform), ["enabled"] = r.enabled })); }
+        else { j["mode"] = Convert.ToString(Field(c, "cullingMode")); j["listed"] = new JArray(((IEnumerable)Read(c, "gameObjects")).Cast<GameObject>().Where(g => g != null).Select(g => new JObject { ["path"] = PathOf(g.transform), ["activeSelf"] = g.activeSelf })); }
+        return j;
+    }
+    void CullingReadout() {
+        try {
+            if (!HomeValid()) throw new InvalidOperationException("Unexpected home or observer mod");
+            var root = One(cullingPath);
+            var data = new JObject { ["evidenceKind"] = "culling-readout", ["schemaVersion"] = 1, ["label"] = cullingLabel, ["sequence"] = ++cullingSequence, ["utc"] = DateTime.UtcNow.ToString("O"), ["frame"] = Time.frameCount, ["gameVersion"] = Application.version, ["group"] = Placement(root) };
+            data["patcherAssemblySha256"] = HashFile(TypeNamed("RailroaderScenePatcher.PatcherBehaviour").Assembly.Location);
+            var camera = Camera.main; if (camera != null) data["camera"] = new JObject { ["mapPosition"] = V(ConvertPosition("WorldToGame", camera.transform.position)), ["rotation"] = Q(camera.transform.rotation), ["distanceToGroup"] = (camera.transform.position - root.position).magnitude };
+            data["cullers"] = new JArray(root.GetComponentsInChildren<Component>(true).Where(c => c != null && (c.GetType().FullName == "Helpers.SimpleCuller" || c.GetType().FullName == "Helpers.Culling.RendererCuller" || c.GetType().FullName == "Helpers.Culling.GameObjectCuller")).Select(GameCuller));
+            // The own spheres of moved parts, as the patcher's own-culling controller reports them.
+            var controller = TypeNamed("RailroaderScenePatcher.GroupWorld").GetField("culling", F)?.GetValue(null);
+            var own = new JArray(); var owners = new List<Transform>();
+            if (controller != null)
+                foreach (var region in (IEnumerable)Call(controller, "Regions", root.gameObject)) {
+                    var owner = Read(region, "Owner") as GameObject; var centre = Read(region, "Centre") as IEnumerable; if (owner != null) owners.Add(owner.transform);
+                    own.Add(new JObject { ["id"] = Convert.ToString(Read(region, "Id")), ["owner"] = owner == null ? null : PathOf(owner.transform), ["mapCenter"] = centre == null ? null : new JArray(centre.Cast<double>()), ["radius"] = JToken.FromObject(Read(region, "Radius")), ["pending"] = JToken.FromObject(Read(region, "Pending")), ["shows"] = JToken.FromObject(Read(region, "Shows")),
+                        ["ownerMapPosition"] = owner == null ? null : V(ConvertPosition("WorldToGame", owner.transform.position)), ["ownerActiveSelf"] = owner == null ? (bool?)null : owner.activeSelf, ["ownerActiveInHierarchy"] = owner == null ? (bool?)null : owner.activeInHierarchy,
+                        ["ownerRenderers"] = owner == null ? null : new JArray(owner.GetComponentsInChildren<Renderer>(true).Select(r => new JObject { ["path"] = PathOf(r.transform), ["enabled"] = r.enabled })) });
+                }
+            data["ownSpheres"] = own; data["controllerPresent"] = controller != null;
+            // Every game-object culler of the loaded scenes with the path of each object it lists, and the objects the
+            // patcher took out of a list for a moved part, with the culler they belong to.
+            data["gameObjectCullers"] = new JArray(Resources.FindObjectsOfTypeAll<Component>().Where(c => c != null && c.GetType().FullName == "Helpers.Culling.GameObjectCuller" && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded)
+                .Select(c => new JObject { ["scene"] = c.gameObject.scene.name, ["path"] = PathOf(c.transform), ["listedPaths"] = new JArray(((IEnumerable)Read(c, "gameObjects")).Cast<GameObject>().Where(g => g != null).Select(g => PathOf(g.transform))) }));
+            if (controller != null) data["handedOver"] = new JArray(((IEnumerable)Call(controller, "HandedOver")).Cast<object>().Select(item => new JObject { ["path"] = Read(item, "Item1") is GameObject g && g != null ? PathOf(g.transform) : null, ["culler"] = Read(item, "Item2") is Component k && k != null ? PathOf(k.transform) : null, ["shows"] = JToken.FromObject(Read(item, "Item3")) }));
+            // Activity of the root and every object below it, with the value the patcher holds as desired, if any.
+            var activity = new JArray();
+            foreach (var t in root.GetComponentsInChildren<Transform>(true).Take(600)) {
+                var desired = controller == null ? null : Call(controller, "Desired", t.gameObject);
+                var row = new JObject { ["path"] = PathOf(t), ["activeSelf"] = t.gameObject.activeSelf, ["activeInHierarchy"] = t.gameObject.activeInHierarchy, ["desired"] = desired == null ? null : JToken.FromObject(desired) };
+                // The components directly on each object between the group root and a moved part with its own sphere.
+                if (owners.Any(o => o != t && o.IsChildOf(t))) row["components"] = new JArray(t.GetComponents<Component>().Where(c => c != null && !(c is Transform)).Select(c => new JObject { ["type"] = c.GetType().FullName, ["enabled"] = c.GetType().GetProperty("enabled")?.GetValue(c, null) as bool? }));
+                activity.Add(row);
+            }
+            data["activity"] = activity;
+            var path = Path.Combine(directory, "Evidence", "culling", "readout.jsonl"); Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.AppendAllText(path, data.ToString(Formatting.None) + "\n");
+            cullingStatus = "Readout " + cullingSequence + " written: " + ((JArray)data["cullers"]).Count + " cullers, " + own.Count + " own spheres";
+        } catch (Exception e) { cullingStatus = "Readout failed: " + e.GetBaseException().Message; }
+    }
     void OnGUI() {
+        if (loaded && HomeValid())
+            cullingWindow = GUI.Window(0x4933394E, cullingWindow, id => {
+                GUILayout.Label(cullingStatus);
+                GUILayout.Label("Group path"); cullingPath = GUILayout.TextField(cullingPath);
+                GUILayout.Label("Label"); cullingLabel = GUILayout.TextField(cullingLabel);
+                if (GUILayout.Button("Culling readout")) CullingReadout();
+                GUI.DragWindow(new Rect(0, 0, 10000, 20));
+            }, "Culling readout");
         if (!ready) return;
         window = GUI.Window(0x4933394F, window, id => {
             GUILayout.Label(status);
