@@ -18,6 +18,7 @@ static class GameDefinedGroupTests {
     public static void Run() {
         Membership();
         BakedSceneryGroupMembership();
+        CategoryGroupMembership();
         SkippedGroupLine();
         Distances();
         Marking();
@@ -49,6 +50,82 @@ static class GameDefinedGroupTests {
         // A crossing inside a listed group root is held by the outermost group.
         var nested = new[] { Object("Yard", Town, baked: true), Object("Setup", Town + "/Yard", controller: true), Object("Bell", Town + "/Yard/Setup") };
         Check(Members(GameDefinedGroups.Of(nested)) == "BakedSceneryGroup:0,1,2", "an object belongs to the outermost group that holds it (got " + Members(GameDefinedGroups.Of(nested)) + ")");
+    }
+    static string[] Up(string above) => above.Length == 0 ? new string[0] : above.Split('/').Reverse().ToArray();
+
+    // The groups of the baked scenery categories, from supplied hierarchy and component facts.
+    static void CategoryGroupMembership() {
+        const string Town = "World/Large Scenery/Bryson";
+        // A station building group holds its inventory objects: the building, the sign markers and the parts below it.
+        var station = new[] {
+            Object("Bryson Depot", Town, baked: true),                                    // 0
+            Object("Sign E", Town + "/Bryson Depot", marker: true),                       // 1
+            new GroupObject("Clock", Up(Town + "/Bryson Depot"), bakedPart: true),         // 2
+            Object("Milepost", Town),                                                     // 3: beside the depot
+        };
+        var depot = GameDefinedGroups.Of(station);
+        Check(Members(depot) == "BakedSceneryGroup:0,1,2", "a station building group holds its inventory objects (got " + Members(depot) + ")");
+        Check(depot[0].Root == 0, "the root of a group with parts stands for the group");
+
+        // A rail bridge construction holds its construction controller and the inventory objects whose visibility
+        // the controller sets, wherever they stand: on a target, or below one.
+        var bridge = new[] {
+            new GroupObject("Ela Bridge Scenery", Up("World/Large Scenery/Ela"), constructionController: true, targets: new[] { "Steel", "Abutments" }), // 0
+            Object("Steel", "World/Large Scenery/Ela/Ela Bridge"),                         // 1: a target itself
+            Object("Abutment W", "World/Large Scenery/Ela/Ela Bridge/Abutments"),          // 2: below a target
+            Object("Ela Bridge", "World/Large Scenery/Ela"),                               // 3: the bridge, which the controller does not switch
+            Object("Board", "World/Large Scenery/Ela"),                                    // 4
+        };
+        var construction = GameDefinedGroups.Of(bridge);
+        Check(Members(construction) == "RailBridgeConstruction:0,1,2", "a rail bridge construction holds its controller and the objects whose visibility it sets, and nothing else (got " + Members(construction) + ")");
+        Check(ReferenceEquals(construction[0].Anchor, bridge[0].Node) && construction[0].Root < 0, "the construction is anchored by its controller");
+        // Targets inside listed group roots: the construction is the outermost group and holds those roots with their parts.
+        var almond = new[] {
+            new GroupObject("Controller", Up("World/Large Scenery/Almond Bridge"), constructionController: true, targets: new[] { "Steel", "Abutments" }), // 0
+            Object("Steel", "World/Large Scenery/Almond Bridge", baked: true),             // 1
+            new GroupObject("Girder", Up("World/Large Scenery/Almond Bridge/Steel"), bakedPart: true), // 2
+            Object("Abutments", "World/Large Scenery/Almond Bridge", baked: true),         // 3
+        };
+        Check(Members(GameDefinedGroups.Of(almond)) == "RailBridgeConstruction:0,1,2,3", "a construction whose targets are group roots holds those roots and their parts (got " + Members(GameDefinedGroups.Of(almond)) + ")");
+
+        // An industry storage display holds the storage piles or log pond that one industry's storage fills. An
+        // industry building is its own group and no member of a storage display or another group.
+        var industry = new[] {
+            new GroupObject("Pile 1", Up("World/Large Scenery/Andrews/Andrews Snowbird Paper"), storage: "Paper storage"),   // 0
+            new GroupObject("Pile 2", Up("World/Large Scenery/Andrews/Andrews Snowbird Paper"), storage: "Paper storage"),   // 1
+            new GroupObject("Log Pond", Up("World/Large Scenery/Whittier/Whittier Log Pond"), storage: "Mill storage"),       // 2
+            new GroupObject("Log Pile", Up("World/Large Scenery/Whittier/Whittier Saw Mill Culled"), storage: "Mill storage"), // 3: fills with the pond, below the mill
+            Object("Whittier Saw Mill Culled", "World/Large Scenery/Whittier", baked: true),                                // 4: the industry building
+            new GroupObject("Saw Shed", Up("World/Large Scenery/Whittier/Whittier Saw Mill Culled"), bakedPart: true),        // 5
+            Object("Coal & Oil", "World/Large Scenery/Andrews", baked: true),                                               // 6: an industry building without parts
+            new GroupObject("Lone Pile", Up("World/Large Scenery/Sylva/Sylva Paperboard"), storage: "Board storage"),        // 7: a display of one pile
+        };
+        var displays = GameDefinedGroups.Of(industry);
+        Check(Members(displays) == "IndustryStorageDisplay:0,1 | IndustryStorageDisplay:2,3 | BakedSceneryGroup:4,5",
+            "an industry storage display holds the piles or log pond one industry's storage fills; an industry building is its own group (got " + Members(displays) + ")");
+        Check(ReferenceEquals(displays[0].Anchor, "Paper storage") && displays[2].Root == 4 && !displays.Any(g => g.Kind != GameDefinedGroupKind.BakedSceneryGroup && (g.Members.Contains(4) || g.Members.Contains(6))),
+            "a storage display is anchored by the industry's storage, and no industry building is a member of one");
+        Check(!displays.Any(g => g.Members.Contains(6) || g.Members.Contains(7)), "an industry building without parts and a display of one pile show as that one object");
+
+        // Beyond 125 metres only the group shows; at 125 metres or less only its parts: the root, which stands for
+        // the group, shows no marker of its own unless it is inspected or the candidate of a choice.
+        foreach (var shows in new[] { GroupShows.Objects, GroupShows.MarkerAndFrame, GroupShows.MarkerOnly }) {
+            Check(!GameDefinedGroups.ShowsOwn(shows, false, false, root: true), "the root of a group with parts shows no marker of its own");
+            Check(GameDefinedGroups.ShowsOwn(shows, true, false, root: true) && GameDefinedGroups.ShowsOwn(shows, false, true, root: true), "an inspected or chosen group root shows its own marker and frame");
+        }
+        Check(GameDefinedGroups.ShowsOwn(GroupShows.Objects, false, false, root: false), "a part of a near group shows on its own");
+        // A choice that offers the root and none of its parts still shows the root near the group: nothing else could be picked.
+        Check(GameDefinedGroups.RootStands(0, new[] { 0, 2 }) && !GameDefinedGroups.RootStands(0, new[] { 0 }) && !GameDefinedGroups.RootStands(-1, new[] { 1, 2 }) && !GameDefinedGroups.RootStands(0, new[] { 1, 2 }),
+            "the root stands for the group only while the choice offers the root and another object of the group");
+        // A group without parts of its own, such as a station whose objects are sign markers, keeps its root in view.
+        Check(GameDefinedGroups.Of(new[] { Object("Bryson Signs", Town, baked: true), Object("Yard Limit", Town + "/Bryson Signs", marker: true) })[0].Root < 0, "a root whose group has no parts shows among its objects");
+
+        // The group's square marker carries its own symbol instead of a part's "+".
+        var plus = ObjectMarkingGeometry.MarkerSymbol(false); var square = ObjectMarkingGeometry.MarkerSymbol(true);
+        bool Covers(IReadOnlyList<ScreenRect> bars, double x, double y) => bars.Any(b => x >= b.X && x < b.Right && y >= b.Y && y < b.Bottom);
+        Check(plus.Count == 2 && Covers(plus, 0, 0) && Covers(plus, -4, 0) && Covers(plus, 0, 4) && !Covers(plus, -4, -4), "a part's marker carries a plus through its centre");
+        Check(!Covers(square, 0, 0) && Covers(square, -4, -4) && Covers(square, 4, 4) && Covers(square, -4, 4) && Covers(square, 0, -5), "a group's marker carries a hollow square, which leaves the centre open");
+        Check(plus.Concat(square).All(b => b.X >= -ObjectMarkingGeometry.MarkerSize / 2 && b.Right <= ObjectMarkingGeometry.MarkerSize / 2 && b.Y >= -ObjectMarkingGeometry.MarkerSize / 2 && b.Bottom <= ObjectMarkingGeometry.MarkerSize / 2), "both symbols stay inside the square marker");
     }
     static void SkippedGroupLine() =>
         Check(GameDefinedGroups.SkippedLine("BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer", "none of its objects has a usable position") ==

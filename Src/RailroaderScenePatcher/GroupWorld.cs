@@ -121,6 +121,12 @@ namespace RailroaderScenePatcher {
             return verdicts = found;
         }
         internal static PartVerdict PartVerdictOf(GameObject go) { if (go == null) return null; Verdicts(); return partVerdicts.TryGetValue(go, out var verdict) ? verdict : null; }
+        // Whether the object is the root of a baked scenery group for world marking: a listed group root, or an
+        // inspection-only one that the category table names. The inventory objects below it are the group's objects.
+        internal static bool IsGroupRoot(GameObject go) {
+            var verdict = VerdictOf(go);
+            return verdict != null && (verdict.Disposition == GroupDisposition.Group || (verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Category != null));
+        }
         internal static bool IsPart(GameObject go) => PartVerdictOf(go)?.Disposition == PartDisposition.Part;
         // The listed parts of the listed group roots, for the inventory.
         internal static IEnumerable<GameObject> Parts() { Verdicts(); return partVerdicts.Where(pair => pair.Key != null && pair.Value.Disposition == PartDisposition.Part).Select(pair => pair.Key).ToArray(); }
@@ -143,7 +149,7 @@ namespace RailroaderScenePatcher {
         // One line per candidate of the rule and per scene object below a listed group root, for evidence that compares
         // the listed and unlisted group roots and parts.
         internal static IEnumerable<string> Report() =>
-            Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + p.Value.Disposition + (p.Value.Reason == null ? "" : "; " + p.Value.Reason) + (p.Value.Ticket == null ? "" : " (" + p.Value.Ticket + ")"))
+            Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + p.Value.Disposition + (p.Value.Reason == null ? "" : "; " + p.Value.Reason) + (p.Value.Ticket == null ? "" : " (" + p.Value.Ticket + ")") + (p.Value.Category == null ? "" : " [" + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory) + "]"))
                 .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + (p.Value.Disposition == PartDisposition.Part ? "Part" : "Part " + p.Value.Disposition) + (p.Value.Reason == null ? "" : "; " + p.Value.Reason)))
                 .OrderBy(line => line, StringComparer.Ordinal);
         internal static GroupRootVerdict VerdictOf(GameObject go) => go != null && Verdicts().TryGetValue(go, out var verdict) ? verdict : null;
@@ -154,7 +160,8 @@ namespace RailroaderScenePatcher {
             if (verdict == null) return IsPart(go) ? BakedSceneryRules.Family : null;
             if (verdict.Disposition == GroupDisposition.Group) return BakedSceneryRules.Family;
             if (verdict.Disposition != GroupDisposition.InspectionOnly) return null;
-            return verdict.Ticket == BakedSceneryRules.CrossbuckTicket ? "Crossbuck" : BakedSceneryRules.Family;
+            // A group the category table names stands in the family under its category, a crossbuck included.
+            return verdict.Category == null && verdict.Ticket == BakedSceneryRules.CrossbuckTicket ? "Crossbuck" : BakedSceneryRules.Family;
         }
         // The rule's view of one loaded object; components and children are read once.
         sealed class HierarchyNode : IHierarchyNode {
@@ -200,25 +207,28 @@ namespace RailroaderScenePatcher {
         static GameObject PartObject(object part) => part as GameObject ?? throw new InvalidOperationException("The part no longer exists");
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         public IReadOnlyList<object> Find(string scene, string path) =>
-            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && VerdictOf(g)?.Disposition == GroupDisposition.Group).Cast<object>().ToArray();
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g), path)).Cast<object>().ToArray();
         public string Refusal(object group) => Problem(group as GameObject);
         // Why a group root cannot be edited, or null. Shared with the inventory.
         internal static string Problem(GameObject root) {
             if (!Loaded(root)) return "The group's scene is not loaded";
+            // A folder of the category table, such as Bryson Yard, resolves so that it fails with this reason.
+            var folder = VerdictOf(root) == null ? BakedSceneryRules.GroupRefusal(BoardScene.PathOf(root.transform)) : null;
+            if (folder != null) return folder;
             if (VerdictOf(root)?.Disposition != GroupDisposition.Group) return "This object is not a group root of the Baked scenery group family";
             var components = root.GetComponentsInChildren<Component>(true);
             if (components.Any(c => c == null)) return "Missing script in the group hierarchy";
             if (components.Any(c => c is Rigidbody)) return "The group holds a rigidbody; only static colliders are supported";
             return null;
         }
-        // A culling container resolves too, so its modification fails with the reason (BakedSceneryRules.PartRefusal).
+        // A culling container and a group root resolve too, so their modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
-            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.Resolves(PartVerdictOf(g))).Cast<object>().ToArray();
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.Resolves(PartVerdictOf(g), VerdictOf(g))).Cast<object>().ToArray();
         public string PartRefusal(object part) => PartProblem(part as GameObject);
         // Why a part cannot be edited, or null: what refuses its group refuses the part. Shared with the inventory.
         internal static string PartProblem(GameObject part) {
             if (!Loaded(part)) return "The part's scene is not loaded";
-            var rule = BakedSceneryRules.PartRefusal(PartVerdictOf(part));
+            var rule = BakedSceneryRules.PartRefusal(PartVerdictOf(part), VerdictOf(part));
             if (rule != null) return rule;
             if (!IsPart(part)) return "This object is not listed as a baked scenery part";
             var root = GroupRootOf(part);

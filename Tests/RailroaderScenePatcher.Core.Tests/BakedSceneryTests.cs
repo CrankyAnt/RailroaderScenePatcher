@@ -105,8 +105,16 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     public readonly Host Native;
     public FakeGroupWorld() { Native = new Host(this); Culling = new PartCullingController(Native); }
     double[] behind, sibling;
-    public IReadOnlyList<object> Find(string scene, string path) => Objects.TryGetValue(path, out var found) ? found : new List<object>();
-    public string Refusal(object group) => Refused;
+    // The group rule's verdicts by path, when set: a group path resolves and is refused as GroupWorld resolves and
+    // refuses it (BakedSceneryRules.ResolvesGroup, GroupRefusal), and so does a part path that names a group root.
+    public Dictionary<string, GroupRootVerdict> GroupVerdicts;
+    GroupRootVerdict GroupVerdict(string path) => GroupVerdicts != null && path != null && GroupVerdicts.TryGetValue(path, out var verdict) ? verdict : null;
+    string PathOf(object handle) => Objects.FirstOrDefault(pair => pair.Value.Contains(handle)).Key;
+    public IReadOnlyList<object> Find(string scene, string path) {
+        if (GroupVerdicts != null && !BakedSceneryRules.ResolvesGroup(GroupVerdict(path), path)) return new List<object>();
+        return Objects.TryGetValue(path, out var found) ? found : new List<object>();
+    }
+    public string Refusal(object group) => (GroupVerdicts == null ? null : BakedSceneryRules.GroupRefusal(PathOf(group))) ?? Refused;
     static double[] Add(double[] a, double[] b) => a.Zip(b, (x, y) => x + y).ToArray();
     static double[] Sub(double[] a, double[] b) => a.Zip(b, (x, y) => x - y).ToArray();
     double[] Map(double[] scene) => new[] { scene[0] + Origin, scene[1], scene[2] };
@@ -187,10 +195,12 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     // (BakedSceneryRules.Resolves, BakedSceneryRules.PartRefusal).
     public Dictionary<string, PartVerdict> Verdicts;
     public IReadOnlyList<object> FindParts(string scene, string path) {
+        if (GroupVerdicts != null && BakedSceneryRules.Resolves(null, GroupVerdict(path)) && Objects.TryGetValue(path, out var root)) return root;
         if (Verdicts != null && Verdicts.TryGetValue(path, out var verdict) && !BakedSceneryRules.Resolves(verdict)) return new List<object>();
         return PartsAt.TryGetValue(path, out var found) ? found : new List<object>();
     }
     public string PartRefusal(object part) {
+        if (part is FakeGroup) return BakedSceneryRules.PartRefusal(null, GroupVerdict(PathOf(part))) ?? "This object is not listed as a baked scenery part";
         if (Verdicts != null) {
             var path = PartsAt.FirstOrDefault(pair => pair.Value.Contains(part)).Key;
             if (path != null && Verdicts.TryGetValue(path, out var verdict) && BakedSceneryRules.PartRefusal(verdict) != null) return BakedSceneryRules.PartRefusal(verdict);

@@ -17,6 +17,8 @@ namespace RailroaderScenePatcher {
         sealed class Shape {
             internal SpatialCandidate Candidate;
             internal Rect Marker;
+            // The marking of a group that shows as one: its square marker carries the group symbol, not a plus.
+            internal bool Group;
             internal readonly List<Rect> Objects = new List<Rect>();
             // The frame as it is drawn and picked: the convex outline of the object on screen. Objects holds the
             // rectangle around it, at whose centre the marker stands.
@@ -257,7 +259,8 @@ namespace RailroaderScenePatcher {
             PickTarget Target(Shape shape, bool marked) => shape == null ? new PickTarget(0, 0, false, false)
                 : new PickTarget(shape.Marker.center.x, shape.Marker.center.y, marked, shape.InFrame(pointer) || (shape.Track != null && shape.Track.Contains(new MarkingPoint(pointer.x, pointer.y))));
             var targets = new PickTarget[shapes.Length];
-            for (var i = 0; i < shapes.Length; i++) targets[i] = Target(shapes[i], shapes[i] != null && Marked(shapes[i], candidates[i], camera, origin));
+            // The root of a near group with parts shows nothing of its own, so the pointer meets nothing of it.
+            for (var i = 0; i < shapes.Length; i++) targets[i] = groups.Absent[i] ? Target(null, false) : Target(shapes[i], shapes[i] != null && Marked(shapes[i], candidates[i], camera, origin));
             return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own, group.Unlisted)).ToArray());
         }
 
@@ -270,6 +273,9 @@ namespace RailroaderScenePatcher {
         // The inspected object has its frame at any distance.
         sealed class GroupLayout {
             internal ShownGroup[] Shown = new ShownGroup[0]; internal bool[] Hidden; internal readonly List<int> OwnAtGroupDistance = new List<int>();
+            // The candidates that show nothing and that no shown group stands for: the root of a group with parts
+            // at the group distance or less, where only its parts show.
+            internal bool[] Absent;
         }
         // What one pass measured of a scene object: its frame, with the bounds and the parts of its framed piece. A
         // group takes its bounds and its one box from these, without reading the object again.
@@ -277,14 +283,16 @@ namespace RailroaderScenePatcher {
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
         // anchors a grade-crossing setup, a track marker that is no crossing pad is, below that controller's root, a
         // whistle sign, and a track span there is a detection span that the controller manages.
-        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span";
+        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
         // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;
         // One group of the inventory: its objects that have a usable position, for each of them whether the group's
         // choice list offers it and its frame surrounds it (GameDefinedGroup.Listed), and the scene object of the
         // game component that anchors it, whose orientation the group's one box takes.
-        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; }
+        // Stands is the index among Objects of the root of a baked scenery group with parts, which stands for the
+        // group (GameDefinedGroup.Root), or -1.
+        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; internal int Stands = -1; }
         // The groups are decided once per inventory snapshot, and again when the snapshot is another one or has
         // another number of entries, and after the scene may have changed (ClearSurface, on every move of the
         // native map editor's history). Without a snapshot they are decided from the candidates of the choice.
@@ -307,18 +315,31 @@ namespace RailroaderScenePatcher {
             groupedFrom = from; groupedCount = count; mappedFor = null; inventoryGroups = new InventoryGroup[0];
             try {
                 var all = listed ? snapshot.ToArray() : candidates.Where(c => c.Observation != null).Select(c => c.Observation).ToArray();
-                // A listed root of the Baked scenery group family anchors a baked scenery group with its parts.
-                bool BakedRoot(SceneObservation o) => o.Family == BakedSceneryRules.Family && o.Handle is GameObject go && go != null && GroupWorld.VerdictOf(go)?.Disposition == GroupDisposition.Group;
+                // A root of the Baked scenery group family anchors a baked scenery group with the inventory objects
+                // below it: its parts, and the objects of other families there.
+                bool BakedRoot(SceneObservation o) => o.Family == BakedSceneryRules.Family && o.GroupPath == null && o.Handle is GameObject go && go != null && GroupWorld.IsGroupRoot(go);
                 var roots = all.Select(BakedRoot).ToArray();
-                if (all.Any(o => o.Family == ControllerFamily) || roots.Any(r => r)) {
+                // What a game component names: the piles an industry's storage fills, and the scene objects whose
+                // visibility a construction controller sets. A fact that cannot be read forms no group.
+                var storage = new Dictionary<GameObject, GameObject>();
+                try { storage = NativeInventory.StorageDisplays(); } catch (Exception e) { Skipped(null, "the industry storage displays could not be read: " + e.GetBaseException().Message); }
+                GameObject[] Targets(SceneObservation o, GameObject go) {
+                    if (o.Family != ConstructionFamily) return null;
+                    try { return NativeInventory.ConstructionTargets(go); } catch (Exception e) { Skipped(go, "its construction targets could not be read: " + e.GetBaseException().Message); return null; }
+                }
+                if (all.Any(o => o.Family == ControllerFamily || o.Family == ConstructionFamily) || roots.Any(r => r) || storage.Count != 0) {
                     var found = new List<InventoryGroup>();
-                    foreach (var group in GameDefinedGroups.Of(all.Select((o, i) => o.Handle is GameObject go && go != null
-                            ? new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily, roots[i]) : null).ToArray())) {
+                    foreach (var group in GameDefinedGroups.Of(all.Select((o, i) => {
+                            if (!(o.Handle is GameObject go) || go == null) return null;
+                            var targets = Targets(o, go);
+                            return new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily, roots[i], o.GroupPath != null,
+                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets);
+                        }).ToArray())) {
                         var root = group.Anchor as GameObject;
                         try {
-                            var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i) }).Where(m => m.Object.Points.Length != 0).ToArray();
+                            var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i), Stands = i == group.Root }).Where(m => m.Object.Points.Length != 0).ToArray();
                             if (placed.Length == 0) { Skipped(root, "none of its objects has a usable position"); continue; }
-                            found.Add(new InventoryGroup { Root = root, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray() });
+                            found.Add(new InventoryGroup { Root = root, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray(), Stands = Array.FindIndex(placed, m => m.Stands) });
                         } catch (Exception e) { Skipped(root, "its objects could not be read: " + e.GetBaseException().Message); }
                     }
                     inventoryGroups = found.ToArray();
@@ -355,7 +376,7 @@ namespace RailroaderScenePatcher {
         // whose objects the choice offers. measured holds what this pass measured of each candidate. chosen is the
         // candidate of the pending choice and inspected the inspected object: each shows its own marker and frame.
         GroupLayout Groups(SpatialCandidate[] candidates, Measured[] measured, Camera camera, Vector3 origin, SelectionCandidate chosen, SpatialCandidate inspected) {
-            var layout = new GroupLayout { Hidden = new bool[candidates.Length] };
+            var layout = new GroupLayout { Hidden = new bool[candidates.Length], Absent = new bool[candidates.Length] };
             var groups = GroupsOf(candidates);
             if (groups.Length == 0) return layout;
             var map = Mapped(candidates, groups);
@@ -383,10 +404,18 @@ namespace RailroaderScenePatcher {
                 // at the surface like the box of an object.
                 var root = groups[g].Root;
                 var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera), listed);
-                if (marking.Shows == GroupShows.Objects) continue;
                 bool Inspected(SpatialCandidate member) => inspected != null && Same(member, inspected.Choice);
+                // The root of a group with parts stands for the group: at the group distance or less only the
+                // parts show, and the root shows only as the candidate of a choice or as the inspected object.
+                var stands = groups[g].Stands < 0 ? -1 : indices[groups[g].Stands];
+                // A choice that offers the root and none of its parts shows the root as any object.
+                if (!GameDefinedGroups.RootStands(stands, members)) stands = -1;
+                if (marking.Shows == GroupShows.Objects) {
+                    if (stands >= 0 && !GameDefinedGroups.ShowsOwn(marking.Shows, Same(candidates[stands], chosen), Inspected(candidates[stands]), true)) layout.Hidden[stands] = layout.Absent[stands] = true;
+                    continue;
+                }
                 var own = members.Where(m => Same(candidates[m], chosen) || Inspected(candidates[m])).ToArray();
-                foreach (var m in members) layout.Hidden[m] = !GameDefinedGroups.ShowsOwn(marking.Shows, Same(candidates[m], chosen), Inspected(candidates[m]));
+                foreach (var m in members) layout.Hidden[m] = !GameDefinedGroups.ShowsOwn(marking.Shows, Same(candidates[m], chosen), Inspected(candidates[m]), m == stands);
                 var ownDistance = GameDefinedGroups.OwnFrameDistance(marking.Shows);
                 if (ownDistance > ObjectMarkingGeometry.FrameDistance) layout.OwnAtGroupDistance.AddRange(own);
                 var unlisted = indices.Where((i, k) => i >= 0 && !listed[k]).ToArray();
@@ -429,7 +458,7 @@ namespace RailroaderScenePatcher {
         // The one marking of a group: its square marker at the centre of its frame, or, beyond the frame distance,
         // at the middle of its bounds. Null when neither is in view.
         Shape GroupShape(GroupMarking marking, Camera camera) {
-            var shape = new Shape();
+            var shape = new Shape { Group = true };
             // The group's marker stands on the center of its one box, a fixed world point.
             var anchor = ScreenPoint(camera, Vector(marking.Marker), Vector3.zero);
             if (marking.Frame.HasValue) {
@@ -1025,8 +1054,8 @@ namespace RailroaderScenePatcher {
             GUI.DrawTexture(marker, Texture2D.whiteTexture);
             Frame(marker, shape.Strong ? Color.white : shape.Color, 2f);
             GUI.color = shape.Strong ? new Color(.08f, .08f, .08f, 1f) : shape.Color;
-            GUI.DrawTexture(new Rect(marker.center.x - 5, marker.center.y - 1, 10, 2), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(marker.center.x - 1, marker.center.y - 5, 2, 10), Texture2D.whiteTexture);
+            foreach (var bar in ObjectMarkingGeometry.MarkerSymbol(shape.Group))
+                GUI.DrawTexture(new Rect(marker.center.x + (float)bar.X, marker.center.y + (float)bar.Y, (float)bar.Width, (float)bar.Height), Texture2D.whiteTexture);
         }
         static void Frame(Rect rect, Color color, float weight) {
             GUI.color = color;

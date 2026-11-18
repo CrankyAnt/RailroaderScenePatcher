@@ -109,6 +109,27 @@ namespace RailroaderScenePatcher {
             return field.GetValue(owner);
         }
         static string Text(object value) => Convert.ToString(value, CultureInfo.InvariantCulture);
+        // The scene objects whose visibility a construction controller sets: the targets of its entries.
+        internal static GameObject[] ConstructionTargets(GameObject controller) {
+            var scenery = controller == null ? null : Get(controller, ConstructionScenery);
+            if (scenery == null) return new GameObject[0];
+            var found = new List<GameObject>();
+            if (Field(scenery, "entries") is IEnumerable entries)
+                foreach (var entry in entries) if (entry != null && Field(entry, "targets") is GameObject[] targets) found.AddRange(targets.Where(target => target != null));
+            return found.Distinct().ToArray();
+        }
+        // For each storage pile or log pond that an industry's storage fills, the scene object of that storage: the
+        // synchronizer that names it in its bulk scenery.
+        const string StorageSynchronizer = "Scenery.BulkIndustryStorageSynchronizer";
+        internal static Dictionary<GameObject, GameObject> StorageDisplays() {
+            var found = new Dictionary<GameObject, GameObject>();
+            var type = Native.Type(StorageSynchronizer);
+            if (type == null) return found;
+            foreach (var storage in Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(c => c != null && Loaded(c)).OrderBy(c => c.GetInstanceID()))
+                if (Field(storage, "bulkScenery") is IEnumerable filled)
+                    foreach (var item in filled) if (item is Component scenery && scenery != null && !found.ContainsKey(scenery.gameObject)) found[scenery.gameObject] = storage.gameObject;
+            return found;
+        }
         static IEnumerable<UnityEngine.Object> References(object value) {
             if (value is UnityEngine.Object obj) { if (obj != null) yield return obj; }
             else if (value is IList list) foreach (var item in list) if (item is UnityEngine.Object element && element != null) yield return element;
@@ -523,7 +544,8 @@ namespace RailroaderScenePatcher {
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
-                bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: c is OwnedEquipment equipment && equipment != null ? equipment.DisplayName : null, groupPath: groupPath);
+                bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: c is OwnedEquipment equipment && equipment != null ? equipment.DisplayName : null, groupPath: groupPath,
+                category: groupRoot ? verdict?.Category : null, subcategory: groupRoot ? verdict?.Subcategory : null);
         }
         // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.
         static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {

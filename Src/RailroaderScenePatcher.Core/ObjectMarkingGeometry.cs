@@ -642,6 +642,11 @@ namespace RailroaderScenePatcher.Core {
             ScreenRect.FromEdges((float)left, (float)top, (float)right, (float)bottom);
         // The square "+" marker of a world marking and the room a frame keeps around it, in screen pixels.
         public const double MarkerSize = 24, MarkerMargin = 4;
+        // The symbol inside a square marker, as bars about the marker's centre: a plus for an object or a part, and
+        // a hollow square for a group, so that a group never reads as one of its parts.
+        public static IReadOnlyList<ScreenRect> MarkerSymbol(bool group) => group
+            ? new[] { new ScreenRect(-5, -5, 10, 2), new ScreenRect(-5, 3, 10, 2), new ScreenRect(-5, -5, 2, 10), new ScreenRect(3, -5, 2, 10) }
+            : new[] { new ScreenRect(-5, -1, 10, 2), new ScreenRect(-1, -5, 2, 10) };
         // The frame as it is drawn and picked: never smaller than its marker with the margin on each side, about the
         // frame's own centre, where the marker stands. A frame of a small or distant object would otherwise lie
         // under its own marker, and the object would seem to have none.

@@ -49,14 +49,100 @@ namespace RailroaderScenePatcher {
         // The rows under their family, families in name order, rows in the order of their names and then their paths, so
         // two lists of one family compare row by row. The rows that are inspection only leave their families for the one
         // Inspection only group at the end, whatever their family, in the same order.
+        // A baked scenery group that no supported operation covers yet keeps its family, where it stands under its
+        // category: only an inspection-only object without a category goes to the Inspection only group.
         internal static IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>> Groups(IEnumerable<SceneObservation> rows) {
             var listed = (rows ?? Array.Empty<SceneObservation>()).OrderBy(Name, StringComparer.OrdinalIgnoreCase).ThenBy(row => row.Identity.Path, StringComparer.Ordinal).ToArray();
-            var groups = listed.Where(row => row.InspectionOnly == null).GroupBy(row => row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            bool Only(SceneObservation row) => row.InspectionOnly != null && row.Category == null;
+            var groups = listed.Where(row => !Only(row)).GroupBy(row => row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(group.Key, group.ToArray())).ToList();
-            var only = listed.Where(row => row.InspectionOnly != null).ToArray();
+            var only = listed.Where(Only).ToArray();
             if (only.Length != 0) groups.Add(new KeyValuePair<string, IReadOnlyList<SceneObservation>>(InspectionOnlyGroup, only));
             return groups;
         }
+
+        // One node of the Baked scenery group family in the outliner: a category or subgroup folder, a group, or a
+        // part. Row is the inventory entry of a group or part and null for a folder. Context marks a group that the
+        // search or filter left out and that is shown only to hold its parts. Count is the number of matching rows
+        // at and below the node.
+        internal sealed class OutlineNode {
+            internal string Key, Label;
+            // For a group, where it stands: the path between World/Large Scenery, or World, and its name.
+            internal string Where;
+            internal SceneObservation Row;
+            internal bool Context;
+            internal int Count;
+            internal readonly List<OutlineNode> Children = new List<OutlineNode>();
+        }
+        // Where a group stands, to tell groups of one name apart, such as the Tall Post Shade of each town: the path
+        // between World/Large Scenery, or World, and the group's name, or null directly below World.
+        internal static string GroupWhere(string path) {
+            if (path == null) return null;
+            const string Scenery = "World/Large Scenery/", World = "World/";
+            var from = path.StartsWith(Scenery, StringComparison.Ordinal) ? Scenery.Length : path.StartsWith(World, StringComparison.Ordinal) ? World.Length : 0;
+            var to = path.LastIndexOf('/');
+            return to <= from ? null : path.Substring(from, to - from).Replace("/", " / ");
+        }
+        // A part's name under its group: the path from the group root to the part.
+        internal static string PartLabel(SceneObservation part) {
+            var path = part.Identity.Path; var group = part.GroupPath;
+            return group != null && path.StartsWith(group + "/", StringComparison.Ordinal) ? path.Substring(group.Length + 1).Replace("/", " / ") : part.DisplayName;
+        }
+        // The rows of the Baked scenery group family as the outliner nests them: the categories in the family's
+        // order, Bridge under its subgroups, each group under its category and each part under its group. A part
+        // never stands as a loose row: when the search or filter left its group out, the group is taken from the
+        // whole inventory and shown to hold it. A category or subgroup without rows is not shown.
+        internal static IReadOnlyList<OutlineNode> Categories(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory) {
+            rows = rows ?? Array.Empty<SceneObservation>();
+            var all = (inventory ?? rows).Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family).ToArray();
+            string GroupKey(string scene, string path) => scene + "\n" + path;
+            var groups = new Dictionary<string, OutlineNode>(StringComparer.Ordinal);
+            var order = new List<OutlineNode>();
+            OutlineNode Group(SceneObservation row, string scene, string path, bool context) {
+                var key = GroupKey(scene, path);
+                if (!groups.TryGetValue(key, out var node)) {
+                    groups[key] = node = new OutlineNode { Key = key, Label = row?.DisplayName ?? path.Substring(path.LastIndexOf('/') + 1), Row = row, Context = context, Where = GroupWhere(path) };
+                    order.Add(node);
+                }
+                return node;
+            }
+            foreach (var row in rows.Where(row => row.GroupPath == null)) Group(row, row.Identity.Scene, row.Identity.Path, false).Count = 1;
+            foreach (var part in rows.Where(row => row.GroupPath != null)) {
+                var key = GroupKey(part.Identity.Scene, part.GroupPath);
+                if (!groups.TryGetValue(key, out var holder))
+                    holder = Group(all.FirstOrDefault(entry => entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == part.GroupPath), part.Identity.Scene, part.GroupPath, true);
+                holder.Children.Add(new OutlineNode { Key = GroupKey(part.Identity.Scene, part.Identity.Path), Label = PartLabel(part), Row = part, Count = 1 });
+                holder.Count++;
+            }
+            foreach (var node in order) node.Children.Sort((a, b) => { var by = StringComparer.OrdinalIgnoreCase.Compare(a.Label, b.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(a.Row.Identity.Path, b.Row.Identity.Path); });
+            var sorted = order.OrderBy(node => node.Label, StringComparer.OrdinalIgnoreCase).ThenBy(node => node.Key, StringComparer.Ordinal).ToArray();
+            var found = new List<OutlineNode>();
+            foreach (var category in BakedSceneryCategories.All) {
+                var folder = new OutlineNode { Key = category, Label = category };
+                var members = sorted.Where(node => (node.Row?.Category ?? BakedSceneryCategories.Other) == category).ToArray();
+                var subgroups = BakedSceneryCategories.Subcategories(category);
+                foreach (var subgroup in subgroups) {
+                    var inner = new OutlineNode { Key = category + "/" + subgroup, Label = subgroup };
+                    inner.Children.AddRange(members.Where(node => node.Row?.Subcategory == subgroup));
+                    inner.Count = inner.Children.Sum(node => node.Count);
+                    if (inner.Children.Count != 0) folder.Children.Add(inner);
+                }
+                folder.Children.AddRange(members.Where(node => !subgroups.Contains(node.Row?.Subcategory)));
+                folder.Count = folder.Children.Sum(node => node.Count);
+                if (folder.Children.Count != 0) found.Add(folder);
+            }
+            return found;
+        }
+        // The inventory entry of the group a part belongs to, or null: for a group root, for an object outside any
+        // group, and while the inventory does not hold exactly one entry for the group.
+        internal static SceneObservation GroupOf(SceneInventory inventory, SceneObservation part) {
+            if (inventory == null || part?.GroupPath == null) return null;
+            var found = inventory.Entries.Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family && entry.Identity.Scene == part.Identity.Scene && entry.Identity.Path == part.GroupPath).Take(2).ToArray();
+            return found.Length == 1 ? found[0] : null;
+        }
+        // The Object tab's line that names a part's group, or null for any object that is no part.
+        internal static string PartOf(SceneObservation entry) =>
+            entry?.GroupPath == null ? null : "Part of: " + entry.GroupPath.Substring(entry.GroupPath.LastIndexOf('/') + 1);
 
         // What the game itself tells apart inside a family, or null: for a track marker its marker type
         // (Track.TrackMarkerType), read from the observation's marker line. Never a name: a station sign and a whistle

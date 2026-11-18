@@ -382,14 +382,16 @@ namespace RailroaderScenePatcher {
                         parent.AddChild(folder);
                         foreach (var row in subgroup.Value) { folders[row] = folder; folderKeys[row] = subKey; }
                     }
-                    foreach (var item in group.Value) {
-                        var holder = folders.TryGetValue(item, out var inFolder) ? inFolder : parent;
+                    // One row: label is the name the row shows, and above the keys of the folders and rows it stands in.
+                    // where is the place a group row names after its name, and dimmed marks a group shown only to hold
+                    // a matching part, which is no match itself.
+                    UIOutlineItem Row(SceneObservation item, string label, IEnumerable<string> above, string where = null, bool dimmed = false) {
                         var key = indices[item].ToString(CultureInfo.InvariantCulture);
                         byKey[key] = item;
                         if (ReferenceEquals(selected, item)) {
                             selectedKey = key;
                             // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
-                            if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; state.SetExpanded(groupKey, true); if (folderKeys.TryGetValue(item, out var folderKey)) state.SetExpanded(folderKey, true); }
+                            if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; foreach (var open in above) state.SetExpanded(open, true); }
                         }
                         var name = ObjectName(item);
                         var changed = IsChanged(item); var added = IsAdded(item);
@@ -399,14 +401,40 @@ namespace RailroaderScenePatcher {
                         // folder carries its parent, dimmed; an inactive object is italic and says so.
                         var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added);
                         var segments = item.Identity.Path.Split('/');
-                        var context = repeated.Contains(name) && segments.Length > 1 ? "  <alpha=#99>" + Literal(segments[segments.Length - 2]) + "<alpha=#FF>" : "";
-                        // A row of the Inspection only group names its family, which its folder does not.
-                        if (item.InspectionOnly != null) context += "  <alpha=#99>" + Literal(item.Family) + "<alpha=#FF>";
-                        holder.AddChild(new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
-                            (item.Active ? Literal(name) : "<i>" + Literal(name) + "</i>") + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly)) + (changed ? "\nChanged by this mod" : "") + (added ? "\nAdded by this mod" : "") +
+                        var context = label == null && repeated.Contains(name) && segments.Length > 1 ? "  <alpha=#99>" + Literal(segments[segments.Length - 2]) + "<alpha=#FF>" : "";
+                        // A row of the Inspection only group names its family, which its folder does not. A group
+                        // that stays under its category without a supported edit is marked as inspection only.
+                        if (item.InspectionOnly != null) context += "  <alpha=#99>" + (item.Category == null ? Literal(item.Family) : "inspection only") + "<alpha=#FF>";
+                        if (where != null) context = "  <alpha=#99>" + Literal(where) + "<alpha=#FF>" + context;
+                        var shown = label ?? name;
+                        var text = item.Active ? Literal(shown) : "<i>" + Literal(shown) + "</i>";
+                        if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
+                        return new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
+                            text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
+                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Category == null ? "" : "\n" + item.Category + (item.Subcategory == null ? "" : " / " + item.Subcategory)) + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly)) + (changed ? "\nChanged by this mod" : "") + (added ? "\nAdded by this mod" : "") +
                                 (item.Problems.Count == 0 ? "" : "\n" + String.Join("\n", item.Problems))).Replace("<", "\\u003c").Replace(">", "\\u003e")
-                        });
+                        };
+                    }
+                    // The Baked scenery group family lists its groups under their categories and each group's parts
+                    // beneath it; a part never stands as a loose row.
+                    void Nest(UIOutlineItem holder, InventoryPresentationState.OutlineNode node, string[] above) {
+                        UIOutlineItem made; string key;
+                        if (node.Row == null) {
+                            key = groupKey + "/" + node.Key;
+                            made = new UIOutlineItem(key, "<alpha=#99>" + node.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(node.Label) + (node.Where == null ? "" : "  <alpha=#99>" + Literal(node.Where) + "<alpha=#FF>"));
+                        } else {
+                            key = indices[node.Row].ToString(CultureInfo.InvariantCulture);
+                            made = Row(node.Row, node.Label, above, node.Where, node.Context);
+                        }
+                        holder.AddChild(made);
+                        var below = above.Concat(new[] { key }).ToArray();
+                        foreach (var child in node.Children) Nest(made, child, below);
+                    }
+                    if (groupKey == "family:" + BakedSceneryRules.Family)
+                        foreach (var category in InventoryPresentationState.Categories(group.Value, inventory?.Entries)) Nest(parent, category, new[] { groupKey });
+                    else foreach (var item in group.Value) {
+                        var holder = folders.TryGetValue(item, out var inFolder) ? inFolder : parent;
+                        holder.AddChild(Row(item, null, folderKeys.TryGetValue(item, out var folderKey) ? new[] { groupKey, folderKey } : new[] { groupKey }));
                     }
                     rows.Add(parent);
                 }
@@ -553,6 +581,21 @@ namespace RailroaderScenePatcher {
 
         // The Object tab: what the object is, whether it is enabled, and what was detected about it.
         void DrawObject(UIPanelBuilder builder) {
+            // A part names its group first, with the button that inspects the group directly after the name.
+            var partOf = InventoryPresentationState.PartOf(selected);
+            if (partOf != null) {
+                var group = InventoryPresentationState.GroupOf(inventory, selected);
+                builder.HStack(row => {
+                    Line(row, Literal(partOf), "Group", selected.GroupPath, RowHeight);
+                    Button(row, "Select group", () => {
+                        var entry = InventoryPresentationState.GroupOf(inventory, selected);
+                        if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
+                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
+                    }).Inactive(group == null)
+                        .Tooltip("Select group", CommandBand.Tooltip("Inspect the group that this part belongs to.", group == null ? "the inventory does not list this part's group; click Refresh" : null));
+                    row.Spacer();
+                }).ChildrenKeepHeight().Height(RowHeight);
+            }
             // An object of a kind no supported family covers says so first, with the reason it is not yet supported.
             if (selected.InspectionOnly != null) {
                 Section(builder, "Inspection only");
@@ -1525,6 +1568,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Changed", "Objects this mod changes, marked *." },
                     new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
+                    new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
                     new[] { "Dimmed rows", "Loaded objects that are inactive." },
                     new[] { "Focus", "Moves the camera. It selects nothing." },

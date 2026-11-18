@@ -293,6 +293,7 @@ class Program {
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
+        BakedCategoryTests.Run();
         BakedPartTests.Run();
         PartCullingTests.Run();
         SelectionTests.Run();
