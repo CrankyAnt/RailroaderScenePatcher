@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher {
             String.IsNullOrEmpty(reason) ? description : "Unavailable: " + Sentence(reason);
         // The labels a reason can carry where it is stored or shown on its own: under Supported edits, or in the
         // reason of a binding that cannot be set.
-        static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Track binding unavailable: ", "Pad binding unavailable: " };
+        static readonly string[] ReasonLabels = { "Not editable: ", "Not yet supported: ", "Not editable as a group: ", "Track binding unavailable: ", "Pad binding unavailable: " };
         // Whether a failed action's message is a warning, in amber, rather than a failure that left something to correct, in
         // red. The failure kind decides, not a word in the text: an edit that was undone and waits for its terrain is a warning.
         internal static bool RecoveryWarning(FailureKind kind) => kind == FailureKind.AwaitingOutput;
@@ -296,6 +296,14 @@ namespace RailroaderScenePatcher {
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + kind + " cannot be edited";
         // The reason an object is inspection only, given as a whole clause.
         internal static string NotYetSupportedBecause(string reason) => NotYetSupportedPrefix + reason;
+        // Why a baked scenery group root is inspection only, or null for a listed group. A group that a ticket covers
+        // waits for support; a group left out under a settled rule that needs no ticket, such as a group that holds track
+        // markers, is not editable as a group and promises nothing later.
+        internal static string GroupInspectionOnly(GroupRootVerdict verdict, string family) {
+            if (verdict?.Disposition == GroupDisposition.Group) return null;
+            if (verdict != null && verdict.Ticket == null && verdict.ReasonIsSentence) return NotEditableAsGroupPrefix + verdict.Reason;
+            return verdict?.ReasonIsSentence == true ? NotYetSupportedBecause(verdict.Reason) : NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant());
+        }
         // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
         // crossing's Connections tab, not on the object itself.
         internal const string AddedEquipmentFamily = "Added light or gate", AddedBellFamily = "Added bell";
@@ -335,10 +343,10 @@ namespace RailroaderScenePatcher {
         // one plain sentence: the message's source and the tooltip's Unavailable: are its only label.
         internal static string EditReason(string operations) {
             var own = operations?.Trim();
-            if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
+            if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal) || own.StartsWith(NotEditableAsGroupPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
             return Sentence(own);
         }
-        const string NotYetSupportedPrefix = "Not yet supported: ";
+        const string NotYetSupportedPrefix = "Not yet supported: ", NotEditableAsGroupPrefix = "Not editable as a group: ";
         // The Inspection only line of a row tooltip and of the state line: one label, and the reason as one plain sentence.
         internal static string InspectionOnlyLine(string reason) => "Inspection only: " + Sentence(reason);
         // Every number the panel shows or fills a field with: metres and degrees to three decimals, without trailing

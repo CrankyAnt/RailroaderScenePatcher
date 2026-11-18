@@ -23,7 +23,7 @@ A group contains only what the scene saves below its root. Props, tanks, conveyo
 
 Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, car loader, lake surface, log pond, storage piles, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
 
-Groups containing track markers are also marked `inspection only`. Their markers keep their own family, but moving the whole group is not yet supported. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
+Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
 ## Which parts are listed
 

@@ -31,7 +31,33 @@ static class CommandBandTests {
         SharedRulesHoldAtEveryCallSite();
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
+        GroupVerdictsSayNotYetOnlyWithATicket();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    // A group left out under a settled rule that needs no ticket, such as a group that holds track markers, is not
+    // waiting for support and never reads "Not yet supported:"; a group a ticket covers does.
+    static void GroupVerdictsSayNotYetOnlyWithATicket() {
+        GroupRootVerdict Verdict(string name, Node part) =>
+            BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node(name, part, new Node("Shell").Solid())))))
+                .Single(v => v.Path == "World/Large Scenery/Town/" + name);
+        const string family = "Baked scenery group";
+        var markers = Verdict("Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family());
+        var settled = CommandBand.GroupInspectionOnly(markers, family);
+        Check(markers.Ticket == null && settled == "Not editable as a group: " + BakedSceneryRules.TrackMarkerReason,
+            "A group that no ticket covers reads Not editable as a group with its reason: " + settled);
+        Check(settled.IndexOf("yet", StringComparison.OrdinalIgnoreCase) < 0 && CommandBand.Refusal(settled) == null,
+            "Its reason promises no later support and is no refusal of a supported family: " + settled);
+        Check(CommandBand.EditReason(settled) == BakedSceneryRules.TrackMarkerReason && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + BakedSceneryRules.TrackMarkerReason
+            && CommandBand.Tooltip("Does something.", settled) == "Unavailable: " + BakedSceneryRules.TrackMarkerReason,
+            "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
+        var loader = Verdict("Coal Loader", new Node("Chute").With("RollingStock.CarContentSwapper"));
+        Check(loader.Ticket == "#92" && CommandBand.GroupInspectionOnly(loader, family) == "Not yet supported: baked scenery groups that hold a car loader cannot be edited",
+            "A group a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(loader, family));
+        var icon = Verdict("Station Icons", new Node("Icon").With("UI.Map.MapIcon"));
+        Check(icon.Ticket == "#89" && CommandBand.GroupInspectionOnly(icon, family) == "Not yet supported: " + icon.Reason,
+            "A whole-sentence reason a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(icon, family));
+        Check(CommandBand.GroupInspectionOnly(Verdict("Platform", new Node("Deck").Solid()), family) == null, "A listed group is not inspection only");
+        Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this baked scenery group cannot be edited", "A group without a verdict waits for support");
     }
     static void QueuingGizmoSetupKeepsTheConnectionsPreview() {
         Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");

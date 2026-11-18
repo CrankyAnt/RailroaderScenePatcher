@@ -226,8 +226,9 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("UI.Map.MapIcon", "station icon", "#89", reason: "This group contains a station icon, so it cannot be edited as a group."),
             new Exclusion("RollingStock.Controls.KeyValuePickableToggle", "pickable toggle", "#91"),
         });
-        // Why a group with track markers is left out: the markers keep their own family. No ticket covers it yet.
-        public const string TrackMarkerReason = "This group contains track markers, so it cannot be moved as a whole.";
+        // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
+        // their own family. No ticket is needed.
+        public const string TrackMarkerReason = "This group is not moved as a whole. Its track markers are edited one by one in the Track marker family.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
         public static readonly IReadOnlyList<string> RailBridgeFolders = Array.AsReadOnly(new[] { "Almond Bridge", "Plate Girder Bridge" });
         // The bridge roots that a later bridge ticket names: road bridges, and rail bridge constructions outside Ela, whose

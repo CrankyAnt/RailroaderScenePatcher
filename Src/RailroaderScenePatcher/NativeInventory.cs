@@ -549,7 +549,7 @@ namespace RailroaderScenePatcher {
                 if (type != "Generic") only = CommandBand.NotYetSupported("track markers of type " + type);
             });
             else if (part) { }
-            else if (groupRoot) { if (verdict?.Disposition != GroupDisposition.Group) only = verdict?.ReasonIsSentence == true ? CommandBand.NotYetSupportedBecause(verdict.Reason) : CommandBand.NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant()); }
+            else if (groupRoot) only = CommandBand.GroupInspectionOnly(verdict, family);
             else if (family == "Track span") only = CommandBand.SpanInspectionOnly(spanHolder != null);
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell);
             if (only != null) markerEditable = false;
