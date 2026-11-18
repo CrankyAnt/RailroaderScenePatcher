@@ -48,11 +48,13 @@ namespace RailroaderScenePatcher {
         internal static string ChoiceLabel(bool useFile) => useFile ? "File version" : "Editor version";
         // The message of a completed Import, for the footer message area.
         // unsaved says whether the patch work now differs from the file on disk.
+        // A conflict resolved with the file version changed the entry, so it counts as an applied change; the conflicts kept
+        // at the editor version changed nothing and are counted apart.
         internal static string Completed(ImportResult result, bool unsaved) {
+            var applied = result.Changes + result.FileChoices;
             var parts = new[] {
-                result.Changes == 0 ? "No changes applied" : result.Changes == 1 ? "1 change applied" : result.Changes + " changes applied",
-                result.FileChoices == 0 ? null : result.FileChoices == 1 ? "file version used for 1 conflict" : "file version used for " + result.FileChoices + " conflicts",
-                result.EditorChoices == 0 ? null : result.EditorChoices == 1 ? "editor version kept for 1 conflict" : "editor version kept for " + result.EditorChoices + " conflicts"
+                applied == 0 ? "No changes applied" : applied == 1 ? "1 change applied" : applied + " changes applied",
+                result.EditorChoices == 0 ? null : result.EditorChoices == 1 ? "1 conflict kept at the editor version" : result.EditorChoices + " conflicts kept at the editor version"
             }.Where(p => p != null).ToArray();
             return "Import completed. " + String.Join(", ", parts) + "."
                 + (result.NotApplied.Count == 0 ? "" : " Kept in the scene patch file but not applied: " + String.Join("; ", result.NotApplied) + ".")

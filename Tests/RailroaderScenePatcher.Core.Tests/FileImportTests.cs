@@ -51,6 +51,7 @@ static class FileImportTests {
         FormatVersionIsCheckedFirst();
         UnknownContentSurvivesImportAndSave();
         SaveDuringSessionCreatesNoConflict();
+        SavedEntryChangedOutsideIsAConflict();
         RemovedEntriesAreClassified();
         FilePanelFollowsTheSession();
         LockedControlsNameThemselves();
@@ -117,7 +118,7 @@ static class FileImportTests {
         var change = world.Session.Import.Changes.Single();
         Assert(change.Description == "Content outside the modifications: futureTop." && change.Kind == ImportChangeKind.New, "A top-level change is listed: " + change.Description);
         Assert(world.Session.ApplyImport().Applied && world.Session.LastImport.Changes == 1, "The top-level change counts as applied");
-        Assert(FilePanelState.Completed(new ImportResult(0, 0, 1), true).StartsWith("Import completed. No changes applied, editor version kept for 1 conflict."), "A count of zero says No changes applied");
+        Assert(FilePanelState.Completed(new ImportResult(0, 0, 1), true).StartsWith("Import completed. No changes applied, 1 conflict kept at the editor version."), "A count of zero says No changes applied");
     }
     static void UnavailableTargetIsIsolated() {
         var world = new World(Doc(Item("a", "p", 110)), "p");
@@ -324,6 +325,20 @@ static class FileImportTests {
         Assert(session.VersionState == FileVersionState.Changed && session.OpenImport().Applied, "Overview opens: " + session.VersionMessage);
         Assert(session.Import.Conflicts.Count == 0 && session.Import.Changes.Single().Key == "b", "A Save during the session creates no conflict by itself");
     }
+    // An outside change to an entry whose session edits were all saved is a conflict: the entry was edited in this session
+    // and also changed in the file. The description says that, without suggesting unsaved edits.
+    static void SavedEntryChangedOutsideIsAConflict() {
+        var world = new World(Doc(Item("a", "p", 110)), "p");
+        var session = world.Session;
+        Assert(session.Edit(Target("p"), At(125), null).Applied, "Fixture edit");
+        world.History.Save();
+        Assert(!session.Outstanding(false).Contains(PatchEditingSession.PatchData), "Every session edit is saved");
+        world.Outside(Doc(Item("a", "p", 126)));
+        Assert(session.OpenImport().Applied, "Overview opens");
+        var conflict = session.Import.Conflicts.Single();
+        Assert(conflict.Case == ImportConflictCase.EditedInBoth && conflict.Description == "Modification ID a for p was edited in this session and also changed in the file.", "The saved entry's outside change is a conflict with a true description: " + conflict.Description);
+        Assert(!conflict.Description.Contains("your edits"), "The description does not suggest unsaved edits");
+    }
     static void RemovedEntriesAreClassified() {
         var world = new World(Doc(Item("a", "p", 110) + "," + Item("b", "r", 140)), "p", "r");
         world.Outside(Doc(Item("a", "p", 110)));
@@ -347,7 +362,9 @@ static class FileImportTests {
         session.CancelImport();
         world.Outside("{broken");
         Assert(FilePanelState.Of(session) == FilePanelState.Kind.Repair && FilePanelState.Heading(FilePanelState.Kind.Repair) == "Repair", "A file that needs repair opens the Repair panel");
-        Assert(FilePanelState.Completed(new ImportResult(2, 1, 0), true) == "Import completed. 2 changes applied, file version used for 1 conflict. Click Save in the Map Editor to write the scene patch file.", "Import results name what was applied");
+        Assert(FilePanelState.Completed(new ImportResult(2, 1, 0), true) == "Import completed. 3 changes applied. Click Save in the Map Editor to write the scene patch file.", "A conflict resolved with the file version counts as an applied change");
+        Assert(FilePanelState.Completed(new ImportResult(0, 1, 0), false) == "Import completed. 1 change applied. Your scene patch edits match the file on disk.", "A single file choice is one applied change");
+        Assert(FilePanelState.Completed(new ImportResult(1, 1, 2), true).StartsWith("Import completed. 2 changes applied, 2 conflicts kept at the editor version."), "Conflicts kept at the editor version are counted apart");
     }
     // While the file panel is open, an outliner row keeps its object's name as its tooltip title and gives only the
     // panel's reason; the search field has a fixed title; the state line puts the badges and the problem count before

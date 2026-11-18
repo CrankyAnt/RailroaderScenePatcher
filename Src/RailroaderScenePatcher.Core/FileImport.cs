@@ -246,7 +246,8 @@ namespace RailroaderScenePatcher.Core {
             switch (kind) {
                 case ImportConflictCase.SameObject: description = subject + (keys.Count == 1 ? " refers" : " refer") + " to the same object. Your edits and the file change it under different modification IDs."; break;
                 case ImportConflictCase.NewOnBothSides: description = subject + (keys.Count == 1 ? " is new" : " are new") + " in both your edits and the file, with different content."; break;
-                default: description = subject + (keys.Count == 1 ? " has" : " have") + " changes in both your edits and the file."; break;
+                // Steps in this session make the conflict, whether or not they were saved since.
+                default: description = subject + (keys.Count == 1 ? " was" : " were") + " edited in this session and also changed in the file."; break;
             }
             var editorSide = String.Join(" ", keys.Where(k => !SameEntry(Entry(start, k), Entry(editor, k))).Select(k => Effect(k, name, Entry(start, k), Entry(editor, k))));
             var fileSide = String.Join(" ", keys.Where(k => !SameEntry(Entry(editor, k), Entry(file, k))).Select(k => Effect(k, name, Entry(editor, k), Entry(file, k))));
