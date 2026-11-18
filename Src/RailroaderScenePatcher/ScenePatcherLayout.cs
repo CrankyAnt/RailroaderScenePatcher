@@ -1269,7 +1269,7 @@ namespace RailroaderScenePatcher {
                                 var request = preparedSnap;
                                 Edit(SnapPlace, "Physical snap", (session, inspection) => snap.Apply(request), true);
                             }),
-                            Slot(CommandBand.DiscardPrepared, "Discard the prepared snap. The object stays where it is.", unprepared, ClearSnap, "Discard prepared snap") };
+                            Slot(CommandBand.DiscardPrepared, "Discard the prepared snap. The object stays where it is.", unprepared, DiscardSnap, "Discard prepared snap") };
                     } else {
                         var unavailable = block ?? (trackPoses == null ? "Track-following placement is unavailable in this game build." : null);
                         var picked = FollowTarget();

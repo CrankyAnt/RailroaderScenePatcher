@@ -522,13 +522,16 @@ namespace RailroaderScenePatcher {
             if (mapEditorWidth > 0) { x = mapEditorLeft; width = Math.Max(width, mapEditorWidth); top = mapEditorBottom; }
             width = Math.Min(width, screenWidth);
             var below = screenHeight - top;
-            if (mapEditorWidth > 0 && below < FallbackBelow * scale) {
+            var minimum = minimumHeight * scale;
+            // Choose the default side using the Map Editor's height at UI scale 1. Keep the actual window below it
+            // only when the scaled minimum fits there.
+            var belowAtDefaultScale = screenHeight - mapEditorBottom / scale;
+            if (mapEditorWidth > 0 && (belowAtDefaultScale < FallbackBelow || below < minimum)) {
                 var remaining = screenHeight - topRightBottom;
-                var height = Math.Max(minimumHeight * scale, Math.Min(remaining, Math.Max(defaultHeight * scale, below)));
+                var height = Math.Max(minimum, Math.Min(remaining, Math.Max(defaultHeight * scale, below)));
                 height = Math.Min(height, screenHeight);
                 return new Area { X = screenWidth - width, Y = Math.Min(topRightBottom, screenHeight - height), Width = width, Height = height, TopRight = true };
             }
-            var minimum = minimumHeight * scale;
             if (below < minimum) { below = Math.Min(minimum, screenHeight); top = screenHeight - below; }
             return new Area { X = Math.Max(0, Math.Min(x, screenWidth - width)), Y = Math.Max(0, top), Width = width, Height = below };
         }

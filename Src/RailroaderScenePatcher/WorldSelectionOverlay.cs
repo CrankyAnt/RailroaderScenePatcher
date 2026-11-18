@@ -524,7 +524,9 @@ namespace RailroaderScenePatcher {
                 textStyle.normal.textColor = new Color(.8156863f, .7950737f, .746353f, 1f);
             }
             var shapes = new List<Shape>();
-            var pointer = Event.current.mousePosition;
+            // Use the same screen pixels as world clicks, regardless of the current IMGUI event.
+            var mouse = Input.mousePosition;
+            var pointer = new Vector2(mouse.x, Screen.height - mouse.y);
             // The pointer marks what a click there would select, by the click's own rule: one candidate, or the
             // candidates of one spot. Over a window or a label it marks nothing by that rule; a label marks its own.
             var projected = ProjectAll(candidates, camera, origin, out var measured);

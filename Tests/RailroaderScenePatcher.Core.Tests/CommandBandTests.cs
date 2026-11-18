@@ -583,6 +583,11 @@ static class CommandBandTests {
         // 2560 x 1440, scale 1: the Map Editor window ends at 666, so 774 units remain below it.
         var roomy = PanelPlacement.Default(2560, 1440, 1, 0, 604, 666, 60, 690, 660, 410);
         Check(!roomy.TopRight && roomy.X == 0 && roomy.Y == 666 && roomy.Width == 690 && roomy.Height == 774, "With 600 units or more below the Map Editor the window fills that space: " + roomy.Y + " " + roomy.Height);
+        var roomyScaled = PanelPlacement.Default(2560, 1440, 1.25f, 0, 755, 832.5f, 75, 734, 660, 470);
+        Check(!roomyScaled.TopRight && roomyScaled.X == roomy.X && roomyScaled.Y == 832.5f && roomyScaled.Height == 607.5f,
+            "Increasing the UI scale keeps the window below the Map Editor when the scaled minimum still fits");
+        var minimumDoesNotFit = PanelPlacement.Default(2560, 1440, 1.5f, 0, 906, 999, 90, 734, 660, 470);
+        Check(minimumDoesNotFit.TopRight && minimumDoesNotFit.Height >= 705, "The fallback still applies when the scaled minimum cannot fit below the Map Editor");
         // 1920 x 1080, scale 1: 414 units remain below, fewer than 600.
         var small = PanelPlacement.Default(1920, 1080, 1, 0, 604, 666, 60, 690, 660, 410);
         Check(small.TopRight && small.X == 1920 - 690 && small.Y == 60 && small.Width == 690 && small.Height == 660, "With fewer than 600 units below, the window opens at the top right below the strip, with the same width: " + small.X + " " + small.Y + " " + small.Height);

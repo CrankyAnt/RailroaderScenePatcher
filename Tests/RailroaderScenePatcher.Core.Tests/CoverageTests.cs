@@ -164,6 +164,7 @@ static partial class CoverageTests {
     }
     public static void Run() {
         RolePickerOffersTheOtherRoles();
+        RolePickerExcludesTheSharedStartOfIslandAndApproachB();
         MarkingsIncludeTheWholeRouteOfEvaluatedSpans();
         ScenePatchFileDistinguishesOmittedSelectedAndDetached();
         ExplicitAlternativeTransfersDetectionAndRetainsCoverage();
@@ -193,6 +194,22 @@ static partial class CoverageTests {
         var offered = SelectionOffers.For(candidates, false, current).Select(c => c.Identity.Identifier);
         Assert(offered.SequenceEqual(new[] { "Snew", "Sspur", "Sother" }), "Picking the island excludes only its current segment");
         Assert(SelectionOffers.For(candidates, false).Contains(candidates[1]), "Picking a location can use its current segment");
+    }
+    static void RolePickerExcludesTheSharedStartOfIslandAndApproachB() {
+        var f = new Fixture();
+        // Bryson Everett circuit P6id: Island and Approach B both start on Sccw.
+        f.Retained.Spans[0].Range = new SpanRange(new TrackLocation("S63c", "b", 1.703918), new TrackLocation("S3ddf", "a", 8.987599));
+        f.Retained.Spans[1].Range = new SpanRange(new TrackLocation("Sccw", "a", 0.1168472), new TrackLocation("Sccw", "b", 50.79974));
+        f.Retained.Spans[2].Range = new SpanRange(new TrackLocation("Sccw", "a", 9.714756), new TrackLocation("Snp1", "b", 43.59196));
+        var candidates = new[] { "S63c", "Sccw", "Sz8t", "S3ddf", "Snp1" }.Select(id =>
+            new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, id), id)).ToArray();
+
+        IEnumerable<string> OfferedFor(int role) => SelectionOffers.For(candidates, false, f.Scene.RoleSegment(f.Crossing, "P6id", role))
+            .Select(candidate => candidate.Identity.Identifier);
+
+        Assert(OfferedFor(0).SequenceEqual(new[] { "Sccw", "Sz8t", "S3ddf", "Snp1" }), "Approach A offers the shared Island and Approach B start segment");
+        Assert(OfferedFor(1).SequenceEqual(new[] { "S63c", "Sz8t", "S3ddf", "Snp1" }), "Island excludes its current Sccw and offers Approach A's S63c");
+        Assert(OfferedFor(2).SequenceEqual(new[] { "S63c", "Sz8t", "S3ddf", "Snp1" }), "Approach B excludes its current Sccw and offers Approach A's S63c");
     }
     static void MarkingsIncludeTheWholeRouteOfEvaluatedSpans() {
         var f = new Fixture();

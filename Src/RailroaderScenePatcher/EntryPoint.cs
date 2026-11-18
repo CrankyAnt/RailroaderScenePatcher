@@ -718,7 +718,7 @@ namespace RailroaderScenePatcher {
                             CancelGizmo(); presentation?.RequestRefresh(); return true;
                         case CommandBand.EscapeStep.CancelSnap:
                             if (Requests.Place == SnapPlace) CancelRequest("you cancelled the snap before the action could run");
-                            ClearSnap(); presentation?.RequestRefresh(); return true;
+                            DiscardSnap(); presentation?.RequestRefresh(); return true;
                     }
                     return Time.frameCount <= gizmoEnded + 1;
                 });
@@ -1194,6 +1194,10 @@ namespace RailroaderScenePatcher {
             : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the object list." : null;
         void ResetSnapState() { preparedSnap = null; choosingSnap = false; choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
         void ClearSnap() { ResetSnapState(); EndWorldEditAction(); }
+        void DiscardSnap() {
+            selection?.Consume();
+            ClearSnap();
+        }
         void BeginSnap(SelectionKind kind) {
             BeginSelection(kind, selected);
             choosingSnap = selection?.Pending != null;
