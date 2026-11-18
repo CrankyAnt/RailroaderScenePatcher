@@ -167,7 +167,7 @@ namespace RailroaderScenePatcher {
             foreach (var place in new[] { ModificationPlace, SavePlace, "Copy ID", "Fit" }) created.GeneralPlaces.Add(place);
             return created;
         }
-        const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = "Gizmo", SnapPlace = "Snap", ActivityPlace = "Activity",
+        const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = CommandBand.GizmoPlace, SnapPlace = "Snap", ActivityPlace = "Activity",
             ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells", WreckPlace = "Start derailed";
         // The place of the open equipment form's messages: its bells or its lights and gates.
         string EquipmentPlace => equipmentSource?.IsDefinition == true ? BellPlace : LightGatePlace;
@@ -1196,13 +1196,15 @@ namespace RailroaderScenePatcher {
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
             : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the object list." : null;
-        void ResetSnapState() { preparedSnap = null; choosingSnap = false; choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
-        void ClearSnap() { ResetSnapState(); EndWorldEditAction(); }
+        void ResetSnapState() { preparedSnap = null; choosingSnap = false; }
+        void ResetConnectionsPreview() { choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
+        void ClearSnap() { ResetSnapState(); ResetConnectionsPreview(); EndWorldEditAction(); }
         void DiscardSnap() {
             if (Requests.Place == SnapPlace) CancelRequest("you cancelled the snap before the action could run");
             if (choosingSnap) { selection?.Cancel(); selectionProblem = null; }
             selection?.Consume();
-            ClearSnap();
+            ResetSnapState();
+            EndWorldEditAction();
         }
         void ChangePlacementMode(int mode) {
             if (placementMode == mode) return;
@@ -1294,6 +1296,7 @@ namespace RailroaderScenePatcher {
                 : attachment == null ? "editing is unavailable" : Requests.Pending ? "another edit is still running" : null;
             if (blocked != null) { feedback.Run(place, action, blocked, inventory, selected, null); refused?.Invoke(); return; }
             ResetSnapState();
+            if (CommandBand.ClearsConnectionsPreviewOnQueue(place)) ResetConnectionsPreview();
             var inspected = selected;
             queuedCompared = Compared();
             if (!queuedCompared) inventory?.CancelFreshnessCheck();
@@ -1467,6 +1470,7 @@ namespace RailroaderScenePatcher {
                     gizmo = null; gizmoEnded = Time.frameCount;
                     // The gizmo comes back for the next drag once the object was observed again.
                     gizmoArmKey = null;
+                    if (outcome?.Applied == true && !outcome.Unchanged) ResetConnectionsPreview();
                     feedback.Report(GizmoPlace, message ?? (outcome?.Applied == true ? (outcome.Unchanged ? "Gizmo released without a move; nothing changed." : IsPad ? CommandBand.PadPlacement("Gizmo placement") : "Gizmo placement completed.") : "Gizmo placement refused: " + outcome?.Error));
                     OwnChange(); RefreshAfterEdit(); attachment?.RefreshChrome();
                 });

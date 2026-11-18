@@ -23,10 +23,15 @@ static class CommandBandTests {
         AClickOnTheInspectedRowClearsTheInspection();
         ClearActivityNeedsAnActivityValue();
         AClosedPanelCancelsTheWaitingRequest();
+        QueuingGizmoSetupKeepsTheConnectionsPreview();
         SharedRulesHoldAtEveryCallSite();
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    static void QueuingGizmoSetupKeepsTheConnectionsPreview() {
+        Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");
+        Check(CommandBand.ClearsConnectionsPreviewOnQueue("Placement"), "Queuing a placement edit invalidates a prepared Connections preview");
     }
     static void AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing() {
         var first = (Scope: "alpha", Id: "signal-1", CopyName: "Signal 1", IsBell: false);

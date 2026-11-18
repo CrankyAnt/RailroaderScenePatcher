@@ -232,6 +232,9 @@ namespace RailroaderScenePatcher {
         // The placement mode an object opens in: Follow for an object that follows a track, Numeric otherwise.
         internal const int NumericMode = 0, GizmoMode = 1, SnapMode = 2, FollowMode = 3;
         internal static int PlacementMode(bool followsTrack) => followsTrack ? FollowMode : NumericMode;
+        internal const string GizmoPlace = "Gizmo";
+        // The queued Gizmo request opens the tool. The drag commits separately.
+        internal static bool ClearsConnectionsPreviewOnQueue(string place) => place != GizmoPlace;
         // The result of a placement edit on a crossing pad. The pad's geometry is generated along its track binding, so
         // moving the pad object moves nothing the player sees: the result says so instead of "completed".
         internal static string PadPlacement(string action) => action + " changed the pad object's physical placement only. The pad's geometry is generated along its track binding and did not move; change the binding on Connections to move the pad.";
