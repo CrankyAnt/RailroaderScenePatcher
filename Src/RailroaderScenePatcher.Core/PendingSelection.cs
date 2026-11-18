@@ -108,9 +108,11 @@ namespace RailroaderScenePatcher.Core {
 
         // The choice only inspects its result, as Select in world does: no scene patch file will name it.
         public bool InspectOnly { get; set; }
-        public void Offer(IEnumerable<SelectionCandidate> hits) {
+        bool crossingSetup;
+        public void Offer(IEnumerable<SelectionCandidate> hits, bool isCrossingSetup = false) {
             if (!IsPending) return;
             Offers = Array.AsReadOnly(hits.Where(c => c != null && c.Identity.Kind == Kind).ToArray());
+            crossingSetup = isCrossingSetup && Kind == SelectionKind.SceneObject;
             Candidate = Offers.Count == 1 ? Offers[0] : null;
             Highlight = null;
             Problem = Offers.Count == 0 ? NoOffer :
@@ -118,7 +120,10 @@ namespace RailroaderScenePatcher.Core {
         }
         // A group's objects or overlapping markers offer a list beside the pointer. The same number names each
         // offer wherever the panel lists it.
-        public const string SeveralOffers = "Choose an item from the list next to the pointer.";
+        public const string SeveralOffers = "Select a row from the list next to the pointer.";
+        public string OfferCountText => Offers.Count + (crossingSetup && ListOpen ? " objects in this crossing setup." :
+            Kind == SelectionKind.SceneObject ? " objects." : " candidates.");
+        public string OfferListInstruction => SeveralOffers;
         // A click that met no candidate.
         public const string NoOffer = "No candidate at this point";
         // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks

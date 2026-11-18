@@ -53,12 +53,8 @@ namespace RailroaderScenePatcher {
             if (confirming || relaunching) return;
             try {
                 current.Session.CheckFileVersion();
-                var warning = current.Session.ReloadWarning(current.NativeDirty);
                 var canSave = current.Session.CanSaveForReload;
-                var message = "Reload the Map Editor? Reloading ends the Map Editor's Undo and Redo history. "
-                    + (warning ?? "All required work is saved.")
-                    + (canSave ? " Save and Reload saves pending native map and patcher work before reloading." : " Resolve the scene patch file version choice before saving.")
-                    + " Discard and Reload discards any remaining unsaved work. Cancel keeps the Map Editor open. Your working location is restored when available.";
+                var message = current.Session.ReloadPrompt(current.NativeDirty);
                 Action<int> choose = value => {
                     confirming = false;
                     if (value == 0 || !ReferenceEquals(Hooks.Current, current)) return;

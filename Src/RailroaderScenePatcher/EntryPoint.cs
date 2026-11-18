@@ -387,7 +387,7 @@ namespace RailroaderScenePatcher {
         }
         static string Describe(LoadedMod loaded, string message) {
             var mod = loaded.Source;
-            return (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + " " + mod.Version + "] " + message + ". Patcher " + Version + ". Author: " + (mod.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(mod.Website) ? "" : "; website: " + mod.Website);
+            return (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + " " + mod.Version + "] " + message + ". Patcher " + Version + ". Mod author: " + (mod.Author ?? "not supplied") + (String.IsNullOrWhiteSpace(mod.Website) ? "" : "; website: " + mod.Website);
         }
         internal void ReportWorld(string message) { Report("world", message); }
         void MapEditorDiagnostic(string message) { if (inMapEditor && !diagnostics.Contains(message)) diagnostics.Add(message); }
@@ -1115,6 +1115,7 @@ namespace RailroaderScenePatcher {
                 var candidate = selection.Confirm();
                 // A refused confirmation says why in the footer, beside Confirm, and in the log (LogChoiceProblem).
                 if (candidate == null) { presentation?.RequestRefresh(); return; }
+                if (!inspectOnly) feedback.ChoiceConfirmed(attachment?.Session);
                 pickedTrackLocation = null; pickedTrackSelection = null;
                 selectionProblem = null;
                 if (snapping) {

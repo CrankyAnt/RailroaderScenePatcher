@@ -18,9 +18,10 @@ namespace RailroaderScenePatcher.Core {
     // whether the pointer is inside the group's frame, the objects the group holds, as indices into the targets, and
     // those of them that show their own marker and frame: a candidate and the inspected object.
     public sealed class PickGroup {
-        public PickGroup(PickTarget target, IReadOnlyList<int> objects, IReadOnlyList<int> own = null, IReadOnlyList<int> unlisted = null) {
-            Target = target; Objects = objects ?? throw new ArgumentNullException(nameof(objects)); Own = own ?? Array.Empty<int>(); Unlisted = unlisted ?? Array.Empty<int>();
+        public PickGroup(PickTarget target, IReadOnlyList<int> objects, IReadOnlyList<int> own = null, IReadOnlyList<int> unlisted = null, GameDefinedGroupKind? kind = null) {
+            Target = target; Objects = objects ?? throw new ArgumentNullException(nameof(objects)); Own = own ?? Array.Empty<int>(); Unlisted = unlisted ?? Array.Empty<int>(); Kind = kind;
         }
+        public GameDefinedGroupKind? Kind { get; }
         public PickTarget Target { get; }
         public IReadOnlyList<int> Objects { get; }
         public IReadOnlyList<int> Own { get; }
@@ -31,13 +32,15 @@ namespace RailroaderScenePatcher.Core {
     // What a click selects among objects and groups: the objects, the winner's first, and the groups it picked, as
     // indices into the groups. The frame of a picked group is the one the pointer marks.
     public sealed class WorldPickResult {
-        internal WorldPickResult(IReadOnlyList<int> objects, IReadOnlyList<int> groups, IReadOnlyList<int> hoveredObjects) {
-            Objects = objects; Groups = groups; HoveredObjects = hoveredObjects;
+        internal WorldPickResult(IReadOnlyList<int> objects, IReadOnlyList<int> groups, IReadOnlyList<int> hoveredObjects, bool isCrossingSetup) {
+            Objects = objects; Groups = groups; HoveredObjects = hoveredObjects; IsCrossingSetup = isCrossingSetup;
         }
         public IReadOnlyList<int> Objects { get; }
         public IReadOnlyList<int> Groups { get; }
         // An offer included because it shares a spot can still be outside the pointer's own hit area.
         public IReadOnlyList<int> HoveredObjects { get; }
+        // A single grade-crossing setup was picked, and every offered object is listed by that setup.
+        public bool IsCrossingSetup { get; }
     }
     // Which candidate a click selects, and so which one the pointer marks before the click. One rule for every world
     // choice: Select in world, a replacement object, segment or node, and the snap and follow picks.
@@ -93,7 +96,10 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var member in group.Objects) if (member >= 0 && member < targets.Count && !group.Unlisted.Contains(member) && !objects.Contains(member)) objects.Add(member);
             }
             var hovered = objects.Where(i => !hidden.Contains(i) && (targets[i].Area || OnMarker(targets[i], x, y))).ToArray();
-            return new WorldPickResult(objects, picked, hovered);
+            var onlyGroup = picked.Count == 1 ? groups[picked[0]] : null;
+            var isCrossingSetup = onlyGroup?.Kind == GameDefinedGroupKind.GradeCrossingSetup && objects.Count > 0 &&
+                objects.All(i => onlyGroup.Objects.Contains(i) && !onlyGroup.Unlisted.Contains(i));
+            return new WorldPickResult(objects, picked, hovered, isCrossingSetup);
         }
         // The rows of the list a click on one spot opens, beside the pointer: to its right and from its height down,
         // or to its left without room on the right, moved up when the list would leave the screen at the bottom. The

@@ -28,7 +28,9 @@ static class SelectionTests {
         var several = new PendingSelection(candidates, SelectionKind.SceneObject, "Replace scene target");
         var twin = new SelectionCandidate(original, SelectionIdentity.SceneObject(new TargetIdentity("scene", "original", "Culler")), "Original board");
         several.Offer(new[] { candidate, twin });
-        Check(several.Candidate == null && several.Problem == "Choose an item from the list next to the pointer.", "A group or overlapping offers direct the choice to the list without claiming the objects share one spot");
+        Check(several.Candidate == null && several.Problem == "Select a row from the list next to the pointer.", "A group or overlapping offers direct the choice to the list without claiming the objects share one spot");
+        Check(several.OfferCountText + " " + several.OfferListInstruction == "2 objects. Select a row from the list next to the pointer.",
+            "Overlapping object markers have a generic footer");
         Check(several.Number(candidate) == 1 && several.Number(twin) == 2 && several.Number(new SelectionCandidate(original, twin.Identity, "Other")) == 0, "Offers carry their numbers from 1; a candidate that is not offered has none");
         // The list of one spot closes without a choice, as a dropdown does on Escape: the choice stays pending.
         Check(several.ListOpen, "Several offers without a choice are an open list");
@@ -211,15 +213,18 @@ static class SelectionTests {
         candidates.Items.AddRange(members);
         var offered = new[] { source }.Concat(members).ToArray();
         var marker = new PickTarget(300, 300, true, false);
-        var picked = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { new PickGroup(marker, new[] { 1, 2, 3 }) });
+        var crossing = new PickGroup(marker, new[] { 1, 2, 3 }, kind: GameDefinedGroupKind.GradeCrossingSetup);
+        var picked = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { crossing });
         undo = mapEditor.UndoGroups.ToArray(); redo = mapEditor.RedoGroups.ToArray(); scenePatchFile = editing.ScenePatchFileText; saved = store.Patch; dirty = mapEditor.IsDirty; writes = store.PatchWrites;
         var mutations = scene.MutationCalls;
         bool Unchanged() => mapEditor.UndoGroups.SequenceEqual(undo) && mapEditor.RedoGroups.SequenceEqual(redo) && mapEditor.IsDirty == dirty && editing.ScenePatchFileText == scenePatchFile &&
             store.Patch == saved && store.PatchWrites == writes && scene.MutationCalls == mutations && board.X == 12 && parts.All(part => part.X == 40 && part.Active);
         choices.Begin(SelectionKind.SceneObject, "Select scene object", inspectOnly: true);
-        choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
+        choices.Pending.Offer(picked.Objects.Select(index => offered[index]), picked.IsCrossingSetup);
         Check(choices.Pending.ListOpen && choices.Pending.Offers.SequenceEqual(members) && choices.Pending.Candidate == null && Unchanged(),
             "A click that picks a group opens the choice list of the group's objects and changes nothing");
+        Check(choices.Pending.OfferCountText + " " + choices.Pending.OfferListInstruction ==
+            "3 objects in this crossing setup. Select a row from the list next to the pointer.", "The footer identifies the crossing setup and directs selection to its rows");
         choices.Pending.Highlight = members[2];
         choices.Pending.Choose(members[1]);
         Check(ReferenceEquals(choices.Pending.Candidate, members[1]) && choices.Pending.IsPending && Unchanged(), "Choosing an entry makes that object the candidate and changes nothing");
@@ -229,7 +234,16 @@ static class SelectionTests {
         choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
         choices.Pending.CloseList();
         Check(choices.Pending != null && choices.Pending.Offers.Count == 0 && Unchanged(), "Closing a group's choice list keeps the choice pending and changes nothing");
-        choices.Pending.Offer(picked.Objects.Select(index => offered[index]));
+        var mixed = WorldPick.Resolve(301, 299, new[] { marker, marker, marker, marker }, new[] { crossing });
+        choices.Pending.Offer(mixed.Objects.Select(index => offered[index]), mixed.IsCrossingSetup);
+        Check(choices.Pending.OfferCountText == "4 objects." && choices.Pending.OfferListInstruction == PendingSelection.SeveralOffers,
+            "An overlapping marker can add an unrelated object to the crossing list, giving it a generic footer");
+        var station = new PickGroup(marker, new[] { 1, 2, 3 }, kind: GameDefinedGroupKind.BakedSceneryGroup);
+        var otherGroup = WorldPick.Resolve(301, 299, new[] { new PickTarget(900, 300, true, false), marker, marker, marker }, new[] { station });
+        choices.Pending.Offer(otherGroup.Objects.Select(index => offered[index]), otherGroup.IsCrossingSetup);
+        Check(choices.Pending.OfferCountText == "3 objects." && choices.Pending.OfferListInstruction == PendingSelection.SeveralOffers,
+            "Other game-defined groups have a generic footer even when they are picked on their own");
+        choices.Pending.Offer(picked.Objects.Select(index => offered[index]), picked.IsCrossingSetup);
         Check(!choices.Confirm() && choices.Pending.ListOpen, "A group's open choice list cannot be confirmed without a choice");
         choices.Pending.Choose(members[2]);
         Check(choices.Confirm() && choices.Confirmed.Identity.Equals(members[2].Identity) && Unchanged(), "Confirm makes the chosen object of the group the confirmed one, and no object of the group changed");

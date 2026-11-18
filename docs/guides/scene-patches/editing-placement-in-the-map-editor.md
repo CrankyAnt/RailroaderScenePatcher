@@ -48,7 +48,7 @@ Click **Cancel** to close the panel without changes and discard the conflict cho
 
 Import adds no native Undo or Redo step. After an import without conflicts, one Undo reverses your own last action before the import. Undo or Redo of an earlier step never overwrites a value applied by the import. If any change fails, the patcher restores the state from before the import and explains the failure in the message area.
 
-While the **Import** panel is open, clicking **Save** writes nothing and shows `Save refused.` followed by `Complete or cancel Import before saving.` After import, the scene patch status is **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs. A file that needs repair cannot be imported.
+While the **Import** panel is open, clicking **Save** writes nothing and shows `Save refused.` followed by `Complete or cancel Import before saving: click Import or Cancel in the Import panel.` After import, the scene patch status is **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs. A file that needs repair cannot be imported.
 
 ### Repair the scene patch file
 
@@ -156,7 +156,7 @@ The editing session never retries a failed edit automatically. Every correction 
 
 ## Leave the native map editor
 
-If work is outstanding, the exit confirmation names it, for example `Unsaved work: map data, scene patch file.` Click **Cancel** to return to the native map editor or **Exit** to discard unsaved work.
+If work is outstanding, the exit confirmation names it. For example, `Exit discards unsaved changes to the map data and scene patch file.` Click **Cancel** to return to the native map editor or **Exit** to discard unsaved work.
 
 For the fields written by Save, see [scene patch file v1](scene-patch-file-v1.md).
 

@@ -18,6 +18,8 @@ static class CommandBandTests {
         OwnSaveKeepsTheDefinitionsCurrent();
         ADisabledControlKeepsItsDescription();
         ChoiceLabelsLeadWithWhatTellsThemApart();
+        AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
+        AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
         AClickOnTheInspectedRowClearsTheInspection();
         ClearActivityNeedsAnActivityValue();
         AClosedPanelCancelsTheWaitingRequest();
@@ -25,6 +27,35 @@ static class CommandBandTests {
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    static void AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing() {
+        var first = (Scope: "alpha", Id: "signal-1", CopyName: "Signal 1", IsBell: false);
+        var second = (Scope: "alpha", Id: "signal-2", CopyName: "Signal 1", IsBell: false);
+        var third = (Scope: "beta", Id: "signal-1", CopyName: "Signal 1", IsBell: false);
+        var gate = (Scope: "alpha", Id: "gate", CopyName: "Gate 1", IsBell: false);
+        var missing = (Scope: "alpha", Id: "missing", CopyName: (string)null, IsBell: false);
+        var crossing = new[] { third, gate, second, missing, first };
+        foreach (var reopened in new[] { crossing, crossing.Reverse().ToArray() }) {
+            Check(InventoryPresentationState.AddedEquipmentName(first, reopened) == "Signal 1 (added, 1 of 3)", "The first copy keeps its ordinal when the list reopens");
+            Check(InventoryPresentationState.AddedEquipmentName(second, reopened) == "Signal 1 (added, 2 of 3)", "Two copies from the same mod are distinguishable by their names");
+            Check(InventoryPresentationState.AddedEquipmentName(third, reopened) == "Signal 1 (added, 3 of 3)", "A copy from another mod at the same crossing is also numbered");
+            Check(InventoryPresentationState.AddedEquipmentName(gate, reopened) == "Gate 1 (added)", "A unique device name has no ordinal");
+            Check(InventoryPresentationState.AddedEquipmentName(missing, reopened) == "Added light or gate", "A missing copy keeps the fallback name");
+        }
+        Check(InventoryPresentationState.AddedEquipmentName(first, new[] { first }) == "Signal 1 (added)", "The same device name at a different crossing has its own count");
+        Check(InventoryPresentationState.AddedEquipmentName(second, new[] { second, first }) == "Signal 1 (added, 2 of 2)", "Removing a copy updates the remaining ordinals");
+    }
+    static void AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates() {
+        var firstBell = (Scope: "alpha", Id: "bell", CopyName: "Signal 1", IsBell: true);
+        var secondBell = (Scope: "beta", Id: "bell", CopyName: "Signal 1", IsBell: true);
+        var light = (Scope: "alpha", Id: "light", CopyName: "Signal 1", IsBell: false);
+        var gate = (Scope: "beta", Id: "gate", CopyName: "Signal 1", IsBell: false);
+        var crossing = new[] { gate, secondBell, light, firstBell };
+        Check(InventoryPresentationState.AddedEquipmentName(firstBell, crossing) == "Signal 1 (added, 1 of 2)", "The first bell counts only the matching bells");
+        Check(InventoryPresentationState.AddedEquipmentName(secondBell, crossing) == "Signal 1 (added, 2 of 2)", "The second bell keeps its ordinal among matching bells");
+        Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added, 1 of 2)", "The light counts the matching gate");
+        Check(InventoryPresentationState.AddedEquipmentName(gate, crossing) == "Signal 1 (added, 2 of 2)", "The gate counts the matching light");
+        Check(InventoryPresentationState.AddedEquipmentName(firstBell, new[] { light, gate, firstBell }) == "Signal 1 (added)", "A single bell with this name has no ordinal");
     }
     static void NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit() {
         var current = new[] { "8", "2", "3", "0", "90", "0" };
@@ -101,16 +132,30 @@ static class CommandBandTests {
         // A window saved at its minimum of 660 by 410 has a content of 636 by 364 inside a frame of 24 by 46.
         Check(CommandBand.RestoredContent(636, 660, 24) == 636 && CommandBand.RestoredContent(364, 410, 46) == 364, "A content size saved at the minimum window is restored as saved, not raised to the window's minimum");
         Check(CommandBand.RestoredContent(900, 660, 24) == 900 && CommandBand.RestoredContent(100, 660, 24) == 636, "A larger saved size stays, and a smaller one is raised to the minimum window's content");
-        // A lamp without its word says it in the tooltip, first.
-        Check(CommandBand.LampTooltip(CommandBand.Inventory(true), "the scene changed") == "Stale: The scene changed", "The tooltip text starts with the state word");
-        Check(CommandBand.LampTooltip(CommandBand.Save(false), null) == "Saved." && CommandBand.LampTooltip(CommandBand.Save(true), "") == "Unsaved.", "Without a reason the tooltip is the word");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(false), "The object list is up to date. You can inspect objects and start edits.") ==
+            ("Current", "The object list is up to date. You can inspect objects and start edits."), "The Current tooltip body gives the next available actions.");
+        var scene = new Scene();
+        var inventory = new SceneInventory(scene);
+        inventory.Refresh();
+        scene.Maps = new[] { "another map" };
+        inventory.CheckFreshness();
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(inventory.IsStale), InventoryPresentationState.Notice(inventory, false)) ==
+            ("Stale", "The map context changed. Click Refresh to update the object list. Edits are refused until then."), "The Stale tooltip gives the reason and tells the user how to update the object list.");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(true, false), FilePanelState.Reason(FilePanelState.Kind.Repair)) ==
+            ("Paused", "The scene patch file needs repair. Use the Repair panel first."), "The Paused tooltip body names the panel without repeating its title.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.None, false)) ==
+            ("Saved", "There are no changes to save."), "The Saved tooltip body explains what the status means.");
         Check(CommandBand.Inventory(true, false).Word == "Paused" && !CommandBand.Inventory(true, false).Good &&
             CommandBand.Save(false, false).Word == "Blocked" && !CommandBand.Save(false, false).Good, "A file lock pauses inspection and unavailable saving cannot show green Saved");
         var writes = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
         Check(CommandBand.LampTooltip(CommandBand.Save(true), CommandBand.SaveNotice(writes, FileVersionState.None, false)) ==
-            "Unsaved: Map data, scene patch file, patcher dependency. Click Save to write these changes.", "Only the start of the joined Save list is capitalized.");
+            ("Unsaved", "Click Save to write changes to the map data, scene patch file, and patcher dependency."), "The Unsaved tooltip body names all outstanding writes and the next action.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(true, false), CommandBand.SaveNotice(new[] { PatchEditingSession.PatchData }, FileVersionState.Repair, true)) ==
+            ("Unsaved", "Changes to the scene patch file still need saving. Restore the scene patch file or click Keep editor version before saving."), "The Unsaved tooltip keeps the outstanding write and names the recovery action when the file is missing.");
         Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Repair, false)) ==
-            "Blocked: The scene patch file needs repair. Resolve the issue before saving.", "A blocked lamp has one status label and its own repair guidance.");
+            ("Blocked", "The scene patch file needs repair. Resolve the issue before saving."), "The Blocked tooltip body gives repair guidance.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Changed, false)) ==
+            ("Blocked", "The scene patch file changed outside scene patch editing. Choose a file version before saving."), "The Blocked tooltip body retains the reason and action for a file version choice.");
         Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene patches to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
         Check(CommandBand.InventoryWord >= 60 && CommandBand.SaveWord >= CommandBand.InventoryWord, "The reserved widths hold the longer word of each lamp");
     }

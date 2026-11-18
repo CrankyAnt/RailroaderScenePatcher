@@ -30,7 +30,8 @@ namespace RailroaderScenePatcher {
         // The wrapper of an addition is its added object and stays inventory; the copy's parts below it do not.
         public bool IsOwned(object handle) => handle is GameObject go && go != null && go.GetComponent<OwnedEquipment>() == null && OwnedEquipment.Of(go) != null;
         static bool CopyPart(Component c) => !(c is OwnedEquipment) && OwnedEquipment.Of(c.gameObject) != null;
-        public bool Present(object handle) => handle is GameObject target && target != null && target.scene.IsValid() && target.scene.isLoaded;
+        public bool Present(object handle) => handle is GameObject target && target != null && target.scene.IsValid() && target.scene.isLoaded
+            && target.GetComponent<OwnedEquipment>()?.Retired != true;
         // The observed components of the object's hierarchy, which holds the lights, gates and bells of a crossing, and
         // for a crossing the spans this patcher owns in its scene: a coverage edit creates and removes those.
         public IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity) {
@@ -166,7 +167,10 @@ namespace RailroaderScenePatcher {
         internal const string AddedEquipmentFamily = CommandBand.AddedEquipmentFamily;
         static string Family(Component c) {
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
-            if (c is OwnedEquipment owned) return owned.Pattern == EquipmentAddition.BellPattern ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
+            if (c is OwnedEquipment owned) {
+                if (owned.Retired) return null;
+                return owned.Pattern == EquipmentAddition.BellPattern ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
+            }
             var type = TypeName(c); var go = c.gameObject;
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
             // editor helpers stays out; a starter placement marker below Setups keeps its family.
@@ -530,7 +534,12 @@ namespace RailroaderScenePatcher {
                 : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates and bells. The crossing and its original detection spans stay in place."
                 : CommandBand.NotEditable(coverageRefusal);
             // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
-            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.DisplayName); }
+            string displayName = null;
+            if (c is OwnedEquipment added) {
+                displayName = added.DisplayName;
+                structure = null;
+                operations = CommandBand.AddedEquipmentOperations(displayName);
+            }
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
@@ -544,7 +553,7 @@ namespace RailroaderScenePatcher {
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
-                bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: c is OwnedEquipment equipment && equipment != null ? equipment.DisplayName : null, groupPath: groupPath,
+                bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
                 category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1]);
         }
         // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.

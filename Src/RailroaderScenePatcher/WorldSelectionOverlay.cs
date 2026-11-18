@@ -230,8 +230,9 @@ namespace RailroaderScenePatcher {
             labels.Any(label => label.Label.Contains(pointer)) && !uiBounds.Any(bounds => bounds.Contains(pointer));
 
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
-            IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen, out bool listRow) {
+            IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen, out bool listRow, out bool isCrossingSetup) {
             listRow = false;
+            isCrossingSetup = false;
             // Native windows can move between the last repaint and this click.
             covered = uiBounds;
             budget.Begin();
@@ -250,7 +251,9 @@ namespace RailroaderScenePatcher {
                 || groups.Shown.Any(group => group.Shape != null && group.Shape.Marker.Contains(pointer)))) labelHits = new Shape[0];
             if (labelHits.Length != 0)
                 return candidates.Where(c => labelHits.Any(s => s.Candidate.Choice.Matches(c.Choice))).Select(c => c.Choice).ToArray();
-            return Resolve(candidates, shapes, groups, camera, origin, pointer).Objects.Select(i => candidates[i].Choice).ToArray();
+            var result = Resolve(candidates, shapes, groups, camera, origin, pointer);
+            isCrossingSetup = result.IsCrossingSetup;
+            return result.Objects.Select(i => candidates[i].Choice).ToArray();
         }
         // Where the last click fell: the list of the candidates of one spot opens beside it.
         Vector2 lastPick;
@@ -263,13 +266,13 @@ namespace RailroaderScenePatcher {
             var targets = new PickTarget[shapes.Length];
             // The root of a near group with parts shows nothing of its own, so the pointer meets nothing of it.
             for (var i = 0; i < shapes.Length; i++) targets[i] = groups.Absent[i] ? Target(null, false) : Target(shapes[i], shapes[i] != null && Marked(shapes[i], candidates[i], camera, origin));
-            return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own, group.Unlisted)).ToArray());
+            return WorldPick.Resolve(pointer.x, pointer.y, targets, groups.Shown.Select(group => new PickGroup(Target(group.Shape, true), group.Members, group.Own, group.Unlisted, group.Kind)).ToArray());
         }
 
         // A game-defined group that shows as one square marker: its objects among the candidates, as indices, those
         // of them that show on their own, those its choice list leaves out (its detection spans), what the group
         // shows and its one marking, or null when it is not in view.
-        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; }
+        sealed class ShownGroup { internal int[] Members; internal int[] Own; internal int[] Unlisted; internal GroupShows Shows; internal Shape Shape; internal GameDefinedGroupKind Kind; }
         // The groups that show as one from this camera, for each candidate whether its group stands for it, the
         // candidates that show their own frame at their group's frame distance (GameDefinedGroups.OwnFrameDistance).
         // The inspected object has its frame at any distance.
@@ -294,7 +297,7 @@ namespace RailroaderScenePatcher {
         // game component that anchors it, whose orientation the group's one box takes.
         // Stands is the index among Objects of the root of a baked scenery group with parts, which stands for the
         // group (GameDefinedGroup.Root), or -1.
-        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; internal int Stands = -1; }
+        sealed class InventoryGroup { internal SpatialCandidate[] Objects; internal bool[] Listed; internal GameObject Root; internal int Stands = -1; internal GameDefinedGroupKind Kind; }
         // The groups are decided once per inventory snapshot, and again when the snapshot is another one or has
         // another number of entries, and after the scene may have changed (ClearSurface, on every move of the
         // native map editor's history). Without a snapshot they are decided from the candidates of the choice.
@@ -341,7 +344,7 @@ namespace RailroaderScenePatcher {
                         try {
                             var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i), Stands = i == group.Root }).Where(m => m.Object.Points.Length != 0).ToArray();
                             if (placed.Length == 0) { Skipped(root, "none of its objects has a usable position"); continue; }
-                            found.Add(new InventoryGroup { Root = root, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray(), Stands = Array.FindIndex(placed, m => m.Stands) });
+                            found.Add(new InventoryGroup { Root = root, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray(), Stands = Array.FindIndex(placed, m => m.Stands), Kind = group.Kind });
                         } catch (Exception e) { Skipped(root, "its objects could not be read: " + e.GetBaseException().Message); }
                     }
                     inventoryGroups = found.ToArray();
@@ -421,7 +424,7 @@ namespace RailroaderScenePatcher {
                 var ownDistance = GameDefinedGroups.OwnFrameDistance(marking.Shows);
                 if (ownDistance > ObjectMarkingGeometry.FrameDistance) layout.OwnAtGroupDistance.AddRange(own);
                 var unlisted = indices.Where((i, k) => i >= 0 && !listed[k]).ToArray();
-                shown.Add(new ShownGroup { Members = members, Own = own, Unlisted = unlisted, Shows = marking.Shows, Shape = GroupShape(marking, camera) });
+                shown.Add(new ShownGroup { Members = members, Own = own, Unlisted = unlisted, Shows = marking.Shows, Shape = GroupShape(marking, camera), Kind = groups[g].Kind });
             }
             layout.Shown = shown.ToArray();
             return layout;

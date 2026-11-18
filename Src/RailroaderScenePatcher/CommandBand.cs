@@ -32,8 +32,10 @@ namespace RailroaderScenePatcher {
                 : version != FileVersionState.Repair ? null
                 : fileMissing ? "Restore the scene patch file or click Keep editor version before saving."
                 : "The scene patch file needs repair. Resolve the issue before saving.";
-            return outstanding.Count == 0 ? reason : String.Join(", ", outstanding.Select(PatchEditingSession.DisplayItem)) + ". " +
-                (reason ?? "Click Save to write these changes.");
+            if (outstanding.Count == 0) return reason ?? "There are no changes to save.";
+            var writes = PatchEditingSession.OutstandingWriteList(outstanding);
+            return reason == null ? "Click Save to write changes to the " + writes + "."
+                : "Changes to the " + writes + " still need saving. " + reason;
         }
         // The left band's fixed widths in canvas units: the Refresh button as the game lays it out (74.15 measured), the
         // spacing between the band's items, a lamp's dot and the gap to its word, and the width each lamp reserves for
@@ -54,9 +56,8 @@ namespace RailroaderScenePatcher {
         // Whether a left band of this width holds Refresh and both lamps with their words. When it does not, each lamp
         // keeps its dot and its word moves into the tooltip.
         internal static bool WordsFit(float band) => LeftBandWidth <= band + 0.5f;
-        // The tooltip of a lamp: its title is the state word, and its text starts with that word, so a lamp without its
-        // word still says it.
-        internal static string LampTooltip(Lamp lamp, string reason) => String.IsNullOrEmpty(reason) ? lamp.Word + "." : lamp.Word + ": " + Char.ToUpperInvariant(reason[0]) + reason.Substring(1);
+        // The title also identifies a lamp when only its dot fits in the command band.
+        internal static (string Title, string Body) LampTooltip(Lamp lamp, string reason) => (lamp.Word, Sentence(reason));
         // Why a command of the right band is disabled now, or null. A disabled command stays in place. Select in world
         // is disabled only while a world choice is pending, Focus and Copy ID only when nothing is inspected; a world
         // selection that could not be set up at all has nothing to start.

@@ -480,7 +480,9 @@ static class PatchEditingTests {
         var w = new World();
         w.MapEditor.NativeEdit(1); w.Session.Edit(P, PlacementAt(112), null);
         Assert(w.Session.Outstanding(w.MapEditor.NativeDirty).SequenceEqual(new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata }), "This mod's modification needs native data, scene patch file and dependency metadata");
-        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: map data, scene patch file, patcher dependency.", "The exit warning uses lowercase labels for all three writes.");
+        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Changes to the map data, scene patch file, and patcher dependency are still unsaved.", "The outstanding-work warning names all three writes.");
+        Assert(w.Session.ExitPrompt(w.MapEditor.NativeDirty) == "Exit the Map Editor? Exit discards unsaved changes to the map data, scene patch file, and patcher dependency.",
+            "The Exit prompt names all three outstanding writes in the discard sentence.");
         Assert(w.MapEditor.Save() == null && w.MapEditor.NativeWrites == 1 && w.Store.PatchWrites == 1 && w.Store.InfoWrites == 1, "One Save writes all three participants");
         Assert(Required(w).SequenceEqual(new[] { "rr/game >=0.6.2", "crankyant/scene-patcher >=0.1.0" }) && (string)JObject.Parse(w.Store.Info)["version"] == "1.0.0", "The dependency is added without disturbing other metadata");
         Assert(w.Session.LastSave.Outstanding.Count == 0 && w.Session.LastSave.Completed.Count == 3 && !w.MapEditor.IsDirty && w.Box.X == 12, "A complete Save reports clean and leaves the world as edited");
@@ -788,10 +790,15 @@ static class PatchEditingTests {
     static void ExitIdentifiesOutstandingWork() {
         var w = new World();
         Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == null, "A clean native map editor has no exit warning");
+        Assert(w.Session.ExitPrompt(w.MapEditor.NativeDirty) == null, "A clean Map Editor has no Exit prompt");
         w.Session.Edit(P, PlacementAt(112), null); w.MapEditor.FailNative = true; w.MapEditor.Save();
-        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: map data.", "After a partial Save the exit warning names the outstanding native work");
+        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Changes to the map data are still unsaved.", "After a partial Save the warning names the outstanding map data");
+        Assert(w.Session.ExitPrompt(w.MapEditor.NativeDirty) == "Exit the Map Editor? Exit discards unsaved changes to the map data.",
+            "The Exit prompt names the one outstanding write after a partial Save.");
         w.MapEditor.FailNative = false; w.MapEditor.Save(); w.Session.Edit(P, PlacementAt(120), null);
-        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: map data, scene patch file.", "The exit warning names outstanding native and patcher work");
+        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Changes to the map data and scene patch file are still unsaved.", "The warning names outstanding native and patcher work");
+        Assert(w.Session.ExitPrompt(w.MapEditor.NativeDirty) == "Exit the Map Editor? Exit discards unsaved changes to the map data and scene patch file.",
+            "The Exit prompt joins two outstanding writes with and.");
     }
     static void NumericEditReachesWorldAndScenePatchFile() {
         var w = new World();

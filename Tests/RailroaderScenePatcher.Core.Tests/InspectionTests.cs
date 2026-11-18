@@ -273,21 +273,21 @@ static class InspectionTests {
         scene.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
         var inventory = new SceneInventory(scene);
         var notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
-        Check(notice == "not yet scanned. Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
+        Check(notice == "not yet scanned. Click Refresh to update the object list. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
         inventory.Refresh();
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, false);
         Check(notice == "The object list is up to date. You can inspect objects and start edits.", "A current inventory with current definitions is a snapshot: " + notice);
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
-        Check(notice == "the supplied definitions changed or were not read. Refresh before relying on these observations." && inventory.Pin(inventory.Entries.Single()) != null,
+        Check(notice == "the supplied definitions changed or were not read. Click Refresh to update the object list." && inventory.Pin(inventory.Entries.Single()) != null,
             "Changed definitions alone are named as stale without a refusal the pin does not make: " + notice);
         box.X = 8; inventory.CheckFreshness();
         foreach (var definitionsStale in new[] { false, true }) {
             notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, definitionsStale);
-            Check(notice == "p changed (position). Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
+            Check(notice == "p changed (position). Click Refresh to update the object list. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
                 "A stale inventory names its own reason and the refusal, whatever the definitions: " + notice);
         }
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(null, false);
-        Check(notice == "inspection is unavailable. Refresh before relying on these observations. " + refused, "A missing inventory refuses edits and says so: " + notice);
+        Check(notice == "inspection is unavailable. Click Refresh to update the object list. " + refused, "A missing inventory refuses edits and says so: " + notice);
     }
 
     // Every edit that is refused or ignored names its reason for the panel and the log.

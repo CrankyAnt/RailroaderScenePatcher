@@ -14,12 +14,26 @@ namespace RailroaderScenePatcher {
     // controlled replay.
     internal sealed class EditFeedback {
         // What the message area shows first. A version choice is never one of them: it stands in the file panel.
-        internal enum PrimaryMessage { None, BackupDiagnosis, Working, WorldChoice }
+        internal enum PrimaryMessage { None, BackupDiagnosis, Working, WorldChoice, ConfirmedChoice, Reported }
         internal static PrimaryMessage Primary(PatchEditingSession session, bool working, bool worldChoice) =>
-            Primary(session?.LastBackup != null && session.VersionMessage != null && session.ScenePatchFileDiagnostics.Count != 0, working, worldChoice);
+            Primary(HasBackupNotice(session), working, worldChoice);
         internal static PrimaryMessage Primary(bool backupDiagnosis, bool working, bool worldChoice) =>
             working ? PrimaryMessage.Working
             : worldChoice ? PrimaryMessage.WorldChoice : backupDiagnosis ? PrimaryMessage.BackupDiagnosis : PrimaryMessage.None;
+        internal static bool HasBackupNotice(PatchEditingSession session) =>
+            session?.LastBackup != null && session.VersionMessage != null && session.ScenePatchFileDiagnostics.Count != 0;
+        long messageOrder, confirmedAt;
+        string backupAtConfirmation;
+        internal void ChoiceConfirmed(PatchEditingSession session) {
+            confirmedAt = messageOrder;
+            backupAtConfirmation = session?.LastBackup;
+        }
+        internal PrimaryMessage Primary(PatchEditingSession session, bool working, bool worldChoice, bool confirmedChoice) {
+            var primary = Primary(session, working, worldChoice);
+            if (!confirmedChoice || working || worldChoice) return primary;
+            if (primary == PrimaryMessage.BackupDiagnosis && session.LastBackup != backupAtConfirmation) return primary;
+            return messages.Count != 0 && messages[0].Order > confirmedAt ? PrimaryMessage.Reported : PrimaryMessage.ConfirmedChoice;
+        }
         internal static string BackupNotice(PatchEditingSession session) =>
             "The original file is backed up at " + session.LastBackup + ". " + session.VersionMessage;
 
@@ -27,6 +41,7 @@ namespace RailroaderScenePatcher {
         internal sealed class Message {
             internal string Source { get; }
             internal string Text { get; }
+            internal long Order { get; }
             // A consequence that follows a result by itself, such as terrain output after an edit, not the result of an
             // action the user selected.
             internal bool FollowUp { get; }
@@ -36,14 +51,16 @@ namespace RailroaderScenePatcher {
             internal bool Kept { get; }
             // The correction guidance of a failed action, with the guide of its operation, or null.
             internal Recovery Recovery { get; set; }
-            internal Message(string source, string text, bool followUp = false, bool general = false, bool kept = false) { Source = source; Text = text; FollowUp = followUp; General = general; Kept = kept; }
+            internal Message(string source, string text, long order, bool followUp, bool general, bool kept) {
+                Source = source; Text = text; Order = order; FollowUp = followUp; General = general; Kept = kept;
+            }
         }
         // The guidance of the newest failed action still shown, or null. It goes with its message.
         internal Recovery Recovery => messages.Select(m => m.Recovery).FirstOrDefault(r => r != null);
         // The places whose actions are the same on every tab, such as the footer's Remove modification and Recheck.
         // Every other place belongs to the tab and mode its result was reported in.
         internal readonly System.Collections.Generic.HashSet<string> GeneralPlaces = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
-        Message New(string place, string message, bool followUp) => new Message(place, message ?? "", followUp, GeneralPlaces.Contains(place), ReferenceEquals(inspected, released));
+        Message New(string place, string message, bool followUp) => new Message(place, message ?? "", ++messageOrder, followUp, GeneralPlaces.Contains(place), ReferenceEquals(inspected, released));
         readonly System.Collections.Generic.List<Message> messages = new System.Collections.Generic.List<Message>();
         // The newest message first, which is the order the message area shows them in: the result of the last action
         // and, above it, the latest follow-up of that action, such as its terrain output.

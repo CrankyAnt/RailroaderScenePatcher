@@ -19,7 +19,7 @@ After you click a candidate, the footer shows it on a blue `Object <n>: …` lin
 
 ## Choose between overlapping markings
 
-A numbered choice list opens beside the pointer when two or more `+` markers are closer than half a marker and a click cannot distinguish them. The footer says `N objects. Choose an item from the list next to the pointer.` Each row starts with the name that distinguishes its candidate. Select a row to make that object the candidate.
+A numbered choice list opens beside the pointer when two or more `+` markers are closer than half a marker and a click cannot distinguish them. The footer says `N objects. Select a row from the list next to the pointer.` Each row starts with the name that distinguishes its candidate. Select a row to make that object the candidate.
 
 The row under the pointer has a blue background. Hover over a row or the candidate's `+` to see its blue world marking. A track shows a ribbon; an object shows a box. Press **Escape** to close the choice list and leave the world choice open so you can click elsewhere. You can navigate the world while the list is open.
 
@@ -78,6 +78,8 @@ At 125 meters or less, each object has its own square marker and object frame an
 Beyond 125 meters, only the group appears, with one square marker and one object frame around its visible objects. Its square marker contains a small hollow square rather than the `+` used for an object or part. Its object frame is one box, turned with the crossing or group root and cut off at the ground like an object's frame. The square marker stays at the center of this box as you zoom and turn the camera. The object frame appears within 500 meters; beyond that, only the square marker remains. A setup with just one inventory object appears as that object.
 
 Beyond 125 meters, click the group's square marker or object frame to open a choice list beside the pointer. The object frame turns blue wherever a click would select the group. The list contains the group's objects, excluding a grade-crossing setup's detection spans. If the group's square marker overlaps other markers at the pointer, those objects appear in the same list.
+
+When you select a single grade-crossing setup and the list contains only its objects, the footer says `N objects in this crossing setup. Select a row from the list next to the pointer.`
 
 Select a row to make that object the candidate, then click **Confirm** to inspect it. The candidate has its own blue square marker and object frame. The inspected object has its own gold square marker and object frame. The rest of the group keeps its shared marking. Opening, using or closing the choice list changes no scene objects, scene patch data or completed edits. You can still navigate the world while it is open.
 

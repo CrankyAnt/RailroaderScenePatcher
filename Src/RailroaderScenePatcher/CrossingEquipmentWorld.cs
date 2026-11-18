@@ -16,7 +16,19 @@ namespace RailroaderScenePatcher {
         internal string Scope, Id, Pattern, SourceScene, SourcePath, SourceDefinition;
         internal GameObject Controller, Copy;
         internal bool Retired;
-        internal string DisplayName => Copy != null ? Copy.name + " (added)" : "Added light or gate";
+        (string Scope, string Id, string CopyName, bool IsBell) NameParts =>
+            (Scope, Id, Copy != null ? Copy.name : null, Pattern == EquipmentAddition.BellPattern);
+        internal string DisplayName {
+            get {
+                var equipment = NameParts;
+                if (Controller == null)
+                    return InventoryPresentationState.AddedEquipmentName(equipment, Array.Empty<(string, string, string, bool)>());
+                var siblings = At(Controller).Select(item => item.NameParts);
+                return InventoryPresentationState.AddedEquipmentName(equipment, siblings);
+            }
+        }
+        internal static IEnumerable<OwnedEquipment> At(GameObject controller) => Enumerable.Range(0, controller.transform.childCount)
+            .Select(i => controller.transform.GetChild(i).GetComponent<OwnedEquipment>()).Where(owned => owned != null && !owned.Retired);
         // The addition this object belongs to, or null.
         internal static OwnedEquipment Of(GameObject go) {
             for (var t = go == null ? null : go.transform; t != null; t = t.parent) { var owned = t.GetComponent<OwnedEquipment>(); if (owned != null) return owned; }
@@ -176,10 +188,7 @@ namespace RailroaderScenePatcher {
         }
         // The names of the objects that enclose a transform, from its parent upwards.
         static IReadOnlyList<string> Ancestors(Transform t) { var names = new List<string>(); for (var p = t.parent; p != null; p = p.parent) names.Add(p.name); return names; }
-        public IReadOnlyList<object> Owned(object target) {
-            var go = (GameObject)target;
-            return Enumerable.Range(0, go.transform.childCount).Select(i => go.transform.GetChild(i).GetComponent<OwnedEquipment>()).Where(o => o != null && !o.Retired).Cast<object>().ToArray();
-        }
+        public IReadOnlyList<object> Owned(object target) => OwnedEquipment.At((GameObject)target).Cast<object>().ToArray();
         public EquipmentAddition Describe(object addition) {
             var owned = (OwnedEquipment)addition;
             var source = owned.SourceDefinition != null ? EquipmentSource.ForDefinition(owned.SourceDefinition) : new EquipmentSource(owned.SourceScene, owned.SourcePath);

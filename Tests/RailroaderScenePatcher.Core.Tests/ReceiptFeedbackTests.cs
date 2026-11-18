@@ -76,10 +76,25 @@ static class ReceiptPriorityTests {
             throw new Exception("Backup diagnosis remains visible while idle");
         var store = new BackupStore { Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}" };
         var session = new PatchEditingSession(new PatchEngine(new Scene()), new NativeMapEditor(), store);
+        var feedback = new EditFeedback();
+        feedback.ChoiceConfirmed(session);
         store.Patch = "{\n broken";
         session.CheckFileVersion();
         if (!session.KeepEditorVersion().Applied || EditFeedback.Primary(session, false, false) != EditFeedback.PrimaryMessage.BackupDiagnosis)
             throw new Exception("A repair backup reports its diagnosis until Save");
+        if (feedback.Primary(session, false, false, true) != EditFeedback.PrimaryMessage.BackupDiagnosis)
+            throw new Exception("A newer repair backup replaces the confirmation in the first footer slot");
+        feedback.Report("Placement", "Previous result.");
+        feedback.ChoiceConfirmed(session);
+        if (feedback.Primary(session, false, false, true) != EditFeedback.PrimaryMessage.ConfirmedChoice)
+            throw new Exception("A confirmed choice appears above an older result and repair backup");
+        if (feedback.Primary(session, true, false, true) != EditFeedback.PrimaryMessage.Working)
+            throw new Exception("A request in progress remains visible above a confirmation");
+        feedback.Report("Placement", "New result.");
+        if (feedback.Primary(session, false, false, true) != EditFeedback.PrimaryMessage.Reported)
+            throw new Exception("A newer result replaces the confirmation in the first footer slot");
+        if (feedback.Primary(session, false, false, false) != EditFeedback.PrimaryMessage.BackupDiagnosis)
+            throw new Exception("A released choice leaves the backup available in the footer");
         var diagnosis = session.ScenePatchFileDiagnostics[0];
         var notice = EditFeedback.BackupNotice(session);
         if (notice != "The original file is backed up at Data/scene-patches.json.backup-test. Scene Patcher will not change the backup. Delete it when you no longer need it. It will be published with the mod while it remains there."

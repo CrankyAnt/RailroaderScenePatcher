@@ -32,6 +32,8 @@ static class ReloadDecisionTests {
     internal static void Run() {
         KeepEditorPreservesUnknownNumber();
         FileVersionUpdatesPlacement();
+        ReloadPromptDescribesChoicesInOrder();
+        ReloadPromptReportsWhenAllWorkIsSaved();
         ReloadRequiresAnExplicitDecision();
         ReloadSaveFailureKeepsOutstandingWork();
         ReloadFeedbackFollowsActualSessionState();
@@ -65,8 +67,9 @@ static class ReloadDecisionTests {
         var w = new World();
         w.Store.Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{},\"extra\":true}";
         w.Session.CheckFileVersion();
-        Assert(w.Session.ReloadWarning(false)?.Contains("choose a version") == true,
-            "A pending file choice is named in the reload prompt even when no edits are dirty");
+        var prompt = w.Session.ReloadPrompt(false);
+        Assert(prompt.Contains("choose a version") && prompt.Contains("Resolve the scene patch file version choice before saving.")
+            && !prompt.Contains("Save and Reload"), "The reload prompt explains the pending version choice when Save is unavailable");
         var saves = 0; var reloads = 0;
         var message = w.Session.Reload(ReloadChoice.Save, () => false, () => saves++, () => reloads++);
         Assert(message != null && saves == 0 && reloads == 0,
@@ -84,12 +87,29 @@ static class ReloadDecisionTests {
         Assert(w.Session.Reload(ReloadChoice.Discard, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++) == null
             && reloads == 2 && w.Store.PatchWrites == writes && w.MapEditor.IsDirty, "Deliberate discard enters the reload route without saving");
     }
+    static void ReloadPromptDescribesChoicesInOrder() {
+        const string initial = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}";
+        var w = new World(initial);
+        w.Session.Edit(P, PlacementAt(112), null); w.MapEditor.NativeEdit(7);
+        Assert(w.Session.ReloadPrompt(w.MapEditor.NativeDirty) ==
+            "Reload the Map Editor? Reloading ends the Map Editor's Undo and Redo history. "
+            + "Save and Reload saves changes to the map data and scene patch file before reloading. "
+            + "Discard and Reload discards unsaved changes to the map data and scene patch file. "
+            + "Cancel keeps the Map Editor open. Your working location is restored when available.",
+            "The reload confirmation explains Save, Discard, and Cancel in order and names the same unsaved work for both reload choices.");
+    }
+    static void ReloadPromptReportsWhenAllWorkIsSaved() {
+        var w = new World();
+        var prompt = w.Session.ReloadPrompt(w.MapEditor.NativeDirty);
+        Assert(prompt.Contains("All required work is saved.") && prompt.Contains("Save and Reload saves changes to the map data and scene patch file before reloading.")
+            && !prompt.Contains("discards unsaved changes"), "The reload confirmation reports the saved state without warning about unsaved changes");
+    }
     static void ReloadSaveFailureKeepsOutstandingWork() {
         var w = new World(); var reloads = 0;
         w.Session.Edit(P, PlacementAt(112), null); w.MapEditor.NativeEdit(7);
         w.MapEditor.FailNative = true;
         var message = w.Session.Reload(ReloadChoice.Save, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++);
-        Assert(message.Contains("Unsaved work: map data.") && message.Contains("native write injected") && reloads == 0
+        Assert(message.Contains("Changes to the map data are still unsaved.") && message.Contains("native write injected") && reloads == 0
             && w.Store.PatchWrites == 1 && w.MapEditor.IsDirty && w.Box.X == 12 && w.MapEditor.NativeValue == 7,
             "A partial Save blocks reload and names completed and outstanding writes and the failure");
         Assert(w.Session.Reload(ReloadChoice.Cancel, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++) == null

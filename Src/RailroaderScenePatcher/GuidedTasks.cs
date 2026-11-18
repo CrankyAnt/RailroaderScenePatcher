@@ -16,6 +16,7 @@ namespace RailroaderScenePatcher {
         double[] guidedPlacement;
         SnapRequest guidedSnap;
         string guidedInspectorTab;
+        ConfirmedSelection choiceBeforeGuided;
         const string GuidedPlace = "Guided task";
         const string GuidedRecovery = "Click Target to discard the draft. Click Refresh, then inspect the object and start again.";
         const string GuidedValuesRecovery = "Click Back to correct the values or click Target to start again.";
@@ -31,6 +32,7 @@ namespace RailroaderScenePatcher {
         void OpenGuided() {
             if (guided.Enabled) return;
             guidedInspectorTab = inspectorTab.Value;
+            choiceBeforeGuided = selection?.Confirmed;
             CancelGizmo(); ClearSnap();
             if (selection?.Pending != null) CancelSelection();
             CancelRequest("you switched to Guided before the action could run");
@@ -39,18 +41,27 @@ namespace RailroaderScenePatcher {
         }
         void CancelGuided() {
             if (guidedInspectorTab != null) {
+                if (!ReferenceEquals(selection?.Confirmed, choiceBeforeGuided)) ReleaseGuidedChoice();
+                else if (selection?.Pending != null) CancelSelection();
+                else ClearSnap();
                 inspectorTab.Value = guidedInspectorTab;
                 feedback.View(InspectorFeedbackView(), preserve: true);
             }
             guidedInspectorTab = null;
+            choiceBeforeGuided = null;
             guided.Cancel(); guidedInspection = null; guidedSnap = null;
             guidedFields = guidedBefore = Array.Empty<string>(); guidedPlacement = null;
         }
         void LeaveGuided() {
             if (!guided.Enabled) return;
             CancelRequest("you cancelled the guided task before the action could run");
+            CancelGuided(); ReadPlacement();
+        }
+        void ReleaseGuidedChoice() {
             if (selection?.Pending != null) CancelSelection();
-            ClearSnap(); CancelGuided(); ReadPlacement();
+            selection?.Consume();
+            ClearSnap();
+            pickedTrackLocation = null; pickedTrackSelection = null;
         }
         static string GuidedName(GuidedTaskKind kind) {
             switch (kind) {
@@ -240,8 +251,7 @@ namespace RailroaderScenePatcher {
         }
         void GuidedTarget() {
             CancelRequest("you released the task's target before the action could run");
-            if (selection?.Pending != null) CancelSelection();
-            ClearSnap(); guided.Open(); guidedInspection = null; guidedSnap = null;
+            ReleaseGuidedChoice(); guided.Open(); guidedInspection = null; guidedSnap = null;
             feedback.View(GuidedFeedbackView());
             guidedFields = guidedBefore = Array.Empty<string>(); guidedPlacement = null;
         }

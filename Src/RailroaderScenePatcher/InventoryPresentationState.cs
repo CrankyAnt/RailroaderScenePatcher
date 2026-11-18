@@ -43,6 +43,18 @@ namespace RailroaderScenePatcher {
         // Baked scenery parts include their group; other objects use their observed visible name.
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
+        // The supplying scope and addition ID keep the order independent of the scene and outliner order.
+        internal static string AddedEquipmentName((string Scope, string Id, string CopyName, bool IsBell) equipment,
+            IEnumerable<(string Scope, string Id, string CopyName, bool IsBell)> crossingEquipment) {
+            if (equipment.CopyName == null) return "Added light or gate";
+            var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.CopyName == equipment.CopyName)
+                .OrderBy(item => item.Scope, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray();
+            var ordinal = Array.IndexOf(matches, equipment) + 1;
+            return matches.Length > 1 && ordinal > 0
+                ? FormattableString.Invariant($"{equipment.CopyName} (added, {ordinal} of {matches.Length})")
+                : equipment.CopyName + " (added)";
+        }
+
         // The group of the objects that are inspection only: outside the family groups, after them, and absent while
         // it holds no entry.
         internal const string InspectionOnlyGroup = "Inspection only";
@@ -191,7 +203,7 @@ namespace RailroaderScenePatcher {
             if (inventory != null && !inventory.IsStale && !definitionsStale) return "The object list is up to date. You can inspect objects and start edits.";
             var refuses = inventory == null || inventory.IsStale;
             return (inventory == null ? "inspection is unavailable" : inventory.IsStale ? inventory.StaleReason : "the supplied definitions changed or were not read") +
-                ". Refresh before relying on these observations." + (refuses ? " Edits are refused until then." : "");
+                ". Click Refresh to update the object list." + (refuses ? " Edits are refused until then." : "");
         }
 
         // A row of the current snapshot can be inspected, also while the snapshot is stale: only edits need a fresh

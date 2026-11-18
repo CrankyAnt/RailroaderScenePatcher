@@ -157,6 +157,11 @@ namespace RailroaderScenePatcher.Core {
         public const string NativeData = "native map data", PatchData = "scene patch file", Metadata = "dependency metadata";
 
         public static string DisplayItem(string item) => item == NativeData ? "map data" : item == Metadata ? "patcher dependency" : item;
+        public static string OutstandingWriteList(IReadOnlyList<string> outstanding) {
+            if (outstanding.Count < 2) return String.Join("", outstanding.Select(DisplayItem));
+            var conjunction = outstanding.Count == 2 ? " and " : ", and ";
+            return String.Join(", ", outstanding.Take(outstanding.Count - 1).Select(DisplayItem)) + conjunction + DisplayItem(outstanding[outstanding.Count - 1]);
+        }
         readonly PatchEngine engine;
         readonly IScene scene;
         readonly INativeHistory history;
@@ -1246,11 +1251,11 @@ namespace RailroaderScenePatcher.Core {
             return result;
         }
         public bool IsDirty(bool nativeDirty) { return Outstanding(nativeDirty).Count != 0; }
-        // Text for the exit confirmation, or null when nothing is outstanding.
+        // Work a failed Save leaves outstanding, or null when every write is complete.
         public string ExitWarning(bool nativeDirty) {
             var outstanding = Outstanding(nativeDirty);
             if (outstanding.Count == 0) return null;
-            return "Unsaved work: " + String.Join(", ", outstanding.Select(DisplayItem)) + "." + (IncompleteOperation == null ? "" : " " + IncompleteOperation);
+            return "Changes to the " + OutstandingWriteList(outstanding) + " are still unsaved." + (IncompleteOperation == null ? "" : " " + IncompleteOperation);
         }
 
         // Why Save is refused now, or null: the file is checked again first, so a pending version choice, a file that needs

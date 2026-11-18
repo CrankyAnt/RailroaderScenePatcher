@@ -7,17 +7,38 @@ namespace RailroaderScenePatcher.Core {
     public enum ReloadChoice { Cancel, Save, Discard }
 
     public sealed partial class PatchEditingSession {
-        public string ReloadWarning(bool nativeDirty) {
-            var warning = ExitWarning(nativeDirty);
-            return CanSaveForReload ? warning : String.IsNullOrEmpty(warning) ? SaveRefusal : warning + " " + SaveRefusal;
+        public string ReloadPrompt(bool nativeDirty) {
+            var warning = ReloadWarning(nativeDirty, out var changes) ?? "All required work is saved.";
+            string choices;
+            if (!CanSaveForReload) choices = warning + " Resolve the scene patch file version choice before saving.";
+            else {
+                var save = "Save and Reload saves changes to the " + (changes ?? "map data and scene patch file") + " before reloading.";
+                choices = changes == null ? warning + " " + save : save + " " + warning;
+            }
+            return "Reload the Map Editor? Reloading ends the Map Editor's Undo and Redo history. "
+                + choices
+                + " Cancel keeps the Map Editor open. Your working location is restored when available.";
+        }
+        public string ReloadWarning(bool nativeDirty) => ReloadWarning(nativeDirty, out _);
+        string ReloadWarning(bool nativeDirty, out string changes) {
+            var outstanding = Outstanding(nativeDirty);
+            changes = outstanding.Count == 0 ? null : OutstandingWriteList(outstanding);
+            if (changes == null) return SaveRefusal;
+            var warning = "Discard and Reload discards unsaved changes to the " + changes + ".";
+            if (IncompleteOperation != null) warning += " " + IncompleteOperation;
+            if (SaveRefusal != null) warning += " " + SaveRefusal;
+            return warning;
         }
         public string ExitPrompt(bool nativeDirty) {
-            var warning = ExitWarning(nativeDirty);
-            if (warning == null && CanSaveForReload) return null;
+            var outstanding = Outstanding(nativeDirty);
+            var unsaved = outstanding.Count != 0;
+            if (!unsaved && CanSaveForReload) return null;
+            var incomplete = unsaved && IncompleteOperation != null ? " " + ScenePatchFile.Sentence(IncompleteOperation) + "." : "";
             var pending = VersionState == FileVersionState.Changed ? " A file version choice is still pending."
                 : VersionState == FileVersionState.Repair ? " The scene patch file still needs repair." : "";
-            return "Exit the Map Editor?" + (warning == null ? "" : " " + ScenePatchFile.Sentence(warning) + ".")
-                + pending + " Exit discards unsaved work.";
+            var consequence = unsaved ? " Exit discards unsaved changes to the " + OutstandingWriteList(outstanding) + "."
+                : " Exit discards unsaved work.";
+            return "Exit the Map Editor?" + incomplete + pending + consequence;
         }
         // Live scene edits and outside file choices need no reload. An unrecovered native
         // history cannot resume recording coherent edits until the native map editor is reloaded.

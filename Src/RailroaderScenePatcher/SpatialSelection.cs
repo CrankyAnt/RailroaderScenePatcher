@@ -253,14 +253,14 @@ namespace RailroaderScenePatcher {
                 return;
             }
             var current = Offered(Pending.Kind, inspectOnly);
-            var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered, Pending.Candidate, out var listRow);
+            var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered, Pending.Candidate, out var listRow, out var isCrossingSetup);
             if (listRow && hits.Length == 1) {
                 var offered = Pending.Offers.FirstOrDefault(offer => offer.Matches(hits[0]));
                 if (offered != null) { Pending.Choose(offered); return; }
             }
             candidates = current;
             lastPointer = pointer;
-            Pending.Offer(hits);
+            Pending.Offer(hits, isCrossingSetup);
         }
         // The pointer of the last click that offered candidates, in GUI coordinates.
         Vector2? lastPointer;

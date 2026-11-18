@@ -226,10 +226,10 @@ namespace RailroaderScenePatcher {
                         // The word has no frame and no action. Its rectangle is as wide as the lamp's longer word, so
                         // the other word takes its place without moving anything; a word never wraps or is cut off.
                         parts.AddLabel(Tint(lamps[index].Color, lamps[index].Word)).TextWrap(TextOverflowModes.Overflow, TextWrappingModes.NoWrap)
-                            .Width(reserved[index]).Height(RowHeight).Tooltip(lamps[index].Word, tooltip);
+                            .Width(reserved[index]).Height(RowHeight).Tooltip(tooltip.Title, tooltip.Body);
                     });
                     // The tooltip sits on the dot and on the word themselves, the objects the pointer rests on.
-                    AddLampDot(lamp, lamps[i].Color).Tooltip(lamps[i].Word, tooltip);
+                    AddLampDot(lamp, lamps[i].Color).Tooltip(tooltip.Title, tooltip.Body);
                     lamp.ChildrenKeepHeight().Height(RowHeight);
                     // A lamp keeps its own width, so a row that is short of room cannot pull it towards Refresh.
                     if (fit) { var own = lamp.GetComponent<LayoutElement>() ?? lamp.gameObject.AddComponent<LayoutElement>(); own.minWidth = own.preferredWidth = index == 0 ? CommandBand.InventoryLamp : CommandBand.SaveLamp; own.flexibleWidth = 0; }
@@ -373,7 +373,7 @@ namespace RailroaderScenePatcher {
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
                     var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + group.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(group.Key));
-                    var repeated = new HashSet<string>(group.Value.GroupBy(ObjectName).Where(names => names.Count() > 1).Select(names => names.Key));
+                    var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
                     // A family whose objects the game itself tells apart shows them under subgroups; a family group
                     // only, never the Inspection only group.
                     var subgroups = groupKey.StartsWith("family:", StringComparison.Ordinal) ? InventoryPresentationState.Subgroups(group.Value) : null;
@@ -395,7 +395,7 @@ namespace RailroaderScenePatcher {
                             // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
                             if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; foreach (var open in above) state.SetExpanded(open, true); }
                         }
-                        var name = ObjectName(item);
+                        var name = InventoryPresentationState.Name(item);
                         var changed = IsChanged(item); var added = IsAdded(item);
                         // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so
                         // that they stay visible when the end of a long name is cut off; they take room only on a row
@@ -463,7 +463,7 @@ namespace RailroaderScenePatcher {
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
-            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(ObjectName(row)).x).ToArray();
+            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
             var divider = NativePresentation.DividerWidth + 26;
             outlinerWidth = InventoryPresentationState.FitWidth(widths, RowDecoration, presentation.ContentWidth, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
             StoreOutlinerWidth(outlinerWidth);
@@ -531,15 +531,9 @@ namespace RailroaderScenePatcher {
             modes.AddSegment("Inspector", !guided.Enabled, presentation.Action(LeaveGuided));
             modes.AddSegment("Guided", guided.Enabled, presentation.Action(OpenGuided));
         }, true);
-        // Added equipment keeps its stored wrapper name and identity. Only its visible name comes from the copy.
-        static string ObjectName(SceneObservation item) {
-            var go = item.Handle as GameObject;
-            var owned = go != null ? go.GetComponent<OwnedEquipment>() : null;
-            return owned == null ? InventoryPresentationState.Name(item) : owned.DisplayName;
-        }
         // One line under the name: the family and the object's states, in the native status colors.
         string StateLine(out string plain) {
-            if (selected == null) { plain = "Use the outliner or Select in world."; return plain; }
+            if (selected == null) { plain = "Select a row or click Select in world."; return plain; }
             var parts = new List<string> { Literal(selected.Family) };
             var text = new List<string> { selected.Family };
             if (!selected.Active) { parts.Add("Inactive"); text.Add("Inactive"); }
@@ -1042,8 +1036,10 @@ namespace RailroaderScenePatcher {
             string source = null, state = "";
             if (pending == null) candidateDetails = false;
             var session = attachment?.Session;
+            var confirmation = selection?.Confirmed;
+            var confirmedForInspected = selected != null && confirmation?.Source != null && confirmation.Source.Equals(SelectionIdentity.SceneObject(selected.Identity));
             // The message area holds no version choice: that stands in the file panel.
-            var primary = EditFeedback.Primary(session, Requests.Place != null, pending != null);
+            var primary = feedback.Primary(session, Requests.Place != null, pending != null, confirmedForInspected);
             if (primary == EditFeedback.PrimaryMessage.Working) { source = Requests.Place; state = "Working..."; }
             else if (primary == EditFeedback.PrimaryMessage.WorldChoice) {
                 var candidate = selection.Find(pending.Candidate);
@@ -1051,7 +1047,7 @@ namespace RailroaderScenePatcher {
                 // A short purpose with the count on the first line, the candidate on its own line.
                 var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
                 // The choice takes the world's clicks: the native map editor does not select or drag until it ends.
-                state = (pending.ListOpen ? Tint(Blue, pending.Offers.Count + (pending.Kind == SelectionKind.SceneObject ? " objects. " : " candidates. ")) + Literal(PendingSelection.SeveralOffers) : Literal(purpose + " in the world.")) +
+                state = (pending.ListOpen ? Tint(Blue, pending.OfferCountText + " ") + Literal(pending.OfferListInstruction) : Literal(purpose + " in the world.")) +
                     (pending.InspectOnly ? "" : Literal(" Map Editor selection is paused. Click Cancel to resume it.")) +
                     (pending.Problem == null || pending.Problem == PendingSelection.SeveralOffers ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
                     (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
@@ -1063,22 +1059,30 @@ namespace RailroaderScenePatcher {
                 source = RecoveryPlace; state = Literal(EditFeedback.BackupNotice(session));
             } else if (gizmo?.Active == true) { source = GizmoPlace; state = Literal(gizmo.State); }
             else if (selectionProblem != null) { source = "World choice"; state = Tint(Red, selectionProblem); }
-            else if (preparedSnap != null && guided.Enabled && guided.Step == GuidedTaskStep.Values) { source = SnapPlace; state = "Click Next to review the snap."; }
+            else if (primary == EditFeedback.PrimaryMessage.Reported) { state = null; } // The newest result leads the list below.
             // A confirmed target belongs to the object it was chosen for; another object does not show it.
-            else if (selected != null && selection?.Confirmed is ConfirmedSelection confirmed && confirmed.Source != null && confirmed.Source.Equals(SelectionIdentity.SceneObject(selected.Identity))) {
-                source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmed.Identity.ToString()));
+            else if (primary == EditFeedback.PrimaryMessage.ConfirmedChoice) {
+                source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmation.Identity.ToString()));
             } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
             else if (feedback.Recovery?.Kind != FailureKind.IncompleteCleanup && feedback.Recovery?.Kind != FailureKind.Blocked && CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
             // The area has a fixed height, so nothing outside it moves, and its entries stack from the top without gaps:
-            // first what the window waits for now, then the messages, newest first, the older ones dimmed. Each names
-            // the action group it came from. The area is a native scroll view: its content takes the height of its
+            // the current state or newest result first, then the guided hint and the remaining results. Older results
+            // are dimmed. Each names its action group. The area is a native scroll view: its content takes the height of its
             // entries, so an entry that wraps has its wrapped height, and its viewport cuts off what does not fit. A
             // stack of fixed height would instead squeeze its entries below their text, and the text would overprint.
             // What lies below the area's edge is reached by scrolling.
             var messages = feedback.Messages;
             var messageArea = presentation.Scroll(builder, MessageHeight, lines => {
+                var firstReport = 0;
                 if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
-                for (var i = 0; i < messages.Count; i++) {
+                else if (messages.Count != 0) { ReportSlot(0); firstReport = 1; }
+                if (preparedSnap != null && guided.Enabled && guided.Step == GuidedTaskStep.Values)
+                    MessageSlot(lines, GuidedPlace, "Click Next to review the snap.", false);
+                for (var i = firstReport; i < messages.Count; i++) ReportSlot(i);
+                if ((primary == EditFeedback.PrimaryMessage.ConfirmedChoice || primary == EditFeedback.PrimaryMessage.Reported) && EditFeedback.HasBackupNotice(session))
+                    MessageSlot(lines, RecoveryPlace, Literal(EditFeedback.BackupNotice(session)), true);
+
+                void ReportSlot(int i) {
                     var message = messages[i]; var older = i > 0;
                     // A failed action's message takes its colour from its failure kind; any other result from its words.
                     var tone = message.Recovery != null ? (CommandBand.RecoveryWarning(message.Recovery.Kind) ? Amber : Red) : ToneOf(message.Text);
@@ -1377,7 +1381,7 @@ namespace RailroaderScenePatcher {
                 }
                 case ChangesTab: {
                     // Retry belongs to terrain output: an object without it has no action on this tab.
-                    if (selected != null && !HasTerrain) return new Act[0];
+                    if (!HasTerrain) return new Act[0];
                     var idle = block;
                     if (idle == null) { var output = inspectedOutput.Of(attachment.Session, selected, out _); if (output.Outstanding.Count == 0) idle = "No terrain is pending."; }
                     return new[] {
@@ -1530,7 +1534,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Undo and Redo", "Every completed edit here is one Undo step. Use Undo and Redo in the Map Editor." },
                     new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after a native edit, Undo or Redo; a stale object list refuses edits." },
                     new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
-                    new[] { "Current, Stale, Paused, Saved, Unsaved, Blocked", "The lamps above the outliner show whether the object list is current and whether changes need saving. Paused means you must finish with the file panel before you can inspect objects. Blocked means Save is unavailable. Hover over a lamp for details." },
+                    new[] { "Current, Stale, Paused, Saved, Unsaved, Blocked", "The lamps above the outliner show whether its contents are current and whether changes need saving. When a lamp shows Paused, follow the instructions in Version choice, Repair, or Import before inspecting objects. Blocked means Save is unavailable. Hover over a lamp for details." },
                     new[] { "* and +", "* marks an object this mod changes. + marks an object this mod adds. The Unsaved lamp tells you when to save." },
                     new[] { "Footer", "Remove modification, Recheck and Guide appear below the messages on every tab. Actions specific to a tab appear at the bottom of that tab." },
                     new[] { "Failed edit", "A refused edit changes nothing. If an edit fails after it starts, the patcher restores the object to how it was. If it cannot verify that restoration, the message lists what remains and further edits are blocked until Recheck succeeds or you reload the Map Editor. Guide opens the guide for the failed action." } },
