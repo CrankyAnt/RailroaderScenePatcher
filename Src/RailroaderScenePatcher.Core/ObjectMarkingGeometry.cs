@@ -423,6 +423,12 @@ namespace RailroaderScenePatcher.Core {
         // baked scenery group, which the inventory lists as one entry for the whole group.
         public const string WholeFamily = "Baked scenery group";
         public static bool FramesWhole(string family) => family == WholeFamily;
+        // Where a marker with a frame stands on screen, from its world point projected to x and y: on that point
+        // whenever it lies in front of the camera, also outside the frame's rectangle or the view, so it stays on its
+        // world point as the camera zooms and turns; the center of the visible part of a frame larger than the view
+        // would wander. A point behind the camera falls back to the center of the frame's rectangle.
+        public static ScreenPoint MarkerScreen(bool inFront, double x, double y, ScreenRect rect) =>
+            inFront ? new ScreenPoint(x, y) : new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
         // Every inventory object within the frame distance has a frame. An object none of whose parts can be framed,
         // because it has no renderer of its own or all its parts are switched off, takes the least frame about its
         // square marker: the marker with its margin on each side. distance is from the camera to the object's

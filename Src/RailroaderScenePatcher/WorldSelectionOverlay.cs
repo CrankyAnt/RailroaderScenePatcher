@@ -766,7 +766,7 @@ namespace RailroaderScenePatcher {
                     var frame = result.Frame.Value;
                     // The frame is never smaller than the marker with its margin. The marker stands on the center of
                     // the box the frame outlines, a point of the object, so it stays there as the camera zooms and
-                    // turns; where that point is not in view, on the center of the frame's rectangle.
+                    // turns, also outside the view; only where that point lies behind the camera does it stand on the center of the frame's rectangle.
                     frame = ObjectMarkingGeometry.VisibleFrame(frame);
                     var rect = Rect.MinMaxRect((float)frame.X, (float)frame.Y, (float)frame.Right, (float)frame.Bottom);
                     shape.Objects.Add(rect);
@@ -855,14 +855,13 @@ namespace RailroaderScenePatcher {
         static Vector3 Vector(WorldPoint p) => new Vector3((float)p.X, (float)p.Y, (float)p.Z);
         // The families of a crossing pad, whose frame is not cut off at the ground.
         static readonly HashSet<string> PadFamilies = new HashSet<string>(StringComparer.Ordinal) { "Crossing pad marker", "Crossing pad" };
-        // Where a marker with a frame stands on screen: on its world point when that lies in front of the camera and
-        // inside the frame's rectangle, else on the rectangle's center.
+        // Where a marker with a frame stands on screen: on its world point when that lies in front of the camera,
+        // otherwise on the rectangle's center.
         static Vector3 MarkerOn(Camera camera, WorldPoint? marker, Rect rect) {
-            if (marker.HasValue) {
-                var point = ScreenPoint(camera, Vector(marker.Value), Vector3.zero);
-                if (InFront(camera, point) && rect.Contains(new Vector2(point.x, point.y))) return point;
-            }
-            return new Vector3(rect.center.x, rect.center.y, camera.nearClipPlane);
+            var point = marker.HasValue ? ScreenPoint(camera, Vector(marker.Value), Vector3.zero) : Vector3.zero;
+            var inFront = marker.HasValue && InFront(camera, point);
+            var at = ObjectMarkingGeometry.MarkerScreen(inFront, point.x, point.y, ScreenRect.FromEdges(rect.xMin, rect.yMin, rect.xMax, rect.yMax));
+            return new Vector3((float)at.X, (float)at.Y, inFront ? point.z : camera.nearClipPlane);
         }
         // The level of detail each renderer of an object belongs to, by its LOD group.
         static Dictionary<Renderer, KeyValuePair<LODGroup, int>> Lods(GameObject go) {

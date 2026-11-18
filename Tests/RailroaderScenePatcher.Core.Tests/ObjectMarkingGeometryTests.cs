@@ -103,6 +103,20 @@ static class ObjectMarkingGeometryTests {
         Check(beyond.Shows == GroupShows.MarkerOnly && At(beyond.Marker, uncut), "beyond 500 m the group's square marker stands on the center of its uncut box: " + beyond.Marker);
     }
 
+    // A marker stands on its world point whenever that point lies in front of the camera, also when the point lies
+    // outside the frame's rectangle or the view, as for a frame larger than the view such as Ela Signs: the center of the
+    // visible part of the frame would wander as the camera zooms. Only a point behind the camera falls back to the
+    // rectangle's center.
+    static void MarkerStaysOnItsPointOutsideTheView() {
+        var rect = ScreenRect.FromEdges(0, 185, 2560, 1440);
+        var inside = ObjectMarkingGeometry.MarkerScreen(true, 1280, 900, rect);
+        Check(inside.X == 1280 && inside.Y == 900, "a marker point inside the frame is the marker");
+        var below = ObjectMarkingGeometry.MarkerScreen(true, 1280, 1800, rect);
+        Check(below.X == 1280 && below.Y == 1800, "a marker point in front of the camera but below the view stays the marker, off the view: " + below.X + "/" + below.Y);
+        var behind = ObjectMarkingGeometry.MarkerScreen(false, 1280, 1800, rect);
+        Check(Math.Abs(behind.X - 1280) < 1e-9 && Math.Abs(behind.Y - 812.5) < 1e-9, "a marker point behind the camera falls back to the center of the frame's rectangle");
+    }
+
     // A renderer outlines its object whether or not the game's distance culling shows it now: on, or off only through
     // a culler that holds it, with every object above it on or off only through a culler. A renderer or object that the
     // scene or a modder switched off outlines nothing.
@@ -573,6 +587,7 @@ static class ObjectMarkingGeometryTests {
         Check(!Frame(new WorldPoint(0, 0, 100)).Frame.HasValue, "an object without parts has no frame");
         MarkerStaysOnTheObject();
         RenderersOutlineWhateverTheCullingDoes();
+        MarkerStaysOnItsPointOutsideTheView();
         Console.WriteLine("PASS: object marking frames identify their object at near and far zoom");
     }
 
