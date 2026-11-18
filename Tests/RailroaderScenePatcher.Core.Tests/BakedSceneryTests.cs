@@ -183,8 +183,20 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
         }
         return corners;
     }
-    public IReadOnlyList<object> FindParts(string scene, string path) => PartsAt.TryGetValue(path, out var found) ? found : new List<object>();
-    public string PartRefusal(object part) => PartRefused;
+    // The part rule's verdicts by path, when set: a path resolves and is refused as GroupWorld resolves and refuses it
+    // (BakedSceneryRules.Resolves, BakedSceneryRules.PartRefusal).
+    public Dictionary<string, PartVerdict> Verdicts;
+    public IReadOnlyList<object> FindParts(string scene, string path) {
+        if (Verdicts != null && Verdicts.TryGetValue(path, out var verdict) && !BakedSceneryRules.Resolves(verdict)) return new List<object>();
+        return PartsAt.TryGetValue(path, out var found) ? found : new List<object>();
+    }
+    public string PartRefusal(object part) {
+        if (Verdicts != null) {
+            var path = PartsAt.FirstOrDefault(pair => pair.Value.Contains(part)).Key;
+            if (path != null && Verdicts.TryGetValue(path, out var verdict) && BakedSceneryRules.PartRefusal(verdict) != null) return BakedSceneryRules.PartRefusal(verdict);
+        }
+        return PartRefused;
+    }
     public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;

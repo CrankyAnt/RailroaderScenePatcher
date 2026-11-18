@@ -41,6 +41,102 @@ static class ObjectMarkingGeometryTests {
     // Two outlines are the same when each point of one lies within a hundredth of a pixel of a point of the other.
     static bool SameOutline(IReadOnlyList<ScreenPoint> a, IReadOnlyList<ScreenPoint> b) =>
         a != null && b != null && a.Count == b.Count && a.All(p => b.Any(q => Math.Abs(p.X - q.X) < .01 && Math.Abs(p.Y - q.Y) < .01));
+    static ScreenPoint OnScreen(ClipPoint p) => new ScreenPoint(View.X + (p.X / p.W + 1) * View.Width / 2, View.Y + (1 - p.Y / p.W) * View.Height / 2);
+    static bool Same(WorldPoint? a, WorldPoint? b) => a.HasValue && b.HasValue && Math.Abs(a.Value.X - b.Value.X) < 1e-9 && Math.Abs(a.Value.Y - b.Value.Y) < 1e-9 && Math.Abs(a.Value.Z - b.Value.Z) < 1e-9;
+
+    // A camera at a position looking at a point, with a vertical field of view, in Unity's clip convention for the view:
+    // a left-handed view with y up, as a camera turned around the object sees it.
+    static Func<WorldPoint, ClipPoint> LookAt(WorldPoint eye, WorldPoint at, double fov) {
+        double t = Math.Tan(fov * Math.PI / 360), aspect = View.Width / View.Height;
+        double fx = at.X - eye.X, fy = at.Y - eye.Y, fz = at.Z - eye.Z, fl = Math.Sqrt(fx * fx + fy * fy + fz * fz);
+        fx /= fl; fy /= fl; fz /= fl;
+        // right = up x forward, then up' = forward x right.
+        double rx = fz, ry = 0, rz = -fx, rl = Math.Sqrt(rx * rx + rz * rz);
+        rx /= rl; rz /= rl;
+        double ux = fy * rz - fz * ry, uy = fz * rx - fx * rz, uz = fx * ry - fy * rx;
+        return q => {
+            double dx = q.X - eye.X, dy = q.Y - eye.Y, dz = q.Z - eye.Z;
+            double depth = dx * fx + dy * fy + dz * fz, right = dx * rx + dy * ry + dz * rz, up = dx * ux + dy * uy + dz * uz;
+            return new ClipPoint(right / (t * aspect), up / t, (Far + Near) / (Far - Near) * depth - 2 * Far * Near / (Far - Near), depth);
+        };
+    }
+    // A square marker stands at a fixed world point of its object, the center of the box its frame outlines, so it stays
+    // on the object as the camera zooms and turns; the center of the frame's rectangle on screen would wander. A group
+    // such as Bryson Coal Dealer, framed whole, keeps the same point at 140 m and 200 m, seen from the front, from the
+    // side and from far above, and the point lies inside the frame each time. Beyond the frame distance the marker still
+    // stands on the object, and so does a group's square marker.
+    static void MarkerStaysOnTheObject() {
+        Func<double, double, double?> ground = (x, z) => 0;
+        var parts = new[] {
+            new ObjectMarkingPart("shed", new WorldPoint(0, 4, 0), new WorldPoint(10, 4, 6), null, ObjectMarkingPartKind.Mesh, ground),
+            new ObjectMarkingPart("bin", new WorldPoint(18, 2, 4), new WorldPoint(4, 2, 4), null, ObjectMarkingPartKind.Mesh, ground),
+            new ObjectMarkingPart("lamp", new WorldPoint(-25, 3, -8), new WorldPoint(.3, 3, .3), null, ObjectMarkingPartKind.Mesh, ground),
+            // A pier footing runs 5 m into the ground: the cut box stands from the ground to the roof, the uncut box
+            // reaches down to the footing.
+            new ObjectMarkingPart("pier", new WorldPoint(5, -1, 0), new WorldPoint(1, 4, 1), null, ObjectMarkingPartKind.Mesh, ground)
+        };
+        // The one box around the parts runs from x -25.3 to 22, y -5 to 8 and z -8.3 to 8; cut at the ground it runs
+        // from y 0 to 8.
+        var cut = new WorldPoint(-1.65, 4, -.15); var uncut = new WorldPoint(-1.65, 1.5, -.15);
+        bool At(WorldPoint? p, WorldPoint q) => p.HasValue && Math.Abs(p.Value.X - q.X) < 1e-6 && Math.Abs(p.Value.Y - q.Y) < 1e-6 && Math.Abs(p.Value.Z - q.Z) < 1e-6;
+        var anchor = new WorldPoint(0, 0, 0);
+        var cameras = new[] { new WorldPoint(0, 40, -134), new WorldPoint(0, 60, -190), new WorldPoint(-120, 50, -110), new WorldPoint(70, 180, -40) };
+        WorldPoint? first = null;
+        foreach (var eye in cameras) {
+            var view = LookAt(eye, new WorldPoint(0, 4, 0), 60);
+            var frame = ObjectMarkingGeometry.Frame(anchor, eye, parts, view, View, null, ObjectMarkingGeometry.FrameDistance, null, true);
+            Check(frame.Frame.HasValue && frame.Marker.HasValue, "a framed object has a marker point");
+            if (first == null) first = frame.Marker; else Check(Same(first, frame.Marker), "the marker stands on the same world point from every camera position");
+            Check(At(frame.Marker, cut), "the marker stands on the center of the box cut at the ground: " + frame.Marker);
+            var screen = OnScreen(view(frame.Marker.Value));
+            Check(ObjectMarkingGeometry.Contains(frame.Outline, screen.X, screen.Y), "the marker point lies inside the frame from " + eye.X + "/" + eye.Y + "/" + eye.Z);
+        }
+        var far = ObjectMarkingGeometry.Frame(anchor, new WorldPoint(0, 100, -900), parts, Strategy(new WorldPoint(0, 100, -900), 5, 60), View, null, ObjectMarkingGeometry.FrameDistance, null, true);
+        Check(!far.Frame.HasValue && At(far.Marker, uncut), "beyond the frame distance the marker stands on the center of the uncut box: " + far.Marker);
+        // A group: its square marker stands on the center of its one box at 140 m and at 200 m.
+        var frames = parts.Select(part => ObjectMarkingGeometry.Frame(anchor, new WorldPoint(0, 40, -134), new[] { part }, Strategy(new WorldPoint(0, 40, -134), 15, 60), View, null)).ToArray();
+        var anchors = parts.Select(part => part.Center).ToArray();
+        var near = ObjectMarkingGeometry.GroupFrame(new WorldPoint(0, 40, -150), anchors, frames, null, ground, Strategy(new WorldPoint(0, 40, -150), 15, 60), View);
+        var farther = ObjectMarkingGeometry.GroupFrame(new WorldPoint(0, 60, -205), anchors, frames, null, ground, Strategy(new WorldPoint(0, 60, -205), 15, 60), View);
+        Check(near.Shows == GroupShows.MarkerAndFrame && farther.Shows == GroupShows.MarkerAndFrame && Same(near.Marker, farther.Marker) && At(near.Marker, cut), "a group's square marker stands on the center of its cut box at 140 m and 200 m: " + near.Marker);
+        var beyond = ObjectMarkingGeometry.GroupFrame(new WorldPoint(0, 60, -700), anchors, frames, null, ground, Strategy(new WorldPoint(0, 60, -700), 5, 60), View);
+        Check(beyond.Shows == GroupShows.MarkerOnly && At(beyond.Marker, uncut), "beyond 500 m the group's square marker stands on the center of its uncut box: " + beyond.Marker);
+    }
+
+    // A renderer outlines its object whether or not the game's distance culling shows it now: on, or off only through
+    // a culler that holds it, with every object above it on or off only through a culler. A renderer or object that the
+    // scene or a modder switched off outlines nothing.
+    static void RenderersOutlineWhateverTheCullingDoes() {
+        // The box a renderer outlines with: its world box while it shows; while it is hidden, its own box from its mesh,
+        // or, in a static batch, which keeps no mesh of its own, the box kept from when it last showed, carried along
+        // with its object's current placement, so a patcher move takes the kept box with it; nothing when neither is
+        // known.
+        WorldPoint[] Cube(double x, double y, double z, double h) => Enumerable.Range(0, 8).Select(c => new WorldPoint(x + ((c & 1) == 0 ? -h : h), y + ((c & 2) == 0 ? -h : h), z + ((c & 4) == 0 ? -h : h))).ToArray();
+        Func<WorldPoint, WorldPoint> Stay = p => p, Moved = p => new WorldPoint(p.X + 100, p.Y, p.Z);
+        var seen = Cube(0, 5, 0, 5); var mesh = Cube(1, 1, 1, 1); var kept = Cube(0, 5, 0, 5);
+        bool SameBox(IReadOnlyList<WorldPoint> a, IReadOnlyList<WorldPoint> b) => a != null && b != null && a.Count == 8 && b.Count == 8 && a.Zip(b, (p, q) => Math.Abs(p.X - q.X) + Math.Abs(p.Y - q.Y) + Math.Abs(p.Z - q.Z)).All(d => d < 1e-9);
+        Check(SameBox(ObjectMarkingGeometry.RendererBox(true, seen, null, null, Stay), seen), "a renderer that shows outlines with its world box");
+        Check(SameBox(ObjectMarkingGeometry.RendererBox(false, null, mesh, kept, Stay), mesh), "a hidden renderer outlines with its own box from its mesh");
+        Check(SameBox(ObjectMarkingGeometry.RendererBox(false, null, null, kept, Stay), kept), "a hidden static-batched renderer outlines with the box kept from when it showed");
+        Check(SameBox(ObjectMarkingGeometry.RendererBox(false, null, null, kept, Moved), Cube(100, 5, 0, 5)), "the kept box follows its object when the patcher moved it");
+        Check(ObjectMarkingGeometry.RendererBox(false, null, null, null, Stay) == null, "a hidden static-batched renderer never seen showing outlines nothing");
+        MarkingLink On = new MarkingLink(true, false), CullerOff = new MarkingLink(false, true), SceneOff = new MarkingLink(false, false);
+        Check(ObjectMarkingGeometry.Outlines(true, false, new[] { On, On }), "a renderer that shows outlines its object");
+        Check(ObjectMarkingGeometry.Outlines(false, true, new[] { On }), "a renderer that a renderer culler holds and hides outlines its object");
+        Check(ObjectMarkingGeometry.Outlines(true, false, new[] { On, CullerOff, On }), "a renderer below an object that a culler switched off outlines its object");
+        Check(ObjectMarkingGeometry.Outlines(false, true, new[] { CullerOff, On }), "a renderer that a culler hides, below an object a culler switched off, outlines its object");
+        Check(!ObjectMarkingGeometry.Outlines(false, false, new[] { On }), "a renderer that the scene switched off outlines nothing");
+        Check(!ObjectMarkingGeometry.Outlines(true, false, new[] { On, SceneOff }), "a renderer below an object that the scene or a modder switched off outlines nothing");
+        // Whether an object that is off is off only through a culler: own culling holds it on, its simple culler or a
+        // game-object culler that lists it, on any object above it as on a crossing's root, hides it now.
+        Check(CullingActivity.OffThroughCuller(null, false, false, new KeyValuePair<bool, bool>[0]) == false, "an object without a culler is off through the scene");
+        Check(CullingActivity.OffThroughCuller(null, true, false, new KeyValuePair<bool, bool>[0]), "an object its simple culler hides is off through the culler");
+        Check(!CullingActivity.OffThroughCuller(null, true, true, new KeyValuePair<bool, bool>[0]), "an object off while its simple culler shows it was switched off by the scene or a modder");
+        Check(CullingActivity.OffThroughCuller(null, false, false, new[] { new KeyValuePair<bool, bool>(false, false), new KeyValuePair<bool, bool>(true, false) }), "an object that a game-object culler above it lists and hides is off through the culler");
+        Check(!CullingActivity.OffThroughCuller(null, false, false, new[] { new KeyValuePair<bool, bool>(true, true) }), "an object off while the game-object culler that lists it shows its objects was switched off");
+        Check(CullingActivity.OffThroughCuller(true, false, false, null) && !CullingActivity.OffThroughCuller(false, true, false, null), "an object own culling switches is off through the culler exactly while the modder or the scene has it on");
+    }
+
     public static void Run() {
         // A 10 m shed 100 m ahead: its front face, 95 m away, is 10/95 of the half view high, about 76 pixels, and a
         // margin of 4 pixels on each side.
@@ -475,6 +571,8 @@ static class ObjectMarkingGeometryTests {
         Check(!ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { Box("shed", 0, 0, 100, 5, 5, 5) }, p => new ClipPoint(double.NaN, 0, 0, 1), View, null).Frame.HasValue,
             "a non-finite projection gives the square marker");
         Check(!Frame(new WorldPoint(0, 0, 100)).Frame.HasValue, "an object without parts has no frame");
+        MarkerStaysOnTheObject();
+        RenderersOutlineWhateverTheCullingDoes();
         Console.WriteLine("PASS: object marking frames identify their object at near and far zoom");
     }
 

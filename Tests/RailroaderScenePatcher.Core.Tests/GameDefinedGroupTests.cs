@@ -10,18 +10,49 @@ using RailroaderScenePatcher.Core;
 static class GameDefinedGroupTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Game-defined group: " + message); }
     // One inventory object: the scene object it is on and the scene objects above that one, nearest first.
-    static GroupObject Object(string at, string above, bool controller = false, bool marker = false, bool span = false) =>
-        new GroupObject(at, above.Length == 0 ? new string[0] : above.Split('/').Reverse().ToArray(), controller, marker, span);
+    static GroupObject Object(string at, string above, bool controller = false, bool marker = false, bool span = false, bool baked = false) =>
+        new GroupObject(at, above.Length == 0 ? new string[0] : above.Split('/').Reverse().ToArray(), controller, marker, span, baked);
     static string Members(IReadOnlyList<GameDefinedGroup> groups) =>
         String.Join(" | ", groups.Select(g => g.Kind + ":" + String.Join(",", g.Members)));
 
     public static void Run() {
         Membership();
+        BakedSceneryGroupMembership();
+        SkippedGroupLine();
         Distances();
         Marking();
         Picking();
         Console.WriteLine("PASS: game-defined groups");
     }
+
+    // A baked scenery group whose parts share one group root, such as Bryson Coal Dealer: the listed group root and the
+    // inventory objects below it, also those in a culling container, are one group. Only the hierarchy decides:
+    // objects that stand close together, but under no common listed root, form no group, and a listed root without
+    // parts shows as that one object.
+    static void BakedSceneryGroupMembership() {
+        const string Town = "World/Large Scenery/Bryson";
+        var coal = new[] {
+            Object("Bryson Coal Dealer", Town, baked: true),                              // 0
+            Object("Coal Bin", Town + "/Bryson Coal Dealer"),                             // 1
+            Object("Shed", Town + "/Bryson Coal Dealer"),                                 // 2
+            Object("Shed Door", Town + "/Bryson Coal Dealer/Shed"),                       // 3
+            Object("Platform", Town + "/Bryson House Track/Culled"),                      // 4: in a culling container of another group
+            Object("Bryson House Track", Town, baked: true),                              // 5
+            Object("Lamp", Town),                                                         // 6: beside the coal dealer, under no root
+            Object("Bryson Depot", Town, baked: true),                                    // 7: a listed root without parts
+            Object("Sign", Town + "/Bryson Coal Dealer", marker: true),                   // 8: a track marker in a baked group
+        };
+        var groups = GameDefinedGroups.Of(coal);
+        Check(Members(groups) == "BakedSceneryGroup:0,1,2,3,8 | BakedSceneryGroup:4,5", "a baked scenery group holds its listed root and the inventory objects below it, at any depth and in its culling containers, track markers included: only a crossing leaves its whistle signs out (got " + Members(groups) + ")");
+        Check(ReferenceEquals(groups[0].Anchor, coal[0].Node) && groups[0].Listed.SequenceEqual(groups[0].Members), "the group is anchored by its root and lists and frames every object");
+        Check(!groups.Any(g => g.Members.Contains(6) || g.Members.Contains(7)), "proximity alone merges no objects into a group, and a root without parts is no group");
+        // A crossing inside a listed group root is held by the outermost group.
+        var nested = new[] { Object("Yard", Town, baked: true), Object("Setup", Town + "/Yard", controller: true), Object("Bell", Town + "/Yard/Setup") };
+        Check(Members(GameDefinedGroups.Of(nested)) == "BakedSceneryGroup:0,1,2", "an object belongs to the outermost group that holds it (got " + Members(GameDefinedGroups.Of(nested)) + ")");
+    }
+    static void SkippedGroupLine() =>
+        Check(GameDefinedGroups.SkippedLine("BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer", "none of its objects has a usable position") ==
+            "Group skipped: BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer: none of its objects has a usable position", "a skipped group gives one line Group skipped: <group root>: <reason>");
 
     static void Membership() {
         // The Andrews crossing as the game holds it: the controller on "Setup", below it two masts with a light and

@@ -110,7 +110,12 @@ namespace RailroaderScenePatcher {
             foreach (var world in worlds) {
                 var classified = BakedSceneryRules.Classify(new HierarchyNode(world.transform, drivenNow));
                 foreach (var verdict in classified) found[((HierarchyNode)verdict.Node).Transform.gameObject] = verdict;
-                foreach (var part in BakedSceneryRules.Parts(classified)) parts[((HierarchyNode)part.Node).Transform.gameObject] = part;
+                // A group whose parts cannot be read keeps its root entry without parts; one developer diagnostic line
+                // says so.
+                foreach (var group in classified.Where(v => v.Disposition == GroupDisposition.Group)) {
+                    try { foreach (var part in BakedSceneryRules.Parts(new[] { group })) parts[((HierarchyNode)part.Node).Transform.gameObject] = part; }
+                    catch (Exception e) { WorldSelectionOverlay.Skipped(((HierarchyNode)group.Node).Transform.gameObject, "its parts could not be read: " + e.GetBaseException().Message); }
+                }
             }
             verdictKey = text; partVerdicts = parts; driven = drivenNow;
             return verdicts = found;
@@ -206,12 +211,15 @@ namespace RailroaderScenePatcher {
             if (components.Any(c => c is Rigidbody)) return "The group holds a rigidbody; only static colliders are supported";
             return null;
         }
+        // A culling container resolves too, so its modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
-            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && IsPart(g)).Cast<object>().ToArray();
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.Resolves(PartVerdictOf(g))).Cast<object>().ToArray();
         public string PartRefusal(object part) => PartProblem(part as GameObject);
         // Why a part cannot be edited, or null: what refuses its group refuses the part. Shared with the inventory.
         internal static string PartProblem(GameObject part) {
             if (!Loaded(part)) return "The part's scene is not loaded";
+            var rule = BakedSceneryRules.PartRefusal(PartVerdictOf(part));
+            if (rule != null) return rule;
             if (!IsPart(part)) return "This object is not listed as a baked scenery part";
             var root = GroupRootOf(part);
             return root == null ? "The group root for this part is no longer listed" : Problem(root);
@@ -256,6 +264,22 @@ namespace RailroaderScenePatcher {
             if (AuthoredActivity.Enabled(false, group != null && group.enabled, group != null && group.enabled && group.IsVisible(0))) return true;
             var culler = ListingCuller(go, GroupRootOf(go) ?? go);
             return culler != null && AuthoredActivity.Enabled(false, true, Convert.ToString(switcherState.GetValue(culler)) == "Visible");
+        }
+        // Whether an object that is switched off is off only through a culler (CullingActivity.OffThroughCuller): own
+        // culling, a simple culler on it, or a game-object culler on it, on any object above it, such as a crossing
+        // root's culler, or in its baked scenery group.
+        internal static bool OffThroughCuller(GameObject go) {
+            var group = GroupOf(OwnSimple(go));
+            var listing = new List<KeyValuePair<bool, bool>>();
+            if (switcher != null && switchedObjects != null && switcherState != null) {
+                var cullers = new List<Component>();
+                for (var t = go.transform; t != null; t = t.parent) cullers.AddRange(t.GetComponents(switcher));
+                var root = GroupRootOf(go);
+                if (root != null) cullers.AddRange(root.GetComponentsInChildren(switcher, true));
+                foreach (var culler in cullers.Distinct())
+                    if (culler != null) listing.Add(new KeyValuePair<bool, bool>(Switches(culler).Contains(go), Convert.ToString(switcherState.GetValue(culler)) == "Visible"));
+            }
+            return CullingActivity.OffThroughCuller(culling?.Desired(go), group != null && group.enabled, group != null && group.enabled && group.IsVisible(0), listing);
         }
         static double[] Coordinates(Vector3 v) => new double[] { v.x, v.y, v.z };
         static double[] Coordinates(Quaternion q) => new double[] { q.x, q.y, q.z, q.w };

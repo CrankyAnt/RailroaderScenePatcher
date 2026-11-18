@@ -22,6 +22,7 @@ Some objects below a group root are not listed as parts:
 
 - Two or more sibling objects with the same name under the same parent share one path. A scene patch file could not tell them apart, so neither they nor the objects below them are listed.
 - A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
+- A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with that reason; the file's other modifications still apply.
 - Objects the game moves during play, such as a clock hand at Bryson depot, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
 - An object without a renderer, collider or light, an object the game creates while running, and an object that another family lists, are not listed.
 

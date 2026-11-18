@@ -189,7 +189,25 @@ namespace RailroaderScenePatcher.Core {
         static bool Physical(IHierarchyNode node) => node.Serialized && (node.Physical || node.Children.Any(Physical));
         // The coverage rules that keep an object below a listed group root out of the part entries.
         public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group",
-            AnimatedParts = "Parts the game moves while running";
+            AnimatedParts = "Parts the game moves while running", CullingContainers = "Culling containers";
+        // The game's cullers: a simple culler switches its own object, a renderer culler the renderers below it and a
+        // game-object culler the objects on its list. Only a simple culler makes a culling container: a renderer
+        // culler sits on the root of a prefab that culls its own children, such as a lamp post (Tall Post Shade), a
+        // crossbuck or a sign, and that root is the object a modder moves.
+        public const string SimpleCuller = "Helpers.SimpleCuller", GameObjectCuller = "Helpers.Culling.GameObjectCuller";
+        public static readonly IReadOnlyList<string> Cullers = Array.AsReadOnly(new[] { SimpleCuller, RendererCuller, GameObjectCuller });
+        // A culling container, such as Bryson House Track/Culled, is a scene object below a group root that only holds
+        // other objects for a simple culler: it carries a simple culler, has no renderer, collider or light of its own
+        // and has children. It is no object a modder moves; its parts stay listed under their group. A group root that
+        // carries the culler itself, such as Sylva Culled, stays the group root.
+        public static bool CullingContainer(IHierarchyNode node) =>
+            node != null && !node.Physical && node.Children.Count != 0 && node.Components.Contains(SimpleCuller);
+        // Why a modification cannot edit the object at a path the part rule did not list, or null for a listed part.
+        public const string CullingContainerRefusal = "This path names a culling container, which only groups parts for the game's culling; it is not an object. Edit its parts instead";
+        // Whether a path resolves to the object the part rule decided this for: a listed part, and a culling container,
+        // so that its modification fails with the container's reason instead of finding nothing.
+        public static bool Resolves(PartVerdict verdict) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict) != null;
+        public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullingContainers ? CullingContainerRefusal : null;
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
         // A part is one scene object, not a renderer or a component. An inspection-only group has no part entries.
         public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {
@@ -213,6 +231,8 @@ namespace RailroaderScenePatcher.Core {
                 // A level of a LOD group belongs to the entry of the object that holds the LOD group.
                 if (child.LodLevel) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, LodLevels)); continue; }
                 if (child.HasFamily) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.ExistingFamily, null)); continue; }
+                // A culling container is no part, but the objects in it are: they stay listed under their group.
+                if (CullingContainer(child)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, CullingContainers)); Walk(child, path, groupPath, null, found); continue; }
                 if (!Physical(child)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, NoPhysicalPresence)); continue; }
                 found.Add(new PartVerdict(child, path, groupPath, PartDisposition.Part, null));
                 Walk(child, path, groupPath, null, found);

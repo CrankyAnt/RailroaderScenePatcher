@@ -20,6 +20,15 @@ namespace RailroaderScenePatcher.Core {
         // The own activity of an object as the modder or the scene set it: for an object own culling switches, the
         // value own culling holds for it, and for every other object its own activity.
         public static bool Desired(bool activeSelf, bool? controlled) => controlled ?? activeSelf;
+        // Whether an object that is switched off is off only through a culler, so that it counts as on. ownDesired is
+        // the activity own culling holds for an object it switches, null for any other object: such an object is off
+        // through own culling exactly while the modder or the scene has it on. Otherwise it is off through its simple
+        // culler while that culler switches it and hides it now, or through a game-object culler that lists it and
+        // hides its objects now; listing holds, for each game-object culler on the object, above it or in its group,
+        // whether it lists the object and whether it shows its objects. Off while its culler shows, the object was
+        // switched off by the scene or a modder (AuthoredActivity.Enabled).
+        public static bool OffThroughCuller(bool? ownDesired, bool simpleSwitches, bool simpleShows, IEnumerable<KeyValuePair<bool, bool>> listing) =>
+            ownDesired ?? ((simpleSwitches && !simpleShows) || (listing != null && listing.Any(culler => culler.Key && !culler.Value)));
         // Whether a sphere shows what it culls, by the rule of the culler it stands in for. A simple culler has no
         // distance band; a game-object culler in distance-band mode ignores visibility.
         public static bool Shows(CullerKind kind, bool distanceBandMode, bool visible, int band, int visibleBand) =>

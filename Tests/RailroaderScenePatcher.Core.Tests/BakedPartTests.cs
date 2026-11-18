@@ -110,6 +110,8 @@ static class BakedPartTests {
         SearchMatchesThePartNameAsShown();
         RefreshClearsTheStaleRefusal();
         PartsTheGameAnimatesDoNotMakeTheInventoryStale();
+        CullingContainersAreNoPartsButTheirPartsAre();
+        CullingContainerPathFailsBeforeMutation();
         Console.WriteLine("PASS: baked scenery parts: part rule, part-only edits, fixed placement through group moves and previews, ordering, removal, culling, refusal, restoration and scene patch editing");
     }
 
@@ -139,6 +141,62 @@ static class BakedPartTests {
         Assert(At("Anchor")?.Reason == BakedSceneryRules.NoPhysicalPresence && At("Spawned Sawdust")?.Reason == BakedSceneryRules.RuntimeObject && At("Sign")?.Disposition == PartDisposition.ExistingFamily,
             "Objects without physical presence, runtime objects and objects of another family are no parts");
         Assert(!parts.Any(v => v.Path.StartsWith("World/Large Scenery/Bryson/", StringComparison.Ordinal)), "An inspection-only group has no part entries");
+    }
+
+    // A culling container, such as Bryson House Track/Culled, holds parts for a culler and has no renderer, collider or
+    // light of its own: it is no part, and its parts stay listed under their group, named with it in their path. A
+    // group root that carries the culler itself, such as Sylva Culled, stays the group root with its models as parts.
+    // An object with a culler and a renderer of its own is an ordinary part.
+    static void CullingContainersAreNoPartsButTheirPartsAre() {
+        const string House = "World/Large Scenery/Bryson/Bryson House Track", Sylva = "World/Large Scenery/Sylva/Sylva Culled";
+        var world = new Node("World", new Node("Large Scenery",
+            new Node("Bryson", new Node("Bryson House Track",
+                new Node("Culled", new Node("Wood Platform 2 x 2").Solid(), new Node("Wood Platform 2 x 2 (1)").Solid(),
+                    new Node("Culling Container", new Node("Ramp").Solid()).With(BakedSceneryRules.SimpleCuller)).With(BakedSceneryRules.SimpleCuller),
+                new Node("Lamp").Solid().With(BakedSceneryRules.RendererCuller),
+                // A lamp post prefab culls its own children with a renderer culler on its root: it is a part.
+                new Node("Tall Post Shade (5)", new Node("Bulb").Solid(), new Node("Tall Post Shade").Solid(), new Node("Spotlight Outdoor").Solid()).With(BakedSceneryRules.RendererCuller),
+                // A simple culler on an object with a renderer of its own: an ordinary part.
+                new Node("Stenzel Mfg", new Node("Sign").Solid()).Solid().With(BakedSceneryRules.SimpleCuller),
+                // Another family and a level of a LOD group keep their rule, whatever culler they carry.
+                new Node("Pad", new Node("Mesh").Solid()).With(BakedSceneryRules.SimpleCuller).Family(),
+                new Node("Shed", new Node("LOD0", new Node("Mesh").Solid()).With(BakedSceneryRules.SimpleCuller).Lod()).With("UnityEngine.LODGroup").Solid())),
+            new Node("Sylva", new Node("Sylva Culled", new Node("Depot Model").Solid(), new Node("Shed Model").Solid()).With(BakedSceneryRules.SimpleCuller))));
+        var verdicts = BakedSceneryRules.Classify(world);
+        Assert(verdicts.Single(v => v.Path == House).Disposition == GroupDisposition.Group && verdicts.Single(v => v.Path == Sylva).Disposition == GroupDisposition.Group, "Both groups are listed group roots");
+        var parts = BakedSceneryRules.Parts(verdicts);
+        var listed = parts.Where(v => v.Disposition == PartDisposition.Part).Select(v => v.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        Assert(listed.SequenceEqual(new[] { House + "/Culled/Culling Container/Ramp", House + "/Culled/Wood Platform 2 x 2", House + "/Culled/Wood Platform 2 x 2 (1)", House + "/Lamp", House + "/Shed",
+                House + "/Stenzel Mfg", House + "/Stenzel Mfg/Sign", House + "/Tall Post Shade (5)", House + "/Tall Post Shade (5)/Bulb", House + "/Tall Post Shade (5)/Spotlight Outdoor", House + "/Tall Post Shade (5)/Tall Post Shade",
+                Sylva + "/Depot Model", Sylva + "/Shed Model" }),
+            "The parts in culling containers stay listed under their group, and a group root with the culler lists its models: " + String.Join(", ", listed));
+        var containers = parts.Where(v => v.Reason == BakedSceneryRules.CullingContainers).Select(v => v.Path).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        Assert(containers.SequenceEqual(new[] { House + "/Culled", House + "/Culled/Culling Container" }) && parts.Where(v => containers.Contains(v.Path)).All(v => v.Disposition == PartDisposition.NotListed && v.GroupPath == House),
+            "A culling container is no part, at any depth: " + String.Join(", ", containers));
+        Assert(parts.Single(v => v.Path == House + "/Pad").Disposition == PartDisposition.ExistingFamily && parts.Single(v => v.Path == House + "/Shed/LOD0").Reason == BakedSceneryRules.LodLevels,
+            "An object of another family and a level of a LOD group keep their own rule, also with a simple culler");
+        Assert(BakedSceneryRules.PartName(House, House + "/Culled/Wood Platform 2 x 2") == "Bryson House Track / Culled / Wood Platform 2 x 2", "A part in a culling container is named with its group and its path");
+        Assert(BakedSceneryRules.PartRefusal(parts.Single(v => v.Path == House + "/Culled")) == BakedSceneryRules.CullingContainerRefusal && BakedSceneryRules.PartRefusal(parts.Single(v => v.Path == House + "/Lamp")) == null,
+            "The part rule refuses a culling container with its reason and refuses no part");
+    }
+
+    // A modification whose path names a culling container fails before mutation with the container's reason, and the
+    // other modifications of the scene patch file still apply.
+    static void CullingContainerPathFailsBeforeMutation() {
+        var f = new Fixture();
+        // The saw mill as the part rule reads it: its listed parts, and a culling container with a piece in it. The
+        // world resolves and refuses paths by those verdicts, as GroupWorld does.
+        var mill = new Node("Whittier Saw Mill", new Node("Platform").Solid(), new Node("Ramp").Solid(), new Node("Lamp").Solid(), new Node("Jetty", new Node("Post").Solid()).Solid(),
+            new Node("Culled", new Node("Piece").Solid()).With(BakedSceneryRules.SimpleCuller));
+        f.World.Verdicts = BakedSceneryRules.Parts(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", mill))))).ToDictionary(v => v.Path);
+        f.World.PartsAt[Mill + "/Culled"] = new List<object> { f.Group.Add(new FakePart { Id = "Culled#8", Offset = new[] { 4.0, 0, 4 } }) };
+        f.World.PartsAt[Mill + "/Culled/Piece"] = new List<object> { f.Group.Add(new FakePart { Id = "Culled/Piece#9", Offset = new[] { 4.0, 0, 5 } }) };
+        Assert(f.World.FindParts(SceneName, Mill + "/Culled").Count == 1 && f.World.FindParts(SceneName, Mill + "/Culled/Piece").Count == 1, "A culling container and the part in it resolve");
+        var before = f.World.Mutations;
+        var result = f.Engine.Apply(Doc(Part("container", "Culled", JettyTarget), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
+        var failure = result.Outcomes["container"];
+        Assert(!failure.Applied && (failure.Error ?? "").Contains("culling container"), "A path that names a culling container fails that modification with the reason: " + failure.Error);
+        Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused one mutates nothing");
     }
 
     static void PartEditChangesOnlyThatPart() {

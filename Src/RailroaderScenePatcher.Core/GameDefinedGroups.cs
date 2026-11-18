@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    public enum GameDefinedGroupKind { GradeCrossingSetup }
+    public enum GameDefinedGroupKind { GradeCrossingSetup, BakedSceneryGroup }
     // What a group shows in the world: each of its objects on its own, or one square marker for the group, with or
     // without the group's object frame.
     public enum GroupShows { Objects, MarkerAndFrame, MarkerOnly }
@@ -13,13 +13,16 @@ namespace RailroaderScenePatcher.Core {
     // One inventory object as the facts a group is decided from: the scene object it is on, the scene objects above
     // that one, nearest first, and what its components say it is.
     public sealed class GroupObject {
-        public GroupObject(object node, IEnumerable<object> above, bool crossingController = false, bool trackMarker = false, bool trackSpan = false) {
+        public GroupObject(object node, IEnumerable<object> above, bool crossingController = false, bool trackMarker = false, bool trackSpan = false, bool bakedGroupRoot = false) {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             Above = above ?? Enumerable.Empty<object>();
-            CrossingController = crossingController; TrackMarker = trackMarker; TrackSpan = trackSpan;
+            CrossingController = crossingController; TrackMarker = trackMarker; TrackSpan = trackSpan; BakedGroupRoot = bakedGroupRoot;
         }
         public object Node { get; }
         public IEnumerable<object> Above { get; }
+        // The object is the root of a listed baked scenery group: its scene object is the root of the group, and the
+        // listed parts below it are the group's other objects.
+        public bool BakedGroupRoot { get; }
         // The object is a crossing controller: its scene object is the root of a grade-crossing setup.
         public bool CrossingController { get; }
         // The object is a track marker other than a crossing pad. The game has no component for a whistle sign: below
@@ -46,28 +49,36 @@ namespace RailroaderScenePatcher.Core {
 
     public static class GameDefinedGroups {
         // The groups among inventory objects. A grade-crossing setup is a crossing controller with the inventory
-        // objects on and below its root, the controller's scene object, other than its whistle signs.
+        // objects on and below its root, the controller's scene object, other than its whistle signs. A baked scenery
+        // group is a listed group root with the inventory objects below it: its parts, whatever culling container
+        // they stand in. An object belongs to the outermost group that holds it. Only the hierarchy decides: objects
+        // that stand close together form no group.
         public static IReadOnlyList<GameDefinedGroup> Of(IReadOnlyList<GroupObject> objects) {
             if (objects == null) throw new ArgumentNullException(nameof(objects));
-            var roots = new HashSet<object>(objects.Where(o => o != null && o.CrossingController).Select(o => o.Node));
+            var crossings = new HashSet<object>(objects.Where(o => o != null && o.CrossingController).Select(o => o.Node));
+            var baked = new HashSet<object>(objects.Where(o => o != null && o.BakedGroupRoot).Select(o => o.Node));
             var members = new Dictionary<object, List<int>>();
             var order = new List<object>();
-            if (roots.Count != 0)
+            if (crossings.Count != 0 || baked.Count != 0)
                 for (var index = 0; index < objects.Count; index++) {
                     var item = objects[index];
                     if (item == null) continue;
-                    object root = roots.Contains(item.Node) ? item.Node : null;
+                    object root = crossings.Contains(item.Node) || baked.Contains(item.Node) ? item.Node : null;
                     var below = false;
-                    foreach (var node in item.Above) if (node != null && roots.Contains(node)) { root = node; below = true; }
-                    if (root == null || (below && item.TrackMarker)) continue;
+                    // Above runs from the nearest object outwards: the last root met is the outermost.
+                    foreach (var node in item.Above) if (node != null && (crossings.Contains(node) || baked.Contains(node))) { root = node; below = true; }
+                    if (root == null || (below && item.TrackMarker && crossings.Contains(root))) continue;
                     if (!members.TryGetValue(root, out var list)) { members[root] = list = new List<int>(); order.Add(root); }
                     list.Add(index);
                 }
             // A group with one inventory object shows as that object: it is no group.
             return order.Where(root => members[root].Count > 1)
-                .Select(root => new GameDefinedGroup(GameDefinedGroupKind.GradeCrossingSetup, root, members[root].AsReadOnly(),
+                .Select(root => new GameDefinedGroup(crossings.Contains(root) ? GameDefinedGroupKind.GradeCrossingSetup : GameDefinedGroupKind.BakedSceneryGroup, root, members[root].AsReadOnly(),
                     members[root].Where(i => !objects[i].TrackSpan).ToArray())).ToArray();
         }
+        // The developer diagnostic line for a group that world marking or the family skips: one line per group root
+        // and reason, in the Player log.
+        public static string SkippedLine(string root, string reason) => "Group skipped: " + (root ?? "unknown group root") + ": " + (reason ?? "no reason given");
 
         // Beyond this distance from the camera to a group's bounds, in metres, the group shows as one square marker
         // and one object frame; at this distance or less each of its objects shows on its own.

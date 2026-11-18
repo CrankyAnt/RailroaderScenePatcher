@@ -28,6 +28,13 @@ namespace RailroaderScenePatcher.Core {
         public ObjectMarkingPartKind Kind { get; }
     }
 
+    // One object between a renderer and the scene root, as the outline rule reads it: whether it is switched on, and
+    // whether an object that is off is off only through a culler (CullingActivity.OffThroughCuller).
+    public readonly struct MarkingLink {
+        public MarkingLink(bool activeSelf, bool offThroughCuller) { ActiveSelf = activeSelf; OffThroughCuller = offThroughCuller; }
+        public bool ActiveSelf { get; }
+        public bool OffThroughCuller { get; }
+    }
     // A world-aligned box, by its least and greatest corner.
     public readonly struct WorldBox {
         public WorldBox(WorldPoint min, WorldPoint max) { Min = min; Max = max; }
@@ -48,9 +55,12 @@ namespace RailroaderScenePatcher.Core {
     // How a game-defined group shows from one camera position: the distance to its bounds, what it shows at that
     // distance, the middle of its bounds, where its square marker stands without a frame, and its one object frame.
     public sealed class GroupMarking {
-        internal GroupMarking(double distance, WorldPoint center, ScreenRect? frame, IReadOnlyList<ScreenPoint> outline) {
-            Distance = distance; Center = center; Frame = frame; Outline = outline; Shows = GameDefinedGroups.Shows(distance);
+        internal GroupMarking(double distance, WorldPoint center, ScreenRect? frame, IReadOnlyList<ScreenPoint> outline, WorldPoint? marker = null) {
+            Distance = distance; Center = center; Frame = frame; Outline = outline; Shows = GameDefinedGroups.Shows(distance); Marker = marker ?? center;
         }
+        // The world point the group's square marker stands at: the center of its one box, which stays where it is as
+        // the camera zooms and turns; the middle of its bounds for a group whose box is not known.
+        public WorldPoint Marker { get; }
         // Metres from the camera to the bounds of the group; NaN for a group without objects.
         public double Distance { get; }
         public GroupShows Shows { get; }
@@ -64,9 +74,14 @@ namespace RailroaderScenePatcher.Core {
     }
 
     public sealed class ObjectMarkingFrame {
-        internal ObjectMarkingFrame(ScreenRect? frame, double distance, IReadOnlyList<ScreenPoint> outline = null, WorldBox? bounds = null, IReadOnlyList<ObjectMarkingPart> piece = null) {
-            Frame = frame; Distance = distance; Outline = outline; Bounds = bounds; this.piece = piece;
+        internal ObjectMarkingFrame(ScreenRect? frame, double distance, IReadOnlyList<ScreenPoint> outline = null, WorldBox? bounds = null, IReadOnlyList<ObjectMarkingPart> piece = null, WorldPoint? marker = null) {
+            Frame = frame; Distance = distance; Outline = outline; Bounds = bounds; this.piece = piece; Marker = marker;
         }
+        // The world point the square marker stands at: while the object has a frame, the center of the one box the
+        // frame outlines; beyond the frame distance, the center of that box uncut by the ground. It is a point of the
+        // object, so the marker stays on it as the camera zooms and turns; the center of the frame's rectangle on
+        // screen would wander. Null when no piece was found or no box could be projected.
+        public WorldPoint? Marker { get; }
         // The parts of the framed piece, whether or not the object has a frame at its distance: a group's one box
         // surrounds them.
         readonly IReadOnlyList<ObjectMarkingPart> piece;
@@ -127,6 +142,27 @@ namespace RailroaderScenePatcher.Core {
             return surface;
         }
 
+        // Whether a renderer outlines its object, whatever the game's distance culling does to it now. A frame stands
+        // for the object, not for what the camera shows of it this frame: a renderer culler switches the renderers it
+        // holds off and on, a simple culler or a game-object culler switches objects off and on, and none of that may
+        // grow, shrink or move the frame or its marker. A renderer counts when it is on, or off only through a culler
+        // that holds it, and when every object from the renderer's own up to the scene root is on, or off only through
+        // a culler (AuthoredActivity.Enabled). A renderer or object that the scene or a modder switched off does not
+        // count.
+        // The eight corners of the box a renderer outlines its object with. While it shows: visible, its world box.
+        // While it is hidden: own, its own box from its mesh; or, for a renderer in a static batch, which keeps no mesh
+        // of its own, kept, the box kept from when it last showed, in its object's own space, carried to the world by
+        // toWorld with the object's current placement, so a box kept before a patcher move follows the object. Null
+        // when a hidden renderer has neither: one that has not shown since the world loaded.
+        public static IReadOnlyList<WorldPoint> RendererBox(bool shows, IReadOnlyList<WorldPoint> visible, IReadOnlyList<WorldPoint> own, IReadOnlyList<WorldPoint> kept, Func<WorldPoint, WorldPoint> toWorld) {
+            if (shows) return visible;
+            if (own != null) return own;
+            if (kept == null || toWorld == null) return null;
+            return kept.Select(toWorld).ToArray();
+        }
+        // chain holds the renderer's own object and every object above it up to the scene root.
+        public static bool Outlines(bool rendererEnabled, bool heldByCuller, IEnumerable<MarkingLink> chain) =>
+            (rendererEnabled || heldByCuller) && (chain == null || chain.All(link => link.ActiveSelf || link.OffThroughCuller));
         // What a renderer is to the outline, from its type, the types of the components on its object with their base
         // types, its shadow mode and its level of detail. Effects reach past the object they belong to: particles,
         // visual-effect graphs such as water spray, lines, trails, billboards and the beam geometry of a volumetric light.
@@ -212,7 +248,10 @@ namespace RailroaderScenePatcher.Core {
             var bounds = new WorldBox(new WorldPoint(minX, minY, minZ), new WorldPoint(maxX, maxY, maxZ));
             if (!(distance <= frameDistance)) {
                 foreach (var part in piece) decisions?.Add(part.Name + ": included, beyond the frame distance at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m");
-                return new ObjectMarkingFrame(null, distance, null, bounds, piece);
+                // Without a frame the marker stands on the center of the uncut box around the piece: the ground is
+                // not read for an object that shows only its marker.
+                var uncut = piece.Count == 1 ? CornersOf(piece[0]) : Enclose(piece.SelectMany(CornersOf), orientation ?? BasisOf(seed));
+                return new ObjectMarkingFrame(null, distance, null, bounds, piece, uncut == null ? null : CenterOf(new List<Piece> { new Piece { Corners = uncut.ToArray() } }));
             }
             // The box is clipped to the view only now, so a box that crosses the near plane or a view edge still
             // outlines a near object, and one outside the view, however near the camera's plane, adds nothing.
@@ -236,16 +275,21 @@ namespace RailroaderScenePatcher.Core {
                 else standing.Add(entry);
             }
             List<ScreenPoint> points = null;
+            WorldPoint? marker = null;
             if (standing.Count == 1) {
                 // One part: its own oriented box, which lies inside its world-aligned box, or the world-aligned
                 // box where the oriented one is unknown.
                 var part = standing[0].Key;
-                points = Project(stands ? Standing(standing[0].Value) : Whole(standing[0].Value), false, project, view, out var finite);
+                var box = stands ? Standing(standing[0].Value) : Whole(standing[0].Value);
+                points = Project(box, false, project, view, out var finite);
+                marker = CenterOf(box);
                 // The world-aligned box stands in for an oriented box that gives nothing: one whose projection is
                 // not finite, or one that lies outside the view although its part does not.
                 if (points == null && part.Oriented != null && part.Oriented.Count == 8) {
                     var aligned = Pieces(BoxCorners(part), part.Ground);
-                    points = Project(stands ? Standing(aligned) : Whole(aligned), false, project, view, out finite);
+                    box = stands ? Standing(aligned) : Whole(aligned);
+                    points = Project(box, false, project, view, out finite);
+                    marker = CenterOf(box);
                 }
                 decisions?.Add(part.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
             } else if (standing.Count > 1) {
@@ -255,13 +299,22 @@ namespace RailroaderScenePatcher.Core {
                 var ground = standing.Select(entry => entry.Key.Ground).FirstOrDefault(g => g != null);
                 var pieces = Pieces(box, ground);
                 var above = pieces.Where(q => q.Above && !q.Whole).ToList();
-                points = Project(stands && above.Count != 0 ? Standing(pieces) : Whole(pieces), false, project, view, out var finite);
+                var drawn = stands && above.Count != 0 ? Standing(pieces) : Whole(pieces);
+                points = Project(drawn, false, project, view, out var finite);
+                marker = CenterOf(drawn);
                 foreach (var entry in standing)
                     decisions?.Add(entry.Key.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
             }
             if (points == null || points.Count == 0) return new ObjectMarkingFrame(null, distance, null, bounds, piece);
             double left = points.Min(q => q.X) - Margin, top = points.Min(q => q.Y) - Margin, right = points.Max(q => q.X) + Margin, bottom = points.Max(q => q.Y) + Margin;
-            return new ObjectMarkingFrame(Rect(left, top, right, bottom), distance, Grown(points, Margin), bounds, piece);
+            return new ObjectMarkingFrame(Rect(left, top, right, bottom), distance, Grown(points, Margin), bounds, piece, marker);
+        }
+        // The center of the one box a frame outlines: the mean of its eight corners.
+        static WorldPoint? CenterOf(List<Piece> box) {
+            var corners = box?.FirstOrDefault()?.Corners;
+            if (corners == null || corners.Length == 0) return null;
+            var center = new WorldPoint(corners.Average(c => c.X), corners.Average(c => c.Y), corners.Average(c => c.Z));
+            return Valid(center) ? center : (WorldPoint?)null;
         }
         // The eight corners of a part's box: its own oriented box where that is known, else its world-aligned box.
         internal static IReadOnlyList<WorldPoint> CornersOf(ObjectMarkingPart part) =>
@@ -324,16 +377,21 @@ namespace RailroaderScenePatcher.Core {
             double dx = Gap(minX, maxX, camera.X, 0), dy = Gap(minY, maxY, camera.Y, 0), dz = Gap(minZ, maxZ, camera.Z, 0);
             var distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
             var center = new WorldPoint((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
-            if (GameDefinedGroups.Shows(distance) != GroupShows.MarkerAndFrame) return new GroupMarking(distance, center, null, null);
+            var shows = GameDefinedGroups.Shows(distance);
+            if (shows == GroupShows.Objects) return new GroupMarking(distance, center, null, null);
             var held = anchors.Where(Valid).ToList();
             if (frames != null) foreach (var frame in frames) if (frame != null) held.AddRange(frame.PieceCorners());
             var box = Enclose(held, orientation ?? WorldBasis.World);
             if (box == null) return new GroupMarking(distance, center, null, null);
+            // Beyond the frame distance the group shows only its marker, on the center of its box uncut by the ground.
+            if (shows != GroupShows.MarkerAndFrame) return new GroupMarking(distance, center, null, null, CenterOf(new List<Piece> { new Piece { Corners = box } }));
             var pieces = Pieces(box, ground);
             var above = pieces.Where(q => q.Above && !q.Whole).ToList();
-            var points = Project(above.Count != 0 ? Standing(pieces) : Whole(pieces), false, project, view, out _);
-            if (points == null || points.Count == 0) return new GroupMarking(distance, center, null, null);
-            return new GroupMarking(distance, center, Rect(points.Min(q => q.X) - Margin, points.Min(q => q.Y) - Margin, points.Max(q => q.X) + Margin, points.Max(q => q.Y) + Margin), Grown(points, Margin));
+            var drawn = above.Count != 0 ? Standing(pieces) : Whole(pieces);
+            var marker = CenterOf(drawn);
+            var points = Project(drawn, false, project, view, out _);
+            if (points == null || points.Count == 0) return new GroupMarking(distance, center, null, null, marker);
+            return new GroupMarking(distance, center, Rect(points.Min(q => q.X) - Margin, points.Min(q => q.Y) - Margin, points.Max(q => q.X) + Margin, points.Max(q => q.Y) + Margin), Grown(points, Margin), marker);
         }
         // The objects of a group that count for its bounds and its box: those its listed members name
         // (GameDefinedGroup.Listed), by position; every object without them. The invisible detection spans of a
