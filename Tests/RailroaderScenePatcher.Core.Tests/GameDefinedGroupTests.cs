@@ -120,6 +120,24 @@ static class GameDefinedGroupTests {
             "a storage display is anchored by the industry's storage, and no industry building is a member of one");
         Check(!displays.Any(g => g.Members.Contains(6) || g.Members.Contains(7)), "an industry building without parts and a display of one pile show as that one object");
 
+        // A storage display that is a baked scenery group lists its piles as parts: each pile belongs to that group,
+        // its outermost group, whichever storage of the industry fills it, so the display is one group with its
+        // root standing for it. Connelly has two storages, logs and pulpwood, on one root.
+        var connelly = new[] {
+            Object("Connelly", "World/Large Scenery/Whittier", baked: true),                                                            // 0
+            new GroupObject("Log Pile L1a", Up("World/Large Scenery/Whittier/Connelly"), bakedPart: true, storage: "Log storage"),     // 1
+            new GroupObject("Log Pile L1b", Up("World/Large Scenery/Whittier/Connelly"), bakedPart: true, storage: "Log storage"),     // 2
+            new GroupObject("Pulpwood Pile P1a", Up("World/Large Scenery/Whittier/Connelly"), bakedPart: true, storage: "Pulpwood storage"), // 3
+            Object("Andrews Snowbird Paper", "World/Large Scenery/Andrews", baked: true),                                              // 4
+            new GroupObject("Pulpwood Piles", Up("World/Large Scenery/Andrews/Andrews Snowbird Paper"), bakedPart: true),               // 5
+            new GroupObject("Pile", Up("World/Large Scenery/Andrews/Andrews Snowbird Paper/Pulpwood Piles"), bakedPart: true, storage: "Paper storage"), // 6
+            new GroupObject("Pile (1)", Up("World/Large Scenery/Andrews/Andrews Snowbird Paper/Pulpwood Piles"), bakedPart: true, storage: "Paper storage"), // 7
+        };
+        var whole = GameDefinedGroups.Of(connelly);
+        Check(Members(whole) == "BakedSceneryGroup:0,1,2,3 | BakedSceneryGroup:4,5,6,7",
+            "a storage display whose piles are parts of its baked scenery group is that one group (got " + Members(whole) + ")");
+        Check(whole[0].Root == 0 && whole[1].Root == 4 && whole[1].Listed.Contains(6) && whole[1].Listed.Contains(7), "the display's root stands for it, and its choice list holds the piles");
+
         // Beyond 125 metres only the group shows; at 125 metres or less only its parts: the root, which stands for
         // the group, shows no marker of its own unless it is inspected or the candidate of a choice.
         foreach (var shows in new[] { GroupShows.Objects, GroupShows.MarkerAndFrame, GroupShows.MarkerOnly }) {

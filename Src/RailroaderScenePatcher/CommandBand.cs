@@ -292,6 +292,30 @@ namespace RailroaderScenePatcher {
         // The supported edits of a part of a listed baked scenery group.
         internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
         internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
+        // What the Object tab says under Use in the game for a group root or part of the Baked scenery group family.
+        // category is the category of the group, also for a part. storage names what a storage pile shows, null for
+        // every object that is no pile. An industry loads and unloads on the track spans of the native map data, so
+        // its decorative buildings and its storage display move without changing that; a pile shows its industry's
+        // storage by the ids the game reads, wherever it stands.
+        // holdsPiles: the group root or part holds storage piles below it.
+        internal static string UseInGame(bool part, string category, string storage, bool holdsPiles) {
+            if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile does not change the storage, and the industry keeps working on its native track spans.";
+            if (category != BakedSceneryCategories.IndustryBuilding && category != BakedSceneryCategories.StorageDisplay) return part ? PartDecorative : Decorative;
+            return "Decorative. The industry works on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " does not change loading or unloading." +
+                (holdsPiles ? " Its piles keep showing the industry's storage." : "");
+        }
+        // The ids by which a pile's storage synchronizer reads the storage the pile shows, as one binding line.
+        internal static string StorageBinding(string industryComponentId, string loadId) => "Industry storage=" + industryComponentId + ", load " + loadId;
+        // How many storage piles stand at or below a group root or part, as one binding line.
+        const string PilesPrefix = "Storage piles=";
+        internal static string PilesBinding(int count) => PilesPrefix + count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        internal static bool HoldsPiles(IEnumerable<string> bindings) => bindings?.Any(line => line != null && line.StartsWith(PilesPrefix, StringComparison.Ordinal)) == true;
+        // The storage a pile shows: the industry's load storage by the names the game shows, the load in lower case
+        // inside the sentence unless it is an acronym, or by the ids its storage synchronizer reads when the industry
+        // or load is not known.
+        internal static string StorageName(string industry, string load, string industryComponentId, string loadId) =>
+            !String.IsNullOrWhiteSpace(industry) && !String.IsNullOrWhiteSpace(load) ? Lower(load) + " storage of " + industry : "storage of load " + loadId + " at industry component " + industryComponentId;
+        static string Lower(string word) => word.Length > 1 && Char.IsUpper(word[1]) ? word : Char.ToLowerInvariant(word[0]) + word.Substring(1);
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
         internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + kind + " cannot be edited";
         // The reason an object is inspection only, given as a whole clause.

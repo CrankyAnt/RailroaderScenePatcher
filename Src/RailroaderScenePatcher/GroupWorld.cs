@@ -20,6 +20,42 @@ namespace RailroaderScenePatcher {
         static readonly MethodInfo simpleMoved = simple?.GetMethod("OnTransformDidChange", Native.Flags, null, Type.EmptyTypes, null);
         static readonly FieldInfo simpleRadius = simple?.GetField("radius", Native.Flags), rendererRadius = renderer?.GetField("radius", Native.Flags), switcherRadius = switcher?.GetField("radius", Native.Flags),
             switcherState = switcher?.GetField("_cullingState", Native.Flags);
+        // A storage pile (Scenery.Pile, a Scenery.BulkScenery) lays its logs out in map space from where it stands when
+        // it builds them, and registers a culling sphere of its own at its transform. Read lazily: a group without a
+        // pile needs none of these, and a group with a pile is refused while one is missing (PileProblem).
+        static readonly Type bulk = Native.Type("Scenery.BulkScenery");
+        static readonly FieldInfo bulkVisible = bulk?.GetField("_cullingVisible", Native.Flags), bulkToken = bulk?.GetField("_cullingToken", Native.Flags);
+        static readonly MethodInfo bulkRebuild = bulk?.GetMethod("Rebuild", Native.Flags, null, Type.EmptyTypes, null), bulkRefresh = bulk?.GetMethod("RequestUpdateCullingPosition", Native.Flags, null, Type.EmptyTypes, null),
+            bulkRadius = bulk?.GetMethod("GetCullingRadius", Native.Flags, null, Type.EmptyTypes, null);
+        static string PileProblem(GameObject root) {
+            if (bulk == null || root.GetComponentsInChildren(bulk, true).Length == 0) return null;
+            return bulkVisible?.FieldType != typeof(bool) || bulkToken == null || bulkRebuild == null || bulkRefresh == null || bulkRadius == null ? "The game's storage pile members are unavailable, so this group and its piles cannot be moved, enabled or disabled" : null;
+        }
+        // The collider a pile builds near the camera: its mesh is a new one at every rebuild, which the game does not
+        // destroy; a rebuild the patcher starts destroys the mesh it replaced.
+        static readonly FieldInfo pileCollider = Native.Type(BakedSceneryRules.StoragePile)?.GetField("_colliderObject", Native.Flags);
+        static Mesh ColliderMesh(Component pile) {
+            var holder = pileCollider?.GetValue(pile) as GameObject;
+            var collider = holder == null ? null : holder.GetComponent<MeshCollider>();
+            return collider == null ? null : collider.sharedMesh;
+        }
+        // Where each pile stood, in map coordinates, when it last laid out its logs as far as this patcher knows: read
+        // when its group is first observed, and after each refresh. Only a pile that stands elsewhere now is laid out
+        // again, so a gizmo drag rebuilds the piles it moves and no other.
+        static readonly Dictionary<Component, Placement> laidOut = new Dictionary<Component, Placement>();
+        static Placement PileAt(Component pile) => new Placement(Coordinates(NativeInventory.MapPosition(pile.transform)), Coordinates(pile.transform.rotation));
+        // Within a centimetre and a hundredth of a degree, as the group checks compare placements; a sphere within ten
+        // centimetres, as they compare registrations.
+        const double SameDistance = 0.01, SameAngle = 0.01, SphereDistance = 0.1;
+        static double Distance(double[] a, double[] b) => Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
+        static bool SamePile(Placement a, Placement b) =>
+            Distance(a.Position, b.Position) <= SameDistance && Quaternion.Angle(new Quaternion((float)a.Rotation[0], (float)a.Rotation[1], (float)a.Rotation[2], (float)a.Rotation[3]),
+                new Quaternion((float)b.Rotation[0], (float)b.Rotation[1], (float)b.Rotation[2], (float)b.Rotation[3])) <= SameAngle;
+        static void RememberPiles(GameObject root) {
+            if (bulk == null) return;
+            foreach (var gone in laidOut.Keys.Where(pile => pile == null).ToList()) laidOut.Remove(gone);
+            foreach (var pile in root.GetComponentsInChildren(bulk, true)) if (!laidOut.ContainsKey(pile)) laidOut[pile] = PileAt(pile);
+        }
         // Own culling of moved parts: one controller for the loaded world, so the readers of the inventory and the
         // inspector see what it holds. A new world replaces it.
         static PartCullingHost host;
@@ -215,7 +251,7 @@ namespace RailroaderScenePatcher {
             var components = root.GetComponentsInChildren<Component>(true);
             if (components.Any(c => c == null)) return "Missing script in the group hierarchy";
             if (components.Any(c => c is Rigidbody)) return "The group holds a rigidbody; only static colliders are supported";
-            return null;
+            return PileProblem(root);
         }
         // A culling container and a group root resolve too, so their modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
@@ -300,6 +336,7 @@ namespace RailroaderScenePatcher {
         internal GroupObservation Observe(object target, GameObject listingRoot, Func<Transform, bool> moves) {
             var root = Root(target);
             Physics.SyncTransforms();
+            RememberPiles(root);
             var t = root.transform;
             var position = NativeInventory.MapPosition(t); var rotation = t.rotation;
             var state = new ObjectState(new Placement(Coordinates(position), Coordinates(rotation)), Authored(root));
@@ -362,12 +399,18 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<IReadOnlyList<double>> Presence(object target, IReadOnlyList<object> without) {
             var part = PartObject(target).transform;
             var skip = (without ?? new object[0]).OfType<GameObject>().Where(go => go != null).Select(go => go.transform).ToArray();
-            bool Counts(Component c) => c != null && !skip.Any(c.transform.IsChildOf);
+            // What the game builds while it runs, such as the collider a pile builds near the camera, does not count, so
+            // the presence does not change with the camera distance.
+            bool Counts(Component c) => c != null && !skip.Any(c.transform.IsChildOf) && !Transient(c.transform, part);
             var points = new List<Vector3>();
             foreach (var shape in part.GetComponentsInChildren<Renderer>(true))
                 if (Counts(shape) && BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false)) points.AddRange(Corners(shape));
             var shapes = points.Count;
             foreach (var collider in part.GetComponentsInChildren<Collider>(true)) if (Counts(collider)) points.AddRange(Corners(collider));
+            // A storage pile has no saved renderer or collider: it counts with the culling sphere it lays its logs out in.
+            if (bulk != null && bulkRadius != null)
+                foreach (var pile in part.GetComponentsInChildren(bulk, true))
+                    if (Counts(pile)) { var r = (float)bulkRadius.Invoke(pile, null); for (var i = 0; i < 8; i++) points.Add(pile.transform.position + Sign(i) * r); shapes++; }
             if (shapes == 0) foreach (var light in part.GetComponentsInChildren<Light>(true)) if (Counts(light)) points.Add(light.transform.position);
             if (points.Count == 0) points.Add(part.position);
             var moves = NativeInventory.MovesWithOrigin(part);
@@ -472,10 +515,39 @@ namespace RailroaderScenePatcher {
             // A simple culler moves its sphere in its own Update, which does not run while the camera has culled it.
             foreach (var culler in root.GetComponentsInChildren(simple, true))
                 if (cullingSpheres.GetValue(culler) != null) simpleMoved.Invoke(culler, null);
+            RefreshPiles(root);
             // Every culler keeps the radius the scene gives it. A moved part outside a culler's sphere gets a sphere of
             // its own instead, as the plan names it.
             own.Apply(root, plan);
             Physics.SyncTransforms();
+        }
+        // Each enabled storage pile that stands elsewhere than where it last laid out its logs moves its culling sphere
+        // to where it stands now, and one whose sphere shows lays its logs out again there, releasing the collider mesh
+        // it replaced; a pile the camera has culled lays them out when it shows again. Its sphere must then stand at the
+        // pile's new place in map coordinates with the radius the pile gives it; otherwise the edit fails and is
+        // restored, so a moved pile never stays culled at its old place.
+        static void RefreshPiles(GameObject root) {
+            if (bulk == null || PileProblem(root) != null) return;
+            foreach (var pile in root.GetComponentsInChildren(bulk, true)) {
+                var now = PileAt(pile);
+                if (laidOut.TryGetValue(pile, out var was) && SamePile(was, now)) continue;
+                var token = pile is Behaviour behaviour && behaviour.isActiveAndEnabled ? bulkToken.GetValue(pile) : null;
+                // A disabled pile, or one whose sphere is gone, registers and lays out at its place when it starts again.
+                if (token == null || (bool)Native.Read(token, "IsRemoved")) { laidOut[pile] = now; continue; }
+                bulkRefresh.Invoke(pile, null);
+                if ((bool)bulkVisible.GetValue(pile)) {
+                    var replaced = ColliderMesh(pile);
+                    bulkRebuild.Invoke(pile, null);
+                    if (replaced != null && replaced != ColliderMesh(pile)) UnityEngine.Object.Destroy(replaced);
+                }
+                var index = (int)Native.Read(token, "Index");
+                var all = (BoundingSphere[])managerSpheres.GetValue(Native.Read(token, "Manager"));
+                if (index < 0 || index >= all.Length) throw new InvalidOperationException("The culling sphere of the storage pile " + pile.name + " is not registered");
+                var centre = Map(all[index].position, pile.transform);
+                if (Distance(centre, now.Position) > SphereDistance || Math.Abs(all[index].radius - (float)bulkRadius.Invoke(pile, null)) > SameDistance)
+                    throw new InvalidOperationException("The culling sphere of the storage pile " + pile.name + " did not follow it to its new place");
+                laidOut[pile] = now;
+            }
         }
         public bool Below(object target, object above) =>
             target is GameObject part && part != null && above is GameObject over && over != null && part != over && part.transform.IsChildOf(over.transform);

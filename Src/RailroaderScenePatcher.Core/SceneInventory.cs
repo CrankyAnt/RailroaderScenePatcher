@@ -161,10 +161,14 @@ namespace RailroaderScenePatcher.Core {
         // detection span, a track span that a crossing controller holds in a circuit, names its controller. Null for every other
         // object. Presentation metadata: the outliner lists the object under its holder.
         public string HolderPath { get; }
+        // For a storage pile, the storage it shows, named for the Object tab; null for every other object. Presentation
+        // metadata: the industry and load names resolve once the game has read its operations data, so the name is no
+        // part of what an inspection pins. The pile's bindings hold the ids its storage is read by.
+        public string Storage { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null) {
-            Enabled = enabled ?? active; HolderPath = holderPath; GroupPath = groupPath; Category = category; Subcategory = subcategory;
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null) {
+            Enabled = enabled ?? active; HolderPath = holderPath; Storage = storage; GroupPath = groupPath; Category = category; Subcategory = subcategory;
             InspectionOnly = inspectionOnly;
             var noted = (notes ?? Array.Empty<string>()).ToArray();
             if (inspectionOnly != null) { noted = noted.Concat(problems).ToArray(); problems = Array.Empty<string>(); }

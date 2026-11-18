@@ -127,6 +127,40 @@ namespace RailroaderScenePatcher {
             if (renderer.enabled && renderer.gameObject.activeInHierarchy) { local = renderer.localBounds; return true; }
             return false;
         }
+        // The storage piles at and below an object that outline it: listed with its renderers, and passed over while
+        // the scene or a modder switched them off, as a renderer is.
+        static readonly Type pileType = Native.Type(BakedSceneryRules.StoragePile);
+        static readonly System.Reflection.FieldInfo pileWidth = pileType?.GetField("width", Native.Flags), pileHeight = pileType?.GetField("maxHeight", Native.Flags),
+            pileProfile = pileType?.BaseType?.GetField("profile", Native.Flags);
+        readonly Dictionary<GameObject, KeyValuePair<int, Component[]>> piles = new Dictionary<GameObject, KeyValuePair<int, Component[]>>();
+        IEnumerable<Component> Piles(GameObject go) {
+            if (pileType == null) return Array.Empty<Component>();
+            if (!piles.TryGetValue(go, out var kept) || Time.frameCount >= kept.Key)
+                piles[go] = kept = new KeyValuePair<int, Component[]>(Time.frameCount + 90 + (go.GetInstanceID() & 63), go.GetComponentsInChildren(pileType, true));
+            return kept.Value.Where(pile => {
+                if (pile == null) return false;
+                try {
+                    var chain = new List<MarkingLink>();
+                    for (var t = pile.transform; t != null; t = t.parent) chain.Add(Link(t.gameObject));
+                    return ObjectMarkingGeometry.Outlines(((Behaviour)pile).enabled, false, chain);
+                } catch { return pile.gameObject.activeInHierarchy; }
+            });
+        }
+        // The eight corners of the box a pile lays its logs out in (Scenery.Pile's own bounds gizmo): its width across,
+        // its height up from the ground plus one log's radius, and the logs' length along it. Null when the pile has no
+        // profile or its settings cannot be read.
+        static WorldPoint[] PileBox(Component pile) {
+            try {
+                var profile = pileProfile?.GetValue(pile);
+                if (profile == null || pileWidth == null || pileHeight == null) return null;
+                float width = (float)pileWidth.GetValue(pile), height = (float)pileHeight.GetValue(pile);
+                float radius = Convert.ToSingle(Native.Read(profile, "EffectiveRadius")), length = Convert.ToSingle(Native.Read(profile, "EffectiveLength"));
+                var centre = new Vector3(0, height / 2 + radius, 0); var half = new Vector3(width / 2, height / 2, length / 2);
+                var matrix = pile.transform.localToWorldMatrix; var corners = new WorldPoint[8];
+                for (var i = 0; i < 8; i++) corners[i] = Point(matrix.MultiplyPoint3x4(centre + Vector3.Scale(half, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
+                return corners;
+            } catch { return null; }
+        }
         // The bounds of an invisible object's colliders, at and below it, as parts for its helper marker
         // (HelperMarkers.Mark): each collider's own box in the world, from its shape. Which colliders frame the object
         // (HelperMarkers.Framing: on, with every object up to the scene root on or off only through a culler; no
@@ -234,7 +268,7 @@ namespace RailroaderScenePatcher {
         }
         // The surface may have changed: an edit, a terrain output that completed, or a track change. The heights are
         // read again.
-        internal void ClearSurface() { grounds.Clear(); listed.Clear(); colliders.Clear(); controlled.Clear(); groupedFrom = null; }
+        internal void ClearSurface() { grounds.Clear(); listed.Clear(); colliders.Clear(); controlled.Clear(); piles.Clear(); groupedFrom = null; }
         // What is kept per object and per renderer loses the entries of objects the game destroyed, now and then.
         int prunedAt;
         void Prune() {
@@ -243,6 +277,7 @@ namespace RailroaderScenePatcher {
             foreach (var gone in listed.Keys.Where(key => key == null).ToArray()) listed.Remove(gone);
             foreach (var gone in colliders.Keys.Where(key => key == null).ToArray()) colliders.Remove(gone);
             foreach (var gone in controlled.Keys.Where(key => key == null).ToArray()) controlled.Remove(gone);
+            foreach (var gone in piles.Keys.Where(key => key == null).ToArray()) piles.Remove(gone);
             foreach (var gone in kinds.Keys.Where(key => key == null).ToArray()) kinds.Remove(gone);
             foreach (var gone in keptBoxes.Keys.Where(key => key == null).ToArray()) keptBoxes.Remove(gone);
         }
@@ -813,6 +848,16 @@ namespace RailroaderScenePatcher {
                     }
                     parts.Add(new ObjectMarkingPart(name, Point(bounds.center), Point(bounds.extents), oriented, kind, ground));
                 }
+                // A storage pile has no renderer of its own: the box it lays its logs out in stands in, from its layout
+                // settings, so a pile is framed like any other visible part whether or not the camera has culled it.
+                if (!waits)
+                    foreach (var pile in Piles(go)) {
+                        var oriented = PileBox(pile);
+                        if (oriented == null) continue;
+                        var bounds = new Bounds(Vector(oriented[0]), Vector3.zero);
+                        foreach (var corner in oriented) bounds.Encapsulate(Vector(corner));
+                        parts.Add(new ObjectMarkingPart("pile " + pile.name, Point(bounds.center), Point(bounds.extents), oriented, ObjectMarkingPartKind.Mesh, ground));
+                    }
                 if (waits) parts.Clear();
                 var view = camera.pixelRect;
                 // One frame per object, around the piece its marker belongs to. Picking uses the same rectangle.

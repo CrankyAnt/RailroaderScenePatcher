@@ -219,8 +219,6 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("RollingStock.CarContentSwapper", "car loader", "#92"),
             new Exclusion("LakePolygon", "lake surface", "#93"),
             new Exclusion("Scenery.LogPond", "log pond", "#93"),
-            new Exclusion("Scenery.Pile", "storage pile", "#98"),
-            new Exclusion("Scenery.BulkIndustryStorageSynchronizer", "industry storage display", "#98"),
             new Exclusion("Game.Mow.TrackConstructionScenery", "bridge construction scenery", "#95"),
             new Exclusion("Character.SpawnPoint", "spawn point", "#94"),
             new Exclusion("UI.Map.MapIcon", "station icon", "#89", reason: "This group contains a station icon, so it cannot be edited as a group."),
@@ -286,10 +284,15 @@ namespace RailroaderScenePatcher.Core {
             if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
             verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.Group, null));
         }
-        // A renderer, collider or light at or below the node, on an object the scene serializes. What the game builds
-        // while it runs does not count: a storage pile builds its collider only while the camera is near, so counting
-        // it would list its group by camera distance.
-        static bool Physical(IHierarchyNode node) => node.Serialized && (node.Physical || node.Children.Any(Physical));
+        // A renderer, collider or light at or below the node, or a storage pile, on an object the scene serializes. What
+        // the game builds while it runs does not count: a storage pile builds its collider only while the camera is
+        // near, so counting that collider would list its group by camera distance. The pile itself counts.
+        static bool Physical(IHierarchyNode node) => node.Serialized && (Present(node) || node.Children.Any(Physical));
+        // A storage pile of an industry (Scenery.Pile) draws its logs through the game's instancer and builds its
+        // collider only near the camera: the scene gives it no renderer or collider, but a track change runs into it.
+        public const string StoragePile = "Scenery.Pile";
+        // The object itself has physical presence: a renderer, collider or light on it, or it is a storage pile.
+        public static bool Present(IHierarchyNode node) => node.Physical || node.Components.Contains(StoragePile);
         // The coverage rules that keep an object below a listed group root out of the part entries.
         public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group",
             AnimatedParts = "Parts the game moves while running", CullingContainers = "Culling containers";
@@ -305,7 +308,7 @@ namespace RailroaderScenePatcher.Core {
         // and has children. It is no object a modder moves; its parts stay listed under their group. A group root that
         // carries the culler itself, such as Sylva Culled, stays the group root.
         public static bool CullingContainer(IHierarchyNode node) =>
-            node != null && !node.Physical && node.Children.Count != 0 && node.Components.Contains(SimpleCuller);
+            node != null && !Present(node) && node.Children.Count != 0 && node.Components.Contains(SimpleCuller);
         // Why a modification cannot edit the object at a path the part rule did not list, or null for a listed part.
         public const string CullingContainerRefusal = "This path names a culling container, which only groups parts for the game's culling; it is not an object. Edit its parts instead";
         // Whether a path resolves to the object the part rule decided this for: a listed part, and a culling container,

@@ -12,16 +12,16 @@ A baked scenery group is saved in the map's scene. Props, masks and other object
 
 The **Baked scenery group** family in the outliner lists one entry per group root, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object one level below a `World` folder, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, the root is one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`.
 
-To be listed, a group must be saved in the scene, have a renderer, collider or light at or below its root, and belong to no other family. The following objects have no group entry:
+To be listed, a group must be saved in the scene, have a renderer, collider, light or storage pile at or below its root, and belong to no other family. The following objects have no group entry:
 
-- Objects without a renderer, collider or light, such as a spawn point under `World/POIs`.
+- Objects without a renderer, collider, light or storage pile, such as a spawn point under `World/POIs`.
 - Visual effects, such as the fireflies under `World/Environment Effects`.
 - Folders, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that folder is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, car loader, lake surface, log pond, storage piles, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
+Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, car loader, lake surface, log pond, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
 
 Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -29,7 +29,7 @@ Groups containing track markers are also marked `inspection only`. Such a group 
 
 Each group in the **Baked scenery group** family lists its parts below its own row, sorted by name. A part's row shows the path from the group root, such as `Jetty / Piece (2)`. Its tooltip and searches use the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
 
-A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider or light at or below it. A part can contain other parts, which move with it.
+A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider, light or storage pile at or below it. A part can contain other parts, which move with it.
 
 Some objects below a group root are not listed as parts:
 
@@ -37,7 +37,7 @@ Some objects below a group root are not listed as parts:
 - A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
 - A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with that reason; the file's other modifications still apply.
 - Objects the game moves during play, such as a clock hand at Bryson depot, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
-- Objects without a renderer, collider or light, objects created while the game runs and objects listed by another family have no part entry.
+- Objects without a renderer, collider, light or storage pile, objects created while the game runs and objects listed by another family have no part entry.
 
 ## Move a group in the native map editor
 
@@ -65,6 +65,19 @@ A part with a fixed placement keeps its map coordinates when its group moves lat
 Click **Remove modification** to restore a part's unmodified placement relative to its parent, which may be the group root or another part. The parent stays at its current placement, and the part moves with it again. A part below a moved part keeps its place relative to that moved part when you disable and enable it or remove its own modification.
 
 **Disable** is unavailable for a part that a game culler switches on and off by camera distance; the editor shows the reason. The culler would override a stored disable, so the patcher cannot maintain it. A placement edit leaves the part in the state set by the culler.
+
+## Industry buildings and storage piles
+
+You can move or disable an industry's decorative buildings and its storage piles to make room for extra track. The industry keeps working on its native track spans.
+
+- **Industry building** lists decorative buildings of industries, such as `Bryson Coal Dealer`, `Whittier Saw Mill Culled` and `Mine 1` at Hewitt. On their **Object** tab, **Use in the game** says that the industry works on its native track spans, so moving or disabling the group or a part does not change loading or unloading.
+- **Storage display** lists the storage piles of `Andrews Snowbird Paper`, `Sylva Paperboard` and `Connelly` as groups. Each pile is a part of its group, such as `Connelly / Log Pile L1a` or `Andrews Snowbird Paper / Pulpwood Piles / Pile (3)`. Move a pile on its own, or move the whole group with all its piles.
+
+On a pile's **Object** tab, **Use in the game** names the storage that the pile shows, such as the pulpwood storage of its industry. Moving or disabling the pile does not change the storage. At its new place the pile still fills and empties with that storage, because the game links the pile to the storage by ID, not by position. The pile's logs, its collider and its culling move with it. A disabled pile shows nothing, and the storage stays as it is.
+
+The industry itself is native map data. Its position, its track spans and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
+
+`Whittier Log Pond` holds a log pond and a lake surface. It stays under **Storage display**, marked `inspection only`.
 
 ## Write the modification by hand
 

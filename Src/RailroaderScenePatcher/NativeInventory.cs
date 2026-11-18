@@ -134,6 +134,27 @@ namespace RailroaderScenePatcher {
                     foreach (var item in filled) if (item is Component scenery && scenery != null && !found.ContainsKey(scenery.gameObject)) found[scenery.gameObject] = storage.gameObject;
             return found;
         }
+        // The storage a pile shows: the binding of the ids the synchronizer naming the pile reads it by, and its name for
+        // the Object tab, by the names the game shows or by those ids while the industry or load is not known. Null for
+        // a pile that no loaded synchronizer names.
+        internal static Tuple<string, string> PileStorage(GameObject pile) {
+            var scenery = pile == null ? null : Get(pile, Pile);
+            var type = Native.Type(StorageSynchronizer);
+            if (scenery == null || type == null) return null;
+            foreach (var storage in Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(c => c != null && Loaded(c)).OrderBy(c => c.GetInstanceID())) {
+                if (!(Field(storage, "bulkScenery") is IEnumerable filled) || !filled.Cast<object>().Any(item => ReferenceEquals(item, scenery))) continue;
+                var componentId = Text(Field(storage, "industryComponentId")); var loadId = Text(Field(storage, "loadId"));
+                string industry = null, load = null;
+                try {
+                    var ops = Native.Read(Native.Type("Model.Ops.OpsController"), "Shared"); var dot = componentId?.IndexOf('.') ?? -1;
+                    var found = ops == null || dot <= 0 ? null : Native.Call(ops, "IndustryForId", componentId.Substring(0, dot));
+                    industry = found == null ? null : Text(Native.Read(found, "name"));
+                } catch { }
+                try { var known = Native.Call(Native.Type("Model.Ops.Definition.CarLoadLibrary"), "GetLoad", loadId); load = known == null ? null : Text(Native.Read(known, "description")); } catch { }
+                return Tuple.Create(CommandBand.StorageBinding(componentId, loadId), CommandBand.StorageName(industry, load, componentId, loadId));
+            }
+            return null;
+        }
         static IEnumerable<UnityEngine.Object> References(object value) {
             if (value is UnityEngine.Object obj) { if (obj != null) yield return obj; }
             else if (value is IList list) foreach (var item in list) if (item is UnityEngine.Object element && element != null) yield return element;
@@ -193,9 +214,6 @@ namespace RailroaderScenePatcher {
             // A span the game builds from the map's operations data is not serialized and stays with the native map
             // editor; the spans this patcher adds for a crossing are listed.
             if (type == Span) return BakedSceneryRules.SpanListed(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName) ? "Track span" : null;
-            // A storage pile of an industry is a scene object the patcher will place; until then it is listed without
-            // an edit, in the Inspection only group, instead of being left out.
-            if (type == Pile) return "Storage pile";
             if (type == Crossing) return "Crossing controller";
             // A crossing mast is one entry: its light object. The gate on a child of that object is a part of the
             // entry and gets no row. A gate that stands on no light object stays visible as a mast that does not
@@ -456,6 +474,18 @@ namespace RailroaderScenePatcher {
             if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output");
             if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root");
             if (part) dependencies.Add(BakedSceneryRules.PartCullingDependency);
+            // A storage pile shows its industry's storage by the ids its synchronizer reads, wherever the pile stands. The
+            // ids are a binding; the storage's name is presentation only.
+            string storageName = null;
+            if (part && Get(go, Pile) != null) Read(() => {
+                var storage = PileStorage(go);
+                if (storage != null) { bindings.Add(storage.Item1); storageName = storage.Item2; dependencies.Add("Industry storage display: the pile rebuilds its logs and collider where it stands"); }
+            });
+            // A group root or part that holds storage piles below it says so, for the Object tab.
+            if ((groupRoot || part) && Get(go, Pile) == null) Read(() => {
+                var piles = components.Count(component => component != null && TypeName(component) == Pile);
+                if (piles != 0) bindings.Add(CommandBand.PilesBinding(piles));
+            });
             if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling; separate construction scenery has its own placement");
             // Crossing equipment sits under objects that a culler switches off when the camera is far away, so whether it
             // is active in the game changes with every camera jump. Its activity is what the scene authored: every
@@ -591,7 +621,7 @@ namespace RailroaderScenePatcher {
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
                 category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1],
-                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform));
+                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName);
         }
         // The names of the objects that enclose a transform, from its parent upwards.
         static IReadOnlyList<string> Ancestors(Transform t) { var names = new List<string>(); for (var p = t.parent; p != null; p = p.parent) names.Add(p.name); return names; }

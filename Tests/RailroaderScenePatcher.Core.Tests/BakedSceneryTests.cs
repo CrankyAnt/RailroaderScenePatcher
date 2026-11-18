@@ -361,8 +361,9 @@ static class BakedSceneryTests {
         Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true), "A scene span and the patcher's own spans are listed");
     }
     // A storage pile (Scenery.Pile) builds a "Pile Collider" child the scene does not save while its culling sphere is
-    // near the camera and destroys it when the camera moves away, as at Sylva Paperboard and Connelly. The group's
-    // verdict is the same with and without that child, so its listing never follows the camera.
+    // near the camera and destroys it when the camera moves away, as at Sylva Paperboard and Connelly. The pile itself
+    // gives the group physical presence, so the group's verdict is the same with and without that child and its
+    // listing never follows the camera.
     static void ListingDoesNotFollowTheCamera() {
         Node Paperboard(bool near) {
             Node Pile(string name) {
@@ -373,8 +374,8 @@ static class BakedSceneryTests {
             return new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Sylva Paperboard", Pile("Pile"), Pile("Pile (1)")).With("Scenery.BulkIndustryStorageSynchronizer"))));
         }
         GroupRootVerdict Verdict(bool near) => At(BakedSceneryRules.Classify(Paperboard(near)), "World/Large Scenery/Sylva/Sylva Paperboard");
-        Assert(Verdict(false).Disposition == GroupDisposition.NotListed && Verdict(false).Reason == BakedSceneryRules.NoPhysicalPresence, "Far away, the pile group has no physical presence of its own");
-        Assert(Verdict(true).Disposition == Verdict(false).Disposition && Verdict(true).Reason == Verdict(false).Reason, "Near the camera, the collider the pile builds does not list the group: " + Verdict(true).Disposition + " " + Verdict(true).Reason);
+        Assert(Verdict(false).Disposition == GroupDisposition.Group, "Far away, the piles give the group physical presence: " + Verdict(false).Disposition + " " + Verdict(false).Reason);
+        Assert(Verdict(true).Disposition == Verdict(false).Disposition && Verdict(true).Reason == Verdict(false).Reason, "Near the camera, the collider the pile builds does not change the group's verdict: " + Verdict(true).Disposition + " " + Verdict(true).Reason);
         // A runtime child with a component of a kind a later ticket covers does not change the reason of a listed group.
         var runtime = new Node("Spawned Marker").With("Track.TrackMarker").Solid(); runtime.Serialized = false;
         var shed = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Shed", new Node("Wall").Solid(), runtime))))), "World/Large Scenery/Town/Shed");
@@ -586,8 +587,6 @@ static class BakedSceneryTests {
             new { Name = "Coal Loader", Component = "RollingStock.CarContentSwapper", Kind = "car loader", Ticket = "#92" },
             new { Name = "Fontana Lake (1)", Component = "LakePolygon", Kind = "lake surface", Ticket = "#93" },
             new { Name = "Whittier Log Pond", Component = "Scenery.LogPond", Kind = "log pond", Ticket = "#93" },
-            new { Name = "Piles", Component = "Scenery.Pile", Kind = "storage pile", Ticket = "#98" },
-            new { Name = "Sylva Paperboard", Component = "Scenery.BulkIndustryStorageSynchronizer", Kind = "industry storage display", Ticket = "#98" },
             new { Name = "Trestle Scenery", Component = "Game.Mow.TrackConstructionScenery", Kind = "bridge construction scenery", Ticket = "#95" },
             new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
             new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "station icon", Ticket = "#89" },

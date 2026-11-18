@@ -76,7 +76,9 @@ namespace RailroaderScenePatcher.Core {
         // its objects stand: a rail bridge construction is a construction controller with the inventory objects on
         // and below the scene objects whose visibility it sets, and an industry storage display is the storage piles
         // or log pond that one industry's storage fills. Such an object belongs to that group, whatever root it
-        // stands below, so an industry building holds no pile. Only these facts decide: objects that stand close
+        // stands below, so an industry building holds no pile, unless it is a part of a baked scenery group: such a
+        // pile belongs to that group, as the storage displays of the Baked scenery group family hold their piles as
+        // parts. Only these facts decide: objects that stand close
         // together form no group.
         public static IReadOnlyList<GameDefinedGroup> Of(IReadOnlyList<GroupObject> objects) {
             if (objects == null) throw new ArgumentNullException(nameof(objects));
@@ -110,7 +112,9 @@ namespace RailroaderScenePatcher.Core {
                     if (controller == null && holders.TryGetValue(item.Node, out var held)) controller = held;
                     if (controller != null) key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.RailBridgeConstruction, controller);
                 }
-                if (key == null && item.Storage != null) key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.IndustryStorageDisplay, item.Storage);
+                // A pile that is a part of a baked scenery group belongs to that group, its outermost one, as the
+                // storage displays the Baked scenery group family lists are; any other filled object to its storage.
+                if (key == null && item.Storage != null && !item.BakedPart) key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.IndustryStorageDisplay, item.Storage);
                 if (key == null) {
                     object root = crossings.Contains(item.Node) || baked.Contains(item.Node) ? item.Node : null;
                     var below = false;

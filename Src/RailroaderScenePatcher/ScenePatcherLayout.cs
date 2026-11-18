@@ -655,10 +655,13 @@ namespace RailroaderScenePatcher {
                 foreach (var note in selected.Notes) PlainLabel(builder, Breakable(note));
             }
             // A group of the Baked scenery group family, and each part of it, is decorative: the game reads nothing from
-            // where it stands.
+            // where it stands. An industry's buildings and storage display say that the industry works on its native
+            // track spans, and a storage pile names the storage it shows.
             if (selected.InspectionOnly == null && selected.Family == BakedSceneryRules.Family) {
                 Section(builder, "Use in the game");
-                PlainLabel(builder, selected.GroupPath != null ? CommandBand.PartDecorative : CommandBand.Decorative);
+                var isPart = selected.GroupPath != null;
+                var category = isPart ? InventoryPresentationState.GroupOf(inventory, selected)?.Category : selected.Category;
+                PlainLabel(builder, CommandBand.UseInGame(isPart, category, selected.Storage, CommandBand.HoldsPiles(selected.Bindings)));
             }
             Section(builder, "State");
             // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
