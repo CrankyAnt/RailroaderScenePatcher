@@ -19,6 +19,13 @@ namespace RailroaderScenePatcher {
                 default: return Kind.None;
             }
         }
+        // The tooltip title of an outliner row and of its disclosure while the panel is open: the first line of the row's own
+        // tooltip, its object's name, or else the row's label, such as a folder's count and name; the reason follows as the
+        // tooltip's text.
+        internal static string RowTitle(string tooltip, string label) {
+            var first = (tooltip ?? "").Split('\n')[0].Trim();
+            return first.Length != 0 ? first : (label ?? "").Trim();
+        }
         internal static string Heading(Kind kind) => kind == Kind.VersionChoice ? "Version choice" : kind == Kind.Repair ? "Repair" : kind == Kind.Import ? "Import" : null;
         // Why a control outside the panel cannot be used, as its "Unavailable:" tooltip gives it, or null.
         internal static string Reason(Kind kind) =>

@@ -34,7 +34,7 @@ None of these choices requires a reload. The version choice remains visible afte
 
 Click **Import** in the **Version choice** panel. The **Import** panel opens in its place and lists every change since the patcher last read or wrote the file. Each is marked **New**, **Changed** or **Removed** and explains its effect, including changes outside the modifications.
 
-The panel then lists conflicts. A conflict occurs when:
+The panel then lists conflicts, each with what the editor version and the file version hold, followed by its choice. A conflict occurs when:
 
 - Your scene patch edits and the changed file both change the same entry.
 - Your edits and the file change one object under different modification IDs.

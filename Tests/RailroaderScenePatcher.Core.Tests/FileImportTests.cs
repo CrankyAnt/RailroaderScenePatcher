@@ -53,6 +53,7 @@ static class FileImportTests {
         SaveDuringSessionCreatesNoConflict();
         RemovedEntriesAreClassified();
         FilePanelFollowsTheSession();
+        LockedControlsNameThemselves();
         UnavailableTargetIsIsolated();
         DependentsAreAppliedAgain();
         OutdatedOverviewCloses();
@@ -347,5 +348,18 @@ static class FileImportTests {
         world.Outside("{broken");
         Assert(FilePanelState.Of(session) == FilePanelState.Kind.Repair && FilePanelState.Heading(FilePanelState.Kind.Repair) == "Repair", "A file that needs repair opens the Repair panel");
         Assert(FilePanelState.Completed(new ImportResult(2, 1, 0), true) == "Import completed. 2 changes applied, file version used for 1 conflict. Click Save in the Map Editor to write the scene patch file.", "Import results name what was applied");
+    }
+    // While the file panel is open, an outliner row keeps its object's name as its tooltip title and gives only the
+    // panel's reason; the search field has a fixed title; the state line puts the badges and the problem count before
+    // the family, so the changed badge is never the part a narrow line cuts off.
+    static void LockedControlsNameThemselves() {
+        Assert(FilePanelState.RowTitle("Loc: Sylva Int\nWorld/Signs/Loc: Sylva Int\nSigns\nChanged by this mod", "* Loc: Sylva Int") == "Loc: Sylva Int", "A locked row's tooltip title is its object's name");
+        Assert(FilePanelState.RowTitle(null, "12 Signs") == "12 Signs" && FilePanelState.RowTitle("", "12 Signs") == "12 Signs", "A folder row and its disclosure take the row's label as title");
+        Assert(CommandBand.Tooltip(null, FilePanelState.Reason(FilePanelState.Kind.Repair)) == "Unavailable: The scene patch file needs repair. Use the Repair panel first.", "A locked row gives the Repair reason");
+        Assert(CommandBand.Tooltip(null, FilePanelState.Reason(FilePanelState.Kind.VersionChoice)) == "Unavailable: Choose a version in the Version choice panel first.", "A locked row gives the Version choice reason");
+        Assert(CommandBand.SearchTitle == "Search objects" && !String.IsNullOrEmpty(CommandBand.SearchTip), "The search field has a fixed title and a description");
+        var parts = CommandBand.StateParts("Signs", "Inactive", new[] { "* CHANGED" }, "Inspection only", "1 problem");
+        Assert(parts.SequenceEqual(new[] { "* CHANGED", "1 problem", "Signs", "Inactive", "Inspection only" }), "Badges and problems lead the state line: " + String.Join(" | ", parts));
+        Assert(CommandBand.StateParts<string>("Signs", null, new string[0], null, null).SequenceEqual(new[] { "Signs" }), "Absent parts are left out");
     }
 }

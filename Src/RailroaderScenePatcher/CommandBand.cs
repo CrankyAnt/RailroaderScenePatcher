@@ -492,6 +492,16 @@ namespace RailroaderScenePatcher {
             internal string Markup => "<color=" + Color + "><b><size=90%>" + Text + "</size></b></color>";
         }
         internal static readonly Badge Changed = new Badge("* CHANGED", Amber), Added = new Badge("+ ADDED", Green);
+        // The order of the state line under the heading: the badges and the problem count first, then the family, its
+        // inactivity and inspection only. The line ends in an ellipsis beside the Inspector and Guided switch, so what is
+        // cut off is the family, which the tooltip and the outliner also give, never a badge. Absent parts are left out.
+        internal static List<T> StateParts<T>(T family, T inactive, IEnumerable<T> badges, T inspectionOnly, T problems) where T : class {
+            var parts = new List<T>(badges ?? Enumerable.Empty<T>());
+            foreach (var part in new[] { problems, family, inactive, inspectionOnly }) if (part != null) parts.Add(part);
+            return parts;
+        }
+        // The search field's tooltip: a fixed title and what the field does, like every other control.
+        internal const string SearchTitle = "Search objects", SearchTip = "Show only the objects whose name, path, family, binding identifiers, dependencies or problems contain the text you type.";
         internal static IReadOnlyList<Badge> Badges(bool changed, bool added) {
             var badges = new List<Badge>();
             if (changed) badges.Add(Changed);

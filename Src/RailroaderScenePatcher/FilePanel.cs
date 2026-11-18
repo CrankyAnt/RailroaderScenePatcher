@@ -54,6 +54,8 @@ namespace RailroaderScenePatcher {
         void DrawImport(UIPanelBuilder builder, PatchEditingSession session) {
             var import = session.Import;
             PlainLabel(builder, FilePanelState.ImportIntro);
+            // As #73 orders the overview: the changes that apply without conflict, then each conflict with what the editor
+            // version and the file version hold, followed by its choice.
             Section(builder, "Changes (" + import.Changes.Count + ")");
             if (import.Changes.Count == 0) PlainLabel(builder, "There are no changes without conflicts.");
             foreach (var change in import.Changes)
@@ -147,7 +149,35 @@ namespace RailroaderScenePatcher {
             string reason = null;
             try { reason = Reason(); } catch { }
             if (reason == null) { Release(); return; }
+            // Rows are locked in every frame: the native list makes and reuses its rows after the window is built, after a
+            // resize or a divider drag, and resets their look when it binds them, so no row is ever clickable or bright
+            // while locked. The other controls are checked now and then.
+            LockRows();
             if (Time.frameCount >= nextFrame) Apply();
+        }
+        // The title of a row and of its disclosure while locked: the first line of the row's own tooltip, its object's
+        // name, or else the row's label, such as a folder's count and name.
+        static string RowTitle(OutlineRowClickHandler row) {
+            var provider = row.GetComponent<UI.Tooltips.UITooltipProvider>();
+            string tooltip = null;
+            try { tooltip = provider?.Title; } catch { }
+            var label = row.GetComponentsInChildren<TMP_Text>(true).Select(t => System.Text.RegularExpressions.Regex.Replace(t.text ?? "", "<[^>]*>", "").Trim()).FirstOrDefault(t => t.Length != 0);
+            return FilePanelState.RowTitle(tooltip, label);
+        }
+        void LockRows() {
+            foreach (var clicks in GetComponentsInChildren<OutlineRowClickHandler>(true)) {
+                if (Except.Any(e => e != null && clicks.transform.IsChildOf(e))) continue;
+                var saved = clicks.GetComponent<UnavailableRow>();
+                if (saved == null) {
+                    saved = clicks.gameObject.AddComponent<UnavailableRow>();
+                    saved.Alphas = clicks.GetComponentsInChildren<TMP_Text>(true).Select(t => Tuple.Create(t, t.alpha)).ToArray();
+                    var row = clicks; var source = Reason;
+                    var provider = clicks.GetComponent<UI.Tooltips.UITooltipProvider>();
+                    if (provider != null) provider.DynamicTooltipInfo = () => new TooltipInfo(RowTitle(row), CommandBand.Tooltip(null, source()));
+                }
+                if (clicks.enabled) clicks.enabled = false;
+                foreach (var text in clicks.GetComponentsInChildren<TMP_Text>(true)) if (text.alpha != CommandBand.InactiveAlpha) text.alpha = CommandBand.InactiveAlpha;
+            }
         }
         internal void Apply() {
             nextFrame = Time.frameCount + 15;
@@ -169,8 +199,12 @@ namespace RailroaderScenePatcher {
                 foreach (var text in selectable.GetComponentsInChildren<TMP_Text>(true)) text.alpha = CommandBand.InactiveAlpha;
                 var tooltip = selectable.GetComponent<UI.Tooltips.UITooltipProvider>() ?? selectable.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
                 var shown = saved.Title; var source = Reason;
-                tooltip.DynamicTooltipInfo = () => new TooltipInfo(shown, CommandBand.Tooltip(null, source()));
+                // A row's disclosure takes the row's title, which follows the row as the native list reuses it.
+                var owner = selectable.GetComponentInParent<OutlineRowClickHandler>(true);
+                tooltip.DynamicTooltipInfo = owner != null ? (Func<TooltipInfo>)(() => new TooltipInfo(RowTitle(owner), CommandBand.Tooltip(null, source())))
+                    : () => new TooltipInfo(shown, CommandBand.Tooltip(null, source()));
             }
+            LockRows();
         }
         // Gives every control its own state back and removes this lock.
         internal void Release() {
@@ -185,11 +219,21 @@ namespace RailroaderScenePatcher {
                 }
                 Destroy(saved);
             }
+            foreach (var row in GetComponentsInChildren<UnavailableRow>(true)) {
+                var clicks = row.GetComponent<OutlineRowClickHandler>();
+                if (clicks != null) clicks.enabled = true;
+                foreach (var pair in row.Alphas) if (pair.Item1 != null) pair.Item1.alpha = pair.Item2;
+                var tooltip = row.GetComponent<UI.Tooltips.UITooltipProvider>();
+                if (tooltip != null) tooltip.DynamicTooltipInfo = null;
+                Destroy(row);
+            }
             var group = GetComponent<CanvasGroup>();
             if (group != null) group.interactable = true;
             Destroy(this);
         }
     }
+    // An outliner row UnavailableControls locked: its native click handler and tooltip get their own behaviour back on release.
+    internal sealed class UnavailableRow : MonoBehaviour { internal Tuple<TMP_Text, float>[] Alphas = new Tuple<TMP_Text, float>[0]; }
     // A control whose state UnavailableControls replaced: what it had before, for the release.
     internal sealed class UnavailableTooltip : MonoBehaviour {
         internal string Title;

@@ -339,6 +339,11 @@ namespace RailroaderScenePatcher {
                 // preferred widths follow its content, the clear button that comes with text included, and they
                 // moved "?" and Fit and pushed Fit past the column's edge. This element decides instead.
                 var search = row.AddFilterField(filter, value => { filter = value; results?.SetNeedsRebuild(); }, null, true);
+                // A fixed title on the field itself, so its tooltip never shows the query or nothing.
+                var searchInput = search.GetComponentInChildren<TMP_InputField>(true);
+                var searchTip = (searchInput != null ? searchInput.gameObject : search.gameObject);
+                var searchProvider = searchTip.GetComponent<UI.Tooltips.UITooltipProvider>() ?? searchTip.AddComponent<UI.Tooltips.UITooltipProvider>();
+                searchProvider.TooltipInfo = new TooltipInfo(CommandBand.SearchTitle, CommandBand.SearchTip);
                 var searchWidth = search.GetComponent<LayoutElement>() ?? search.gameObject.AddComponent<LayoutElement>();
                 searchWidth.minWidth = 0; searchWidth.preferredWidth = 0; searchWidth.flexibleWidth = 1; searchWidth.layoutPriority = 2;
                 HelpButton(row, "outliner", "Outliner");
@@ -531,22 +536,22 @@ namespace RailroaderScenePatcher {
             modes.AddSegment("Inspector", !guided.Enabled, presentation.Action(LeaveGuided));
             modes.AddSegment("Guided", guided.Enabled, presentation.Action(OpenGuided));
         }, true);
-        // One line under the name: the family and the object's states, in the native status colors.
+        // One line under the name: the object's badges and problem count, then its family and states, in the native status
+        // colors. The line ends in an ellipsis beside the Inspector and Guided switch, so what is cut off is the family's end,
+        // never a badge (CommandBand.StateParts).
         string StateLine(out string plain) {
             if (selected == null) { plain = "Select a row or click Select in world."; return plain; }
-            var parts = new List<string> { Literal(selected.Family) };
             var text = new List<string> { selected.Family };
-            if (!selected.Active) { parts.Add("Inactive"); text.Add("Inactive"); }
+            if (!selected.Active) text.Add("Inactive");
             // The native Map Editor's badges, as its inspector shows them beside the row marker.
-            foreach (var badge in CommandBand.Badges(IsChanged(selected), IsAdded(selected))) {
-                parts.Add(badge.Markup); text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this mod" : "Added by this mod");
-            }
-            if (selected.InspectionOnly != null) { parts.Add("Inspection only"); text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly)); }
-            if (selected.Problems.Count != 0) {
-                var count = selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
-                parts.Add("<color=" + Red + ">" + count + "</color>"); text.Add(count);
-            }
+            var badges = CommandBand.Badges(IsChanged(selected), IsAdded(selected));
+            foreach (var badge in badges) text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this mod" : "Added by this mod");
+            if (selected.InspectionOnly != null) text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly));
+            var count = selected.Problems.Count == 0 ? null : selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
+            if (count != null) text.Add(count);
             plain = String.Join("; ", text) + "\n" + selected.Identity.Path;
+            var parts = CommandBand.StateParts(Literal(selected.Family), selected.Active ? null : "Inactive", badges.Select(badge => badge.Markup),
+                selected.InspectionOnly == null ? null : "Inspection only", count == null ? null : "<color=" + Red + ">" + count + "</color>");
             return String.Join("   ", parts);
         }
         // A tab body scrolls inside its own rectangle. Its first row names what the tab is for and holds the tab's own
@@ -1106,10 +1111,12 @@ namespace RailroaderScenePatcher {
             viewport.anchorMax = Vector2.one;
             viewport.offsetMin = Vector2.zero;
             viewport.offsetMax = new Vector2(scrollbar == null ? 0 : -Mathf.Max(0, scrollbar.rect.width + messageScroll.verticalScrollbarSpacing), 0);
-            // The area keeps the height it had while it held the version choice's row, so no control below it moves.
+            // The area is at least one message and a row high and prefers three messages. While the file panel is open it
+            // keeps only that least height, and the panel above it takes the height it frees; the footer's row below it
+            // stays in place.
             var area = messageArea.GetComponent<LayoutElement>();
             area.minHeight = MessageHeight + RowHeight;
-            area.preferredHeight = 3 * MessageHeight + RowHeight;
+            area.preferredHeight = FileLocked ? area.minHeight : 3 * MessageHeight + RowHeight;
             area.flexibleHeight = 0;
             // While the file panel is open, the footer's row waits for it with the panel's reason.
             ActionRow(builder, guided.Enabled && !FileLocked && selection?.Pending == null ? GuidedActs() : FooterActs(), FileLockReason);
