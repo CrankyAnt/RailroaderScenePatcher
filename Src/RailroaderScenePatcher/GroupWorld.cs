@@ -24,7 +24,6 @@ namespace RailroaderScenePatcher {
         // inspector see what it holds. A new world replaces it.
         static PartCullingHost host;
         static PartCullingController culling;
-        static readonly List<string> reported = new List<string>();
         internal GroupWorld() {
             if (simple == null || renderer == null || switcher == null) throw new InvalidOperationException("Culler types unavailable");
             if (cullingGroup?.FieldType != typeof(CullingGroup) || cullingSpheres?.FieldType != typeof(BoundingSphere[]) || simpleMoved == null || simpleRadius?.FieldType != typeof(float)) throw new MissingMemberException("Simple culler members unavailable");
@@ -39,10 +38,10 @@ namespace RailroaderScenePatcher {
             var next = new PartCullingHost();
             // An earlier world's own culling goes back to the game before this one starts.
             culling?.ReleaseAll(); host?.Dispose();
-            host = next; culling = new PartCullingController(host); reported.Clear();
+            host = next; culling = new PartCullingController(host);
             own = culling; ownHost = host;
             var current = culling;
-            host.Unloaded = () => { current.Unload(); reported.Clear(); };
+            host.Unloaded = () => current.Unload();
             culling.Fault = message => Debug.LogWarning("Scene Patcher: " + message);
         }
         readonly PartCullingController own;
@@ -55,19 +54,14 @@ namespace RailroaderScenePatcher {
             disposed = true;
             try { own.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling release failed: " + e.GetBaseException().Message); }
             ownHost.Dispose();
-            if (ReferenceEquals(culling, own)) { culling = null; host = null; reported.Clear(); }
+            if (ReferenceEquals(culling, own)) { culling = null; host = null; }
         }
         // Every frame: installs own culling that waited for a game culler to start.
         internal static void Tick() { try { culling?.Tick(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling update failed: " + e.GetBaseException().Message); } }
         // A world load started.
         internal static void WorldLoaded() => host?.WorldLoaded();
-        // Notes for the inventory diagnostics, each once: a handler the patcher could not take out of a simple culler.
-        internal static IEnumerable<string> CullingNotes() {
-            if (culling == null || culling.Leftovers.Count == reported.Count) return Array.Empty<string>();
-            var fresh = culling.Leftovers.Where(id => !reported.Contains(id)).ToArray();
-            reported.AddRange(fresh);
-            return fresh.Select(BakedSceneryRules.LeftoverWrapper).ToArray();
-        }
+        // Reports what own culling could not take out again, each once, at information level.
+        internal static void ReportCulling(ICullingLog log) => culling?.Report(log);
         // The objects own culling took out of a game-object culler's list, with that culler and whether the object's
         // own sphere shows it now.
         internal static IEnumerable<Tuple<GameObject, Component, bool>> HandedOver() =>

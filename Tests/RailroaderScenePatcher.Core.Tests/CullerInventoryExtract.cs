@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 // An extract of the Railroader 0.6.3 inventory ledger of the base-game map (level4_mb_rows): every row of a
 // game-object culler and every component row at or below its object, as component type and hierarchy path.
+// Listed holds what each of those cullers lists, as the culler's path and the listed object's path, from the culling
+// readout of the unedited base-game map in Railroader 0.6.3 (row r2-control of the ticket's game run).
 static class CullerInventoryExtract {
     public static readonly string[][] Rows = {
         new[] { "Helpers.Culling.GameObjectCuller", "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett" },
@@ -97,5 +99,15 @@ static class CullerInventoryExtract {
         new[] { "Track.TrackRelativePosition", "World/Roads Sylva/Grade Crossing - Allen/Whistle Sign E" },
         new[] { "Track.TrackMarker", "World/Roads Sylva/Grade Crossing - Allen/Whistle Sign W" },
         new[] { "Track.TrackRelativePosition", "World/Roads Sylva/Grade Crossing - Allen/Whistle Sign W" },
+    };
+    public static readonly string[][] Listed = {
+        new[] { "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup", "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Signal 1" },
+        new[] { "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup", "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup/Signal 2" },
+        new[] { "World/Roads Sylva/Grade Crossing - Allen", "World/Roads Sylva/Grade Crossing - Allen/Signal 1" },
+        new[] { "World/Roads Sylva/Grade Crossing - Allen", "World/Roads Sylva/Grade Crossing - Allen/Signal 2" },
+        new[] { "World/Roads Andrews/Grade Crossing Setup 2 Tracks", "World/Roads Andrews/Grade Crossing Setup 2 Tracks/Signal 1" },
+        new[] { "World/Roads Andrews/Grade Crossing Setup 2 Tracks", "World/Roads Andrews/Grade Crossing Setup 2 Tracks/Signal 2" },
+        new[] { "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett", "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Signal 1" },
+        new[] { "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett", "World/Large Scenery/Bryson/Grade Crossing - Bryson Everett/Signal 2" },
     };
 }

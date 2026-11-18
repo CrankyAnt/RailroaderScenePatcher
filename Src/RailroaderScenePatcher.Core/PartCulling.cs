@@ -317,6 +317,11 @@ namespace RailroaderScenePatcher.Core {
         public bool Shows { get; }
     }
 
+    // Where own culling reports: information for what needs no action, a warning for a failure.
+    public interface ICullingLog {
+        void Information(string message);
+        void Warning(string message);
+    }
     // The game-facing operations of own culling. Positions are map coordinates.
     public interface ICullingHost {
         // False while the map unloads: nothing registers, moves, releases or reads a sphere then.
@@ -387,6 +392,13 @@ namespace RailroaderScenePatcher.Core {
         // The simple cullers whose handler could not be put back at release, so the hook stays as a pass-through. For
         // the inventory diagnostics, at information level.
         public IReadOnlyList<string> Leftovers => leftovers;
+        int reportedLeftovers;
+        // Reports each such handler once, at information level: it only passes the game's events on, so it needs no
+        // action and is no warning.
+        public void Report(ICullingLog log) {
+            if (log == null) throw new ArgumentNullException(nameof(log));
+            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) log.Information("Scene inventory: " + BakedSceneryRules.LeftoverWrapper(leftovers[reportedLeftovers]));
+        }
         public int RegionCount => groups.Values.Sum(g => g.Regions.Count);
         // Whether a load-order retry or a failed callback waits for the next Tick.
         public bool Waiting => groups.Values.Any(g => g.Pending || g.Dirty);
@@ -432,7 +444,7 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var region in state.Regions.Values) region.Released = true;
                 foreach (var hook in state.Hooks.Values) hook.Removed = true;
             }
-            groups.Clear(); leftovers.Clear();
+            groups.Clear(); leftovers.Clear(); reportedLeftovers = 0;
         }
         // The map unloads: forgets everything without touching a culling manager, a culler or an object.
         public void Unload() {
@@ -440,7 +452,7 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var region in state.Regions.Values) region.Released = true;
                 foreach (var hook in state.Hooks.Values) hook.Removed = true;
             }
-            groups.Clear(); leftovers.Clear();
+            groups.Clear(); leftovers.Clear(); reportedLeftovers = 0;
         }
         NodeState NodeOf(object node) {
             if (node == null) return null;

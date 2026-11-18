@@ -620,13 +620,21 @@ namespace RailroaderScenePatcher {
             attachment?.RefreshChrome();
             presentation?.RequestRefresh();
         }
+        // Own culling's reports in the mod log: information as information, a failure as a Unity warning.
+        sealed class CullingLog : ICullingLog {
+            readonly IModContext context;
+            internal CullingLog(IModContext context) { this.context = context; }
+            public void Information(string message) => context.Log.Info(message);
+            public void Warning(string message) => Debug.LogWarning("Scene Patcher: " + message);
+        }
+        CullingLog cullingLog;
         void Update() {
             FlushWarnings();
             if (!Initialized || engine == null) return;
             // Own culling of moved parts installs what waited for a game culler to start. What it could not take out
             // again is information for the log, not a warning.
             GroupWorld.Tick();
-            foreach (var note in GroupWorld.CullingNotes()) context?.Log.Info("Scene inventory: " + note);
+            if (context != null) GroupWorld.ReportCulling(cullingLog ?? (cullingLog = new CullingLog(context)));
             // Focus callbacks can arrive before the editor attachment is ready. Keep the check pending until Update
             // has attached it, and also observe the focus edge when Unity does not deliver the callback to this host.
             var focused = Application.isFocused;

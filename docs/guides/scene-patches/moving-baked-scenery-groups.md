@@ -140,4 +140,6 @@ Automated tests check group behavior with a controlled group. Runs on the base m
 
 The runs did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
 
-Automated tests also check part edits and a moved part's separate culling sphere with a controlled group. No game run has yet observed a part edit or a part's separate culling sphere.
+Automated tests also check part edits and a moved part's separate culling sphere with a controlled group.
+
+These results hold for the Railroader 0.6.3 journey on the Whittier saw mill, Bryson House Track, Bryson Yard and Bryson Signs groups. In that run Bryson Yard was still one group, and its lamp post Tall Post Shade was moved as a part. A moved part outside its culler's sphere got a separate culling sphere, and the culler kept its radius (300 m for the saw mill). The part showed at 64 m, 2 km and about 5 km from its culler, in view and out of view, and returned to the culler when moved back inside. Undo, Redo, **Remove modification**, disabling, Save and reload, a floating-origin shift and a cancelled gizmo gesture left one separate sphere or none, as expected. Not measured: collision at the new place, a Bryson Signs container whose own culler runs, and a grade crossing with a moved neighbor. The unedited saw mill switched off between 1175 m and 1308 m from the camera, far beyond the culler's 300 m radius.

@@ -69,6 +69,7 @@ static class PartCullingTests {
         MovedPartBelowAMovedListedObjectShows();
         PartInsideAListedSphereButOutsideTheSimpleSphereGetsItsOwn();
         GameObjectCullersStandOnGradeCrossings();
+        NoListedObjectIsABakedSceneryPart();
         EndingThePatcherReturnsTheCullingToTheGame();
         InstallWaitsForTheGamesCuller();
         StaleCallbacksWriteNothing();
@@ -441,6 +442,38 @@ static class PartCullingTests {
         }
     }
 
+    // The paths among listed that are a baked scenery part, or stand below one: an object a game-object culler lists
+    // there would be one that own culling could have to take over. The hierarchy is built from component rows and the
+    // listed paths; a crossing controller's object belongs to the crossing families, and every object renders or collides.
+    static string[] ListedBakedParts(IEnumerable<string[]> rows, IEnumerable<string> listed) {
+        var world = new Node("World");
+        Node At(string path) {
+            var node = world;
+            foreach (var name in path.Split('/').Skip(1)) { var next = node.Kids.FirstOrDefault(k => k.Name == name); if (next == null) node.Kids.Add(next = new Node(name)); node = next; }
+            return node;
+        }
+        foreach (var row in rows) At(row[1]).With(row[0]);
+        foreach (var path in listed) At(path);
+        void Mark(Node node) { node.Physical = true; node.HasFamily = node.Own.Contains(BakedSceneryRules.CrossingController); foreach (var kid in node.Kids) Mark(kid); }
+        Mark(world);
+        var parts = BakedSceneryRules.Parts(BakedSceneryRules.Classify(world)).Where(v => v.Disposition == PartDisposition.Part).Select(v => v.Path).ToArray();
+        return listed.Where(path => parts.Any(part => path == part || path.StartsWith(part + "/", StringComparison.Ordinal))).ToArray();
+    }
+    // What the four game-object cullers of Railroader 0.6.3 list: eight signals, each below a grade-crossing setup.
+    // None is a baked scenery part, so the base-game map has no listed part for own culling to take over.
+    static void NoListedObjectIsABakedSceneryPart() {
+        var rows = CullerInventoryExtract.Rows; var listed = CullerInventoryExtract.Listed;
+        var cullers = rows.Where(r => r[0] == "Helpers.Culling.GameObjectCuller").Select(r => r[1]).OrderBy(p => p, StringComparer.Ordinal).ToArray();
+        Assert(listed.Length == 8 && listed.Select(l => l[0]).Distinct().OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(cullers), "The extract holds the eight listed objects of the four game-object cullers");
+        Assert(listed.All(l => l[1].StartsWith(l[0] + "/", StringComparison.Ordinal)), "Every listed object stands below its culler's grade-crossing setup");
+        var found = ListedBakedParts(rows, listed.Select(l => l[1]));
+        Assert(found.Length == 0, "No object a game-object culler lists is a baked scenery part: " + String.Join(", ", found));
+        // The check finds a listed baked scenery part where one exists: a lamp of a shed that is a listed group.
+        const string lamp = "World/Large Scenery/Town/Shed/Lamp";
+        var withLamp = ListedBakedParts(rows.Concat(new[] { new[] { "UnityEngine.MeshRenderer", lamp }, new[] { "Helpers.Culling.GameObjectCuller", "World/Large Scenery/Town/Shed" } }), listed.Select(l => l[1]).Concat(new[] { lamp }));
+        Assert(withLamp.SequenceEqual(new[] { lamp }), "A listed part of a baked scenery group is found: " + String.Join(", ", withLamp));
+    }
+
     // The patcher's state ends while the scene stays loaded: everything own culling took over goes back to the game.
     static void EndingThePatcherReturnsTheCullingToTheGame() {
         var f = Plain(); var root = Root(f);
@@ -541,8 +574,20 @@ static class PartCullingTests {
         Action other = () => { }; own.Handler = other;
         Assert(session.Remove(PartId("Jetty")).Applied, "Removal still applies");
         Assert(own.Handler == other && f.World.Culling.Leftovers.SequenceEqual(new[] { own.Id }), "A wrapper that could not be taken out is named, and the other handler stays");
-        var note = BakedSceneryRules.LeftoverWrapper(own.Id);
-        Assert(note.Contains(own.Id) && !note.StartsWith("Warning", StringComparison.OrdinalIgnoreCase), "The note for the inventory diagnostics is information: " + note);
+        // The report goes to the log at information level, once, and never as a warning.
+        var log = new Log();
+        f.World.Culling.Fault = log.Warning;
+        f.World.Culling.Report(log); f.World.Culling.Report(log);
+        Assert(log.Informations.Count == 1 && log.Warnings.Count == 0, "The wrapper that stays is reported once at information level, not as a warning: " + log.Informations.Count + " / " + log.Warnings.Count);
+        Assert(log.Informations[0] == "Scene inventory: " + BakedSceneryRules.LeftoverWrapper(own.Id) && log.Informations[0].Contains(own.Id), "The line names the culler: " + log.Informations[0]);
+        var quiet = new Log(); new Fixture().World.Culling.Report(quiet);
+        Assert(quiet.Informations.Count == 0 && quiet.Warnings.Count == 0, "Without such a wrapper nothing is reported");
+    }
+
+    sealed class Log : ICullingLog {
+        public readonly List<string> Informations = new List<string>(), Warnings = new List<string>();
+        public void Information(string message) => Informations.Add(message);
+        public void Warning(string message) => Warnings.Add(message);
     }
 
     static void InspectorNamesOwnCulling() {
