@@ -126,6 +126,8 @@ namespace RailroaderScenePatcher.Core {
     public sealed class SceneObservation {
         public object Handle { get; }
         public TargetIdentity Identity { get; }
+        // Presentation metadata only. The identity path remains unchanged and searchable.
+        public string DisplayName { get; }
         public string Family { get; }
         public bool Active { get; }
         public IReadOnlyList<double> Position { get; }
@@ -153,7 +155,7 @@ namespace RailroaderScenePatcher.Core {
         public string GroupPath { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string groupPath = null) {
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null) {
             Enabled = enabled ?? active; GroupPath = groupPath;
             InspectionOnly = inspectionOnly;
             var noted = (notes ?? Array.Empty<string>()).ToArray();
@@ -161,6 +163,7 @@ namespace RailroaderScenePatcher.Core {
             Notes = Array.AsReadOnly(noted);
             Handle = handle ?? throw new ArgumentNullException(nameof(handle));
             Identity = identity ?? throw new ArgumentNullException(nameof(identity)); Family = family; Active = active;
+            DisplayName = displayName ?? identity.Path.Substring(identity.Path.LastIndexOf('/') + 1);
             Position = Array.AsReadOnly(position.ToArray()); Rotation = Array.AsReadOnly(rotation.ToArray());
             Bindings = Array.AsReadOnly(bindings.ToArray()); Dependencies = Array.AsReadOnly(dependencies.ToArray());
             Problems = Array.AsReadOnly(problems.ToArray()); Operations = operations;
@@ -197,8 +200,8 @@ namespace RailroaderScenePatcher.Core {
         internal string Fingerprint => new JArray(Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Active,
             new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly).ToString(Newtonsoft.Json.Formatting.None);
         public bool Matches(SceneObservation current) => current != null && ReferenceEquals(Handle, current.Handle) && Fingerprint == current.Fingerprint && SamePosition(current);
-        // The name a part row shows, with its group, is searchable as shown.
-        internal string SearchText => String.Join(" ", new[] { Identity.Scene, Identity.Path, GroupPath == null ? null : BakedSceneryRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family,
+        // The visible name and the group-qualified part name are searchable as shown.
+        internal string SearchText => String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, GroupPath == null ? null : BakedSceneryRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family,
             Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes));
     }
     public sealed class SceneInventory {

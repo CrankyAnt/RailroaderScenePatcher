@@ -350,8 +350,8 @@ static class CommandBandTests {
         Check(CommandBand.BindingAction("S9728", "A", 74.43612) == "Track binding to S9728 / a / 74.436", "The binding's log name uses the same form");
         foreach (var row in new[] { new[] { "end", "A", "a" }, new[] { "end", "b", "b" }, new[] { "end", null, "" }, new[] { "segment", "S9728", "S9728" } })
             Check(CommandBand.Shown(row[0], row[1]) == row[2], "The value " + row[0] + "=" + row[1] + " shows as " + row[2]);
-        // Several candidates on one spot are an instruction, not an error; a miss and a refusal are problems.
-        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point", "Several candidates on one spot and a click that met none read as ordinary text: nothing is broken");
+        // An offered list and a miss are instructions, not errors; a refusal is a problem.
+        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point", "An offered list and a click that met no candidate read as ordinary text: nothing is broken");
         Check(!PendingSelection.IsInstruction(null) && !PendingSelection.IsInstruction("The candidate changed or no longer resolves uniquely: it is no longer found. Pick again."), "A refusal stays a problem, in red");
         // The log line of a world choice names the candidates of the clicked spot, and the object the choice is for only when it is for one.
         var offered = new[] { "Crossing light: World/Roads/Everett/Signal 1/Signal 1", "Crossing gate: World/Roads/Everett/Signal 1/Signal 1/Wishbone" };
@@ -393,7 +393,9 @@ static class CommandBandTests {
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.
         foreach (var row in new[] { new object[] { "Choice", 2, 3, "Choice 2" }, new object[] { "New", 1, 3, "New 1" }, new object[] { "Choose", 3, 3, "Choose 3" }, new object[] { "Candidate", 1, 1, "Candidate" }, new object[] { "Choice", 0, 3, "Choice" } })
-            Check(CommandBand.ChoiceTag((string)row[0], (int)row[1], (int)row[2]) == (string)row[3], "A candidate is named " + row[3]);
+            Check(CommandBand.ChoiceTag((string)row[0], (int)row[1], (int)row[2]) == (string)row[3]
+                && CommandBand.ChoiceLine((string)row[0], (int)row[1], (int)row[2], "Track segment Se6a", Array.Empty<string>()) == (string)row[3] + ": Track segment Se6a.",
+                "A candidate keeps its number and ends its label before the confirmation instruction: " + row[3]);
         Check(new[] { CommandBand.ClearActivity, CommandBand.DiscardPrepared, CommandBand.RemoveModification }.Distinct().Count() == 3, "The three controls that take something back have three names");
     }
     // The labels of overlapping candidates differ at their end, which is the object's own name: the short label leads
@@ -412,7 +414,20 @@ static class CommandBandTests {
         Check(CommandBand.ChoiceLabel(twins[0], twins) != CommandBand.ChoiceLabel(twins[1], twins), "The two labels differ");
         Check(CommandBand.ChoiceLabel("Track segment Sdb78", new[] { "Track segment Sdb78", "Track segment S9728" }) == "Track segment Sdb78", "A track's label is kept");
         Check(CommandBand.ChoiceLabel(offered[0], offered, 12) == "wh-e-wate...", "A label longer than its room is cut at the end");
-        Check(CommandBand.ChoiceLabel(null, offered) == "", "No label gives none");
+        Check(CommandBand.ChoiceLabel(null, offered) == "" && AddedChoicesKeepTheirVisibleName(), "No label gives none; added-object list rows and candidate captions keep their visible name");
+    }
+    static bool AddedChoicesKeepTheirVisibleName() {
+        SceneObservation Added(string id) => new SceneObservation(new object(),
+            new TargetIdentity("scene", "World/Roads Sylva/Grade Crossing - Allen/CrankyAnt Scene Patcher equipment crankyant:maptest " + id, "OwnedEquipment"),
+            "Added light or gate", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "Inspection only", displayName: "Signal 1 (added)");
+        var entries = new[] { Added("signal-1-added-2"), Added("signal-1-added-3") };
+        var labels = entries.Select(entry => entry.Family + ": " + entry.Identity.Path).ToArray();
+        for (var i = 0; i < entries.Length; i++) {
+            if (CommandBand.ChoiceLabel(labels[i], labels, 60, entries[i]) != "Signal 1 (added) (Added light or gate)"
+                || CommandBand.ChoiceLine("Object", i + 1, 2, labels[i], labels, entries[i]) != "Object " + (i + 1) + ": Signal 1 (added) (Added light or gate).") return false;
+        }
+        return true;
     }
     static void AClickOnTheInspectedRowClearsTheInspection() {
         object inspected = new object(), other = new object();

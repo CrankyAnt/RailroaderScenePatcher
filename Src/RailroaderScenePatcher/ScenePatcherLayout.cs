@@ -371,7 +371,7 @@ namespace RailroaderScenePatcher {
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
                     var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + group.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(group.Key));
-                    var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
+                    var repeated = new HashSet<string>(group.Value.GroupBy(ObjectName).Where(names => names.Count() > 1).Select(names => names.Key));
                     // A family whose objects the game itself tells apart shows them under subgroups; a family group
                     // only, never the Inspection only group.
                     var subgroups = groupKey.StartsWith("family:", StringComparison.Ordinal) ? InventoryPresentationState.Subgroups(group.Value) : null;
@@ -391,7 +391,7 @@ namespace RailroaderScenePatcher {
                             // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
                             if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; state.SetExpanded(groupKey, true); if (folderKeys.TryGetValue(item, out var folderKey)) state.SetExpanded(folderKey, true); }
                         }
-                        var name = InventoryPresentationState.Name(item);
+                        var name = ObjectName(item);
                         var changed = IsChanged(item); var added = IsAdded(item);
                         // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so
                         // that they stay visible when the end of a long name is cut off; they take room only on a row
@@ -434,7 +434,7 @@ namespace RailroaderScenePatcher {
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
-            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
+            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(ObjectName(row)).x).ToArray();
             var divider = NativePresentation.DividerWidth + 26;
             outlinerWidth = InventoryPresentationState.FitWidth(widths, RowDecoration, presentation.ContentWidth, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
             StoreOutlinerWidth(outlinerWidth);
@@ -446,7 +446,7 @@ namespace RailroaderScenePatcher {
         void DrawInspector(UIPanelBuilder builder) {
             builder.ConfigureLayout(4f);
             DrawRightBand(builder);
-            var name = selected == null ? "No Selection" : InventoryPresentationState.Name(selected);
+            var name = selected == null ? "No Selection" : ObjectName(selected);
             // The name takes the whole row and is cut only when the row itself is too short; its tooltip holds the
             // full path. The name gives way to the Inspector and Guided switch at the right end of the row.
             builder.HStack(row => {
@@ -457,8 +457,10 @@ namespace RailroaderScenePatcher {
                     modes.AddSegment("Inspector", !guided.Enabled, presentation.Action(LeaveGuided));
                     modes.AddSegment("Guided", guided.Enabled, presentation.Action(OpenGuided));
                 }, true);
-            }).ChildrenKeepHeight();
-            var stateLine = Line(builder, StateLine(out var states), "State", states);
+            }).ChildrenKeepHeight().Height(RowHeight);
+            var state = StateLine(out var states);
+            // Reserve the heading's line height in both states so inspection does not move the tabs.
+            var stateLine = Line(builder, selected == null ? "<style=H3>" + state + "</style>" : state, "State", states, RowHeight);
             if (guided.Enabled) DrawGuided(builder);
             else {
                 builder.AddTabbedPanels(inspectorTab, tabs => {
@@ -471,7 +473,16 @@ namespace RailroaderScenePatcher {
             // The native tab strip gives each tab the share of its label's width. In a narrow strip a title ends in an
             // ellipsis inside 8 units of padding; the four titles are never renamed.
             var tabView = stateLine.parent == null ? null : stateLine.parent.GetComponentInChildren<UI.TabView.TabView>(true);
+            if (tabView != null) {
+                // The native prefab leaves its title strip shrinkable. Reserve the strip and the tab body's
+                // minimum before the footer competes for height; only the scrolling body takes the remainder.
+                var tabsLayout = tabView.GetComponent<LayoutElement>() ?? tabView.gameObject.AddComponent<LayoutElement>();
+                tabsLayout.minHeight = 30 + TabBodyMinimumHeight + RowHeight + TabGap;
+                tabsLayout.flexibleHeight = 10000;
+            }
             if (tabView != null) foreach (var toggle in tabView.GetComponentsInChildren<Toggle>(true)) {
+                var strip = toggle.transform.parent as RectTransform;
+                if (strip != null && strip.parent == tabView.transform) strip.Height(30);
                 // Step titles show progress; Back and Next alone navigate the guided steps.
                 // A disabled Toggle component ignores pointer and keyboard input without Selectable's disabled tint.
                 // TabView has already set its selected title to alpha 1 and the others to alpha .6.
@@ -483,9 +494,16 @@ namespace RailroaderScenePatcher {
             }
             DrawFooter(builder);
         }
+        // Added equipment keeps its stored wrapper name and identity. Only its visible name comes from the copy.
+        static string ObjectName(SceneObservation item) {
+            var go = item.Handle as GameObject;
+            var owned = go != null ? go.GetComponent<OwnedEquipment>() : null;
+            return owned == null ? InventoryPresentationState.Name(item)
+                : owned.DisplayName;
+        }
         // One line under the name: the family and the object's states, in the native status colors.
         string StateLine(out string plain) {
-            if (selected == null) { plain = null; return "Select a row in the outliner, or use Select in world."; }
+            if (selected == null) { plain = "Use the outliner or Select in world."; return plain; }
             var parts = new List<string> { Literal(selected.Family) };
             var text = new List<string> { selected.Family };
             if (!selected.Active) { parts.Add("Inactive"); text.Add("Inactive"); }
@@ -520,7 +538,7 @@ namespace RailroaderScenePatcher {
             // The body takes all free height: its least height shows one role of a coverage form under the tab's
             // first rows, and the window's least height leaves it that.
             var fill = view.GetComponent<LayoutElement>();
-            if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
+            if (fill != null) { fill.minHeight = fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
             ActionRow(builder, TabActs(id), ChoiceBlock);
             builder.Spacer(TabGap);
         }
@@ -972,12 +990,12 @@ namespace RailroaderScenePatcher {
                 var candidate = selection.Find(pending.Candidate);
                 source = "World choice";
                 // A short purpose with the count on the first line, the candidate on its own line.
-                var purpose = choosingSnap ? "Pick the snap target" : pending.Kind == SelectionKind.SceneObject ? "Pick an object" : pending.Kind == SelectionKind.TrackSegment ? "Pick a track" : "Pick an endpoint";
+                var purpose = choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
                 // The choice takes the world's clicks: the native map editor does not select or drag until it ends.
-                state = (pending.Offers.Count > 1 ? Tint(Blue, pending.Offers.Count + " candidates") + " " : "") + Literal(purpose + " in the world. Native world clicks are suspended; Cancel restores them.") +
-                    (pending.Problem == null ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
+                state = (pending.ListOpen ? Tint(Blue, pending.Offers.Count + (pending.Kind == SelectionKind.SceneObject ? " objects. " : " candidates. ")) + Literal(PendingSelection.SeveralOffers) : Literal(purpose + " in the world.")) + Literal(" Map Editor selection is paused. Use Cancel to resume it.") +
+                    (pending.Problem == null || pending.Problem == PendingSelection.SeveralOffers ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) + (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
                     (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
-                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceTag("Candidate", pending.Number(candidate.Choice), pending.Offers.Count) + ": " + CommandBand.ChoiceLabel(candidate.Choice.Label, pending.Offers.Select(o => o.Label), 60)) + Literal(choosingSnap ? guided.Enabled ? " Select Confirm to choose this target, then Next to review the snap." : " Confirm takes it; Apply then moves the object." : " Confirm takes it.")) +
+                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation)) + Literal(choosingSnap ? guided.Enabled ? " Select Confirm to choose this target, then Next to review the snap." : " Confirm chooses it. Apply moves the object." : pending.InspectOnly ? " Confirm inspects this object." : " Confirm chooses this target.")) +
                     // The footer's Details: the clicked candidate's identity and details, here in the message area.
                     (candidate == null || !candidateDetails ? "" : "\n" + Literal(candidate.Choice.Identity.ToString()) + (String.IsNullOrEmpty(candidate.Details) ? "" : "\n" + Literal(candidate.Details)));
             } else if (guided.Enabled && !String.IsNullOrEmpty(guided.Recovery)) { source = "Guided task"; state = Literal(guided.Recovery); }

@@ -248,7 +248,11 @@ namespace RailroaderScenePatcher {
                 return;
             }
             var current = Offered(Pending.Kind, inspectOnly);
-            var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered, Pending.Candidate);
+            var hits = overlay.Pick(current, camera, WorldOffset(), pointer, covered, Pending.Candidate, out var listRow);
+            if (listRow && hits.Length == 1) {
+                var offered = Pending.Offers.FirstOrDefault(offer => offer.Matches(hits[0]));
+                if (offered != null) { Pending.Choose(offered); return; }
+            }
             candidates = current;
             lastPointer = pointer;
             Pending.Offer(hits);

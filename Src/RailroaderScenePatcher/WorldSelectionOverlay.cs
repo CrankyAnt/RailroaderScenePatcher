@@ -170,7 +170,8 @@ namespace RailroaderScenePatcher {
         }
 
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
-            IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen) {
+            IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen, out bool listRow) {
+            listRow = false;
             // Native windows can move between the last repaint and this click.
             covered = uiBounds;
             budget.Begin();
@@ -184,7 +185,7 @@ namespace RailroaderScenePatcher {
             // that marker, also where the label of another candidate lies over it. Any other opaque identity label
             // owns its click; geometry hidden behind it is never selected.
             var rows = labelHits.Where(s => s.Listed).ToArray();
-            if (rows.Length != 0) labelHits = rows;
+            if (rows.Length != 0) { labelHits = rows; listRow = true; }
             else if (CommandBand.MarkerBeforeLabel(Enumerable.Range(0, shapes.Length).Any(i => shapes[i] != null && !groups.Hidden[i] && Marked(shapes[i], candidates[i], camera, origin) && shapes[i].Marker.Contains(pointer))
                 || groups.Shown.Any(group => group.Shape != null && group.Shape.Marker.Contains(pointer)))) labelHits = new Shape[0];
             if (labelHits.Length != 0)
@@ -435,16 +436,17 @@ namespace RailroaderScenePatcher {
             OwnFrames(candidates, projected, measured, groups, camera, origin);
             var pointed = pending == null || overUi || labelled != null ? null : Resolve(candidates, projected, groups, camera, origin, pointer);
             var under = pointed == null ? new int[0] : pointed.Objects.ToArray();
-            var several = pending != null && pending.Offers.Count > 1;
+            var several = pending?.ListOpen == true;
             var offerLabels = several ? pending.Offers.Select(o => o.Label).ToArray() : null;
             for (var index = 0; index < candidates.Length; index++) {
                 var candidate = candidates[index]; var shape = projected[index];
-                bool offered = pending != null && pending.Offers.Contains(candidate.Choice);
+                bool offered = pending != null && pending.Offers.Contains(candidate.Choice) &&
+                    (several || ReferenceEquals(candidate.Choice, pending.Candidate));
                 // An object of a group that shows as one has no marker and no frame of its own. Offered, it is a
                 // row of the choice list, in view or not.
                 if (groups.Hidden[index]) {
                     if (offered && several) shapes.Add(new Shape { Candidate = candidate, Listed = true, Color = Tone(CommandBand.CandidateMark(true, false)),
-                        Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60) });
+                        Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation) });
                     continue;
                 }
                 if (shape == null) continue;
@@ -458,7 +460,7 @@ namespace RailroaderScenePatcher {
                 // tells it from the others.
                 shape.Listed = offered && several;
                 shape.Strong = pending != null && (ReferenceEquals(candidate.Choice, pending.Highlight) || (labelled != null && ReferenceEquals(labelled, candidate.Choice)));
-                if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60)
+                if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation)
                     : (chosen ? "New: " : "Choice: ") + Short(candidate.Choice.Label);
                 // Every candidate of the mode carries its "+" marker without the pointer over it; a track within a
                 // distance of the camera, so that a wide view is not filled with them.
