@@ -11,16 +11,15 @@ using UnityEngine.InputSystem;
 
 namespace RailroaderScenePatcher {
     // Shows the native gizmo on the inspected object for as long as the Gizmo mode is open, without selecting or editing
-    // native map DTOs. The gizmo is shown and waits; it owns input only during a drag. While it is merely shown the
-    // native map editor keeps its own input, its own gizmos and its Escape, as it does beside any native gizmo: the native
-    // gizmo class already tells the game when the pointer is on a handle. Each completed drag is one operation; the
+    // native map DTOs. While shown, it blocks native world clicks but keeps the native gizmo's own handle input.
+    // Each completed drag is one operation; the
     // owner then shows the gizmo again on the new placement with a new inspection.
     [DefaultExecutionOrder(-10000)]
     public sealed class GizmoController : MonoBehaviour {
         const string HookId = "CrankyAnt.ScenePatcher.Gizmo";
         static GizmoController current;
-        TransformGizmo visual;
-        Behaviour controller, picker;
+        TransformGizmo visual, nativeVisual;
+        Behaviour controller;
         MapEditorAttachment attachment;
         PatchEngine engine;
         TargetIdentity identity;
@@ -28,7 +27,7 @@ namespace RailroaderScenePatcher {
         PlacementGesture gesture;
         Action<Outcome, string> finished;
         Harmony hooks;
-        bool stopping, pickerWasEnabled, pickerHooked, holding;
+        bool stopping, holding, worldHooks, nativeVisualWasEnabled;
         IScene scene;
         object target;
         float activated;
@@ -36,6 +35,8 @@ namespace RailroaderScenePatcher {
         internal bool Active => !stopping && gesture?.Active == true;
         // The gizmo stands on the object and waits for a drag.
         internal bool Shown => !stopping && visual != null;
+        internal static bool IsShown => current?.Shown == true;
+        internal static bool RestingNativeGizmo(TransformGizmo instance) => IsShown && ReferenceEquals(current.nativeVisual, instance);
         // The controller has ended; its owner lets go of it.
         internal bool Closed => stopping;
         internal string State => Active ? "Dragging. Release to apply; Escape restores the prior placement." : holding ? "Reading the object again; the gizmo takes a drag in a moment." : "Drag a gizmo handle in the world.";
@@ -81,26 +82,26 @@ namespace RailroaderScenePatcher {
                 target = matches[0];
                 shown = scene.Read(matches[0]).Placement;
                 var position = MapToWorld(shown);
+                var nativeGizmo = Native.Read(controller, "TransformGizmo");
+                var native = nativeGizmo == null ? null : Native.Read(nativeGizmo, "_gizmo") as TransformGizmo;
+                if (native == null) throw new InvalidOperationException("The native map editor gizmo is unavailable");
+                if (native.IsDragging) throw new InvalidOperationException("Release the native map editor gizmo first");
+                var box = Native.Read(controller, "BoxSelect");
+                if (box != null && (bool)Native.Read(box, "IsDragging")) {
+                    Native.Call(box, "Cancel");
+                    Native.Call(controller, "RefreshWindowSelection");
+                }
                 hooks = new Harmony(HookId);
                 // These hooks act only while a drag is in progress: Escape, Save, Undo and Redo then cancel the drag.
                 Patch(controller.GetType(), "HandleEscapeCancel", nameof(BeforeEscape));
                 Patch(attachment.MapEditor.GetType(), "Save", nameof(BeforeSaveOrHistory));
                 Patch(attachment.Manager.GetType(), "Undo", nameof(BeforeSaveOrHistory));
                 Patch(attachment.Manager.GetType(), "Redo", nameof(BeforeSaveOrHistory));
+                WorldInputHooks.Acquire(); worldHooks = true;
+                nativeVisual = native;
+                nativeVisualWasEnabled = native.enabled;
+                native.enabled = false;
                 current = this;
-                // World click targets, such as a station's click spot, do not react while the gizmo is shown: a click
-                // on a handle that lies over one would open its window. The game's picker is the one that finds
-                // them; while the gizmo stands it finds none, so no target is clicked and none shows its hover
-                // tooltip. The picker itself keeps running, so the native map editor works as usual: a right-click on a
-                // track still opens the native track menu, which the picker shows when it finds no target.
-                try {
-                    picker = Native.Read(Native.Type("ObjectPicker"), "Shared") as Behaviour;
-                    var find = picker?.GetType().GetMethod("TryGetPickableUnderMouse", Native.Flags);
-                    if (find != null) { hooks.Patch(find, prefix: new HarmonyMethod(typeof(GizmoController).GetMethod(nameof(NoPickable), Native.Flags)) { priority = Priority.First }); pickerHooked = true; }
-                    // A build whose picker has no such method rests the whole picker, as before; the track menu
-                    // then rests with it.
-                    else if (picker != null) { pickerWasEnabled = picker.enabled; picker.enabled = false; }
-                } catch { picker = null; }
                 visual = gameObject.AddComponent<TransformGizmo>();
                 visual.Camera = Camera.main;
                 if (visual.Camera == null) throw new InvalidOperationException("The native map editor camera is unavailable");
@@ -131,8 +132,8 @@ namespace RailroaderScenePatcher {
         }
         // Switches between Move and Rotate while the gizmo stands; not during a drag.
         internal void SetMode(TransformGizmoMode mode) { if (Shown && !Active) visual.Mode = mode; }
-        void Patch(Type type, string name, string prefix) {
-            var method = type.GetMethod(name, Native.Flags, null, Type.EmptyTypes, null);
+        void Patch(Type type, string name, string prefix, params Type[] parameters) {
+            var method = type.GetMethod(name, Native.Flags, null, parameters, null);
             if (method == null) throw new MissingMethodException(type.FullName, name);
             hooks.Patch(method, prefix: new HarmonyMethod(typeof(GizmoController).GetMethod(prefix, Native.Flags)) { priority = Priority.First });
         }
@@ -192,9 +193,14 @@ namespace RailroaderScenePatcher {
                 visual.enabled = false; visual.Visible = false; Destroy(visual); visual = null;
             }
             if (ReferenceEquals(current, this)) current = null;
-            // The hook on the picker leaves with the other hooks below; a picker that was rested returns.
-            if (picker != null && !pickerHooked) { try { picker.enabled = pickerWasEnabled; } catch (Exception e) { cleanup.Add(e.GetBaseException().Message); } }
-            picker = null;
+            if (nativeVisual != null) {
+                try { nativeVisual.enabled = nativeVisualWasEnabled; } catch (Exception e) { cleanup.Add(e.GetBaseException().Message); }
+                nativeVisual = null;
+            }
+            if (worldHooks) {
+                worldHooks = false;
+                try { WorldInputHooks.Release(); } catch (Exception e) { cleanup.Add(e.GetBaseException().Message); }
+            }
             try { hooks?.UnpatchAll(HookId); } catch (Exception e) { cleanup.Add(e.GetBaseException().Message); }
             hooks = null;
             try {
@@ -240,32 +246,7 @@ namespace RailroaderScenePatcher {
                 drifting = apart;
             } catch { }
         }
-        // The picker's search for a world target under the pointer, while a gizmo stands: none. The out values are
-        // the ones the picker sets itself when it finds nothing.
-        static bool NoPickable(ref bool __result, ref float distanceToPickable, System.Reflection.MethodBase __originalMethod, object[] __args) {
-            if (current == null || !current.Shown) return true;
-            try {
-                var parameters = __originalMethod.GetParameters();
-                for (var i = 0; i < parameters.Length; i++) if (parameters[i].Name == "picked") __args[i] = null;
-            } catch { }
-            distanceToPickable = float.MaxValue;
-            __result = false;
-            return false;
-        }
-        // A picker that is rested as a whole leaves the tooltip of its last target; it is cleared while the gizmo stands.
-        static void ClearPickTooltip() {
-            try {
-                var controller = Native.Read(Native.Type("UI.Tooltips.UITooltipController"), "Shared");
-                if (controller == null) return;
-                var property = controller.GetType().GetProperty("PickableTooltipInfo", Native.Flags);
-                var empty = property?.PropertyType.GetProperty("Empty", Native.Flags | System.Reflection.BindingFlags.Static)?.GetValue(null)
-                    ?? property?.PropertyType.GetField("Empty", Native.Flags | System.Reflection.BindingFlags.Static)?.GetValue(null);
-                if (property != null && empty != null) property.SetValue(controller, empty);
-            } catch { }
-        }
-        void LateUpdate() { if (Shown && picker != null && !pickerHooked) ClearPickTooltip(); }
         void Update() {
-            if (Shown && picker != null && !pickerHooked) ClearPickTooltip();
             if (!Shown) return;
             if (controller == null || !controller.isActiveAndEnabled || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor) || Camera.main == null || Mouse.current == null) { Close(); return; }
             if (Active && Keyboard.current?.escapeKey.wasPressedThisFrame == true) Cancel();

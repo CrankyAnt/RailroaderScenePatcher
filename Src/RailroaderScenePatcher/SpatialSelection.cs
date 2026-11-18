@@ -215,21 +215,23 @@ namespace RailroaderScenePatcher {
         SpatialCandidate[] Offered(SelectionKind kind, bool inspectOnly) {
             var all = scene.Scan(kind).Where(c => c.Points.Length != 0).ToArray();
             if (inspectOnly) return all;
-            var offered = new HashSet<SelectionCandidate>(SelectionOffers.For(all.Select(c => c.Choice), false));
+            var offered = new HashSet<SelectionCandidate>(SelectionOffers.For(all.Select(c => c.Choice), false, excluded));
             return all.Where(c => offered.Contains(c.Choice)).ToArray();
         }
         bool inspectOnly;
-        internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false) {
+        SelectionIdentity excluded;
+        internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false, SelectionIdentity excluded = null, string purpose = null) {
             if (Pending != null) return;
             if (Camera.main == null) throw new InvalidOperationException("The native map editor camera is unavailable");
             WorldOffset();
             this.inspectOnly = inspectOnly;
+            this.excluded = excluded;
             var current = Offered(kind, inspectOnly);
             var newSource = origin == null ? null : SpatialSelectionScene.Observe(origin);
             if (current.Length == 0) throw new InvalidOperationException("No candidates with usable world positions were found");
-            var purpose = kind == SelectionKind.SceneObject
+            purpose = purpose ?? (kind == SelectionKind.SceneObject
                 ? (origin == null ? "Select scene object" : "Select replacement scene object")
-                : (kind == SelectionKind.TrackSegment ? "Select replacement track segment" : "Select replacement track node");
+                : (kind == SelectionKind.TrackSegment ? "Select replacement track segment" : "Select replacement track node"));
             session.Begin(kind, purpose, newSource?.Choice, inspectOnly);
             candidates = current;
             source = newSource;
@@ -304,6 +306,8 @@ namespace RailroaderScenePatcher {
         // The surface under the objects may have changed; their frames are cut at it anew.
         internal void ClearSurface() { overlay.ClearSurface(); }
 
+        internal bool OverLabel(Vector2 pointer, IReadOnlyList<Rect> uiBounds) => overlay.OverLabel(pointer, uiBounds);
+
         internal void Release() {
             Cancel();
             overlay.Release();
@@ -312,6 +316,7 @@ namespace RailroaderScenePatcher {
         void ClearMarks() {
             source = null;
             candidates = Array.Empty<SpatialCandidate>();
+            excluded = null;
         }
 
         // trackPoint is the inspected starter placement marker's track point in map coordinates, or null; cut is the track

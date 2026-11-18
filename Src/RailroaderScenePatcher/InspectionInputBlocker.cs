@@ -20,11 +20,19 @@ namespace RailroaderScenePatcher {
         Image dragImage;
         // Bounds arrive from the drawn panel and toggle.
         Rect toggle, panel;
-        bool panelOpen, captured, worldCaptured, worldHoverShield;
+        bool panelOpen, captured, worldCaptured, worldHoverShield, navigating, worldHooks;
         internal bool WorldPicking { get; set; }
+        internal bool WorldInspecting { get; set; }
+        internal bool WorldEditing {
+            get => WorldInputHooks.EditOpen;
+            set { if (worldHooks) WorldInputHooks.EditOpen = value; }
+        }
+        internal bool GizmoShown { get; set; }
         internal Action RefreshRegions { get; set; }
+        internal Func<Vector2, bool> OverWorldLabel { get; set; }
         internal Vector2? WorldClick { get; private set; }
         Vector2? candidate, confirmed;
+        bool candidateInspectOnly;
         MethodInfo overUiPoint;
         FieldInfo pressInput, primaryState, pressClaimed, pressStarted;
         // The UI gate's problem, kept until the gate answers again, and the press claim's, kept until the claim reads again.
@@ -58,6 +66,7 @@ namespace RailroaderScenePatcher {
             dragRegion = Region("Scene patches pointer capture", layer);
             dragImage = dragRegion.GetComponent<Image>();
             InitializeNativeWindow();
+            WorldInputHooks.Acquire(); worldHooks = true;
             SetRegions(false, panel, toggle);
         }
         void InitializeNativeWindow() {
@@ -99,7 +108,7 @@ namespace RailroaderScenePatcher {
             // An overlay over them would consume the click before their callbacks receive it.
             Place(toggleRegion, toggle, false);
             Place(panelRegion, panel, false);
-            Place(dragRegion, new Rect(0, 0, Screen.width, Screen.height), worldCaptured || worldHoverShield);
+            Place(dragRegion, new Rect(0, 0, Screen.width, Screen.height), !navigating && (worldCaptured || worldHoverShield));
         }
         void SetNativeWindow(bool shown, Rect bounds) {
             if (nativeWindow == null || !nativeWindow.gameObject.activeInHierarchy) return;
@@ -122,8 +131,9 @@ namespace RailroaderScenePatcher {
             region.gameObject.SetActive(active);
         }
         void Update() {
-            WorldClick = confirmed; confirmed = null; candidate = null;
+            WorldClick = confirmed; confirmed = null; candidate = null; candidateInspectOnly = false;
             if (canvasRoot == null) return;
+            WorldInputHooks.OverlayShielded = false;
             RefreshRegions?.Invoke();
             var position = Input.mousePosition;
             var point = new Vector2(position.x, Screen.height - position.y);
@@ -139,29 +149,38 @@ namespace RailroaderScenePatcher {
             var overButton = toggle.Contains(point);
             if (pressed && (overButton || overPanel)) captured = true;
             if (!Input.GetMouseButton(0) && !Input.GetMouseButtonUp(0)) worldCaptured = false;
+            navigating = Input.GetMouseButton(1) || Input.GetMouseButton(2);
             worldHoverShield = false;
-            if (WorldPicking && Available && !captured && !worldCaptured && !overButton && !overPanel &&
-                !Input.GetMouseButton(1) && !Input.GetMouseButton(2)) {
+            var primaryPressed = Input.GetMouseButtonDown(0);
+            var overWorldLabel = false;
+            if (Available && !captured && !worldCaptured && !overButton && !overPanel) {
                 try {
-                    // The native UI gate first checks the EventSystem's cached hover state.
-                    // Arm the shield before the click, and hide it while checking for native UI underneath.
-                    dragImage.raycastTarget = false;
-                    var input = Native.Type("UI.GameInput");
-                    bool overUi = (bool)Native.Call(input, "IsMouseOverUI", null, null)
-                        || (bool)overUiPoint.Invoke(null, new object[] { (Vector2)position, true });
-                    bool overWorld = (bool)Native.Call(input, "IsMouseOverGameWindow", new object[] { null });
-                    if (!overUi && overWorld) {
-                        worldHoverShield = true;
-                        if (Input.GetMouseButtonDown(0)) {
-                            worldCaptured = true;
-                            candidate = point;
+                    overWorldLabel = WorldInspecting && !navigating && OverWorldLabel?.Invoke(point) == true;
+                    var needsWorldShield = !navigating && (WorldPicking || (WorldEditing && !GizmoShown) || overWorldLabel);
+                    var inspectClick = WorldInspecting && primaryPressed;
+                    if (needsWorldShield || inspectClick) {
+                        // The native UI gate first checks the EventSystem's cached hover state.
+                        // Arm the shield before the click, and hide it while checking for native UI underneath.
+                        dragImage.raycastTarget = false;
+                        var input = Native.Type("UI.GameInput");
+                        bool overUi = (bool)Native.Call(input, "IsMouseOverUI", null, null)
+                            || (bool)overUiPoint.Invoke(null, new object[] { (Vector2)position, true });
+                        bool overWorld = (bool)Native.Call(input, "IsMouseOverGameWindow", new object[] { null });
+                        if (!overUi && overWorld) {
+                            worldHoverShield = needsWorldShield;
+                            if (inspectClick || (WorldPicking && needsWorldShield && primaryPressed)) {
+                                worldCaptured = needsWorldShield;
+                                candidate = point;
+                                candidateInspectOnly = inspectClick;
+                            }
                         }
+                        gateProblem = null;
                     }
-                    gateProblem = null;
                 } catch (Exception e) {
                     gateProblem = "Cannot select in the world: " + e.GetBaseException().Message;
                 } finally { dragImage.raycastTarget = true; }
             }
+            WorldInputHooks.OverlayShielded = !navigating && WorldInspecting && (worldCaptured || (overWorldLabel && worldHoverShield));
             SetRegions(panelOpen, panel, toggle);
             // Only panel drags need the full native window shield for wheel input.
             SetNativeWindow(captured || overButton || overPanel, captured ? new Rect(0, 0, Screen.width, Screen.height) : overPanel ? panel : toggle);
@@ -172,6 +191,7 @@ namespace RailroaderScenePatcher {
         void LateUpdate() {
             if (candidate == null) return;
             var point = candidate; candidate = null;
+            if (candidateInspectOnly) { candidateInspectOnly = false; confirmed = point; claimProblem = null; return; }
             try {
                 var shared = Native.Read(Native.Type("UI.GameInput"), "Shared");
                 var press = shared == null ? null : pressInput.GetValue(shared);
@@ -184,12 +204,23 @@ namespace RailroaderScenePatcher {
                 claimProblem = "Cannot select in the world: " + e.GetBaseException().Message;
             }
         }
-        void OnDisable() { captured = worldCaptured = worldHoverShield = false; WorldClick = candidate = confirmed = null; SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false); }
+        void OnDisable() {
+            captured = worldCaptured = worldHoverShield = WorldPicking = WorldInspecting = WorldEditing = GizmoShown = false;
+            if (worldHooks) WorldInputHooks.OverlayShielded = false;
+            WorldClick = candidate = confirmed = null; candidateInspectOnly = false;
+            SetNativeWindow(false, panel); if (canvasRoot != null) canvasRoot.SetActive(false);
+        }
         void OnEnable() { if (canvasRoot != null) canvasRoot.SetActive(true); }
         internal void Release() {
             RefreshRegions = null;
-            captured = worldCaptured = worldHoverShield = WorldPicking = false;
-            WorldClick = candidate = confirmed = null;
+            OverWorldLabel = null;
+            captured = worldCaptured = worldHoverShield = WorldPicking = WorldInspecting = WorldEditing = GizmoShown = false;
+            if (worldHooks) {
+                WorldInputHooks.OverlayShielded = false;
+                worldHooks = false;
+                WorldInputHooks.Release();
+            }
+            WorldClick = candidate = confirmed = null; candidateInspectOnly = false;
             if (nativeWindow != null) {
                 var root = nativeWindow.gameObject;
                 if (root.activeInHierarchy) Native.Call(nativeWindow, "CloseWindow");

@@ -183,7 +183,7 @@ namespace RailroaderScenePatcher {
             { "Preview", 64.68f }, { "Clear circuit", 96.93f }, { "Delete", 53.4f }, { "Retry", 43.8f }, { "Refresh", 62.15f }, { "Select in world", 119.96f }, { "Clear", 41.71f },
             { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f }, { "Guide", 47f } };
         // One colour table for every world marking. Gold frames the inspected object. A candidate of a pick mode is
-        // blue: saturated while the pointer is over it, lighter once it was clicked and until Confirm. A current
+        // blue: more saturated while the pointer is over it, plain blue once it was clicked and until Confirm. A current
         // relation of the inspected object, native or set by a patch, is green, and more saturated under the pointer.
         // A candidate that is neither hovered nor clicked shows only its neutral "+" marker. Red marks a broken item.
         internal enum WorldMark { Inspected, Marker, CandidateHover, CandidateSelected, Relation, RelationHover, Broken }
@@ -191,7 +191,7 @@ namespace RailroaderScenePatcher {
             switch (mark) {
                 case WorldMark.Inspected: return new[] { 1f, .8f, 0f };
                 case WorldMark.CandidateHover: return new[] { .1f, .6f, 1f };
-                case WorldMark.CandidateSelected: return new[] { .45f, .85f, 1f };
+                case WorldMark.CandidateSelected: return new[] { .3f, .8f, 1f };
                 case WorldMark.Relation: return new[] { .498f, .722f, .42f };
                 case WorldMark.RelationHover: return new[] { .3f, .78f, .2f };
                 case WorldMark.Broken: return new[] { 1f, .502f, .502f };
@@ -395,6 +395,9 @@ namespace RailroaderScenePatcher {
         // without leaving the field.
         internal static string FieldReason(string block, IReadOnlyList<string> entered, IReadOnlyList<string> current, string same, params int[] exact) =>
             block ?? (SameFields(entered, current, exact) ? same : null);
+
+        internal static bool NumericEditBlocksWorld(bool focused, IReadOnlyList<string> entered, IReadOnlyList<string> current) =>
+            focused || !SameFields(entered, current);
         internal const string SamePlacement = "The fields hold the object's current placement.", SameBinding = "The fields hold the marker's current binding.", AlreadyDetached = "The marker is detached already.",
             SameLocation = "The fields hold the marker's current track location.", SameActivity = "The object already has the selected enabled or disabled state.";
         // The result of an edit that applied. An edit that changed nothing says so; an edit whose value equals the

@@ -198,6 +198,8 @@ namespace RailroaderScenePatcher.Core {
         IReadOnlyList<object> Spans(object circuit);
         string SpanId(object span);
         SpanRange Range(object span);
+        // The native route of a span, including any segments between its endpoints.
+        IReadOnlyList<string> SegmentIds(object span);
         // The graph's span registered under the span's ID is this span.
         bool Registered(object span);
         // Some span is registered under the ID.
@@ -266,6 +268,23 @@ namespace RailroaderScenePatcher.Core {
         public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == ComponentType) ? RequiredVersion : null;
         // Spans the patcher owns for the controller in this load, for inspection.
         public IReadOnlyList<object> OwnedSpans(object target) => baselines.TryGetValue(target, out var b) ? b.Owned.ToArray() : Array.Empty<object>();
+        public IReadOnlyList<string> CoveredSegments(object target) {
+            return world.Circuits(target).SelectMany(world.Spans).Where(span => span != null)
+                .SelectMany(world.SegmentIds).Where(id => !String.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).ToArray();
+        }
+        // The segment the selected role currently starts on, or null when the circuit or role has no span.
+        public SelectionIdentity RoleSegment(object target, string circuit, int role) {
+            foreach (var set in world.Circuits(target)) {
+                var spans = world.Spans(set);
+                var island = spans.ElementAtOrDefault(1);
+                var key = CircuitSpanProblems.CircuitKey(island == null ? null : world.SpanId(island), world.AdditionKey(set));
+                if (key != circuit) continue;
+                var span = spans.ElementAtOrDefault(role);
+                var segment = span == null ? null : world.Range(span).From.Segment;
+                return String.IsNullOrWhiteSpace(segment) ? null : SelectionIdentity.Graph(SelectionKind.TrackSegment, segment);
+            }
+            return null;
+        }
         Baseline BaselineOf(object target) {
             if (baselines.TryGetValue(target, out var known)) return known;
             var problem = world.PatternProblem(target);

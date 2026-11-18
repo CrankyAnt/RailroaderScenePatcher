@@ -22,8 +22,17 @@ static class CommandBandTests {
         ClearActivityNeedsAnActivityValue();
         AClosedPanelCancelsTheWaitingRequest();
         SharedRulesHoldAtEveryCallSite();
+        NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    static void NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit() {
+        var current = new[] { "8", "2", "3", "0", "90", "0" };
+        var unchanged = new[] { "8.00", "2", "3", "-0", "90", "0" };
+        var draft = new[] { "9", "2", "3", "0", "90", "0" };
+        Check(CommandBand.NumericEditBlocksWorld(true, unchanged, current), "A focused numeric field blocks native editing before a value changes");
+        Check(!CommandBand.NumericEditBlocksWorld(false, unchanged, current), "Leaving an unchanged numeric field restores native world input");
+        Check(CommandBand.NumericEditBlocksWorld(false, draft, current), "Leaving a changed numeric field keeps the edit open until Apply or Read");
     }
     // The Map Editor's Save button stays enabled. A refused Save shows its reason in the message area of the open window; with
     // the window closed, a native alert in the style of Save Failed shows it, so the click never looks ignored.
@@ -473,11 +482,10 @@ static class CommandBandTests {
         float Max(float[] c) => Math.Max(c[0], Math.Max(c[1], c[2]));
         float Min(float[] c) => Math.Min(c[0], Math.Min(c[1], c[2]));
         float Saturation(float[] c) => (Max(c) - Min(c)) / Max(c);
-        float Lightness(float[] c) => (Max(c) + Min(c)) / 2;
         var hover = CommandBand.WorldColor(CommandBand.WorldMark.CandidateHover); var chosen = CommandBand.WorldColor(CommandBand.WorldMark.CandidateSelected);
         var relation = CommandBand.WorldColor(CommandBand.WorldMark.Relation); var relationHover = CommandBand.WorldColor(CommandBand.WorldMark.RelationHover);
         Check(hover[2] == Max(hover) && chosen[2] == Max(chosen), "A candidate is blue, under the pointer and after a click");
-        Check(Saturation(hover) > Saturation(chosen) && Lightness(chosen) > Lightness(hover), "The hovered candidate is more saturated and the clicked one lighter");
+        Check(Saturation(hover) > Saturation(chosen) && chosen[0] == .3f && chosen[1] == .8f && chosen[2] == 1f, "The hovered candidate is more saturated, while a clicked candidate keeps the plain native blue");
         Check(relation[1] == Max(relation) && relationHover[1] == Max(relationHover) && Saturation(relationHover) > Saturation(relation), "A current relation is green, more saturated under the pointer");
         var gold = CommandBand.WorldColor(CommandBand.WorldMark.Inspected);
         Check(gold[0] == 1 && gold[2] == 0 && CommandBand.WorldColor(CommandBand.WorldMark.Broken)[0] == 1, "The inspected object is gold and a broken item red");

@@ -10,6 +10,7 @@ using RailroaderScenePatcher.Core;
 // A detection span: the track between two locations, registered in the graph under its ID while it is enabled.
 class FakeSpan {
     public string Id; public SpanRange Range; public bool Owned, Destroyed;
+    public string[] Route;
 }
 // One circuit set of a crossing controller: approach A, island and approach B.
 // Addition is the key of the detection addition the patcher built the set for; a native set has none.
@@ -50,6 +51,10 @@ class FakeCrossingWorld : ICrossingCoverageWorld {
     public IReadOnlyList<object> Spans(object circuit) => ((FakeCircuit)circuit).Spans;
     public string SpanId(object span) => ((FakeSpan)span).Id;
     public SpanRange Range(object span) => ((FakeSpan)span).Range;
+    public IReadOnlyList<string> SegmentIds(object span) {
+        var detectionSpan = (FakeSpan)span;
+        return detectionSpan.Route ?? new[] { detectionSpan.Range.From.Segment, detectionSpan.Range.To.Segment };
+    }
     public bool Registered(object span) => Graph.TryGetValue(((FakeSpan)span).Id, out var found) && ReferenceEquals(found, span);
     public bool IdRegistered(string id) => Graph.ContainsKey(id);
     public bool Covers(object span) { var s = (FakeSpan)span; return !s.Destroyed && Valid(s.Range.From) && Valid(s.Range.To); }
@@ -158,6 +163,8 @@ static partial class CoverageTests {
         public bool OldRouteStillOccupied => new[] { 500.0, 300, 100 }.All(d => World.Occupies("Sold", d));
     }
     public static void Run() {
+        RolePickerOffersTheOtherRoles();
+        MarkingsIncludeTheWholeRouteOfEvaluatedSpans();
         ScenePatchFileDistinguishesOmittedSelectedAndDetached();
         ExplicitAlternativeTransfersDetectionAndRetainsCoverage();
         DetachStopsDetectionAndKeepsOthers();
@@ -175,6 +182,27 @@ static partial class CoverageTests {
         DependedCoverageKeepsItsLastEntry();
         UnresolvedDetectionSpanIsAControllerProblem();
         Console.WriteLine("PASS: crossing coverage omission, explicit selection, detachment, retention, refusal, restoration and scene patch editing");
+    }
+    static void RolePickerOffersTheOtherRoles() {
+        var f = new Fixture();
+        f.OldSpans[0].Range = R("Snew", 10, 30);
+        f.OldSpans[2].Range = R("Sspur", 10, 30);
+        var candidates = new[] { "Snew", "Sold", "Sspur", "Sother" }.Select(id =>
+            new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, id), id)).ToArray();
+        var current = f.Scene.RoleSegment(f.Crossing, "Pipr", 1);
+        var offered = SelectionOffers.For(candidates, false, current).Select(c => c.Identity.Identifier);
+        Assert(offered.SequenceEqual(new[] { "Snew", "Sspur", "Sother" }), "Picking the island excludes only its current segment");
+        Assert(SelectionOffers.For(candidates, false).Contains(candidates[1]), "Picking a location can use its current segment");
+    }
+    static void MarkingsIncludeTheWholeRouteOfEvaluatedSpans() {
+        var f = new Fixture();
+        f.OldSpans[0].Range = new SpanRange(new TrackLocation("Sold", "a", 10), new TrackLocation("Sspur", "a", 30));
+        f.OldSpans[0].Route = new[] { "Sold", "Smiddle", "Sspur" };
+        Assert(f.Scene.CoveredSegments(f.Crossing).SequenceEqual(new[] { "Sold", "Smiddle", "Sspur", "Sother" }),
+            "Markings include the intermediate segment, and each segment is marked once");
+        var result = new PatchEngine(f.Scene).Apply(Doc(Cover("detach", Detached("Pipr"))));
+        Assert(result.Outcomes["detach"].Applied && f.World.IdRegistered("Pcyi"), "The crossing stops evaluating the native span, which stays registered");
+        Assert(f.Scene.CoveredSegments(f.Crossing).SequenceEqual(new[] { "Sother" }), "Only evaluated spans are marked");
     }
     // A circuit whose detection span no longer resolves to an existing track segment is a problem of its crossing
     // controller, naming the circuit as the Connections tab does, the span by its Connections tab role and its ID,

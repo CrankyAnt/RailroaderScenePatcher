@@ -222,6 +222,9 @@ namespace RailroaderScenePatcher {
             listed.Clear();
         }
 
+        internal bool OverLabel(Vector2 pointer, IReadOnlyList<Rect> uiBounds) =>
+            labels.Any(label => label.Label.Contains(pointer)) && !uiBounds.Any(bounds => bounds.Contains(pointer));
+
         internal SelectionCandidate[] Pick(SpatialCandidate[] candidates, Camera camera, Vector3 origin, Vector2 pointer,
             IReadOnlyList<Rect> uiBounds, SelectionCandidate chosen, out bool listRow) {
             listRow = false;
@@ -230,7 +233,7 @@ namespace RailroaderScenePatcher {
             budget.Begin();
             if (covered.Any(r => r.Contains(pointer))) return Array.Empty<SelectionCandidate>();
             lastPick = pointer;
-            var labelHits = labels.Where(s => s.Label.Contains(pointer) && !covered.Any(r => r.Overlaps(s.Label))).ToArray();
+            var labelHits = labels.Where(s => s.Label.Contains(pointer)).ToArray();
             var shapes = ProjectAll(candidates, camera, origin, out var measured);
             var groups = Groups(candidates, measured, camera, origin, chosen, inspectedMark);
             OwnFrames(candidates, shapes, measured, groups, camera, origin);
@@ -453,7 +456,7 @@ namespace RailroaderScenePatcher {
             CommandBand.ShowsMarker(shape.Track != null, shape.Track == null ? 0 : (camera.transform.position - (candidate.Position + origin)).magnitude, false);
 
         // One colour table with the panel, CommandBand.WorldColor: gold frames the inspected object; a candidate is blue,
-        // saturated under the pointer and lighter once clicked; a current relation is green, more saturated under the
+        // more saturated under the pointer and plain blue once clicked; a current relation is green, more saturated under the
         // pointer; red marks only a broken item. A candidate that is neither hovered nor clicked shows its neutral
         // marker. Amber is a panel colour and never appears in the world.
         static Color Tone(CommandBand.WorldMark mark) { var c = CommandBand.WorldColor(mark); return new Color(c[0], c[1], c[2]); }
@@ -508,32 +511,36 @@ namespace RailroaderScenePatcher {
                 var candidate = candidates[index]; var shape = projected[index];
                 bool offered = pending != null && pending.Offers.Contains(candidate.Choice) &&
                     (several || ReferenceEquals(candidate.Choice, pending.Candidate));
-                // An object of a group that shows as one has no marker and no frame of its own. Offered, it is a
-                // row of the choice list, in view or not.
+                bool chosen = pending != null && ReferenceEquals(candidate.Choice, pending.Candidate);
+                bool rowHovered = pending != null && (ReferenceEquals(candidate.Choice, pending.Highlight) || ReferenceEquals(candidate.Choice, labelled));
+                // Hovering a row reveals that object's own frame, including when its group stands in for it.
                 if (groups.Hidden[index]) {
-                    if (offered && several) shapes.Add(new Shape { Candidate = candidate, Listed = true, Color = Tone(CommandBand.CandidateMark(true, false)),
-                        Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation) });
-                    continue;
+                    if (!offered || !several) continue;
+                    shape = rowHovered ? Project(candidate, camera, origin, Double.PositiveInfinity, out _) : null;
+                    if (shape == null) {
+                        shapes.Add(new Shape { Candidate = candidate, Listed = true, Color = Tone(CommandBand.CandidateMark(false, rowHovered)),
+                            Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation) });
+                        continue;
+                    }
                 }
                 if (shape == null) continue;
-                bool chosen = pending != null && ReferenceEquals(candidate.Choice, pending.Candidate);
                 // A candidate the panel points at, or whose label the pointer is over, is marked as one under the pointer.
-                bool hovered = Array.IndexOf(under, index) >= 0 || (pending != null && ReferenceEquals(candidate.Choice, pending.Highlight)) || (labelled != null && ReferenceEquals(labelled, candidate.Choice));
-                // Blue for the candidate a click would select and, lighter, for one that was clicked, until Confirm.
-                shape.Color = Tone(CommandBand.CandidateMark(offered && !(several && hovered), hovered));
-                shape.Detailed = offered || hovered;
+                bool hovered = Array.IndexOf(under, index) >= 0 || rowHovered;
+                // Blue for the candidate a click would select and after it was clicked, until Confirm.
+                shape.Color = Tone(CommandBand.CandidateMark(chosen, hovered));
+                shape.Detailed = chosen || hovered;
                 // The candidates of one spot are the rows of a list beside the click, numbered, each named by what
                 // tells it from the others.
                 shape.Listed = offered && several;
-                shape.Strong = pending != null && (ReferenceEquals(candidate.Choice, pending.Highlight) || (labelled != null && ReferenceEquals(labelled, candidate.Choice)));
+                shape.Strong = rowHovered;
                 if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation)
                     : (chosen ? "New: " : "Choice: ") + Short(candidate.Choice.Label);
                 // Every candidate of the mode carries its "+" marker without the pointer over it; a track within a
                 // distance of the camera, so that a wide view is not filled with them.
-                if (shape.Detailed || Marked(shape, candidate, camera, origin)) shapes.Add(shape);
+                if (shape.Listed || shape.Detailed || Marked(shape, candidate, camera, origin)) shapes.Add(shape);
             }
             // A group that shows as one: its square marker, and its frame in blue while the pointer is where a click
-            // would pick the group, and lighter while its choice list is open.
+            // would pick the group, and plain blue while its choice list is open.
             for (var index = 0; index < groups.Shown.Length; index++) {
                 var group = groups.Shown[index];
                 if (group.Shape == null) continue;

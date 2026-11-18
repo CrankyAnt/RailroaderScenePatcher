@@ -88,6 +88,11 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<object> Spans(object circuit) => roles.Select(r => { var value = r.GetValue(circuit) as Component; return value == null ? null : (object)value; }).ToArray();
         public string SpanId(object value) => spanId.GetValue(value) as string;
         public SpanRange Range(object value) => new SpanRange(Location(lower.GetValue(value)), Location(upper.GetValue(value)));
+        public IReadOnlyList<string> SegmentIds(object value) {
+            if ((value as UnityEngine.Object) == null || !Covers(value)) return Array.Empty<string>();
+            var route = Native.Call(value, "GetSegments") as IEnumerable ?? throw new InvalidOperationException("The track span's route is unavailable");
+            return route.Cast<object>().Select(segment => Native.Read(segment, "id") as string).ToArray();
+        }
         static TrackLocation Location(object serialized) {
             var type = serialized.GetType();
             return new TrackLocation(type.GetField("segmentId", Native.Flags).GetValue(serialized) as string,

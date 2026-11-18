@@ -87,7 +87,7 @@ namespace RailroaderScenePatcher {
         bool openOnTick;
         // The title bar holds, left of the close button and from right to left, the window's "?", the Reset layout icon
         // and the Session details icon: bare glyphs in the close glyph's colour, without a button face, each named in
-        // its tooltip. The "?" shows "x" while the window's help is open. TitleHelpProblem says why the title bar could
+        // its tooltip. TitleHelpProblem says why the title bar could
         // not take the "?"; the owner then keeps a "?" in the command band. TitleReset and TitleDetails say whether
         // each icon stands in the title bar; without one the owner keeps a button for it in the window help.
         internal Action ResetRequested;
@@ -111,7 +111,6 @@ namespace RailroaderScenePatcher {
                 if (button != null) button.interactable = !repairMode;
             }
         }
-        TMP_Text titleHelpText;
         Sprite resetSprite, detailsSprite;
         Texture2D resetTexture, detailsTexture;
         // The region of the window's own help.
@@ -178,14 +177,23 @@ namespace RailroaderScenePatcher {
                 close = native.GetComponentsInChildren<Button>(true).FirstOrDefault(b => content == null || !b.transform.IsChildOf(content));
                 if (close == null) { TitleHelpProblem = "the window has no close button to stand beside"; return; }
                 titleClose = (RectTransform)close.transform;
-                titleHelp = BareTitleButton(manager, close.transform.parent, "CrankyAnt Scene Patcher window help", () => ToggleHelp(WindowHelpRegion, titleHelp), out titleHelpText);
-                if (titleHelpText != null) { titleHelpText.richText = false; titleHelpText.text = "?"; titleHelpText.color = TitleGlyph; titleHelpText.fontStyle = FontStyles.Normal; titleHelpText.enableAutoSizing = false; titleHelpText.fontSize = TitleGlyphFont; titleHelpText.alignment = TextAlignmentOptions.Center; }
+                titleHelp = BareTitleButton(manager, close.transform.parent, "CrankyAnt Scene Patcher window help", () => ToggleHelp(WindowHelpRegion, titleHelp), out var label);
+                if (label != null) {
+                    label.richText = false; label.text = "?"; label.color = TitleGlyph;
+                    label.fontStyle = FontStyles.Normal; label.enableAutoSizing = false;
+                    label.fontSize = TitleGlyphFont; label.alignment = TextAlignmentOptions.CenterGeoAligned;
+                    label.margin = Vector4.zero;
+                    if (label.rectTransform.parent == titleHelp) {
+                        label.rectTransform.anchorMin = Vector2.zero; label.rectTransform.anchorMax = Vector2.one;
+                        label.rectTransform.offsetMin = label.rectTransform.offsetMax = Vector2.zero;
+                    }
+                }
                 var tooltip = titleHelp.GetComponent<UI.Tooltips.UITooltipProvider>() ?? titleHelp.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
                 tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Explain the whole Scene patches window.");
                 titleHelp.SetAsLastSibling();
             } catch (Exception e) {
                 if (titleHelp != null) UnityEngine.Object.Destroy(titleHelp.gameObject);
-                titleHelp = null; titleHelpText = null;
+                titleHelp = null;
                 TitleHelpProblem = e.GetBaseException().Message;
                 return;
             }
@@ -267,8 +275,10 @@ namespace RailroaderScenePatcher {
             var corners = new Vector3[4];
             titleClose.GetWorldCorners(corners);
             Vector3 lowerLeft = parent.InverseTransformPoint(corners[0]), upperLeft = parent.InverseTransformPoint(corners[1]);
-            var height = Mathf.Max(20, upperLeft.y - lowerLeft.y);
-            var width = Mathf.Max(20, height);
+            var upperRight = parent.InverseTransformPoint(corners[2]);
+            var height = upperLeft.y - lowerLeft.y;
+            var width = upperRight.x - upperLeft.x;
+            if (height <= 0 || width <= 0) return;
             var middle = (lowerLeft.y + upperLeft.y) * 0.5f;
             var right = lowerLeft.x - 2;
             foreach (var icon in new[] { titleHelp, titleReset, titleDetails }) {
@@ -276,11 +286,6 @@ namespace RailroaderScenePatcher {
                 icon.sizeDelta = new Vector2(width, height);
                 icon.localPosition = new Vector3(right, middle, 0);
                 right -= width + 2;
-            }
-            if (titleHelpText != null) {
-                // The "?" shows "x" while the window's help is open, as every other "?" does.
-                var label = HelpRegion == WindowHelpRegion ? "x" : "?";
-                if (titleHelpText.text != label) titleHelpText.text = label;
             }
             if (detailsGlyph != null) { var colour = DetailsOpen ? TitleGlyphOpen : TitleGlyph; if (detailsGlyph.color != colour) detailsGlyph.color = colour; }
         }
@@ -774,6 +779,7 @@ namespace RailroaderScenePatcher {
             var events = EventSystem.current;
             if (events != null && Owns(events.currentSelectedGameObject)) events.SetSelectedGameObject(null);
         }
+        internal void ClearFocusForEdit() => ClearFocus();
         internal bool Owns(GameObject target) => target != null &&
             ((entry != null && target.transform.IsChildOf(entry.transform)) ||
              (window != null && target.transform.IsChildOf(window.transform)) ||

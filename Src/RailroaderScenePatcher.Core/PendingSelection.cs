@@ -214,11 +214,11 @@ namespace RailroaderScenePatcher.Core {
     // a scene patch file has to name, such as a replacement object, offers no candidate whose identity another candidate
     // shares: the scene patch file could not tell them apart, so offering one would only lead to a refusal.
     public static class SelectionOffers {
-        public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly) {
+        public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly, SelectionIdentity excluded = null) {
             var all = (candidates ?? Enumerable.Empty<SelectionCandidate>()).Where(c => c != null).ToArray();
             if (inspectOnly) return all;
             var shared = new HashSet<SelectionIdentity>(all.GroupBy(c => c.Identity).Where(group => group.Count() > 1).Select(group => group.Key));
-            return all.Where(c => !shared.Contains(c.Identity)).ToArray();
+            return all.Where(c => !c.Identity.Equals(excluded) && !shared.Contains(c.Identity)).ToArray();
         }
     }
 
