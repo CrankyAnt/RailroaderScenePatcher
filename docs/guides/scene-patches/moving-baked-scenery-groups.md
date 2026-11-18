@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask or map icon. The same restriction applies to road bridges and crossbucks at unprotected crossings.
+Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to road bridges, to crossbucks at unprotected crossings and to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks).
 
 Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -29,7 +29,7 @@ Groups containing track markers or spawn points are also marked `inspection only
 
 Each group in the **Baked scenery group** family lists its parts below its own row, sorted by name. A part's row shows the path from the group root, such as `Jetty / Piece (2)`. Its tooltip and searches use the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
 
-A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider, light, storage pile or log pond at or below it. A part can contain other parts, which move with it.
+A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider, light, storage pile or log pond at or below it, unless it holds a scene ground mask. A part can contain other parts, which move with it.
 
 Some objects below a group root are not listed as parts:
 
@@ -37,13 +37,13 @@ Some objects below a group root are not listed as parts:
 - A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
 - A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with that reason; the file's other modifications still apply.
 - Objects the game moves during play, such as a clock hand at Bryson depot or the flame of a lantern, which the game turns toward the camera, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
-- Objects without a renderer, collider, light, storage pile or log pond, objects created while the game runs and objects listed by another family have no part entry.
+- Objects without a renderer, collider, light, storage pile or log pond, objects created while the game runs and objects listed by another family have no part entry. The exception is an object that holds a scene ground mask, which is listed as a part.
 
 ## Move a group in the native map editor
 
 1. Open **Scene patches** and click **Refresh** in the command band. Search for the group, for example `Bryson House Track`, and select its row under **Baked scenery group**. You can also use **Select in world** to select it by its marking, as described in [select world targets](select-world-targets.md). On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-group-v1`. **Use in the game** identifies the group as decorative.
 2. Click **Focus** in the command band to see the group.
-3. On the **Placement** tab, change the six **Numeric** fields for position in map coordinates and rotation in degrees. Click **Apply** at the bottom of the tab. You can also use **Gizmo** or **Snap**, as for other objects. See [using transform gizmos](using-transform-gizmos.md) and [snapping to track](snapping-to-track.md).
+3. On the **Placement** tab, change the six **Numeric** fields for position in map coordinates and rotation in degrees. Click **Apply** at the bottom of the tab. You can also use **Gizmo** or **Snap**, as for other objects, unless a ground mask refuses the move; see [buildings with ground masks](#buildings-with-ground-masks). See [using transform gizmos](using-transform-gizmos.md) and [snapping to track](snapping-to-track.md).
 
 The group root moves at once with everything below it. Save, Undo, Redo and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal returns the group to the placement the loaded map gives it, together with the values other mods still set.
 
@@ -58,7 +58,7 @@ If the root has a simple culler, as at Bryson House Track, the culler stops swit
 ## Move or disable a single part
 
 1. Select the part's row under **Baked scenery group**, for example `Bryson House Track / Ramp`. On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-part-v1`. **Use in the game** identifies the part as decorative.
-2. On the **Placement** tab, change the **Numeric** fields and click **Apply**, or use **Gizmo** or **Snap** as for other objects. To switch the part off, click **Disable** at the bottom of the **Object** tab.
+2. On the **Placement** tab, change the **Numeric** fields and click **Apply**, or use **Gizmo** or **Snap** as for other objects, unless a ground mask refuses the move. To switch the part off, click **Disable** at the bottom of the **Object** tab.
 
 A part with a fixed placement keeps its map coordinates when its group moves later, including during a **Gizmo** drag. This applies whether the group move is in the same scene patch file or another mod's, regardless of key or load order. The group placement applies first, followed by each fixed part placement. A part without a fixed placement moves with its group.
 
@@ -90,6 +90,24 @@ On the **Object** tab of the `Whittier Log Pond` group and of its `LogPond` part
 A Fontana lake is one object without parts. After a move, the patcher moves the sphere of its renderer culler to the lake's new place.
 
 If the game draws a lake surface from a static batch, a move would leave the water drawn at its old place. The patcher refuses such a move before it changes anything and says so; **Disable** and **Enable** still work. Under **Dependencies**, the **Object** tab of a lake surface says whether its water is part of a static batch.
+
+## Buildings with ground masks
+
+A scene ground mask is a component that registers a shape in the game's terrain system where its object stands. The shape sets the ground and the vegetation there. The flag-stop stations `Alarka Jct Station`, `Cochran flagstopstation`, `Ela flagstopstation`, `Nantahala Station`, `Rhodo Station`, `Topton Station` and `Wilmot Station`, and the depots `Alarka Depot`, `Almond Depot`, `Sylva Depot` and `Southern Combination Depot` at Whittier, are groups under **Station building** in the **Baked scenery group** family.
+
+In each of them, the mask is a `RectangleMapMask` on a child object named `Mask`. The patcher lists `Mask` as a part although it has no renderer, collider or light, because it is the part that holds the mask. On its **Object** tab, **Dependencies** says that it holds the scene ground mask, which also flattens the terrain height, and that it cannot be moved. The group root and any part above `Mask` name that part under **Dependencies** too.
+
+When the holder of the mask moves, the patcher asks the game to rebuild the mask through the game's own `Rebuild` method, so that the mask registers once, with its center and rotation at the holder, and the game regenerates terrain and vegetation at the old and the new place. Not yet observed in Railroader. The patcher tracks that terrain output for the edited object, at the center of the mask, as it does for a board: the **Terrain** section on the **Changes** tab shows it, and **Retry** asks again for a write that stops. A mask whose shape crosses a terrain tile border is tracked only on the tile of its center, so **Retry** asks again only for that tile; see [the limits](#limits). Save does not write the output. A write that does not complete within 30 seconds is reported with its completed and outstanding positions. See [move a board with its terrain effects](moving-boards.md#when-the-terrain-output-does-not-complete).
+
+A part with its own fixed placement keeps its mask where it is when its group moves. The patcher expects disabling a group or part to release the mask through the component's own lifecycle, and enabling to register it again. It checks both, and fails the edit when the mask does not agree with the activity. Not yet observed in Railroader. After **Undo**, **Redo**, the restoration after a failed edit and **Remove modification**, the patcher checks that the mask stands at its holder again.
+
+In Railroader 0.6.3, the masks of these buildings flatten the terrain height. A flattening mask refuses a move of its holder, of a part above the holder and of its group before anything changes. The refusal also applies to a move of the group when the flattening mask stands on a part that has its own fixed placement, although that part would stay behind. For `Mask`, the refusal reads `The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`. In the inspector, **Gizmo**, **Snap** and **Follow** are unavailable for such an object. **Numeric** stays open to show the placement, but its fields are unavailable too. The tooltip of each unavailable control reads `Unavailable: A ground mask of this object flattens the terrain height, and it is not confirmed that the game restores the height after a move.` Enabling and disabling stay possible for every object. In this version, the groups and their `Mask` parts cannot be moved. Their other parts, such as lamps, signs and clocks, can be moved and disabled. This limit stands until a Railroader test confirms that the game restores the terrain height after **Undo** and removal.
+
+If the game's ground mask members are unavailable in a build, the group is refused with `The game's ground mask members are unavailable, so this group and its parts cannot be moved, enabled or disabled`.
+
+Hemingway flagstopstation is not a group. Its Generic track marker stands on the root of the building, so the object stays in the **Track marker** family. Only this station building gets mask handling in that family. A placement of its marker is refused before anything changes, because its ground mask flattens the terrain height. An existing scene patch file that moves the marker fails that modification on load with the reason `The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`, and the file's other modifications still apply. On its **Object** tab, **Dependencies** names the object that holds the mask, because the **Track marker** family has no parts. The masks of other marker objects, such as a sign with a circle mask, are left as that family already left them: the patcher neither rebuilds nor refuses them.
+
+The game's progression switches the Cochran, Alarka Depot, Alarka Jct and Hemingway station objects on and off. The patcher leaves that switching alone. In this version it does not hold an explicit disable against that switching, so a disable of these objects may not last.
 
 ## Move the coal loader with the track under it
 
@@ -208,7 +226,7 @@ Before changing a group, the patcher checks that its scene is loaded, its path n
 
 For a part, the path must name exactly one listed part, and its group must pass the same checks. If a part modification names a group root, such as a yard lamp post below Bryson Yard, it fails with an explanation that the path names a group root. The file's other modifications still apply. Edit that object as a baked scenery group.
 
-After changing a group, the patcher checks that the root's placement and activity match the mod values. Every part must keep its place relative to the root, except for parts with their own fixed placement, which must stay at that placement. Each part must also keep its own activity unless a culler switches it. Every enabled culler's sphere must be at the culler and keep the radius set in the scene. A disabled group has no culling sphere.
+After changing a group, the patcher checks that the root's placement and activity match the mod values. Every part must keep its place relative to the root, except for parts with their own fixed placement, which must stay at that placement. Each part must also keep its own activity unless a culler switches it. Every enabled culler's sphere must be at the culler and keep the radius set in the scene. A disabled group has no culling sphere. After a move, the patcher also checks that each enabled ground mask registers at its holder's new center and direction; a mask that does not follow its holder fails the edit.
 
 After changing a part, the patcher checks its placement and activity. The group root and every other part must keep their placement and activity. Objects below the edited part must keep their placement relative to it. A culler on a moved part moves with it.
 
@@ -226,11 +244,17 @@ If any check finds a difference, the modification fails and the patcher restores
 
 ## Limits
 
-Grass and other terrain detail under a group come from the terrain and its masks. A native map mask, such as `br-house-track` under Bryson House Track, keeps the ground clear at the group's original position. After a move, grass grows through the group at its new position until you move or add the mask in the native map editor.
+Grass and other terrain detail under a group come from the terrain and its masks. A native map mask, such as `br-house-track` under Bryson House Track, keeps the ground clear at the group's original position. After a move, grass grows through the group at its new position until you move or add the mask in the native map editor. A scene ground mask is different: the scene saves it, and the patcher moves it with its holder, as described in [buildings with ground masks](#buildings-with-ground-masks). Native masks in `Map.json` stay where they are.
 
 Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. In those runs Bryson Yard was still listed as one group: it moved with all its posts and lamps, and no part remained at its old position. Bryson Yard is now a folder, and each of its lamp posts is its own group. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
 
 The runs did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
+
+The ground mask behavior of the station and depot groups has not been run in Railroader. Automated tests use a controlled mask and terrain system. They check the rebuild, the terrain output of the old and the new place, the flattening refusal, the Hemingway track marker, restoration, Undo, Redo, Save and reload. Not yet observed in the game: whether the rebuilt mask regenerates terrain and vegetation at the new place, whether the old place returns to its former state, and whether the terrain height returns after Undo and removal.
+
+A mask whose shape crosses a terrain tile border is tracked only on the tile of its center. A depot mask is 10.2 m by 26.9 m, with up to 16 m of falloff, so its footprint can cross such a border. **Retry** asks the game again only for the tile of the center, and the terrain output on any other tile of the shape is not tracked. Boards behave the same way.
+
+Without the game's ground mask members, the groups that hold a mask are refused, but the Hemingway marker is not refused and would move without its mask. This is a limit of this version.
 
 Lake surfaces are not yet measured in Railroader. Automated tests check their listing, edits, refusal, restoration, Undo, Redo, Save and reload with controlled groups. Not yet observed in the game: whether the water and the logs appear at the new place, whether the log pond keeps following the sawmill's storage there, whether a moved lake appears and disappears by camera distance at its new place, and whether the game draws the lake surfaces of the base map from a static batch.
 

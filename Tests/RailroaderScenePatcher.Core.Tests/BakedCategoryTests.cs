@@ -191,7 +191,7 @@ Wilmot | Wilmot Station | Group | Station building";
         var world = new Node("World", new Node("Large Scenery",
             new Node("Almond", new Node("Cube").Solid()),
             new Node("Bryson", new Node("Bryson Appalachian Hardwoods", new Node("A").Solid(), new Node("B").Solid())),
-            new Node("Sylva", new Node("New Shed", new Node("Wall").Solid()), new Node("New Masked Shed", new Node("Wall").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask"))));
+            new Node("Sylva", new Node("New Shed", new Node("Wall").Solid()), new Node("New Masked Shed", new Node("Wall").Solid()).With("Character.SpawnPoint"))));
         var verdicts = BakedSceneryRules.Classify(world);
         foreach (var path in new[] { "World/Large Scenery/Almond/Cube", "World/Large Scenery/Bryson/Bryson Appalachian Hardwoods" }) {
             var verdict = At(verdicts, path);

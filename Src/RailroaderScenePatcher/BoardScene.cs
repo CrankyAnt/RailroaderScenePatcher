@@ -160,6 +160,8 @@ namespace RailroaderScenePatcher {
             if (dictionary == null) throw new MissingMemberException("Terrain modifier storage unavailable");
             return dictionary.Contains(key) ? dictionary[key] : null;
         }
+        // The terrain modifier the terrain system stores under a mask component's key, or null.
+        internal object StoredModifier(string key) => Stored(maskStorage, key) ?? Stored(heightStorage, key);
         object Tile(double[] position) => tileOf.Invoke(terrain, new object[] { new Vector3((float)position[0], (float)position[1], (float)position[2]) });
         public bool TileLoaded(double[] position) => (bool)held.Invoke(terrain, new[] { Tile(position) });
         public void InvalidateTile(double[] position) => invalidate.Invoke(terrain, new[] { Tile(position) });

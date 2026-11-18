@@ -107,6 +107,8 @@ namespace RailroaderScenePatcher {
         IModContext context;
         BoardScene world;
         IndependentBoards scene;
+        // The scene ground masks of baked scenery groups and of marker objects, with their terrain output.
+        GroundMasks groundMasks;
         NativeInventory native;
         SceneCapabilities capabilities;
         PatchEngine engine;
@@ -227,6 +229,15 @@ namespace RailroaderScenePatcher {
                     status = "Independent board capability incompatible or unavailable: " + e.GetBaseException().Message;
                     Report("capability", status);
                 }
+                // Ground masks register in the terrain system the board world reaches; without it, a group that holds
+                // a mask is refused.
+                try {
+                    if (world == null) throw new InvalidOperationException("the terrain system is unavailable");
+                    groundMasks = new GroundMasks(new GroundMaskWorld(world));
+                } catch (Exception e) {
+                    groundMasks = null; GroundMaskWorld.Unavailable();
+                    context.Log.Info("Scene Patcher " + Version + ": ground mask handling incompatible or unavailable: " + e.GetBaseException().Message);
+                }
                 PrepareRuntime(value);
                 if (inMapEditor) {
                     inventory = new SceneInventory(native);
@@ -259,8 +270,8 @@ namespace RailroaderScenePatcher {
                 GroupWorld groupWorld = null;
                 try {
                     groupWorld = new GroupWorld(); var holds = new PartHolds();
-                    capabilities.Add(new BakedSceneryGroups(groupWorld, Capability.Unchecked, holds));
-                    capabilities.Add(new BakedSceneryParts(groupWorld, holds));
+                    capabilities.Add(new BakedSceneryGroups(groupWorld, Capability.Unchecked, holds, groundMasks));
+                    capabilities.Add(new BakedSceneryParts(groupWorld, holds, masks: groundMasks));
                 } catch (Exception e) {
                     capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
                     capabilities.AddUnavailable(BakedSceneryParts.Structure, e.GetBaseException().Message);
@@ -330,7 +341,7 @@ namespace RailroaderScenePatcher {
             native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
             ModScenePatchFiles.Log = message => context?.Log.Info(message);
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
-            try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
+            try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
             engine = new PatchEngine(capabilities);
             nativeDiagnostics = new NativePatchDiagnostics(Report);
@@ -831,6 +842,13 @@ namespace RailroaderScenePatcher {
                 foreach (var failure in scene.Failures)
                     Report("terrain/" + world.Label(failure.Key) + "/" + failure.Value.Error, "Terrain output for " + world.Label(failure.Key) + " did not complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". The board keeps its applied placement; reloading the map regenerates the output. Report to the patcher maintainer.");
             } catch (Exception e) { Report("terrain", "Dependent terrain state remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
+            if (groundMasks != null) try {
+                groundMasks.Poll();
+                foreach (var failure in groundMasks.Failures) {
+                    var label = failure.Key is GameObject moved && moved != null ? BoardScene.PathOf(moved.transform) : "an unloaded object";
+                    Report("terrain/" + label + "/" + failure.Value.Error, "Terrain output for " + label + " did not complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". The object keeps its applied placement; reloading the map regenerates the output. Report to the patcher maintainer.");
+                }
+            } catch (Exception e) { Report("terrain-masks", "Dependent terrain state of a ground mask remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
             if (presentation != null) {
                 // A closed window shows nothing: it computes no snapshot. Opening builds the content anew.
                 if (open) {
@@ -974,7 +992,7 @@ namespace RailroaderScenePatcher {
             Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Release(); selection = null;
             // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
             capabilities?.Dispose();
-            scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
+            groundMasks?.Dispose(); groundMasks = null; GroundMaskWorld.Unavailable(); scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
             runtime = null; markerWorld = null; nativeDiagnostics = null; pendingWarnings.Clear(); pendingNotices.Clear(); overlapNotices = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);

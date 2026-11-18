@@ -403,7 +403,20 @@ namespace RailroaderScenePatcher {
         // is not in the inventory.
         internal static string UseInGame(SceneObservation selected, SceneObservation group) {
             var isPart = selected.GroupPath != null;
-            return UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings, isPart ? group?.Bindings : null);
+            var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings, isPart ? group?.Bindings : null);
+            return GroundMaskUse(use, isPart, selected.Dependencies);
+        }
+        // An object with a scene ground mask at or below it is not only decorative: the mask shapes the terrain where it
+        // stands. The part that holds the mask says what the mask does; an object above it adds that to its own text.
+        // An object whose mask flattens the terrain height cannot be moved, so its text names disabling alone.
+        internal const string GroundMaskHolderUse = "Ground mask: it shapes the ground and the vegetation where this part stands. Moving or disabling this part changes the terrain there.";
+        internal static string GroundMaskUse(string use, bool part, IEnumerable<string> dependencies) {
+            var line = dependencies?.FirstOrDefault(dependency => dependency != null && dependency.StartsWith(GroundMaskPrefix, StringComparison.Ordinal));
+            if (line == null) return use;
+            var edits = line.EndsWith(HeightUnconfirmed, StringComparison.Ordinal) ? "disabling" : "moving or disabling";
+            if (line.StartsWith(GroundMaskPrefix + "this part", StringComparison.Ordinal)) return edits == "disabling" ? GroundMaskHolderUse.Replace("Moving or disabling", "Disabling") : GroundMaskHolderUse;
+            var shaping = "Its ground mask shapes the ground and the vegetation where it stands, so " + edits + " this " + (part ? "part" : "group") + " changes the terrain there.";
+            return use == Decorative || use == PartDecorative ? "The building is decorative. " + shaping : use + " " + shaping;
         }
         // The ids by which a pile's or log pond's storage synchronizer reads the storage it shows, as one binding line.
         const string StoragePrefix = "Industry storage=";
@@ -505,6 +518,32 @@ namespace RailroaderScenePatcher {
         internal const string ConstructionHoldWarning = "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.";
         // Names in running text: "a", "a and b", "a, b and c".
         static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
+        // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise
+        // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height keeps
+        // the object in place.
+        const string GroundMaskPrefix = "Ground mask: ", HeightUnconfirmed = "cannot be moved, because it is not confirmed that the game restores the height after a move";
+        // parts: the holders are parts of the object's family; below a marker object they are plain objects.
+        internal static string GroundMaskDependency(bool self, IEnumerable<string> holders, bool flattens, bool parts = true) {
+            var names = (holders ?? Enumerable.Empty<string>()).ToArray();
+            var several = !self && names.Length > 1;
+            var kind = parts ? "part" : "object";
+            var who = self ? "this part holds the scene ground mask" : several ? "the " + kind + "s " + Listing(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
+            if (flattens) return GroundMaskPrefix + who + (several ? ", and one or more also flatten the terrain height. " : ", which also flattens the terrain height. ") + (self ? "It " : "This object ") + HeightUnconfirmed;
+            return GroundMaskPrefix + who + ". Moving " + (self ? "it moves the terrain shaping" : "this object moves " + (several ? "those " + kind + "s" : "that " + kind) + " and the terrain shaping with " + (several ? "them" : "it")) +
+                ", and the patcher asks the game to regenerate terrain and vegetation at the old and the new place";
+        }
+        // Whether the Placement tab shows Numeric whatever mode was open: a pad, an object that cannot be edited, a
+        // construction controller, and an object whose every move is refused have no use for the other modes.
+        internal static bool ForcesNumeric(bool pad, bool editable, bool controller, string moveBlock) => pad || !editable || controller || moveBlock != null;
+        // Why the placement actions of the tab, Read and Apply included, are unavailable, or null: the first block that holds.
+        internal static string PlacementBlock(string edit, string pad, string controller, string moveBlock) => edit ?? pad ?? controller ?? moveBlock;
+        // Why every move of the object is refused, or null: its dependency line names a mask that flattens the terrain
+        // height. The placement modes and fields are then unavailable with this reason.
+        internal const string FlatteningMoveBlock = "A ground mask of this object flattens the terrain height, and it is not confirmed that the game restores the height after a move.";
+        internal static string GroundMaskMoveBlock(IEnumerable<string> dependencies) =>
+            dependencies?.Any(line => line != null && line.StartsWith(GroundMaskPrefix, StringComparison.Ordinal) && line.EndsWith(HeightUnconfirmed, StringComparison.Ordinal)) == true ? FlatteningMoveBlock : null;
+        // Whether the object has terrain output of a scene ground mask, by its dependency line.
+        internal static bool HoldsGroundMask(IEnumerable<string> dependencies) => dependencies?.Any(line => line != null && line.StartsWith(GroundMaskPrefix, StringComparison.Ordinal)) == true;
         // The dependency a lake surface's inspection names: what moves with it, what stays native, and whether its water
         // is part of a static batch, which the game would keep drawing at its old place.
         internal static string LakeSurfaceDependency(bool batched) => batched
@@ -612,8 +651,11 @@ namespace RailroaderScenePatcher {
         // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
         // placement, and has every other mode inactive with the object's own reason.
         // An existing crossing mast or bell has one for Follow as well.
-        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false, bool railBridge = false, bool controller = false) =>
-            controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
+        // moveBlock: why every move of the object is refused, such as a ground mask that flattens the terrain height;
+        // Numeric then stays open to show the placement, with its fields unavailable for the same reason.
+        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false, bool railBridge = false, bool controller = false, string moveBlock = null) =>
+            controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : moveBlock != null && mode != NumericMode ? moveBlock
+            : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
             : railBridge && mode == FollowMode ? RailBridgeNoFollow : null;
         // A rail bridge construction does not follow its track: move the track natively, then the construction onto it.
         internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + ". Move the track in the native map editor, then move the bridge onto it.";

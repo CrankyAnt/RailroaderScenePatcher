@@ -664,7 +664,6 @@ static class BakedSceneryTests {
     // with the reason and the ticket that covers it.
     static void LeavesOutGroupsThatLaterTicketsCover() {
         var cases = new[] {
-            new { Name = "Alarka Jct Station", Component = "Map.Runtime.MaskComponents.RectangleMapMask", Kind = "scene ground mask", Ticket = "#90" },
             new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = (string)null },
             new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "map icon", Ticket = (string)null },
         };

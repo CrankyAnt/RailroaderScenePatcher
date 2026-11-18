@@ -14,6 +14,7 @@ static class FaultInjectionTests {
         AfterMutationIsRestoredOnce();
         DuringRestorationLeavesAnIncompleteCleanup();
         CoverageTests.RunInjectedInterruption();
+        GroundMaskTests.RunFlatteningSwitch();
         UnreadableGroupIsSkippedOnce();
         Console.WriteLine("PASS: fault build arms each injected failure once and handles it as a real failure, and logs an unreadable group once");
 #else

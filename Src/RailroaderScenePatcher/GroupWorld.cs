@@ -304,8 +304,12 @@ namespace RailroaderScenePatcher {
             if (components.Any(c => c is Rigidbody)) return "The group holds a rigidbody; only static colliders are supported";
             // The track and what the game builds for it are native map data, which a rail bridge move must leave in place.
             if (RailBridgeRoot(root)) { var owned = BakedSceneryRules.TrackOwnedRefusal(components.Where(c => c != null).Select(c => c.GetType().FullName)); if (owned != null) return owned; }
-            return ConstructionProblem(root) ?? PileProblem(root);
+            return ConstructionProblem(root) ?? PileProblem(root) ?? MaskProblem(root);
         }
+        // A group that holds a scene ground mask is not edited while the mask cannot be read and rebuilt: a move would
+        // leave the terrain shaping behind.
+        static string MaskProblem(GameObject root) =>
+            !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so this group and its parts cannot be moved, enabled or disabled" : null;
         // A culling container and a group root resolve too, so their modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
             BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.Resolves(PartVerdictOf(g), VerdictOf(g))).Cast<object>().ToArray();

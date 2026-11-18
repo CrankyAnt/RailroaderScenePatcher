@@ -562,6 +562,12 @@ namespace RailroaderScenePatcher {
                 bindings.AddRange(CommandBand.ConstructionBindings(ids, segmentIds));
                 dependencies.Add(CommandBand.ConstructionDependency);
             });
+            // A scene ground mask shapes the terrain where its object stands: the part that holds it says so, and the
+            // group root, a part above it and a marker object above it name that part.
+            if (groupRoot || part || family == "Track marker") Read(() => {
+                var holders = GroundMaskWorld.Holders(go, out var flattens);
+                if (holders.Count != 0) dependencies.Add(CommandBand.GroundMaskDependency(holders.Count == 1 && holders[0] == go, holders.Select(holder => holder.name), flattens, groupRoot || part));
+            });
             // A building with pickable toggles: each entry names the toggles, the key-value object and the name text it
             // owns, its own object and those below it outside its parts, and counts the toggles in its parts. Other
             // groups read none of this, so their bindings stay as they were.

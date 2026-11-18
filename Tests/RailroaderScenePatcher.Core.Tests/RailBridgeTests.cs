@@ -382,7 +382,7 @@ static class RailBridgeTests {
         Assert(other?.Disposition == GroupDisposition.InspectionOnly && other.Reason == BakedSceneryRules.ConstructionOutsideBridge && other.ReasonIsSentence,
             "A controller outside a supported rail bridge keeps its group inspection only: " + other?.Disposition + " " + other?.Reason);
         // A rail bridge that holds another excluded kind stays inspection only under its category.
-        var masked = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Plate Girder Bridge", new Node("Plate Girder Bridge", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask"))))), Girders + "Plate Girder Bridge");
+        var masked = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Plate Girder Bridge", new Node("Plate Girder Bridge", new Node("Deck").Solid()).With("Character.SpawnPoint"))))), Girders + "Plate Girder Bridge");
         Assert(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Subcategory == BakedSceneryCategories.RailBridges, "An excluded kind keeps a rail bridge inspection only under Rail bridges");
         // Track-owned components belong to the native track: a rail bridge holding one is refused.
         Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", Controller }) == null, "A construction controller is no track-owned component");

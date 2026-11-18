@@ -733,7 +733,7 @@ namespace RailroaderScenePatcher {
         void DrawPlacement(UIPanelBuilder builder) {
             // A crossing pad has no placement of its own, and an object that cannot be edited has none to set: the tab
             // shows the placement, and no other mode is open.
-            if (IsPad || !Editable || IsController) placementMode = CommandBand.NumericMode;
+            if (CommandBand.ForcesNumeric(IsPad, Editable, IsController, MoveBlock)) placementMode = CommandBand.NumericMode;
             // A new-game car placement puts its cars at the marker's track point, which the world marks in gold; the
             // object position below plays no part in it.
             if (selected.Family == StarterPlacements.Family) {
@@ -749,11 +749,11 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController, MoveBlock);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
-            var block = EditBlock() ?? PadBlock ?? ControllerBlock;
+            var block = EditBlock() ?? PadBlock ?? ControllerBlock ?? MoveBlock;
             if (placementMode == 0) {
                 for (var group = 0; group < 2; group++) {
                     if (group != 0) builder.Spacer(6f);
@@ -1138,8 +1138,8 @@ namespace RailroaderScenePatcher {
                 try { lines = attachment.Session.Changes(selected.Identity); } catch { }
                 if (lines != null) foreach (var line in lines) PlainLabel(builder, Breakable(line));
             }
-            // Terrain output exists only for an object with a terrain mask, an independent board: the section is
-            // there only for those, in plain words.
+            // Terrain output exists only for an object with a terrain mask: an independent board, and an object that
+            // holds a scene ground mask or stands above one. The section is there only for those, in plain words.
             if (!HasTerrain) return;
             Section(builder, "Terrain");
             var problem = (string)null;
@@ -1148,7 +1148,7 @@ namespace RailroaderScenePatcher {
             if (problem != null) builder.AddLabel(Tint(Red, text)); else PlainLabel(builder, text);
         }
         // Whether the inspected object has terrain output at all.
-        bool HasTerrain => selected != null && selected.Identity.Structure == IndependentBoards.Structure;
+        bool HasTerrain => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || CommandBand.HoldsGroundMask(selected.Dependencies));
 
         // The footer, the same on every tab: the message area, then one row with the actions on the inspected object
         // that belong to no tab, Remove modification and Recheck. A pending world choice or an active gizmo takes that
@@ -1401,7 +1401,7 @@ namespace RailroaderScenePatcher {
             var identity = selected?.Identity;
             switch (id) {
                 case PlacementTab:
-                    block = block ?? PadBlock ?? ControllerBlock;
+                    block = CommandBand.PlacementBlock(block, PadBlock, ControllerBlock, MoveBlock);
                     // Without fields there is nothing to apply or to read: an object whose placement stands as running
                     // lines has no value controls.
                     if ((placementMode == 0 || IsPad) && block != null) return new Act[0];
@@ -1566,6 +1566,8 @@ namespace RailroaderScenePatcher {
         }
         // Why no placement mode edits the inspected object when it is a crossing pad; null for any other object.
         string PadBlock => IsPad ? CommandBand.PadFollowsTrack : null;
+        // Why every move of the inspected object is refused, or null: a ground mask at or below it flattens the height.
+        string MoveBlock => CommandBand.GroundMaskMoveBlock(selected?.Dependencies);
         // A construction controller on an object of its own takes no placement and no Enabled setting: its position has
         // no effect, and the construction's visibility control runs on it.
         bool IsController => selected?.Identity.Structure == ConstructionSceneryScene.Structure;
@@ -1736,7 +1738,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Gizmo", "The native gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
-                    new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." },
+                    new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. The terrain output of a board or a ground mask regenerates after the move." },
                     new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
                     new[] { "Spawn points", "The game reads a spawn point where it stands each time it starts, rescues or teleports a player. A disabled spawn point is not offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
@@ -1758,7 +1760,7 @@ namespace RailroaderScenePatcher {
                 Terms = new[] {
                     new[] { "Remove modification", "Deletes this mod's modification and restores the object's underlying state, not an earlier patched position." },
                     new[] { "Recheck", "After a failed edit, compares the object with the scene patch file and unblocks it once they agree." },
-                    new[] { "Terrain output", "The game regenerates terrain after a board move. Save does not write that output. Retry asks for it again." } },
+                    new[] { "Terrain output", "The game regenerates terrain after a move of a board or a ground mask. Save does not write that output. Retry asks for it again." } },
                 Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {

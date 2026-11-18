@@ -320,10 +320,17 @@ namespace RailroaderScenePatcher.Core {
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
     // placement stays a separate, independently set value.
-    public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
+    public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene {
         public const string Structure = "track-marker-v1", RequiredVersion = "0.5.0";
         readonly MarkerRelationship relationship;
-        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability) { relationship = new MarkerRelationship(world, Structure, null); Capability = capability; }
+        // The scene ground masks at and below a marker object, such as the Hemingway station, whose track marker stands
+        // on the root of its building: a move of the marker rebuilds them, and a mask that flattens the terrain height
+        // refuses the move. Null in a world without them.
+        readonly GroundMasks masks;
+        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null); Capability = capability; this.masks = masks; }
+        public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
+        public void RetryOutput(object target) => masks?.RetryOutput(target);
+        void Masked(object target, Action change) { var before = masks?.Observe(target); change(); masks?.Follow(target, target, before); }
         public IEnumerable<string> MapIds => relationship.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
@@ -331,12 +338,19 @@ namespace RailroaderScenePatcher.Core {
         public void PreflightPlacement(object target) => relationship.PreflightPlacement(target);
         public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == "Track.TrackMarker") ? RequiredVersion : null;
         public void Preflight(object target) => relationship.Preflight(target);
-        public void CheckRelationships(object target, ObjectState state) => relationship.CheckRelationships(target, state);
+        public void CheckRelationships(object target, ObjectState state) {
+            relationship.CheckRelationships(target, state);
+            if (state?.Placement != null && masks?.PlacementRefusal(target) is string refusal) throw new InvalidOperationException(refusal);
+        }
         public object Capture(object target) => relationship.Capture(target);
         public ObjectState Read(object target) => relationship.Read(target);
-        public void Apply(object target, ObjectState state) => relationship.Apply(target, state);
-        public void ApplyFollowUpdate(object target, ObjectState state) => relationship.Apply(target, state, true);
-        public bool Restore(object target, object snapshot) => relationship.Restore(target, snapshot);
+        public void Apply(object target, ObjectState state) => Masked(target, () => relationship.Apply(target, state));
+        public void ApplyFollowUpdate(object target, ObjectState state) => Masked(target, () => relationship.Apply(target, state, true));
+        public bool Restore(object target, object snapshot) {
+            var before = masks?.Observe(target);
+            if (!relationship.Restore(target, snapshot)) return false;
+            try { masks?.Follow(target, target, before); return true; } catch { return false; }
+        }
     }
     // State that a marker's consumer derives from the marker's location and the object's placement, such as generated geometry.
     internal interface IMarkerConsumer {

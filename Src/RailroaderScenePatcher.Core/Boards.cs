@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
@@ -61,7 +60,7 @@ namespace RailroaderScenePatcher.Core {
         public int MissingMaskKeys { get; }
     }
     // The native operations of the independent-board capability. Positions are map coordinates.
-    public interface IBoardWorld {
+    public interface IBoardWorld : ITerrainWorld {
         IEnumerable<string> MapIds { get; }
         // Objects at the scene path that carry the board's renderer culler.
         IReadOnlyList<object> Find(string scene, string path);
@@ -75,14 +74,6 @@ namespace RailroaderScenePatcher.Core {
         void RefreshCulling(object board);
         void RebuildMask(object board);
         BoardRegistration Registration(object board);
-        // Whether the terrain tile containing the position is built; an unbuilt tile later builds from the current masks.
-        bool TileLoaded(double[] position);
-        void InvalidateTile(double[] position);
-        bool TerrainIdle { get; }
-        // Monotonic seconds.
-        double Now { get; }
-        // Bounds of a built terrain tile: minimum and maximum corner.
-        event Action<double[], double[]> TileBuilt;
     }
 
     // Independent boards: scene objects with a renderer culler and a circle map mask and no track relationship.
@@ -94,26 +85,16 @@ namespace RailroaderScenePatcher.Core {
         public const string SylvaScene = "BushnellWhittier-MapManager", SylvaPath = "World/Signs/Loc: Sylva Int";
         // Pattern-based boards share the delivery minimum; the original Sylva target retains its legacy support.
         public const string PatternVersion = "0.5.0";
-        public const double OutputTimeout = 30;
+        public const double OutputTimeout = TerrainOutput.Timeout;
         const double PlacementTolerance = 0.01, RegistrationTolerance = 0.1;
         readonly IBoardWorld world;
         readonly Func<IEnumerable<SceneObservation>> discover;
-        readonly Dictionary<object, Work> work = new Dictionary<object, Work>();
-        readonly Action<double[], double[]> built;
+        readonly TerrainOutput output;
         sealed class Snapshot { internal double[] Position, Rotation; internal bool Active; internal object Parent; }
-        sealed class Write { internal double[] Position; internal string Label; internal bool Built; }
-        sealed class Work {
-            internal readonly List<Write> Outstanding = new List<Write>();
-            internal readonly List<string> Completed = new List<string>();
-            internal double Since;
-            internal string Error;
-            internal bool Settled => Outstanding.Count == 0 && Error == null;
-        }
         public IndependentBoards(IBoardWorld world, Func<IEnumerable<SceneObservation>> discover = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world));
             this.discover = discover ?? (() => Array.Empty<SceneObservation>());
-            built = TileBuilt;
-            world.TileBuilt += built;
+            output = new TerrainOutput(world);
         }
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability => Capability.Unchecked;
@@ -185,53 +166,16 @@ namespace RailroaderScenePatcher.Core {
         }
 
         // Dependent terrain output.
-        void Track(object target, double[] position) {
-            if (!work.TryGetValue(target, out var item)) work.Add(target, item = new Work());
-            else if (item.Settled) item.Completed.Clear();
-            item.Error = null; item.Since = world.Now;
-            var label = "terrain output at map x=" + Text(position[0]) + ", z=" + Text(position[2]);
-            if (!world.TileLoaded(position)) { item.Completed.Add(label + " (tile not built; it builds from the current mask)"); return; }
-            if (item.Outstanding.Any(w => w.Label == label)) { foreach (var w in item.Outstanding.Where(w => w.Label == label)) w.Built = false; return; }
-            item.Outstanding.Add(new Write { Position = (double[])position.Clone(), Label = label });
-        }
-        void TileBuilt(double[] min, double[] max) {
-            foreach (var item in work.Values)
-                foreach (var write in item.Outstanding)
-                    if (write.Position[0] >= min[0] && write.Position[0] <= max[0] && write.Position[2] >= min[2] && write.Position[2] <= max[2]) write.Built = true;
-        }
-        // Advances completion. The game reports a write complete when its tile was built afterwards and all terrain work is idle.
-        public void Poll() {
-            foreach (var item in work.Values) {
-                if (item.Error != null || item.Outstanding.Count == 0) continue;
-                foreach (var write in item.Outstanding.ToArray())
-                    if (!world.TileLoaded(write.Position)) { item.Outstanding.Remove(write); item.Completed.Add(write.Label + " (tile unloaded; it builds from the current mask)"); }
-                if (world.TerrainIdle) {
-                    var done = item.Outstanding.Where(w => w.Built).ToArray();
-                    foreach (var write in done) { item.Outstanding.Remove(write); item.Completed.Add(write.Label); }
-                }
-                if (item.Outstanding.Count != 0 && world.Now - item.Since > OutputTimeout) item.Error = "Terrain output did not complete within " + OutputTimeout.ToString(CultureInfo.InvariantCulture) + " seconds";
-            }
-        }
-        public DependentOutput Output(object target) {
-            if (target == null || !work.TryGetValue(target, out var item)) return DependentOutput.None;
-            return new DependentOutput(item.Completed, item.Outstanding.Select(w => w.Label), item.Error);
-        }
-        public void RetryOutput(object target) {
-            if (target == null || !work.TryGetValue(target, out var item) || item.Outstanding.Count == 0) return;
-            item.Error = null; item.Since = world.Now;
-            foreach (var write in item.Outstanding.ToArray()) {
-                if (!world.TileLoaded(write.Position)) { item.Outstanding.Remove(write); item.Completed.Add(write.Label + " (tile unloaded; it builds from the current mask)"); continue; }
-                write.Built = false;
-                try { world.InvalidateTile(write.Position); }
-                catch (Exception e) { item.Error = "Terrain output could not be requested again: " + e.Message; return; }
-            }
-        }
+        void Track(object target, double[] position) => output.Track(target, position);
+        public void Poll() => output.Poll();
+        public DependentOutput Output(object target) => output.Output(target);
+        public void RetryOutput(object target) => output.RetryOutput(target);
         // Boards whose dependent output stopped without completing, with their reports.
-        public IEnumerable<KeyValuePair<object, DependentOutput>> Failures => work.Where(p => p.Value.Error != null).Select(p => new KeyValuePair<object, DependentOutput>(p.Key, Output(p.Key))).ToArray();
+        public IEnumerable<KeyValuePair<object, DependentOutput>> Failures => output.Failures;
         public string Status {
             get {
-                if (work.Values.Any(w => w.Error != null)) return "Terrain output stopped without completing for " + work.Count(p => p.Value.Error != null) + " board(s); retry it from the inspected board";
-                var outstanding = work.Values.Sum(w => w.Outstanding.Count);
+                if (output.Stopped != 0) return "Terrain output stopped without completing for " + output.Stopped + " board(s); retry it from the inspected board";
+                var outstanding = output.Outstanding;
                 return outstanding == 0 ? "No terrain output outstanding" : "Terrain output outstanding at " + outstanding + " position(s); the game is regenerating it";
             }
         }
@@ -239,7 +183,7 @@ namespace RailroaderScenePatcher.Core {
         // The requirement holds for the scene patch file whether or not this capability is available in the current load.
         public static string RequiredVersion(TargetIdentity target) =>
             target != null && target.Component == CullerType && (target.Structure == null || target.Structure == Structure) && (target.Scene != SylvaScene || target.Path != SylvaPath) ? PatternVersion : null;
-        public void Dispose() { world.TileBuilt -= built; work.Clear(); }
+        public void Dispose() => output.Dispose();
 
         static double[] Finite(double[] values) {
             if (values == null || values.Any(v => Double.IsNaN(v) || Double.IsInfinity(v) || Math.Abs(v) > Single.MaxValue)) throw new InvalidOperationException("Coordinate exceeds native precision");
@@ -252,6 +196,5 @@ namespace RailroaderScenePatcher.Core {
             for (var i = 0; i < 4; i++) { dot += a[i] * b[i]; la += a[i] * a[i]; lb += b[i] * b[i]; }
             return Math.Acos(Math.Min(1, Math.Abs(dot) / Math.Sqrt(la * lb))) * 2 * 180 / Math.PI;
         }
-        static string Text(double v) => v.ToString("0.0", CultureInfo.InvariantCulture);
     }
 }

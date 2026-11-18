@@ -227,7 +227,6 @@ namespace RailroaderScenePatcher.Core {
             internal bool Matches(string type) => Prefix ? type.StartsWith(Component, StringComparison.Ordinal) : type == Component;
         }
         public static readonly IReadOnlyList<Exclusion> Exclusions = Array.AsReadOnly(new[] {
-            new Exclusion("Map.Runtime.MaskComponents.", "scene ground mask", "#90", true),
             new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
             new Exclusion("Model.StationAgent", "station click spot", null, reason: StationAgentReason),
             new Exclusion(ConstructionController, "track construction controller", null, reason: ConstructionOutsideBridge),
@@ -415,7 +414,9 @@ namespace RailroaderScenePatcher.Core {
                 if (child.HasFamily) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.ExistingFamily, null)); continue; }
                 // A culling container is no part, but the objects in it are: they stay listed under their group.
                 if (CullingContainer(child)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, CullingContainers)); Walk(child, path, groupPath, null, found); continue; }
-                if (!Physical(child)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, NoPhysicalPresence)); continue; }
+                // The object that holds a scene ground mask is a part without a renderer, collider or light: moving it
+                // moves the terrain shaping.
+                if (!Physical(child) && !HoldsGroundMask(child.Components)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, NoPhysicalPresence)); continue; }
                 found.Add(new PartVerdict(child, path, groupPath, PartDisposition.Part, null));
                 Walk(child, path, groupPath, null, found);
             }
@@ -448,6 +449,16 @@ namespace RailroaderScenePatcher.Core {
         // The inventory note for a simple culler whose handler other code replaced while the patcher listened to it: the
         // patcher's handler stays in the chain and only passes the game's events on. Information, not a warning.
         public static string LeftoverWrapper(string culler) => "Own culling left a pass-through handler on " + culler + " because another handler was installed after it";
+        // A scene ground mask is a component in this namespace (Map.Runtime.MaskComponents): it registers a shape in
+        // the game's terrain system where its object stands, which shapes the ground and the vegetation there. A group
+        // that holds one is a group of the family, and the object that holds it is a part.
+        public const string GroundMasks = "Map.Runtime.MaskComponents.";
+        public static bool HoldsGroundMask(IEnumerable<string> components) => components != null && components.Any(type => type != null && type.StartsWith(GroundMasks, StringComparison.Ordinal));
+        // The marker objects whose scene ground mask the Track marker family handles: a station building whose track
+        // marker stands on its root, which keeps that family. Railroader 0.6.3 has one, the Hemingway flag-stop station.
+        // The masks of other marker objects, such as a sign's, stay as that family leaves them.
+        public static readonly IReadOnlyList<string> MaskedMarkers = Array.AsReadOnly(new[] { "World/Large Scenery/Hemingway/Hemingway flagstopstation" });
+        public static bool MaskedMarker(string path) => path != null && MaskedMarkers.Contains(path);
         // The first exclusion, in the order of the list, that a component at or below the node matches.
         static Exclusion FirstExclusion(IHierarchyNode node, string allowed = null) {
             var types = new HashSet<string>(StringComparer.Ordinal);
@@ -761,15 +772,20 @@ namespace RailroaderScenePatcher.Core {
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
     // The root of a rail bridge construction that carries its construction controller, such as Bryson Bridge 1 and the
     // Almond Bridge, also holds the construction-segment relationship.
-    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDisposable {
+    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IDisposable {
         public const string Structure = "baked-scenery-group-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
         // The construction controllers on group roots; null in a world without them.
         IConstructionSegmentWorld Segments => world as IConstructionSegmentWorld;
-        public BakedSceneryGroups(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null) {
-            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds();
+        // The scene ground masks of the groups, or null in a world without them.
+        readonly GroundMasks masks;
+        public BakedSceneryGroups(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null, GroundMasks masks = null) {
+            this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds(); this.masks = masks;
         }
+        // The terrain output that follows a ground mask of the group, by the edited group root.
+        public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
+        public void RetryOutput(object target) => masks?.RetryOutput(target);
         // The capability ends: the world gives back what its own culling of moved parts took over from the game.
         public void Dispose() => (world as IDisposable)?.Dispose();
         public IEnumerable<string> MapIds => world.MapIds;
@@ -793,7 +809,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = state?.Placement == null ? null : world.PlacementRefusal(target);
+            var refusal = state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; }
@@ -818,6 +834,7 @@ namespace RailroaderScenePatcher.Core {
             var segments = ConstructionSegmentRule.Verify(Segments, target, state.Segments);
             if (segments != null) throw new InvalidOperationException("Applied construction segments did not verify: " + segments);
             var before = world.Observe(target);
+            var masked = masks?.Observe(target);
             var active = state.Active ?? before.Root.Active ?? true;
             if (active && before.Root.Active != true) world.SetActive(target, true);
             if (state.Placement != null) Place(target, state.Placement);
@@ -827,6 +844,8 @@ namespace RailroaderScenePatcher.Core {
             if (!GroupChecks.SamePlacement(after.Root.Placement, state.Placement ?? before.Root.Placement) || after.Root.Active != active) throw new InvalidOperationException("Applied group placement or activity did not verify");
             var difference = GroupChecks.Layout(before, after, holds.Contains) ?? GroupChecks.Colliders(before, after) ?? GroupChecks.Culling(after, active, plan) ?? GroupChecks.RootCuller(after, active);
             if (difference != null) throw new InvalidOperationException("The group did not move as one: " + difference);
+            // The ground masks at and below the root register again where their holders stand now.
+            masks?.Follow(target, target, masked);
         }
         public bool Restore(object target, object snapshot) {
             var taken = (Snapshot)snapshot; var captured = taken.Observed;
@@ -834,12 +853,14 @@ namespace RailroaderScenePatcher.Core {
                 if (!ReferenceEquals(world.Observe(target).Parent, captured.Parent)) return false;
                 ConstructionSegmentRule.Apply(Segments, target, taken.Segments);
                 if (ConstructionSegmentRule.Verify(Segments, target, taken.Segments) != null) return false;
+                var masked = masks?.Observe(target);
                 var root = captured.Root;
                 if (root.Active == true) world.SetActive(target, true);
                 if (root.Placement != null) Place(target, root.Placement);
                 if (root.Active == false) world.SetActive(target, false);
                 var plan = Refresh(target);
                 var current = world.Observe(target);
+                masks?.Follow(target, target, masked);
                 return GroupChecks.SamePlacement(current.Root.Placement, root.Placement) && current.Root.Active == root.Active && GroupChecks.Layout(captured, current, holds.Contains) == null
                     && GroupChecks.Colliders(captured, current) == null && GroupChecks.Culling(current, root.Active != false, plan) == null && current.RootCulling == captured.RootCulling;
             } catch { return false; }
@@ -850,13 +871,18 @@ namespace RailroaderScenePatcher.Core {
     // is an ordinary scene-object edit; the group root and the other parts keep their placement and activity. A fixed
     // placement holds the part in map coordinates when its group moves later; the placement the part has without any
     // modification stays relative to its group.
-    public sealed class BakedSceneryParts : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene {
+    public sealed class BakedSceneryParts : IScene, IVersionedScene, IFramedScene, IRelationshipScene, IRetainedScene, IDependentOutputScene {
         public const string Structure = "baked-scenery-part-v1", ComponentType = BakedSceneryGroups.ComponentType, RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
-        public BakedSceneryParts(IGroupWorld world, PartHolds holds, Capability capability = Capability.Unchecked) {
-            this.world = world ?? throw new ArgumentNullException(nameof(world)); this.holds = holds ?? throw new ArgumentNullException(nameof(holds)); Capability = capability;
+        // The scene ground masks of the groups, or null in a world without them.
+        readonly GroundMasks masks;
+        public BakedSceneryParts(IGroupWorld world, PartHolds holds, Capability capability = Capability.Unchecked, GroundMasks masks = null) {
+            this.world = world ?? throw new ArgumentNullException(nameof(world)); this.holds = holds ?? throw new ArgumentNullException(nameof(holds)); Capability = capability; this.masks = masks;
         }
+        // The terrain output that follows a ground mask at or below the part, by the edited part.
+        public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
+        public void RetryOutput(object target) => masks?.RetryOutput(target);
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -890,7 +916,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-equipment relationships");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target));
+            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target));
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal PartObservation Observed; internal Placement Held, Scene; }
@@ -912,6 +938,7 @@ namespace RailroaderScenePatcher.Core {
             var before = world.ObservePart(target);
             var desired = state.Placement;
             if (desired != null) GroupChecks.CheckPlacement(desired);
+            var masked = masks?.Observe(before.Group);
             // A game-object culler switches this part by camera distance: its activity stays the culler's, whatever the
             // state says, so an edit never switches it on or off against the culler.
             var switched = world.ActivityRefusal(target) != null;
@@ -922,6 +949,8 @@ namespace RailroaderScenePatcher.Core {
             if (desired != null) Place(target, before.Group, desired, desired.Frame == null ? desired : null, holds.Contains(target) ? holds.AuthoredOf(target) : GroupChecks.InParent(before.GroupState, target));
             if (!switched && !active && before.Part.Active != false) world.SetPartActive(target, false);
             Verify(target, before, desired ?? before.Part.Placement, switched ? (bool?)null : active, Refresh(before.Group));
+            // The ground masks of the group register again where their holders stand now: the part's and those below it.
+            masks?.Follow(target, before.Group, masked);
         }
         // active is null for a part whose activity a culler switches: its activity is not compared.
         void Verify(object target, PartObservation before, Placement placement, bool? active, CullingPlan plan) {
@@ -939,11 +968,13 @@ namespace RailroaderScenePatcher.Core {
                 var current = world.ObservePart(target);
                 if (!ReferenceEquals(current.Parent, captured.Observed.Parent) || !ReferenceEquals(current.Group, captured.Observed.Group)) return false;
                 var part = captured.Observed.Part;
+                var masked = masks?.Observe(captured.Observed.Group);
                 var switched = world.ActivityRefusal(target) != null;
                 if (!switched && part.Active == true) world.SetPartActive(target, true);
                 if (part.Placement != null) Place(target, captured.Observed.Group, part.Placement, captured.Held, captured.Scene);
                 if (!switched && part.Active == false) world.SetPartActive(target, false);
                 Verify(target, captured.Observed, part.Placement, switched ? (bool?)null : part.Active != false, Refresh(captured.Observed.Group));
+                masks?.Follow(target, captured.Observed.Group, masked);
                 return true;
             } catch { return false; }
         }
