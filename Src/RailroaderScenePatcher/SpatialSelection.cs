@@ -143,7 +143,6 @@ namespace RailroaderScenePatcher {
         SpatialCandidate source;
         // The confirmed target and the object it was confirmed for, kept for its world marking.
         SpatialCandidate confirmedMark;
-        object confirmedFor;
         // The track element the inspected object follows, and the object. Its marking is rebuilt from the element
         // itself a few times a second, so it moves with the track; the element is looked up once.
         SelectionIdentity followed;
@@ -240,7 +239,7 @@ namespace RailroaderScenePatcher {
             source = newSource;
             // A choice for the same object keeps that object's confirmed relation in view, so the track it follows
             // stays green beside the blue candidate. A choice for another object starts without one.
-            if (origin == null || !ReferenceEquals(confirmedFor, origin.Handle)) { confirmedMark = null; confirmedFor = null; }
+            if (Confirmed?.AppliesTo(origin?.Handle) != true) confirmedMark = null;
         }
 
         internal void Pick(Vector2 pointer, IReadOnlyList<Rect> covered) {
@@ -291,14 +290,13 @@ namespace RailroaderScenePatcher {
             var selected = Find(Pending?.Candidate);
             if (selected == null || !session.Confirm()) return null;
             withdrawn = false;
-            var owner = source?.Choice.Handle;
             ClearMarks();
-            confirmedMark = selected; confirmedFor = owner;
+            confirmedMark = selected;
             return selected;
         }
 
         internal void Cancel() {
-            if (session.Pending != null) { withdrawn = true; confirmedMark = null; confirmedFor = null; }
+            if (session.Pending != null) { withdrawn = true; confirmedMark = null; }
             session.Cancel();
             ClearMarks();
         }
@@ -306,14 +304,14 @@ namespace RailroaderScenePatcher {
         internal void Clear() {
             session.Clear();
             confirmedMark = null;
-            confirmedFor = null;
             withdrawn = false;
             lastPointer = null;
             ClearMarks();
         }
 
         // An edit used the confirmed target: nothing is confirmed any more, and its marking goes.
-        internal void Consume() { session.Consume(); confirmedMark = null; confirmedFor = null; }
+        internal void Consume() { session.Consume(); confirmedMark = null; }
+        internal void Inspect(object handle) { if (session.Inspect(handle)) confirmedMark = null; }
 
         // The surface under the objects may have changed; their frames are cut at it anew.
         internal void ClearSurface() { overlay.ClearSurface(); }
@@ -340,8 +338,9 @@ namespace RailroaderScenePatcher {
             if (camera == null) return;
             var original = source ?? (inspected == null ? null : SpatialSelectionScene.Observe(inspected));
             // The confirmed relation belongs to the object it was chosen for, and is not the inspected object itself.
-            var relation = (Pending == null || (source != null && ReferenceEquals(source.Choice.Handle, confirmedFor))) && session.Confirmed != null && confirmedMark != null && inspected != null &&
-                (confirmedFor == null || ReferenceEquals(confirmedFor, inspected.Handle)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
+            var confirmed = Confirmed;
+            var relation = confirmed?.Source != null && confirmed.AppliesTo(inspected?.Handle) && confirmedMark != null &&
+                (Pending == null || confirmed.AppliesTo(source?.Choice.Handle)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
             // The track point is its own marking, apart from the object's: a car placement reads that point, not the
             // object position. Its evidence tells it from the object's own candidate.
             var point = inspected != null && trackPoint != null && trackPoint.Length == 3

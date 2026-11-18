@@ -61,6 +61,7 @@ static class SelectionTests {
         Check(inspection.Confirmed == null && inspection.Pending == null, "Clear drops the previous confirmed inspection even with no pending choice");
         inspection.Begin(SelectionKind.SceneObject, "Select scene object", inspectOnly: true);
         Check(inspection.Pending.Candidate == null && inspection.Pending.Highlight == null, "A fresh inspection pick starts without a clicked or hovered candidate");
+        ConfirmationEndsWhenInspectionChanges();
         var overlapping = new[] { new PickTarget(100, 100, true, false), new PickTarget(111, 100, true, false) };
         var overSign = WorldPick.Resolve(89, 100, overlapping, null);
         var offSign = WorldPick.Resolve(122, 100, overlapping, null);
@@ -92,6 +93,30 @@ static class SelectionTests {
             return Items.Where(c => c.Identity.Kind == identity.Kind && (identity.Target == null ? c.Identity.Identifier == identity.Identifier
                 : c.Identity.Target.Scene == identity.Target.Scene && c.Identity.Target.Path == identity.Target.Path && c.Identity.Target.Component == identity.Target.Component)).ToArray();
         }
+    }
+    static void ConfirmationEndsWhenInspectionChanges() {
+        var scene = new Candidates();
+        var boardId = SelectionIdentity.SceneObject(new TargetIdentity("scene", "Bryson House Track", "Culler"));
+        var board = new SelectionCandidate(new object(), boardId, "Bryson House Track");
+        var track = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "Szqa"), "Track Szqa");
+        scene.Items.Add(board);
+        scene.Items.Add(track);
+        var session = new SelectionSession(scene);
+
+        session.Begin(SelectionKind.SceneObject, "Select in world", inspectOnly: true);
+        session.Pending.Offer(new[] { board });
+        Check(session.Confirm(), "Confirm the object to inspect");
+        var inspected = session.Confirmed;
+        Check(!session.Inspect(board.Handle) && ReferenceEquals(inspected, session.Confirmed), "Confirming the inspection keeps the choice on that object");
+        Check(session.Inspect(new object()) && session.Confirmed == null, "Inspecting another object ends an inspection-only confirmation");
+        Check(!session.Inspect(board.Handle) && session.Confirmed == null, "Returning to the original object does not revive its choice");
+
+        session.Begin(SelectionKind.TrackSegment, "Follow", board);
+        session.Pending.Offer(new[] { track });
+        Check(session.Confirm(), "Confirm a Follow target for the inspected object");
+        var follow = session.Confirmed;
+        Check(!session.Inspect(board.Handle) && ReferenceEquals(follow, session.Confirmed), "Keeping the same inspection retains its confirmed Follow target");
+        Check(session.Inspect(new object()) && session.Confirmed == null, "A Follow target cannot carry to another live object");
     }
     static void ConfirmationFindsOneIdentity() {
         var scene = new FindingCandidates();

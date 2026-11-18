@@ -131,7 +131,14 @@ namespace RailroaderScenePatcher {
         TMP_InputField numericEditField;
         int numericEditFocusFrame;
         GizmoController gizmo;
-        SceneObservation selected;
+        SceneObservation inspected;
+        SceneObservation selected {
+            get => inspected;
+            set {
+                inspected = value;
+                selection?.Inspect(value?.Handle);
+            }
+        }
         string selectionProblem;
         string scenePatchFileInspection = "";
         // The scene patch files the last refresh read, and whether they changed outside scene patch editing since.

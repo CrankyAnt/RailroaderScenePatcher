@@ -73,15 +73,19 @@ namespace RailroaderScenePatcher.Core {
     }
 
     public sealed class ConfirmedSelection {
+        readonly object inspectionOwner;
         public SelectionIdentity Identity { get; }
         public SelectionIdentity Source { get; }
         public IReadOnlyList<string> MapIds { get; }
 
-        internal ConfirmedSelection(SelectionIdentity identity, SelectionIdentity source, string[] maps) {
+        internal ConfirmedSelection(SelectionIdentity identity, SelectionIdentity source, object inspectionOwner, string[] maps) {
             Identity = identity;
             Source = source;
+            this.inspectionOwner = inspectionOwner;
             MapIds = Array.AsReadOnly((string[])maps.Clone());
         }
+
+        public bool AppliesTo(object inspectedHandle) => ReferenceEquals(inspectionOwner, inspectedHandle);
     }
 
     public sealed class PendingSelection {
@@ -176,7 +180,7 @@ namespace RailroaderScenePatcher.Core {
                     : "The candidate changed or no longer resolves uniquely: " + difference + ". Pick again.");
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
                 return Reject("The loaded map changed. Cancel and start a new selection.");
-            Confirmed = new ConfirmedSelection(Candidate.Identity, Source?.Identity, maps);
+            Confirmed = new ConfirmedSelection(Candidate.Identity, Source?.Identity, Source?.Handle ?? Candidate.Handle, maps);
             End();
             return true;
         }
@@ -256,6 +260,12 @@ namespace RailroaderScenePatcher.Core {
         public void Clear() {
             Cancel();
             Consume();
+        }
+        // A choice survives the same inspection, including a refresh of its observations.
+        public bool Inspect(object inspectedHandle) {
+            if (Confirmed == null || Confirmed.AppliesTo(inspectedHandle)) return false;
+            Consume();
+            return true;
         }
         // The confirmed identity was used by an edit: it is no longer something that waits to be used.
         public void Consume() { Confirmed = null; }
