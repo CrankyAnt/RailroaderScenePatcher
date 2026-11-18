@@ -254,8 +254,9 @@ namespace RailroaderScenePatcher {
                     context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 // Groups and their parts share one world and the fixed placements that hold parts when their group moves.
+                GroupWorld groupWorld = null;
                 try {
-                    var groupWorld = new GroupWorld(); var holds = new PartHolds();
+                    groupWorld = new GroupWorld(); var holds = new PartHolds();
                     capabilities.Add(new BakedSceneryGroups(groupWorld, Capability.Unchecked, holds));
                     capabilities.Add(new BakedSceneryParts(groupWorld, holds));
                 } catch (Exception e) {
@@ -285,6 +286,18 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": crossing-coverage capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
+                // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
+                // crossing controller as the group; one set of fixed placements gives each crossing one culling plan.
+                try {
+                    if (groupWorld == null) throw new InvalidOperationException("the baked scenery group capability, which supplies the culling of moved objects, is unavailable");
+                    var held = new PartHolds();
+                    capabilities.Add(ExistingEquipmentScene.Masts(new CrossingDeviceWorld(groupWorld, false), held));
+                    capabilities.Add(ExistingEquipmentScene.Bells(new CrossingDeviceWorld(groupWorld, true, equipmentWorld?.ReconfigureBell, equipmentWorld == null ? "crossing-equipment prerequisites are unavailable" : equipmentWorld.BellsUnavailable), held));
+                } catch (Exception e) {
+                    capabilities.AddUnavailable(ExistingEquipmentScene.MastStructure, e.GetBaseException().Message);
+                    capabilities.AddUnavailable(ExistingEquipmentScene.BellStructure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": existing crossing equipment capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); }
                 catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": track-following placement unavailable: " + e.GetBaseException().Message); }
@@ -1078,7 +1091,8 @@ namespace RailroaderScenePatcher {
             } else if (key == gizmoArmKey) return;
             if (Requests.Pending || refreshFrame != 0 || replayFrame != 0) return;
             gizmoArmKey = key; gizmoHandle = selected.Handle;
-            BeginGizmo(gizmoTool);
+            // A bell takes no rotation, so its gizmo starts on Move whatever tool was chosen last.
+            BeginGizmo(CommandBand.RotationBlock(selected.Identity.Structure) != null ? UI.Gizmos.TransformGizmoMode.Move : gizmoTool);
         }
         // The read-only placement of the Gizmo mode follows the gizmo while it is dragged: the texts are set in place,
         // because the panel does not rebuild while a pointer button is down.
@@ -1184,7 +1198,9 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Refuse(BindingPlace, action, e.GetBaseException().Message + "; enter end and distance by hand"); }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure || selected.Identity.Structure == BakedSceneryParts.Structure) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure || selected.Identity.Structure == BakedSceneryParts.Structure || IsEquipment) && selected.Handle is GameObject;
+        // The inspected object is an existing crossing mast or bell that conforms to its pattern.
+        bool IsEquipment => selected != null && (selected.Identity.Structure == ExistingEquipmentScene.MastStructure || selected.Identity.Structure == ExistingEquipmentScene.BellStructure);
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
         // A starter placement marker is edited on the Connections tab only, where it is placed on the track; on every other
         // tab its object's placement and activity stay disabled with the reason.

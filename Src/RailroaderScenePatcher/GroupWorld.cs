@@ -66,6 +66,8 @@ namespace RailroaderScenePatcher {
         // own sphere shows it now.
         internal static IEnumerable<Tuple<GameObject, Component, bool>> HandedOver() =>
             culling == null ? new Tuple<GameObject, Component, bool>[0] : culling.HandedOver().Where(item => item.Item1 as GameObject != null && item.Item2 as Component != null).Select(item => Tuple.Create((GameObject)item.Item1, (Component)item.Item2, item.Item3)).ToArray();
+        // The own culling spheres of the moved objects below a root, as they stand now, for an inspection.
+        internal static IReadOnlyList<ObservedRegion> OwnSpheres(GameObject root) => culling == null || root == null ? new ObservedRegion[0] : culling.Regions(root);
         // The object's own activity as the scene or the modder set it: what own culling holds for an object it switches.
         internal static bool OwnActivity(GameObject go) => CullingActivity.Desired(go.activeSelf, culling?.Desired(go));
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
@@ -242,6 +244,9 @@ namespace RailroaderScenePatcher {
                 if (Switches(culler).Contains(go)) return culler;
             return null;
         }
+        // Whether a game-object culler on the holder switches the object: it lists it, or own culling took it out of its list.
+        internal static bool ListedOn(GameObject go, GameObject holder) =>
+            switcher != null && switchedObjects != null && go != null && holder != null && holder.GetComponents(switcher).Any(culler => culler != null && Switches(culler).Contains(go));
         // Whether a simple culler on the object switches the object itself by camera distance now.
         internal static bool SwitchesItself(GameObject go) { if (simple == null || cullingGroup == null) return false; var group = GroupOf(go.GetComponent(simple)); return group != null && group.enabled; }
         // A part's own activity is switched by a simple culler on it, or by a game-object culler that lists it.
@@ -259,14 +264,16 @@ namespace RailroaderScenePatcher {
         // The object's own activity as the scene authored it. A simple culler on the object, or a game-object culler in
         // its group that lists it, switches it off while the camera is far away; off while that culler hides it, the
         // object counts as on, as AuthoredActivity.Enabled reads it for the inventory.
-        internal static bool Authored(GameObject go) {
+        // listingRoot names the object whose game-object cullers can list the object, when that is not its baked
+        // scenery group: a crossing controller for the objects below it.
+        internal static bool Authored(GameObject go, GameObject listingRoot = null) {
             // An object own culling switches reads what the scene or the modder set, whatever the camera made of it.
             var desired = culling?.Desired(go);
             if (desired != null) return desired.Value;
             if (go.activeSelf) return true;
             var group = GroupOf(OwnSimple(go));
             if (AuthoredActivity.Enabled(false, group != null && group.enabled, group != null && group.enabled && group.IsVisible(0))) return true;
-            var culler = ListingCuller(go, GroupRootOf(go) ?? go);
+            var culler = ListingCuller(go, listingRoot ?? GroupRootOf(go) ?? go);
             return culler != null && AuthoredActivity.Enabled(false, true, Convert.ToString(switcherState.GetValue(culler)) == "Visible");
         }
         // Whether an object that is switched off is off only through a culler (CullingActivity.OffThroughCuller): own
@@ -287,7 +294,10 @@ namespace RailroaderScenePatcher {
         }
         static double[] Coordinates(Vector3 v) => new double[] { v.x, v.y, v.z };
         static double[] Coordinates(Quaternion q) => new double[] { q.x, q.y, q.z, q.w };
-        public GroupObservation Observe(object target) {
+        public GroupObservation Observe(object target) => Observe(target, null, null);
+        // listingRoot: the object whose game-object cullers list the parts, when the root is no baked scenery group.
+        // moves: the parts that the game moves while it runs, beside the transforms the baked scenery rule names.
+        internal GroupObservation Observe(object target, GameObject listingRoot, Func<Transform, bool> moves) {
             var root = Root(target);
             Physics.SyncTransforms();
             var t = root.transform;
@@ -300,7 +310,7 @@ namespace RailroaderScenePatcher {
                 if (part == t || Transient(part, t)) continue;
                 var local = t.InverseTransformPoint(part.position); var turn = Quaternion.Inverse(t.rotation) * part.rotation;
                 var switched = Switched(part, listed);
-                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), switched ? Authored(part.gameObject) : OwnActivity(part.gameObject), switched, part.gameObject, part.parent == t ? null : part.parent.gameObject, Animated(part, t)));
+                parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), switched ? Authored(part.gameObject, listingRoot) : OwnActivity(part.gameObject), switched, part.gameObject, part.parent == t ? null : part.parent.gameObject, Animated(part, t) || (moves != null && moves(part))));
             }
             var cullers = new List<GroupCuller>();
             var regions = culling == null ? new ObservedRegion[0] : culling.Regions(root);

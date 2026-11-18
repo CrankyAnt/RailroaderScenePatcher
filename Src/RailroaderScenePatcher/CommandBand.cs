@@ -379,8 +379,30 @@ namespace RailroaderScenePatcher {
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
         // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
         // placement, and has every other mode inactive with the object's own reason.
-        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false) =>
-            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : null;
+        // An existing crossing mast or bell has one for Follow as well.
+        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false) =>
+            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow : null;
+        // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
+        internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";
+        // Why the rotation of an existing crossing bell cannot be set, or null for any other object: the bell is a
+        // sound source at a point. Its position stays editable.
+        internal const string BellNoRotation = "A bell's sound has no direction, so rotation does not apply to it. You can still set its position.";
+        internal static string RotationBlock(string structure) => structure == ExistingEquipmentScene.BellStructure ? BellNoRotation : null;
+        // Why a track span is inspection only, or null: a detection span, which a crossing controller holds in a
+        // circuit, is a supported kind whose edit is crossing coverage on its controller; any other span has no edit.
+        internal static string SpanInspectionOnly(bool controllerHolds) => InspectionOnly("Track span", controllerHolds);
+        // What an existing crossing mast's Supported edits says: the light and its gate as one, and what stays unchanged.
+        internal const string MastOperations = "Move, rotate, enable or disable this mast. Its light and gate move, rotate and are enabled or disabled together. They keep the same connection to the crossing controller, which continues to control them.";
+        // What an existing crossing bell's Supported edits says.
+        internal const string BellOperations = "Move, enable or disable this bell. The crossing controller continues to control when it rings. A bell's sound has no direction, so rotation does not apply to it.";
+        // What the Supported edits of a detection span says: no placement of its own, and where its one supported
+        // edit, crossing coverage, is made.
+        internal const string DetectionSpanOperations = NotEditablePrefix + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.";
+        // The guide link offered for a mast or bell that does not conform to its pattern: its label and the guide page
+        // with the anchor of the refusal reasons.
+        internal static readonly string[] EquipmentGuide = { "Why this equipment cannot be edited", "moving-crossing-equipment.md#refusal-reasons" };
+        // Why Enabled cannot be set for equipment that a culler of the game switches itself.
+        internal const string EquipmentSwitched = "The game's culler enables and disables this object based on camera distance. It would override a saved Enabled setting, so the patcher cannot keep that setting applied";
         // Why Follow is inactive for a milepost: the milepost capability covers fixed placement, activity and the binding.
         internal const string MilepostNoFollow = "Mileposts use fixed placement. Set the track binding under Connections.";
         // A target confirmed in the world and not yet used is the one green relation: the relations it would replace,

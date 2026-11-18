@@ -230,6 +230,25 @@ namespace RailroaderScenePatcher {
                 else Debug.LogWarning("Scene Patcher: " + message);
             } catch (Exception e) { Debug.LogWarning("Scene Patcher: " + message + " (warning delivery failed: " + e.GetBaseException().Message + ")"); }
         }
+        // Configures a controller's own bell player again with the clip the controller loaded, its definition's indexes
+        // and volume: what GradeCrossingController.LoadBellAudio does once. A player that was disabled destroyed the
+        // clips it split and splits none when it is enabled, so an existing bell needs this before it is enabled
+        // again: called on the inactive player, Configure sets the clips and starts no loop.
+        // While the controller's audio still loads there is nothing to do: the controller configures the player itself.
+        internal void ReconfigureNative(GameObject controllerObject) {
+            var component = controllerObject == null ? null : controllerObject.GetComponent(controllerType);
+            if (component == null) throw new InvalidOperationException("The crossing controller of this bell no longer exists");
+            var native = Native.Read(component, "_bellPlayer") as Component;
+            var reference = Native.Read(component, "_audioLoadReference");
+            if (native == null || reference == null) return;
+            var audio = Native.Read(reference, "Asset") as UnityEngine.Object;
+            if (audio == null) return;
+            var field = controllerType.GetField("DefaultCrossingBellIdentifier", Native.Flags);
+            if (field == null || !field.IsLiteral || !(field.GetRawConstantValue() is string identifier)) throw new MissingFieldException(controllerType.FullName, "DefaultCrossingBellIdentifier");
+            var source = Resolve(identifier).FirstOrDefault() ?? throw new InvalidOperationException("The crossing bell definition " + identifier + " is not in the content library");
+            var facts = Facts(source, controllerObject);
+            configure.Invoke(native, new object[] { audio, facts.Indexes.Select(i => (float)i).ToArray(), (float)facts.Volume });
+        }
         // Why a present bell is not built, bound and loaded as the pattern requires, or null. A load still running is no
         // problem; the status says it.
         internal string Problem(OwnedBell bell, GameObject controller) {

@@ -79,6 +79,8 @@ namespace RailroaderScenePatcher {
         }
         // Why bells are unavailable on this build, or null.
         internal string BellsUnavailable => bellsUnavailable;
+        // Configures a controller's own bell again after it was enabled, or null while bells are unavailable on this build.
+        internal Action<GameObject> ReconfigureBell => bells == null ? (Action<GameObject>)null : bells.ReconfigureNative;
         // Raises the warning of a bell whose audio fails to load after the apply: key, message and originator.
         internal Action<string, string, string> Warn { set { if (bells != null) bells.Warn = value; } }
         sealed class UnavailableBell { }

@@ -15,6 +15,7 @@ Current native target support covers:
 - Crossing coverage ([correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) and [add detection for extra tracks at an existing crossing](adding-crossing-detection.md)).
 - Crossing lights and gates ([add lights and gates to an existing crossing](adding-crossing-equipment.md)).
 - Crossing bells ([add a bell to an existing crossing](adding-crossing-bells.md)).
+- Existing crossing masts and bells ([move or disable an existing crossing mast or bell](moving-crossing-equipment.md)).
 - Starter placements ([place a starter placement marker on the track](placing-starter-markers.md)).
 
 The Current native targets section describes the native observations and their limits. The runtime capability classification remains `Unchecked`.
@@ -268,6 +269,37 @@ A path that names no part or more than one fails before changing anything. A mod
 
 After a change, the patcher verifies the part's placement and activity. It also checks that the group root and other parts kept their placement and activity, and that objects below the part kept their placement relative to it. It refreshes every enabled culling sphere in the group, and every culler keeps the radius the scene gives it. A part moved outside the sphere of a culler above it keeps its own culling sphere, centered on the part's renderer, collider and light bounds and enclosing them. The patcher registers that sphere with the game's culling manager and removes it when the part is back inside the culler's sphere, is disabled, or loses its modification. A part that was never moved gets no sphere of its own. The scene patch file holds no field for own culling spheres. A difference fails the modification and restores the captured part; an unverified restoration blocks further operations on the part for the load.
 
+### Existing crossing mast and bell
+
+The patcher recognizes the masts and bell of an existing crossing. A mast's target `scene` and `path` identify its light object, such as `.../Grade Crossing - Bryson Everett/Signal 1/Signal 1`. Its `component` is `Track.KeyValueLampMaterialController`. If `structure` is present, it must be `existing-crossing-mast-v1`. The gate on a child of the light object is part of the mast and cannot be targeted separately.
+
+A bell's target identifies the bell player that the crossing controller creates at `.../Crossing Bell`. Its `component` is `Audio.IntegerLoopingPlayer`. If `structure` is present, it must be `existing-crossing-bell-v1`. The native map editor's Save writes the structure for both masts and bells.
+
+A mast matches `existing-crossing-mast-v1` when it meets these requirements:
+
+- Its light object is below a crossing controller, and that controller's key-value object is the nearest key-value object above it.
+- Each lamp and gate on or below the light object observes the `lights` or `gates` key published by the controller.
+- Every lamp target is inside the mast's hierarchy.
+- No gate is elsewhere under the light object's parent.
+- The mast contains no second light object, crossing controller, key-value object, detection span, game-object culler, bell player, rigidbody or missing script.
+- No track-relative component switches the mast with a track group.
+- No other loaded object shares its hierarchy path.
+- The patcher did not add the equipment.
+
+A bell matches `existing-crossing-bell-v1` when it is the bell player created by its crossing controller and the controller is enabled. If a target matches no object, matches more than one object, or does not match its supported source pattern, the modification fails before changing anything and reports the reason. Other modifications still apply. See [refusal reasons](moving-crossing-equipment.md#refusal-reasons).
+
+A modification may set `placement`, `active`, or both. Each is a separate operation. The modification accepts no `trackMarker`, `coverage`, `equipment` or `starter` relationship. Placement and activity changes preserve the equipment's logical binding to its crossing controller, which continues to drive the same mast or bell.
+
+`placement` uses fixed placement in map coordinates. The mast's light and gate move and rotate together. The crossing controller, other masts and bell keep their physical placement. Without a placement modification, the mast or bell keeps the scene's placement relative to its parent. Removing the modification in **Scene patches** returns it there. A modification whose `placement.mode` is `trackFollowing` fails before changing anything and reports that track-following placement is unsupported. A bell's sound has no direction, so its rotation has no effect. Scene patch editing shows the rotation but does not let you set it.
+
+`active` sets the activity of the mast's light object or the bell itself. The patcher applies `"active": false` on every load, and the equipment stays disabled as the game's culler hides and shows the crossing. Without that value, the equipment follows the game as before. The bell player discards its sound when disabled. When the bell is enabled again, the patcher configures the player with the crossing's loaded bell sound.
+
+If a game-object culler lists the equipment itself, the patcher refuses `active` before changing anything because the culler would override the saved value. At the Bryson Everett crossing in Railroader 0.6.3, the crossing's culler lists each mast's parent, so `active` is supported for those masts.
+
+A crossing's game-object culler keeps its radius. A mast moved outside that culler's sphere gets a sphere of its own, as a moved [baked scenery part](#baked-scenery-part) does. The patcher removes the listed object above the mast from the crossing's culler list and gives that object a sphere that stands in for the culler's, with the same center and radius. The mast uses its own sphere, sized around the mast and the gate arm's position at that moment. The patcher returns both objects to the game's culling when the mast returns inside the crossing's sphere, the modification is removed or restored, or the patcher's state for the world ends. No culler switches a bell, and the patcher gives it no sphere.
+
+After a change, the patcher checks the equipment's physical placement and activity. It also verifies that the crossing controller and every other object below it kept their physical placement and activity, and that each culling sphere is where the plan requires it. A difference fails the modification. The patcher restores the captured placement, activity and culling membership. If it cannot verify the restoration, it blocks further operations on that mast or bell for the load. See [move or disable an existing crossing mast or bell](moving-crossing-equipment.md) for editing instructions and limits.
+
 ### Track marker
 
 The patcher recognizes an object holding one Generic `Track.TrackMarker`. The target `component` is `Track.TrackMarker`; set `structure` to `track-marker-v1`. The object must meet these requirements:
@@ -422,6 +454,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification with `relationships`, a `Track.TrackMarker` target component, or target `structure` `track-marker-v1` | `0.5.0` |
 | Any modification with `active` whose target `structure` is `track-marker-v1` | `0.5.0` |
 | Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
+| Any modification whose target `structure` is `existing-crossing-mast-v1` or `existing-crossing-bell-v1` | `0.5.0` |
 | Any modification with `relationships.crossingCoverage`, including a detection addition, a `Track.Crossings.GradeCrossingController` target component, or target `structure` `crossing-coverage-v1` | `0.5.0` |
 | Any modification with `relationships.crossingEquipment` | `0.5.0` |
 | Any modification whose target `structure` is `crossing-pad-v1` | `0.5.0` |

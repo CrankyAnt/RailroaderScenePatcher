@@ -37,6 +37,8 @@ namespace RailroaderScenePatcher {
         public IEnumerable<SceneObservation> ObserveRelated(object handle, TargetIdentity identity) {
             var target = handle as GameObject;
             if (target == null || observer == null) return null;
+            // An edit of a crossing can have added or removed detection spans in this frame.
+            CrossingDeviceWorld.InvalidateHolders();
             var roots = new List<GameObject> { target };
             var found = new List<SceneObservation>();
             // A group root or a part is observed through its transform; the families below it through their own components.
@@ -83,7 +85,8 @@ namespace RailroaderScenePatcher {
         static Vector3 Vector(double[] v) => new Vector3((float)v[0], (float)v[1], (float)v[2]);
         const string GameObjectCuller = "Helpers.Culling.GameObjectCuller";
         // The equipment of a crossing whose activity the game switches by camera distance through a culler.
-        static readonly HashSet<string> CulledFamilies = new HashSet<string>(StringComparer.Ordinal) { "Crossing light", "Crossing gate", "Crossing bell" };
+        static readonly HashSet<string> CulledFamilies = new HashSet<string>(StringComparer.Ordinal) { MastFamily, BellFamily };
+        const string MastFamily = ExistingEquipmentScene.MastFamily, BellFamily = ExistingEquipmentScene.BellFamily;
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
         const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile";
@@ -194,8 +197,13 @@ namespace RailroaderScenePatcher {
             // an edit, in the Inspection only group, instead of being left out.
             if (type == Pile) return "Storage pile";
             if (type == Crossing) return "Crossing controller";
-            if ((type == "Track.KeyValueLampMaterialController" || type == "RollingStock.Controls.KeyValueBoolAnimator" || type == "Audio.IntegerLoopingPlayer") && Parent(c, Crossing) != null)
-                return type == "Track.KeyValueLampMaterialController" ? "Crossing light" : type == "Audio.IntegerLoopingPlayer" ? "Crossing bell" : "Crossing gate";
+            // A crossing mast is one entry: its light object. The gate on a child of that object is a part of the
+            // entry and gets no row. A gate that stands on no light object stays visible as a mast that does not
+            // conform, with its reason.
+            if ((type == ExistingEquipmentScene.MastComponent || type == ExistingEquipmentScene.GateComponent || type == ExistingEquipmentScene.BellComponent) && Parent(c, Crossing) != null) {
+                if (type == ExistingEquipmentScene.BellComponent) return BellFamily;
+                return type == ExistingEquipmentScene.GateComponent && CrossingDeviceWorld.OnLightObject(c.transform) ? null : MastFamily;
+            }
             if (type == BoardScene.CullerType && BridgeWorld.SupportedPaths.Contains(BoardScene.PathOf(c.transform))) return "Bridge";
             if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Independent board";
             if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == "World/Large Scenery/Ela/Ela Bridge Scenery") return "Bridge construction scenery";
@@ -216,6 +224,7 @@ namespace RailroaderScenePatcher {
         static IEnumerable<SceneObservation> Steps(Func<GameObject, string> boardRefusal, bool whole) {
             // A whole discovery reads the group roots again; a stepped pass reuses them while the hierarchy above them stays.
             if (whole) GroupWorld.Invalidate();
+            CrossingDeviceWorld.InvalidateHolders();
             var incoming = new Dictionary<UnityEngine.Object, List<string>>(); var scanErrors = 0;
             // A reference in a field Unity does not serialize is working state of a running manager, such as a culling or
             // audio list: it appears and disappears when the camera moves or an object is inspected. It is runtime state.
@@ -505,6 +514,27 @@ namespace RailroaderScenePatcher {
             if (groupRoot) Read(() => { verdict = GroupWorld.VerdictOf(go); groupRefusal = GroupWorld.Problem(go); });
             string partRefusal = null, groupPath = null;
             if (part) Read(() => { partRefusal = GroupWorld.PartProblem(go); groupPath = GroupWorld.PartVerdictOf(go)?.GroupPath; });
+            // An existing mast or bell that conforms to its pattern takes placement, rotation and Enabled; one that
+            // does not stays listed with its reason under Supported edits.
+            var mast = family == MastFamily; var ownBell = family == BellFamily;
+            string equipmentRefusal = mast || ownBell ? "Existing crossing equipment editing is unavailable" : null;
+            if (mast) Read(() => equipmentRefusal = CrossingDeviceWorld.MastProblem(go));
+            if (ownBell) Read(() => equipmentRefusal = CrossingDeviceWorld.BellProblem(go));
+            // A gate that stands on no light object is named by another component than a mast's target.
+            if (mast && equipmentRefusal == null && TypeName(c) != ExistingEquipmentScene.MastComponent) equipmentRefusal = "this gate does not stand on a light object, so it is not part of a mast";
+            if (mast) Read(() => bindings.AddRange(CrossingDeviceWorld.Describe(go)));
+            // Which culler shows the equipment is runtime state: it changes with the camera and with a move.
+            if (mast || ownBell) Read(() => runtime.AddRange(CrossingDeviceWorld.CullingState(go)));
+            // Who names an object above the equipment in an authored field, such as a culler's list or a map feature's
+            // or a progression's switch list: those can switch the equipment with the object above it.
+            // Every object up to the scene root counts: a progression list on a town folder can name the crossing.
+            if (mast || ownBell)
+                for (var t = go.transform.parent; t != null; t = t.parent)
+                    if (incoming.TryGetValue(t.gameObject, out var above)) foreach (var line in above) runtime.Add("Above this object, " + BoardScene.PathOf(t) + ": " + line);
+            // A detection span, which a crossing controller holds in a circuit, belongs to that controller: crossing
+            // coverage, on the controller's Connections tab, is its supported edit, and it has no placement of its own.
+            GameObject spanHolder = null;
+            if (family == "Track span") Read(() => spanHolder = CrossingDeviceWorld.HolderOf(c));
             var crossing = family == "Crossing controller";
             string coverageRefusal = crossing ? "Crossing coverage editing is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
@@ -520,9 +550,10 @@ namespace RailroaderScenePatcher {
             });
             else if (part) { }
             else if (groupRoot) { if (verdict?.Disposition != GroupDisposition.Group) only = verdict?.ReasonIsSentence == true ? CommandBand.NotYetSupportedBecause(verdict.Reason) : CommandBand.NotYetSupported(verdict?.Reason ?? "this " + family.ToLowerInvariant()); }
-            else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost);
+            else if (family == "Track span") only = CommandBand.SpanInspectionOnly(spanHolder != null);
+            else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell);
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
+            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : null;
             var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Move, rotate, enable or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Set, replace or detach the marker's track binding. Edit placement and activity separately."
@@ -531,6 +562,9 @@ namespace RailroaderScenePatcher {
                 : pad ? CommandBand.NotEditable(padRefusal)
                 : milepostEditable ? CommandBand.MilepostOperations
                 : milepost ? CommandBand.NotEditable(milepostRefusal)
+                : mast ? (equipmentRefusal == null ? CommandBand.MastOperations : CommandBand.NotEditable(equipmentRefusal))
+                : ownBell ? (equipmentRefusal == null ? CommandBand.BellOperations : CommandBand.NotEditable(equipmentRefusal))
+                : spanHolder != null ? CommandBand.DetectionSpanOperations
                 : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates and bells. The crossing and its original detection spans stay in place."
                 : CommandBand.NotEditable(coverageRefusal);
             // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
@@ -540,6 +574,8 @@ namespace RailroaderScenePatcher {
                 structure = null;
                 operations = CommandBand.AddedEquipmentOperations(displayName);
             }
+            // A mast and a bell are named with their crossing, which tells the masts of several crossings apart.
+            if ((mast || ownBell) && controller != null) Read(() => displayName = go.name + " at " + CrossingEquipment.Place(controller.gameObject.name, Ancestors(controller.transform)));
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
@@ -554,8 +590,11 @@ namespace RailroaderScenePatcher {
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
-                category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1]);
+                category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1],
+                holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform));
         }
+        // The names of the objects that enclose a transform, from its parent upwards.
+        static IReadOnlyList<string> Ancestors(Transform t) { var names = new List<string>(); for (var p = t.parent; p != null; p = p.parent) names.Add(p.name); return names; }
         // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.
         static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {
             var segment = Text(Field(location, "segmentId"));

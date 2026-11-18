@@ -60,14 +60,14 @@ The box stops where the object, including its wider parts, meets the terrain or 
 
 A group contains scene objects that the game handles together. Some follow a shared root; others follow the objects named by a game component:
 
-- A grade-crossing setup contains its controller and the inventory objects below its root, such as lights, gates, the bell, detection spans and crossing pads.
+- A grade-crossing setup contains its controller and the inventory objects below its root, such as crossing masts, the bell, detection spans and crossing pads. Each mast is one inventory entry for its light object and the gate on a child object.
 - A baked scenery group, such as Bryson Coal Dealer, contains its group root and the inventory objects below it. These include its parts and objects of other families, such as the signs of a station building.
 - A rail bridge construction contains its construction controller and the objects whose visibility it controls. At the Ela bridge, the controller `Ela Bridge Scenery` controls the steel and abutments of `Ela Bridge`, so the two form one group.
 - An industry storage display contains the storage piles or log pond filled by one industry's storage. An industry building is a separate group and contains no storage pile.
 
 A folder is not a group. For example, Bryson Yard is a folder, and each of its 13 yard lamp posts is a separate group. Objects do not form a group just because they are close together. An object outside every group appears on its own. Whistle signs remain separate objects at every distance.
 
-Grouping changes only how objects appear in the world. Each object keeps its inventory entry, outliner row and edits. A grade-crossing setup's controller manages its invisible detection spans. They do not appear in the group's object frame or choice list, but remain in the outliner as **Inspection only** rows. To change detection, use the controller's **Connections** tab.
+Grouping changes only how objects appear in the world. Each object keeps its inventory entry, outliner row and edits. A grade-crossing setup's controller manages its invisible detection spans. The spans do not appear in the group's object frame or choice list. They remain in the outliner under their controller in the **Crossing controller** family. To change detection, use the controller's **Connections** tab.
 
 ### Select at different distances
 

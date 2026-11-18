@@ -311,6 +311,7 @@ class Program {
         BakedCategoryTests.Run();
         BakedPartTests.Run();
         PartCullingTests.Run();
+        ExistingEquipmentTests.Run();
         SelectionTests.Run();
         GameDefinedGroupTests.Run();
         BoardTests.Run();

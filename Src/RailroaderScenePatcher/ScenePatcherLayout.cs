@@ -455,6 +455,9 @@ namespace RailroaderScenePatcher {
                     }
                     if (groupKey == "family:" + BakedSceneryRules.Family)
                         foreach (var category in InventoryPresentationState.Categories(group.Value, inventory?.Entries, filter)) Nest(parent, category, new[] { groupKey });
+                    // The Crossing controller family lists each controller with the spans it holds beneath it.
+                    else if (groupKey == "family:" + InventoryPresentationState.HolderFamily)
+                        foreach (var holder in InventoryPresentationState.Held(group.Value, inventory?.Entries)) Nest(parent, holder, new[] { groupKey });
                     else foreach (var item in group.Value) {
                         var holder = folders.TryGetValue(item, out var inFolder) ? inFolder : parent;
                         holder.AddChild(Row(item, null, folderKeys.TryGetValue(item, out var folderKey) ? new[] { groupKey, folderKey } : new[] { groupKey }));
@@ -620,6 +623,22 @@ namespace RailroaderScenePatcher {
                     row.Spacer();
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
+            // A detection span names the crossing controller that holds it first, with the button that inspects the
+            // controller: crossing coverage, the span's supported edit, is on that controller's Connections tab.
+            var heldBy = InventoryPresentationState.HeldBy(selected);
+            if (heldBy != null) {
+                var holder = InventoryPresentationState.HolderOf(inventory, selected);
+                builder.HStack(row => {
+                    Line(row, Literal(heldBy), "Crossing controller", selected.HolderPath, RowHeight);
+                    Button(row, "Select controller", () => {
+                        var entry = InventoryPresentationState.HolderOf(inventory, selected);
+                        if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
+                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
+                    }).Inactive(holder == null)
+                        .Tooltip("Select controller", CommandBand.Tooltip("Inspect the crossing controller that holds this detection span. Set crossing coverage on its Connections tab.", holder == null ? "the object list does not include this detection span's crossing controller; click Refresh" : null));
+                    row.Spacer();
+                }).ChildrenKeepHeight().Height(RowHeight);
+            }
             // An object of a kind no supported family covers says so first, with the reason it is not yet supported.
             if (selected.InspectionOnly != null) {
                 Section(builder, "Inspection only");
@@ -649,6 +668,9 @@ namespace RailroaderScenePatcher {
             if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
             FieldLabel(builder, "Supported edits");
             PlainLabel(builder, selected.Operations);
+            // A mast or bell that does not conform to its pattern links to the guide's refusal reasons.
+            if ((selected.Family == ExistingEquipmentScene.MastFamily || selected.Family == ExistingEquipmentScene.BellFamily) && CommandBand.Refusal(selected.Operations) != null)
+                Button(builder, CommandBand.EquipmentGuide[0], () => Application.OpenURL(GuideRoot + CommandBand.EquipmentGuide[1])).Tooltip(CommandBand.EquipmentGuide[0], "Open the guide's refusal reasons in your browser.");
             // A starter placement marker names every setup and car placement that reads it, with the cars and the wreck
             // setting of each.
             if (selected.Family == StarterPlacements.Family) {
@@ -707,7 +729,7 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
@@ -715,20 +737,25 @@ namespace RailroaderScenePatcher {
             if (placementMode == 0) {
                 for (var group = 0; group < 2; group++) {
                     if (group != 0) builder.Spacer(6f);
-                    ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, placementFields, group * 3, block, group == 0 ? "Map coordinates" : "Euler angles", column => true);
+                    // A bell's rotation stays visible as a running line with the reason it does not apply.
+                    ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, placementFields, group * 3, block ?? (group == 1 ? CommandBand.RotationBlock(selected?.Identity.Structure) : null), group == 0 ? "Map coordinates" : "Euler angles", column => true);
                 }
             } else if (placementMode == 1) {
                 // The tool is a choice, as in the native map editor: Move by default. The gizmo stands on the object as
                 // soon as this mode is open and stays until the mode, the tab or the inspection ends; choosing the
                 // other tool changes the gizmo at once. Each completed drag is one operation.
+                // Rotation does not apply to a bell: its Rotate tool stays visible and inactive, and the gizmo stays on Move.
+                var noRotation = CommandBand.RotationBlock(selected?.Identity.Structure);
+                if (noRotation != null && gizmoTool != UI.Gizmos.TransformGizmoMode.Move) { gizmoTool = UI.Gizmos.TransformGizmoMode.Move; gizmo?.SetMode(gizmoTool); }
                 builder.AddSegmentedControlCompact(tools => {
                     foreach (var tool in new[] { UI.Gizmos.TransformGizmoMode.Move, UI.Gizmos.TransformGizmoMode.Rotate }) {
                         var chosen = tool; var name = tool == UI.Gizmos.TransformGizmoMode.Move ? "Move" : "Rotate";
+                        var toolBlock = ChoiceBlock ?? (tool == UI.Gizmos.TransformGizmoMode.Rotate ? noRotation : null);
                         tools.AddSegment(name, gizmoTool == tool, presentation.Action(() => {
-                            if (selection?.Pending != null) return;
+                            if (selection?.Pending != null || toolBlock != null) return;
                             gizmoTool = chosen;
                             gizmo?.SetMode(chosen);
-                        })).Inactive(ChoiceBlock != null).Tooltip(name, CommandBand.Tooltip(tool == UI.Gizmos.TransformGizmoMode.Move ? "Drag the native Move gizmo in the world." : "Drag the native Rotate gizmo in the world.", ChoiceBlock));
+                        })).Inactive(toolBlock != null).Tooltip(name, CommandBand.Tooltip(tool == UI.Gizmos.TransformGizmoMode.Move ? "Drag the native Move gizmo in the world." : "Drag the native Rotate gizmo in the world.", toolBlock));
                     }
                 }, true);
                 // The object's placement as the running lines of Numeric: it follows the gizmo while it is dragged
@@ -1464,7 +1491,7 @@ namespace RailroaderScenePatcher {
                     var target = selected?.Handle as GameObject;
                     var enabled = OwnActivity(selected);
                     // A part that a culler of the game switches by camera distance cannot hold an Enabled setting.
-                    var switched = block == null && target != null && selected.GroupPath != null ? GroupWorld.SwitchedPart(target) : null;
+                    var switched = block == null && target != null && selected.GroupPath != null ? GroupWorld.SwitchedPart(target) : block == null && target != null && IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                     return new[] {
                         Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
@@ -1480,7 +1507,8 @@ namespace RailroaderScenePatcher {
         }
         static bool OwnActivity(SceneObservation observation) {
             var target = observation?.Handle as GameObject;
-            return target != null && (observation.Family == BakedSceneryRules.Family ? observation.Enabled : target.activeSelf);
+            // Own culling switches a moved mast by camera distance, as it does a moved part: the observation reads what the scene or the modder set.
+            return target != null && (observation.Family == BakedSceneryRules.Family || observation.Family == ExistingEquipmentScene.MastFamily ? observation.Enabled : target.activeSelf);
         }
         static double[] EnteredRotation(double x, double y, double z) {
             var rotation = Quaternion.Euler((float)x, (float)y, (float)z);

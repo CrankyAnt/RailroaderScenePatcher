@@ -117,7 +117,8 @@ namespace RailroaderScenePatcher {
             bool Only(SceneObservation row) => row.InspectionOnly != null && row.Category == null;
             // An object with a category stands in the Baked scenery group family, whatever family lists it: the bridge
             // and the construction controller of a rail bridge construction stand with the other rail bridges.
-            var groups = listed.Where(row => !Only(row)).GroupBy(row => row.Category != null || row.GroupPath != null ? BakedSceneryRules.Family : row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            // A detection span stands in the family of the crossing controller that holds it, under that controller.
+            var groups = listed.Where(row => !Only(row)).GroupBy(row => row.Category != null || row.GroupPath != null ? BakedSceneryRules.Family : row.HolderPath != null ? HolderFamily : row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(group.Key, group.ToArray())).ToList();
             var only = listed.Where(Only).ToArray();
             if (only.Length != 0) groups.Add(new KeyValuePair<string, IReadOnlyList<SceneObservation>>(InspectionOnlyGroup, only));
@@ -201,6 +202,47 @@ namespace RailroaderScenePatcher {
             }
             return found;
         }
+        // The family of the crossing controllers, which also lists each controller's detection spans.
+        internal const string HolderFamily = "Crossing controller";
+        // The rows of the Crossing controller family as the outliner nests them: each controller, in name order, with
+        // its detection spans beneath it, by name. A detection span never stands as a loose row: when the search or filter left
+        // its controller out, the controller is taken from the whole inventory and shown to hold it.
+        internal static IReadOnlyList<OutlineNode> Held(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory) {
+            rows = rows ?? Array.Empty<SceneObservation>();
+            var all = (inventory ?? rows).Where(entry => entry.HolderPath == null && entry.Family == HolderFamily).ToArray();
+            string Key(string scene, string path) => scene + "\n" + path;
+            var holders = new Dictionary<string, OutlineNode>(StringComparer.Ordinal);
+            var order = new List<OutlineNode>();
+            OutlineNode Holder(SceneObservation row, string scene, string path, bool context) {
+                var key = Key(scene, path);
+                if (!holders.TryGetValue(key, out var node)) {
+                    holders[key] = node = new OutlineNode { Key = key, Label = row == null ? path.Substring(path.LastIndexOf('/') + 1) : Name(row), Row = row, Context = context };
+                    order.Add(node);
+                }
+                return node;
+            }
+            foreach (var row in rows.Where(row => row.HolderPath == null)) Holder(row, row.Identity.Scene, row.Identity.Path, false).Count = 1;
+            foreach (var held in rows.Where(row => row.HolderPath != null)) {
+                var key = Key(held.Identity.Scene, held.HolderPath);
+                if (!holders.TryGetValue(key, out var holder))
+                    holder = Holder(all.FirstOrDefault(entry => entry.Identity.Scene == held.Identity.Scene && entry.Identity.Path == held.HolderPath), held.Identity.Scene, held.HolderPath, true);
+                holder.Children.Add(new OutlineNode { Key = Key(held.Identity.Scene, held.Identity.Path), Label = Name(held), Row = held, Count = 1 });
+                holder.Count++;
+            }
+            foreach (var node in order) node.Children.Sort((a, b) => { var by = StringComparer.OrdinalIgnoreCase.Compare(a.Label, b.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(a.Row.Identity.Path, b.Row.Identity.Path); });
+            return order.OrderBy(node => node.Label, StringComparer.OrdinalIgnoreCase).ThenBy(node => node.Key, StringComparer.Ordinal).ToArray();
+        }
+        // The inventory entry of the controller that holds a detection span, or null: for an object no controller holds, and
+        // while the inventory does not hold exactly one entry for the controller.
+        internal static SceneObservation HolderOf(SceneInventory inventory, SceneObservation held) {
+            if (inventory == null || held?.HolderPath == null) return null;
+            var found = inventory.Entries.Where(entry => entry.HolderPath == null && entry.Family == HolderFamily && entry.Identity.Scene == held.Identity.Scene && entry.Identity.Path == held.HolderPath).Take(2).ToArray();
+            return found.Length == 1 ? found[0] : null;
+        }
+        // The Object tab's line that names the controller of a detection span, or null for any other object.
+        internal static string HeldBy(SceneObservation entry) =>
+            entry?.HolderPath == null ? null : "Detection span of: " + entry.HolderPath.Substring(entry.HolderPath.LastIndexOf('/') + 1);
+
         // The inventory entry of the group a part belongs to, or null: for a group root, for an object outside any
         // group, and while the inventory does not hold exactly one entry for the group.
         internal static SceneObservation GroupOf(SceneInventory inventory, SceneObservation part) {
