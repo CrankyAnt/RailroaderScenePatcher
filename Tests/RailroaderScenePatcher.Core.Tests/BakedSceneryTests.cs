@@ -619,7 +619,7 @@ static class BakedSceneryTests {
         var world = new Node("World",
             new Node("Signs", new Node("Loc: Sylva Int").Solid().Family(), new Node("USGS Comment").With("Helpers.Comment")),
             new Node("Roads Bryson", runtime, new Node("br-depot").With("Game.MapObjectActivation").Solid()),
-            new Node("Map Labels", new Node("Bryson").With("UI.Map.MapLabel").Solid(), new Node("Station Icons", new Node("Icon").With("UI.Map.MapIcon").Solid())),
+            new Node("Map Labels", new Node("Bryson").With("UI.Map.MapLabel").Solid(), new Node("Station Icons", new Node("Icon").With("UI.Map.MapIcon").Solid().Family())),
             new Node("Builder Photo Setup", new Node("Backdrop").Solid()),
             new Node("Track", new Node("Segment Mesh").Solid()).With("Track.TrackObjectManager", "Game.MapLoader"),
             new Node("Telegraph Poles", new Node("Pole").Solid()).With("TelegraphPoles.TelegraphPoleManager"));
@@ -633,7 +633,8 @@ static class BakedSceneryTests {
         Expect("World/Roads Bryson/Spawned Car", GroupDisposition.NotListed, BakedSceneryRules.RuntimeObject);
         Expect("World/Roads Bryson/br-depot", GroupDisposition.NotListed, BakedSceneryRules.NativeMapData);
         Expect("World/Map Labels/Bryson", GroupDisposition.NotListed, BakedSceneryRules.MapLabel);
-        Expect("World/Map Labels/Station Icons", GroupDisposition.InspectionOnly, null);
+        // The Station Icons folder is no group: its station map icon keeps its family.
+        Assert(At(verdicts, "World/Map Labels/Station Icons") == null && At(verdicts, "World/Map Labels/Station Icons/Icon")?.Disposition == GroupDisposition.ExistingFamily, "The station icon keeps its family");
         Expect("World/Builder Photo Setup/Backdrop", GroupDisposition.NotListed, BakedSceneryRules.BuilderPhotoRig);
         Expect("World/Track/Segment Mesh", GroupDisposition.NotListed, BakedSceneryRules.RuntimeObject);
         Expect("World/Telegraph Poles/Pole", GroupDisposition.NotListed, BakedSceneryRules.RuntimeObject);
@@ -644,9 +645,9 @@ static class BakedSceneryTests {
     static void LeavesOutGroupsThatLaterTicketsCover() {
         var cases = new[] {
             new { Name = "Alarka Jct Station", Component = "Map.Runtime.MaskComponents.RectangleMapMask", Kind = "scene ground mask", Ticket = "#90" },
-            new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = "#89" },
+            new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = (string)null },
             new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
-            new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "station icon", Ticket = "#89" },
+            new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "map icon", Ticket = (string)null },
         };
         foreach (var item in cases) {
             // The excluded component sits on a part, not on the root, and the root has no renderer of its own.
@@ -673,7 +674,7 @@ static class BakedSceneryTests {
                 new Node("Almond", new Node("Almond Road Bridge", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", "Helpers.Culling.RendererCuller"))),
             new Node("Roads Sylva", new Node("Sylva Road Bridge 20m", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", "Helpers.Culling.RendererCuller")),
             new Node("POIs", new Node("Alarka").With("Character.SpawnPoint"), new Node("Bryson").With("Character.SpawnPoint")),
-            new Node("Map Labels", new Node("Station Icons", new Node("Bryson").With("UI.Map.MapIcon", "UnityEngine.UI.Image", "UnityEngine.BoxCollider").Solid()))));
+            new Node("Map Labels", new Node("Station Icons", new Node("Bryson").With("UI.Map.MapIcon", "UnityEngine.UI.Image", "UnityEngine.BoxCollider").Solid().Family()))));
         // The rail bridge constructions outside Ela are groups of the family: the Almond Bridge folder, which carries
         // the construction's controller and culler, each plate girder bridge and Bryson Bridge 1.
         foreach (var path in new[] { "World/Large Scenery/Almond Bridge", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge",
@@ -686,8 +687,8 @@ static class BakedSceneryTests {
         // Physical presence comes first: a spawn point root has no renderer, collider or light.
         foreach (var path in new[] { "World/POIs/Alarka", "World/POIs/Bryson" })
             Assert(At(verdicts, path)?.Disposition == GroupDisposition.NotListed && At(verdicts, path).Reason == BakedSceneryRules.NoPhysicalPresence, path + " has no physical presence and is not listed");
-        // The station icons carry colliders, so their group is physical and waits for the map icon ticket.
-        Assert(At(verdicts, "World/Map Labels/Station Icons")?.Disposition == GroupDisposition.InspectionOnly && At(verdicts, "World/Map Labels/Station Icons").Ticket == "#89", "The station icons wait for #89");
+        // The station icons stand in a folder, not a group: each keeps the Station map icon family.
+        Assert(At(verdicts, "World/Map Labels/Station Icons") == null && At(verdicts, "World/Map Labels/Station Icons/Bryson")?.Disposition == GroupDisposition.ExistingFamily, "The station icons keep their family");
     }
     // A group root is one level below a World category folder, and below World/Large Scenery one level below a town.
     static void ListsSimpleGroupRoots() {

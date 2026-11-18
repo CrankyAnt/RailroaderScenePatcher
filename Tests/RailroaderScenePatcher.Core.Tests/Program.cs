@@ -313,6 +313,7 @@ class Program {
         BakedPartTests.Run();
         IndustryObjectTests.Run();
         LakeSurfaceTests.Run();
+        StationMapIconTests.Run();
         CoalLoaderTests.Run();
         RailBridgeTests.Run();
         InteractiveBuildingTests.Run();

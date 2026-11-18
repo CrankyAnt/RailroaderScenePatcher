@@ -126,6 +126,7 @@ namespace RailroaderScenePatcher.Core {
             }
             if (structure == IndependentBoards.Structure) return Pair("Boards", "moving-boards.md");
             if (structure == BridgeScene.Structure) return Pair("Bridges", "placing-bridges.md");
+            if (structure == StationMapIconRules.Structure) return Pair("Station map icons", "moving-station-map-icons.md");
             if (structure == TrackMarkerScene.Structure) return Pair("Track bindings", "repairing-track-bindings.md");
             if (structure == CrossingPadScene.Structure) return Pair("Crossing pads", "rebinding-crossing-pads.md");
             if (structure == CrossingCoverageScene.Structure) return Pair("Crossing coverage", "correcting-crossing-coverage.md");

@@ -245,6 +245,14 @@ The patcher moves and enables or disables the bridge root. Its colliders and ren
 
 After a change the patcher verifies the root placement and activity, the collider layout, collider activity under the root, and that the loaded generated trestles within 250 m of the bridge and the construction-scenery controller that references the bridge are unchanged. Separate track-owned scenery is never part of the moved hierarchy. A difference fails the modification and restores the captured bridge state; an unverified restoration blocks further operations on the bridge for the load. See [move or disable a bridge with its collision](placing-bridges.md) for editing instructions and limits.
 
+### Station map icon
+
+The patcher recognizes the station map icons of the Station map icon family: each object with a `UI.Map.MapIcon` component directly in `World/Map Labels/Station Icons`. The target `scene` and `path` name the icon's object, its `component` is `UI.Map.MapIcon`, and `structure`, when present, must be `station-map-icon-v1`. The native map editor's Save writes the structure. A map icon elsewhere, deeper in the folder or such as one the game creates for a car or a player while it runs, does not resolve. The `Station Icons` folder is no group root, and neither the folder nor any other object in it is listed. A modification may set `placement`, `active`, or both.
+
+The patcher moves the icon's object and enables or disables it. The map is expected to draw the icon where its object stands, because the icon is a world-space canvas; this is not yet observed in Railroader. By the game's code, an icon registers with the map when it is enabled and leaves it when it is disabled, through its own lifecycle (`UI.Map.MapIcon.OnEnable`, `OnDisable`; `UI.Map.MapBuilder.Add`, `Remove`). The station's track span, depot house and station agent are native map data in `Map.json`; no modification of an icon changes them. Before changing anything, the icon's scene must be loaded, its hierarchy must hold no missing script, rigidbody or culler, and its map coordinates must be readable. A culler refuses only the icon whose hierarchy holds it.
+
+After a change, the patcher verifies the icon's placement and activity, that it stands in the same object as before, and that the map has the icon registered while it is active with its parents; before the map exists, registration is not checked. A difference fails the modification and restores the captured placement and activity; an unverified restoration blocks further operations on the icon for the load. The game's progression can switch an icon on or off with its station at load and when industries change. See [move or disable a station map icon](moving-station-map-icons.md) for editing instructions and limits.
+
 ### Baked scenery group
 
 The patcher recognizes the group roots of the Baked scenery group family. The target `scene` and `path` name the group root, its `component` is `UnityEngine.Transform`, and `structure`, when present, must be `baked-scenery-group-v1`. The native map editor's Save writes the structure.
@@ -498,6 +506,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |
 | Any modification whose target `structure` is `baked-scenery-group-v1` | `0.5.0` |
 | A modification whose target `structure` is `baked-scenery-part-v1` | `0.5.0` |
+| A modification with `UI.Map.MapIcon` as its target component or `station-map-icon-v1` as its target `structure` | `0.5.0` |
 
 Fixed placement is the base minimum. Other scene patch file content can raise it according to the table, whether or not the target is loaded or its capability is available on this build. The legacy Sylva location sign does not raise the pattern-based board dependency minimum.
 

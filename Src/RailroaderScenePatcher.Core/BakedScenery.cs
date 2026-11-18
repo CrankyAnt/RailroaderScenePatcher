@@ -172,6 +172,15 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var (town, root, path) in Roots(category, categoryPath)) {
                     if (rule != null) verdicts.Add(new GroupRootVerdict(root, path, GroupDisposition.NotListed, rule));
                     else if (category.Name == MapLabels && root.Name != StationIcons) verdicts.Add(new GroupRootVerdict(root, path, GroupDisposition.NotListed, MapLabel));
+                    // The Station Icons folder holds the station map icons, each an entry of its own family: the folder is
+                    // no group. A direct child with a map icon is a candidate, which keeps that family; any other child,
+                    // such as a subgroup, is not listed, as the map labels beside the folder are not.
+                    else if (category.Name == MapLabels)
+                        foreach (var icon in root.Children) {
+                            var at = path + "/" + icon.Name;
+                            if (icon.Components.Contains(StationMapIconRules.Component)) Candidate(town, icon, at, verdicts);
+                            else verdicts.Add(new GroupRootVerdict(icon, at, GroupDisposition.NotListed, MapLabel));
+                        }
                     else Candidate(town, root, path, verdicts);
                 }
             }
@@ -220,11 +229,17 @@ namespace RailroaderScenePatcher.Core {
         public static readonly IReadOnlyList<Exclusion> Exclusions = Array.AsReadOnly(new[] {
             new Exclusion("Map.Runtime.MaskComponents.", "scene ground mask", "#90", true),
             new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
-            new Exclusion("Model.StationAgent", "station click spot", "#89"),
+            new Exclusion("Model.StationAgent", "station click spot", null, reason: StationAgentReason),
             new Exclusion(ConstructionController, "track construction controller", null, reason: ConstructionOutsideBridge),
             new Exclusion("Character.SpawnPoint", "spawn point", "#94"),
-            new Exclusion("UI.Map.MapIcon", "station icon", "#89", reason: "This group contains a station icon, so it cannot be edited as a group."),
+            new Exclusion("UI.Map.MapIcon", "map icon", null, reason: MapIconReason),
         });
+        // Why a group with a map icon is left out. Station map icons, in the Station Icons folder, have their own family;
+        // a map icon elsewhere is in no family and has no edit. No ticket is needed.
+        public const string MapIconReason = "This group holds a map icon, which the patcher cannot move with a group.";
+        // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
+        // which the native map editor edits. No ticket is needed.
+        public const string StationAgentReason = "This group holds a station click spot, which is native map data that the Map Editor edits.";
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
         public const string TrackMarkerReason = "This group is not moved as a whole. Its track markers are edited one by one in the Track marker family.";

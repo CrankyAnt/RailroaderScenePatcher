@@ -53,9 +53,13 @@ static class CommandBandTests {
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
         Check(spawn.Ticket == "#94" && CommandBand.GroupInspectionOnly(spawn, family) == "Not yet supported: baked scenery groups that hold a spawn point cannot be edited",
             "A group a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(spawn, family));
-        var icon = Verdict("Station Icons", new Node("Icon").With("UI.Map.MapIcon"));
-        Check(icon.Ticket == "#89" && CommandBand.GroupInspectionOnly(icon, family) == "Not yet supported: " + icon.Reason,
-            "A whole-sentence reason a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(icon, family));
+        var bridge = Verdict("Almond Road Bridge", new Node("Deck").Solid());
+        Check(bridge.Ticket == "#97" && bridge.ReasonIsSentence && CommandBand.GroupInspectionOnly(bridge, family) == "Not yet supported: " + bridge.Reason,
+            "A whole-sentence reason a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(bridge, family));
+        // A group with a map icon elsewhere needs no ticket: station map icons have their own family.
+        var icon = Verdict("Depot", new Node("Icon").With("UI.Map.MapIcon"));
+        Check(icon.Ticket == null && CommandBand.GroupInspectionOnly(icon, family) == "Not editable as a group: " + BakedSceneryRules.MapIconReason,
+            "A group with a map icon reads Not editable as a group: " + CommandBand.GroupInspectionOnly(icon, family));
         Check(CommandBand.GroupInspectionOnly(Verdict("Platform", new Node("Deck").Solid()), family) == null, "A listed group is not inspection only");
         Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this baked scenery group cannot be edited", "A group without a verdict waits for support");
     }
