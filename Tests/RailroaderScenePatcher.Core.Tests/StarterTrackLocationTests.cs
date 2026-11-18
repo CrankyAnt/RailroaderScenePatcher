@@ -28,9 +28,26 @@ class FakeStarterWorld : FakeMarkerWorld, IStarterPlacementWorld {
         return Objects.TryGetValue(identity.Path, out var found) ? found : new List<object>();
     }
     public StarterSetups Setups() => FailSetups ? StarterSetups.Unreadable("placements unavailable") : new StarterSetups(Placements.ToList());
-    public object Marker(object target) => target;
     public TrackLocation PlacementLocation(object marker) => Location(marker);
     // Each car's length with a gap of one metre between two cars.
+    // The native write of a car placement's wreck setting: the placement is replaced by one with the new setting, as the
+    // game's CarPlacement object keeps it. ThrowAfterWreck fails once after the write, as a native failure would.
+    public int WreckWrites;
+    public bool ThrowAfterWreck, FailWreckWrites, FailMarker;
+    // Runs after each wreck write, such as a failure that also makes the following writes fail.
+    public Action AfterWreckWrite;
+    public object Marker(object target) => FailMarker ? throw new InvalidOperationException("marker unreadable") : target;
+    public void SetWreck(StarterCarPlacement placement, bool wreck) {
+        if (FailWreckWrites) throw new InvalidOperationException("injected: the wreck cannot be written");
+        var index = Placements.FindIndex(p => ReferenceEquals(p, placement) || (p.Setup == placement.Setup && p.Index == placement.Index && ReferenceEquals(p.Marker, placement.Marker)));
+        if (index < 0) throw new InvalidOperationException("No such car placement");
+        var p0 = Placements[index];
+        Placements[index] = new StarterCarPlacement(p0.Setup, p0.SetupActive, p0.Index, p0.Count, p0.Marker, p0.Cars, wreck);
+        WreckWrites++; Mutations++;
+        AfterWreckWrite?.Invoke();
+        if (ThrowAfterWreck) { ThrowAfterWreck = false; throw new InvalidOperationException("injected after the wreck write"); }
+    }
+    public bool WreckOf(object marker) => Placements.Single(p => ReferenceEquals(p.Marker, marker)).Wreck;
     public double CutLength(IReadOnlyList<string> cars) {
         if (cars.Count == 0) return 0;
         return cars.Select(c => CarLengths.TryGetValue(c, out var l) ? l : throw new InvalidOperationException("No car for identifier: " + c)).Sum() + (cars.Count - 1);
@@ -84,7 +101,7 @@ static class StarterTrackLocationTests {
     // segments, S1 from 0 to 100 m, S2 from 100 to 200 m and the unavailable Sclosed from 200 to 260 m, beside a
     // separate 10 m siding Sshort at 500 m. The cuts extend towards end a, so a cut with its front at distance d from a
     // reaches back to d minus its length. One marker is disabled, as some base-game starter markers are.
-    static (FakeStarterWorld world, FakeMarker wreck, FakeMarker shed, FakeMarker hopper, StarterPlacementScene scene) Setup() {
+    internal static (FakeStarterWorld world, FakeMarker wreck, FakeMarker shed, FakeMarker hopper, StarterPlacementScene scene) Setup() {
         var world = new FakeStarterWorld();
         world.Segments.Clear();
         world.Line("S1", 0, 100); world.Line("S2", 100, 100); world.Line("Sclosed", 200, 60); world.Line("Sshort", 500, 10);

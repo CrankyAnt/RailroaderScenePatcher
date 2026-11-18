@@ -162,7 +162,7 @@ namespace RailroaderScenePatcher {
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = "Gizmo", SnapPlace = "Snap", ActivityPlace = "Activity",
-            ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells";
+            ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells", WreckPlace = "Start derailed";
         // The place of the open equipment form's messages: its bells or its lights and gates.
         string EquipmentPlace => equipmentSource?.IsDefinition == true ? BellPlace : LightGatePlace;
         bool staleLogged = true;
@@ -1440,6 +1440,16 @@ namespace RailroaderScenePatcher {
                 cut = body.Where((p, i) => i % 6 == 0 || i == body.Count - 1).ToArray();
             } catch { cut = null; }
             return cut;
+        }
+        // The effective wreck setting of the car placement that reads the inspected starter placement marker, or null when
+        // not exactly one does: what the Wreck checkbox shows. Read a few times a second.
+        int wreckFrame = -100; object wreckOf; bool? wreck;
+        internal bool? InspectedWreck() {
+            if (!IsStarter || attachment == null) return null;
+            if (Time.frameCount < wreckFrame + 10 && ReferenceEquals(wreckOf, selected.Handle)) return wreck;
+            wreckFrame = Time.frameCount; wreckOf = selected.Handle;
+            try { wreck = attachment.Session.StarterWreck(selected.Identity); } catch { wreck = null; }
+            return wreck;
         }
         internal double[] InspectedTrackPoint() {
             if (selected == null || selected.Family != StarterPlacements.Family) return null;

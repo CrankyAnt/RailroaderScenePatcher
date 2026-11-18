@@ -62,7 +62,7 @@ static class StarterPlacementTests {
         var unreadable = StarterSetups.Unreadable("placements unavailable");
         Check(unreadable.Error == "placements unavailable" && unreadable.Use(Wreck) == StarterUse.None && unreadable.Family(Wreck, "Track marker") == "Track marker",
             "Unreadable setups classify no marker as a starter placement marker");
-        Check(StarterPlacements.Unreadable("placements unavailable") == "Inspection unavailable: the new-game setups could not be read, so starter placement markers cannot be told apart: placements unavailable"
+        Check(StarterPlacements.Unreadable("placements unavailable") == "Inspection unavailable: the new-game setups could not be read, so starter placement markers cannot be identified: placements unavailable"
             && BindingRules.IsNote(StarterPlacements.Unreadable("x")), "The note names the starter setups and is an inspection note");
         var scene = new SetupScene { Setups = unreadable };
         scene.Markers.Add(new KeyValuePair<Marker, object[]>(Wreck, new object[] { false, "", (bool?)false }));

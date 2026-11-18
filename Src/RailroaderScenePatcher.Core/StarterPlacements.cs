@@ -16,10 +16,16 @@ namespace RailroaderScenePatcher.Core {
         public int Count { get; }
         public object Marker { get; }
         public IReadOnlyList<string> Cars { get; }
-        public bool Wreck { get; }
-        public StarterCarPlacement(string setup, bool setupActive, int index, int count, object marker, IEnumerable<string> cars, bool wreck) {
+        // The wreck setting: read from the game's car placement now when the placement can read it, so a placement read
+        // before a wreck edit shows the edited setting; otherwise as it was read.
+        public bool Wreck => currentWreck != null ? currentWreck() : wreck;
+        readonly bool wreck;
+        readonly Func<bool> currentWreck;
+        // The game's own car placement, whose wreck setting the starter placement capability writes; null when unknown.
+        public object Handle { get; }
+        public StarterCarPlacement(string setup, bool setupActive, int index, int count, object marker, IEnumerable<string> cars, bool wreck, object handle = null, Func<bool> currentWreck = null) {
             Setup = setup; SetupActive = setupActive; Index = index; Count = count; Marker = marker;
-            Cars = (cars ?? Enumerable.Empty<string>()).ToArray(); Wreck = wreck;
+            Cars = (cars ?? Enumerable.Empty<string>()).ToArray(); this.wreck = wreck; Handle = handle; this.currentWreck = currentWreck;
         }
     }
     // Whether the game reads a marker as a starter placement marker. Used: an active setup's car placement holds it.
@@ -65,29 +71,33 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<StarterCarPlacement> Placements(string setup) =>
             placements.Where(p => p.SetupActive && p.Setup == setup).OrderBy(p => p.Index).ToArray();
         // The one car placement that reads the marker, or why there is not exactly one. A starter placement changes one
-        // car placement, so a marker that no car placement or several read cannot be placed.
+        // car placement, so a marker that no car placement or several read takes no starter placement.
         public StarterCarPlacement Reader(object marker, out string refusal) {
             refusal = null;
             if (Error != null) { refusal = StarterPlacements.Unreadable(Error); return null; }
             var readers = Reading(marker);
             if (readers.Count == 1) return readers[0];
             refusal = readers.Count == 0 ? StarterPlacements.NoReader
-                : readers.Count + " new-game car placements read this marker (" + String.Join("; ", readers.Select(StarterPlacements.Place)) + "); a starter placement changes the one car placement that reads its marker, so this marker cannot be placed";
+                : StarterPlacements.SeveralReaders(readers.Select(StarterPlacements.Place).ToArray());
             return null;
         }
     }
-    // A starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, and the
-    // marker's track location, the front of that placement's car cut. A null track leaves the location untouched; a
-    // detached track is refused, because the game reads a used marker's track location.
+    // A starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, the
+    // marker's track location, the front of that placement's car cut, and the placement's wreck setting, whether the
+    // game places the cut derailed. A null track or wreck leaves that setting untouched; a detached track is refused,
+    // because the game reads a used marker's track location.
     public sealed class StarterSetting {
-        public StarterSetting(string setup, MarkerBinding track) { Setup = setup; Track = track; }
+        public StarterSetting(string setup, MarkerBinding track) : this(setup, track, null) { }
+        public StarterSetting(string setup, MarkerBinding track, bool? wreck) { Setup = setup; Track = track; Wreck = wreck; }
         public string Setup { get; }
         public MarkerBinding Track { get; }
+        public bool? Wreck { get; }
         // The modification's values laid over the complete state below.
         internal static StarterSetting Overlay(StarterSetting under, StarterSetting mod) =>
-            mod == null ? under : under == null ? mod : new StarterSetting(mod.Setup ?? under.Setup, mod.Track ?? under.Track);
-        // Two states agree when the track location agrees; the setup identifies the car placement and is no state.
-        internal static bool Same(StarterSetting a, StarterSetting b) => a == null ? b == null : b != null && MarkerBinding.Same(a.Track, b.Track);
+            mod == null ? under : under == null ? mod : new StarterSetting(mod.Setup ?? under.Setup, mod.Track ?? under.Track, mod.Wreck ?? under.Wreck);
+        // Two states agree when the track location and the wreck setting agree; the setup identifies the car placement
+        // and is no state.
+        internal static bool Same(StarterSetting a, StarterSetting b) => a == null ? b == null : b != null && MarkerBinding.Same(a.Track, b.Track) && a.Wreck == b.Wreck;
     }
     // Why the game could not move along the track or place a car: the game's own reason, such as "Not enough track."
     public sealed class StarterTrackException : Exception {
@@ -224,18 +234,22 @@ namespace RailroaderScenePatcher.Core {
     public static class StarterPlacements {
         public const string Family = "Starter placement";
         // The inspection note of a marker, and the Refresh's report, when the setups could not be read.
-        public static string Unreadable(string error) => "Inspection unavailable: the new-game setups could not be read, so starter placement markers cannot be told apart: " + error;
+        public static string Unreadable(string error) => "Inspection unavailable: " + UnreadableReason(error);
+        // The reason of Unreadable without its label, as a tooltip gives it after its own label.
+        public static string UnreadableReason(string error) => "the new-game setups could not be read, so starter placement markers cannot be identified: " + error;
         // The start of a reader line: the inspector shows these lines under their own heading.
         public const string ReaderPrefix = "Read by setup ";
         // Why a starter placement marker has no Focus target: its track location does not resolve on the loaded track.
         public const string NoTrackPoint = "the marker's track location does not resolve to a track point";
         // What Supported edits says for a used marker. The track location is the starter placement workflow's own edit;
         // the object's placement and activity do not reach the car placement.
-        public const string Operations = "Track location: place the marker on the track under Connections; the start setup puts the front of its car cut there, after the game's placement rule passes for the whole cut. The object's placement and activity do not change where its cars start, and editing the wreck setting is not available in this version";
+        public const string Operations = "Track location: place the marker on the track under Connections. Once the whole car cut passes the game's placement rule, the new-game setup places its front there. Start derailed: choose under Connections whether the cut starts derailed as a wreck. The object's placement and activity do not change where its cars start";
         // Why the object's placement and activity cannot be edited: what the Placement tab's modes and the activity
         // buttons say, and what a starter placement modification with placement or active fails with.
         public const string ObjectSettings = "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections";
         public const string OtherRelationships = "A starter placement marker's track location is set through starterPlacement, not through relationships";
+        // What a starter placement modification that sets neither a track location nor a wreck setting fails with.
+        public const string NothingSet = "Invalid starter placement: set track, wreck or both in starterPlacement";
         // Why the track location of a used marker cannot be detached: the game reads it to place the cut.
         public const string NoDetach = "The track location of a starter placement marker cannot be detached: the new-game car placement reads it to place its cars, and a missing location stops the whole setup";
         // Why the Generic track-marker capability leaves a used marker alone: its track location is edited in the
@@ -243,7 +257,18 @@ namespace RailroaderScenePatcher.Core {
         public const string MarkerCapabilityRefusal = "This is a starter placement marker: a new-game car placement reads its track location, which belongs to the starter placement workflow";
         // A car placement as a refusal names it: its setup and its place in it.
         public static string Place(StarterCarPlacement placement) => "setup " + placement.Setup + ", car placement " + (placement.Index + 1) + " of " + placement.Count;
-        public const string NoReader = "No new-game car placement of an active setup reads this marker, so it is no starter placement marker";
+        public const string NoReader = "No new-game car placement in an active setup reads this marker, so it is not a starter placement marker";
+        // Why a marker that several car placements read takes no starter placement, for a track location and a wreck
+        // setting alike; places names each car placement as Place does.
+        public static string SeveralReaders(IReadOnlyList<string> places) =>
+            places.Count + " new-game car placements read this marker (" + String.Join("; ", places) + "); a starter placement can change only one car placement, so it cannot be used for this marker";
+        // The car placement a reader line names, as Place names it: "setup ewh-steam, car placement 3 of 3".
+        public static string PlaceOf(string readerLine) {
+            if (readerLine == null || !readerLine.StartsWith(ReaderPrefix, StringComparison.Ordinal)) return readerLine;
+            var rest = readerLine.Substring("Read by ".Length);
+            var colon = rest.IndexOf(':');
+            return colon < 0 ? rest : rest.Substring(0, colon);
+        }
         // Why another capability's object takes no starter placement.
         public const string NotAStarter = "This object is no starter placement marker; a starter placement applies to a marker that a new-game car placement reads";
         public static string Reader(StarterCarPlacement placement) =>

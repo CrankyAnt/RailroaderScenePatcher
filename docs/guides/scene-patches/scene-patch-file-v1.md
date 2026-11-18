@@ -48,7 +48,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | `placement` | object | Optional. A fixed placement contains `mode`, `position` and `rotation`; a track-following placement contains `mode`, `track`, `offset` and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
 | `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.5.0 or later. |
-| `starterPlacement` | object | Optional. The track location of a starter placement marker; see Starter placement below. Requires patcher 0.5.0 or later. |
+| `starterPlacement` | object | Optional. Sets a starter placement marker's track location, whether its starting cars are a wreck, or both. See Starter placement below. Requires patcher 0.5.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same scene patch file. |
 
 The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
@@ -181,23 +181,32 @@ An equipment modification is refused before any change while an addition of the 
 
 ## Starter placement
 
-`starterPlacement` sets the track location of a starter placement marker: the place on the track where a new-game car placement puts the front of its car cut. The target names the marker with `component` `Track.TrackMarker` and `structure` `starter-placement-v1`. The member accepts only these fields:
+`starterPlacement` controls where a cut of starting cars appears in a new company game and whether it starts as a wreck. It sets the starter placement marker's track location, the car placement's wreck setting, or both. The track location is where the front of the cut starts. Identify the marker with target `component` `Track.TrackMarker` and `structure` `starter-placement-v1`.
+
+The object accepts only the fields below. It must contain `track`, `wreck` or both.
 
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `setup` | string | Required and non-empty. The identifier of the setup whose car placement reads the marker. |
-| `track` | object | Required. A track location with exactly `segment`, `end` and `distance`, with the same rules as a `trackMarker` reference. `{ "detach": true }` is read and refused. |
+| `track` | object | Optional. The marker's track location. Must contain exactly `segment`, `end` and `distance`, following the rules for a `trackMarker` reference. The parser accepts `{ "detach": true }`, but the engine refuses to apply it. |
+| `wreck` | boolean | Optional. `true` starts the cars derailed, using the game's own wreck behavior. `false` starts them on the track. All other values, including `null`, are invalid. |
 
-The cut extends from the track location towards the end that `distance` counts from: for `end` `a` towards end `a`, for `end` `b` towards end `b`. Omitting `starterPlacement` leaves the marker's track location untouched by this mod. A starter placement marker accepts no `placement`, `active` or `relationships`: the object's placement and activity do not change where the cars start, and its track location belongs to `starterPlacement`.
+The cut extends from the track location towards the segment end from which `distance` is measured. With `end` set to `a`, it extends towards end `a`; with `end` set to `b`, it extends towards end `b`.
+
+Omitting `track` leaves the marker's track location untouched by this mod. Omitting `wreck` keeps the car placement's native wreck setting. An explicit `wreck` value is reapplied every time, even if it equals the native setting. Omitting `starterPlacement` leaves both settings untouched by this mod.
+
+A starter placement marker accepts no `placement`, `active` or `relationships`. Its object position and activity do not affect where the cars start. Its track location belongs in `starterPlacement`.
 
 Before changing anything, the engine refuses these invalid definitions:
 
 - A track location whose segment is missing or ambiguous. The refusal names the segment.
 - A distance outside the segment. The refusal gives the distance and the segment's length.
-- A detach, a `setup` other than the setup whose car placement reads the marker, or a marker read by no car placement of an active setup or by more than one. The refusal gives the reason.
+- A detach, a `setup` other than the setup whose car placement reads the marker, or a marker read by no car placement of an active setup or by more than one. The refusal gives the reason. This also applies to a modification that sets only `wreck`.
 - A location where the whole car cut, together with the cuts of the setup's other placements, fails the game's placement rule. The refusal names the car placement, its cars and length, and the game's reason.
 
-The engine does not substitute another segment for a missing, ambiguous or out-of-range location. The other cuts stand at the track locations set by the scene patch file's other starter placements, or at their current locations otherwise. The result therefore does not depend on the order in which modifications apply; see [place a starter placement marker on the track](placing-starter-markers.md#what-the-patcher-checks-first). A refused modification leaves the marker as it was, and the other modifications still apply.
+The engine does not substitute another segment for a missing, ambiguous or out-of-range location. The other cuts stand at the track locations set by the scene patch file's other starter placements, or at their current locations otherwise. The result therefore does not depend on the order in which modifications apply; see [place a starter placement marker on the track](placing-starter-markers.md#what-the-patcher-checks-first). A refused modification leaves the marker and the wreck setting as they were, and the other modifications still apply.
+
+If an application fails after changes have begun, the engine restores the captured wreck setting, track location and registration. Removing the modification or its `wreck` member restores the wreck setting the car placement has without this mod, recalculated from the loaded map and remaining values.
 
 ## Several mods
 
@@ -333,9 +342,9 @@ The patcher loads the definition's audio through the content library and keeps t
 
 The patcher recognizes an object holding one Generic `Track.TrackMarker` held by a car placement of an active new-game setup (`Game.Progression.SetupDescriptor`). The target `component` is `Track.TrackMarker`; set `structure` to `starter-placement-v1`. The marker must have an ID, and the object must not be a milepost or crossing pad. No other component may listen to the marker's location changes, and its activity must not follow a track group. No loaded component other than a colocated `Track.TrackRelativePosition` may hold a direct reference to it. Such a marker never resolves as `track-marker-v1`. A modification may set only `starterPlacement`.
 
-A `starterPlacement` track location writes the marker's serialized location and its registration in the track graph as for a Generic marker: the patcher removes the registration under the marker ID, writes the location, and registers the marker at the new location when the marker is enabled and active. A disabled marker keeps no registration; the game reads its location at a new company game all the same. The object's placement and activity stay as they are. Before changing anything the patcher requires the track-marker registration rule and refuses a marker whose marker id another scene marker holds, as it does for track markers. After a change it verifies the location and that rule. A difference fails the modification and restores the captured location and registration; an unverified restoration blocks further operations on the marker for the load.
+A `starterPlacement` track location writes the marker's serialized location and its registration in the track graph as for a Generic marker: the patcher removes the registration under the marker ID, writes the location, and registers the marker at the new location when the marker is enabled and active. A disabled marker keeps no registration; the game reads its location at a new company game all the same. The object's placement and activity stay as they are. A `wreck` writes the `wreck` field of the one `SetupDescriptor.CarPlacement` that reads the marker; an omitted `track` leaves the marker's location and registration untouched. Before changing anything the patcher requires the track-marker registration rule and refuses a marker whose marker id another scene marker holds, as it does for track markers. After a change it verifies the location and that rule. A difference fails the modification and restores the captured wreck setting, location and registration; an unverified restoration blocks further operations on the marker for the load.
 
-The game reads the location in `Game.State.CompanyModeSetup.Setup`, which runs when a new company game becomes active, after the world-load callback in which the patcher applies its scene patch files. The whole-cut check walks the track with the graph's own `LocationByMoving`, reads the segments' availability, and takes each cut's length from `StateManager.DescriptorsForIdentifiers` and `ConsistLength.OfDescriptors`, as the game's `TrainController.HandlePlaceTrain` does before `CanPlaceAt`. See [place a starter placement marker on the track](placing-starter-markers.md) for editing instructions and limits.
+The game reads the location and the wreck setting in `Game.State.CompanyModeSetup.Setup`, which runs when a new company game becomes active, after the world-load callback in which the patcher applies its scene patch files. The whole-cut check walks the track with the graph's own `LocationByMoving`, reads the segments' availability, and takes each cut's length from `StateManager.DescriptorsForIdentifiers` and `ConsistLength.OfDescriptors`, as the game's `TrainController.HandlePlaceTrain` does before `CanPlaceAt`. See [place a starter placement marker on the track](placing-starter-markers.md) for editing instructions and limits.
 
 ## Writing by the native map editor
 
@@ -386,7 +395,7 @@ A Save that writes the scene patch file writes its content in this order:
 - `target`: `scene`, `path`, `component`, `structure`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`.
 - `crossingCoverage`: `circuits`, `additions`.
-- `starterPlacement`: `setup`, `track`.
+- `starterPlacement`: `setup`, `track`, `wreck`.
 - An entry under `circuits` or `additions`: `approachA`, `island`, `approachB`, `detach`.
 - An entry under `crossingEquipment`: `pattern`, `source`, `placement`.
 - `source`: `scene`, `path`, `definition`.

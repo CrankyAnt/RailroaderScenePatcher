@@ -38,6 +38,7 @@ static class CommandBandTests {
     // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
     // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
     static void ReasonsReadAsOnePlainSentence() {
+        Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
         // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
         if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")) != "Inspection only: The patcher has no edit for baked scenery groups that hold a car loader yet.")
             throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")));
@@ -55,6 +56,11 @@ static class CommandBandTests {
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
+            new[] { CommandBand.WreckReason(null, new string[0]), StarterPlacements.NoReader + "." },
+            new[] { CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no", StarterPlacements.ReaderPrefix + "ewh-diesel, car placement 1 of 1: cars rr/gb-gondola3; wreck: no" }),
+                "2 new-game car placements read this marker (setup ewh-steam, car placement 3 of 3; setup ewh-diesel, car placement 1 of 1); a starter placement can change only one car placement, so it cannot be used for this marker." },
+            new[] { CommandBand.WreckReason("placements unavailable", new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }),
+                "The new-game setups could not be read, so starter placement markers cannot be identified: placements unavailable." },
         }) {
             var tooltip = CommandBand.Tooltip("Does something.", row[0]);
             Check(tooltip == "Unavailable: " + row[1], "The tooltip gives the reason as one plain sentence: " + tooltip);

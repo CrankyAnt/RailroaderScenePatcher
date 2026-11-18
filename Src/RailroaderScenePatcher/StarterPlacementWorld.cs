@@ -20,6 +20,7 @@ namespace RailroaderScenePatcher {
         readonly Type graph, location, end, endOfTrack, switchAgainst, stateManager, consistLength;
         readonly MethodInfo moving, position, descriptors, lengthOf, getSegment;
         readonly PropertyInfo available;
+        readonly FieldInfo wreck;
         internal StarterPlacementWorld() {
             graph = Native.Type(GraphType); location = Native.Type(LocationType);
             var segment = Native.Type(SegmentType);
@@ -42,6 +43,8 @@ namespace RailroaderScenePatcher {
             var setup = Native.Type("Game.Progression.SetupDescriptor") ?? throw new InvalidOperationException("Game.Progression.SetupDescriptor unavailable");
             var placement = setup.GetNestedType("CarPlacement", Native.Flags) ?? throw new MissingMemberException("Game.Progression.SetupDescriptor", "CarPlacement");
             foreach (var field in new[] { "carIdentifier", "marker", "wreck" }) if (placement.GetField(field, Native.Flags) == null) throw new MissingFieldException(placement.FullName, field);
+            wreck = placement.GetField("wreck", Native.Flags);
+            if (wreck.FieldType != typeof(bool)) throw new MissingFieldException(placement.FullName, "wreck (bool)");
             if (setup.GetField("identifier", Native.Flags) == null) throw new MissingFieldException(setup.FullName, "identifier");
         }
         static object Graph() => Native.Read(Native.Type(GraphType), "Shared") ?? throw new InvalidOperationException("The track graph is unavailable");
@@ -62,6 +65,14 @@ namespace RailroaderScenePatcher {
             return m != null && Setups().Use(m) == StarterUse.Used;
         }
         public object Marker(object target) => MarkerOf(target);
+        // Writes CarPlacement.wreck, which CompanyModeSetup reads when it places the cut at a new company game: a wreck's
+        // cars are placed derailed. The next check reads the setups again, so it sees the new setting.
+        public void SetWreck(StarterCarPlacement placement, bool value) {
+            var handle = placement?.Handle ?? throw new InvalidOperationException("The game's car placement is unavailable");
+            if (!wreck.DeclaringType.IsInstanceOfType(handle)) throw new InvalidOperationException("The car placement is no " + wreck.DeclaringType.FullName);
+            setupsFrame = -1;
+            wreck.SetValue(handle, value);
+        }
         public TrackLocation PlacementLocation(object marker) => marker is Component c && c != null ? Location(c.gameObject) : null;
         // The marker's own shape and consumers: a Generic marker with an ID and no other consumer of its location than the
         // setups. Its object's activity does not matter to the setup, which reads the location either way.

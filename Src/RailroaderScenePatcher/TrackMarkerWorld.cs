@@ -179,7 +179,8 @@ namespace RailroaderScenePatcher {
                     var placement = placements[i];
                     if (placement == null) continue;
                     var cars = Field(placement, "carIdentifier") as string[];
-                    found.Add(new StarterCarPlacement(String.IsNullOrEmpty(name) ? setup.gameObject.name : name, active, i, placements.Length, Field(placement, "marker"), cars, Field(placement, "wreck") is bool wreck && wreck));
+                    found.Add(new StarterCarPlacement(String.IsNullOrEmpty(name) ? setup.gameObject.name : name, active, i, placements.Length, Field(placement, "marker"), cars, Field(placement, "wreck") is bool wreck && wreck, placement,
+                        () => Field(placement, "wreck") is bool current && current));
                 }
             }
             return new StarterSetups(found);

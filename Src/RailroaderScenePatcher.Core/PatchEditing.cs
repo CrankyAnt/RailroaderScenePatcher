@@ -409,6 +409,7 @@ namespace RailroaderScenePatcher.Core {
             if (state.Active.HasValue) lines.Add("Enabled: from " + (before == null ? "unknown" : before.Active == null ? "controlled by its track group" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
             if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
             if (state.Starter?.Track != null) lines.Add("Track location: from " + Location(before?.Starter?.Track) + " to " + Location(state.Starter.Track));
+            if (state.Starter?.Wreck != null) lines.Add("Start derailed: from " + (before?.Starter?.Wreck == null ? "unknown" : before.Starter.Wreck.Value ? "Yes" : "No") + " to " + (state.Starter.Wreck.Value ? "Yes" : "No"));
             if (state.Coverage != null) foreach (var circuit in state.Coverage.Circuits)
                 lines.Add((DetectionAddition.Id(circuit.Key) == null ? "Circuit " + circuit.Key : "Detection addition " + DetectionAddition.Id(circuit.Key)) + ": " + circuit.Value);
             return lines;
@@ -819,14 +820,10 @@ namespace RailroaderScenePatcher.Core {
         // marker and the new track location. The capability checks the location and the whole car cut before anything changes.
         public Outcome PlaceStarter(TargetIdentity target, TrackLocation location, InspectedTarget inspected = null) {
             return Change("Place starter marker", target, inspected, existing => {
-                if (location == null) throw new InvalidOperationException("Choose a track location on the track");
+                if (location == null) throw new InvalidOperationException("Choose a location on the track");
                 if (existing != null) PatchEngine.Parse(existing);
-                var setup = scene.Read(engine.ResolveUnique(target)).Starter?.Setup;
-                if (setup == null) {
-                    // The capability names why no single car placement reads the marker.
-                    engine.CheckRelationships(engine.ResolveUnique(target), new ObjectState(null, null, null, null, new StarterSetting("", null)));
-                    throw new InvalidOperationException(StarterPlacements.NoReader);
-                }
+                // The capability names why no single car placement reads the marker.
+                var setup = StarterSetup(target);
                 var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
                 var starter = value["starterPlacement"] as JObject ?? new JObject();
                 starter["setup"] = setup;
@@ -840,7 +837,7 @@ namespace RailroaderScenePatcher.Core {
         // track location. A modification left without a setting leaves the scene patch file.
         public Outcome ClearStarterTrack(TargetIdentity target, InspectedTarget inspected = null) {
             return Change("Clear starter track location", target, inspected, existing => {
-                if (existing?["starterPlacement"]?["track"] == null) throw new InvalidOperationException("This mod sets no track location for this marker, so there is nothing to clear");
+                if (existing?["starterPlacement"]?["track"] == null) throw new InvalidOperationException("This mod does not set a track location for this marker, so there is nothing to clear");
                 PatchEngine.Parse(existing);
                 var rest = (JObject)existing.DeepClone();
                 var starter = (JObject)rest["starterPlacement"];
@@ -849,13 +846,43 @@ namespace RailroaderScenePatcher.Core {
                 return Empty(rest) ? null : rest;
             });
         }
+        // Sets the wreck setting of the car placement that reads a starter placement marker: the scene patch file records the setup
+        // and the setting. A setting equal to the one without this mod leaves the modification, as any edit does.
+        public Outcome SetStarterWreck(TargetIdentity target, bool wreck, InspectedTarget inspected = null) {
+            return Change("Set starter wreck", target, inspected, existing => {
+                if (existing != null) PatchEngine.Parse(existing);
+                var setup = StarterSetup(target);
+                var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+                var starter = value["starterPlacement"] as JObject ?? new JObject();
+                starter["setup"] = setup;
+                starter["wreck"] = wreck;
+                if (starter.Parent == null) value["starterPlacement"] = starter;
+                if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
+                return value;
+            }, null, "starter-");
+        }
+        // The setup whose one car placement reads the marker; a marker that no car placement or several read is refused
+        // with the reason the capability gives.
+        string StarterSetup(TargetIdentity target) {
+            var setup = scene.Read(engine.ResolveUnique(target)).Starter?.Setup;
+            if (setup != null) return setup;
+            engine.CheckRelationships(engine.ResolveUnique(target), new ObjectState(null, null, null, null, new StarterSetting("", null)));
+            throw new InvalidOperationException(StarterPlacements.NoReader);
+        }
+        // The effective wreck setting of the car placement that reads the marker, or null when not exactly one does.
+        public bool? StarterWreck(TargetIdentity target) {
+            try { return scene.Read(engine.ResolveUnique(target)).Starter?.Wreck; } catch (Exception) { return null; }
+        }
         // Whether the active scene patch file sets the track location of this starter placement marker. Read from the scene patch file alone.
-        public bool HasStarterTrack(TargetIdentity target) {
+        public bool HasStarterTrack(TargetIdentity target) => HasStarter(target, "track");
+        // Whether the active scene patch file sets the wreck setting of this starter placement marker. Read from the scene patch file alone.
+        public bool HasStarterWreck(TargetIdentity target) => HasStarter(target, "wreck");
+        bool HasStarter(TargetIdentity target, string member) {
             if (scenePatchFile == null || target == null) return false;
             foreach (var item in scenePatchFile.Items) {
                 var other = item["target"] as JObject;
                 if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
-                if (item["starterPlacement"]?["track"] != null) return true;
+                if (item["starterPlacement"]?[member] != null) return true;
             }
             return false;
         }
@@ -977,10 +1004,11 @@ namespace RailroaderScenePatcher.Core {
                 if (!relationships.HasValues) result.Remove("relationships");
             }
             var starter = result["starterPlacement"] as JObject;
-            if (starter != null && Changed(existing?["starterPlacement"]?["track"], starter["track"]) && state.Starter?.Track != null && under.Starter?.Track != null && MarkerBinding.Same(state.Starter.Track, under.Starter.Track)) {
+            if (starter != null && Changed(existing?["starterPlacement"]?["track"], starter["track"]) && state.Starter?.Track != null && under.Starter?.Track != null && MarkerBinding.Same(state.Starter.Track, under.Starter.Track))
                 starter.Remove("track");
-                if (!starter.Properties().Any(p => p.Name != "setup")) result.Remove("starterPlacement");
-            }
+            if (starter != null && Changed(existing?["starterPlacement"]?["wreck"], starter["wreck"]) && state.Starter?.Wreck != null && under.Starter?.Wreck == state.Starter.Wreck)
+                starter.Remove("wreck");
+            if (starter != null && !starter.Properties().Any(p => p.Name != "setup")) result.Remove("starterPlacement");
             if (PreservingJson.SameModification(result, value)) return value;
             return Empty(result) ? null : result;
         }

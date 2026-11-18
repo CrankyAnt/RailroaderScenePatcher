@@ -925,8 +925,20 @@ namespace RailroaderScenePatcher {
             FieldLabel(builder, "Current track location");
             if (current.Length == 0) Line(builder, "None", null, null);
             foreach (var line in current) BindingFields(builder, line);
-            Section(builder, "Read by");
             var readers = selected.Bindings.Where(IsReader).ToArray();
+            // The native checkbox shows the effective wreck setting of the one car placement that reads the marker and
+            // sets this mod's value; the result appears in the footer.
+            Section(builder, "Starting cars");
+            var wreckBlock = block ?? CommandBand.WreckReason(NativeInventory.StartersError, readers);
+            var identity = selected.Identity;
+            // A checkbox that cannot be used refuses the click and dims its label, as an inactive button does.
+            var wreckRow = builder.HStack(row => {
+                row.AddToggle(() => InspectedWreck() == true, value => Edit(WreckPlace, CommandBand.WreckAction(value), (current, inspection) => current.SetStarterWreck(identity, value, inspection)), wreckBlock == null);
+                row.AddLabel("Start derailed");
+            }).Height(RowHeight);
+            if (wreckBlock != null) foreach (var text in wreckRow.GetComponentsInChildren<TMP_Text>(true)) text.alpha = CommandBand.InactiveAlpha;
+            wreckRow.Tooltip("Start derailed", CommandBand.Tooltip("Start this car cut derailed as a wreck, like the game's own wreck. Changing this sets the mod's value; choosing the setting the cut has without this mod removes the mod's value.", wreckBlock));
+            Section(builder, "Used by");
             if (readers.Length == 0) Line(builder, "No active setup", null, null);
             foreach (var line in readers) PlainLabel(builder, line.Substring("Read by ".Length));
         }

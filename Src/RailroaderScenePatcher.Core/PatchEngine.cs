@@ -708,19 +708,28 @@ namespace RailroaderScenePatcher.Core {
         // The starter placement of a starter placement marker: setup names the setup whose new-game car placement reads the
         // marker, and track sets the marker's track location. A detach object is read so the capability can refuse it with
         // its reason: the game reads a used marker's track location whatever else holds.
+        // wreck sets whether the car placement places its cut derailed; an omitted wreck keeps the native setting.
         static StarterSetting ParseStarter(JToken token) {
             var starter = token as JObject;
-            if (starter == null) throw new InvalidOperationException("Invalid starter placement: starterPlacement must be an object with setup and track");
-            if (!Only(starter, "setup", "track")) throw new InvalidOperationException("Unsupported starter placement content");
+            if (starter == null) throw new InvalidOperationException("Invalid starter placement: starterPlacement must be an object with setup, and track, wreck or both");
+            if (!Only(starter, "setup", "track", "wreck")) throw new InvalidOperationException("Unsupported starter placement content");
             if (!RequiredString(starter, "setup")) throw new InvalidOperationException("Invalid starter placement: setup must name the setup whose car placement reads the marker");
-            if (starter["track"] == null) throw new InvalidOperationException("Invalid starter placement: track must set the marker's track location");
+            bool? wreck = null;
+            if (starter.Property("wreck") != null) {
+                if (starter["wreck"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid starter placement: wreck must be true or false");
+                wreck = (bool)starter["wreck"];
+            }
+            if (starter.Property("track") == null) {
+                if (wreck == null) throw new InvalidOperationException(StarterPlacements.NothingSet);
+                return new StarterSetting((string)starter["setup"], null, wreck);
+            }
             var track = starter["track"] as JObject;
             if (track == null) throw new InvalidOperationException("Invalid starter placement: track must be a track location with segment, end and distance");
             if (track["detach"] != null) {
                 if (!Only(track, "detach") || track["detach"].Type != JTokenType.Boolean || !(bool)track["detach"]) throw new InvalidOperationException("Invalid starter placement: detach must be true and stand alone");
-                return new StarterSetting((string)starter["setup"], MarkerBinding.Detached);
+                return new StarterSetting((string)starter["setup"], MarkerBinding.Detached, wreck);
             }
-            return new StarterSetting((string)starter["setup"], MarkerBinding.At(ParseLocation(track, "starter placement")));
+            return new StarterSetting((string)starter["setup"], MarkerBinding.At(ParseLocation(track, "starter placement")), wreck);
         }
         // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by its native island span, with selected
         // tracks or an explicit detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every

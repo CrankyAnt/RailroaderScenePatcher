@@ -2,50 +2,69 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Place a starter placement marker on the track
 
-This guide shows how to choose where a new company game on your map places a cut of starting cars. Each car placement of a new-game setup reads one starter placement marker for its track location: the front of the cut stands at that point, and the cut extends from there towards the end of the segment that the distance counts from. The marker's object position plays no part. See [starter placement markers](inspect-scene-objects.md#starter-placement-markers) for how the inventory lists these markers.
+Use a starter placement marker to choose where a cut of starting cars appears in a new company game on your map. Each car placement in a new-game setup uses one marker's track location. The front of the cut starts there, and the rest extends towards the segment end from which the distance is measured. The marker object's position has no effect. See [starter placement markers](inspect-scene-objects.md#starter-placement-markers) for how to find these markers in the inventory.
 
-A starter placement changes only the marker's track location. The cars of the cut, their loads, the wreck setting and the marker object's placement and activity stay as the map has them. A starter placement requires patcher 0.5.0 or later.
+A starter placement can change the track location, choose whether the cars start as a wreck, or do both. It keeps the map's choice of cars and loads, and leaves the marker object's placement and activity unchanged. It requires patcher 0.5.0 or later.
 
 ## What the patcher checks first
 
-When the game starts a new company game, the setup places its cuts one after the other. When a cut does not fit, the game stops the whole setup, and the cuts after it never appear. So the patcher checks a new track location before it changes anything, and refuses it with the reason when:
+At the start of a new company game, the setup places its cuts in order. If one does not fit, the setup stops and none of the later cuts appear. The patcher therefore checks a new track location before making any changes. It refuses the edit and explains why if:
 
-- the segment does not exist on the loaded track, or the track holds more than one segment with that ID. The refusal names the segment, and no other segment is used instead;
-- the distance lies outside the segment. The refusal gives the distance and the segment's length;
-- the whole cut, together with the cuts of the setup's other placements, fails the game's own placement rule. The game checks the front and a point every 1.5 metres back over the length of the cut, the cars with the gaps between them and the tender of a steam locomotive included, and its back end; for a cut whose length is a whole number of 1.5-metre steps the game checks its last step a second time instead of the back end, and the patcher does the same. Each of these points must be on track that is available, the track must not end and no switch may be lined against the cut before the back end, and no car of a cut that the setup places earlier may stand within 0.75 metres. The refusal names the car placement, its cars and length, and the game's reason, such as `Not enough track.`, `Track not available.`, `Switch lined against.` or the earlier cut it runs into. The new location is also refused when a cut that the setup places later would run into this one;
-- no car placement of an active setup reads the marker, or more than one does. A starter placement changes the one car placement that reads its marker;
-- the marker's track location would be detached. The game reads it to place the cut.
-- another scene marker holds the same marker id. The game removes a marker's registration by marker id from every marker that holds it, so the refusal names the duplicate marker id and every holder; see [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
+- The segment is missing from the loaded track, or more than one segment has its ID. The message names the segment. The patcher never substitutes another segment.
+- The distance lies outside the segment. The message gives both the distance and the segment's length.
+- The cut does not fit under the game's placement rule, taking the setup's other cuts into account. The check is described below. The message names the car placement, its cars and length, and the game's reason, such as `Not enough track.`, `Track not available.`, `Switch lined against.` or the earlier cut blocking it. The patcher also refuses a location that would block a later cut.
+- No car placement in an active setup uses the marker, or more than one does. The patcher needs exactly one car placement to change.
+- The edit would detach the marker's track location. The game needs that location to place the cut.
+- Another scene marker has the same marker id. Removing a registration by marker id removes it for every marker with that id. The message names the duplicate id and all its holders. See [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
 
-The other cuts stand where your scene patch file places them: a cut that another starter placement of the same scene patch file moves is judged at its new track location, also when the game loads the scene patch file, so two cuts can swap places. Move one of them away first in the native map editor, then the other into its old place. A failure of another placement that this cut does not cause, such as another marker on a missing segment, does not refuse this location. Fix that marker on its own.
+The game's placement rule checks the front of the cut, then points every 1.5 metres towards its back, then the back end. The cut's length includes gaps between cars and a steam locomotive's tender. If the length is an exact multiple of 1.5 metres, the game checks the last step twice instead of checking the back end. The patcher follows that rule too.
 
-The patcher checks against the track as the native map editor has it: which track groups are available and which way each switch is lined. A new company game starts from the same map data.
+Every checked point must be on available track, with no car from an earlier cut within 0.75 metres. The track must continue to the back of the cut, with no switch lined against it.
+
+The check uses the other cuts' locations from the same scene patch file, including when that file loads. A cut moved by another starter placement is checked at its new location. This allows two cuts to swap places. In the native map editor, move one cut out of the way first, then move the other into its old place. An unrelated failure in another placement, such as a marker on a missing segment, does not block this edit. Fix that marker separately.
+
+The check uses the track groups and switch positions currently set in the native map editor. A new company game starts from that same map data.
 
 ## Place the marker in the native map editor
 
-1. Open **Scene patches**, select **Refresh** in the command band and select the marker's row in the **Starter placement** family. The world marks the marker's current track point in gold and the track its cut stands on as a gold ribbon from that point back, so you can see where the cut starts and which way it extends.
-2. Open the **Connections** tab. Under **Place on the track**, select **Segment**, click the track where the front of the cut belongs, check the candidate in the footer and choose **Confirm**. The **Track location (m)** fields take the confirmed segment, end `a` and the distance of the click from end `a`.
-3. Change **End** to `b` when the cut should extend the other way along the segment, and adjust **Distance** if needed: with end `b` the distance counts from end `b`. You can also type all three fields without clicking the track.
-4. Select **Set** at the bottom of the tab.
+1. Open **Scene patches**, click **Refresh** in the command band and select the marker under **Starter placement**. A gold point marks the front of its cut. A gold ribbon extends back along the track to show where the cut stands and which way it extends.
+2. Open the **Connections** tab. Under **Place on the track**, click **Segment** and click where the front of the cut should stand. Check the candidate in the footer and click **Confirm**. This fills the **Track location (m)** fields with the segment, end `a` and the distance of the click from end `a`.
+3. To reverse the cut's direction, change **End** to `b` and adjust **Distance** as needed. The distance now counts from end `b`. You can also enter all three fields without clicking the track.
+4. Click **Set** at the bottom of the tab.
 
-The patcher runs the checks above. A refusal appears in the footer with its reason, and the marker keeps its track location. After a successful edit the marker is registered at the new location, the gold point and ribbon move there, and the **Changes** tab shows the old and the new track location. The edit is one native Undo step.
+The patcher runs the checks above. If it refuses the edit, the footer explains why and the marker keeps its location. If the edit succeeds, the patcher registers the marker at the new location and moves the gold point and ribbon there. The **Changes** tab shows the old and new locations. The edit takes one native Undo step.
 
-**Detach** at the bottom of the tab stays greyed out: a starter placement marker cannot be detached. The **Placement** tab's modes and the activity buttons on the **Object** tab stay greyed out too, because the object's placement and activity do not change where the cars start.
+**Detach** stays unavailable because a starter placement marker must have a track location. The modes on the **Placement** tab and the activity buttons on the **Object** tab are also unavailable. The marker object's placement and activity do not affect where the cars start.
+
+## Choose whether the cars start as a wreck
+
+The wreck setting makes the cars start derailed, using the game's own wreck behavior, or on the track.
+
+1. Inspect the marker as in step 1 above and open the **Connections** tab.
+2. Under **Starting cars**, the **Start derailed** checkbox shows the cut's current setting. This is the map's setting unless this mod's scene patch file overrides it.
+3. Select the checkbox to make the cut a wreck, or clear it to place the cut on the track.
+
+The footer reports the result. The **Changes** tab shows the old and new settings, such as `Start derailed: from No to Yes`, and the **Used by** lines show the updated setting. The edit takes one native Undo step.
+
+The checkbox is unavailable if the patcher cannot read the new-game setups or cannot identify exactly one car placement in an active setup that uses this marker. Its tooltip explains why. The patcher refuses an edit for the same reason before changing anything.
+
+Changing the wreck setting keeps the marker's track location. Moving the marker to another track location keeps the wreck setting.
 
 ## Undo, clear and remove
 
-- Native **Undo** returns the track location from before the edit, with its registration; **Redo** applies the edit again. The title, the dirty state and the **Save** button follow.
-- **Clear location** at the bottom of the **Connections** tab removes this mod's track location: the marker returns to the track location the loaded map gives it. A modification that sets nothing else leaves the scene patch file.
-- **Remove modification** in the footer removes the whole modification and returns the marker to the loaded map's track location, computed again from the map and the other mods' values.
-- Setting the marker back to the map's own track location reverts the setting, and the modification leaves the scene patch file.
+- Native **Undo** restores the previous track location and registration, or the previous wreck setting. **Redo** reapplies the edit. The title, unsaved-change state and **Save** button update accordingly.
+- **Clear location**, at the bottom of **Connections**, removes this mod's track location and restores the location from the loaded map. It keeps any wreck setting in the same modification. If nothing else remains, the patcher removes the modification from the scene patch file.
+- Returning the **Start derailed** checkbox to the setting the cut has without this mod removes this mod's wreck setting. It keeps any track location in the same modification. If nothing else remains, the patcher removes the modification from the file.
+- **Remove modification** in the footer removes the entire modification. It restores the track location and wreck setting the marker and car placement have without this mod, recalculated from the loaded map and other mods' values.
+- Returning the marker to the map's track location removes that setting. If nothing else remains, the patcher removes the modification from the file.
 
-If an edit fails after the patcher started to change the marker, it restores the track location and registration the marker had before. When it cannot verify that restoration, it says so and refuses further edits of the marker until **Recheck** in the footer succeeds or the world reloads. **Recheck** refuses while the graph registration does not match the stored location.
+If an edit fails after changes have begun, the patcher restores the previous wreck setting, track location and registration. If it cannot verify the restoration, it reports that and blocks further edits of the marker until **Recheck** in the footer succeeds or the world reloads. **Recheck** cannot succeed while the graph registration differs from the stored location.
 
 ## Save and play
 
-The native map editor's **Save** writes the modification to `Data/scene-patches.json` and raises the mod's dependency on the patcher to 0.5.0, keeping a stricter constraint that `Info.json` already has. The scene patch file stays in format version 1.
+Click **Save** in the native map editor to write the modification to `Data/scene-patches.json`. Save raises the mod's patcher dependency to 0.5.0, preserving any stricter constraint already in `Info.json`. The scene patch file remains in format version 1.
 
-When a player starts a new company game on the map, the patcher applies the scene patch file when the world loads, before the setup places its cars, so the cut stands at the patched track location. The same checks run then: a scene patch file whose location fails them is not applied, the marker keeps the map's track location and the player sees a patcher warning that names the reason. In a game loaded from a save the setup does not run, so the patched track location places no cars there.
+When a player starts a new company game, the patcher applies the scene patch file during world load, before the setup places its cars. The cut then starts at the patched track location, derailed if the file sets it as a wreck. The same checks run at load. If a location fails, the scene patch file does not apply, the marker keeps the map's location and a patcher warning explains why. Loading an existing save does not run the setup, so these settings place no cars in that case.
 
 ## Write the starter placement by hand
 
@@ -61,16 +80,19 @@ Copy the identity with **Copy ID** in the command band and add a modification un
   },
   "starterPlacement": {
     "setup": "ewh-steam",
-    "track": { "segment": "Stky030z8", "end": "b", "distance": 45 }
+    "track": { "segment": "Stky030z8", "end": "b", "distance": 45 },
+    "wreck": false
   },
   "dependsOn": []
 }
 ```
 
-`setup` names the setup whose car placement reads the marker, as the **Read by** lines on the **Object** tab show it.
+For `setup`, use the setup identifier shown under **Read by** on the **Object** tab. Its car placement uses this marker. Omit `track` to keep the map's track location. Omit `wreck` to keep the map's wreck setting, use `true` to make the cut a wreck, or use `false` to place it on the track.
 
 ## Limits
 
-The automated tests check set and omitted track locations, the detach refusal, missing and ambiguous segments, a distance outside the segment, a cut that runs off the track, onto unavailable track, across a switch lined against it or into another cut, a marker that no car placement or several read, repeated application, failure restoration, guarded retry, Undo, Redo, removal and the canonical Save, against a controlled setup and track. They do not load Railroader.
+Automated tests use a controlled setup and track. They cover explicit and omitted track locations, refusal to detach, missing and ambiguous segments, distances outside a segment, and cuts that run out of track, reach unavailable track, cross a switch lined against them or collide with another cut. They also cover markers used by no car placement or by several, repeated application, failure restoration, guarded retry, Undo, Redo, removal and canonical Save. The wreck tests cover omitted, on and off settings and the same refusal when no single car placement uses the marker. These tests do not load Railroader.
 
-The check of earlier cuts treats each cut as one body along its track from its front to its back, half a car wide on each side; the game checks the cars themselves, so a point in the gap between two cars of an earlier cut counts as blocked here. Whether a patched location reaches a new company game, and where its cars then stand, is shown only by a Railroader journey for a tested build, setup and cut. Multiplayer is not covered.
+When checking earlier cuts, the patcher treats each as a continuous body along the track, extending half a car's width to either side. The game checks individual cars. The patcher therefore treats gaps between an earlier cut's cars as blocked too.
+
+Only a Railroader journey can show whether the patched location and wreck setting take effect in a new company game, and where and how the cars appear. That evidence applies to the tested build, setup and cut. Multiplayer is not covered.

@@ -18,11 +18,15 @@ namespace RailroaderScenePatcher.Core {
         // The length of the cut the game builds for these car identifiers, tenders included, with the gaps between the
         // cars. Throws when a car is unknown.
         double CutLength(IReadOnlyList<string> cars);
+        // Writes the wreck setting of the game's car placement that the placement read; the game reads it when it
+        // places the cut at a new company game.
+        void SetWreck(StarterCarPlacement placement, bool wreck);
     }
     // Places a starter placement marker on the track: the marker's track location, which a new-game car placement reads
     // as the front of its car cut, together with its graph registration. The object's placement and activity play no
     // part in where the cars start, so a starter placement leaves them alone. A new location must resolve on the loaded
     // track and must let the whole cut, with the cuts of the setup's other placements, pass the game's placement rule.
+    // The starter placement also sets the wreck setting of the one car placement that reads the marker.
     public sealed class StarterPlacementScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlannedStateScene {
         public const string Structure = "starter-placement-v1", RequiredVersion = "0.5.0";
         readonly IStarterPlacementWorld world;
@@ -51,19 +55,45 @@ namespace RailroaderScenePatcher.Core {
         public bool StillIdentifies(object target, TargetIdentity identity) => identity.Structure == Structure && relationship.StillIdentifies(target, identity);
         public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure ? RequiredVersion : null;
         public void Preflight(object target) => relationship.Preflight(target);
-        public object Capture(object target) => relationship.Capture(target);
-        public bool Restore(object target, object snapshot) => relationship.Restore(target, snapshot);
+        // The marker's own snapshot, with the wreck setting of the car placement that read it, when one did. Setups or a
+        // marker that cannot be read leave the wreck setting out, so the marker's capture stands as it did without it.
+        sealed class Snapshot { internal object Marker; internal bool? Wreck; }
+        public object Capture(object target) {
+            bool? wreck = null;
+            try { wreck = world.Setups().Reader(world.Marker(target), out _)?.Wreck; } catch (Exception) { }
+            return new Snapshot { Marker = relationship.Capture(target), Wreck = wreck };
+        }
+        // Returns the captured wreck setting and then the marker's track location; true only when both verify.
+        public bool Restore(object target, object snapshot) {
+            var captured = (Snapshot)snapshot;
+            var wreck = true;
+            if (captured.Wreck != null) {
+                try {
+                    var reader = world.Setups().Reader(world.Marker(target), out _);
+                    if (reader != null && reader.Wreck != captured.Wreck.Value) world.SetWreck(reader, captured.Wreck.Value);
+                    wreck = world.Setups().Reader(world.Marker(target), out _)?.Wreck == captured.Wreck.Value;
+                } catch (Exception) { wreck = false; }
+            }
+            var marker = relationship.Restore(target, captured.Marker);
+            return wreck && marker;
+        }
         public ObjectState Read(object target) {
             var setups = world.Setups();
             var reader = setups.Reader(world.Marker(target), out _);
             return new ObjectState(new Placement(world.Position(target), world.Rotation(target)), world.Active(target), null, null,
-                new StarterSetting(reader?.Setup, MarkerBinding.Of(world.Location(target))));
+                new StarterSetting(reader?.Setup, MarkerBinding.Of(world.Location(target)), reader?.Wreck));
         }
-        // Writes the track location with its registration; the object keeps its placement and activity.
+        // Writes the wreck setting of the car placement that reads the marker, and the track location with its
+        // registration; the object keeps its placement and activity. A setting the state leaves out is not written.
         public void Apply(object target, ObjectState state) {
-            var track = state?.Starter?.Track;
+            var starter = state?.Starter;
+            var track = starter?.Track;
             if (track != null && track.IsDetached) throw new InvalidPatchDefinitionException(StarterPlacements.NoDetach);
-            relationship.Apply(target, new ObjectState(null, null, track ?? MarkerBinding.Of(world.Location(target))));
+            if (starter?.Wreck != null) {
+                var reader = world.Setups().Reader(world.Marker(target), out var refusal) ?? throw new InvalidPatchDefinitionException(refusal);
+                if (reader.Wreck != starter.Wreck.Value) world.SetWreck(reader, starter.Wreck.Value);
+            }
+            if (starter == null || track != null) relationship.Apply(target, new ObjectState(null, null, track ?? MarkerBinding.Of(world.Location(target))));
         }
         public void CheckRelationships(object target, ObjectState state) {
             if (state == null) return;

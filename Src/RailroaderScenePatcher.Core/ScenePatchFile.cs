@@ -178,7 +178,7 @@ namespace RailroaderScenePatcher.Core {
                 Member = name => name == "trackMarker" ? Location : name == "crossingCoverage" ? Coverage : name == "crossingEquipment" ? EquipmentEntries : Unknown };
             static readonly Shape Target = new Shape { Known = new[] { "scene", "path", "component", "structure" } };
             static readonly Shape Dependencies = new Shape { SortedStrings = true };
-            static readonly Shape Starter = new Shape { Known = new[] { "setup", "track" }, Member = name => name == "track" ? Location : Unknown };
+            static readonly Shape Starter = new Shape { Known = new[] { "setup", "track", "wreck" }, Member = name => name == "track" ? Location : Unknown };
             static readonly Shape Modification = new Shape { Known = new[] { "target", "relationships", "starterPlacement", "placement", "dependsOn", "active" },
                 Member = name => name == "target" ? Target : name == "relationships" ? Relationships : name == "starterPlacement" ? Starter : name == "placement" ? Placement : name == "dependsOn" ? Dependencies : Unknown };
             static readonly Shape Modifications = new Shape { Member = name => Modification };

@@ -93,6 +93,17 @@ namespace RailroaderScenePatcher {
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
         // Why Clear location has nothing to clear: this mod sets no track location for the starter placement marker.
         internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This mod sets no track location for this marker, so there is nothing to clear.";
+        // The name of a wreck edit, after the checkbox's new state.
+        internal static string WreckAction(bool wreck) => wreck ? "Start derailed: Yes" : "Start derailed: No";
+        // Why the Wreck checkbox of a starter placement marker cannot be used, or null: the setups could not be read, or
+        // not exactly one active car placement reads the marker. readers are the marker's reader lines. The reasons are
+        // the ones the engine refuses a wreck setting with.
+        internal static string WreckReason(string setupsError, IReadOnlyList<string> readers) {
+            if (setupsError != null) return Sentence(StarterPlacements.UnreadableReason(setupsError));
+            var count = readers?.Count ?? 0;
+            return count == 1 ? null : count == 0 ? Sentence(StarterPlacements.NoReader)
+                : Sentence(StarterPlacements.SeveralReaders(readers.Select(StarterPlacements.PlaceOf).ToArray()));
+        }
         // Why Clear activity cannot run for an object this mod sets no activity for, or null.
         internal static string ClearActivityReason(bool hasValue) => hasValue ? null : "This mod sets no activity for this object, so there is nothing to clear.";
         // Why the footer's Details of a world choice cannot show anything, or null: it shows the clicked candidate.
