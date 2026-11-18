@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, car loader, lake surface, log pond, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
+Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, lake surface, log pond, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
 
 Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -78,6 +78,22 @@ On a pile's **Object** tab, **Use in the game** names the storage that the pile 
 The industry itself is native map data. Its position, its track spans and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
 
 `Whittier Log Pond` holds a log pond and a lake surface. It stays under **Storage display**, marked `inspection only`.
+
+## Move the coal loader with the track under it
+
+The `Coal Loader` group at Robinson Gap Mine, under **Industry building**, carries the scene's car loader on its group root. The car loader looks for a car under the group root's position and fills it with the load that the scene sets for it. It reads no industry storage. When you move the group, the patcher moves this scene object, so the position the car loader reads moves with it. The patcher does not change the load.
+
+The native Prop `aj-coal-loader-mine` stands beside the group, about 3 m away. It is native map data, so moving the group leaves it in place.
+
+On the group's **Object** tab, **Use in the game** reads `Loading point: cars under it are loaded.` The group's only part is `Coal Loader / Model / Spotlight Outdoor`, and its tab says that moving or disabling it does not change loading. `Model / MineLoader`, the chute and frame that the game animates while it loads, moves with the group and has no row of its own.
+
+Track and Props are native map data, so move them first:
+
+1. In the native map editor, move the track under the loader and the Prop `aj-coal-loader-mine` to the new place.
+1. In **Scene patches**, select `Coal Loader` under **Baked scenery group** > **Industry building** and move the group so that its group root stands above the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor).
+1. Click **Save** in the native map editor.
+
+A car that the loader is filling when you move the group keeps loading at the old place until the car leaves; the next search uses the new position. While the group is disabled, its car loader does not run.
 
 ## Write the modification by hand
 

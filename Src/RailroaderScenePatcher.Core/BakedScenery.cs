@@ -216,7 +216,6 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("Map.Runtime.MaskComponents.", "scene ground mask", "#90", true),
             new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
             new Exclusion("Model.StationAgent", "station click spot", "#89"),
-            new Exclusion("RollingStock.CarContentSwapper", "car loader", "#92"),
             new Exclusion("LakePolygon", "lake surface", "#93"),
             new Exclusion("Scenery.LogPond", "log pond", "#93"),
             new Exclusion("Game.Mow.TrackConstructionScenery", "bridge construction scenery", "#95"),
@@ -345,7 +344,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!child.Serialized) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, RuntimeObject)); continue; }
                 // A transform the game animates, such as a clock hand, changes while nothing edits it, and so does
                 // everything below it: as a part it would make the inventory stale by itself. It moves with its group.
-                if (child.Animated) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, AnimatedParts)); Walk(child, path, groupPath, AnimatedParts, found); continue; }
+                if (child.Animated || Animates(child.Components)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, AnimatedParts)); Walk(child, path, groupPath, AnimatedParts, found); continue; }
                 if (shared.Contains(child.Name)) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, AmbiguousParts)); Walk(child, path, groupPath, AmbiguousParts, found); continue; }
                 // A level of a LOD group belongs to the entry of the object that holds the LOD group.
                 if (child.LodLevel) { found.Add(new PartVerdict(child, path, groupPath, PartDisposition.NotListed, LodLevels)); continue; }
@@ -357,6 +356,12 @@ namespace RailroaderScenePatcher.Core {
                 Walk(child, path, groupPath, null, found);
             }
         }
+        // The components that animate the object they stand on, and everything below it, while the game runs. Railroader
+        // 0.6.3: a KeyValueBoolAnimator plays its clip on its own Animator whenever its key changes, as the chute of the
+        // Robinson Gap Mine Coal Loader (Model/MineLoader) does while it loads. The game's adapter adds these objects to
+        // the transforms it treats as animated (GroupWorld.AddDriven), so the part rule and the group observation agree.
+        public static readonly IReadOnlyList<string> Animators = Array.AsReadOnly(new[] { "RollingStock.Controls.KeyValueBoolAnimator" });
+        public static bool Animates(IEnumerable<string> components) => components != null && components.Any(type => type != null && Animators.Contains(type));
         // The name of a part entry: the group root's name, then the path from the group root to the part.
         public static string PartName(string groupPath, string path) {
             if (groupPath == null || path == null || !path.StartsWith(groupPath + "/", StringComparison.Ordinal)) return path?.Substring(path.LastIndexOf('/') + 1);

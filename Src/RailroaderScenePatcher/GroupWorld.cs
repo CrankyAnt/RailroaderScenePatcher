@@ -450,7 +450,12 @@ namespace RailroaderScenePatcher {
         // transform its needle field names.
         static readonly Type gaugeNeedle = Native.Type("RollingStock.GaugeNeedle");
         static readonly FieldInfo needleField = gaugeNeedle?.GetField("needle", Native.Flags);
+        // A component of BakedSceneryRules.Animators, such as the KeyValueBoolAnimator of the coal loader's chute,
+        // animates the object it stands on.
+        static readonly Type[] animators = BakedSceneryRules.Animators.Select(Native.Type).Where(type => type != null).ToArray();
         static void AddDriven(Transform world, HashSet<Transform> found) {
+            foreach (var type in animators)
+                foreach (var animator in world.GetComponentsInChildren(type, true)) if (animator is Component c && c != null) found.Add(c.transform);
             if (needleField == null || needleField.FieldType != typeof(Transform)) return;
             foreach (var gauge in world.GetComponentsInChildren(gaugeNeedle, true))
                 if (gauge != null && needleField.GetValue(gauge) is Transform needle && needle != null) found.Add(needle);

@@ -312,6 +312,7 @@ class Program {
         BakedCategoryTests.Run();
         BakedPartTests.Run();
         IndustryObjectTests.Run();
+        CoalLoaderTests.Run();
         PartCullingTests.Run();
         ExistingEquipmentTests.Run();
         SelectionTests.Run();

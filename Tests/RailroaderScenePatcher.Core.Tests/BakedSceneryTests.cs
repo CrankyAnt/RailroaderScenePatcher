@@ -584,7 +584,6 @@ static class BakedSceneryTests {
         var cases = new[] {
             new { Name = "Alarka Jct Station", Component = "Map.Runtime.MaskComponents.RectangleMapMask", Kind = "scene ground mask", Ticket = "#90" },
             new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = "#89" },
-            new { Name = "Coal Loader", Component = "RollingStock.CarContentSwapper", Kind = "car loader", Ticket = "#92" },
             new { Name = "Fontana Lake (1)", Component = "LakePolygon", Kind = "lake surface", Ticket = "#93" },
             new { Name = "Whittier Log Pond", Component = "Scenery.LogPond", Kind = "log pond", Ticket = "#93" },
             new { Name = "Trestle Scenery", Component = "Game.Mow.TrackConstructionScenery", Kind = "bridge construction scenery", Ticket = "#95" },

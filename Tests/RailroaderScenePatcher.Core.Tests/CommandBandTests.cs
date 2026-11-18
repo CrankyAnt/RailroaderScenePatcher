@@ -50,9 +50,9 @@ static class CommandBandTests {
         Check(CommandBand.EditReason(settled) == BakedSceneryRules.TrackMarkerReason && CommandBand.InspectionOnlyLine(settled) == "Inspection only: " + BakedSceneryRules.TrackMarkerReason
             && CommandBand.Tooltip("Does something.", settled) == "Unavailable: " + BakedSceneryRules.TrackMarkerReason,
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
-        var loader = Verdict("Coal Loader", new Node("Chute").With("RollingStock.CarContentSwapper"));
-        Check(loader.Ticket == "#92" && CommandBand.GroupInspectionOnly(loader, family) == "Not yet supported: baked scenery groups that hold a car loader cannot be edited",
-            "A group a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(loader, family));
+        var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
+        Check(spawn.Ticket == "#94" && CommandBand.GroupInspectionOnly(spawn, family) == "Not yet supported: baked scenery groups that hold a spawn point cannot be edited",
+            "A group a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(spawn, family));
         var icon = Verdict("Station Icons", new Node("Icon").With("UI.Map.MapIcon"));
         Check(icon.Ticket == "#89" && CommandBand.GroupInspectionOnly(icon, family) == "Not yet supported: " + icon.Reason,
             "A whole-sentence reason a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(icon, family));
@@ -167,8 +167,8 @@ static class CommandBandTests {
     static void ReasonsReadAsOnePlainSentence() {
         Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
         // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
-        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")) != "Inspection only: Baked scenery groups that hold a car loader cannot be edited.")
-            throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")));
+        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a spawn point")) != "Inspection only: Baked scenery groups that hold a spawn point cannot be edited.")
+            throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a spawn point")));
         var starter = StarterPlacements.ObjectSettings + ".";
         var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
         foreach (var row in new[] {

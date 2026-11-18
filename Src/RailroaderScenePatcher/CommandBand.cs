@@ -297,12 +297,45 @@ namespace RailroaderScenePatcher {
         // every object that is no pile. An industry loads and unloads on the track spans of the native map data, so
         // its decorative buildings and its storage display move without changing that; a pile shows its industry's
         // storage by the ids the game reads, wherever it stands.
-        // holdsPiles: the group root or part holds storage piles below it.
-        internal static string UseInGame(bool part, string category, string storage, bool holdsPiles) {
+        // holdsPiles: the group root or part holds storage piles below it. loadingPoint: the object holds a car loader,
+        // which loads the cars under where the object stands; groupLoads: the object is a part of a group whose root
+        // holds one, so the part does not decide where cars load.
+        internal static string UseInGame(bool part, string category, string storage, bool holdsPiles, bool loadingPoint = false, bool groupLoads = false) {
+            if (loadingPoint) return LoadingPoint;
+            if (groupLoads) return "Decorative. Cars are loaded under the group's loading point, so moving or disabling this part does not change loading.";
             if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile does not change the storage, and the industry keeps working on its native track spans.";
             if (category != BakedSceneryCategories.IndustryBuilding && category != BakedSceneryCategories.StorageDisplay) return part ? PartDecorative : Decorative;
             return "Decorative. The industry works on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " does not change loading or unloading." +
                 (holdsPiles ? " Its piles keep showing the industry's storage." : "");
+        }
+        // A car loader (RollingStock.CarContentSwapper) loads the car under the object it stands on, wherever that is.
+        internal const string LoadingPoint = "Loading point: cars under it are loaded.";
+        // The load a car loader fills, by the id the game reads, as one binding line on the object that holds it.
+        const string LoaderPrefix = "Car loader=";
+        internal static string LoaderBinding(string loadId) => LoaderPrefix + (String.IsNullOrWhiteSpace(loadId) ? "no load" : "load " + loadId);
+        internal static bool HoldsLoader(IEnumerable<string> bindings) => bindings?.Any(line => line != null && line.StartsWith(LoaderPrefix, StringComparison.Ordinal)) == true;
+        // The binding of a car loader as the game serializes it: the load id in its outputContent, the only content it
+        // fills cars with. A loader without that field fails the readout (MissingFieldException).
+        internal static string LoaderBindingOf(object loader) {
+            if (loader == null) throw new ArgumentNullException(nameof(loader));
+            var content = Member(loader, "outputContent");
+            return LoaderBinding(Convert.ToString(Member(content, "loadId"), System.Globalization.CultureInfo.InvariantCulture));
+        }
+        static object Member(object owner, string name) {
+            if (owner == null) return null;
+            for (var type = owner.GetType(); type != null; type = type.BaseType) {
+                var field = type.GetField(name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.DeclaredOnly);
+                if (field != null) return field.GetValue(owner);
+            }
+            throw new MissingFieldException(owner.GetType().FullName, name);
+        }
+        // The Use in the game text for an entry of the Baked scenery group family: for a part, its group's entry gives
+        // the category and whether the group holds a car loader; group is null for a group root or a part whose group
+        // is not in the inventory.
+        internal static string UseInGame(SceneObservation selected, SceneObservation group) {
+            var isPart = selected.GroupPath != null;
+            return UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, HoldsPiles(selected.Bindings),
+                HoldsLoader(selected.Bindings), isPart && HoldsLoader(group?.Bindings));
         }
         // The ids by which a pile's storage synchronizer reads the storage the pile shows, as one binding line.
         internal static string StorageBinding(string industryComponentId, string loadId) => "Industry storage=" + industryComponentId + ", load " + loadId;
