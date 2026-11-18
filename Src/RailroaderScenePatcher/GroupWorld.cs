@@ -157,6 +157,7 @@ namespace RailroaderScenePatcher {
             var found = new Dictionary<GameObject, GroupRootVerdict>();
             var parts = new Dictionary<GameObject, PartVerdict>();
             var drivenNow = new HashSet<Transform>();
+            var togglesNow = new HashSet<GameObject>();
             foreach (var world in worlds) AddDriven(world.transform, drivenNow);
             foreach (var world in worlds) {
                 var classified = BakedSceneryRules.Classify(new HierarchyNode(world.transform, drivenNow));
@@ -164,13 +165,20 @@ namespace RailroaderScenePatcher {
                 // A group whose parts cannot be read keeps its root entry without parts; one developer diagnostic line
                 // says so.
                 foreach (var group in classified.Where(v => v.Disposition == GroupDisposition.Group)) {
+                    var groupRoot = ((HierarchyNode)group.Node).Transform;
+                    if (pickableToggle != null && groupRoot.GetComponentsInChildren(pickableToggle, true).Length != 0) togglesNow.Add(groupRoot.gameObject);
                     try { foreach (var part in BakedSceneryRules.Parts(new[] { group })) parts[((HierarchyNode)part.Node).Transform.gameObject] = part; }
                     catch (Exception e) { WorldSelectionOverlay.Skipped(((HierarchyNode)group.Node).Transform.gameObject, "its parts could not be read: " + e.GetBaseException().Message); }
                 }
             }
-            verdictKey = text; partVerdicts = parts; driven = drivenNow;
+            verdictKey = text; partVerdicts = parts; driven = drivenNow; toggleRoots = togglesNow;
             return verdicts = found;
         }
+        // The listed group roots that hold a pickable toggle at any depth, read once with the verdicts: only their entries
+        // read the toggles, key-value objects and name texts they own (NativeInventory.InteractiveBindings).
+        static readonly Type pickableToggle = Native.Type(CommandBand.PickableToggle);
+        static HashSet<GameObject> toggleRoots = new HashSet<GameObject>();
+        internal static bool HoldsToggles(GameObject root) { if (root == null) return false; Verdicts(); return toggleRoots.Contains(root); }
         internal static PartVerdict PartVerdictOf(GameObject go) { if (go == null) return null; Verdicts(); return partVerdicts.TryGetValue(go, out var verdict) ? verdict : null; }
         // Whether the object is the root of a baked scenery group for world marking: a listed group root, or an
         // inspection-only one that the category table names. The inventory objects below it are the group's objects.
@@ -467,17 +475,20 @@ namespace RailroaderScenePatcher {
         // sets the value of one for each hand every frame. The needle can be any transform, wherever the gauge stands. One
         // detection serves the part rule and the group observation: every gauge below a loaded World root, and the
         // transform its needle field names.
-        static readonly Type gaugeNeedle = Native.Type("RollingStock.GaugeNeedle");
-        static readonly FieldInfo needleField = gaugeNeedle?.GetField("needle", Native.Flags);
+        // A field of BakedSceneryRules.DrivenFields, such as a gauge's needle or a lantern's filament renderer, names a
+        // transform the game drives; the field holds that transform or a component on it.
+        static readonly Tuple<Type, FieldInfo>[] drivenFields = BakedSceneryRules.DrivenFields
+            .Select(d => { var type = Native.Type(d.Component); return Tuple.Create(type, type?.GetField(d.Field, Native.Flags)); })
+            .Where(d => d.Item1 != null && d.Item2 != null && typeof(Component).IsAssignableFrom(d.Item2.FieldType)).ToArray();
         // A component of BakedSceneryRules.Animators, such as the KeyValueBoolAnimator of the coal loader's chute,
         // animates the object it stands on.
         static readonly Type[] animators = BakedSceneryRules.Animators.Select(Native.Type).Where(type => type != null).ToArray();
         static void AddDriven(Transform world, HashSet<Transform> found) {
             foreach (var type in animators)
                 foreach (var animator in world.GetComponentsInChildren(type, true)) if (animator is Component c && c != null) found.Add(c.transform);
-            if (needleField == null || needleField.FieldType != typeof(Transform)) return;
-            foreach (var gauge in world.GetComponentsInChildren(gaugeNeedle, true))
-                if (gauge != null && needleField.GetValue(gauge) is Transform needle && needle != null) found.Add(needle);
+            foreach (var driven in drivenFields)
+                foreach (var owner in world.GetComponentsInChildren(driven.Item1, true))
+                    if (owner != null && driven.Item2.GetValue(owner) is Component target && target != null) found.Add(target.transform);
         }
         // The part or an object above it, below the root, is a transform the game animates.
         static bool Animated(Transform part, Transform root) {

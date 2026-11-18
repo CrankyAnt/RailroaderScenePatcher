@@ -134,6 +134,44 @@ namespace RailroaderScenePatcher {
                     foreach (var item in filled) if (item is Component scenery && scenery != null && !found.ContainsKey(scenery.gameObject)) found[scenery.gameObject] = storage.gameObject;
             return found;
         }
+        // The game logic a group root or part of a building with pickable toggles owns, as bindings in the order the
+        // scene lists it: its own object and the objects below it down to the next part. A toggle in a part below is
+        // only counted, and so is a key-value object there. A group without a toggle adds nothing.
+        static void InteractiveBindings(GameObject go, GameObject root, List<string> bindings, List<string> dependencies) {
+            if (!GroupWorld.HoldsToggles(root)) return;
+            var owned = new List<GameObject>();
+            void Own(Transform t) {
+                if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return;
+                owned.Add(t.gameObject);
+                foreach (Transform child in t) if (!GroupWorld.IsPart(child.gameObject)) Own(child);
+            }
+            Own(go.transform);
+            int toggles = 0, holders = 0;
+            foreach (var at in owned) {
+                var components = at.GetComponents<Component>().Where(c => c != null).ToArray();
+                var types = components.Select(TypeName).ToArray();
+                foreach (var toggle in components.Where(c => TypeName(c) == CommandBand.PickableToggle)) {
+                    bindings.Add(CommandBand.ToggleBinding(CommandBand.ToggleKind(types), CommandBand.ToggleKeyOf(toggle)));
+                    toggles++;
+                }
+                if (types.Contains(CommandBand.KeyValueObject)) {
+                    var global = components.FirstOrDefault(c => TypeName(c) == CommandBand.GlobalKeyValueObject);
+                    bindings.Add(CommandBand.KeyObjectBinding(global == null ? null : CommandBand.GlobalIdOf(global)));
+                    holders++;
+                }
+                foreach (var text in components.Where(c => TypeName(c) == CommandBand.NameTextType)) {
+                    var value = text.GetType().GetProperty("text", BindingFlags.Instance | BindingFlags.Public)?.GetValue(text) as string;
+                    if (!String.IsNullOrWhiteSpace(value)) bindings.Add(CommandBand.NameTextBinding(String.Join(" ", value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)).Trim()));
+                }
+            }
+            if (toggles != 0) dependencies.Add("Pickable toggle: clicked through its collider where it stands; its state is read by key from the key-value object above it");
+            // What the parts below hold: disabling this object disables a key-value object there too.
+            var saved = go.GetComponentsInChildren<Component>(true).Where(c => c != null && (c.gameObject.hideFlags & HideFlags.DontSave) == 0).Select(TypeName).ToArray();
+            var holdersBelow = saved.Count(type => type == CommandBand.KeyValueObject) - holders;
+            if (holdersBelow > 0) bindings.Add(CommandBand.KeyObjectsBelowBinding(holdersBelow));
+            var below = saved.Count(type => type == CommandBand.PickableToggle) - toggles;
+            if (below > 0) bindings.Add(CommandBand.TogglesBelowBinding(below));
+        }
         // The storage a pile shows: the binding of the ids the synchronizer naming the pile reads it by, and its name for
         // the Object tab, by the names the game shows or by those ids while the industry or load is not known. Null for
         // a pile that no loaded synchronizer names. A log pond's logs show their storage the same way.
@@ -508,6 +546,10 @@ namespace RailroaderScenePatcher {
                 bindings.Add(CommandBand.LoaderBindingOf(Get(go, CarLoader)));
                 dependencies.Add("Car loader: cars under this object are loaded where it stands");
             });
+            // A building with pickable toggles: each entry names the toggles, the key-value object and the name text it
+            // owns, its own object and those below it outside its parts, and counts the toggles in its parts. Other
+            // groups read none of this, so their bindings stay as they were.
+            if (groupRoot || part) Read(() => InteractiveBindings(go, groupRoot ? go : GroupWorld.GroupRootOf(go), bindings, dependencies));
             if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling; separate construction scenery has its own placement");
             // Crossing equipment sits under objects that a culler switches off when the camera is far away, so whether it
             // is active in the game changes with every camera jump. Its activity is what the scene authored: every

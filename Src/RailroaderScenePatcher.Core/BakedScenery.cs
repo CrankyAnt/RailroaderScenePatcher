@@ -219,7 +219,6 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("Game.Mow.TrackConstructionScenery", "bridge construction scenery", "#95"),
             new Exclusion("Character.SpawnPoint", "spawn point", "#94"),
             new Exclusion("UI.Map.MapIcon", "station icon", "#89", reason: "This group contains a station icon, so it cannot be edited as a group."),
-            new Exclusion("RollingStock.Controls.KeyValuePickableToggle", "pickable toggle", "#91"),
         });
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
@@ -384,6 +383,18 @@ namespace RailroaderScenePatcher.Core {
         // the transforms it treats as animated (GroupWorld.AddDriven), so the part rule and the group observation agree.
         public static readonly IReadOnlyList<string> Animators = Array.AsReadOnly(new[] { "RollingStock.Controls.KeyValueBoolAnimator" });
         public static bool Animates(IEnumerable<string> components) => components != null && components.Any(type => type != null && Animators.Contains(type));
+        // A component field that names a transform the game turns or moves every frame, wherever it stands relative to the
+        // component: a gauge's needle (the clock hand at Bryson depot), and the filament renderer that a lantern's
+        // LanternController turns to the camera and scales (Railroader 0.6.3, Effects.LanternController.Update). The
+        // field holds the transform itself or a component on it. The game's adapter (GroupWorld.AddDriven) marks these
+        // transforms animated, so they and everything below them are no parts.
+        public sealed class DrivenField {
+            internal DrivenField(string component, string field) { Component = component; Field = field; }
+            public string Component { get; }
+            public string Field { get; }
+        }
+        public static readonly IReadOnlyList<DrivenField> DrivenFields = Array.AsReadOnly(new[] {
+            new DrivenField("RollingStock.GaugeNeedle", "needle"), new DrivenField("Effects.LanternController", "filamentRenderer") });
         // The name of a part entry: the group root's name, then the path from the group root to the part.
         public static string PartName(string groupPath, string path) {
             if (groupPath == null || path == null || !path.StartsWith(groupPath + "/", StringComparison.Ordinal)) return path?.Substring(path.LastIndexOf('/') + 1);

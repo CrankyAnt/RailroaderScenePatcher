@@ -314,6 +314,7 @@ class Program {
         IndustryObjectTests.Run();
         LakeSurfaceTests.Run();
         CoalLoaderTests.Run();
+        InteractiveBuildingTests.Run();
         PartCullingTests.Run();
         ExistingEquipmentTests.Run();
         SelectionTests.Run();

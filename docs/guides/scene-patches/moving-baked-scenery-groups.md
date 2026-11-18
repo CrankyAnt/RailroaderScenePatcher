@@ -4,7 +4,7 @@
 
 Use the patcher to move, rotate, disable or restore baked scenery groups and their parts. These groups include platforms, lamps, signs and small buildings that the native map editor does not edit. A part might be a sawmill jetty or a station lamp.
 
-When you move a group, its physical placement changes and everything below its group root moves with it, including its colliders and culling. Each part keeps its activity. When you edit a part, only that part and the objects below it are affected. The group root and other parts stay where they are. Moving or disabling a group or part changes no game function.
+When you move a group, its physical placement changes and everything below its group root moves with it, including its colliders and culling. Each part keeps its activity. When you edit a part, only that part and the objects below it are affected. The group root and other parts stay where they are. Moving or disabling a group or part changes no game function, unless a section below says otherwise.
 
 A baked scenery group is saved in the map's scene. Props, masks and other objects in the map's `Map.json` are native map data, which you edit in the native map editor. Editing a baked scenery group requires patcher 0.5.0 or later. When you click **Save** in the native map editor, the patcher derives the dependency minimum from the scene patch file's content. See [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
+Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, spawn point or map icon. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
 
 Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -36,7 +36,7 @@ Some objects below a group root are not listed as parts:
 - Sibling objects with the same name share one path. A scene patch file cannot tell them apart, so neither they nor the objects below them are listed.
 - A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
 - A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with that reason; the file's other modifications still apply.
-- Objects the game moves during play, such as a clock hand at Bryson depot, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
+- Objects the game moves during play, such as a clock hand at Bryson depot or the flame of a lantern, which the game turns toward the camera, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
 - Objects without a renderer, collider, light, storage pile or log pond, objects created while the game runs and objects listed by another family have no part entry.
 
 ## Move a group in the native map editor
@@ -106,6 +106,29 @@ Track and Props are native map data, so move them first:
 1. Click **Save** in the native map editor.
 
 A car that the loader is filling when you move the group keeps loading at the old place until the car leaves; the next search uses the new position. While the group is disabled, its car loader does not run.
+
+## Buildings with lanterns and doors
+
+Four buildings under **Railroad service building** have parts that you click in the game:
+
+- `Bryson Section House` has a trainman's lantern, `Bryson Section House / TrainmanLantern`, that switches on and off.
+- `Bryson Tower Chance Clayton`, the tower at Bryson, has a lantern, `Bryson Tower Chance Clayton / Culling Container / TrainmanLantern`, and a name sign whose text is the part `Bryson Tower Chance Clayton / Culling Container / Sign-Station / Text`.
+- `Bryson Turntable` and `Roundhouse 3` at Dillsboro are roundhouses. Each stall, such as `Bryson Turntable / Roundhouse / Stall (2)` or `Roundhouse 3 / Stall (1)`, has doors that open and close.
+
+Move or disable these buildings and their parts as any other group or part. The game reads no position for a lantern or stall, so a moved lantern or stall should work at its new place: you click it there, and it switches there. Not yet observed in Railroader.
+
+The game keeps the state of each lantern and stall door by its key, not by its position. The building holds the states under an ID that the game saves: the group root of `Bryson Section House` and `Roundhouse 3`, the `Roundhouse` part of `Bryson Turntable`, and the culling container of the tower. A move changes no key or ID, so the states should stay; this is not yet observed in Railroader. A disabled lantern or stall cannot be clicked. When you disable the object that holds the states, or a group or part above it, the game stops tracking that ID, so a game save made while it is disabled might not keep the states. The patcher does not refuse this, as the native map editor does not.
+
+On the **Object** tab, **Use in the game** names each interactive part and its key:
+
+- A lantern reads `Lantern switch: click the lantern in the game to switch it on or off.`, followed by its key and the note that its state stays when the part moves.
+- A stall reads `Door toggle: click the doors in the game to open or close them.`, with the same note.
+- The object that holds the states names their saved ID. For the tower, whose holder is its culling container without a row of its own, the group names it.
+- A group or part above the object that holds the states, such as the `Bryson Turntable` group, says that disabling it also disables that object, so a game save might not keep the states.
+- A group or part with interactive parts below it says how many it holds.
+- The tower's name text says that the scene keeps the text with the part, so the text moves with it.
+
+The object that animates a stall's doors, such as `Stall (2) / Roundhouse Modular A Stall`, has no row of its own. It holds the stall's walls, roof and doors and moves with its stall, so move the stall to move the doors. The turntable and the tracks into the stalls are native map data; move them in the native map editor.
 
 ## Write the modification by hand
 

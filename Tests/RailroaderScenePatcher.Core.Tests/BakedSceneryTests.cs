@@ -591,7 +591,6 @@ static class BakedSceneryTests {
             new { Name = "Trestle Scenery", Component = "Game.Mow.TrackConstructionScenery", Kind = "bridge construction scenery", Ticket = "#95" },
             new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
             new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "station icon", Ticket = "#89" },
-            new { Name = "Roundhouse 3", Component = "RollingStock.Controls.KeyValuePickableToggle", Kind = "pickable toggle", Ticket = "#91" },
         };
         foreach (var item in cases) {
             // The excluded component sits on a part, not on the root, and the root has no renderer of its own.

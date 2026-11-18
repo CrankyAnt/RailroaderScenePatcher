@@ -329,6 +329,72 @@ namespace RailroaderScenePatcher {
             }
             throw new MissingFieldException(owner.GetType().FullName, name);
         }
+        // The game logic of the buildings with pickable toggles (Railroader 0.6.3). A pickable toggle
+        // (RollingStock.Controls.KeyValuePickableToggle) is clicked through a collider at or below its object, wherever
+        // that stands, and flips one Boolean key of the nearest key-value object above it, which it looks up when it is
+        // first used. A key-value object with a global id (RollingStock.Controls.GlobalKeyValueObject) registers under
+        // that id while it is enabled, and the game save keeps its values by that id; disabled, it unregisters. What
+        // reacts to the key, such as a lantern (Effects.LanternController) or the doors a KeyValueBoolAnimator opens,
+        // stands on the toggle's object. Nothing of this reads where the objects stand.
+        public const string PickableToggle = "RollingStock.Controls.KeyValuePickableToggle", LanternControl = "Effects.LanternController",
+            KeyValueObject = "KeyValue.Runtime.KeyValueObject", GlobalKeyValueObject = "RollingStock.Controls.GlobalKeyValueObject", NameTextType = "TMPro.TextMeshPro";
+        internal const string LanternSwitch = "Lantern switch", DoorToggle = "Door toggle", PlainToggle = "Toggle";
+        // What a toggle switches, from the components on its own object.
+        internal static string ToggleKind(IEnumerable<string> components) {
+            var types = (components ?? Enumerable.Empty<string>()).ToArray();
+            return types.Contains(LanternControl) ? LanternSwitch : BakedSceneryRules.Animates(types) ? DoorToggle : PlainToggle;
+        }
+        // One toggle on the object, by its kind and the key the game keeps its state by, as one binding line.
+        const string TogglePrefix = "Toggle=", KeySeparator = ", key ";
+        internal static string ToggleBinding(string kind, string key) => TogglePrefix + kind + (String.IsNullOrWhiteSpace(key) ? ", no key" : KeySeparator + key);
+        // The key-value object on the object or below it outside other entries, by the global id the game saves its
+        // values under, as one binding line.
+        const string SavedStatesPrefix = "Saved states=", SavedIdPrefix = "id ", NoSavedId = "no id";
+        internal static string KeyObjectBinding(string id) => SavedStatesPrefix + (String.IsNullOrWhiteSpace(id) ? NoSavedId : SavedIdPrefix + id);
+        // How many key-value objects stand below the object in other entries, its parts: disabling the object disables
+        // them too.
+        const string SavedStatesBelowPrefix = "Saved states below=";
+        internal static string KeyObjectsBelowBinding(int count) => SavedStatesBelowPrefix + count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        // How many toggles stand below the object in other entries, its parts.
+        const string TogglesBelowPrefix = "Toggles below=";
+        internal static string TogglesBelowBinding(int count) => TogglesBelowPrefix + count.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        // The text of a name sign in a building with toggles, which the scene saves with its object.
+        const string NameTextPrefix = "Name text=";
+        internal static string NameTextBinding(string text) => NameTextPrefix + text;
+        // The key a pickable toggle flips and the global id of a key-value object, as the game serializes them. A
+        // component without the field fails the readout (MissingFieldException).
+        internal static string ToggleKeyOf(object toggle) => Convert.ToString(Member(toggle ?? throw new ArgumentNullException(nameof(toggle)), "key"), System.Globalization.CultureInfo.InvariantCulture);
+        internal static string GlobalIdOf(object globalObject) => Convert.ToString(Member(globalObject ?? throw new ArgumentNullException(nameof(globalObject)), "globalObjectId"), System.Globalization.CultureInfo.InvariantCulture);
+        // The Use in the game text for the toggles, key-value object and name text an entry carries, or null when it
+        // carries none of them. Each toggle is named by what it switches.
+        static string Interactive(bool part, IReadOnlyList<string> lines) {
+            var self = part ? "part" : "group";
+            var said = new List<string>();
+            foreach (var line in lines.Where(line => line.StartsWith(TogglePrefix, StringComparison.Ordinal))) {
+                var body = line.Substring(TogglePrefix.Length);
+                var at = body.IndexOf(KeySeparator, StringComparison.Ordinal);
+                var kind = at < 0 ? body.Split(',')[0] : body.Substring(0, at);
+                var key = at < 0 ? null : body.Substring(at + KeySeparator.Length);
+                var (action, thing) = kind == LanternSwitch ? ("click the lantern in the game to switch it on or off", "the lantern")
+                    : kind == DoorToggle ? ("click the doors in the game to open or close them", "the doors") : ("click it in the game to switch it", "the toggle");
+                said.Add(kind + ": " + action + ". " + (key == null ? "It has no key, so the game keeps no state for it." : "The game keeps its state by its key " + key + ", not by its position, so the state stays when this " + self + " moves.") +
+                    " While this " + self + " is disabled, " + thing + " cannot be clicked.");
+            }
+            foreach (var line in lines.Where(line => line.StartsWith(SavedStatesPrefix, StringComparison.Ordinal))) {
+                var value = line.Substring(SavedStatesPrefix.Length);
+                said.Add(value.StartsWith(SavedIdPrefix, StringComparison.Ordinal)
+                    ? "This " + self + " holds the states of its toggles under the saved ID " + value.Substring(SavedIdPrefix.Length) + ". The game keeps them by this ID, not by position. A game save made while this " + self + " is disabled might not keep them."
+                    : "This " + self + " holds the states of its toggles. It has no saved ID, so the game does not save them.");
+            }
+            if (lines.Any(line => line.StartsWith(SavedStatesBelowPrefix, StringComparison.Ordinal)))
+                said.Add("Disabling this " + self + " also disables the object that holds the states of its toggles, so a game save made while this " + self + " is disabled might not keep them.");
+            foreach (var line in lines.Where(line => line.StartsWith(NameTextPrefix, StringComparison.Ordinal)))
+                said.Add("Name text \"" + line.Substring(NameTextPrefix.Length) + "\": the scene keeps the text with this " + self + ", not by its position, so the text moves with it.");
+            var below = lines.Where(line => line.StartsWith(TogglesBelowPrefix, StringComparison.Ordinal)).Select(line => line.Substring(TogglesBelowPrefix.Length)).FirstOrDefault();
+            if (below == "1") said.Add("Its toggle keeps its state by its key, not by its position, and works at its new place.");
+            else if (below != null) said.Add("Its " + below + " toggles keep their states by their keys, not by their positions, and work at their new place.");
+            return said.Count == 0 ? null : String.Join(" ", said);
+        }
         // The Use in the game text for an entry of the Baked scenery group family: for a part, its group's entry gives
         // the category and whether the group holds a car loader; group is null for a group root or a part whose group
         // is not in the inventory.
@@ -363,6 +429,8 @@ namespace RailroaderScenePatcher {
             var lines = (bindings ?? Enumerable.Empty<string>()).Where(line => line != null).ToArray();
             var shown = storage ?? "industry's storage";
             if (HoldsLoader(lines)) return LoadingPoint;
+            var interactive = Interactive(part, lines);
+            if (interactive != null) return interactive;
             if (part && HoldsLoader(groupBindings)) return UseInGame(part, category, null, false, groupLoads: true);
             if (lines.Contains(LogPondSelf))
                 return "This log pond shows the " + shown + ". Moving or disabling the log pond does not change the storage, and the industry keeps working on its native track spans.";
