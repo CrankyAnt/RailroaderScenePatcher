@@ -4,7 +4,7 @@
 
 Use this guide when **Scene patches** reports that the edited mod's `Data/scene-patches.json` is protected from overwrite. The patcher protects a scene patch file if it cannot read it, its format version is missing, unrecognized or newer, it names another map, or it contains numbers whose written form cannot be preserved exactly. The native map editor's Save will not overwrite a protected scene patch file. If the mod's `Info.json` cannot be read, editing is also unavailable. Correct `Info.json` and click **Read again**. **Start fresh** is unavailable because the problem is in `Info.json`.
 
-If a readable scene patch file changes outside the editing session, you can choose **Use file version** or **Keep editor version**. If it is malformed, unreadable or has an unsupported version, **Scene patches** shows **File needs repair**. Before **Keep editor version** allows Save to overwrite that file, the patcher must create and verify a backup.
+If a readable scene patch file changes outside the editing session, you can choose **Use file version**, **Keep editor version** or **Import** in the **Version choice** panel. If it is malformed, unreadable or has an unsupported version, **Scene patches** shows **File needs repair** in the **Repair** panel. Before **Keep editor version** allows Save to overwrite that file, the patcher must create and verify a backup.
 
 If the scene patch file was deleted outside the editing session, **Keep editor version** needs no backup. The next Save writes the editor version.
 

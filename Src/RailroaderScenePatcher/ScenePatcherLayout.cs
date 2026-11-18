@@ -175,20 +175,20 @@ namespace RailroaderScenePatcher {
                 var width = Mathf.Clamp(outlinerWidth, OutlinerMinimumWidth, OutlinerMaximum());
                 leftBandWidth = width;
                 var outlinerRect = row.VStack(DrawOutliner);
-                if (FileRepair) DisableDuringRepair(outlinerRect);
+                // While the file panel is open, the outliner waits for it; Refresh alone stays available.
+                if (FileLocked) { DisableDuringRepair(outlinerRect); LockControls(outlinerRect, refreshButton); }
                 var outliner = outlinerRect.gameObject.AddComponent<LayoutElement>();
                 outliner.minWidth = width; outliner.preferredWidth = width; outliner.flexibleWidth = 0; outliner.flexibleHeight = 10000;
                 presentation.Divider(row, outliner, OutlinerMinimumWidth, OutlinerMaximum, () => outlinerWidth, width => { outlinerWidth = width; StoreOutlinerWidth(width); });
                 // The explicit widths keep long inspector text from claiming the width of the outliner.
                 var inspectorRect = row.VStack(DrawInspector);
-                if (FileRepair) DisableDuringRepair(inspectorRect);
                 var inspector = inspectorRect.gameObject.AddComponent<LayoutElement>();
                 inspector.minWidth = InspectorMinimumWidth; inspector.preferredWidth = InspectorMinimumWidth; inspector.flexibleWidth = 10000; inspector.flexibleHeight = 10000;
             }).gameObject.AddComponent<LayoutElement>();
             columns.flexibleWidth = 10000; columns.flexibleHeight = 10000;
         }
         bool firstOpenDone;
-        bool FileRepair => attachment?.Session.VersionState == FileVersionState.Repair;
+        RectTransform refreshButton;
         static void DisableDuringRepair(RectTransform rect) {
             var group = rect.GetComponent<CanvasGroup>() ?? rect.gameObject.AddComponent<CanvasGroup>();
             group.interactable = false;
@@ -207,8 +207,9 @@ namespace RailroaderScenePatcher {
             var unsaved = Unsaved(out var saveText);
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileRepair) Inspect(); });
-                if (FileRepair) AllowDuringRepair(refresh.RectTransform);
+                var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileLocked) Inspect(); });
+                refreshButton = refresh.RectTransform;
+                if (FileLocked) AllowDuringRepair(refresh.RectTransform);
                 refresh.Tooltip("Refresh", "Read the scene, scene patch file and supplied definitions again without applying changes.");
                 var lamps = new[] { CommandBand.Inventory(stale), CommandBand.Save(unsaved) };
                 var reasons = new[] { InventoryPresentationState.Notice(inventory, definitionsStale), saveText };
@@ -274,8 +275,8 @@ namespace RailroaderScenePatcher {
         // The right band, over the inspector: the commands for the inspection. A command that cannot run stays in
         // place, greyed out, with its reason. The session details and Reset layout are window commands and stand in
         // the title bar.
-        void DrawRightBand(UIPanelBuilder builder) {
-            builder.HStack(row => {
+        RectTransform DrawRightBand(UIPanelBuilder builder) {
+            return builder.HStack(row => {
                 row.ConfigureLayout(4f);
                 var pending = selection?.Pending != null;
                 var select = CommandBand.SelectInWorld(selection != null, pending);
@@ -473,7 +474,7 @@ namespace RailroaderScenePatcher {
 
         void DrawInspector(UIPanelBuilder builder) {
             builder.ConfigureLayout(4f);
-            DrawRightBand(builder);
+            LockControls(DrawRightBand(builder));
             RectTransform headingRow;
             if (selected == null) {
                 // Keep the instruction across the full width while Guided is available without an inspected object.
@@ -484,13 +485,16 @@ namespace RailroaderScenePatcher {
             } else {
                 headingRow = Heading(builder, Literal(selected.DisplayName), "Object", selected.Identity.Path).Height(RowHeight);
             }
+            LockControls(headingRow);
             var state = StateLine(out var states);
             if (selected == null) Heading(builder, state, null, null).Height(RowHeight);
-            else builder.HStack(row => {
+            else LockControls(builder.HStack(row => {
                 Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
                 DrawModeSwitch(row);
-            }).ChildrenKeepHeight().Height(RowHeight);
-            if (guided.Enabled) DrawGuided(builder);
+            }).ChildrenKeepHeight().Height(RowHeight));
+            // The file panel takes the place of the tabs and the tab body, and of the guided steps, until it is resolved.
+            if (FileLocked) DrawFilePanel(builder);
+            else if (guided.Enabled) DrawGuided(builder);
             else {
                 builder.AddTabbedPanels(inspectorTab, tabs => {
                     tabs.AddTab("Object", ObjectTab, body => Tab(body, ObjectTab, DrawObject));
@@ -1038,15 +1042,9 @@ namespace RailroaderScenePatcher {
             string source = null, state = "";
             if (pending == null) candidateDetails = false;
             var session = attachment?.Session;
+            // The message area holds no version choice: that stands in the file panel.
             var primary = EditFeedback.Primary(session, Requests.Place != null, pending != null);
-            if (primary == EditFeedback.PrimaryMessage.VersionChoice) {
-                source = RecoveryPlace;
-                state = Literal(CommandBand.Sentence(session.VersionMessage) + (FileRepair
-                    ? session.VersionFileMissing
-                        ? " There is no file to back up. Choose Keep editor version. The next Save creates the file from the editor version."
-                        : " Keep editor version backs up the file to " + session.BackupPreview + " and keeps your editor work. The next Save replaces the file with the editor version."
-                    : " Use file version applies the file and discards unsaved scene patch edits. Native map work is unaffected. Keep editor version keeps your edits and replaces the file on the next Save."));
-            } else if (primary == EditFeedback.PrimaryMessage.Working) { source = Requests.Place; state = "Working..."; }
+            if (primary == EditFeedback.PrimaryMessage.Working) { source = Requests.Place; state = "Working..."; }
             else if (primary == EditFeedback.PrimaryMessage.WorldChoice) {
                 var candidate = selection.Find(pending.Candidate);
                 source = "World choice";
@@ -1078,10 +1076,8 @@ namespace RailroaderScenePatcher {
             // stack of fixed height would instead squeeze its entries below their text, and the text would overprint.
             // What lies below the area's edge is reached by scrolling.
             var messages = feedback.Messages;
-            RectTransform versionActions = null;
             var messageArea = presentation.Scroll(builder, MessageHeight, lines => {
                 if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
-                versionActions = ActionRow(lines, VersionChoiceActs(session), null, FileRepair);
                 for (var i = 0; i < messages.Count; i++) {
                     var message = messages[i]; var older = i > 0;
                     // A failed action's message takes its colour from its failure kind; any other result from its words.
@@ -1090,8 +1086,7 @@ namespace RailroaderScenePatcher {
                     MessageSlot(lines, message.Source, PathBreaks(tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text)), older);
                 }
             }, false);
-            // Keep the scroll rectangle itself in place. Its viewport ends above a reserved action row in every state.
-            // The row is built with the native builder, then moved out of the scrolling content into that strip.
+            // Keep the scroll rectangle itself in place; its viewport takes the full height of the area in every state.
             var messageScroll = messageArea.GetComponent<ScrollRect>();
             // ExpandViewport drives the viewport's anchors and size during layout, undoing the reserved strip.
             // Preserve auto-hiding while leaving the viewport and scrollbar bounds under our control.
@@ -1105,25 +1100,15 @@ namespace RailroaderScenePatcher {
             // stretch the viewport ourselves so the content and wrapped labels receive the available width.
             viewport.anchorMin = Vector2.zero;
             viewport.anchorMax = Vector2.one;
-            viewport.offsetMin = new Vector2(0, RowHeight);
+            viewport.offsetMin = Vector2.zero;
             viewport.offsetMax = new Vector2(scrollbar == null ? 0 : -Mathf.Max(0, scrollbar.rect.width + messageScroll.verticalScrollbarSpacing), 0);
-            if (scrollbar != null && scrollbar.parent == messageArea)
-                scrollbar.offsetMin = new Vector2(scrollbar.offsetMin.x, scrollbar.offsetMin.y + RowHeight);
-            versionActions.SetParent(messageArea, false);
-            versionActions.anchorMin = new Vector2(0, 0);
-            versionActions.anchorMax = new Vector2(1, 0);
-            versionActions.pivot = new Vector2(0.5f, 0);
-            versionActions.offsetMin = Vector2.zero;
-            versionActions.offsetMax = new Vector2(0, RowHeight);
-            var actionLayout = versionActions.GetComponent<LayoutElement>();
-            actionLayout.ignoreLayout = true;
-            if (FileRepair) AllowDuringRepair(messageArea);
-            // Include the reserved action strip in the rectangle's height so it never consumes message space.
+            // The area keeps the height it had while it held the version choice's row, so no control below it moves.
             var area = messageArea.GetComponent<LayoutElement>();
             area.minHeight = MessageHeight + RowHeight;
             area.preferredHeight = 3 * MessageHeight + RowHeight;
             area.flexibleHeight = 0;
-            ActionRow(builder, guided.Enabled && !FileRepair && selection?.Pending == null ? GuidedActs() : FooterActs(), null, FileRepair);
+            // While the file panel is open, the footer's row waits for it with the panel's reason.
+            ActionRow(builder, guided.Enabled && !FileLocked && selection?.Pending == null ? GuidedActs() : FooterActs(), FileLockReason);
             // The native resize grip takes the window's lower right corner, 22 units high, and the row would reach 12
             // units into its height: the row stands that much higher, so the footer and the grip do not overlap.
             builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
@@ -1205,17 +1190,6 @@ namespace RailroaderScenePatcher {
         // The end of a long text, with a leading ellipsis.
         static string Tail(string text, int length) => text == null || text.Length <= length ? text : "..." + text.Substring(text.Length - length);
         void CancelSelection() { selection.Cancel(); selectionProblem = null; ClearSnap(); }
-        // Version choices stay in the message area, leaving the footer's general actions in place.
-        Act[] VersionChoiceActs(PatchEditingSession session) {
-            if (session?.VersionState == FileVersionState.Changed) return new[] {
-                Slot("Use file version", "Apply the file now and discard unsaved scene patch edits. Native map work is unaffected.", null, () => ChooseFileVersion(true)),
-                Slot("Keep editor version", "Keep your scene patch edits. The next Save replaces the file with the editor version.", null, () => ChooseFileVersion(false)) };
-            if (session?.VersionState == FileVersionState.Repair) return new[] {
-                Slot("Keep editor version", session.VersionFileMissing ? "There is no file to back up. The next Save creates the file from the editor version." : "Back up the file and keep your scene patch edits. The next Save replaces the file with the editor version.", !session.VersionFileMissing && session.BackupPreview == null ? "The backup path is unavailable." : null, () => ChooseFileVersion(false)),
-                Slot("Details", "Show the full diagnosis.", null, () => presentation.ToggleDetails()),
-                Slot("Copy to clipboard", "Copy the full diagnosis.", null, () => GUIUtility.systemCopyBuffer = FullDiagnosis(session)) };
-            return new Act[0];
-        }
         // The footer's row: the same on every tab. A pending world choice and an active gizmo take it over.
         Act[] FooterActs() {
             var pending = selection?.Pending;
@@ -1237,7 +1211,7 @@ namespace RailroaderScenePatcher {
             // The gizmo owns the row only during a drag, when Escape cancels; while it stands, the row is the general one.
             if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the drag and restore the placement.", null, () => gizmo?.Cancel(), "Cancel gizmo drag") };
             // A starter placement marker's modification is removed or rechecked from every tab.
-            var block = FileRepair ? "The scene patch file needs repair." : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : EditBlock();
+            var block = FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : EditBlock();
             var identity = selected?.Identity;
             var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.");
             return new[] {

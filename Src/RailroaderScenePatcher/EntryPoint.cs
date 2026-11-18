@@ -484,7 +484,7 @@ namespace RailroaderScenePatcher {
         }
         void Detach() {
             reloadRequirement = null;
-            presentation?.SetRepairMode(false);
+            presentation?.SetFileLock(null);
             CancelGuided();
             pickedTrackLocation = null; pickedTrackSelection = null;
             ClearSnap(); snap = null;
@@ -598,18 +598,25 @@ namespace RailroaderScenePatcher {
         void CheckFileVersion() {
             if (attachment == null) return;
             try {
-                if (feedback.CheckFileVersion(attachment.Session, RecoveryPlace)) VersionChanged();
+                var session = attachment.Session;
+                var changed = feedback.CheckFileVersion(session, RecoveryPlace);
+                if (session.ImportOutdated) { session.ImportOutdated = false; feedback.Report(ImportPlace, FilePanelState.ImportOutdated); changed = true; }
+                if (changed) VersionChanged();
             } catch (Exception e) { attachment.Fault = "Could not check the scene patch file: " + e.GetBaseException().Message; }
         }
         void VersionChanged() {
             if (attachment != null) feedback.ObserveFileVersion(attachment.Session, RecoveryPlace);
-            var repair = attachment?.Session.VersionState == FileVersionState.Repair;
-            if (repair) {
+            // While the file panel is open, nothing outside it may continue: a pending world choice, gizmo, snap or
+            // request ends.
+            var reason = FileLockReason;
+            if (reason != null) {
                 CancelGizmo(); ClearSnap();
                 selection?.Cancel();
-                CancelRequest("the scene patch file needs repair");
+                CancelRequest(reason);
+                // A typed, unapplied Numeric draft keeps native world clicks blocked; the panel ends it.
+                EndWorldEditAction();
             }
-            presentation?.SetRepairMode(repair);
+            presentation?.SetFileLock(reason);
             attachment?.RefreshChrome();
             presentation?.RequestRefresh();
         }
@@ -840,7 +847,7 @@ namespace RailroaderScenePatcher {
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
                 selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, reloadRequirement, MapEditorReload.Error, TerrainSnapshot(),
-                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage,
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage, ImportSnapshot(),
                 equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
         // Computing the outstanding work serializes the scene patch file and reads the dependency metadata. Its inputs change
@@ -1162,6 +1169,7 @@ namespace RailroaderScenePatcher {
         // tab its object's placement and activity stay disabled with the reason.
         string EditBlock() =>
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
+            : FileLockReason != null ? FileLockReason
             : attachment.Session.Blocked != null ? attachment.Session.Blocked + " The recovery choices are in the session details."
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
@@ -1172,6 +1180,7 @@ namespace RailroaderScenePatcher {
         // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
         string StarterBlock() =>
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
+            : FileLockReason != null ? FileLockReason
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
             : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the inventory." : null;

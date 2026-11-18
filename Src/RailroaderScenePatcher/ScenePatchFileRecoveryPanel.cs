@@ -33,8 +33,8 @@ namespace RailroaderScenePatcher {
                 if (useFile) { ReplaceScenePatchFileDiagnostics(session.LastVersionApplication); Inspect(); }
                 feedback.Report(RecoveryPlace, !useFile && session.LastBackup != null && session.VersionMessage != null ? "Editor version kept. The next Save replaces the file with this version." : session.VersionMessage ?? (useFile ? "File version applied." : "Editor version kept. The next Save replaces the file with this version."));
             }
-            attachment.RefreshChrome();
-            presentation?.RequestRefresh();
+            // The choice may close the file panel: the window's controls and the title bar follow it.
+            VersionChanged(); attachment.RefreshChrome();
         }
         // Once Save replaced the original after a fresh start, everything that described the old scene patch file is read again:
         // the message of the fresh start goes, the scene patch file's diagnostics are replaced and the supplied definitions and

@@ -13,12 +13,12 @@ namespace RailroaderScenePatcher {
     // reported after the inspection was cleared stays until an object is inspected again. UI-independent, shared with
     // controlled replay.
     internal sealed class EditFeedback {
-        internal enum PrimaryMessage { None, VersionChoice, BackupDiagnosis, Working, WorldChoice }
+        // What the message area shows first. A version choice is never one of them: it stands in the file panel.
+        internal enum PrimaryMessage { None, BackupDiagnosis, Working, WorldChoice }
         internal static PrimaryMessage Primary(PatchEditingSession session, bool working, bool worldChoice) =>
-            Primary(session != null && session.VersionState != FileVersionState.None,
-                session?.LastBackup != null && session.VersionMessage != null && session.ScenePatchFileDiagnostics.Count != 0, working, worldChoice);
-        internal static PrimaryMessage Primary(bool versionChoice, bool backupDiagnosis, bool working, bool worldChoice) =>
-            versionChoice ? PrimaryMessage.VersionChoice : working ? PrimaryMessage.Working
+            Primary(session?.LastBackup != null && session.VersionMessage != null && session.ScenePatchFileDiagnostics.Count != 0, working, worldChoice);
+        internal static PrimaryMessage Primary(bool backupDiagnosis, bool working, bool worldChoice) =>
+            working ? PrimaryMessage.Working
             : worldChoice ? PrimaryMessage.WorldChoice : backupDiagnosis ? PrimaryMessage.BackupDiagnosis : PrimaryMessage.None;
         // One result with the action group it came from, such as Placement or Track binding.
         internal sealed class Message {

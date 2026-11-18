@@ -16,16 +16,27 @@ Open **Scene patches** and click the page icon to open its session details. The 
 
 The patcher checks `Data/scene-patches.json` when the game regains focus and when you click **Refresh** or **Save**. It compares content rather than formatting. Changes to whitespace, object-member order or the order of entries with stable identities do not create a version choice.
 
-When the file content changes outside the editing session, Scene patches says `The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version.` The Map Editor's **Save** button remains enabled, but clicking it writes nothing until you choose a version. Scene patches shows `Save refused.` and the reason in its message area. If Scene patches is closed, a **Save refused** alert shows the reason instead. Choose one of these versions:
+When the file content changes outside the editing session, the **Version choice** panel replaces the inspector tabs. It says `The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version.` and states what each choice does. Until you choose, every other Scene Patcher control except **Refresh** and the session details is unavailable, and its tooltip says why. The message area keeps its full height and shows results only. The Map Editor's **Save** button remains enabled, but clicking it writes nothing until you choose a version. Scene patches shows `Save refused.` and the reason in its message area. If Scene patches is closed, a **Save refused** alert shows the reason instead. Click one of these choices:
 
 - **Use file version** applies the changed file in the current session and discards unsaved scene patch edits. Scene patches explains this loss before you confirm. The discarded history step remains in native Undo and Redo under its original action name, and the menu titles still identify it, but the step has no effect. Undo or Redo of that step, or of a scene patch edit recorded before the choice, does not change the scene patch file. Unsaved native map work is unaffected. Afterward, the scene patch status is **Saved** if the session's scene patch content equals the file on disk, and **Unsaved** otherwise.
-- **Keep editor version** retains the session's scene patch file and edits. Scene patches says that the next Save will overwrite the changed file.
+- **Keep editor version** retains the session's scene patch file and edits. Save is no longer refused, and the next Save replaces the changed file with the editor version.
+- **Import** brings the file's changes into the session. See [Import outside changes](#import-outside-changes).
 
-Neither choice requires a reload.
+No choice requires a reload.
+
+### Import outside changes
+
+Click **Import** in the **Version choice** panel to open the **Import** panel in the same place. It lists each change the file made since the patcher last read or wrote it, as **New**, **Changed** or **Removed**, with what the change does, including changes to content outside the modifications. Then it lists each conflict. A conflict is an entry that your scene patch edits in this session changed and that also changed in the file, one object that your edits and the file changed under different modification IDs, or a modification ID that is new on both sides with different content. For each conflict, select **Editor version** or **File version**.
+
+- Click **Import** to apply every listed change and every conflict choice at once. **Import** is unavailable until each conflict has a choice. A change becomes unsaved scene patch work; nothing is written until you click **Save** in the Map Editor. Your other scene patch edits keep their values. The result appears in the message area.
+- **File version** discards your edits for that conflict. Their steps stay in native Undo and Redo under their names and change nothing, as after **Use file version**.
+- Click **Cancel** to close the panel without changes. The conflict choices are discarded, and the version choice stays pending.
+
+Import adds no native Undo or Redo step: after an import without conflicts, one Undo reverses your own last action from before the import. Undo or Redo of a step recorded before the import never overwrites a value the import applied. If any change fails, scene patch editing returns to its state before the import and the message area says why. While the **Import** panel is open, clicking **Save** writes nothing and shows `Save refused.` followed by `Complete or cancel Import before saving.` After the import, the scene patch status is **Saved** when the session's scene patch content equals the file on disk, and **Unsaved** otherwise. A file that needs repair offers no import.
 
 The choice remains visible after the action that detected the change. Undo, Redo and **Remove modification** update reload feedback to match the current session. If the file changed while the game was closed, the next native map editor load reads it without a version-choice dialog.
 
-If the file cannot be read as a valid scene patch file, or its format version is missing, unrecognized or newer, Scene patches enters **File needs repair** and shows the diagnosis with line numbers. **Use file version** is unavailable. Scene patch controls are disabled except **Refresh**, **Keep editor version**, **Details** and **Copy to clipboard**. Clicking **Save** writes nothing and shows `Save refused.` with the diagnosis in the message area. See [Recover a protected scene patch file](recover-scene-patch-files.md).
+If the file cannot be read as a valid scene patch file, or its format version is missing, unrecognized or newer, Scene patches enters **File needs repair**. The **Repair** panel replaces the inspector tabs and shows the diagnosis with line numbers, with **Keep editor version**, **Details** and **Copy to clipboard**. **Use file version** and **Import** are unavailable. Every other Scene Patcher control except **Refresh** and the session details is unavailable, and its tooltip says why. Clicking **Save** writes nothing and shows `Save refused.` with the diagnosis in the message area. See [Recover a protected scene patch file](recover-scene-patch-files.md).
 
 If a repair check finds that the file is readable but still changed, Scene patches says `The file is readable again.` and offers the normal version choice. If the file's content is unchanged, the choice clears.
 
@@ -95,7 +106,7 @@ If a write fails, the native map editor shows **Save Failed** with the cause and
 
 A failed write never damages the file it was replacing. The patcher first writes the complete new content of `Data/scene-patches.json` or `Info.json` to a file beside it, ending in `.saving`, and then puts it in the file's place. If the write stops midway, the previous file remains unchanged, or there is no file if this was the first Save. The patcher removes the unfinished `.saving` file. If an interrupted Save, for example after a crash, leaves a `.saving` file, the next Save replaces it. If another program, such as a virus scanner or sync client, briefly holds the file open, Save retries for up to half a second before reporting the failure.
 
-Correct the cause, such as a locked or read-only file, and click **Save** again. The retry writes only what is outstanding. If `Data/scene-patches.json` changed outside the editing session after the patcher read it, the retry refuses to overwrite it. Choose **Use file version** or **Keep editor version** before retrying. A file that needs repair requires a backup first.
+Correct the cause, such as a locked or read-only file, and click **Save** again. The retry writes only what is outstanding. If `Data/scene-patches.json` changed outside the editing session after the patcher read it, the retry refuses to overwrite it. Choose **Use file version**, **Keep editor version** or **Import** before retrying. A file that needs repair requires a backup first.
 
 Save refuses to write the dependency when an existing constraint in `Info.json`, such as `^0.1.0`, excludes the version the scene patch file needs. Correct that constraint and save again.
 

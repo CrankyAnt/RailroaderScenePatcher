@@ -274,6 +274,7 @@ class Program {
         ReloadDecisionTests.Run();
         ReloadReturnTests.Run();
         FileVersionTests.Run();
+        FileImportTests.Run();
         NativeDirtyTests.Run();
         ReceiptFeedbackTests.Run();
         ReceiptPriorityTests.Run();

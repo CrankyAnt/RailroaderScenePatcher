@@ -232,10 +232,10 @@ namespace RailroaderScenePatcher.Core {
             if (metadataError != null) { Blocked = "The edited mod's Info.json cannot be read. " + ScenePatchFile.Sentence(metadataError) + MetadataSuffix; return; }
             if (scenePatchFileError != null) Blocked = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(scenePatchFileError);
             else try {
-                if (diskText == null) { scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); return; }
+                if (diskText == null) { scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); ResetStartState(); return; }
                 var loaded = ScenePatchFile.Load(diskText);
                 Blocked = Refusal(loaded, diskText);
-                if (Blocked == null) { scenePatchFile = loaded; saved = PreservingJson.Parse(diskText).Root; }
+                if (Blocked == null) { scenePatchFile = loaded; saved = PreservingJson.Parse(diskText).Root; ResetStartState(); }
             } catch (Exception e) { Blocked = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(e.Message); }
             if (Blocked != null) { scenePatchFileProblem = true; Blocked += ProtectedSuffix; }
         }
@@ -955,8 +955,9 @@ namespace RailroaderScenePatcher.Core {
                     PreservingJson.KeepLiterals(existing, value);
                 }
                 Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation);
-                var generation = versionGeneration;
-                RegisterPatchAction(() => Replay(name, slot, target, existing, generation), name);
+                var generation = versionGeneration; var keyGeneration = KeyGeneration(slot);
+                stepKeys.Add(slot);
+                RegisterPatchAction(() => Replay(name, slot, target, existing, generation, keyGeneration), name);
                 outcome.Applied = true;
             } catch (Exception e) { Fail(outcome, e); }
             return outcome;
@@ -1034,9 +1035,11 @@ namespace RailroaderScenePatcher.Core {
         public Action<TargetIdentity> Replayed;
         public Action<string> HistoryNotice;
         // Undo and Redo restore the modification under its key.
-        void Replay(string name, string slot, TargetIdentity target, JObject value, int generation) {
-            if (generation != versionGeneration) {
-                RegisterPatchAction(() => Replay(name, slot, target, value, generation), name);
+        // A step recorded before a file version replaced its entry, through Use file version or a file choice in Import, is a
+        // no-op that stays in the native history.
+        void Replay(string name, string slot, TargetIdentity target, JObject value, int generation, int keyGeneration) {
+            if (generation != versionGeneration || keyGeneration != KeyGeneration(slot)) {
+                RegisterPatchAction(() => Replay(name, slot, target, value, generation, keyGeneration), name);
                 try { HistoryNotice?.Invoke("This discarded scene patch step no longer changes the scene patch file."); } catch { }
                 return;
             }
@@ -1052,7 +1055,7 @@ namespace RailroaderScenePatcher.Core {
                 uncertain = true;
                 IncompleteOperation = name + " could not be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown; Save remains available.";
             }
-            RegisterPatchAction(() => Replay(name, slot, target, current, generation), name);
+            RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration), name);
         }
         void Commit(TargetIdentity identity, object target, InspectedTarget inspected, string key, JObject current, JObject value, Action validateBeforeMutation = null) {
             var mapContext = scene.MapIds.ToArray();
@@ -1249,6 +1252,7 @@ namespace RailroaderScenePatcher.Core {
         // check cannot raise are all found before the native Save button writes terrain or map data.
         public string SaveRefusalBeforeWrite() {
             if (scenePatchFile == null) return null;
+            if (Import != null) return ImportSaveRefusal;
             CheckFileVersion();
             if (SaveRefusal != null) return SaveRefusal;
             if (replacementBackup != null) {

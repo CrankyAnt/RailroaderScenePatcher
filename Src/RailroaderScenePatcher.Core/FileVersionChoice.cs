@@ -60,14 +60,17 @@ namespace RailroaderScenePatcher.Core {
                     try { if (PreservingJson.SameContent(PreservingJson.Parse(text).Root, acceptedContent)) return; }
                     catch { /* A damaged replacement goes through the diagnostic read below. */ }
                 }
-                if (!ChangedOutside(text)) { VersionState = FileVersionState.None; VersionMessage = null; ClearVersionAcceptance(); return; }
+                if (!ChangedOutside(text)) { VersionState = FileVersionState.None; VersionMessage = null; ClearVersionAcceptance(); Import = null; return; }
                 var loaded = text == null ? null : ScenePatchFile.Load(text);
                 var refusal = loaded == null ? "The file no longer exists" : Refusal(loaded, text);
                 VersionState = refusal == null ? FileVersionState.Changed : FileVersionState.Repair;
                 VersionMessage = refusal == null ? (previous == FileVersionState.Repair ? "The file is readable again. " : "") + "The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version." : "File needs repair: " + refusal;
                 if (VersionState == FileVersionState.Repair && backupPreview == null && storage is IVersionBackupStorage backup) backupPreview = backup.ReserveVersionBackup();
+                // A file that needs repair offers no Import; an overview of an earlier version of the file closes.
+                if (VersionState == FileVersionState.Repair) Import = null;
+                else if (Import != null && observedVersion != Import.Fingerprint) { Import = null; ImportOutdated = true; }
             } catch (Exception e) {
-                VersionState = FileVersionState.Repair;
+                VersionState = FileVersionState.Repair; Import = null;
                 VersionMessage = "File needs repair: " + e.Message;
                 ScenePatchFileDiagnostics = new[] { ScenePatchFileDiagnostic.Create(null, "", e.Message, "A readable scene patch file") };
                 if (backupPreview == null && storage is IVersionBackupStorage backup) backupPreview = backup.ReserveVersionBackup();
@@ -108,7 +111,7 @@ namespace RailroaderScenePatcher.Core {
                     acceptedContent = PreservingJson.Parse(text).Root; acceptedVersion = true;
                     VersionMessage = null;
                 }
-                VersionState = FileVersionState.None; outcome.Applied = true;
+                VersionState = FileVersionState.None; Import = null; outcome.Applied = true;
             } catch (Exception e) { outcome.Error = e.Message; }
             return outcome;
         }
@@ -165,6 +168,7 @@ namespace RailroaderScenePatcher.Core {
                 if ((storage is IVersionBackupStorage finalStorage ? finalStorage.VersionFingerprint() : storage.ReadScenePatchFile()) != shown)
                     throw new InvalidOperationException("The file changed while the choice was being applied. Review the updated choice before continuing");
                 scenePatchFile = loaded; diskText = text; saved = PreservingJson.Parse(text).Root; comparedVersion = -1;
+                ResetStartState(); stepKeys.Clear(); Import = null;
                 ClearVersionAcceptance(); VersionState = FileVersionState.None; VersionMessage = null;
                 LastVersionApplication = engine.ApplyFileVersion(text, scenePatchFileKey);
                 versionGeneration++;

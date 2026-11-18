@@ -68,11 +68,11 @@ static class ReceiptPriorityTests {
         public bool VersionBackupExists(string path) => backup != null;
     }
     internal static void Run() {
-        if (EditFeedback.Primary(false, true, true, false) != EditFeedback.PrimaryMessage.Working)
+        if (EditFeedback.Primary(true, true, false) != EditFeedback.PrimaryMessage.Working)
             throw new Exception("Working feedback remains visible after a repair backup");
-        if (EditFeedback.Primary(false, true, false, true) != EditFeedback.PrimaryMessage.WorldChoice)
+        if (EditFeedback.Primary(true, false, true) != EditFeedback.PrimaryMessage.WorldChoice)
             throw new Exception("A pending world choice remains visible after a repair backup");
-        if (EditFeedback.Primary(false, true, false, false) != EditFeedback.PrimaryMessage.BackupDiagnosis)
+        if (EditFeedback.Primary(true, false, false) != EditFeedback.PrimaryMessage.BackupDiagnosis)
             throw new Exception("Backup diagnosis remains visible while idle");
         var store = new BackupStore { Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}" };
         var session = new PatchEditingSession(new PatchEngine(new Scene()), new NativeMapEditor(), store);

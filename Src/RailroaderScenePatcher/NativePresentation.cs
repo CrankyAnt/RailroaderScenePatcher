@@ -98,17 +98,26 @@ namespace RailroaderScenePatcher {
         internal bool TitleReset => titleReset != null;
         internal bool TitleDetails => titleDetails != null;
         RectTransform titleHelp, titleReset, titleDetails, titleClose;
-        bool repairMode;
-        internal void SetRepairMode(bool value) {
-            repairMode = value;
-            if (value) CloseHelp();
-            if (divider != null) divider.enabled = !value;
+        // Why the window's own controls are unavailable while the file panel is open, or null. The session details stay
+        // available: the Repair panel's Details opens them.
+        string lockReason;
+        bool repairMode => lockReason != null;
+        internal void SetFileLock(string reason) {
+            lockReason = reason;
+            if (reason != null) CloseHelp();
+            if (divider != null) divider.enabled = reason == null;
             SetTitleRepairControls();
         }
         void SetTitleRepairControls() {
             foreach (var rect in new[] { titleHelp, titleReset, titleClose }) {
                 var button = rect == null ? null : rect.GetComponent<Button>();
                 if (button != null) button.interactable = !repairMode;
+            }
+            // The native close button has no tooltip of its own; it gets one only to say why it is unavailable.
+            if (titleClose != null) {
+                var tooltip = titleClose.GetComponent<UI.Tooltips.UITooltipProvider>() ?? titleClose.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
+                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Close", CommandBand.Tooltip(null, lockReason));
+                tooltip.enabled = repairMode;
             }
         }
         Sprite resetSprite, detailsSprite;
@@ -189,7 +198,7 @@ namespace RailroaderScenePatcher {
                     }
                 }
                 var tooltip = titleHelp.GetComponent<UI.Tooltips.UITooltipProvider>() ?? titleHelp.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
-                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Explain the whole Scene patches window.");
+                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", CommandBand.Tooltip(HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Explain the whole Scene patches window.", lockReason));
                 titleHelp.SetAsLastSibling();
             } catch (Exception e) {
                 if (titleHelp != null) UnityEngine.Object.Destroy(titleHelp.gameObject);
@@ -199,7 +208,7 @@ namespace RailroaderScenePatcher {
             }
             try {
                 titleReset = TitleIcon(manager, close.transform.parent, "CrankyAnt Scene Patcher reset layout", ResetGlyph(), () => ResetRequested?.Invoke(),
-                    () => new TooltipInfo("Reset layout", "Put the window at its default place again and restore the outliner width."), out _);
+                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again and restore the outliner width.", lockReason)), out _);
             } catch (Exception e) {
                 if (titleReset != null) UnityEngine.Object.Destroy(titleReset.gameObject);
                 titleReset = null;
@@ -604,7 +613,8 @@ namespace RailroaderScenePatcher {
             drag.enabled = !repairMode;
             drag.Column = column; drag.Minimum = minimum; drag.Maximum = maximum; drag.Changed = changed;
             divider = drag; dividerWidth = desired;
-            rule.Tooltip("Outliner width", "Drag to resize the outliner.");
+            var tooltip = rule.GetComponent<UI.Tooltips.UITooltipProvider>() ?? rule.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
+            tooltip.DynamicTooltipInfo = () => new TooltipInfo("Outliner width", CommandBand.Tooltip("Drag to resize the outliner.", lockReason));
         }
         // Forgets the saved bounds and places the window at its default position again.
         internal void ResetLayout() {

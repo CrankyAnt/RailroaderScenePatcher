@@ -73,7 +73,7 @@ namespace RailroaderScenePatcher.Core {
                 string metadata;
                 try { metadata = storage.ReadModInfo(); }
                 catch (Exception e) { scenePatchFileProblem = false; throw new InvalidOperationException("The edited mod's Info.json cannot be read. " + ScenePatchFile.Sentence(e.Message) + ". Scene patch editing stays unavailable"); }
-                scenePatchFile = loaded; diskText = text; info = metadata; saved = PreservingJson.Parse(text).Root; comparedVersion = -1;
+                scenePatchFile = loaded; diskText = text; info = metadata; saved = PreservingJson.Parse(text).Root; comparedVersion = -1; ResetStartState();
                 Blocked = null;
                 LastReread = engine.Apply(text, scenePatchFileKey);
                 outcome.Applied = true;
@@ -92,7 +92,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!ScenePatchFileExists()) throw new InvalidOperationException("The scene patch file no longer exists; reopen the native map editor to start a new one");
                 var backup = recovery.BackupScenePatchFile();
                 if (String.IsNullOrWhiteSpace(backup) || !recovery.MatchesPatchBackup(backup)) throw new InvalidOperationException("The backup of the original scene patch file could not be verified; the original stays protected");
-                scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds));
+                scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); ResetStartState();
                 replacementBackup = backup; LastBackup = backup; saved = null; comparedVersion = -1;
                 ScenePatchFileDiagnostics = Array.Empty<ScenePatchFileDiagnostic>();
                 Blocked = null;
