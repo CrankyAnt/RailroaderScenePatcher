@@ -7,7 +7,7 @@ namespace RailroaderScenePatcher.Core {
     // Test-only fault injection. It exists only in a build with -p:SceneFaults=true, which defines SCENE_PATCHER_FAULTS;
     // the normal build has no type, no hook and no way to arm a failure. One armed failure trips at the next mutation that
     // reaches its point, whether that mutation is an edit, an Undo or Redo step or a world-load application, and then
-    // disarms itself.
+    // disarms itself. The unreadable-group point is no mutation failure: it stays armed for one group root.
     public static class FaultInjection {
         // The points a failure can be armed at, by the names the test mod passes.
         public const string AfterMutation = "after-mutation", DuringRestoration = "during-restoration", BetweenAdditionSteps = "between-addition-steps";
@@ -30,7 +30,30 @@ namespace RailroaderScenePatcher.Core {
             if (point != AfterMutation && point != DuringRestoration && point != BetweenAdditionSteps) throw new ArgumentException("Unknown fault point: " + point);
             lock (gate) { armed = point; failRestoration = false; }
         }
-        public static void Disarm() { lock (gate) { armed = null; failRestoration = false; } }
+        public static void Disarm() { lock (gate) { armed = null; failRestoration = false; unreadableGroup = null; } }
+        // The group root that world marking reads as unreadable, as the Group skipped line names it
+        // (scene name/path), or null.
+        static string unreadableGroup;
+        public static string UnreadableGroup { get { lock (gate) return unreadableGroup; } }
+        // Arms the unreadable-group point, beside any armed failure: every read of the group with this root throws
+        // until Disarm or another root is armed, so world marking skips that group each time it decides its groups.
+        // The root is kept as typed, since a scene object's name may begin or end with a space.
+        public static void ArmUnreadableGroup(string root) {
+            if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A group root is required", nameof(root));
+            lock (gate) unreadableGroup = root;
+        }
+        // root is computed only while the point is armed.
+        internal static void TripUnreadableGroup(Func<string> root) {
+            string armedRoot;
+            lock (gate) armedRoot = unreadableGroup;
+            if (armedRoot == null) return;
+            var read = root();
+            lock (gate) {
+                if (read == null || !String.Equals(read, unreadableGroup, StringComparison.Ordinal)) return;
+                LastTrip = "Tripped unreadable-group for " + read + " at " + DateTime.UtcNow.ToString("O");
+            }
+            throw new InjectedFault("Injected unreadable group", false);
+        }
         internal static void TripAfterMutation() {
             lock (gate) {
                 if (armed != AfterMutation && armed != DuringRestoration) return;

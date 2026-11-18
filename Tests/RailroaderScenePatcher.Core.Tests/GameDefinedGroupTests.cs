@@ -21,6 +21,7 @@ static class GameDefinedGroupTests {
         CategoryGroupMembership();
         RoadBridgeGroup();
         SkippedGroupLine();
+        SkippedGroupOnce();
         Distances();
         Marking();
         Picking();
@@ -188,6 +189,24 @@ static class GameDefinedGroupTests {
     static void SkippedGroupLine() =>
         Check(GameDefinedGroups.SkippedLine("BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer", "none of its objects has a usable position") ==
             "Group skipped: BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer: none of its objects has a usable position", "a skipped group gives one line Group skipped: <group root>: <reason>");
+    // World marking decides its groups again after every scene change; a skipped group logs its line once per root
+    // and reason.
+    static void SkippedGroupOnce() {
+        var lines = new List<string>();
+        var skips = new GroupSkips(lines.Add);
+        var computed = 0;
+        for (var pass = 0; pass < 3; pass++) {
+            Check(skips.Read<object>(() => "s/World/A", () => throw new InvalidOperationException("broken")) == null, "a group whose objects cannot be read is skipped");
+            skips.Skip("s/World/A", "none of its objects has a usable position");
+            Check(skips.Read(() => { computed++; return "s/World/B"; }, () => "read") == "read", "a readable group is read");
+        }
+        Check(computed == 0, "the root of a group that is read is not computed (computed " + computed + " times)");
+        // A root that cannot be computed skips only its own group.
+        Check(skips.Read<object>(() => throw new InvalidOperationException("no root"), () => throw new InvalidOperationException("broken")) == null && skips.Read(() => "s/World/B", () => "read") == "read",
+            "a group whose root cannot be computed is skipped alone");
+        Check(lines.SequenceEqual(new[] { "Group skipped: s/World/A: its objects could not be read: broken", "Group skipped: s/World/A: none of its objects has a usable position", "Group skipped: unknown group root: its objects could not be read: broken" }),
+            "one line per group root and reason: " + String.Join(" | ", lines));
+    }
 
     static void Membership() {
         // The Andrews crossing as the game holds it: the controller on "Setup", below it two masts with a light and

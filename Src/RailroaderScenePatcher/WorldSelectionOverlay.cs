@@ -341,11 +341,12 @@ namespace RailroaderScenePatcher {
                                 storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets, targets?.Select(Above));
                         }).ToArray())) {
                         var root = group.Anchor as GameObject;
-                        try {
+                        var read = skips.Read(() => RootPath(root), () => {
                             var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i), Stands = i == group.Root }).Where(m => m.Object.Points.Length != 0).ToArray();
-                            if (placed.Length == 0) { Skipped(root, "none of its objects has a usable position"); continue; }
-                            found.Add(new InventoryGroup { Root = root, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray(), Stands = Array.FindIndex(placed, m => m.Stands), Kind = group.Kind });
-                        } catch (Exception e) { Skipped(root, "its objects could not be read: " + e.GetBaseException().Message); }
+                            if (placed.Length == 0) { skips.Skip(RootPath(root), "none of its objects has a usable position"); return null; }
+                            return new InventoryGroup { Root = root, Objects = placed.Select(m => m.Object).ToArray(), Listed = placed.Select(m => m.Listed).ToArray(), Stands = Array.FindIndex(placed, m => m.Stands), Kind = group.Kind };
+                        });
+                        if (read != null) found.Add(read);
                     }
                     inventoryGroups = found.ToArray();
                 }
@@ -354,11 +355,9 @@ namespace RailroaderScenePatcher {
         }
         // A group that world marking skips shows its objects on its own; one developer diagnostic line says so, once
         // per group root and reason.
-        static readonly HashSet<string> skippedGroups = new HashSet<string>(StringComparer.Ordinal);
-        internal static void Skipped(GameObject root, string reason) {
-            var line = GameDefinedGroups.SkippedLine(root == null ? null : root.scene.name + "/" + BoardScene.PathOf(root.transform), reason);
-            if (skippedGroups.Add(line)) Debug.Log("Scene Patcher: " + line);
-        }
+        static readonly GroupSkips skips = new GroupSkips(line => Debug.Log("Scene Patcher: " + line));
+        static string RootPath(GameObject root) => root == null ? null : root.scene.name + "/" + BoardScene.PathOf(root.transform);
+        internal static void Skipped(GameObject root, string reason) => skips.Skip(RootPath(root), reason);
         int[][] Mapped(SpatialCandidate[] candidates, InventoryGroup[] groups) {
             if (ReferenceEquals(candidates, mappedFor)) return mapped;
             var byHandle = new Dictionary<object, List<int>>();

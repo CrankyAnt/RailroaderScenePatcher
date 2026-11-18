@@ -157,4 +157,30 @@ namespace RailroaderScenePatcher.Core {
         public static double OwnFrameDistance(GroupShows group) =>
             group == GroupShows.MarkerAndFrame ? Double.PositiveInfinity : ObjectMarkingGeometry.FrameDistance;
     }
+
+    // The groups that world marking or the family skips: each shows its objects on its own, and one developer
+    // diagnostic line (GameDefinedGroups.SkippedLine) says so, once per group root and reason.
+    public sealed class GroupSkips {
+        readonly HashSet<string> logged = new HashSet<string>(StringComparer.Ordinal);
+        readonly Action<string> log;
+        public GroupSkips(Action<string> log) { this.log = log ?? throw new ArgumentNullException(nameof(log)); }
+        public void Skip(string root, string reason) {
+            var line = GameDefinedGroups.SkippedLine(root, reason);
+            if (logged.Add(line)) log(line);
+        }
+        // Reads one group of world marking. A group whose objects cannot be read is skipped: the result is null. root
+        // names the group's root; a normal build computes it only for a skipped group, and a root that cannot be computed
+        // skips that group as an unknown group root.
+        public T Read<T>(Func<string> root, Func<T> read) where T : class {
+            if (root == null) throw new ArgumentNullException(nameof(root));
+            if (read == null) throw new ArgumentNullException(nameof(read));
+            try {
+#if SCENE_PATCHER_FAULTS
+                FaultInjection.TripUnreadableGroup(root);
+#endif
+                return read();
+            } catch (Exception e) { Skip(RootOrNull(root), "its objects could not be read: " + e.GetBaseException().Message); return null; }
+        }
+        static string RootOrNull(Func<string> root) { try { return root(); } catch { return null; } }
+    }
 }
