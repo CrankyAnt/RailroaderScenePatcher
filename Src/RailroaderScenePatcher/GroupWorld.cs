@@ -22,20 +22,39 @@ namespace RailroaderScenePatcher {
             switcherState = switcher?.GetField("_cullingState", Native.Flags);
         // A storage pile (Scenery.Pile, a Scenery.BulkScenery) lays its logs out in map space from where it stands when
         // it builds them, and registers a culling sphere of its own at its transform. Read lazily: a group without a
-        // pile needs none of these, and a group with a pile is refused while one is missing (PileProblem).
+        // pile needs none of these, and a group with a pile is refused while one is missing (PileProblem). The logs of a
+        // log pond (Scenery.LogPond) are a Scenery.BulkScenery too and take the same refresh; "pile" below covers them.
         static readonly Type bulk = Native.Type("Scenery.BulkScenery");
         static readonly FieldInfo bulkVisible = bulk?.GetField("_cullingVisible", Native.Flags), bulkToken = bulk?.GetField("_cullingToken", Native.Flags);
         static readonly MethodInfo bulkRebuild = bulk?.GetMethod("Rebuild", Native.Flags, null, Type.EmptyTypes, null), bulkRefresh = bulk?.GetMethod("RequestUpdateCullingPosition", Native.Flags, null, Type.EmptyTypes, null),
             bulkRadius = bulk?.GetMethod("GetCullingRadius", Native.Flags, null, Type.EmptyTypes, null);
         static string PileProblem(GameObject root) {
-            if (bulk == null || root.GetComponentsInChildren(bulk, true).Length == 0) return null;
-            return bulkVisible?.FieldType != typeof(bool) || bulkToken == null || bulkRebuild == null || bulkRefresh == null || bulkRadius == null ? "The game's storage pile members are unavailable, so this group and its piles cannot be moved, enabled or disabled" : null;
+            var found = bulk == null ? new Component[0] : root.GetComponentsInChildren(bulk, true);
+            if (found.Length == 0) return null;
+            if (bulkVisible?.FieldType == typeof(bool) && bulkToken != null && bulkRebuild != null && bulkRefresh != null && bulkRadius != null) return null;
+            var ponds = found.Any(c => c != null && c.GetType().FullName == BakedSceneryRules.LogPond);
+            return BakedSceneryRules.BulkMembersRefusal(found.Any(c => c != null && c.GetType().FullName != BakedSceneryRules.LogPond), ponds);
+        }
+        // The lake surface (LakePolygon) at or below an object whose water mesh renderer is part of a static batch, by
+        // its name, or null. The game draws a batched mesh where the scene had it, whatever its transform says, so such
+        // a water surface would stay at its old place while every transform check passes.
+        internal static string BatchedLake(GameObject go) {
+            if (go == null) return null;
+            foreach (var renderer in go.GetComponentsInChildren<Renderer>(true))
+                if (renderer != null && renderer.isPartOfStaticBatch && renderer.GetComponents<Component>().Any(c => c != null && c.GetType().FullName == BakedSceneryRules.LakeSurface)) return renderer.name;
+            return null;
+        }
+        // A group root or part whose lake surface is drawn from a static batch is not moved; its activity stays editable.
+        public string PlacementRefusal(object target) {
+            var water = BatchedLake(target as GameObject);
+            return water == null ? null : BakedSceneryRules.StaticBatchRefusal(water);
         }
         // The collider a pile builds near the camera: its mesh is a new one at every rebuild, which the game does not
         // destroy; a rebuild the patcher starts destroys the mesh it replaced.
         static readonly FieldInfo pileCollider = Native.Type(BakedSceneryRules.StoragePile)?.GetField("_colliderObject", Native.Flags);
+        // A log pond (Scenery.LogPond, also a Scenery.BulkScenery) builds no collider.
         static Mesh ColliderMesh(Component pile) {
-            var holder = pileCollider?.GetValue(pile) as GameObject;
+            var holder = pileCollider != null && pileCollider.DeclaringType.IsInstanceOfType(pile) ? pileCollider.GetValue(pile) as GameObject : null;
             var collider = holder == null ? null : holder.GetComponent<MeshCollider>();
             return collider == null ? null : collider.sharedMesh;
         }
@@ -547,10 +566,10 @@ namespace RailroaderScenePatcher {
                 }
                 var index = (int)Native.Read(token, "Index");
                 var all = (BoundingSphere[])managerSpheres.GetValue(Native.Read(token, "Manager"));
-                if (index < 0 || index >= all.Length) throw new InvalidOperationException("The culling sphere of the storage pile " + pile.name + " is not registered");
+                if (index < 0 || index >= all.Length) throw new InvalidOperationException("The culling sphere of the " + BakedSceneryRules.BulkKind(pile.GetType().FullName) + " " + pile.name + " is not registered");
                 var centre = Map(all[index].position, pile.transform);
                 if (Distance(centre, now.Position) > SphereDistance || Math.Abs(all[index].radius - (float)bulkRadius.Invoke(pile, null)) > SameDistance)
-                    throw new InvalidOperationException("The culling sphere of the storage pile " + pile.name + " did not follow it to its new place");
+                    throw new InvalidOperationException("The culling sphere of the " + BakedSceneryRules.BulkKind(pile.GetType().FullName) + " " + pile.name + " did not follow it to its new place");
                 laidOut[pile] = now;
             }
         }

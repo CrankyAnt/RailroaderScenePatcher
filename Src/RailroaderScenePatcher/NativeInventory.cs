@@ -89,7 +89,7 @@ namespace RailroaderScenePatcher {
         const string MastFamily = ExistingEquipmentScene.MastFamily, BellFamily = ExistingEquipmentScene.BellFamily;
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
-        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile", CarLoader = "RollingStock.CarContentSwapper";
+        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile", CarLoader = "RollingStock.CarContentSwapper", LogPond = BakedSceneryRules.LogPond, LakeSurface = BakedSceneryRules.LakeSurface;
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         // Why a board candidate cannot be edited, from the board capability; null when that capability is unavailable.
         readonly Func<GameObject, string> boardRefusal;
@@ -136,9 +136,9 @@ namespace RailroaderScenePatcher {
         }
         // The storage a pile shows: the binding of the ids the synchronizer naming the pile reads it by, and its name for
         // the Object tab, by the names the game shows or by those ids while the industry or load is not known. Null for
-        // a pile that no loaded synchronizer names.
+        // a pile that no loaded synchronizer names. A log pond's logs show their storage the same way.
         internal static Tuple<string, string> PileStorage(GameObject pile) {
-            var scenery = pile == null ? null : Get(pile, Pile);
+            var scenery = pile == null ? null : Get(pile, Pile) ?? Get(pile, LogPond);
             var type = Native.Type(StorageSynchronizer);
             if (scenery == null || type == null) return null;
             foreach (var storage in Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(c => c != null && Loaded(c)).OrderBy(c => c.GetInstanceID())) {
@@ -481,6 +481,21 @@ namespace RailroaderScenePatcher {
                 var storage = PileStorage(go);
                 if (storage != null) { bindings.Add(storage.Item1); storageName = storage.Item2; dependencies.Add("Industry storage display: the pile rebuilds its logs and collider where it stands"); }
             });
+            // A log pond's logs show their storage as a pile does; a group root or part that holds them names that
+            // storage for the Object tab, as presentation only.
+            if ((groupRoot || part) && Get(go, Pile) == null) Read(() => {
+                var ponds = components.Where(component => component != null && TypeName(component) == LogPond).ToArray();
+                if (ponds.Length == 0) return;
+                var self = ponds[0].gameObject == go;
+                var storage = PileStorage(ponds[0].gameObject);
+                storageName = storage?.Item2;
+                bindings.AddRange(CommandBand.LogPondBindings(self, self ? 0 : ponds.Length, storage?.Item1));
+                if (self) dependencies.Add("Industry storage display: the log pond lays its logs out where it stands");
+            });
+            // The water mesh of a lake surface moves with its object, unless the game draws it from a static batch; the
+            // native lake masks and rivers do not move.
+            if ((groupRoot || part) && components.Any(component => component != null && TypeName(component) == LakeSurface))
+                dependencies.Add(CommandBand.LakeSurfaceDependency(GroupWorld.BatchedLake(go) != null));
             // A group root or part that holds storage piles below it says so, for the Object tab.
             if ((groupRoot || part) && Get(go, Pile) == null) Read(() => {
                 var piles = components.Count(component => component != null && TypeName(component) == Pile);

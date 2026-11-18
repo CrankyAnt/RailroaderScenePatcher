@@ -12,16 +12,16 @@ A baked scenery group is saved in the map's scene. Props, masks and other object
 
 The **Baked scenery group** family in the outliner lists one entry per group root, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object one level below a `World` folder, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, the root is one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`.
 
-To be listed, a group must be saved in the scene, have a renderer, collider, light or storage pile at or below its root, and belong to no other family. The following objects have no group entry:
+To be listed, a group must be saved in the scene, have a renderer, collider, light, storage pile or log pond at or below its root, and belong to no other family. The following objects have no group entry:
 
-- Objects without a renderer, collider, light or storage pile, such as a spawn point under `World/POIs`.
+- Objects without a renderer, collider, light, storage pile or log pond, such as a spawn point under `World/POIs`.
 - Visual effects, such as the fireflies under `World/Environment Effects`.
 - Folders, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that folder is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, lake surface, log pond, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
+Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, spawn point, map icon or pickable toggle. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
 
 Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -29,7 +29,7 @@ Groups containing track markers are also marked `inspection only`. Such a group 
 
 Each group in the **Baked scenery group** family lists its parts below its own row, sorted by name. A part's row shows the path from the group root, such as `Jetty / Piece (2)`. Its tooltip and searches use the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
 
-A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider, light or storage pile at or below it. A part can contain other parts, which move with it.
+A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider, light, storage pile or log pond at or below it. A part can contain other parts, which move with it.
 
 Some objects below a group root are not listed as parts:
 
@@ -37,7 +37,7 @@ Some objects below a group root are not listed as parts:
 - A level of a LOD group, such as `LOD0` and `LOD1` below a lamp, belongs to the entry of the object that holds the LOD group.
 - A culling container, such as `Bryson House Track / Culled`, only groups parts for the game's culling. It has no row of its own and appears in no world choice list, but the parts in it are listed under their group, with the container in their name. A group whose root carries the culler, such as Sylva Culled, keeps its group row and lists its models as parts. A modification whose path names a culling container fails with that reason; the file's other modifications still apply.
 - Objects the game moves during play, such as a clock hand at Bryson depot, are not listed as parts. Neither are the objects below them. These objects remain in their group and move with it.
-- Objects without a renderer, collider, light or storage pile, objects created while the game runs and objects listed by another family have no part entry.
+- Objects without a renderer, collider, light, storage pile or log pond, objects created while the game runs and objects listed by another family have no part entry.
 
 ## Move a group in the native map editor
 
@@ -77,7 +77,19 @@ On a pile's **Object** tab, **Use in the game** names the storage that the pile 
 
 The industry itself is native map data. Its position, its track spans and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
 
-`Whittier Log Pond` holds a log pond and a lake surface. It stays under **Storage display**, marked `inspection only`.
+## Lake surfaces
+
+You can move, rotate or disable a lake surface to fit a changed river or track. A lake surface is a water mesh that the scene saves. `Fontana Lake (1)` and `Fontana Lake (2)` below `World/Rivers` are lake surfaces, each its own group under **Other**. The `Whittier Log Pond` group at the Whittier saw mill, under **Storage display**, holds a lake surface and a log pond.
+
+The native map editor still owns the lake masks and rivers in `Map.json`. Native masks shape and color the terrain, and the water surface is the scene object. The patcher moves the lake surface and leaves the native mask where it is. To reshape the terrain under the moved water, edit the mask in the native map editor.
+
+The `Whittier Log Pond` group has two parts: `Whittier Log Pond / Whittier Saw Mill Log Pond`, its lake surface, and `Whittier Log Pond / LogPond`, its log pond, which lays out the logs of the sawmill's storage in the water. Move the whole group to move the water with its logs, or move a part on its own.
+
+On the **Object** tab of the `Whittier Log Pond` group and of its `LogPond` part, **Use in the game** names the storage that the log pond shows and says that moving or disabling the group or the log pond does not change the storage. The game links the log pond to the storage by ID, not by position. After a move, the patcher moves the log pond's culling sphere to its new place and has it lay out its logs again there, as it does for a storage pile.
+
+A Fontana lake is one object without parts. After a move, the patcher moves the sphere of its renderer culler to the lake's new place.
+
+If the game draws a lake surface from a static batch, a move would leave the water drawn at its old place. The patcher refuses such a move before it changes anything and says so; **Disable** and **Enable** still work. Under **Dependencies**, the **Object** tab of a lake surface says whether its water is part of a static batch.
 
 ## Move the coal loader with the track under it
 
@@ -168,6 +180,8 @@ Grass and other terrain detail under a group come from the terrain and its masks
 Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. In those runs Bryson Yard was still listed as one group: it moved with all its posts and lamps, and no part remained at its old position. Bryson Yard is now a folder, and each of its lamp posts is its own group. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
 
 The runs did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
+
+Lake surfaces are not yet measured in Railroader. Automated tests check their listing, edits, refusal, restoration, Undo, Redo, Save and reload with controlled groups. Not yet observed in the game: whether the water and the logs appear at the new place, whether the log pond keeps following the sawmill's storage there, whether a moved lake appears and disappears by camera distance at its new place, and whether the game draws the lake surfaces of the base map from a static batch.
 
 Automated tests also check part edits and a moved part's separate culling sphere with a controlled group.
 

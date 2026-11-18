@@ -217,6 +217,8 @@ namespace RailroaderScenePatcher {
             return problem == null ? null : "This " + (bells ? "bell" : "mast") + " cannot be edited: " + problem;
         }
         public string ActivityRefusal(object part) => ActivityProblem(part as GameObject);
+        // Crossing masts and bells hold no lake surface.
+        public string PlacementRefusal(object target) => null;
         static double[] Coordinates(Vector3 v) => new double[] { v.x, v.y, v.z };
         static double[] Coordinates(Quaternion q) => new double[] { q.x, q.y, q.z, q.w };
         public PartObservation ObservePart(object target) {

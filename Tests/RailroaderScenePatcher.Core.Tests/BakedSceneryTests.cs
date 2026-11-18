@@ -207,6 +207,10 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
         }
         return PartRefused;
     }
+    // Why a placement of the group root or part cannot be set, by handle, as GroupWorld refuses the move of a lake surface
+    // whose water mesh is part of a static batch.
+    public Dictionary<object, string> PlacementRefused = new Dictionary<object, string>();
+    public string PlacementRefusal(object target) => PlacementRefused.TryGetValue(target, out var reason) ? reason : null;
     public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;
@@ -584,8 +588,6 @@ static class BakedSceneryTests {
         var cases = new[] {
             new { Name = "Alarka Jct Station", Component = "Map.Runtime.MaskComponents.RectangleMapMask", Kind = "scene ground mask", Ticket = "#90" },
             new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = "#89" },
-            new { Name = "Fontana Lake (1)", Component = "LakePolygon", Kind = "lake surface", Ticket = "#93" },
-            new { Name = "Whittier Log Pond", Component = "Scenery.LogPond", Kind = "log pond", Ticket = "#93" },
             new { Name = "Trestle Scenery", Component = "Game.Mow.TrackConstructionScenery", Kind = "bridge construction scenery", Ticket = "#95" },
             new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
             new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "station icon", Ticket = "#89" },

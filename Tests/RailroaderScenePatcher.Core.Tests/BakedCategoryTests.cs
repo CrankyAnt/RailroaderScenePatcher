@@ -192,7 +192,7 @@ Wilmot | Wilmot Station | Group | Station building";
         var world = new Node("World", new Node("Large Scenery",
             new Node("Almond", new Node("Cube").Solid()),
             new Node("Bryson", new Node("Bryson Appalachian Hardwoods", new Node("A").Solid(), new Node("B").Solid())),
-            new Node("Sylva", new Node("New Shed", new Node("Wall").Solid()), new Node("New Pond", new Node("Water").Solid()).With("LakePolygon"))));
+            new Node("Sylva", new Node("New Shed", new Node("Wall").Solid()), new Node("New Masked Shed", new Node("Wall").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask"))));
         var verdicts = BakedSceneryRules.Classify(world);
         foreach (var path in new[] { "World/Large Scenery/Almond/Cube", "World/Large Scenery/Bryson/Bryson Appalachian Hardwoods" }) {
             var verdict = At(verdicts, path);
@@ -202,8 +202,8 @@ Wilmot | Wilmot Station | Group | Station building";
         // A listed group the table does not name stands under Other; a group no supported operation covers and no
         // category names stays in the Inspection only group.
         Check(At(verdicts, "World/Large Scenery/Sylva/New Shed")?.Category == "Other", "a listed group outside the table stands under Other");
-        var pond = At(verdicts, "World/Large Scenery/Sylva/New Pond");
-        Check(pond?.Disposition == GroupDisposition.InspectionOnly && pond.Category == null, "an inspection-only group that no category covers has no category: it stays in the Inspection only group");
+        var masked = At(verdicts, "World/Large Scenery/Sylva/New Masked Shed");
+        Check(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Category == null, "an inspection-only group that no category covers has no category: it stays in the Inspection only group");
     }
 
     // The outliner rows of a small inventory: groups, parts, an inspection-only group with a category, and one without.

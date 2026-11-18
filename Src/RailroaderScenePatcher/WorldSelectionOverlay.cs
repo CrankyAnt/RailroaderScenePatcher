@@ -127,16 +127,18 @@ namespace RailroaderScenePatcher {
             if (renderer.enabled && renderer.gameObject.activeInHierarchy) { local = renderer.localBounds; return true; }
             return false;
         }
-        // The storage piles at and below an object that outline it: listed with its renderers, and passed over while
-        // the scene or a modder switched them off, as a renderer is.
-        static readonly Type pileType = Native.Type(BakedSceneryRules.StoragePile);
+        // The storage piles and log ponds at and below an object that outline it: listed with its renderers, and passed
+        // over while the scene or a modder switched them off, as a renderer is. Both lay out their logs through the
+        // game's instancer and have no renderer of their own.
+        static readonly Type pileType = Native.Type(BakedSceneryRules.StoragePile), pondType = Native.Type(BakedSceneryRules.LogPond);
         static readonly System.Reflection.FieldInfo pileWidth = pileType?.GetField("width", Native.Flags), pileHeight = pileType?.GetField("maxHeight", Native.Flags),
-            pileProfile = pileType?.BaseType?.GetField("profile", Native.Flags);
+            pileProfile = (pileType ?? pondType)?.BaseType?.GetField("profile", Native.Flags), pondWidth = pondType?.GetField("width", Native.Flags), pondLength = pondType?.GetField("length", Native.Flags);
         readonly Dictionary<GameObject, KeyValuePair<int, Component[]>> piles = new Dictionary<GameObject, KeyValuePair<int, Component[]>>();
         IEnumerable<Component> Piles(GameObject go) {
-            if (pileType == null) return Array.Empty<Component>();
+            if (pileType == null && pondType == null) return Array.Empty<Component>();
             if (!piles.TryGetValue(go, out var kept) || Time.frameCount >= kept.Key)
-                piles[go] = kept = new KeyValuePair<int, Component[]>(Time.frameCount + 90 + (go.GetInstanceID() & 63), go.GetComponentsInChildren(pileType, true));
+                piles[go] = kept = new KeyValuePair<int, Component[]>(Time.frameCount + 90 + (go.GetInstanceID() & 63),
+                    (pileType == null ? new Component[0] : go.GetComponentsInChildren(pileType, true)).Concat(pondType == null ? new Component[0] : go.GetComponentsInChildren(pondType, true)).ToArray());
             return kept.Value.Where(pile => {
                 if (pile == null) return false;
                 try {
@@ -150,6 +152,7 @@ namespace RailroaderScenePatcher {
         // its height up from the ground plus one log's radius, and the logs' length along it. Null when the pile has no
         // profile or its settings cannot be read.
         static WorldPoint[] PileBox(Component pile) {
+            if (pondType != null && pondType.IsInstanceOfType(pile)) return PondBox(pile);
             try {
                 var profile = pileProfile?.GetValue(pile);
                 if (profile == null || pileWidth == null || pileHeight == null) return null;
@@ -157,6 +160,20 @@ namespace RailroaderScenePatcher {
                 float radius = Convert.ToSingle(Native.Read(profile, "EffectiveRadius")), length = Convert.ToSingle(Native.Read(profile, "EffectiveLength"));
                 var centre = new Vector3(0, height / 2 + radius, 0); var half = new Vector3(width / 2, height / 2, length / 2);
                 var matrix = pile.transform.localToWorldMatrix; var corners = new WorldPoint[8];
+                for (var i = 0; i < 8; i++) corners[i] = Point(matrix.MultiplyPoint3x4(centre + Vector3.Scale(half, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
+                return corners;
+            } catch { return null; }
+        }
+        // The eight corners of the box a log pond lays its logs out in (BakedSceneryRules.LogPondBox): its width across,
+        // its length plus width along, and one log's radius up and down from the water line. Null when the log pond has
+        // no profile or its settings cannot be read.
+        static WorldPoint[] PondBox(Component pond) {
+            try {
+                var profile = pileProfile?.GetValue(pond);
+                if (profile == null || pondWidth == null || pondLength == null) return null;
+                var box = BakedSceneryRules.LogPondBox((float)pondWidth.GetValue(pond), (float)pondLength.GetValue(pond), Convert.ToSingle(Native.Read(profile, "EffectiveRadius")));
+                var centre = new Vector3((float)box.Item1[0], (float)box.Item1[1], (float)box.Item1[2]); var half = new Vector3((float)box.Item2[0], (float)box.Item2[1], (float)box.Item2[2]);
+                var matrix = pond.transform.localToWorldMatrix; var corners = new WorldPoint[8];
                 for (var i = 0; i < 8; i++) corners[i] = Point(matrix.MultiplyPoint3x4(centre + Vector3.Scale(half, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
                 return corners;
             } catch { return null; }
@@ -848,8 +865,8 @@ namespace RailroaderScenePatcher {
                     }
                     parts.Add(new ObjectMarkingPart(name, Point(bounds.center), Point(bounds.extents), oriented, kind, ground));
                 }
-                // A storage pile has no renderer of its own: the box it lays its logs out in stands in, from its layout
-                // settings, so a pile is framed like any other visible part whether or not the camera has culled it.
+                // A storage pile or log pond has no renderer of its own: the box it lays its logs out in stands in, from
+                // its layout settings, so it is framed like any other visible part whether or not the camera has culled it.
                 if (!waits)
                     foreach (var pile in Piles(go)) {
                         var oriented = PileBox(pile);

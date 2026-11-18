@@ -334,15 +334,47 @@ namespace RailroaderScenePatcher {
         // is not in the inventory.
         internal static string UseInGame(SceneObservation selected, SceneObservation group) {
             var isPart = selected.GroupPath != null;
-            return UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, HoldsPiles(selected.Bindings),
-                HoldsLoader(selected.Bindings), isPart && HoldsLoader(group?.Bindings));
+            return UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings, isPart ? group?.Bindings : null);
         }
-        // The ids by which a pile's storage synchronizer reads the storage the pile shows, as one binding line.
-        internal static string StorageBinding(string industryComponentId, string loadId) => "Industry storage=" + industryComponentId + ", load " + loadId;
+        // The ids by which a pile's or log pond's storage synchronizer reads the storage it shows, as one binding line.
+        const string StoragePrefix = "Industry storage=";
+        internal static string StorageBinding(string industryComponentId, string loadId) => StoragePrefix + industryComponentId + ", load " + loadId;
         // How many storage piles stand at or below a group root or part, as one binding line.
         const string PilesPrefix = "Storage piles=";
         internal static string PilesBinding(int count) => PilesPrefix + count.ToString(System.Globalization.CultureInfo.InvariantCulture);
         internal static bool HoldsPiles(IEnumerable<string> bindings) => bindings?.Any(line => line != null && line.StartsWith(PilesPrefix, StringComparison.Ordinal)) == true;
+        // The binding lines of a log pond (Scenery.LogPond) and of a group root or part above one. self: the object is
+        // the log pond; below: how many log ponds stand below it; storage: the log pond's storage binding, or null when
+        // no loaded synchronizer names it. The log pond carries a fixed line of its own and, as a pile does, its storage
+        // binding only while the storage is known; an object above it carries only the count. Every line stays the
+        // same while the scene stays, so the Object tab's choice never makes the inventory stale.
+        const string LogPondSelf = "Log pond=this object", LogPondsBelowPrefix = "Log ponds below=";
+        internal static IReadOnlyList<string> LogPondBindings(bool self, int below, string storage) {
+            var lines = new List<string>();
+            if (self) { lines.Add(LogPondSelf); if (storage != null) lines.Add(storage); }
+            else if (below > 0) lines.Add(LogPondsBelowPrefix + below.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return lines;
+        }
+        // What the Object tab says under Use in the game for a group root or part of the Baked scenery group family,
+        // chosen from its bindings alone, and for a part also from its group's bindings: a car loader's object and the
+        // other parts of its group, the log pond itself, an object above a log pond, and otherwise the text of UseInGame
+        // above, with piles as #98 has them. storage names what the pile or log pond shows, or null.
+        internal static string UseInGame(bool part, string category, string storage, IEnumerable<string> bindings, IEnumerable<string> groupBindings = null) {
+            var lines = (bindings ?? Enumerable.Empty<string>()).Where(line => line != null).ToArray();
+            var shown = storage ?? "industry's storage";
+            if (HoldsLoader(lines)) return LoadingPoint;
+            if (part && HoldsLoader(groupBindings)) return UseInGame(part, category, null, false, groupLoads: true);
+            if (lines.Contains(LogPondSelf))
+                return "This log pond shows the " + shown + ". Moving or disabling the log pond does not change the storage, and the industry keeps working on its native track spans.";
+            if (lines.Any(line => line.StartsWith(LogPondsBelowPrefix, StringComparison.Ordinal)))
+                return "Decorative. Its log pond shows the " + shown + ". Moving or disabling this " + (part ? "part" : "group") + " does not change the storage, and the industry keeps working on its native track spans.";
+            return UseInGame(part, category, lines.Any(line => line.StartsWith(StoragePrefix, StringComparison.Ordinal)) ? storage : null, HoldsPiles(lines));
+        }
+        // The dependency a lake surface's inspection names: what moves with it, what stays native, and whether its water
+        // is part of a static batch, which the game would keep drawing at its old place.
+        internal static string LakeSurfaceDependency(bool batched) => batched
+            ? "Lake surface: the water surface is part of a static batch, so it cannot be moved. Native lake masks and rivers shape and color the terrain and stay with the native map editor"
+            : "Lake surface: the water surface moves with this object. Native lake masks and rivers shape and color the terrain and stay with the native map editor";
         // The storage a pile shows: the industry's load storage by the names the game shows, the load in lower case
         // inside the sentence unless it is an acronym, or by the ids its storage synchronizer reads when the industry
         // or load is not known.

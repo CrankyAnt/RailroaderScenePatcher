@@ -39,7 +39,11 @@ namespace RailroaderScenePatcher.Core {
             }).ToArray();
             if (own.Length > 1) throw new InvalidOperationException("Several modifications target this object; combine them outside scene patch editing first");
             foreach (var item in own) PatchEngine.Parse(item);
-            before = scene.Read(target); snapshot = scene.Capture(target);
+            before = scene.Read(target);
+            // A placement the scene refuses, such as the move of a lake surface drawn from a static batch, refuses the
+            // gesture before any preview mutates the target.
+            engine.CheckRelationships(target, new ObjectState(before.Placement, null));
+            snapshot = scene.Capture(target);
             engine.Underlying(target);
             engine.GuardMutation(identity, target, maps, inspected);
         }

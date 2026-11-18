@@ -28,7 +28,7 @@ static class IndustryObjectTests {
         new Node("Sylva", new Node("Sylva Paperboard", new Node("Pulpwood Piles", Pile("Pile", near), Pile("Pile (1)", near))).With(Synchronizer)),
         new Node("Whittier",
             new Node("Connelly", Pile("Log Pile L1a", near), Pile("Log Pile L1b", near), Pile("Pulpwood Pile P1a", near)).With(Synchronizer, Synchronizer),
-            new Node("Whittier Log Pond", new Node("Pond").With("LakePolygon", "Scenery.LogPond").Solid()).With(Synchronizer),
+            new Node("Whittier Log Pond", new Node("Whittier Saw Mill Log Pond").With("LakePolygon", "UnityEngine.MeshRenderer").Solid(), new Node("LogPond").With("Scenery.LogPond")).With(Synchronizer),
             new Node("Whittier Saw Mill Culled", new Node("Saw Shed").Solid()))));
     static GroupRootVerdict At(IReadOnlyList<GroupRootVerdict> verdicts, string path) => verdicts.SingleOrDefault(v => v.Path == path);
 
@@ -42,7 +42,7 @@ static class IndustryObjectTests {
     }
 
     // The three pile groups are listed groups under Storage display, whatever the camera distance, and each pile is a
-    // part named with its group; the log pond stays inspection only for its own ticket.
+    // part named with its group; the Whittier Log Pond group, with its lake surface and log pond, is listed there too.
     static void InventoryListsPileGroupsWithTheirParts() {
         foreach (var near in new[] { false, true }) {
             var verdicts = BakedSceneryRules.Classify(World(near));
@@ -52,7 +52,7 @@ static class IndustryObjectTests {
                     path + " is a listed group under Storage display (near " + near + "): " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
             }
             var pond = At(verdicts, LogPond);
-            Assert(pond?.Disposition == GroupDisposition.InspectionOnly && pond.Ticket == "#93" && pond.Category == BakedSceneryCategories.StorageDisplay, "The log pond stays inspection only for #93: " + pond?.Disposition + " " + pond?.Ticket);
+            Assert(pond?.Disposition == GroupDisposition.Group && pond.Category == BakedSceneryCategories.StorageDisplay, "The Whittier Log Pond group is listed under Storage display: " + pond?.Disposition + " " + pond?.Reason);
             var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).Select(p => p.Path).ToArray();
             foreach (var path in new[] { Andrews + "/Pulpwood Piles", Andrews + "/Pulpwood Piles/Pile", Andrews + "/Pulpwood Piles/Pile (1)", Andrews + "/Retaining Wall",
                 Sylva + "/Pulpwood Piles", Sylva + "/Pulpwood Piles/Pile (1)", Connelly + "/Log Pile L1a", Connelly + "/Log Pile L1b", Connelly + "/Pulpwood Pile P1a" })

@@ -216,8 +216,6 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("Map.Runtime.MaskComponents.", "scene ground mask", "#90", true),
             new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
             new Exclusion("Model.StationAgent", "station click spot", "#89"),
-            new Exclusion("LakePolygon", "lake surface", "#93"),
-            new Exclusion("Scenery.LogPond", "log pond", "#93"),
             new Exclusion("Game.Mow.TrackConstructionScenery", "bridge construction scenery", "#95"),
             new Exclusion("Character.SpawnPoint", "spawn point", "#94"),
             new Exclusion("UI.Map.MapIcon", "station icon", "#89", reason: "This group contains a station icon, so it cannot be edited as a group."),
@@ -290,8 +288,32 @@ namespace RailroaderScenePatcher.Core {
         // A storage pile of an industry (Scenery.Pile) draws its logs through the game's instancer and builds its
         // collider only near the camera: the scene gives it no renderer or collider, but a track change runs into it.
         public const string StoragePile = "Scenery.Pile";
-        // The object itself has physical presence: a renderer, collider or light on it, or it is a storage pile.
-        public static bool Present(IHierarchyNode node) => node.Physical || node.Components.Contains(StoragePile);
+        // The kind of a bulk scenery object (Scenery.BulkScenery) for refusal and failure texts, by its type's full name.
+        public static string BulkKind(string type) => type == LogPond ? "log pond" : "storage pile";
+        // Why a group with storage piles or a log pond cannot be edited while the game's bulk scenery members that the
+        // refresh uses are unavailable, naming the kinds the group holds.
+        public static string BulkMembersRefusal(bool piles, bool ponds) =>
+            piles && ponds ? "The game's storage pile and log pond members are unavailable, so this group, its piles and its log pond cannot be moved, enabled or disabled"
+            : ponds ? "The game's log pond members are unavailable, so this group and its log pond cannot be moved, enabled or disabled"
+            : "The game's storage pile members are unavailable, so this group and its piles cannot be moved, enabled or disabled";
+        // The box a log pond lays its logs out in, in its own coordinates, as centre and half extents: its width across
+        // (X), its length plus width along (Z, the capsule's straight section and its two round ends), and one log's
+        // radius up and down from the water line where the logs float (LogPond.ComputeLayout places them at height 0).
+        public static Tuple<double[], double[]> LogPondBox(double width, double length, double radius) =>
+            Tuple.Create(new[] { 0.0, 0, 0 }, new[] { width / 2, radius, (Math.Max(length, 0) + width) / 2 });
+        // Why the move of a lake surface whose water mesh is part of a static batch is refused: the game draws the
+        // batched mesh where the scene had it, whatever the transform says.
+        public static string StaticBatchRefusal(string water) =>
+            "The water surface " + water + " is part of a static batch, so the game would keep drawing it at its old place. This lake surface cannot be moved";
+        // The logs of a log pond (Scenery.LogPond) are drawn the same way, without a collider: the scene gives the
+        // object no renderer, but it shows the logs of the sawmill's storage inside the pond's water surface.
+        public const string LogPond = "Scenery.LogPond";
+        // A lake surface (LakePolygon) is a water mesh the scene saves with its object: native lake masks and rivers
+        // shape and color the terrain, and the water surface is this scene object.
+        public const string LakeSurface = "LakePolygon";
+        // The object itself has physical presence: a renderer, collider or light on it, or it is a storage pile or the
+        // logs of a log pond.
+        public static bool Present(IHierarchyNode node) => node.Physical || node.Components.Contains(StoragePile) || node.Components.Contains(LogPond);
         // The coverage rules that keep an object below a listed group root out of the part entries.
         public const string AmbiguousParts = "Parts with the same name and parent share a path", LodLevels = "LOD levels belong to the object with the LOD group",
             AnimatedParts = "Parts the game moves while running", CullingContainers = "Culling containers";
@@ -483,6 +505,10 @@ namespace RailroaderScenePatcher.Core {
         // Why the part's activity cannot be set, or null: a game-object culler switches it by camera distance and would
         // override a stored setting. The patcher then never sets that part's activity.
         string ActivityRefusal(object part);
+        // Why the placement of the group root or part cannot be set, or null: a lake surface at or below it whose water
+        // mesh is part of a static batch would stay drawn at its old place while every transform check passes. A
+        // placement is then refused before any mutation; activity stays editable.
+        string PlacementRefusal(object target);
         PartObservation ObservePart(object part);
         // Sets the part's own activity; its cullers register and release through their own lifecycle.
         void SetPartActive(object part, bool active);
@@ -656,7 +682,7 @@ namespace RailroaderScenePatcher.Core {
     }
     // Baked scenery groups: places and enables or disables a group root with everything below it. A group move is
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
-    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IDisposable {
+    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IDisposable {
         public const string Structure = "baked-scenery-group-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
@@ -675,6 +701,16 @@ namespace RailroaderScenePatcher.Core {
             var refusal = world.Refusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
             if (!GroupChecks.Finite(world.Observe(target).Root.Placement)) throw new InvalidOperationException("The group's map coordinates are unavailable");
+        }
+        // A group has no relationships; a placement the world refuses, such as the move of a lake surface whose water
+        // is part of a static batch, is refused here, before any mutation.
+        public void CheckRelationships(object target, ObjectState state) {
+            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
+            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
+            if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
+            var refusal = state?.Placement == null ? null : world.PlacementRefusal(target);
+            if (refusal != null) throw new InvalidOperationException(refusal);
         }
         public object Capture(object target) => world.Observe(target);
         public ObjectState Read(object target) => world.Observe(target).Root;
@@ -761,7 +797,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Coverage != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-coverage relationships");
             if (state?.Equipment != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-equipment relationships");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
-            var refusal = state?.Active == null ? null : world.ActivityRefusal(target);
+            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target));
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal PartObservation Observed; internal Placement Held, Scene; }
