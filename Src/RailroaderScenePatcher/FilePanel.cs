@@ -164,6 +164,7 @@ namespace RailroaderScenePatcher {
             var label = row.GetComponentsInChildren<TMP_Text>(true).Select(t => System.Text.RegularExpressions.Regex.Replace(t.text ?? "", "<[^>]*>", "").Trim()).FirstOrDefault(t => t.Length != 0);
             return FilePanelState.RowTitle(tooltip, label);
         }
+        static readonly int UiLayer = LayerMask.NameToLayer("UI");
         void LockRows() {
             foreach (var clicks in GetComponentsInChildren<OutlineRowClickHandler>(true)) {
                 if (Except.Any(e => e != null && clicks.transform.IsChildOf(e))) continue;
@@ -177,6 +178,14 @@ namespace RailroaderScenePatcher {
                 }
                 if (clicks.enabled) clicks.enabled = false;
                 foreach (var text in clicks.GetComponentsInChildren<TMP_Text>(true)) if (text.alpha != CommandBand.InactiveAlpha) text.alpha = CommandBand.InactiveAlpha;
+                // The game shows the tooltip of a raycast hit on the UI layer only. The native list makes a row's disclosure
+                // on the default layer, so its tooltip never showed; while locked it stands on the UI layer, and its own
+                // layer comes back on release.
+                foreach (var disclosure in clicks.GetComponentsInChildren<Button>(true)) {
+                    if (UiLayer < 0 || disclosure.gameObject.layer == UiLayer) continue;
+                    saved.Layers.Add(Tuple.Create(disclosure.gameObject, disclosure.gameObject.layer));
+                    disclosure.gameObject.layer = UiLayer;
+                }
             }
         }
         internal void Apply() {
@@ -223,6 +232,7 @@ namespace RailroaderScenePatcher {
                 var clicks = row.GetComponent<OutlineRowClickHandler>();
                 if (clicks != null) clicks.enabled = true;
                 foreach (var pair in row.Alphas) if (pair.Item1 != null) pair.Item1.alpha = pair.Item2;
+                foreach (var pair in row.Layers) if (pair.Item1 != null) pair.Item1.layer = pair.Item2;
                 var tooltip = row.GetComponent<UI.Tooltips.UITooltipProvider>();
                 if (tooltip != null) tooltip.DynamicTooltipInfo = null;
                 Destroy(row);
@@ -233,7 +243,11 @@ namespace RailroaderScenePatcher {
         }
     }
     // An outliner row UnavailableControls locked: its native click handler and tooltip get their own behaviour back on release.
-    internal sealed class UnavailableRow : MonoBehaviour { internal Tuple<TMP_Text, float>[] Alphas = new Tuple<TMP_Text, float>[0]; }
+    internal sealed class UnavailableRow : MonoBehaviour {
+        internal Tuple<TMP_Text, float>[] Alphas = new Tuple<TMP_Text, float>[0];
+        // The disclosures moved to the UI layer for their tooltip, with the layer each had.
+        internal readonly System.Collections.Generic.List<Tuple<GameObject, int>> Layers = new System.Collections.Generic.List<Tuple<GameObject, int>>();
+    }
     // A control whose state UnavailableControls replaced: what it had before, for the release.
     internal sealed class UnavailableTooltip : MonoBehaviour {
         internal string Title;
