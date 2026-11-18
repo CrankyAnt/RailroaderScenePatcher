@@ -15,7 +15,7 @@ The patcher rebinds a pad when all of these hold:
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object, if present, does not make the object's activity follow a track group,
 - no loaded component other than that `Track.TrackRelativePosition` and the pad builder holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check,
-- the graph holds one registration of the marker at its current location while the pad is enabled and active, and none otherwise.
+- the game lists one track location for the marker, at its current location, while the pad is enabled and active, and none otherwise.
 
 A pad inside a protected crossing qualifies too, because the crossing controller does not read the pad's marker. The crossing's own track spans and circuits are a separate operation.
 
@@ -30,9 +30,9 @@ The inventory shows such an object in the `Crossing pad marker` family with the 
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration and geometry.
 
-After the check the patcher moves the marker's graph registration to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
+After the check, the patcher changes the track location the game lists for the marker to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
 
-The patcher verifies the stored location, the single graph registration, that the current mesh was generated from the mod's location and the pad's current position, and that the culling sphere encloses the new mesh. Any difference fails the edit: the patcher writes the earlier location back, generates the pad again and checks that the regenerated mesh matches the mesh it captured before the edit.
+The patcher checks the stored track location and that the game lists exactly one track location for the marker. It also verifies that the current mesh was generated from the mod's location and the pad's current position, and that the culling sphere encloses the new mesh. Any difference fails the edit: the patcher writes the earlier location back, generates the pad again and checks that the regenerated mesh matches the mesh it captured before the edit.
 
 ## Detaching is refused
 

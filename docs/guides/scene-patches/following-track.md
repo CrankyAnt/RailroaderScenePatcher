@@ -26,7 +26,7 @@ On every world load the patcher places the object relative to the track's curren
 
 A failed move restores the object's previous state. When that restoration cannot be verified, the object refuses further edits and stops following until **Recheck** succeeds or the world reloads.
 
-Track following changes only placement. It does not change a marker's binding, its graph registration or its activity. Change a binding as described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
+Track following changes only placement. It does not change a marker's binding, the track location the game lists for it or its activity. Change a binding as described in [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
 
 ## Disable an object whose activity follows a track group
 

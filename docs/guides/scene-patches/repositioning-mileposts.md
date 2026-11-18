@@ -17,7 +17,7 @@ The patcher edits a milepost when all of these hold:
 - No component other than the milepost itself listens to the marker's location changes.
 - If a `Track.TrackRelativePosition` on the object makes its activity follow a track group, it activates this object itself. No other component has replaced its activation callback.
 - No loaded component other than the milepost and that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check.
-- The graph holds one registration of the marker at its current location while the post is enabled and active, and none otherwise.
+- The game lists one track location for the marker, at its current location, while the post is enabled and active, and none otherwise.
 
 The inventory lists an object that meets these conditions in the `Milepost` family with the structure `milepost-v1`. For any other milepost, **Supported edits** on the **Object** tab reads **Not editable:** and gives the reason.
 
@@ -29,7 +29,7 @@ The inventory lists an object that meets these conditions in the `Milepost` fami
 
 ## Set, replace or detach the binding in the native map editor
 
-1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end and distance, and each graph registration under the marker ID with its owner.
+1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end and distance, and each track location the game lists under the marker ID, each in a **Track location listed by the game** row; a location that belongs to another object says so.
 2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**. To select the segment in the world, choose **Segment** under **Replacement targets**, click the track and choose **Confirm** in the footer. The **Segment** field takes the confirmed segment.
 3. Select **Set**. **Detach** removes the post from the track, and **Clear binding** returns it to its underlying binding.
 

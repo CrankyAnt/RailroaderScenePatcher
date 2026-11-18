@@ -15,7 +15,7 @@ The patcher edits a marker when all of these hold:
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object whose activity follows a track group activates this object itself, and no other component has replaced its activation callback,
 - no loaded component other than that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it does not know the holders and refuses every marker until the next check,
-- the graph holds one registration of the marker at its current location while the marker is enabled and active, and none otherwise. A registration that another scene marker with the same marker id holds is not a registration of this marker.
+- the game lists one track location for the marker, at its current location, while the marker is enabled and active, and none otherwise. A track location listed for another scene marker with the same marker id does not count for this marker.
 
 A Generic marker inside a grade-crossing setup, such as a whistle sign under a `Track.Crossings.GradeCrossingController`, qualifies like any other: the crossing controller reads its circuits and spans, and the auto engineer's crossing horn reads the crossing pad's `Crossing` marker, not the sign. The crossing pad and the crossing's own `Crossing` markers keep their own operations.
 
@@ -32,17 +32,17 @@ The inventory lists an object that meets these conditions in the `Track marker` 
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit, and the marker keeps its binding and registration. The patcher never picks a nearby segment instead.
 
-After the check it removes the marker's graph registration, writes the new location, and registers the marker at that location when the marker is enabled and active. A map label below the marker is registered with the map again, so its dimming follows the track group of the new location. The patcher then verifies that the stored location is the mod's location, that the graph holds exactly one registration, for this marker, at that location, and that each registered map label is dimmed by the new location's track group. Any difference fails the edit and restores the earlier location and registration.
+After the check, the patcher removes the track location the game lists for the marker, writes the new stored location, and has the game list the marker at that location when the marker is enabled and active. A map label below the marker is registered with the map again, so its dimming follows the track group of the new location. The patcher then verifies that the stored location is the mod's location, that the game lists exactly one track location under the marker's ID, belonging to this marker, at that location, and that each registered map label is dimmed by the new location's track group. Any difference fails the edit and restores the earlier stored location and the track location the game listed.
 
 ## Detach the marker
 
-Select **Detach** at the bottom of the tab. The stored location becomes empty and the graph holds no registration for the marker, so a lookup by its ID no longer finds it. The object stays where it is and keeps its activity. The scene patch file records an explicit `"detach": true`; leaving the relationship out of the scene patch file would leave the binding untouched.
+Select **Detach** at the bottom of the tab. The stored location becomes empty and the game lists no track location for the marker, so a lookup by its ID no longer finds it. The object stays where it is and keeps its activity. The scene patch file records an explicit `"detach": true`; leaving the relationship out of the scene patch file would leave the binding untouched.
 
 ## Undo, clear and remove
 
 Native Undo and Redo reverse and reapply each binding edit together with its registration. **Clear binding** at the bottom of the **Connections** tab removes only the relationship from this mod's modification: the marker returns to the binding the loaded map gives it, while the mod's placement or activity stays. **Remove modification** in the footer removes the whole modification and returns binding, registration, placement and activity to the loaded map's values. Other objects' modifications stay applied.
 
-If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the marker until **Recheck** in the footer succeeds or the world reloads. Recheck refuses while the graph registration does not match the stored location.
+If an edit fails and the patcher cannot verify the restoration, it reports incomplete cleanup and refuses further edits of the marker until **Recheck** in the footer succeeds or the world reloads. Recheck refuses while the track location listed by the game does not match the stored location.
 
 ## Activity and registration
 
@@ -50,7 +50,7 @@ A disabled marker keeps its binding without a registration. When it is enabled, 
 
 ## Markers with a duplicate marker id
 
-Some scene markers hold a duplicate marker id: another scene marker holds the same marker id. In the base-game map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`, and six `Whistle Sign W` markers hold `Mkft`. The game removes a marker's graph registration by its marker id, and it removes that marker id from every segment. Disabling or rebinding one holder would therefore also remove the registration of the others.
+Some scene markers hold a duplicate marker id: another scene marker holds the same marker id. In the base-game map, the active speed sign `Speed - Fontana South Curve (3)` and an inactive yard limit hold `Mg6m`, and six `Whistle Sign W` markers hold `Mkft`. When the game removes the track location listed for one marker, it removes every track location listed under that marker id, on every segment. Disabling or rebinding one holder would therefore also remove the registration of the others.
 
 The **Dependencies** section on the **Object** tab of such a marker starts with the duplicate marker id, the number of scene markers that hold it and why their edits are refused. One sentence per holder follows: first the inspected marker, as **This marker**, then the active holders and the inactive ones last, each with its scene and path, whether it is active, and where it has a registration under the marker id, or that it has none. A registration under the marker id that no scene marker holds gets a sentence of its own. A scene marker that is not loaded but still owns a registration under the marker id also counts as a holder.
 
@@ -97,13 +97,13 @@ Remove a repair with **Remove modification** in the footer. This restores the un
 
 The automated tests check set, replacement, detachment, omission, refusal of missing, ambiguous and out-of-range targets, dependency isolation, failure restoration, guarded retry, Undo, Redo, removal and reload against a controlled track graph. They also check the dependency lines and refusals for a pair and a group of three holders of a duplicate marker id, a holder whose activity follows its track group, crossing pads, and a holder that is not loaded, and that no holder loses its registration. They do not load Railroader. One native journey on Railroader with patcher commit `c4b6cb9` inspected the `Mg6m` pair and the six `Mkft` holders, one of them inactive through an inactive parent, and saw Enable and a rebind of the yard limit and a Disable of a whistle sign refused while every holder's registration stayed the same. That journey used the earlier wording of the explanation.
 
-The supported pattern comes from the game's source: setting a marker's location does not change its graph registration, so the patcher repeats the registration steps the marker performs when it is enabled and disabled.
+The game's source shows that changing a marker's stored track location leaves the location listed by the game unchanged, so the patcher adds or removes that listing as the marker does when enabled or disabled.
 
-One native journey on Railroader 0.6.2 with patcher source `a59b8d9` exercised the yard limit Mkwd in the native map editor of a test mod, with four other inherited signs as unchanged controls. Set, replacement, detachment, refusal of a missing segment and of a distance beyond the segment, a placement change, native Undo and Redo, clearing the mod's binding, physical snap, Save, native map editor reload and removal behaved as described above. Each bound state had exactly one graph registration owned by the marker and a matching graph lookup, a detached marker had none, and the controls kept their bindings, registrations and placements. That journey did not cover a completed transform-gizmo placement of a bound marker, which it refused as a changed target, a map-label refresh, because no admitted sign has a registered map label, or a second application within one load. It covers that marker, build and fixture only.
+One native journey on Railroader 0.6.2 with patcher source `a59b8d9` exercised the yard limit Mkwd in the native map editor of a test mod, with four other inherited signs as unchanged controls. Set, replacement, detachment, refusal of a missing segment and of a distance beyond the segment, a placement change, native Undo and Redo, clearing the mod's binding, physical snap, Save, native map editor reload and removal behaved as described above. In each bound state, the game listed exactly one track location under the marker's ID, it belonged to the marker, and looking up the marker by ID returned that location. A detached marker had no listed location, and the controls kept their bindings, registrations and placements. That journey did not cover a completed transform-gizmo placement of a bound marker, which it refused as a changed target, a map-label refresh, because no admitted sign has a registered map label, or a second application within one load. It covers that marker, build and fixture only.
 
 The game reads a Generic marker's binding in these places:
 
-- Track scripts look a marker up by ID in the graph registration, and fall back to the marker's stored location.
+- Track scripts look up the track location the game lists for a marker ID and fall back to the marker's stored location.
 - The map dims a label below a marker by the track group of the marker's location, cached when the label registers. The patcher refreshes that cache.
 - A new-game car placement reads its marker's location when the setup runs. Such a marker is a starter placement marker with its own family; see [starter placement markers](inspect-scene-objects.md#starter-placement-markers).
 - The flare and planner queries read registrations of their own marker types, not of Generic markers.
