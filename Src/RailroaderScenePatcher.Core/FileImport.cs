@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher.Core {
                 var mine = fileRoot[member]; var theirs = readRoot?[member];
                 if (mine != null && theirs != null && PreservingJson.SameContent(mine, theirs)) continue;
                 changes.Add(new ImportChange(member, theirs == null ? ImportChangeKind.New : mine == null ? ImportChangeKind.Removed : ImportChangeKind.Changed, null,
-                    "Changes content outside the modifications (" + member + ").", true));
+                    "Changes content outside the modifications: " + member + ".", true));
             }
             return new ImportOverview(changes, conflicts, fingerprint, text);
         }
@@ -187,7 +187,7 @@ namespace RailroaderScenePatcher.Core {
             if (after == null) return "Removes " + subject + ". The object returns to its state without this modification.";
             if (before == null) return "Adds " + subject + ". It sets " + List(Settings(after, null)) + ".";
             var changed = Settings(after, before);
-            return "Changes " + subject + ": " + (changed.Count == 0 ? "its content" : List(changed)) + ".";
+            return "Changes " + (changed.Count == 0 ? "the content" : List(changed)) + " in " + subject + ".";
         }
         // The settings an entry holds, or, against an earlier value, the settings whose values differ.
         static List<string> Settings(JObject entry, JObject against) {
@@ -213,9 +213,9 @@ namespace RailroaderScenePatcher.Core {
                 case "dependsOn": return "the dependencies";
                 case "starterPlacement": return "the starter placement";
                 case "trackMarker": return "the track binding";
-                case "crossingCoverage": return "the detection coverage";
+                case "crossingCoverage": return "the crossing coverage";
                 case "crossingEquipment": return "the added lights, gates and bells";
-                default: return "content this patcher version does not execute (" + member + ")";
+                default: return "content this patcher version does not apply (" + member + ")";
             }
         }
         static string List(IReadOnlyList<string> items) {
@@ -228,16 +228,16 @@ namespace RailroaderScenePatcher.Core {
             var subject = (keys.Count == 1 ? "Modification ID " + keys[0] : "Modification IDs " + List(keys)) + (name == null ? "" : " for " + name);
             string description;
             switch (kind) {
-                case ImportConflictCase.SameObject: description = subject + ": this session's edits and the file change the same object under different modification IDs."; break;
-                case ImportConflictCase.NewOnBothSides: description = subject + ": new in this session and new in the file, with different content."; break;
-                default: description = subject + ": changed by this session's edits and in the file."; break;
+                case ImportConflictCase.SameObject: description = subject + (keys.Count == 1 ? " refers" : " refer") + " to the same object. Your edits and the file change it under different modification IDs."; break;
+                case ImportConflictCase.NewOnBothSides: description = subject + (keys.Count == 1 ? " is new" : " are new") + " in both your edits and the file, with different content."; break;
+                default: description = subject + (keys.Count == 1 ? " has" : " have") + " changes in both your edits and the file."; break;
             }
             var editorSide = String.Join(" ", keys.Where(k => !SameEntry(Entry(start, k), Entry(editor, k))).Select(k => Effect(k, name, Entry(start, k), Entry(editor, k))));
             var fileSide = String.Join(" ", keys.Where(k => !SameEntry(Entry(editor, k), Entry(file, k))).Select(k => Effect(k, name, Entry(editor, k), Entry(file, k))));
             return new ImportConflict(number, kind, keys, name,
                 description,
                 ("Editor version: keeps your edits. " + editorSide).TrimEnd(),
-                ("File version: discards your edits for " + (keys.Count == 1 ? "this entry" : "these entries") + ". Their steps stay in Undo and Redo and change nothing. " + fileSide).TrimEnd());
+                ("File version: discards your edits for " + (keys.Count == 1 ? "this entry" : "these entries") + ". Their steps remain in Undo and Redo but no longer change anything. " + fileSide).TrimEnd());
         }
 
         // Applies every change of the overview and every conflict choice at once. When one fails, scene patch editing returns to

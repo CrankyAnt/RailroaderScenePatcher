@@ -90,9 +90,9 @@ static class FileImportTests {
         world.Outside(Doc(Item("a", "p", 110), "\"futureTop\":{\"x\":3},"));
         Assert(world.Session.OpenImport().Applied, "Overview opens");
         var change = world.Session.Import.Changes.Single();
-        Assert(change.Description == "Changes content outside the modifications (futureTop)." && change.Kind == ImportChangeKind.New, "A top-level change is listed: " + change.Description);
+        Assert(change.Description == "Changes content outside the modifications: futureTop." && change.Kind == ImportChangeKind.New, "A top-level change is listed: " + change.Description);
         Assert(world.Session.ApplyImport().Applied && world.Session.LastImport.Changes == 1, "The top-level change counts as applied");
-        Assert(FilePanelState.Completed(new ImportResult(0, 0, 1), true).StartsWith("Import completed. No changes applied, 1 conflict kept the editor version."), "A count of zero says No changes applied");
+        Assert(FilePanelState.Completed(new ImportResult(0, 0, 1), true).StartsWith("Import completed. No changes applied, editor version kept for 1 conflict."), "A count of zero says No changes applied");
     }
     static void UnavailableTargetIsIsolated() {
         var world = new World(Doc(Item("a", "p", 110)), "p");
@@ -266,7 +266,7 @@ static class FileImportTests {
         var world = new World(Doc(Item("a", "p", 110)), "p");
         world.Outside(Doc(Item("a", "p", 110) + "," + Item("future", "p", 120, ",\"futureOperation\":true"), "\"futureTop\":{\"x\":3},"));
         Assert(world.Session.OpenImport().Applied, "Overview opens");
-        Assert(world.Session.Import.Changes.Any(c => c.Key == "future" && c.Description.Contains("does not execute")), "Unknown content is named as not executed");
+        Assert(world.Session.Import.Changes.Any(c => c.Key == "future" && c.Description.Contains("does not apply")), "Unknown content is named as not applied");
         var applied = world.Session.ApplyImport();
         Assert(applied.Applied && world.X("p") == 110, "Unknown content is kept without execution: " + applied.Error);
         world.Session.Edit(Target("p"), At(111), null);
@@ -299,12 +299,12 @@ static class FileImportTests {
         world.Outside(Doc(Item("a", "p", 119)));
         Assert(FilePanelState.Of(session) == FilePanelState.Kind.VersionChoice && FilePanelState.Heading(FilePanelState.Kind.VersionChoice) == "Version choice", "A pending choice opens the Version choice panel");
         Assert(EditFeedback.Primary(session, false, false) == EditFeedback.PrimaryMessage.None, "The message area holds no version choice");
-        Assert(FilePanelState.KeepEditorEffect.Contains("Save is no longer refused") && FilePanelState.KeepEditorEffect.Contains("next Save replaces the file"), "Keep editor version states both effects before the choice");
+        Assert(FilePanelState.KeepEditorEffect.Contains("lets you save again") && FilePanelState.KeepEditorEffect.Contains("next Save replaces the file"), "Keep editor version states both effects before the choice");
         Assert(CommandBand.Tooltip("Inspect.", FilePanelState.Reason(FilePanelState.Of(session))) == "Unavailable: Choose a version in the Version choice panel first.", "A control outside the panel shows its reason");
         Assert(session.OpenImport().Applied && FilePanelState.Of(session) == FilePanelState.Kind.Import && FilePanelState.Heading(FilePanelState.Kind.Import) == "Import", "Import replaces the choice in the same panel");
         session.CancelImport();
         world.Outside("{broken");
         Assert(FilePanelState.Of(session) == FilePanelState.Kind.Repair && FilePanelState.Heading(FilePanelState.Kind.Repair) == "Repair", "A file that needs repair opens the Repair panel");
-        Assert(FilePanelState.Completed(new ImportResult(2, 1, 0), true) == "Import completed. 2 changes applied, 1 conflict took the file version. Click Save in the Map Editor to write the scene patch file.", "Import results name what was applied");
+        Assert(FilePanelState.Completed(new ImportResult(2, 1, 0), true) == "Import completed. 2 changes applied, file version used for 1 conflict. Click Save in the Map Editor to write the scene patch file.", "Import results name what was applied");
     }
 }

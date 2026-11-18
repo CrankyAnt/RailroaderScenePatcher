@@ -59,7 +59,7 @@ namespace RailroaderScenePatcher {
             var import = session.Import;
             PlainLabel(builder, FilePanelState.ImportIntro);
             Section(builder, "Changes (" + import.Changes.Count + ")");
-            if (import.Changes.Count == 0) PlainLabel(builder, "No change applies without a conflict.");
+            if (import.Changes.Count == 0) PlainLabel(builder, "There are no changes without conflicts.");
             foreach (var change in import.Changes)
                 builder.AddLabel("<b>" + FilePanelState.KindLabel(change.Kind) + "</b> " + PathBreaks(Literal(change.Description)));
             Section(builder, "Conflicts (" + import.Conflicts.Count + ")");
@@ -73,7 +73,7 @@ namespace RailroaderScenePatcher {
                     segments.AddSegment(FilePanelState.ChoiceLabel(false), conflict.UseFile == false, presentation.Action(() => ChooseImportVersion(number, false)))
                         .Tooltip(FilePanelState.ChoiceLabel(false), "Keep your edits for this conflict.");
                     segments.AddSegment(FilePanelState.ChoiceLabel(true), conflict.UseFile == true, presentation.Action(() => ChooseImportVersion(number, true)))
-                        .Tooltip(FilePanelState.ChoiceLabel(true), "Take the file's version for this conflict and discard your edits for it.");
+                        .Tooltip(FilePanelState.ChoiceLabel(true), "Use the file version for this conflict and discard your edits for it.");
                 });
             }
         }
@@ -85,11 +85,11 @@ namespace RailroaderScenePatcher {
                     Slot(FilePanelState.Import, FilePanelState.ImportEffect, null, OpenImport) };
                 case FilePanelState.Kind.Repair: return new[] {
                     Slot(FilePanelState.KeepEditor, FilePanelState.RepairKeepEffect(session), !session.VersionFileMissing && session.BackupPreview == null ? "The backup path is unavailable." : null, () => ChooseFileVersion(false)),
-                    Slot(FilePanelState.Details, "Open the session details with the full diagnosis.", null, () => presentation.ToggleDetails()),
+                    Slot(FilePanelState.Details, "Open Details to read the full diagnosis for this session.", null, () => presentation.ToggleDetails()),
                     Slot(FilePanelState.Copy, "Copy the full diagnosis.", null, () => { GUIUtility.systemCopyBuffer = FullDiagnosis(session); feedback.Report(RecoveryPlace, "Diagnosis copied to the clipboard."); }) };
                 case FilePanelState.Kind.Import: return new[] {
-                    Slot(FilePanelState.Import, "Apply every change and conflict choice in this overview at once.", session.Import?.ApplyRefusal, ApplyImport),
-                    Slot(FilePanelState.Cancel, "Close the overview and discard its conflict choices. Nothing changes, and the version choice stays pending.", null, CancelImport) };
+                    Slot(FilePanelState.Import, "Apply all changes and your choices for all conflicts in this overview together.", session.Import?.ApplyRefusal, ApplyImport),
+                    Slot(FilePanelState.Cancel, "Close the overview and discard your conflict choices. Nothing changes. You still need to choose a version.", null, CancelImport) };
                 default: return new Act[0];
             }
         }
@@ -120,7 +120,7 @@ namespace RailroaderScenePatcher {
         }
         void CancelImport() {
             attachment.Session.CancelImport();
-            feedback.Report(ImportPlace, "Import canceled. Nothing changed; choose a version to continue.");
+            feedback.Report(ImportPlace, "Import canceled. Nothing changed. Choose a version to continue.");
             VersionChanged();
         }
         // What the file panel's look depends on beyond the version state, for the rebuild key.
