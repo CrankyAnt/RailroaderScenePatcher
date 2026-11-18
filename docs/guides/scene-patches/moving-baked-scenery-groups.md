@@ -10,7 +10,7 @@ A baked scenery group is saved in the map's scene. Props, masks and other object
 
 ## Which groups are listed
 
-The **Baked scenery group** family in the outliner lists one entry per group root, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object one level below a `World` folder, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, the root is one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`.
+The **Baked scenery group** family in the outliner lists one entry per group root, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object one level below a `World` folder, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, the root is one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`. The `World/Large Scenery/Almond Bridge` folder is itself a group root, because it holds the construction of one rail bridge; see [rail bridges outside Ela](#rail-bridges-outside-ela).
 
 To be listed, a group must be saved in the scene, have a renderer, collider, light, storage pile or log pond at or below its root, and belong to no other family. The following objects have no group entry:
 
@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, spawn point or map icon. The same restriction applies to road bridges, rail bridge constructions outside Ela and crossbucks at unprotected crossings.
+Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, spawn point or map icon. The same restriction applies to road bridges and crossbucks at unprotected crossings.
 
 Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -130,6 +130,34 @@ On the **Object** tab, **Use in the game** names each interactive part and its k
 
 The object that animates a stall's doors, such as `Stall (2) / Roundhouse Modular A Stall`, has no row of its own. It holds the stall's walls, roof and doors and moves with its stall, so move the stall to move the doors. The turntable and the tracks into the stalls are native map data; move them in the native map editor.
 
+## Rail bridges outside Ela
+
+You can move, rotate or disable a rail bridge construction outside Ela so that it stands where you moved its track in the native map editor. Each construction is a group under **Bridge** > **Rail bridges**, beside `Ela Bridge`:
+
+- `Bridge 1` at Bryson, with its parts `Bridge 1 / Abutments` and `Bridge 1 / Steel` and the objects below them.
+- `Almond Bridge`, the folder `World/Large Scenery/Almond Bridge`, with its parts `Almond Bridge / Abutments` and `Almond Bridge / Steel`. The folder carries the bridge's construction controller and culler, so the abutments and steel are parts of one group.
+- Each of the seven plate girder bridges below `World/Large Scenery/Plate Girder Bridge`, such as `Plate Girder Bridge (1)`. Each one is one object without parts.
+
+The construction moves with its colliders and culling. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere or capsule collider follow the construction. The patcher does not compare the bounds of mesh colliders. It also checks that the generated trestles near the bridge stay unchanged. The patcher refuses a construction that holds a track component or a generated trestle.
+
+The track stays native map data. The native map editor moves it, and the track keeps its own trestle or steel flags. A rail bridge does not follow its track: **Follow** is unavailable for a rail bridge and its parts, and a hand-written track-following placement is refused. Move the track first, and then move the construction onto it:
+
+1. In the native map editor, move the track that the bridge carries.
+1. In **Scene patches**, select the construction under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
+1. Click **Save** in the native map editor.
+
+### Construction segments
+
+Bryson Bridge 1 and the Almond Bridge each have a construction controller. It switches parts of the bridge on and off by the construction state of its construction segments: the track segments that the controller names by ID. On the **Object** tab of the construction and of its parts, **Use in the game** names these segments. The controller finds the segments by ID, not by position. Whether the construction shows its state correctly at a new place has not yet been observed in Railroader. A plate girder bridge has no construction controller, and its **Use in the game** reads as decorative.
+
+The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. If you split or replace the track natively, a segment can stop existing. The tab then shows its ID followed by `no longer exists`. The patcher reports no problem for it. The game's own construction controller fails when one of its segments no longer exists, so the construction no longer follows the state of its segments.
+
+### Disable an object that the construction switches
+
+You can disable the construction root, a part or a plate girder bridge. A disable holds even against the construction controller: the object stays off when the controller would switch it on. The **Object** tab and the footer's message area then show an amber warning that the object stays off in the game although the game's track construction progress switches it on, because your disable holds against it. **Enable** or **Clear activity** returns the object to the controller's current choice. Which objects of Bryson Bridge 1 and the Almond Bridge the controller switches has not yet been observed in Railroader.
+
+A part moved outside its culler's sphere gets its own culling sphere, as described in [what the patcher checks](#what-the-patcher-checks). For a part that the controller switches, its own sphere shows the part only while the controller shows it.
+
 ## Write the modification by hand
 
 Click **Copy ID** in the command band to copy the identity. Add a modification under a key of your choice in the `modifications` object of `Data/scene-patches.json`, as described in [scene patch file v1](scene-patch-file-v1.md):
@@ -207,5 +235,7 @@ The runs did not cover other groups, groups with game logic or terrain shaping, 
 Lake surfaces are not yet measured in Railroader. Automated tests check their listing, edits, refusal, restoration, Undo, Redo, Save and reload with controlled groups. Not yet observed in the game: whether the water and the logs appear at the new place, whether the log pond keeps following the sawmill's storage there, whether a moved lake appears and disappears by camera distance at its new place, and whether the game draws the lake surfaces of the base map from a static batch.
 
 Automated tests also check part edits and a moved part's separate culling sphere with a controlled group.
+
+Rail bridges outside Ela are not yet measured in Railroader. Automated tests use a controlled construction. They check the listing, moves with colliders and culling, a disable that holds against the construction controller, own culling that follows the controller, refused track following, failure restoration, Undo, Redo, Save and reload. Not yet observed in the game: collision and culling at the new place, the native track's trestle or steel flags, construction visibility after a construction-state change, and a train crossing a moved bridge.
 
 These results hold for the Railroader 0.6.3 journey on the Whittier saw mill, Bryson House Track, Bryson Yard and Bryson Signs groups. In that run Bryson Yard was still one group, and its lamp post Tall Post Shade was moved as a part. A moved part outside its culler's sphere got a separate culling sphere, and the culler kept its radius (300 m for the saw mill). The part showed at 64 m, 2 km and about 5 km from its culler, in view and out of view, and returned to the culler when moved back inside. Undo, Redo, **Remove modification**, disabling, Save and reload, a floating-origin shift and a cancelled gizmo gesture left one separate sphere or none, as expected. Not measured: collision at the new place, a Bryson Signs container whose own culler runs, and a grade crossing with a moved neighbor. The unedited saw mill switched off between 1175 m and 1308 m from the camera, far beyond the culler's 300 m radius.

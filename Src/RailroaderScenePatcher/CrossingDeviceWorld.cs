@@ -217,6 +217,8 @@ namespace RailroaderScenePatcher {
             return problem == null ? null : "This " + (bells ? "bell" : "mast") + " cannot be edited: " + problem;
         }
         public string ActivityRefusal(object part) => ActivityProblem(part as GameObject);
+        // Existing equipment refuses track-following placement itself (ExistingEquipmentScene).
+        public string FollowingRefusal(object target) => null;
         // Crossing masts and bells hold no lake surface.
         public string PlacementRefusal(object target) => null;
         static double[] Coordinates(Vector3 v) => new double[] { v.x, v.y, v.z };

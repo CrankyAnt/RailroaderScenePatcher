@@ -95,7 +95,7 @@ namespace RailroaderScenePatcher {
         static string F(float n) => n.ToString("R", CultureInfo.InvariantCulture);
         static string V(Vector3 v) => F(v.x) + "," + F(v.y) + "," + F(v.z);
         static string Q(Quaternion q) => F(q.x) + "," + F(q.y) + "," + F(q.z) + "," + F(q.w);
-        static string Shape(Collider c) {
+        internal static string Shape(Collider c) {
             var shape = c.GetType().FullName + " trigger=" + c.isTrigger + " layer=" + c.gameObject.layer + " contactOffset=" + F(c.contactOffset);
             if (c is BoxCollider box) shape += " center=" + V(box.center) + " size=" + V(box.size);
             if (c is SphereCollider sphere) shape += " center=" + V(sphere.center) + " radius=" + F(sphere.radius);
@@ -105,7 +105,7 @@ namespace RailroaderScenePatcher {
         }
         // After synchronisation, the world bounds of an active primitive collider are centred on its transformed centre.
         // Mesh collider bounds are not centred on a fixed point; their agreement is left to the native contact check.
-        static bool BoundsFollow(Collider c) {
+        internal static bool BoundsFollow(Collider c) {
             if (!c.enabled || !c.gameObject.activeInHierarchy) return true;
             Vector3 center;
             if (c is BoxCollider box) center = box.center;
@@ -116,20 +116,7 @@ namespace RailroaderScenePatcher {
         }
         string SeparateScenery(GameObject bridge) {
             if (!trestles.TryGetValue(bridge, out var selected)) trestles.Add(bridge, selected = NearbyTrestles(bridge.transform.position));
-            var text = new StringBuilder();
-            foreach (var c in selected) {
-                if (c == null) { text.AppendLine("trestle destroyed"); continue; }
-                var t = c.transform;
-                text.Append("trestle ").Append(c.GetInstanceID()).Append(' ').Append(BoardScene.PathOf(t)).Append(" parent=").Append(t.parent == null ? 0 : t.parent.GetInstanceID())
-                    .Append(" local=").Append(V(t.localPosition)).Append(' ').Append(Q(t.localRotation)).Append(' ').Append(V(t.localScale))
-                    .Append(" active=").Append(c.gameObject.activeSelf).Append('/').Append(c.gameObject.activeInHierarchy).Append(" enabled=").Append(((Behaviour)c).enabled)
-                    .Append(" generated=").Append(Field(c, "_hasGenerated"));
-                if (Field(c, "controlPoints") is IEnumerable points) foreach (var point in points) text.Append(" point=").Append(point == null ? "null" : V((Vector3)Field(point, "position")) + "/" + Q((Quaternion)Field(point, "rotation")));
-                var matrices = new StringBuilder(); var count = 0;
-                if (Field(c, "_beamMatrices") is IEnumerable beams) foreach (Matrix4x4 m in beams) { for (var i = 0; i < 16; i++) matrices.Append(F(m[i])).Append(','); matrices.Append(';'); count++; }
-                using (var sha = SHA256.Create()) text.Append(" beams=").Append(count).Append(' ').Append(BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(matrices.ToString()))).Replace("-", ""));
-                text.AppendLine();
-            }
+            var text = new StringBuilder(DescribeTrestles(selected));
             // Construction-scenery controllers that reference the bridge: their placement and configuration.
             foreach (var controller in Resources.FindObjectsOfTypeAll<MonoBehaviour>().Where(c => c != null && Loaded(c.gameObject) && c.GetType().FullName == SceneryType).OrderBy(c => c.GetInstanceID())) {
                 var description = new StringBuilder(); var references = false;
@@ -147,8 +134,28 @@ namespace RailroaderScenePatcher {
             }
             return text.ToString();
         }
-        Component[] NearbyTrestles(Vector3 center) =>
+        // The placement, activity, control points and generated beams of generated trestles, one line each.
+        internal static string DescribeTrestles(IEnumerable<Component> selected) {
+            var text = new StringBuilder();
+            foreach (var c in selected) {
+                if (c == null) { text.AppendLine("trestle destroyed"); continue; }
+                var t = c.transform;
+                text.Append("trestle ").Append(c.GetInstanceID()).Append(' ').Append(BoardScene.PathOf(t)).Append(" parent=").Append(t.parent == null ? 0 : t.parent.GetInstanceID())
+                    .Append(" local=").Append(V(t.localPosition)).Append(' ').Append(Q(t.localRotation)).Append(' ').Append(V(t.localScale))
+                    .Append(" active=").Append(c.gameObject.activeSelf).Append('/').Append(c.gameObject.activeInHierarchy).Append(" enabled=").Append(((Behaviour)c).enabled)
+                    .Append(" generated=").Append(Field(c, "_hasGenerated"));
+                if (Field(c, "controlPoints") is IEnumerable points) foreach (var point in points) text.Append(" point=").Append(point == null ? "null" : V((Vector3)Field(point, "position")) + "/" + Q((Quaternion)Field(point, "rotation")));
+                var matrices = new StringBuilder(); var count = 0;
+                if (Field(c, "_beamMatrices") is IEnumerable beams) foreach (Matrix4x4 m in beams) { for (var i = 0; i < 16; i++) matrices.Append(F(m[i])).Append(','); matrices.Append(';'); count++; }
+                using (var sha = SHA256.Create()) text.Append(" beams=").Append(count).Append(' ').Append(BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(matrices.ToString()))).Replace("-", ""));
+                text.AppendLine();
+            }
+            return text.ToString();
+        }
+        // The generated trestles within 250 m of a point, or whose control points lie there.
+        internal static Component[] TrestlesNear(Type trestle, Vector3 center) =>
             Resources.FindObjectsOfTypeAll(trestle).OfType<Component>().Where(c => c != null && Loaded(c.gameObject) && Near(c, center)).OrderBy(c => c.GetInstanceID()).ToArray();
+        Component[] NearbyTrestles(Vector3 center) => TrestlesNear(trestle, center);
         // Distances in world space equal distances in map space under the floating origin.
         static bool Near(Component c, Vector3 center) {
             if ((c.transform.position - center).magnitude <= TrestleRadius) return true;

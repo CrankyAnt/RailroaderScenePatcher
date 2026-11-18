@@ -30,8 +30,7 @@ Alarka | Wood Platform 2 x 2 (7) | Group | Platform
 Alarka | Wood Platform 2 x 2 (8) | Group | Platform
 Alarka | Wood Platform 2 x 2 (9) | Group | Platform
 Alarka | Wood Platform Ramp 2 x 4 (1) | Group | Platform
-Almond Bridge | Abutments | Group | Bridge / Rail bridges
-Almond Bridge | Steel | Group | Bridge / Rail bridges
+Almond Bridge |  | Group | Bridge / Rail bridges
 Almond | Almond Depot | Group | Station building
 Almond | Almond Road Bridge | Group | Bridge / Road bridges
 Almond | Tall Post Shade | Group | Lights
@@ -108,7 +107,7 @@ Wilmot | Wilmot Station | Group | Station building";
     static readonly Row[] Rows = Table.Split('\n').Select(line => line.Trim()).Where(line => line.Length != 0).Select(line => {
         var cells = line.Split('|').Select(cell => cell.Trim()).ToArray();
         var category = cells[3].Split(new[] { " / " }, StringSplitOptions.None);
-        return new Row { Path = "World/Large Scenery/" + cells[0] + "/" + cells[1], Folder = cells[2] == "Folder", Category = cells[2] == "Folder" ? null : category[0], Subcategory = category.Length > 1 ? category[1] : null };
+        return new Row { Path = ("World/Large Scenery/" + cells[0] + "/" + cells[1]).TrimEnd('/'), Folder = cells[2] == "Folder", Category = cells[2] == "Folder" ? null : category[0], Subcategory = category.Length > 1 ? category[1] : null };
     }).ToArray();
     static readonly string[] Categories = { "Station building", "Platform", "Lights", "Sign", "Grade crossing", "Bridge", "Industry building", "Storage display", "Railroad service building", "Other" };
 

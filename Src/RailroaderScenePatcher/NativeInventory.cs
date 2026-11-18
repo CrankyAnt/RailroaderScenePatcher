@@ -546,6 +546,15 @@ namespace RailroaderScenePatcher {
                 bindings.Add(CommandBand.LoaderBindingOf(Get(go, CarLoader)));
                 dependencies.Add("Car loader: cars under this object are loaded where it stands");
             });
+            // A rail bridge construction shows or hides its parts by the construction state of the track segments its
+            // controller names, wherever it stands: each segment is a binding of the group root and of every part below the
+            // controller. A segment that no longer exists keeps its id with a remark and is no problem.
+            if (groupRoot || part) Read(() => {
+                var ids = GroupWorld.ConstructionSegmentsOf(go);
+                if (ids == null) return;
+                bindings.AddRange(CommandBand.ConstructionBindings(ids, segmentIds));
+                dependencies.Add(CommandBand.ConstructionDependency);
+            });
             // A building with pickable toggles: each entry names the toggles, the key-value object and the name text it
             // owns, its own object and those below it outside its parts, and counts the toggles in its parts. Other
             // groups read none of this, so their bindings stay as they were.
@@ -557,7 +566,7 @@ namespace RailroaderScenePatcher {
             var active = go.activeInHierarchy;
             // A simple culler on a group root switches the root itself by camera distance: what it switches is runtime
             // state, as for the cullers of crossing equipment.
-            if (groupRoot || part) enabled = GroupWorld.Authored(go);
+            if (groupRoot || part) enabled = GroupWorld.Enabled(go);
             if (CulledFamilies.Contains(family) || groupRoot || part) {
                 var chain = new List<KeyValuePair<bool, bool>>();
                 for (var t = go.transform; t != null; t = t.parent) {

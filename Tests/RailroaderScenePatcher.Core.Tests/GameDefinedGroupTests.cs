@@ -93,13 +93,25 @@ static class GameDefinedGroupTests {
         Check(Members(GameDefinedGroups.Of(ela)) == "RailBridgeConstruction:0,1", "a target that is no inventory object brings in the nearest inventory object above it, and no other object below that one (got " + Members(GameDefinedGroups.Of(ela)) + ")");
         Check(ReferenceEquals(construction[0].Anchor, bridge[0].Node) && construction[0].Root < 0, "the construction is anchored by its controller");
         // Targets inside listed group roots: the construction is the outermost group and holds those roots with their parts.
-        var almond = new[] {
-            new GroupObject("Controller", Up("World/Large Scenery/Almond Bridge"), constructionController: true, targets: new[] { "Steel", "Abutments" }), // 0
-            Object("Steel", "World/Large Scenery/Almond Bridge", baked: true),             // 1
-            new GroupObject("Girder", Up("World/Large Scenery/Almond Bridge/Steel"), bakedPart: true), // 2
-            Object("Abutments", "World/Large Scenery/Almond Bridge", baked: true),         // 3
+        var targetsAsRoots = new[] {
+            new GroupObject("Controller", Up("World/Large Scenery/Somewhere"), constructionController: true, targets: new[] { "Steel", "Abutments" }), // 0
+            Object("Steel", "World/Large Scenery/Somewhere", baked: true),                 // 1
+            new GroupObject("Girder", Up("World/Large Scenery/Somewhere/Steel"), bakedPart: true), // 2
+            Object("Abutments", "World/Large Scenery/Somewhere", baked: true),             // 3
         };
-        Check(Members(GameDefinedGroups.Of(almond)) == "RailBridgeConstruction:0,1,2,3", "a construction whose targets are group roots holds those roots and their parts (got " + Members(GameDefinedGroups.Of(almond)) + ")");
+        Check(Members(GameDefinedGroups.Of(targetsAsRoots)) == "RailBridgeConstruction:0,1,2,3", "a construction whose targets are group roots holds those roots and their parts (got " + Members(GameDefinedGroups.Of(targetsAsRoots)) + ")");
+        // The Almond Bridge as the game holds it in Railroader 0.6.3: the folder carries the controller and the culler and
+        // is the group root, its abutments and steel are parts, and the controller is no inventory object of its own. The
+        // construction is one baked scenery group with the folder as its root.
+        var almond = new[] {
+            Object("Almond Bridge", "World/Large Scenery", baked: true),                       // 0
+            new GroupObject("Steel", Up("World/Large Scenery/Almond Bridge"), bakedPart: true),     // 1
+            new GroupObject("Truss", Up("World/Large Scenery/Almond Bridge/Steel"), bakedPart: true), // 2
+            new GroupObject("Abutments", Up("World/Large Scenery/Almond Bridge"), bakedPart: true), // 3
+            Object("Almond Depot", "World/Large Scenery/Almond", baked: true),                  // 4: another town
+        };
+        var almondGroups = GameDefinedGroups.Of(almond);
+        Check(Members(almondGroups) == "BakedSceneryGroup:0,1,2,3" && almondGroups[0].Root == 0, "the Almond Bridge is one group with the folder as its root and its abutments and steel as parts (got " + Members(almondGroups) + ")");
 
         // An industry storage display holds the storage piles or log pond that one industry's storage fills. An
         // industry building is its own group and no member of a storage display or another group.

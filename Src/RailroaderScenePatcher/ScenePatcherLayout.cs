@@ -606,6 +606,12 @@ namespace RailroaderScenePatcher {
             builder.Spacer(TabGap);
         }
 
+        // A rail bridge construction outside Ela, or a part of one: it takes no track-following placement.
+        bool IsRailBridge => selected != null && selected.Family == BakedSceneryRules.Family
+            && (selected.GroupPath == null ? selected.Subcategory : InventoryPresentationState.GroupOf(inventory, selected)?.Subcategory) == BakedSceneryCategories.RailBridges;
+        // An explicit disable holds the inspected object off against its track construction: the amber warning shows on
+        // the Object tab and in the footer.
+        bool HeldAgainstConstruction => selected?.Handle is GameObject held && GroupWorld.HeldAgainstConstruction(held);
         // The Object tab: what the object is, whether it is enabled, and what was detected about it.
         void DrawObject(UIPanelBuilder builder) {
             // A part names its group first, with the button that inspects the group directly after the name.
@@ -663,6 +669,7 @@ namespace RailroaderScenePatcher {
                 PlainLabel(builder, CommandBand.UseInGame(selected, selected.GroupPath != null ? InventoryPresentationState.GroupOf(inventory, selected) : null));
             }
             Section(builder, "State");
+            if (HeldAgainstConstruction) builder.AddLabel(Tint(Amber, CommandBand.ConstructionHoldWarning));
             // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
             var own = OwnActivity(selected);
             Field(builder, "Enabled", own ? (selected.Active ? "Yes" : "Yes; a parent is inactive") : "No")
@@ -731,7 +738,7 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
@@ -1160,6 +1167,7 @@ namespace RailroaderScenePatcher {
                 source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmation.Identity.ToString()));
             } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
             else if (feedback.Recovery?.Kind != FailureKind.IncompleteCleanup && feedback.Recovery?.Kind != FailureKind.Blocked && CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
+            else if (!guided.Enabled && HeldAgainstConstruction) { source = ActivityPlace; state = Tint(Amber, CommandBand.ConstructionHoldWarning); }
             // Entries in the area stack from the top without gaps:
             // the current state or newest result first, then the guided hint and the remaining results. Older results
             // are dimmed. Each names its action group. The area is a native scroll view: its content takes the height of its
@@ -1492,8 +1500,9 @@ namespace RailroaderScenePatcher {
                 default: {
                     var target = selected?.Handle as GameObject;
                     var enabled = OwnActivity(selected);
-                    // A part that a culler of the game switches by camera distance cannot hold an Enabled setting.
-                    var switched = block == null && target != null && selected.GroupPath != null ? GroupWorld.SwitchedPart(target) : block == null && target != null && IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
+                    // A part that a culler of the game switches by camera distance, and a group root or part that a rail
+                    // bridge's construction controller switches, cannot hold an Enabled setting.
+                    var switched = block == null && target != null && (selected.GroupPath != null || selected.Family == BakedSceneryRules.Family) ? GroupWorld.ActivityProblem(target) : block == null && target != null && IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                     return new[] {
                         Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.

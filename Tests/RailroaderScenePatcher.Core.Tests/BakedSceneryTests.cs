@@ -39,6 +39,8 @@ class FakePart {
     public string Id; public double[] Offset; public double[] Rotation = { 0, 0, 0, 1 }; public bool Active = true; public bool Culled, Switched;
     // The game turns or moves this part while it runs, as a gauge needle turns a clock hand.
     public bool Animated;
+    // A rail bridge's construction controller switches this part on and off by the state of its track segments.
+    public bool Constructed;
     // For a switched part: whether its culler shows it now. Off while its culler hides it, it counts as on.
     public bool Shown = true;
     public FakePart Parent; public FakeGroup Group;
@@ -49,6 +51,8 @@ class FakePart {
     public FakePart() { Renderer = new FakeRenderer { On = this }; }
 }
 class FakeRenderer { public FakePart On; public bool Enabled = true; }
+// A collider in the group: its type and shape, whether it is enabled, and whether its physics bounds follow its transform.
+class FakeGroupCollider { public string Id, Shape = "box"; public bool Enabled = true, Follows = true; }
 // A culler in the group: where its culling sphere is registered, relative to the root, or null while it holds none.
 // On names the part a culler stands on; without it the culler stands on the root. A culler is a simple culler on the
 // root and a renderer culler on a part unless Simple says otherwise.
@@ -80,6 +84,13 @@ class FakeGroup {
     public List<FakeCuller> Cullers = new List<FakeCuller> { new FakeCuller { Id = "SimpleCuller#9", OnRoot = true } };
     // Whether the simple culler on the root switches the root; null without one.
     public bool? RootCulling = true;
+    public List<FakeGroupCollider> Colliders = new List<FakeGroupCollider>();
+    // A construction controller switches the root itself.
+    public bool Constructed;
+    // A rail bridge construction: it and its parts take no track-following placement, and its separate track-owned
+    // scenery is described by Scenery.
+    public bool RailBridge;
+    public string Scenery;
     public FakeGroup() { foreach (var part in Parts) part.Group = this; }
     public FakePart Add(FakePart part) { part.Group = this; Parts.Add(part); return part; }
 }
@@ -99,11 +110,43 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     public string Refused, PartRefused;
     public int Mutations;
     public bool ThrowAfterPlacement, SkipCullingRefresh, LeavePartBehind, KeepPartBehind, KeepRootCulling, ThrowAfterPartPlacement, MoveSibling, KeepSiblingMoved;
+    // DetachCollider: the next group placement leaves the first collider's physics bounds behind, until the placement
+    // after it, unless KeepColliderDetached. ChangeColliderShape: the next part placement changes the first collider's
+    // shape, until the part placement after it. ConstructionFlips: the next group placement lets the construction
+    // controller switch off every part it switches.
+    public bool DetachCollider, KeepColliderDetached, ChangeColliderShape, ConstructionFlips, DisturbScenery;
+    bool detached; string shapeBefore;
+    // The activity of the objects a construction controller switches, shared with that controller.
+    public readonly ConstructionActivity Constructions;
+    // The controller's writes that the patcher diverted, by object: the stand-in's activity and what reports its
+    // changes. Like a Unity object, the stand-in reports only a change of its activity.
+    sealed class StandIn { internal bool Active; internal Action<bool> Changed; }
+    readonly Dictionary<object, StandIn> diverted = new Dictionary<object, StandIn>();
+    // The next culling refresh hides every own sphere before construction activity settles, as a culling manager that
+    // reports the sphere out of view at once does, such as at a world load far from the bridge.
+    public bool HideSpheresOnApply;
+    // The construction controller sets the object's activity, as a construction-state change makes it do: into the
+    // stand-in while the patcher diverts its writes, otherwise into the object itself.
+    public void Controller(object node, bool shows) {
+        if (diverted.TryGetValue(node, out var standIn)) { if (standIn.Active != shows) { standIn.Active = shows; standIn.Changed(shows); } return; }
+        if (node is FakeGroup group) { group.Active = shows; Registrations(group); } else { var part = (FakePart)node; part.Active = shows; Registrations(part.Group); }
+    }
+    public bool Diverted(object node) => diverted.ContainsKey(node);
+    sealed class ConstructionHost : IConstructionHost {
+        readonly FakeGroupWorld world;
+        internal ConstructionHost(FakeGroupWorld world) { this.world = world; }
+        public bool Switched(object node) => node is FakeGroup group ? group.Constructed : node is FakePart part && part.Constructed;
+        public bool Active(object node) => node is FakeGroup group ? group.Active : ((FakePart)node).Active;
+        public void Divert(object node, bool choice, Action<bool> changed) => world.diverted[node] = new StandIn { Active = choice, Changed = changed };
+        public void Restore(object node) => world.diverted.Remove(node);
+        public void SetActive(object node, bool active) => world.Native.SetActive(node, active);
+        public bool Alive(object node) => world.Alive(node);
+    }
     // The plan of the last culling refresh.
     public CullingPlan Plan;
     public readonly PartCullingController Culling;
     public readonly Host Native;
-    public FakeGroupWorld() { Native = new Host(this); Culling = new PartCullingController(Native); }
+    public FakeGroupWorld() { Native = new Host(this); Culling = new PartCullingController(Native); Constructions = new ConstructionActivity(new ConstructionHost(this), Culling); }
     double[] behind, sibling;
     // The group rule's verdicts by path, when set: a group path resolves and is refused as GroupWorld resolves and
     // refuses it (BakedSceneryRules.ResolvesGroup, GroupRefusal), and so does a part path that names a group root.
@@ -133,6 +176,8 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     // A part's own activity as the scene or the modder set it: what own culling holds for a part it switches, and on
     // for a part that is off only because a culler of the game hides it.
     bool Authored(FakePart part) {
+        var shared = Constructions.Effective(part);
+        if (shared != null) return shared.Value;
         var own = SimpleOn(part.Group, part);
         var hidden = part.Group.Cullers.Any(c => c.Switcher && !c.Shows && Listed(c).Contains(part));
         return CullingActivity.Desired(part.Active || (part.Switched && !part.Shown) || (own != null && !own.Visible) || hidden, Culling.Desired(part));
@@ -144,9 +189,10 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     public GroupObservation Observe(object target) {
         var group = (FakeGroup)target;
         var regions = Culling.Regions(group);
-        return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), Authored(group)),
-            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, Authored(p), p.Culled || ListedPart(p), p, p.Parent, p.Animated)),
-            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, c.Authored, (object)c.On ?? group, Listed(c), c.Kind, c, regions.Where(r => ReferenceEquals(r.Culler, c)))), group.Parent, group.RootCulling);
+        return new GroupObservation(new ObjectState(new Placement(Map(group.Position), (double[])group.Rotation.Clone()), Constructions.Enabled(group) ?? Authored(group)),
+            group.Parts.Select(p => new GroupPart(p.Id, p.Offset, p.Rotation, Authored(p), p.Culled || ListedPart(p) || p.Constructed, p, p.Parent, p.Animated)),
+            group.Cullers.Select(c => new GroupCuller(c.Id, c.Registered == null ? null : Map(c.Registered), Map(CullerAt(group, c)), c.Radius, c.Authored, (object)c.On ?? group, Listed(c), c.Kind, c, regions.Where(r => ReferenceEquals(r.Culler, c)))), group.Parent, group.RootCulling,
+            group.Colliders.Select(c => new ColliderState(c.Id, c.Shape, c.Enabled, true, group.Active, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, c.Follows)), group.Scenery);
     }
     // The game's renderer and game-object cullers hold a sphere only while their object is on in the scene.
     void Registrations(FakeGroup group) {
@@ -157,6 +203,7 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     }
     public void SetActive(object target, bool active) {
         Mutations++; var group = (FakeGroup)target;
+        if (Constructions.Set(group, active)) return;
         var own = SimpleOn(group, null);
         // Enabled again, the root takes the visibility its culling group holds.
         if (!Culling.SetDesired(group, active)) group.Active = active && (own == null || own.Visible);
@@ -170,6 +217,10 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
         // A part left behind once follows the root again at the next placement, unless the injection keeps it behind.
         if (behind != null && !KeepPartBehind) { group.Parts[0].Offset = behind; behind = null; }
         else if (LeavePartBehind && behind == null) { behind = group.Parts[0].Offset; group.Parts[0].Offset = new[] { 9.0, 9, 9 }; LeavePartBehind = false; }
+        if (detached && !KeepColliderDetached) { group.Colliders[0].Follows = true; detached = false; }
+        else if (DetachCollider && !detached) { group.Colliders[0].Follows = false; detached = true; DetachCollider = false; }
+        if (ConstructionFlips) { ConstructionFlips = false; foreach (var part in group.Parts.Where(p => p.Constructed)) Controller(part, false); }
+        if (DisturbScenery) { DisturbScenery = false; group.Scenery += " trestle moved"; }
         if (ThrowAfterPlacement) { ThrowAfterPlacement = false; throw new Exception("injected after placement"); }
     }
     public void RefreshCulling(object target, CullingPlan plan) {
@@ -179,6 +230,8 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
         foreach (var culler in group.Cullers)
             if (group.Active && (culler.On == null || Enabled(culler.On))) culler.Registered = CullerAt(group, culler);
         Culling.Apply(group, plan);
+        if (HideSpheresOnApply) { HideSpheresOnApply = false; foreach (var registration in Native.Registered.ToList()) Show(registration, false); }
+        Constructions.Settle(group.Parts.Where(p => p.Constructed).Cast<object>().Concat(group.Constructed ? new object[] { group } : new object[0]));
     }
     // The corners of the cube around the part and around every part below it, leaving out the named parts and what
     // stands below them.
@@ -212,13 +265,15 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
     public Dictionary<object, string> PlacementRefused = new Dictionary<object, string>();
     public string PlacementRefusal(object target) => PlacementRefused.TryGetValue(target, out var reason) ? reason : null;
     public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
+    public string FollowingRefusal(object target) => (target is FakeGroup group ? group : ((FakePart)target).Group).RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : null;
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;
         var parent = part.Parent == null ? new Placement(Map(group.Position), (double[])group.Rotation.Clone()) : new Placement(Map(ScenePosition(part.Parent)), Turn.Multiply(group.Rotation, part.Parent.Rotation));
-        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), Authored(part)), group, Observe(group), (object)part.Parent ?? group, parent);
+        return new PartObservation(new ObjectState(new Placement(Map(ScenePosition(part)), Turn.Multiply(group.Rotation, part.Rotation)), Constructions.Enabled(part) ?? Authored(part)), group, Observe(group), (object)part.Parent ?? group, parent);
     }
     public void SetPartActive(object target, bool active) {
         Mutations++; var part = (FakePart)target;
+        if (Constructions.Set(part, active)) return;
         if (!Culling.SetDesired(part, active)) part.Active = active;
         foreach (var culler in part.Group.Cullers.Where(c => c.On != null && (c.On == part || Below(c.On, part)))) culler.Registered = active && part.Group.Active && Enabled(culler.On) ? CullerAt(part.Group, culler) : null;
     }
@@ -237,6 +292,8 @@ class FakeGroupWorld : IGroupWorld, IDisposable {
         var other = group.Parts.First(p => p != part && p.Parent == null && !Below(part, p));
         if (sibling != null && !KeepSiblingMoved) { other.Offset = sibling; sibling = null; }
         else if (MoveSibling && sibling == null) { sibling = other.Offset; other.Offset = new[] { 7.0, 7, 7 }; MoveSibling = false; }
+        if (shapeBefore != null) { group.Colliders[0].Shape = shapeBefore; shapeBefore = null; }
+        else if (ChangeColliderShape && group.Colliders.Count != 0) { shapeBefore = group.Colliders[0].Shape; group.Colliders[0].Shape = "box size=1,1,1"; ChangeColliderShape = false; }
         if (ThrowAfterPartPlacement) { ThrowAfterPartPlacement = false; throw new Exception("injected after part placement"); }
     }
     public bool Alive(object handle) => handle is FakeGroup group ? Objects.Values.Any(list => list.Contains(group)) : handle is FakePart part && part.Group.Parts.Contains(part);
@@ -588,7 +645,6 @@ static class BakedSceneryTests {
         var cases = new[] {
             new { Name = "Alarka Jct Station", Component = "Map.Runtime.MaskComponents.RectangleMapMask", Kind = "scene ground mask", Ticket = "#90" },
             new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = "#89" },
-            new { Name = "Trestle Scenery", Component = "Game.Mow.TrackConstructionScenery", Kind = "bridge construction scenery", Ticket = "#95" },
             new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
             new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "station icon", Ticket = "#89" },
         };
@@ -611,17 +667,19 @@ static class BakedSceneryTests {
     static void ResearchHierarchy() {
         var verdicts = BakedSceneryRules.Classify(new Node("World",
             new Node("Large Scenery",
-                new Node("Almond Bridge", new Node("Abutments", new Node("Abutment").Solid()), new Node("Steel", new Node("Girder").Solid())),
+                new Node("Almond Bridge", new Node("Abutments", new Node("Abutment").Solid()), new Node("Steel", new Node("Girder").Solid())).With("Helpers.SimpleCuller", "Game.Mow.TrackConstructionScenery"),
                 new Node("Plate Girder Bridge", new Node("Plate Girder Bridge").Solid(), new Node("Plate Girder Bridge (1)").Solid(), new Node("Plate Girder Bridge End", new Node("End").Solid())),
                 new Node("Bryson", new Node("Bridge 1", new Node("Deck").Solid()).With("Helpers.Culling.RendererCuller", "Game.Mow.TrackConstructionScenery")),
                 new Node("Almond", new Node("Almond Road Bridge", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", "Helpers.Culling.RendererCuller"))),
             new Node("Roads Sylva", new Node("Sylva Road Bridge 20m", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", "Helpers.Culling.RendererCuller")),
             new Node("POIs", new Node("Alarka").With("Character.SpawnPoint"), new Node("Bryson").With("Character.SpawnPoint")),
             new Node("Map Labels", new Node("Station Icons", new Node("Bryson").With("UI.Map.MapIcon", "UnityEngine.UI.Image", "UnityEngine.BoxCollider").Solid()))));
-        foreach (var path in new[] { "World/Large Scenery/Almond Bridge/Abutments", "World/Large Scenery/Almond Bridge/Steel", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge",
+        // The rail bridge constructions outside Ela are groups of the family: the Almond Bridge folder, which carries
+        // the construction's controller and culler, each plate girder bridge and Bryson Bridge 1.
+        foreach (var path in new[] { "World/Large Scenery/Almond Bridge", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge",
             "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge End", "World/Large Scenery/Bryson/Bridge 1" }) {
             var verdict = At(verdicts, path);
-            Assert(verdict?.Disposition == GroupDisposition.InspectionOnly && verdict.Ticket == "#95", path + " is a rail bridge part outside Ela for #95: " + verdict?.Disposition + " " + verdict?.Ticket);
+            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges, path + " is a rail bridge construction outside Ela: " + verdict?.Disposition + " " + verdict?.Reason);
         }
         foreach (var path in new[] { "World/Large Scenery/Almond/Almond Road Bridge", "World/Roads Sylva/Sylva Road Bridge 20m" })
             Assert(At(verdicts, path)?.Disposition == GroupDisposition.InspectionOnly && At(verdicts, path).Ticket == "#97", path + " is a road bridge for #97");

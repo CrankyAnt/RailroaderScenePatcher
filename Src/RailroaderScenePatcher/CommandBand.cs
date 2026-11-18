@@ -428,6 +428,9 @@ namespace RailroaderScenePatcher {
         internal static string UseInGame(bool part, string category, string storage, IEnumerable<string> bindings, IEnumerable<string> groupBindings = null) {
             var lines = (bindings ?? Enumerable.Empty<string>()).Where(line => line != null).ToArray();
             var shown = storage ?? "industry's storage";
+            var segments = ConstructionSegments(lines);
+            if (segments.Count != 0)
+                return "The construction state of track segment" + (segments.Count == 1 ? " " : "s ") + Listing(segments) + " decides which parts of this bridge the game shows.";
             if (HoldsLoader(lines)) return LoadingPoint;
             var interactive = Interactive(part, lines);
             if (interactive != null) return interactive;
@@ -438,6 +441,26 @@ namespace RailroaderScenePatcher {
                 return "Decorative. Its log pond shows the " + shown + ". Moving or disabling this " + (part ? "part" : "group") + " does not change the storage, and the industry keeps working on its native track spans.";
             return UseInGame(part, category, lines.Any(line => line.StartsWith(StoragePrefix, StringComparison.Ordinal)) ? storage : null, HoldsPiles(lines));
         }
+        // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery) shows or hides parts of the bridge by
+        // the construction state of the track segments it names by id, wherever the bridge stands. Each segment is one
+        // binding line of the group root and of every part below the controller, for the Connections tab. A segment that
+        // no longer exists in the track graph keeps its id with a remark and is no problem: repairing the segments is a
+        // later edit. exists is null when the track graph could not be read.
+        const string SegmentPrefix = "Construction segment=", MissingSegment = "; no longer exists";
+        internal static string SegmentBinding(string id, bool? exists) => SegmentPrefix + (id ?? "") + (exists == false ? MissingSegment : "");
+        internal static IReadOnlyList<string> ConstructionSegments(IEnumerable<string> bindings) =>
+            (bindings ?? Enumerable.Empty<string>()).Where(line => line != null && line.StartsWith(SegmentPrefix, StringComparison.Ordinal))
+                .Select(line => { var id = line.Substring(SegmentPrefix.Length); return id.EndsWith(MissingSegment, StringComparison.Ordinal) ? id.Substring(0, id.Length - MissingSegment.Length) : id; }).ToArray();
+        internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments";
+        // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
+        // holds; known is null when the track graph could not be read. An empty id is a segment that does not exist.
+        internal static IReadOnlyList<string> ConstructionBindings(IEnumerable<string> ids, ICollection<string> known) =>
+            (ids ?? Enumerable.Empty<string>()).Select(id => SegmentBinding(id, known == null ? (bool?)null : !String.IsNullOrWhiteSpace(id) && known.Contains(id))).ToArray();
+        // The amber warning for an object that an explicit disable holds off against its construction controller, on the
+        // Object tab and in the footer's message area.
+        internal const string ConstructionHoldWarning = "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.";
+        // Names in running text: "a", "a and b", "a, b and c".
+        static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
         // The dependency a lake surface's inspection names: what moves with it, what stays native, and whether its water
         // is part of a static batch, which the game would keep drawing at its old place.
         internal static string LakeSurfaceDependency(bool batched) => batched
@@ -545,8 +568,11 @@ namespace RailroaderScenePatcher {
         // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
         // placement, and has every other mode inactive with the object's own reason.
         // An existing crossing mast or bell has one for Follow as well.
-        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false) =>
-            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow : null;
+        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false, bool railBridge = false) =>
+            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
+            : railBridge && mode == FollowMode ? RailBridgeNoFollow : null;
+        // A rail bridge construction does not follow its track: move the track natively, then the construction onto it.
+        internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + ". Move the track in the native map editor, then move the bridge onto it.";
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
         internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";
         // Why the rotation of an existing crossing bell cannot be set, or null for any other object: the bell is a
