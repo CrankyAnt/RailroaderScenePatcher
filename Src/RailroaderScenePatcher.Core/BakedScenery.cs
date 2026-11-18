@@ -131,6 +131,11 @@ namespace RailroaderScenePatcher.Core {
         // The table's row for the scene object at a hierarchy path from World, or null.
         public static Row Find(string path) => path != null && ByPath.TryGetValue(path, out var row) ? row : null;
         public static bool IsFolder(string path) => Find(path)?.Folder == true;
+        // The category and subgroup of an object that another family lists, or null: the bridge and the construction
+        // controller of a rail bridge construction stand under Bridge / Rail bridges with the other rail bridges.
+        public const string BridgeFamily = "Bridge", ConstructionFamily = "Bridge construction scenery";
+        static readonly IReadOnlyList<string> RailBridge = Array.AsReadOnly(new[] { Bridge, RailBridges });
+        public static IReadOnlyList<string> OfFamily(string family) => family == BridgeFamily || family == ConstructionFamily ? RailBridge : null;
         // The scene objects in a group-root position that have no model or function in the game: an inactive default
         // cube and five objects without a model. They are not supported and stay out of the inventory.
         public static readonly IReadOnlyList<string> WithoutFunction = Array.AsReadOnly(new[] { "World/Large Scenery/Almond/Cube", "World/Large Scenery/Bryson/Bryson Appalachian Hardwoods" });
@@ -174,7 +179,7 @@ namespace RailroaderScenePatcher.Core {
                 if (verdict.Disposition != GroupDisposition.Group && verdict.Disposition != GroupDisposition.InspectionOnly) continue;
                 var row = BakedSceneryCategories.Find(verdict.Path);
                 if (row != null && !row.Folder) { verdict.Category = row.Category; verdict.Subcategory = row.Subcategory; }
-                else if (verdict.Disposition == GroupDisposition.Group) verdict.Category = BakedSceneryCategories.Other;
+                else if (verdict.Category == null && verdict.Disposition == GroupDisposition.Group) verdict.Category = BakedSceneryCategories.Other;
             }
             return verdicts;
         }
@@ -269,7 +274,13 @@ namespace RailroaderScenePatcher.Core {
             // Physical presence comes first: an object without a renderer, collider or light is not listed, whatever it holds.
             if (!Physical(node)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
             var bridge = BridgeTicket(town, node.Name);
-            if (bridge != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, bridge == "#97" ? "Road bridges cannot be edited." : "Rail bridges outside Ela cannot be edited.", bridge, true)); return; }
+            // A bridge takes its category from this rule wherever it stands, also outside the category table, as
+            // the road bridges below the World/Roads folders do.
+            if (bridge != null) {
+                verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, bridge == "#97" ? "Road bridges cannot be edited." : "Rail bridges outside Ela cannot be edited.", bridge, true) {
+                    Category = BakedSceneryCategories.Bridge, Subcategory = bridge == "#97" ? BakedSceneryCategories.RoadBridges : BakedSceneryCategories.RailBridges });
+                return;
+            }
             var excluded = FirstExclusion(node);
             if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
             verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.Group, null));

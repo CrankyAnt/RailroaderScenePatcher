@@ -14,11 +14,12 @@ namespace RailroaderScenePatcher.Core {
     // that one, nearest first, and what its components say it is.
     public sealed class GroupObject {
         public GroupObject(object node, IEnumerable<object> above, bool crossingController = false, bool trackMarker = false, bool trackSpan = false, bool bakedGroupRoot = false,
-            bool bakedPart = false, object storage = null, bool constructionController = false, IEnumerable<object> targets = null) {
+            bool bakedPart = false, object storage = null, bool constructionController = false, IEnumerable<object> targets = null, IEnumerable<IEnumerable<object>> targetsAbove = null) {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             Above = above ?? Enumerable.Empty<object>();
             CrossingController = crossingController; TrackMarker = trackMarker; TrackSpan = trackSpan; BakedGroupRoot = bakedGroupRoot;
             BakedPart = bakedPart; Storage = storage; ConstructionController = constructionController; Targets = (targets ?? Enumerable.Empty<object>()).Where(target => target != null).ToArray();
+            TargetsAbove = (targetsAbove ?? Enumerable.Empty<IEnumerable<object>>()).Select(above => (IReadOnlyList<object>)(above ?? Enumerable.Empty<object>()).ToArray()).ToArray();
         }
         public object Node { get; }
         public IEnumerable<object> Above { get; }
@@ -34,6 +35,10 @@ namespace RailroaderScenePatcher.Core {
         // visibility it sets.
         public bool ConstructionController { get; }
         public IReadOnlyList<object> Targets { get; }
+        // For each target, in the order of Targets, the scene objects above it, nearest first. A target that is no
+        // inventory object itself stands for the nearest inventory object above it, as the steel and abutments of
+        // the Ela bridge stand below the bridge object. Without this fact only objects on and below a target count.
+        public IReadOnlyList<IReadOnlyList<object>> TargetsAbove { get; }
         // The object is a crossing controller: its scene object is the root of a grade-crossing setup.
         public bool CrossingController { get; }
         // The object is a track marker other than a crossing pad. The game has no component for a whistle sign: below
@@ -81,6 +86,16 @@ namespace RailroaderScenePatcher.Core {
             var switched = new Dictionary<object, object>();
             foreach (var controller in objects.Where(o => o != null && o.ConstructionController))
                 foreach (var target in controller.Targets) if (!switched.ContainsKey(target)) switched[target] = controller.Node;
+            // The inventory object that holds a switched object which is no inventory object itself: the nearest one
+            // above it. It joins the construction alone; what else stands below it does not.
+            var nodes = new HashSet<object>(objects.Where(o => o != null).Select(o => o.Node));
+            var holders = new Dictionary<object, object>();
+            foreach (var controller in objects.Where(o => o != null && o.ConstructionController))
+                for (var t = 0; t < controller.Targets.Count && t < controller.TargetsAbove.Count; t++) {
+                    if (nodes.Contains(controller.Targets[t])) continue;
+                    var holder = controller.TargetsAbove[t].FirstOrDefault(node => node != null && nodes.Contains(node));
+                    if (holder != null && !holders.ContainsKey(holder)) holders[holder] = controller.Node;
+                }
             var members = new Dictionary<KeyValuePair<GameDefinedGroupKind, object>, List<int>>();
             var order = new List<KeyValuePair<GameDefinedGroupKind, object>>();
             for (var index = 0; index < objects.Count; index++) {
@@ -92,6 +107,7 @@ namespace RailroaderScenePatcher.Core {
                     // The outermost switched object at or above the item names its construction.
                     object controller = switched.TryGetValue(item.Node, out var own) ? own : null;
                     foreach (var node in item.Above) if (node != null && switched.TryGetValue(node, out var outer)) controller = outer;
+                    if (controller == null && holders.TryGetValue(item.Node, out var held)) controller = held;
                     if (controller != null) key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.RailBridgeConstruction, controller);
                 }
                 if (key == null && item.Storage != null) key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.IndustryStorageDisplay, item.Storage);

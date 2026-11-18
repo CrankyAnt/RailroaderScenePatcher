@@ -62,7 +62,7 @@ A group contains scene objects that the game handles together. Some follow a sha
 
 - A grade-crossing setup contains its controller and the inventory objects below its root, such as lights, gates, the bell, detection spans and crossing pads.
 - A baked scenery group, such as Bryson Coal Dealer, contains its group root and the inventory objects below it. These include its parts and objects of other families, such as the signs of a station building.
-- A rail bridge construction contains its construction controller and the objects whose visibility it controls.
+- A rail bridge construction contains its construction controller and the objects whose visibility it controls. At the Ela bridge, the controller `Ela Bridge Scenery` controls the steel and abutments of `Ela Bridge`, so the two form one group.
 - An industry storage display contains the storage piles or log pond filled by one industry's storage. An industry building is a separate group and contains no storage pile.
 
 A folder is not a group. For example, Bryson Yard is a folder, and each of its 13 yard lamp posts is a separate group. Objects do not form a group just because they are close together. An object outside every group appears on its own. Whistle signs remain separate objects at every distance.
@@ -85,9 +85,9 @@ These rules apply to every scene-object choice. If a replacement choice offers o
 
 ### Find a baked scenery group in the outliner
 
-The **Baked scenery group** family groups its rows under these categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Industry building contains buildings where production uses inputs and produces outputs. Other contains listed groups that fit no other category.
+The **Baked scenery group** family groups its rows under these categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Industry building contains buildings where production uses inputs and produces outputs. Other contains listed groups that fit no other category. Every road bridge appears under Road bridges, including the road bridges below the `World/Roads` folders. The bridge and the construction controller of a rail bridge construction, such as `Ela Bridge` and `Ela Bridge Scenery`, appear under Rail bridges as rows of their own.
 
-Each group appears under its category. Its row shows the group's name followed by its location, for example `Alarka Jct / Crossing Unprotected (1)`. Parts appear beneath their group, never as separate rows outside it. If a search or filter matches only a part, the outliner shows it beneath a dimmed group row. The dimming means that the group itself does not match. A group with no supported edit remains under its category, marked `inspection only`.
+Each group appears under its category. Its row shows the group's name followed by its location, for example `Alarka Jct / Crossing Unprotected (1)`. Parts appear beneath their group, never as separate rows outside it. If a search or filter matches only a part, the outliner shows it beneath a dimmed group row. The dimming means that the group itself does not match: a group does not match a search through the names of the objects below it. A group with no supported edit remains under its category, marked `inspection only`.
 
 When you inspect a part, the **Object** tab starts with `Part of:` and the group's name. Click **Select group** beside this line to inspect the group. The button appears only for a part.
 

@@ -545,7 +545,7 @@ namespace RailroaderScenePatcher {
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: c is OwnedEquipment equipment && equipment != null ? equipment.DisplayName : null, groupPath: groupPath,
-                category: groupRoot ? verdict?.Category : null, subcategory: groupRoot ? verdict?.Subcategory : null);
+                category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1]);
         }
         // A marker's binding, judged by what the game needs from its kind. A span's two locations keep Location below.
         static void MarkerLocation(object location, BindingNeed need, bool enabled, bool followsGroup, List<string> bindings, List<string> problems, HashSet<string> segmentIds, string graphError) {

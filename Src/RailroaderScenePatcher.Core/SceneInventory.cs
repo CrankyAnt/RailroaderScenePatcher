@@ -204,6 +204,16 @@ namespace RailroaderScenePatcher.Core {
         internal string Fingerprint => new JArray(Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Active,
             new JArray(Rotation), new JArray(Bindings), new JArray(Dependencies), new JArray(Problems), Operations, new JArray(Notes), InspectionOnly).ToString(Newtonsoft.Json.Formatting.None);
         public bool Matches(SceneObservation current) => current != null && ReferenceEquals(Handle, current.Handle) && Fingerprint == current.Fingerprint && SamePosition(current);
+        // Whether a search text matches the object by what it says about itself. A group root names every component
+        // below it among its dependencies, so a search for a part also finds its group: such a dependency line,
+        // which names an object below this one, does not count here. An empty text matches every object.
+        public bool MatchesItself(string text) {
+            if (String.IsNullOrEmpty(text)) return true;
+            var below = Identity.Path + "/";
+            var own = String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, Identity.Component, Identity.Structure, Family, Category, Subcategory, Active ? "active" : "inactive", Operations, InspectionOnly }
+                .Concat(Bindings).Concat(Dependencies.Where(line => line.IndexOf(below, StringComparison.Ordinal) < 0)).Concat(Problems).Concat(Notes));
+            return own.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
         // The visible name and the group-qualified part name are searchable as shown.
         internal string SearchText => String.Join(" ", new[] { DisplayName, Identity.Scene, Identity.Path, GroupPath == null ? null : BakedSceneryRules.PartName(GroupPath, Identity.Path), Identity.Component, Identity.Structure, Family, Category, Subcategory,
             Active ? "active" : "inactive", Operations, InspectionOnly }.Concat(Bindings).Concat(Dependencies).Concat(Problems).Concat(Notes));

@@ -118,6 +118,7 @@ Wilmot | Wilmot Station | Group | Station building";
         FolderHasNoGroupEntry();
         VerdictsKeepObjectsOut();
         OutlinerNestsGroupsAndParts();
+        BridgesOutsideTheTable();
         SelectGroupFindsTheGroup();
         Console.WriteLine("PASS: baked scenery categories");
     }
@@ -206,9 +207,9 @@ Wilmot | Wilmot Station | Group | Station building";
     }
 
     // The outliner rows of a small inventory: groups, parts, an inspection-only group with a category, and one without.
-    static SceneObservation Entry(string path, string category = null, string subcategory = null, string groupPath = null, string only = null, string family = BakedSceneryRules.Family) =>
+    static SceneObservation Entry(string path, string category = null, string subcategory = null, string groupPath = null, string only = null, string family = BakedSceneryRules.Family, string[] dependencies = null) =>
         new SceneObservation(new object(), new TargetIdentity("scene", path, "UnityEngine.Transform"), family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
-            new string[0], new string[0], new string[0], only ?? "Placement", inspectionOnly: only, groupPath: groupPath, category: category, subcategory: subcategory);
+            new string[0], dependencies ?? new string[0], new string[0], only ?? "Placement", inspectionOnly: only, groupPath: groupPath, category: category, subcategory: subcategory);
     sealed class Inventory : IInspectionScene {
         public List<SceneObservation> Objects = new List<SceneObservation>();
         public IEnumerable<string> MapIds => new[] { "map" };
@@ -223,7 +224,8 @@ Wilmot | Wilmot Station | Group | Station building";
         scene.Objects.AddRange(new[] {
             Entry(Dealer + "/Bent/Beams", groupPath: Dealer),
             Entry(Bryson + "Bridge 1", "Bridge", "Rail bridges", only: "not yet supported"),
-            Entry(Dealer, "Industry building"),
+            // A group root names every component below it among its dependencies, as the native inventory does.
+            Entry(Dealer, "Industry building", dependencies: new[] { "Component scene/" + Dealer + "/Heap [UnityEngine.MeshRenderer]", "Culling and colliders of every part follow the group root" }),
             Entry(Dealer + "/Heap", groupPath: Dealer),
             Entry("World/Large Scenery/Almond/Almond Road Bridge", "Bridge", "Road bridges", only: "not yet supported"),
             Entry(Bryson + "Bryson Depot", "Station building"),
@@ -235,7 +237,7 @@ Wilmot | Wilmot Station | Group | Station building";
         var groups = InventoryPresentationState.Groups(all);
         Check(groups.Select(g => g.Key + ":" + g.Value.Count).SequenceEqual(new[] { "Baked scenery group:6", "Track marker:1", "Inspection only:1" }),
             "a group that no supported operation covers stays in the family under its category; only one without a category stands in the Inspection only group (got " + String.Join(", ", groups.Select(g => g.Key + ":" + g.Value.Count)) + ")");
-        var tree = InventoryPresentationState.Categories(groups[0].Value, inventory.Entries);
+        var tree = InventoryPresentationState.Categories(groups[0].Value, inventory.Entries, "");
         Check(Shape(tree) == "[Station building]{Bryson Depot} [Bridge]{[Rail bridges]{Bridge 1} [Road bridges]{Almond Road Bridge}} [Industry building]{Bryson Coal Dealer{Bent / Beams Heap}}",
             "groups stand under their categories in the family's order, Bridge under its subgroups, and each group lists its parts beneath it (got " + Shape(tree) + ")");
         Check(tree.Select(n => n.Count).SequenceEqual(new[] { 1, 2, 3 }), "a category counts the rows beneath it");
@@ -246,11 +248,45 @@ Wilmot | Wilmot Station | Group | Station building";
             "a group's place is the path between World/Large Scenery, or World, and its name");
         // A search that matches only a part still shows the part under its group, never as a loose row.
         var found = InventoryPresentationState.Rows(inventory, "Heap", OutlinerFilter.All, null);
-        var narrowed = InventoryPresentationState.Categories(InventoryPresentationState.Groups(found)[0].Value, inventory.Entries);
+        // The group's own row is found too, through the dependency that names its part: it does not match itself.
+        Check(found.Any(row => row.Identity.Path == Dealer) && !found.Single(row => row.Identity.Path == Dealer).MatchesItself("Heap") && found.Single(row => row.Identity.Path == Dealer).MatchesItself("coal dealer")
+            && found.Single(row => row.Identity.Path == Dealer).MatchesItself("colliders"), "a group matches itself by its name and by what it says about itself, not by a dependency that names an object below it");
+        var narrowed = InventoryPresentationState.Categories(InventoryPresentationState.Groups(found)[0].Value, inventory.Entries, "Heap");
+        Check(Shape(InventoryPresentationState.Categories(InventoryPresentationState.Groups(InventoryPresentationState.Rows(inventory, "coal dealer", OutlinerFilter.All, null))[0].Value, inventory.Entries, "coal dealer")).StartsWith("[Industry building]{Bryson Coal Dealer{", StringComparison.Ordinal),
+            "a group that matches by its own name is a match, with the parts that match through its name beneath it");
         Check(Shape(narrowed) == "[Industry building]{Bryson Coal Dealer~{Heap}}", "a part that matches alone stands under its group, which is shown to hold it (got " + Shape(narrowed) + ")");
         Check(narrowed[0].Count == 1, "a group shown only to hold a part is not counted");
         // The category is searchable as shown.
         Check(InventoryPresentationState.Rows(inventory, "Rail bridges", OutlinerFilter.All, null).Select(r => r.Identity.Path).SequenceEqual(new[] { Bryson + "Bridge 1" }), "a search matches a group by its category");
+    }
+
+    // A bridge outside the category table takes its category from the bridge rule; a rail bridge construction's
+    // controller and bridge, which other families list, stand under Bridge / Rail bridges in the outliner too.
+    static void BridgesOutsideTheTable() {
+        var world = new Node("World", new Node("Roads Bryson", new Node("Concrete Road Bridge - 20m", new Node("Deck").Solid()),
+            new Node("US19 Gov Island", new Node("Grade Crossing Setup").With(BakedSceneryRules.CrossingController).Family(), new Node("Concrete Road Bridge - 60m", new Node("Deck").Solid()))),
+            new Node("Large Scenery", new Node("Newtown", new Node("Plate Girder Span", new Node("Girder").Solid()))));
+        var verdicts = BakedSceneryRules.Classify(world);
+        foreach (var path in new[] { "World/Roads Bryson/Concrete Road Bridge - 20m", "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m" }) {
+            var verdict = At(verdicts, path);
+            Check(verdict?.Disposition == GroupDisposition.InspectionOnly && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", path + " is a road bridge the table does not name: it stands under Bridge / Road bridges (got " + verdict?.Category + ")");
+        }
+        var span = At(verdicts, "World/Large Scenery/Newtown/Plate Girder Span");
+        Check(span?.Category == "Bridge" && span.Subcategory == "Rail bridges", "a rail bridge construction the table does not name stands under Bridge / Rail bridges");
+        Check(BakedSceneryCategories.OfFamily("Bridge").SequenceEqual(new[] { "Bridge", "Rail bridges" }) && BakedSceneryCategories.OfFamily("Bridge construction scenery").SequenceEqual(new[] { "Bridge", "Rail bridges" })
+            && BakedSceneryCategories.OfFamily("Track marker") == null && BakedSceneryCategories.OfFamily(null) == null, "the bridge and the construction controller of a rail bridge construction stand under Bridge / Rail bridges; no other family has a category");
+        // In the outliner both stand in the Baked scenery group family, under Bridge / Rail bridges, as groups of their own.
+        var scene = new Inventory();
+        scene.Objects.AddRange(new[] {
+            Entry("World/Large Scenery/Ela/Ela Bridge", "Bridge", "Rail bridges", family: "Bridge"),
+            Entry("World/Large Scenery/Ela/Ela Bridge Scenery", "Bridge", "Rail bridges", only: "not yet supported", family: "Bridge construction scenery"),
+            Entry("World/Large Scenery/Bryson/Bridge 1", "Bridge", "Rail bridges", only: "not yet supported"),
+            Entry("World/Sign", family: "Track marker"),
+        });
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        var groups = InventoryPresentationState.Groups(InventoryPresentationState.Rows(inventory, "", OutlinerFilter.All, null));
+        Check(groups.Select(g => g.Key + ":" + g.Value.Count).SequenceEqual(new[] { "Baked scenery group:3", "Track marker:1" }), "an object with a category stands in the Baked scenery group family, whatever family lists it (got " + String.Join(", ", groups.Select(g => g.Key + ":" + g.Value.Count)) + ")");
+        Check(Shape(InventoryPresentationState.Categories(groups[0].Value, inventory.Entries, "")) == "[Bridge]{[Rail bridges]{Bridge 1 Ela Bridge Ela Bridge Scenery}}", "the bridge and its construction controller stand under Bridge / Rail bridges (got " + Shape(InventoryPresentationState.Categories(groups[0].Value, inventory.Entries, "")) + ")");
     }
 
     static void SelectGroupFindsTheGroup() {

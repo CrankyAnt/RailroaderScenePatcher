@@ -73,11 +73,22 @@ static class GameDefinedGroupTests {
             new GroupObject("Ela Bridge Scenery", Up("World/Large Scenery/Ela"), constructionController: true, targets: new[] { "Steel", "Abutments" }), // 0
             Object("Steel", "World/Large Scenery/Ela/Ela Bridge"),                         // 1: a target itself
             Object("Abutment W", "World/Large Scenery/Ela/Ela Bridge/Abutments"),          // 2: below a target
-            Object("Ela Bridge", "World/Large Scenery/Ela"),                               // 3: the bridge, which the controller does not switch
+            Object("Ela Bridge", "World/Large Scenery/Ela"),                               // 3: the bridge beside the targets, which names none of them
             Object("Board", "World/Large Scenery/Ela"),                                    // 4
         };
         var construction = GameDefinedGroups.Of(bridge);
         Check(Members(construction) == "RailBridgeConstruction:0,1,2", "a rail bridge construction holds its controller and the objects whose visibility it sets, and nothing else (got " + Members(construction) + ")");
+        // Ela as the game holds it in Railroader 0.6.3: the controller switches Ela Bridge/Steel and Ela Bridge/Abutments,
+        // which are no inventory objects themselves. The inventory object that holds them, the Ela Bridge, is the object
+        // whose visibility the controller sets; a board below the bridge that no target holds is not.
+        var ela = new[] {
+            new GroupObject("Ela Bridge Scenery", Up("World/Large Scenery/Ela"), constructionController: true, targets: new[] { "Steel", "Abutments" },
+                targetsAbove: new[] { Up("World/Large Scenery/Ela/Ela Bridge"), Up("World/Large Scenery/Ela/Ela Bridge") }),   // 0
+            Object("Ela Bridge", "World/Large Scenery/Ela"),                               // 1
+            Object("Bridge Board", "World/Large Scenery/Ela/Ela Bridge"),                  // 2: below the bridge, outside every target
+            Object("Ela Station", "World/Large Scenery/Ela"),                              // 3
+        };
+        Check(Members(GameDefinedGroups.Of(ela)) == "RailBridgeConstruction:0,1", "a target that is no inventory object brings in the nearest inventory object above it, and no other object below that one (got " + Members(GameDefinedGroups.Of(ela)) + ")");
         Check(ReferenceEquals(construction[0].Anchor, bridge[0].Node) && construction[0].Root < 0, "the construction is anchored by its controller");
         // Targets inside listed group roots: the construction is the outermost group and holds those roots with their parts.
         var almond = new[] {

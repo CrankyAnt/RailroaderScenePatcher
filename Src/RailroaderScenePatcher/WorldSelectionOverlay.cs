@@ -333,7 +333,7 @@ namespace RailroaderScenePatcher {
                             if (!(o.Handle is GameObject go) || go == null) return null;
                             var targets = Targets(o, go);
                             return new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily, roots[i], o.GroupPath != null,
-                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets);
+                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets, targets?.Select(Above));
                         }).ToArray())) {
                         var root = group.Anchor as GameObject;
                         try {

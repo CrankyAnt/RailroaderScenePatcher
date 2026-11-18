@@ -54,7 +54,9 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>> Groups(IEnumerable<SceneObservation> rows) {
             var listed = (rows ?? Array.Empty<SceneObservation>()).OrderBy(Name, StringComparer.OrdinalIgnoreCase).ThenBy(row => row.Identity.Path, StringComparer.Ordinal).ToArray();
             bool Only(SceneObservation row) => row.InspectionOnly != null && row.Category == null;
-            var groups = listed.Where(row => !Only(row)).GroupBy(row => row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            // An object with a category stands in the Baked scenery group family, whatever family lists it: the bridge
+            // and the construction controller of a rail bridge construction stand with the other rail bridges.
+            var groups = listed.Where(row => !Only(row)).GroupBy(row => row.Category != null || row.GroupPath != null ? BakedSceneryRules.Family : row.Family ?? "").OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(group.Key, group.ToArray())).ToList();
             var only = listed.Where(Only).ToArray();
             if (only.Length != 0) groups.Add(new KeyValuePair<string, IReadOnlyList<SceneObservation>>(InspectionOnlyGroup, only));
@@ -92,7 +94,10 @@ namespace RailroaderScenePatcher {
         // order, Bridge under its subgroups, each group under its category and each part under its group. A part
         // never stands as a loose row: when the search or filter left its group out, the group is taken from the
         // whole inventory and shown to hold it. A category or subgroup without rows is not shown.
-        internal static IReadOnlyList<OutlineNode> Categories(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory) {
+        // search is the outliner's search text. A group root names every component below it among its dependencies, so
+        // a search for a part finds the group's row too: a group that holds matching parts and does not match by
+        // what it says about itself (SceneObservation.MatchesItself) is shown to hold them, as one the search left out.
+        internal static IReadOnlyList<OutlineNode> Categories(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory, string search) {
             rows = rows ?? Array.Empty<SceneObservation>();
             var all = (inventory ?? rows).Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family).ToArray();
             string GroupKey(string scene, string path) => scene + "\n" + path;
@@ -114,6 +119,8 @@ namespace RailroaderScenePatcher {
                 holder.Children.Add(new OutlineNode { Key = GroupKey(part.Identity.Scene, part.Identity.Path), Label = PartLabel(part), Row = part, Count = 1 });
                 holder.Count++;
             }
+            foreach (var node in order)
+                if (!node.Context && node.Row != null && node.Children.Count != 0 && !node.Row.MatchesItself(search)) { node.Context = true; node.Count--; }
             foreach (var node in order) node.Children.Sort((a, b) => { var by = StringComparer.OrdinalIgnoreCase.Compare(a.Label, b.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(a.Row.Identity.Path, b.Row.Identity.Path); });
             var sorted = order.OrderBy(node => node.Label, StringComparer.OrdinalIgnoreCase).ThenBy(node => node.Key, StringComparer.Ordinal).ToArray();
             var found = new List<OutlineNode>();

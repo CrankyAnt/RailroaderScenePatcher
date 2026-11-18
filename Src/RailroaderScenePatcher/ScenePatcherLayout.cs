@@ -433,7 +433,7 @@ namespace RailroaderScenePatcher {
                         foreach (var child in node.Children) Nest(made, child, below);
                     }
                     if (groupKey == "family:" + BakedSceneryRules.Family)
-                        foreach (var category in InventoryPresentationState.Categories(group.Value, inventory?.Entries)) Nest(parent, category, new[] { groupKey });
+                        foreach (var category in InventoryPresentationState.Categories(group.Value, inventory?.Entries, filter)) Nest(parent, category, new[] { groupKey });
                     else foreach (var item in group.Value) {
                         var holder = folders.TryGetValue(item, out var inFolder) ? inFolder : parent;
                         holder.AddChild(Row(item, null, folderKeys.TryGetValue(item, out var folderKey) ? new[] { groupKey, folderKey } : new[] { groupKey }));
@@ -1543,7 +1543,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
-                    new[] { "Dimmed rows", "Loaded objects that are inactive." },
+                    new[] { "Dimmed rows", "A dimmed group row holds matching parts but does not match the search itself." },
                     new[] { "Focus", "Moves the camera to the inspected object or the starting point of a car placement." },
                     new[] { "Fit names", "Sizes the column to most names. Drag the divider for another width." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
