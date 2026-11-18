@@ -34,6 +34,7 @@ static class ReloadDecisionTests {
         FileVersionUpdatesPlacement();
         ReloadPromptDescribesChoicesInOrder();
         ReloadPromptReportsWhenAllWorkIsSaved();
+        ReloadPromptNamesOnlyOutstandingWrites();
         ReloadRequiresAnExplicitDecision();
         ReloadSaveFailureKeepsOutstandingWork();
         ReloadFeedbackFollowsActualSessionState();
@@ -101,8 +102,22 @@ static class ReloadDecisionTests {
     static void ReloadPromptReportsWhenAllWorkIsSaved() {
         var w = new World();
         var prompt = w.Session.ReloadPrompt(w.MapEditor.NativeDirty);
-        Assert(prompt.Contains("All required work is saved.") && prompt.Contains("Save and Reload saves changes to the map data and scene patch file before reloading.")
-            && !prompt.Contains("discards unsaved changes"), "The reload confirmation reports the saved state without warning about unsaved changes");
+        Assert(prompt == "Reload the Map Editor? Reloading ends the Map Editor's Undo and Redo history. "
+            + "All required work is saved. Cancel keeps the Map Editor open. Your working location is restored when available.",
+            "The reload confirmation reports the saved state without claiming that Save writes anything");
+    }
+    static void ReloadPromptNamesOnlyOutstandingWrites() {
+        const string initial = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}";
+        var w = new World(initial);
+        w.MapEditor.NativeEdit(7);
+        var prompt = w.Session.ReloadPrompt(w.MapEditor.NativeDirty);
+        Assert(prompt.Contains("Save and Reload saves changes to the map data before reloading.")
+            && !prompt.Contains("scene patch file") && !prompt.Contains("patcher dependency"), "Only native map data is outstanding");
+        w = new World();
+        Assert(w.Session.Edit(P, PlacementAt(112), null).Applied, "Create a scene patch that also requires a patcher dependency");
+        prompt = w.Session.ReloadPrompt(w.MapEditor.NativeDirty);
+        Assert(prompt.Contains("Save and Reload saves changes to the map data, scene patch file, and patcher dependency before reloading."),
+            "All three outstanding writes are named when the mod still needs the patcher dependency");
     }
     static void ReloadSaveFailureKeepsOutstandingWork() {
         var w = new World(); var reloads = 0;

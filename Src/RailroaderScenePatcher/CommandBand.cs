@@ -451,6 +451,11 @@ namespace RailroaderScenePatcher {
             if (Split(label, out var family, out var segments, out var inactive)) {
                 var observedPath = observation?.Identity.Path;
                 var visibleName = observation?.DisplayName;
+                if (IsAddedFamily(observation?.Family)) {
+                    var state = inactive ? " [inactive]" : "";
+                    var shortened = InventoryPresentationState.NarrowName(observation.Family, visibleName, length - state.Length, value => value.Length);
+                    if (shortened != visibleName || visibleName.Length + state.Length <= length) return shortened + state;
+                }
                 // A presentation name is not another hierarchy segment. Prepending a wrapper parent for equal
                 // added names would hide that name again when the line is shortened; list numbers distinguish them.
                 if (observedPath != null && visibleName != observedPath.Substring(observedPath.LastIndexOf('/') + 1))

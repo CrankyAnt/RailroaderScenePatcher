@@ -20,7 +20,7 @@ The patcher checks `Data/scene-patches.json` when the game regains focus and whe
 
 If the content changes outside the editing session, the **Version choice** panel replaces the inspector tabs. It says `The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version.` and explains each choice.
 
-Until you choose a version, only **Refresh** and the session details remain available outside the **Version choice** panel in Scene Patcher. Disabled controls show the reason in their tooltips. The message area keeps its full height and shows only results. The native map editor's **Save** button stays enabled, but writes nothing. Clicking it shows `Save refused.` and the reason in the message area. If **Scene patches** is closed, a **Save refused** alert shows the reason instead.
+Until you choose a version, only **Refresh** and the session details remain available outside the **Version choice** panel in Scene Patcher. Disabled controls show the reason in their tooltips. The message area keeps its height while you choose a version. Scroll it to read results that extend below its bottom edge. The native map editor's **Save** button stays enabled, but writes nothing. Clicking it shows `Save refused.` and the reason in the message area. If **Scene patches** is closed, a **Save refused** alert shows the reason instead.
 
 Choose how to handle the changed file:
 
@@ -80,7 +80,7 @@ Every edit uses the observation you inspected. The patcher refuses an edit if th
 
 The first message slot shows the action group and **Working...** until the edit finishes, then shows a result such as `Placement completed.` A completed edit refreshes the inventory a moment later. After Undo, Redo or a native edit, click **Refresh** before editing again. If you forget, the refusal tells you to refresh.
 
-A refused edit, or one that does not run, reports why. The message area shows the newest message at the top and dims older messages beneath it. Every message starts with its action group. Only the latest automatic follow-up message, such as **Terrain output**, remains, so follow-up messages do not displace the action result. Scroll if the messages do not fit. Inspecting another object clears them all.
+A refused edit, or one that does not run, reports why. The message area shows the newest message at the top and dims older messages beneath it. Every message starts with its action group. A **Gizmo** result keeps the previous **Copy ID** result below it. Only the latest automatic follow-up message, such as **Terrain output**, remains, so follow-up messages do not displace the action result. Scroll if the messages do not fit. Inspecting another object clears them all.
 
 The line above the messages shows why the inspected object cannot currently be edited under **Editing**, or identifies a pending world choice, gizmo or prepared snap. An unavailable action stays visible but disabled. Its tooltip explains why, and the log records the reason. Reasons include a stale inventory and what made it stale, unreadable values, or an edit requested while a world selection or gizmo is pending.
 

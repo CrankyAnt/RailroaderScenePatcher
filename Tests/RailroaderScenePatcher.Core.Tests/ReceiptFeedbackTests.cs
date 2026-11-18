@@ -7,7 +7,34 @@ using RailroaderScenePatcher.Core;
 
 static class ReceiptFeedbackTests {
     const string Empty = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}";
-    internal static void Run() { DiscardedHistoryUsesFeedback(); FileStateReplacesOldFeedback(); }
+    internal static void Run() {
+        GizmoResultKeepsCopyId();
+        DiscardedHistoryUsesFeedback();
+        FileStateReplacesOldFeedback();
+    }
+    static void GizmoResultKeepsCopyId() {
+        const string copied = "Copied the ID for Wood Platform 2 x 2 (4).";
+        var feedback = new EditFeedback();
+        feedback.GeneralPlaces.Add("Copy ID");
+        feedback.Inspecting(new object());
+        feedback.View("placement/Follow");
+        feedback.Report("Copy ID", copied);
+        feedback.View("placement/Gizmo");
+        if (feedback.Result != copied) throw new Exception("Opening Gizmo keeps the Copy ID result");
+
+        const string completed = "Gizmo placement completed.";
+        feedback.Report(CommandBand.GizmoPlace, completed);
+        if (feedback.Messages.Count != 2 || feedback.Messages[0].Text != completed || feedback.Messages[1].Text != copied)
+            throw new Exception("Releasing the gizmo shows the placement result first and keeps Copy ID readable below it");
+
+        const string cancelled = "Gizmo drag cancelled; the prior placement is restored.";
+        feedback.Report(CommandBand.GizmoPlace, cancelled);
+        if (feedback.Messages.Count != 2 || feedback.Messages[0].Text != cancelled || feedback.Messages[1].Text != copied)
+            throw new Exception("Cancelling a later drag replaces the earlier gizmo result and keeps Copy ID");
+
+        feedback.Inspecting(new object());
+        if (feedback.Messages.Count != 0) throw new Exception("Inspecting another object clears both results");
+    }
     static void FileStateReplacesOldFeedback() {
         var store = new Store { Patch = Empty };
         var session = new PatchEditingSession(new PatchEngine(new Scene()), new NativeMapEditor(), store);

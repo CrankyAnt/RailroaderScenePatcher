@@ -8,11 +8,11 @@ namespace RailroaderScenePatcher {
     // The result of the last action, for the message area and for the log. An edit that is refused or does not run
     // always leaves its reason here. A result describes the present: it goes when another object is inspected, when a
     // new action reports its own result, and when the native map editor's history moves by Undo or Redo, after which "Enable
-    // completed" would be untrue. A result of a tab's own action also goes when the open tab or placement mode
-    // changes; a result of a general action, one that is the same on every tab, stays through that change. A refusal
-    // reported after the inspection was cleared stays until an object is inspected again. UI-independent, shared with
-    // controlled replay.
+    // completed" would be untrue. A gizmo result keeps the earlier Copy ID result. Changing the tab or placement mode
+    // clears the tab's own results and keeps general results. A refusal reported after the inspection was cleared stays
+    // until an object is inspected again. UI-independent, shared with controlled replay.
     internal sealed class EditFeedback {
+        internal const string CopyIdPlace = "Copy ID";
         // What the message area shows first. A version choice is never one of them: it stands in the file panel.
         internal enum PrimaryMessage { None, BackupDiagnosis, Working, WorldChoice, ConfirmedChoice, Reported }
         internal static PrimaryMessage Primary(PatchEditingSession session, bool working, bool worldChoice) =>
@@ -105,10 +105,11 @@ namespace RailroaderScenePatcher {
         internal void ChoiceStarted() { messages.RemoveAll(m => !m.Kept); }
         // A refresh made the inventory current: a refusal because it was stale no longer holds and goes.
         internal void InventoryCurrent() { messages.RemoveAll(m => m.Text.IndexOf(SceneInventory.StaleRefusal, StringComparison.Ordinal) >= 0); }
-        // The result of an action. It takes the place of the result before it and of that result's follow-ups.
+        // A new result replaces earlier feedback. The gizmo keeps the Copy ID result for the same inspection.
         internal void Report(string place, string message) {
-            messages.Clear();
-            messages.Add(New(place, message, false));
+            if (place == CommandBand.GizmoPlace) messages.RemoveAll(m => m.Source != CopyIdPlace || m.FollowUp);
+            else messages.Clear();
+            messages.Insert(0, New(place, message, false));
             try { Log?.Invoke(Result); } catch { }
         }
         // Reports a follow-up of the last action. It replaces the follow-up before it and never the result.

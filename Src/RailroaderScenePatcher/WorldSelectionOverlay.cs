@@ -502,7 +502,7 @@ namespace RailroaderScenePatcher {
             if (shape == null) return;
             shape.Color = Tone(CommandBand.RelationMark(shape.Contains(pointer)));
             shape.Detailed = true;
-            shape.Text = label + Short(relation.Observation?.DisplayName ?? relation.Choice.Label);
+            shape.Text = ObjectLabel(relation, label);
             shapes.Add(shape);
         }
         internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed, SpatialCandidate followed,
@@ -556,7 +556,7 @@ namespace RailroaderScenePatcher {
                     shape = rowHovered ? Project(candidate, camera, origin, Double.PositiveInfinity, out _) : null;
                     if (shape == null) {
                         shapes.Add(new Shape { Candidate = candidate, Listed = true, Color = Tone(CommandBand.CandidateMark(false, rowHovered)),
-                            Text = pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation) });
+                            Text = ObjectLabel(candidate, pending.Number(candidate.Choice) + "  ", offerLabels) });
                         continue;
                     }
                 }
@@ -570,8 +570,8 @@ namespace RailroaderScenePatcher {
                 // tells it from the others.
                 shape.Listed = offered && several;
                 shape.Strong = rowHovered;
-                if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation)
-                    : "Candidate: " + Short(candidate.Observation?.DisplayName ?? candidate.Choice.Label);
+                if (offered) shape.Text = several ? ObjectLabel(candidate, pending.Number(candidate.Choice) + "  ", offerLabels)
+                    : ObjectLabel(candidate, "Candidate: ");
                 // Every candidate of the mode carries its "+" marker without the pointer over it; a track within a
                 // distance of the camera, so that a wide view is not filled with them.
                 if (shape.Listed || shape.Detailed || Marked(shape, candidate, camera, origin)) shapes.Add(shape);
@@ -592,7 +592,7 @@ namespace RailroaderScenePatcher {
                 // The inspected object keeps its frame and marker at any camera distance and while culling hides it.
                 var shape = Project(source, camera, origin, Double.PositiveInfinity, out _);
                 if (marked != null) {
-                    if (hasSource) marked.Text = "Inspected: " + Short(source.Observation?.DisplayName ?? source.Choice.Label);
+                    if (hasSource) marked.Text = ObjectLabel(source, "Inspected: ");
                 } else if (shape != null) {
                     // The gold frame and the marker at its center say which object is inspected; a world label would
                     // stand in the gizmo's way, and the panel names the object.
@@ -852,6 +852,17 @@ namespace RailroaderScenePatcher {
             var slash = text.LastIndexOf('/');
             return slash >= 0 ? text.Substring(slash + 1) : text;
         }
+        string ObjectLabel(SpatialCandidate candidate, string prefix, IEnumerable<string> offers = null) {
+            var observation = candidate.Observation;
+            if (CommandBand.IsAddedFamily(observation?.Family)) {
+                var state = offers != null && !observation.Active ? " [inactive]" : "";
+                var name = InventoryPresentationState.NarrowName(observation.Family, observation.DisplayName, LabelMaximumWidth,
+                    value => textStyle.CalcSize(new GUIContent(prefix + value + state)).x);
+                return prefix + name + state;
+            }
+            return prefix + (offers != null ? CommandBand.ChoiceLabel(candidate.Choice.Label, offers, 60, observation)
+                : Short(observation?.DisplayName ?? candidate.Choice.Label));
+        }
         static Vector3 ScreenPoint(Camera camera, Vector3 point, Vector3 origin) {
             var projected = camera.WorldToScreenPoint(point + origin);
             projected.y = Screen.height - projected.y;
@@ -968,11 +979,12 @@ namespace RailroaderScenePatcher {
             return Rect.MinMaxRect((float)rect.X, (float)rect.Y, (float)rect.Right, (float)rect.Bottom);
         }
 
+        static float LabelMaximumWidth => Mathf.Min(480, Screen.width);
         Vector2 LabelSize(string text) {
             var content = new GUIContent(text);
             // Use the final pixel width for both wrapping and drawing. Rounding a natural width
             // down can introduce a line that was absent during measurement.
-            float width = Mathf.Min(480, Screen.width, Mathf.Ceil(textStyle.CalcSize(content).x));
+            float width = Mathf.Min(LabelMaximumWidth, Mathf.Ceil(textStyle.CalcSize(content).x));
             return new Vector2(width, Mathf.Ceil(textStyle.CalcHeight(content, width)));
         }
 

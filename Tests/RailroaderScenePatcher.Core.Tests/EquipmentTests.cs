@@ -159,6 +159,7 @@ static class EquipmentTests {
         SupplyingModsKeepSeparateIdentities();
         MissingCapabilityRefusesEquipment();
         EditingPreviewAddMoveUndoRedoAndRemoval();
+        EquipmentPreviewUsesDisplayNames();
         EditingRefusalAndFailureRestore();
         SaveAndReloadReproduceEquipmentOnce();
         EquipmentIdsNameOneAdditionPerScenePatchFile();
@@ -386,6 +387,25 @@ static class EquipmentTests {
         Assert(removed.Applied && f.Live.Count == 0 && f.World.All.All(a => a.Destroyed && !a.InCuller), "Removing the modification releases every owned addition from the controller and culling: " + removed.Error);
         mapEditor.Undo(); Assert(f.Live.Count == 1, "Undo of removal restores the effective equipment");
         Assert(f.World.Live(f.Other).Count() == 0, "No scene patch editing operation touched the other crossing");
+    }
+    static void EquipmentPreviewUsesDisplayNames() {
+        var (_, session, _, _) = Session();
+        Assert(session.AddEquipment(Crossing, West()).Applied, "The crossing has a copy of Signal 1");
+        const string replacementPath = CrossingPath + "/Signal 2";
+        string DisplayName(EquipmentAddition addition) => addition.Source.Path == SignalPath ? "Signal 1 (added)" : "Signal 2";
+        EquipmentPreview Preview(EquipmentAddition addition, string id = null) =>
+            session.PreviewEquipment(Crossing, addition, id, null, DisplayName);
+        void CheckLines(EquipmentPreview preview, params string[] expected) {
+            Assert(preview.Error == null && preview.Lines.SequenceEqual(expected),
+                "Expected [" + String.Join(" | ", expected) + "]. Got [" + (preview.Error ?? String.Join(" | ", preview.Lines)) + "].");
+        }
+
+        CheckLines(Preview(West(path: replacementPath, id: "east")),
+            "Add Signal 2; the crossing controller drives it.", "Keep Signal 1 (added).");
+        CheckLines(Preview(West(path: replacementPath)),
+            "Rebuild Signal 2; the copy of Signal 1 (added) is removed.");
+        CheckLines(Preview(West(12)), "Move Signal 1 (added).");
+        CheckLines(Preview(null, "west"), "Remove Signal 1 (added).");
     }
     static void EditingRefusalAndFailureRestore() {
         var (f, session, mapEditor, store) = Session();

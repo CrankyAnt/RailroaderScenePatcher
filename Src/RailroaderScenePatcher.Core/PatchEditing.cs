@@ -770,7 +770,10 @@ namespace RailroaderScenePatcher.Core {
             return scene is ICrossingEquipmentScene equipment ? equipment.EquipmentStatus(resolved, scenePatchFileKey, id) : null;
         }
         // The effect of adding (addition) or removing (id) one addition, without changing the scene, the scene patch file or the history.
-        public EquipmentPreview PreviewEquipment(TargetIdentity target, EquipmentAddition addition, string id, InspectedTarget inspected = null) {
+        public EquipmentPreview PreviewEquipment(TargetIdentity target, EquipmentAddition addition, string id, InspectedTarget inspected = null) =>
+            PreviewEquipment(target, addition, id, inspected, null);
+        public EquipmentPreview PreviewEquipment(TargetIdentity target, EquipmentAddition addition, string id, InspectedTarget inspected,
+            Func<EquipmentAddition, string> displayName) {
             try {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
@@ -787,7 +790,7 @@ namespace RailroaderScenePatcher.Core {
                 if (value == null) candidate.Remove(key); else candidate[key] = value;
                 var current = scene.Read(resolved).Equipment;
                 var desired = engine.Desired(candidate, resolved, scenePatchFileKey).Equipment;
-                return new EquipmentPreview(CrossingEquipment.Describe(current, desired), null);
+                return new EquipmentPreview(CrossingEquipment.Describe(current, desired, displayName), null);
             } catch (Exception e) { return new EquipmentPreview(Array.Empty<string>(), e.Message); }
         }
         // The modification with one entry of its crossing equipment set or, for a null addition, removed. An entry is keyed by

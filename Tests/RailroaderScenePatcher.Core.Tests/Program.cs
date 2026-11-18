@@ -179,6 +179,16 @@ class Program {
     static string Item(string id, string path, string deps = "[]", string extra = "") => "\"" + id + "\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":" + deps + extra + "}";
     static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
     static int Main(string[] args) {
+        try {
+            return RunTests(args);
+        } catch (Exception e) {
+            var failure = e is System.Reflection.TargetInvocationException invocation ? invocation.InnerException ?? invocation : e;
+            var test = args.Length == 2 && args[0] == "--suite" ? args[1] : "Core tests";
+            Console.Error.WriteLine("FAIL: " + test + ": " + failure);
+            return 1;
+        }
+    }
+    static int RunTests(string[] args) {
         if (args.Length != 0) {
             if (args.Length != 2 || args[0] != "--suite" || !args[1].EndsWith("Tests", StringComparison.Ordinal)) return 2;
             var suite = typeof(Program).Assembly.GetType(args[1], false);

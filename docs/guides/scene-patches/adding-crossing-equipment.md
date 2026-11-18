@@ -57,15 +57,15 @@ The editor lists every device beneath a loaded crossing controller, including th
 
 1. Open the Scene patches window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates and bells** lists the current additions. **Add a light or gate** lists the devices, with a reason for each one that does not qualify. **Why a device is rejected** opens the table above.
-3. Select **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. The **Light or gate** form opens at the top of the tab. It proposes an unused **Equipment ID**, adding a numeric suffix if the name is taken. The proposed placement uses the device's position relative to its own crossing at the inspected crossing, offset by five metres. Change the **Equipment ID**, **Position** in map coordinates and **Rotation** in degrees as needed.
-4. Select **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt or removed. Nothing changes yet.
-5. Select **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
+3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab. It proposes an unused **Equipment ID**, adding a numeric suffix if the name is taken. The proposed placement uses the device's position relative to its own crossing at the inspected crossing, offset by five metres. Change the **Equipment ID**, **Position** in map coordinates and **Rotation** in degrees as needed.
+4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt or removed. Nothing changes yet.
+5. Click **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
 
-To move an addition, select **Edit** beside its ID, change the fields, preview and apply. To remove one, select **Edit**, then **Remove** at the bottom of the tab and apply.
+To move an addition, click **Edit** under its name, change the fields, preview and apply. To remove one, click **Edit**, then **Remove** at the bottom of the tab and apply.
 
 **Remove modification** in the footer removes all of your mod's coverage, detection additions, lights, gates and bells for this crossing. Native Undo and Redo reverse and repeat each applied change, including rebuilding a removed addition.
 
-**Lights, gates and bells** shows whether each addition is visible with its lamp and gate observers registered, awaiting initialization, or culled with its crossing. If the patcher cannot build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason. Select **Edit** to correct or remove it.
+**Lights, gates and bells** shows the names of the added equipment. It shows whether a light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher cannot build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason. Click **Edit** to correct or remove it.
 
 Save writes the additions to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the copies in native map data. The patcher rebuilds them from the scene patch file on each load. If copies already exist on a repeated load, the patcher reconciles them without duplicating them.
 

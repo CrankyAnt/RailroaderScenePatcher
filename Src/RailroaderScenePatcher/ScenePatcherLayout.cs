@@ -14,9 +14,10 @@ using UnityEngine.UI;
 namespace RailroaderScenePatcher {
     // Inspector mode of the Scene patches window: a command band, the outliner beside the inspector, four tabs and a
     // fixed footer. A control sits where its scope is: a tab's own actions in a pinned row at the bottom of its tab
-    // body, the actions on the inspected object that are the same on every tab in the footer below the messages. Every
-    // region has a fixed height or scrolls inside its own rectangle, so showing or hiding text or feedback moves no
-    // other control.
+    // body, the actions on the inspected object that are the same on every tab in the footer below the messages.
+    // The tab body takes the height left by the fixed message area and the action rows.
+    // Every region has a fixed height or scrolls inside its own rectangle, so showing or hiding text or feedback
+    // moves no other control.
     public sealed partial class PatcherBehaviour {
         const string ObjectTab = "object", PlacementTab = "placement", ConnectionsTab = "connections", ChangesTab = "changes";
         static readonly string[] TabIds = { ObjectTab, PlacementTab, ConnectionsTab, ChangesTab };
@@ -26,7 +27,7 @@ namespace RailroaderScenePatcher {
         // their words, 251.
         // The inspector's minimum holds the four footer slots, their spacing and the resize grip.
         const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 100, TabGap = 8,
-            RowHeight = 24, LineHeight = 20, MessageHeight = 40,
+            RowHeight = 24, LineHeight = 20, TabStripHeight = 30, InspectorMessageHeight = 104, FilePanelMessageHeight = 64,
             // What a row adds to its name: the folder and child indent, the two markers and the scroll bar.
             RowDecoration = 80;
         // The changed state reads the same in the state line and on the Changes tab: the native Map Editor's badge.
@@ -79,9 +80,9 @@ namespace RailroaderScenePatcher {
         RectTransform FieldMarkup(UIPanelBuilder builder, string label, string markup) { FieldLabel(builder, label); return builder.AddLabel(markup); }
         // A section heading: a rule, then the title in bold body text. The native section header has the small upper-case
         // letters of a field label, so "STATE" over "ENABLED" read as an empty section followed by a second heading.
-        void Section(UIPanelBuilder builder, string title, bool divider = true) {
+        RectTransform Section(UIPanelBuilder builder, string title, bool divider = true) {
             if (divider) builder.AddHRule();
-            builder.AddLabel("<b>" + Literal(title) + "</b>");
+            return builder.AddLabel("<b>" + Literal(title) + "</b>");
         }
         // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.
@@ -149,11 +150,24 @@ namespace RailroaderScenePatcher {
             var text = input.GetComponent<TMP_InputField>()?.textComponent;
             if (text != null) text.alignment = TextAlignmentOptions.Right;
         }
-        // Reserve a full native H3 line for the name. Its tooltip holds the entire path.
+        // Reserve a full native H3 line for the name. The tooltip gives the full text supplied by the caller.
         RectTransform Heading(UIPanelBuilder builder, string markup, string title, string full) {
             var line = builder.AddLabel("<style=H3>" + markup + "</style>").TextWrap(TextOverflowModes.Ellipsis, TextWrappingModes.NoWrap);
             if (!String.IsNullOrEmpty(full)) line.Tooltip(title, full);
             return line;
+        }
+        // Remeasure when the native layout gives this label a different width.
+        static void FitEquipmentText(TMP_Text text, string family, string name, Func<string, string> format, Func<float> parentWidth = null) {
+            var lastWidth = 0f;
+            var shown = format(name);
+            text.gameObject.AddComponent<TextUpdater>().Configure(() => {
+                var width = (parentWidth == null ? text.rectTransform.rect.width : parentWidth()) - text.margin.x - text.margin.z - 1;
+                if (width > 0 && width != lastWidth) {
+                    lastWidth = width;
+                    shown = format(InventoryPresentationState.NarrowName(family, name, width, value => text.GetPreferredValues(format(value)).x));
+                }
+                return shown;
+            }, 0.1f);
         }
         // One line of fixed height. Text that does not fit ends in an ellipsis and is complete in the tooltip.
         RectTransform Line(UIPanelBuilder builder, string markup, string title, string full, float height = LineHeight) {
@@ -320,8 +334,8 @@ namespace RailroaderScenePatcher {
             if (selected == null) return;
             try {
                 GUIUtility.systemCopyBuffer = Identity(selected);
-                feedback.Report("Copy ID", "Copied the ID for " + selected.DisplayName + ".");
-            } catch (Exception e) { feedback.Report("Copy ID", "Could not copy the ID: " + e.GetBaseException().Message); }
+                feedback.Report(EditFeedback.CopyIdPlace, "Copied the ID for " + selected.DisplayName + ".");
+            } catch (Exception e) { feedback.Report(EditFeedback.CopyIdPlace, "Could not copy the ID: " + e.GetBaseException().Message); }
         }
 
         // A light, gate or bell the patcher added is an added object: the outliner marks it with "+" and the state line with
@@ -364,7 +378,7 @@ namespace RailroaderScenePatcher {
                 items.ConfigureLayout(4f);
                 var shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged);
                 var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
-                Line(items, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.");
+                var measure = Line(items, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.").GetComponent<TMP_Text>();
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
                 string selectedKey = null;
@@ -413,13 +427,15 @@ namespace RailroaderScenePatcher {
                         // that stays under its category without a supported edit is marked as inspection only.
                         if (item.InspectionOnly != null) context += "  <alpha=#99>" + (item.Category == null ? Literal(item.Family) : "inspection only") + "<alpha=#FF>";
                         if (where != null) context = "  <alpha=#99>" + Literal(where) + "<alpha=#FF>" + context;
-                        var shown = label ?? name;
-                        var text = item.Active ? Literal(shown) : "<i>" + Literal(shown) + "</i>";
+                        var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ");
+                        string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
+                        // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
+                        var shown = label ?? InventoryPresentationState.NarrowName(item.Family, name, OutlinerMinimumWidth - RowDecoration,
+                            value => measure.GetPreferredValues(prefix + NameMarkup(value)).x);
+                        var text = NameMarkup(shown);
                         if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
-                        return new UIOutlineItem(key, markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ") +
-                            text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = (name + "\n" + item.Identity.Path + "\n" + item.Family + (item.Category == null ? "" : "\n" + item.Category + (item.Subcategory == null ? "" : " / " + item.Subcategory)) + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly)) + (changed ? "\nChanged by this mod" : "") + (added ? "\nAdded by this mod" : "") +
-                                (item.Problems.Count == 0 ? "" : "\n" + String.Join("\n", item.Problems))).Replace("<", "\\u003c").Replace(">", "\\u003e")
+                        return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
+                            Tooltip = InventoryPresentationState.OutlinerTooltip(item, changed)
                         };
                     }
                     // The Baked scenery group family lists its groups under their categories and each group's parts
@@ -468,7 +484,8 @@ namespace RailroaderScenePatcher {
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
-            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row => measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
+            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row =>
+                measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
             var divider = NativePresentation.DividerWidth + 26;
             outlinerWidth = InventoryPresentationState.FitWidth(widths, RowDecoration, presentation.ContentWidth, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
             StoreOutlinerWidth(outlinerWidth);
@@ -488,7 +505,10 @@ namespace RailroaderScenePatcher {
                     DrawModeSwitch(row);
                 }).ChildrenKeepHeight().Height(RowHeight);
             } else {
-                headingRow = Heading(builder, Literal(selected.DisplayName), "Object", selected.Identity.Path).Height(RowHeight);
+                var name = selected.DisplayName;
+                var added = IsAdded(selected);
+                headingRow = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path).Height(RowHeight);
+                if (added) FitEquipmentText(headingRow.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
             }
             LockControls(headingRow);
             var state = StateLine(out var states);
@@ -512,15 +532,15 @@ namespace RailroaderScenePatcher {
             // ellipsis inside 8 units of padding; the four titles are never renamed.
             var tabView = headingRow.parent.GetComponentInChildren<UI.TabView.TabView>(true);
             if (tabView != null) {
-                // The native prefab leaves its title strip shrinkable. Reserve the strip and the tab body's
-                // minimum before the footer competes for height; only the scrolling body takes the remainder.
+                // Give the tab container a fixed preferred height so the body, through its flexible height,
+                // takes the remainder after the pinned rows and fixed footer.
                 var tabsLayout = tabView.GetComponent<LayoutElement>() ?? tabView.gameObject.AddComponent<LayoutElement>();
-                tabsLayout.minHeight = 30 + TabBodyMinimumHeight + RowHeight + TabGap;
+                tabsLayout.minHeight = tabsLayout.preferredHeight = TabStripHeight + TabBodyMinimumHeight + RowHeight + TabGap;
                 tabsLayout.flexibleHeight = 10000;
             }
             if (tabView != null) foreach (var toggle in tabView.GetComponentsInChildren<Toggle>(true)) {
                 var strip = toggle.transform.parent as RectTransform;
-                if (strip != null && strip.parent == tabView.transform) strip.Height(30);
+                if (strip != null && strip.parent == tabView.transform) strip.Height(TabStripHeight);
                 // Step titles show progress; Back and Next alone navigate the guided steps.
                 // A disabled Toggle component ignores pointer and keyboard input without Selectable's disabled tint.
                 // TabView has already set its selected title to alpha 1 and the others to alpha .6.
@@ -549,7 +569,8 @@ namespace RailroaderScenePatcher {
             if (selected.InspectionOnly != null) text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly));
             var count = selected.Problems.Count == 0 ? null : selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
             if (count != null) text.Add(count);
-            plain = String.Join("; ", text) + "\n" + selected.Identity.Path;
+            plain = String.Join("; ", text);
+            if (!IsAdded(selected)) plain += "\n" + selected.Identity.Path;
             var parts = CommandBand.StateParts(Literal(selected.Family), selected.Active ? null : "Inactive", badges.Select(badge => badge.Markup),
                 selected.InspectionOnly == null ? null : "Inspection only", count == null ? null : "<color=" + Red + ">" + count + "</color>");
             return String.Join("   ", parts);
@@ -817,16 +838,19 @@ namespace RailroaderScenePatcher {
         // crossing controller drives. The open form stands first; the tab's pinned row holds Preview, Remove and Apply for it.
         // Every device scene patch editing considers is listed: an eligible one with its Use button, a rejected one with its reason.
         // The open light or gate form stands first in the Connections tab, above the replacement targets it does not use,
-        // so the scrolling tab body shows its ID and position at its least height; its source is one line with the full
-        // path in the tooltip.
+        // so the scrolling tab body shows its name, ID and position.
         // The kind of the open equipment form, as its labels name it.
         string EquipmentKind => equipmentSource?.IsDefinition == true ? "bell" : "light or gate";
+        static string AddedEquipmentFamily(EquipmentSource source) => source.IsDefinition ? CommandBand.AddedBellFamily : CommandBand.AddedEquipmentFamily;
         void DrawEquipmentForm(UIPanelBuilder builder) {
             var block = EditBlock();
             var bell = equipmentSource.IsDefinition;
             {
-                Section(builder, (bell ? "Bell " : "Light or gate ") + (equipmentFields[0] ?? ""));
-                Line(builder, Literal("Source " + equipmentSource), "Source", equipmentSource.ToString());
+                var label = Section(builder, equipmentLabel);
+                if (equipmentEdited != null) {
+                    label.Tooltip("Equipment", equipmentLabel);
+                    FitEquipmentText(label.GetComponent<TMP_Text>(), AddedEquipmentFamily(equipmentSource), equipmentLabel, value => "<b>" + Literal(value) + "</b>");
+                }
                 FieldLabel(builder, "Equipment ID");
                 if (block != null) Line(builder, Literal(equipmentFields[0] ?? ""), "Equipment ID", block, 30);
                 else {
@@ -852,38 +876,54 @@ namespace RailroaderScenePatcher {
             IReadOnlyList<EquipmentEntry> mine = Array.Empty<EquipmentEntry>();
             if (attachment != null) try { current = attachment.Session.Equipment(identity); mine = attachment.Session.EquipmentEntries(identity); }
                 catch (Exception e) { builder.AddLabel(Tint(Red, "Lights, gates and bells unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
+            IReadOnlyList<SourceCandidate> candidates = null;
+            string sourcesUnavailable = null;
+            if (attachment != null) try { candidates = attachment.Session.EquipmentSources(identity); }
+                catch (Exception e) { sourcesUnavailable = e.GetBaseException().Message; }
             if (current != null) {
+                var copies = EquipmentCopies();
                 var others = current.Additions.Where(a => a.Scope != attachment.Session.ScenePatchFileKey).ToArray();
                 if (mine.Count == 0 && others.Length == 0) Line(builder, "None added", null, null);
                 // This mod's additions come from its scene patch file, so one whose build failed is listed with its reason and can
                 // be edited or removed.
                 foreach (var entry in mine) {
                     var item = entry.Built ?? entry.Addition;
-                    var kind = Kind(item);
+                    var kind = InventoryPresentationState.EquipmentKind(item.Source).ToLowerInvariant();
+                    var name = entry.Built == null ? InventoryPresentationState.UnbuiltEquipmentName(item, candidates) : EquipmentDisplayName(item, copies, candidates);
                     string state = null;
-                    if (entry.Built != null) try { state = attachment.Session.EquipmentStatus(identity, item.Id); } catch (Exception e) { state = "state unknown: " + e.GetBaseException().Message; }
-                    if (entry.Problem != null) FieldMarkup(builder, kind + " " + item.Id, Literal(Breakable(item.ToString()) + ".") + " " + Tint(Red, "Not built: " + CommandBand.Sentence(entry.Problem)));
-                    else Field(builder, kind + " " + item.Id, Breakable(item.ToString()) + (state == null ? "" : ". " + CommandBand.Sentence(state)));
+                    if (entry.Built != null) {
+                        try { state = attachment.Session.EquipmentStatus(identity, item.Id); }
+                        catch (Exception e) {
+                            state = "The equipment status could not be checked";
+                            Debug.LogWarning("Scene Patcher: Could not check equipment status for " + item.Id + ": " + e.GetBaseException());
+                        }
+                    }
+                    EquipmentNameField(builder, item, name, entry.Built != null);
+                    if (entry.Problem != null) builder.AddLabel(Tint(Red, "Not built: " + CommandBand.Sentence(entry.Problem)));
+                    else if (state != null) builder.AddLabel(Literal(CommandBand.Sentence(state)));
                     var scenePatchFile = entry.Addition;
-                    Button(builder, "Edit " + item.Id, () => ReadEquipment(scenePatchFile)).Inactive(wait != null)
-                        .Tooltip("Edit " + kind.ToLowerInvariant() + " " + item.Id, CommandBand.Tooltip(entry.Problem == null ? (item.Source.IsDefinition ? "Change this bell's placement or remove it." : "Change this copy's placement or remove it.") : "Correct this " + kind.ToLowerInvariant() + " or remove it.", wait));
+                    var edit = Button(builder, "Edit " + name, () => ReadEquipment(scenePatchFile, name)).Inactive(wait != null)
+                        .Tooltip("Edit " + name, CommandBand.Tooltip(entry.Problem == null ? (item.Source.IsDefinition ? "Change this bell's placement or remove it." : "Change this copy's placement or remove it.") : "Correct this " + kind + " or remove it.", wait));
+                    FitEquipmentText(edit.RectTransform.GetComponentInChildren<TMP_Text>(true), AddedEquipmentFamily(item.Source), name, value => "Edit " + value,
+                        () => ((RectTransform)edit.RectTransform.parent).rect.width - 2 * CommandBand.ButtonPadding);
                 }
-                foreach (var item in others)
-                    Field(builder, Kind(item) + " " + item.Id, Breakable(item.ToString()) + " (another mod's addition; read only)");
+                foreach (var item in others) {
+                    EquipmentNameField(builder, item, EquipmentDisplayName(item, copies, candidates), true);
+                    builder.AddLabel("Added by another mod. Read only.");
+                }
             }
             Section(builder, "Add a light or gate");
-            IReadOnlyList<SourceCandidate> candidates = null;
-            if (attachment != null) try { candidates = attachment.Session.EquipmentSources(identity); }
-                catch (Exception e) { builder.AddLabel(Tint(Red, "Sources unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
+            if (sourcesUnavailable != null) builder.AddLabel(Tint(Red, "Sources unavailable: " + CommandBand.Sentence(sourcesUnavailable)));
             if (candidates == null) return;
             var bells = candidates.Where(c => c.Source.IsDefinition).ToList();
             candidates = candidates.Where(c => !c.Source.IsDefinition).ToList();
             Line(builder, candidates.Count(c => c.Eligible) + " eligible and " + candidates.Count(c => !c.Eligible) + " rejected devices in the loaded map", null, null);
             foreach (var candidate in candidates) {
                 var source = candidate;
-                if (source.Eligible) Button(builder, "Use " + source.Label, () => UseSource(attachment.Session, source)).Inactive(wait != null)
-                    .Tooltip("Use " + source.Source.Path, CommandBand.Tooltip("Copy this device to this crossing. The crossing controller drives its lamps and gates.", wait));
-                else Field(builder, "Rejected " + source.Label, Breakable(source.Source.Path) + ": " + CommandBand.Sentence(source.Problem));
+                var name = InventoryPresentationState.EquipmentSourceName(source);
+                if (source.Eligible) Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
+                    .Tooltip("Use " + name, CommandBand.Tooltip("Copy this device to this crossing. The crossing controller drives its lamps and gates.", wait));
+                else Field(builder, "Rejected " + name, CommandBand.Sentence(source.Problem));
             }
             var deviceGuide = CommandBand.RejectionGuide(candidates);
             if (deviceGuide != null)
@@ -893,15 +933,29 @@ namespace RailroaderScenePatcher {
             Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " rejected bell definitions in the content library", null, null);
             foreach (var candidate in bells) {
                 var source = candidate;
-                if (source.Eligible) Button(builder, "Use " + source.Label, () => UseSource(attachment.Session, source)).Inactive(wait != null)
-                    .Tooltip("Use " + source.Source.Definition, CommandBand.Tooltip("Add a bell to this crossing using this definition's sound. It rings when the crossing controller rings its own bell.", wait));
-                else Field(builder, "Rejected " + source.Label, CommandBand.Sentence(source.Problem));
+                var name = InventoryPresentationState.EquipmentSourceName(source);
+                if (source.Eligible) Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
+                    .Tooltip("Use " + name, CommandBand.Tooltip("Add a bell to this crossing using this definition's sound. It rings when the crossing controller rings its own bell.", wait));
+                else Field(builder, "Rejected " + name, CommandBand.Sentence(source.Problem));
             }
             var bellGuide = CommandBand.RejectionGuide(bells);
             if (bellGuide != null)
                 Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open the guide's rejection reasons in your browser.");
         }
-        static string Kind(EquipmentAddition item) => item.Source.IsDefinition ? "Bell" : "Light or gate";
+        void EquipmentNameField(UIPanelBuilder builder, EquipmentAddition item, string name, bool built) {
+            var label = FieldLabel(builder, name);
+            if (built) {
+                label.Tooltip("Equipment", name);
+                FitEquipmentText(label.GetComponent<TMP_Text>(), AddedEquipmentFamily(item.Source), name, value => "<style=FieldLabel>" + Literal(value) + "</style>");
+            }
+        }
+        OwnedEquipment[] EquipmentCopies() => selected?.Handle is GameObject crossing && crossing != null
+            ? OwnedEquipment.At(crossing).ToArray() : Array.Empty<OwnedEquipment>();
+
+        static string EquipmentDisplayName(EquipmentAddition item, IEnumerable<OwnedEquipment> copies, IEnumerable<SourceCandidate> candidates) =>
+            copies.FirstOrDefault(copy => copy.Scope == item.Scope && copy.Id == item.Id && copy.SourceScene == item.Source.Scene
+                && copy.SourcePath == item.Source.Path && copy.SourceDefinition == item.Source.Definition)?.DisplayName
+            ?? InventoryPresentationState.EquipmentSourceName(item.Source, candidates);
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
         // adapter refuses, or that the operation is for markers, mileposts and pads. It is one plain sentence
         // (CommandBand.Sentence): the tooltip's Unavailable: and the section it stands in name what is unavailable.
@@ -1034,6 +1088,12 @@ namespace RailroaderScenePatcher {
         void FieldsChanged() { foreach (var update in typed.ToArray()) { try { update(); } catch { } } }
         static Act Slot(string label, string tip, string reason, Action run, string title = null, int span = 1, float width = 0, string other = null) => new Act { Label = label, Tip = tip, Reason = reason, Run = run, Title = title, Other = other };
         static readonly Act Empty = new Act();
+        GameObject gizmoDragMessage;
+        // A held pointer prevents a rebuild. The footer's first row can follow the drag in place.
+        void ShowLiveGizmoDrag() {
+            var dragging = gizmo?.Active == true;
+            if (gizmoDragMessage != null && gizmoDragMessage.activeSelf != dragging) gizmoDragMessage.SetActive(dragging);
+        }
         void DrawFooter(UIPanelBuilder builder) {
             builder.AddHRule();
             // The first slot says what the window is waiting for or why the open tab cannot edit now.
@@ -1062,22 +1122,25 @@ namespace RailroaderScenePatcher {
             } else if (guided.Enabled && !String.IsNullOrEmpty(guided.Recovery)) { source = "Guided task"; state = Literal(guided.Recovery); }
             else if (primary == EditFeedback.PrimaryMessage.BackupDiagnosis) {
                 source = RecoveryPlace; state = Literal(EditFeedback.BackupNotice(session));
-            } else if (gizmo?.Active == true) { source = GizmoPlace; state = Literal(gizmo.State); }
-            else if (selectionProblem != null) { source = "World choice"; state = Tint(Red, selectionProblem); }
+            } else if (selectionProblem != null) { source = "World choice"; state = Tint(Red, selectionProblem); }
             else if (primary == EditFeedback.PrimaryMessage.Reported) { state = null; } // The newest result leads the list below.
             // A confirmed target belongs to the object it was chosen for; another object does not show it.
             else if (primary == EditFeedback.PrimaryMessage.ConfirmedChoice) {
                 source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmation.Identity.ToString()));
             } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
             else if (feedback.Recovery?.Kind != FailureKind.IncompleteCleanup && feedback.Recovery?.Kind != FailureKind.Blocked && CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
-            // The area has a fixed height, so nothing outside it moves, and its entries stack from the top without gaps:
+            // Entries in the area stack from the top without gaps:
             // the current state or newest result first, then the guided hint and the remaining results. Older results
             // are dimmed. Each names its action group. The area is a native scroll view: its content takes the height of its
             // entries, so an entry that wraps has its wrapped height, and its viewport cuts off what does not fit. A
             // stack of fixed height would instead squeeze its entries below their text, and the text would overprint.
             // What lies below the area's edge is reached by scrolling.
             var messages = feedback.Messages;
-            var messageArea = presentation.Scroll(builder, MessageHeight, lines => {
+            // Reserve room even when empty. The file panel uses a shorter viewport so its decisions have more room.
+            var messageHeight = FileLocked ? FilePanelMessageHeight : InspectorMessageHeight;
+            var messageArea = presentation.Scroll(builder, messageHeight, lines => {
+                gizmoDragMessage = MessageSlot(lines, GizmoPlace, Literal(GizmoController.DraggingState), false).gameObject;
+                ShowLiveGizmoDrag();
                 var firstReport = 0;
                 if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
                 else if (messages.Count != 0) { ReportSlot(0); firstReport = 1; }
@@ -1111,12 +1174,8 @@ namespace RailroaderScenePatcher {
             viewport.anchorMax = Vector2.one;
             viewport.offsetMin = Vector2.zero;
             viewport.offsetMax = new Vector2(scrollbar == null ? 0 : -Mathf.Max(0, scrollbar.rect.width + messageScroll.verticalScrollbarSpacing), 0);
-            // The area is at least one message and a row high and prefers three messages. While the file panel is open it
-            // keeps only that least height, and the panel above it takes the height it frees; the footer's row below it
-            // stays in place.
             var area = messageArea.GetComponent<LayoutElement>();
-            area.minHeight = MessageHeight + RowHeight;
-            area.preferredHeight = FileLocked ? area.minHeight : 3 * MessageHeight + RowHeight;
+            area.preferredHeight = messageHeight;
             area.flexibleHeight = 0;
             // While the file panel is open, the footer's row waits for it with the panel's reason.
             ActionRow(builder, guided.Enabled && !FileLocked && selection?.Pending == null ? GuidedActs() : FooterActs(), FileLockReason);
@@ -1183,11 +1242,13 @@ namespace RailroaderScenePatcher {
             return actionRow;
         }
         // Each message takes its wrapped height inside the scrolling content.
-        void MessageSlot(UIPanelBuilder builder, string source, string markup, bool older) =>
-            builder.AddLabel((older ? "<alpha=#80>" : "") + (String.IsNullOrEmpty(source) ? "" : "<b>" + Literal(source) + "</b> ") + markup)
-                .TextWrap(TextOverflowModes.Overflow, TextWrappingModes.Normal).GetComponentsInChildren<TMP_Text>(true).ToList()
-                // Leave a small gap between the text and the viewport edge.
-                .ForEach(text => text.margin = new Vector4(0, 0, 4, 0));
+        RectTransform MessageSlot(UIPanelBuilder builder, string source, string markup, bool older) {
+            var label = builder.AddLabel((older ? "<alpha=#80>" : "") + (String.IsNullOrEmpty(source) ? "" : "<b>" + Literal(source) + "</b> ") + markup)
+                .TextWrap(TextOverflowModes.Overflow, TextWrappingModes.Normal);
+            // Leave a small gap between the text and the viewport edge.
+            foreach (var text in label.GetComponentsInChildren<TMP_Text>(true)) text.margin = new Vector4(0, 0, 4, 0);
+            return label;
+        }
         // A result that begins with its own source does not say it twice: "Placement  completed.".
         static string WithoutSource(EditFeedback.Message message) =>
             message.Text.StartsWith(message.Source + " ", StringComparison.OrdinalIgnoreCase) ? message.Text.Substring(message.Source.Length + 1) : message.Text;

@@ -39,7 +39,8 @@ namespace RailroaderScenePatcher {
         internal static bool RestingNativeGizmo(TransformGizmo instance) => IsShown && ReferenceEquals(current.nativeVisual, instance);
         // The controller has ended; its owner lets go of it.
         internal bool Closed => stopping;
-        internal string State => Active ? "Dragging. Release to apply; Escape restores the prior placement." : holding ? "Reading the object again; the gizmo takes a drag in a moment." : "Drag a gizmo handle in the world.";
+        internal const string DraggingState = "Dragging. Release to apply; Escape restores the prior placement.";
+        internal string State => Active ? DraggingState : holding ? "Reading the object again; the gizmo takes a drag in a moment." : "Drag a gizmo handle in the world.";
         // The object changed under the standing gizmo, as by a native Undo: the gizmo stays on the object, at its
         // placement now, and takes no drag until Rebind gives it the new inspection.
         internal bool Holding => holding && Shown;

@@ -11,10 +11,8 @@ namespace RailroaderScenePatcher.Core {
             var warning = ReloadWarning(nativeDirty, out var changes) ?? "All required work is saved.";
             string choices;
             if (!CanSaveForReload) choices = warning + " Resolve the scene patch file version choice before saving.";
-            else {
-                var save = "Save and Reload saves changes to the " + (changes ?? "map data and scene patch file") + " before reloading.";
-                choices = changes == null ? warning + " " + save : save + " " + warning;
-            }
+            else if (changes == null) choices = warning;
+            else choices = "Save and Reload saves changes to the " + changes + " before reloading. " + warning;
             return "Reload the Map Editor? Reloading ends the Map Editor's Undo and Redo history. "
                 + choices
                 + " Cancel keeps the Map Editor open. Your working location is restored when available.";

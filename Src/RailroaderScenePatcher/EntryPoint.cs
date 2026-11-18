@@ -164,7 +164,7 @@ namespace RailroaderScenePatcher {
         // stay through a tab switch.
         static EditFeedback NewFeedback() {
             var created = new EditFeedback();
-            foreach (var place in new[] { ModificationPlace, SavePlace, "Copy ID", "Fit" }) created.GeneralPlaces.Add(place);
+            foreach (var place in new[] { ModificationPlace, SavePlace, EditFeedback.CopyIdPlace, "Fit" }) created.GeneralPlaces.Add(place);
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = CommandBand.GizmoPlace, SnapPlace = "Snap", ActivityPlace = "Activity",
@@ -190,6 +190,7 @@ namespace RailroaderScenePatcher {
         // A light or gate being added or edited: the chosen source, seven fields (ID, position x/y/z, rotation x/y/z in
         // degrees) and the previewed change, which holds the addition to add or the ID to remove. Null source: no form open.
         EquipmentSource equipmentSource;
+        string equipmentLabel;
         readonly string[] equipmentFields = { "", "", "", "", "0", "0", "0" };
         sealed class PreparedEquipment { internal EquipmentAddition Addition; internal string RemoveId; internal EquipmentPreview Preview; }
         PreparedEquipment preparedEquipment;
@@ -804,6 +805,7 @@ namespace RailroaderScenePatcher {
                     MarkBound();
                     ArmGizmo();
                     ShowLivePlacement();
+                    ShowLiveGizmoDrag();
                     LogChoiceProblem();
                     // A result belongs to the tab and placement mode it was reported in.
                     feedback.View(guided.Enabled ? GuidedFeedbackView() : InspectorFeedbackView());
@@ -1328,7 +1330,12 @@ namespace RailroaderScenePatcher {
             var place = EquipmentPlace;
             Queue(place, "Equipment preview", pin => {
                 EquipmentPreview preview;
-                try { preview = session.PreviewEquipment(identity, addition, removeId, pin(selected)); }
+                try {
+                    var copies = EquipmentCopies();
+                    IReadOnlyList<SourceCandidate> candidates = null;
+                    try { candidates = session.EquipmentSources(identity); } catch { }
+                    preview = session.PreviewEquipment(identity, addition, removeId, pin(selected), item => EquipmentDisplayName(item, copies, candidates));
+                }
                 catch (Exception e) { feedback.Refuse(place, "Equipment preview", e.GetBaseException().Message); preparedEquipment = null; return; }
                 preparedEquipment = new PreparedEquipment { Addition = addition, RemoveId = removeId, Preview = preview };
                 if (preview.Error != null) feedback.Refuse(place, "Equipment preview", preview.Error);
@@ -1343,6 +1350,7 @@ namespace RailroaderScenePatcher {
         void UseSource(PatchEditingSession session, SourceCandidate candidate) {
             CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
             equipmentSource = candidate.Source; preparedEquipment = null; equipmentOwn = null; equipmentEdited = null;
+            equipmentLabel = InventoryPresentationState.EquipmentSourceName(candidate);
             var path = candidate.Source.Path ?? candidate.Source.Definition;
             var name = candidate.Name ?? path.Substring(path.LastIndexOf('/') + 1);
             equipmentFields[0] = session.NewEquipmentId(name.ToLowerInvariant().Replace(' ', '-') + "-added");
@@ -1351,9 +1359,10 @@ namespace RailroaderScenePatcher {
             FillEquipment(EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, candidate.CrossingPosition, candidate.CrossingRotation, selected.Position.ToArray(), selected.Rotation.ToArray()));
         }
         // Opens the form for an addition of this mod as the scene patch file holds it.
-        void ReadEquipment(EquipmentAddition addition) {
+        void ReadEquipment(EquipmentAddition addition, string name) {
             CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
             equipmentSource = addition.Source; preparedEquipment = null; equipmentOwn = null;
+            equipmentLabel = name;
             equipmentFields[0] = addition.Id; equipmentEdited = addition.Id;
             if (addition.Placement?.Position != null && addition.Placement.Rotation != null) FillEquipment(addition.Placement);
         }
@@ -1379,10 +1388,15 @@ namespace RailroaderScenePatcher {
                 var entry = attachment.Session.EquipmentEntries(selected.Identity).FirstOrDefault(e => e.Addition.Id == equipmentEdited);
                 if (entry == null) return;
                 equipmentSource = entry.Addition.Source; preparedEquipment = null; equipmentOwn = null; equipmentFields[0] = entry.Addition.Id;
+                var copies = EquipmentCopies();
+                IReadOnlyList<SourceCandidate> candidates = null;
+                if (entry.Built == null) try { candidates = attachment.Session.EquipmentSources(selected.Identity); } catch { }
+                equipmentLabel = entry.Built == null ? InventoryPresentationState.UnbuiltEquipmentName(entry.Addition, candidates)
+                    : EquipmentDisplayName(entry.Built, copies, candidates);
                 if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement);
             } catch (Exception) { }
         }
-        void CloseEquipmentForm() { equipmentEdited = null; equipmentSource = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
+        void CloseEquipmentForm() { equipmentEdited = null; equipmentSource = null; equipmentLabel = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
         EquipmentAddition ParseEquipment(out string problem) {
             var id = (equipmentFields[0] ?? "").Trim();
             problem = EquipmentAddition.IdProblem(id);

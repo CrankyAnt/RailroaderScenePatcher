@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
@@ -43,10 +45,57 @@ namespace RailroaderScenePatcher {
         // Baked scenery parts include their group; other objects use their observed visible name.
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
+        static readonly Regex AddedSuffix = new Regex(@" \(added(?:, [0-9]+ of [0-9]+)?\)\z");
+        internal static string NarrowName(string family, string name, float width, Func<string, float> measure) {
+            if (!CommandBand.IsAddedFamily(family) || measure(name) <= width) return name;
+            var suffix = AddedSuffix.Match(name);
+            // Cut only the name, on a text-element boundary. Measure with the suffix and any caller-supplied markup.
+            var elements = StringInfo.ParseCombiningCharacters(suffix.Success ? name.Substring(0, suffix.Index) : name);
+            var shortened = "…" + suffix.Value;
+            if (suffix.Success && measure(shortened) > width) return suffix.Value.Substring(1);
+            var lower = 0;
+            var upper = elements.Length - 1;
+            while (lower <= upper) {
+                var middle = lower + (upper - lower) / 2;
+                var candidate = name.Substring(0, elements[middle]).TrimEnd() + "…" + suffix.Value;
+                if (measure(candidate) <= width) {
+                    shortened = candidate;
+                    lower = middle + 1;
+                } else upper = middle - 1;
+            }
+            return shortened;
+        }
+
+        internal static string EquipmentKind(EquipmentSource source) => source.IsDefinition ? "Bell" : "Light or gate";
+
+        internal static string EquipmentSourceName(SourceCandidate candidate) {
+            var name = String.IsNullOrWhiteSpace(candidate.Name) ? EquipmentKind(candidate.Source) : candidate.Name;
+            return String.IsNullOrEmpty(candidate.Crossing) ? name : name + " at " + candidate.Crossing;
+        }
+
+        internal static string EquipmentSourceName(EquipmentSource source, IEnumerable<SourceCandidate> candidates) {
+            var match = candidates?.FirstOrDefault(candidate => candidate.Source.Scene == source.Scene && candidate.Source.Path == source.Path
+                && candidate.Source.Definition == source.Definition);
+            return match == null ? EquipmentKind(source) : EquipmentSourceName(match);
+        }
+
+        internal static string UnbuiltEquipmentName(EquipmentAddition item, IEnumerable<SourceCandidate> candidates) =>
+            item.Id + ": " + EquipmentSourceName(item.Source, candidates);
+
+        internal static string OutlinerTooltip(SceneObservation item, bool changed) {
+            var equipment = CommandBand.IsAddedFamily(item.Family);
+            return (Name(item) + "\n" + (equipment ? "" : item.Identity.Path + "\n") + item.Family
+                + (item.Category == null ? "" : "\n" + item.Category + (item.Subcategory == null ? "" : " / " + item.Subcategory))
+                + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly))
+                + (changed ? "\nChanged by this mod" : "")
+                + (item.Problems.Count == 0 ? "" : equipment ? "\nDetected problems: " + item.Problems.Count : "\n" + String.Join("\n", item.Problems)))
+                .Replace("<", "\\u003c").Replace(">", "\\u003e");
+        }
+
         // The supplying scope and addition ID keep the order independent of the scene and outliner order.
         internal static string AddedEquipmentName((string Scope, string Id, string CopyName, bool IsBell) equipment,
             IEnumerable<(string Scope, string Id, string CopyName, bool IsBell)> crossingEquipment) {
-            if (equipment.CopyName == null) return "Added light or gate";
+            if (equipment.CopyName == null) return equipment.IsBell ? "Added bell" : "Added light or gate";
             var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.CopyName == equipment.CopyName)
                 .OrderBy(item => item.Scope, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray();
             var ordinal = Array.IndexOf(matches, equipment) + 1;

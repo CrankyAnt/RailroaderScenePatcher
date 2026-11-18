@@ -116,17 +116,20 @@ namespace RailroaderScenePatcher.Core {
             return a.additions.Count == b.additions.Count && a.additions.All(x => b.Find(x.Key) is EquipmentAddition y && EquipmentAddition.Same(x, y));
         }
         // One line per addition: what changes first, as it is built, rebuilt, moved or removed, then what is kept.
-        internal static IReadOnlyList<string> Describe(CrossingEquipment current, CrossingEquipment desired) {
+        internal static IReadOnlyList<string> Describe(CrossingEquipment current, CrossingEquipment desired) => Describe(current, desired, null);
+        internal static IReadOnlyList<string> Describe(CrossingEquipment current, CrossingEquipment desired, Func<EquipmentAddition, string> displayName) {
             if (current == null || desired == null) throw new InvalidOperationException("This object has no crossing equipment");
             var changes = new List<string>(); var kept = new List<string>();
+            string Name(EquipmentAddition addition) => displayName?.Invoke(addition) ?? addition.ToString();
             foreach (var want in desired.additions) {
                 var now = current.Find(want.Key);
-                if (now == null) changes.Add("Add " + want + "; the crossing controller drives it.");
-                else if (!EquipmentAddition.SameBuild(now, want)) changes.Add("Rebuild " + want + "; the copy of " + now.Source + " is removed.");
-                else if (!EquipmentAddition.SamePlacement(now.Placement, want.Placement)) changes.Add("Move " + want + ".");
-                else kept.Add("Keep " + want + ".");
+                if (now == null) changes.Add("Add " + Name(want) + "; the crossing controller drives it.");
+                else if (!EquipmentAddition.SameBuild(now, want)) changes.Add("Rebuild " + Name(want) + "; the copy of " + (displayName == null ? now.Source.ToString() : Name(now)) + " is removed.");
+                else if (!EquipmentAddition.SamePlacement(now.Placement, want.Placement)) changes.Add("Move " + Name(want) + ".");
+                else kept.Add("Keep " + Name(want) + ".");
             }
-            foreach (var gone in current.additions.Where(a => desired.Find(a.Key) == null)) changes.Add("Remove " + gone + "; its copy is released from the controller and its culling.");
+            foreach (var gone in current.additions.Where(a => desired.Find(a.Key) == null))
+                changes.Add("Remove " + Name(gone) + (displayName == null ? "; its copy is released from the controller and its culling." : "."));
             return changes.Concat(kept).ToList();
         }
         // The place a crossing stands at, for a label: the part after "Grade Crossing - " of its own name, or else the

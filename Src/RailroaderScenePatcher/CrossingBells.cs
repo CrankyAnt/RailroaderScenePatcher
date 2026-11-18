@@ -246,7 +246,7 @@ namespace RailroaderScenePatcher {
             if (bell == null || bell.Player == null) return "bell player is missing";
             if (bell.LoadProblem != null) return "audio failed to load";
             if (!bell.Loaded) return "loading audio";
-            return "audio loaded; following the controller's bell key; added bell is " + Ringing(bell.Player) + "; crossing's own bell is " + Ringing(NativeBell(controller));
+            return "audio loaded. Added bell is " + Ringing(bell.Player) + ". The crossing's own bell is " + Ringing(NativeBell(controller));
         }
         Component NativeBell(GameObject controller) {
             try { return controller == null ? null : Native.Read(controller.GetComponent(controllerType), "_bellPlayer") as Component; } catch { return null; }

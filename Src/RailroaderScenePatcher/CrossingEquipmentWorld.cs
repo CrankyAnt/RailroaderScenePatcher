@@ -342,12 +342,12 @@ namespace RailroaderScenePatcher {
             var copy = owned.Copy;
             if (copy == null) return "copy missing";
             if (owned.Pattern == EquipmentAddition.BellPattern) return bells == null ? "crossing bells are unavailable" : bells.Status(copy.GetComponent<OwnedBell>(), owned.Controller);
-            if (!copy.activeInHierarchy) return "culled with its crossing; it initializes when visible";
+            if (!copy.activeInHierarchy) return "hidden with the crossing. It connects when visible";
             int Registered(Type type, FieldInfo observer) => observer == null ? -1 : All(copy, type).Count(c => observer.GetValue(c) != null);
             var lamps = All(copy, lamp).Length; var gates = All(copy, gate).Length;
             var lampsOn = Registered(lamp, lampObserver); var gatesOn = Registered(gate, gateObserver);
-            if (lampsOn < 0 || gatesOn < 0) return "visible; observer state unreadable in this build";
-            return lampsOn == lamps && gatesOn == gates ? "visible; " + lamps + " lamp and " + gates + " gate observers registered with the controller" : "visible; initialization pending (" + lampsOn + "/" + lamps + " lamp, " + gatesOn + "/" + gates + " gate observers)";
+            if (lampsOn < 0 || gatesOn < 0) return "visible. Connection to the crossing could not be checked";
+            return lampsOn == lamps && gatesOn == gates ? "visible. Connected to the crossing" : "visible. Waiting to connect to the crossing";
         }
     }
 }
