@@ -58,6 +58,29 @@ static class FileImportTests {
         FileChangedAgainRefusesApply();
         TargetMovedAwayFromEditedObjectConflicts();
         TopLevelChangesAreListed();
+        ImportListNamesTheKindOnce();
+        ImportListWordsEachSetting();
+    }
+    // The Import list leads with the kind in bold; the description does not repeat it as a verb.
+    static void ImportListNamesTheKindOnce() {
+        var world = new World(Doc(Item("a", "p", 110) + "," + Item("b", "r", 140)), "p", "r", "q");
+        world.Outside(Doc(Item("a", "p", 117) + "," + Item("c", "q", 150)));
+        Assert(world.Session.OpenImport().Applied, "Overview opens");
+        var changes = world.Session.Import.Changes;
+        Assert(changes.Single(c => c.Key == "a").Description == "Modification ID a for p. Setting: the placement.", "Changed: " + changes.Single(c => c.Key == "a").Description);
+        Assert(changes.Single(c => c.Key == "b").Description == "Modification ID b for r. The object returns to its state without this modification.", "Removed: " + changes.Single(c => c.Key == "b").Description);
+        Assert(changes.Single(c => c.Key == "c").Description == "Modification ID c for q. It sets the placement.", "New: " + changes.Single(c => c.Key == "c").Description);
+        foreach (var change in changes) Assert(!change.Description.StartsWith("Changes ") && !change.Description.StartsWith("Adds ") && !change.Description.StartsWith("Removes "), "No list line repeats its kind: " + change.Description);
+    }
+    // A setting's own plurality decides the wording, and a new entry that sets nothing says only what it adds.
+    static void ImportListWordsEachSetting() {
+        var world = new World(Doc(Item("base", "r", 140) + "," + Item("a", "p", 110)), "p", "r", "q");
+        world.Outside(Doc(Item("base", "r", 140) + "," + Item("a", "p", 110).Replace("\"dependsOn\":[]", "\"dependsOn\":[\"base\"]")
+            + ",\"d\":{\"target\":{\"scene\":\"s\",\"path\":\"q\",\"component\":\"c\"},\"dependsOn\":[]}"));
+        Assert(world.Session.OpenImport().Applied, "Overview opens");
+        var changes = world.Session.Import.Changes;
+        Assert(changes.Single(c => c.Key == "a").Description == "Modification ID a for p. Setting: the dependencies.", "A single plural setting: " + changes.Single(c => c.Key == "a").Description);
+        Assert(changes.Single(c => c.Key == "d").Description == "Modification ID d for q.", "A new entry that sets nothing: " + changes.Single(c => c.Key == "d").Description);
     }
     static void FileChangedAgainRefusesApply() {
         var world = new World(Doc(Item("a", "p", 110)), "p");
@@ -90,7 +113,7 @@ static class FileImportTests {
         world.Outside(Doc(Item("a", "p", 110), "\"futureTop\":{\"x\":3},"));
         Assert(world.Session.OpenImport().Applied, "Overview opens");
         var change = world.Session.Import.Changes.Single();
-        Assert(change.Description == "Changes content outside the modifications: futureTop." && change.Kind == ImportChangeKind.New, "A top-level change is listed: " + change.Description);
+        Assert(change.Description == "Content outside the modifications: futureTop." && change.Kind == ImportChangeKind.New, "A top-level change is listed: " + change.Description);
         Assert(world.Session.ApplyImport().Applied && world.Session.LastImport.Changes == 1, "The top-level change counts as applied");
         Assert(FilePanelState.Completed(new ImportResult(0, 0, 1), true).StartsWith("Import completed. No changes applied, editor version kept for 1 conflict."), "A count of zero says No changes applied");
     }

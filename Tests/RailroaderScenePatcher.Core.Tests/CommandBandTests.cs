@@ -484,6 +484,13 @@ static class CommandBandTests {
             Check(CommandBand.RowFits(widths), "Every action row fits the inspector's minimum with its full labels: " + String.Join(", ", row.Select(button => button[0])) + " = " + widths.Sum());
         }
         Check(CommandBand.ButtonWidth(CommandBand.LabelWidths["Disable"], CommandBand.LabelWidths["Enable"]) == CommandBand.ButtonWidth(CommandBand.LabelWidths["Disable"]), "A button whose label changes takes its widest label, so the change moves nothing");
+        // The file panel's Repair and Import rows fit the inspector's minimum with full or short labels.
+        Check(CommandBand.ShortLabel(FilePanelState.Copy) == "Copy", "Copy to clipboard has the short label Copy");
+        foreach (var row in CommandBand.FilePanelRows) {
+            var full = row.Select(label => CommandBand.ButtonWidth(CommandBand.LabelWidths[label])).ToArray();
+            var shortened = row.Select(label => CommandBand.ButtonWidth(CommandBand.LabelWidths[CommandBand.ShortLabel(label)])).ToArray();
+            Check(CommandBand.RowFits(full) || CommandBand.RowFits(shortened), "A file panel row fits with full or short labels: " + String.Join(", ", row));
+        }
         Check(!CommandBand.RowFits(new[] { 200f, 150f }) && CommandBand.RowFits(new[] { 200f, 136f }) && CommandBand.ShortLabel(CommandBand.RemoveModification) == "Remove" && CommandBand.ShortLabel("Recheck") == "Recheck",
             "A row that would not fit takes the shorter label where a button has one");
         // World colours: one table for every marking.

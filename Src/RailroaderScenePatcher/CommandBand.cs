@@ -165,7 +165,12 @@ namespace RailroaderScenePatcher {
             return total + Math.Max(0, count - 1) * ActionRowSpacing <= ActionRowBudget;
         }
         // The shorter label a button takes when its row would not fit with the full ones, or the label itself.
-        internal static string ShortLabel(string label) => label == RemoveModification ? "Remove" : label;
+        internal static string ShortLabel(string label) => label == RemoveModification ? "Remove" : label == FilePanelState.Copy ? "Copy" : label;
+        // The pinned rows of the file panel that must fit the inspector's minimum, with full or short labels: Repair and Import.
+        internal static readonly string[][] FilePanelRows = {
+            new[] { "Keep editor version", "Details", "Copy to clipboard" },
+            new[] { "Import", "Cancel" },
+        };
         // Every action row of the panel, for the table test of the rule: each row a list of buttons, each button its
         // label or the labels it changes between.
         internal static readonly string[][][] ActionRows = {
@@ -194,7 +199,10 @@ namespace RailroaderScenePatcher {
             { "Disable", 60.44f }, { "Enable", 56.36f }, { "Clear activity", 104.74f }, { "Apply", 46.95f }, { "Read", 41.67f }, { "Track", 43.46f }, { "Node", 43.86f },
             { "Discard", 61.5f }, { "Start", 39f }, { "Stop", 37.35f }, { "Set", 26.36f }, { "Detach", 59.13f }, { "Clear binding", 109.6f }, { "Clear location", 112.5f }, { "Picked", 55.25f },
             { "Preview", 64.68f }, { "Clear circuit", 96.93f }, { "Delete", 53.4f }, { "Retry", 43.8f }, { "Refresh", 62.15f }, { "Select in world", 119.96f }, { "Clear", 41.71f },
-            { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f }, { "Guide", 47f } };
+            { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f }, { "Guide", 47f },
+            // Estimated from the game capture of the Repair row (Copy to clipboard 143 units wide with its padding) and
+            // the glyph advances of the measured labels.
+            { "Keep editor version", 152f }, { "Copy to clipboard", 131f }, { "Copy", 41f }, { "Import", 52f } };
         // One colour table for every world marking. Gold frames the inspected object. A candidate of a pick mode is
         // blue: more saturated while the pointer is over it, plain blue once it was clicked and until Confirm. A current
         // relation of the inspected object, native or set by a patch, is green, and more saturated under the pointer.

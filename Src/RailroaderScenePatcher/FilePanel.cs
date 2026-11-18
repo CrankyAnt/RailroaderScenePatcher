@@ -110,6 +110,8 @@ namespace RailroaderScenePatcher {
             else {
                 attachment.Fault = null;
                 Inspect();
+                // The fields show the imported placement; the session value from before Import never stays behind.
+                ReadPlacement();
                 feedback.Report(ImportPlace, FilePanelState.Completed(session.LastImport, session.Outstanding(false).Contains(PatchEditingSession.PatchData)));
             }
             VersionChanged();

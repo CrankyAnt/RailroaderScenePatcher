@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher.Core {
                 var mine = fileRoot[member]; var theirs = readRoot?[member];
                 if (mine != null && theirs != null && PreservingJson.SameContent(mine, theirs)) continue;
                 changes.Add(new ImportChange(member, theirs == null ? ImportChangeKind.New : mine == null ? ImportChangeKind.Removed : ImportChangeKind.Changed, null,
-                    "Changes content outside the modifications: " + member + ".", true));
+                    "Content outside the modifications: " + member + ".", true));
             }
             return new ImportOverview(changes, conflicts, fingerprint, text);
         }
@@ -178,7 +178,21 @@ namespace RailroaderScenePatcher.Core {
         static ImportChangeKind KindOf(JObject before, JObject after) => before == null ? ImportChangeKind.New : after == null ? ImportChangeKind.Removed : ImportChangeKind.Changed;
         static ImportChange Change(string key, JObject before, JObject after) {
             var name = TargetName(after, before);
-            return new ImportChange(key, KindOf(before, after), name, Effect(key, name, before, after));
+            return new ImportChange(key, KindOf(before, after), name, ListLine(key, name, before, after));
+        }
+        // The line of a change in the Import list. The list names the kind in front of it, so the line does not repeat it as
+        // a verb: the entry first, then what the change does.
+        static string ListLine(string key, string name, JObject before, JObject after) {
+            var entry = "Modification ID " + key + (name == null ? "" : " for " + name) + ".";
+            if (after == null) return entry + " The object returns to its state without this modification.";
+            if (before == null) {
+                // A new entry that sets nothing beyond its target says only what it adds.
+                var sets = Settings(after, null);
+                return sets.Count == 0 ? entry : entry + " It sets " + List(sets) + ".";
+            }
+            var changed = Settings(after, before);
+            if (changed.Count == 0) return entry + " Its content changes.";
+            return entry + (changed.Count == 1 ? " Setting: " : " Settings: ") + List(changed) + ".";
         }
         // What replacing one value of an entry by another does, as plain sentences.
         static string Effect(string key, string name, JObject before, JObject after) {
@@ -201,6 +215,8 @@ namespace RailroaderScenePatcher.Core {
                         if (Differs(mine?[relation], theirs?[relation])) Add(SettingName(relation));
                     continue;
                 }
+                // A new entry sets what it changes: its target names the object, and an empty dependsOn sets nothing.
+                if (against == null && (member == "target" || (member == "dependsOn" && entry[member] is JArray none && none.Count == 0))) continue;
                 if (Differs(entry[member], against?[member])) Add(SettingName(member));
             }
             return names;

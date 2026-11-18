@@ -52,7 +52,7 @@ While the **Import** panel is open, clicking **Save** writes nothing and shows `
 
 ### Repair the scene patch file
 
-If the patcher cannot read the file as a valid scene patch file, or its format version is missing, unrecognized or newer, **Scene patches** enters **File needs repair**. The **Repair** panel replaces the inspector tabs. It shows the diagnosis with line numbers and offers **Keep editor version**, **Details** and **Copy to clipboard**. **Use file version** and **Import** are unavailable.
+If the patcher cannot read the file as a valid scene patch file, or its format version is missing, unrecognized or newer, **Scene patches** enters **File needs repair**. The **Repair** panel replaces the inspector tabs. It shows the diagnosis with line numbers and offers **Keep editor version**, **Details** and **Copy**, whose tooltip reads **Copy to clipboard**. **Use file version** and **Import** are unavailable.
 
 Only **Refresh** and the session details remain available outside the panel. Disabled controls show the reason in their tooltips. Clicking **Save** writes nothing and shows `Save refused.` with the diagnosis in the message area. See [Recover a protected scene patch file](recover-scene-patch-files.md).
 

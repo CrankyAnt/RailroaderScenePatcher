@@ -607,6 +607,10 @@ namespace RailroaderScenePatcher {
         Func<float> dividerWidth;
         internal void Divider(UIPanelBuilder builder, LayoutElement column, float minimum, Func<float> maximum, Func<float> desired, Action<float> changed) {
             var rule = builder.AddVRule().Width(DividerWidth);
+            // The game shows the tooltip of the first object under the pointer that is on the UI layer; the builder's rule
+            // is not, so the divider's tooltip never showed.
+            var ui = LayerMask.NameToLayer("UI");
+            if (ui >= 0) rule.gameObject.layer = ui;
             var image = rule.GetComponent<Image>();
             if (image != null) image.raycastTarget = true;
             var drag = rule.gameObject.AddComponent<ColumnDivider>();

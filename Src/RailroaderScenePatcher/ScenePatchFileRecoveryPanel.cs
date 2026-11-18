@@ -38,6 +38,9 @@ namespace RailroaderScenePatcher {
             else {
                 attachment.Fault = null;
                 if (useFile) { ReplaceScenePatchFileDiagnostics(session.LastVersionApplication); Inspect(); }
+                // The fields show the object as it now stands: a draft or a value from before the choice never stays
+                // behind to be applied.
+                ReadPlacement();
                 feedback.Report(RecoveryPlace, useFile ? "File version applied." : "Editor version kept.");
             }
             // The choice may close the file panel: the window's controls and the title bar follow it.

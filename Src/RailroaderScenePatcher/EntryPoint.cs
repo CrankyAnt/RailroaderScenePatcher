@@ -613,8 +613,11 @@ namespace RailroaderScenePatcher {
                 CancelGizmo(); ClearSnap();
                 selection?.Cancel();
                 CancelRequest(reason);
-                // A typed, unapplied Numeric draft keeps native world clicks blocked; the panel ends it.
+                // A typed, unapplied Numeric draft keeps native world clicks blocked; the panel ends it and discards the
+                // draft: the fields show the object as it stands, and nothing applies the draft later.
                 EndWorldEditAction();
+                presentation?.ClearFocusForEdit();
+                ReadPlacement();
             }
             presentation?.SetFileLock(reason);
             attachment?.RefreshChrome();
