@@ -48,6 +48,7 @@ static class FileImportTests {
         SaveIsRefusedWhileImportIsOpen();
         FailedImportRestoresEverything();
         InvalidOrNewerFileOffersNoImport();
+        FormatVersionIsCheckedFirst();
         UnknownContentSurvivesImportAndSave();
         SaveDuringSessionCreatesNoConflict();
         RemovedEntriesAreClassified();
@@ -257,7 +258,7 @@ static class FileImportTests {
         world.Outside(Doc(Item("a", "p", 119)));
         Assert(world.Session.OpenImport().Applied, "Overview opens");
         var patch = world.Store.Patch; var nativeWrites = world.History.NativeWrites;
-        Assert(world.Session.SaveRefusalBeforeWrite() == "Complete or cancel Import before saving: click Import or Cancel in the Import panel.",
+        Assert(world.Session.SaveRefusalBeforeWrite() == "Click Import to finish the import before saving. After Cancel, choose a version in the Version choice panel before saving.",
             "Save is refused with the visible actions while the Import panel is open");
         var result = world.History.Save();
         Assert(result != null && world.Store.Patch == patch && world.Store.PatchWrites == 0 && world.History.NativeWrites == nativeWrites, "The refused Save writes nothing");
@@ -285,6 +286,22 @@ static class FileImportTests {
         Assert(world.Session.OpenImport().Applied, "A readable file offers Import again");
         world.Outside("{broken");
         Assert(world.Session.Import == null, "A file that needs repair closes the open overview");
+    }
+    // Import checks the declared format version before any other content: a changed file whose version is missing,
+    // unrecognized or newer, with other invalid content as well, needs repair for its version and offers no Import.
+    static void FormatVersionIsCheckedFirst() {
+        var cases = new[] {
+            Tuple.Create("{\"sourceMap\":{\"mapId\":5},\"modifications\":[1]}", "Missing format version"),
+            Tuple.Create("{\"formatVersion\":\"one\",\"sourceMap\":{\"mapId\":5},\"modifications\":[1]}", "Unrecognized format version"),
+            Tuple.Create("{\"formatVersion\":2,\"sourceMap\":{\"mapId\":5},\"modifications\":[1", "Newer format version 2") };
+        foreach (var item in cases) {
+            var world = new World(Doc(Item("a", "p", 110)), "p");
+            world.Outside(item.Item1);
+            var session = world.Session;
+            Assert(session.VersionState == FileVersionState.Repair && session.VersionMessage.StartsWith("File needs repair: " + item.Item2), "The version decides the repair: " + session.VersionMessage);
+            Assert(session.ScenePatchFileDiagnostics.Count == 1 && session.ScenePatchFileDiagnostics[0].Path == "formatVersion" && session.ScenePatchFileDiagnostics[0].Message.StartsWith(item.Item2), "The diagnosis is the version's, not the other content's: " + String.Join(" | ", session.ScenePatchFileDiagnostics.Select(d => d.Path + ": " + d.Message)));
+            Assert(!session.OpenImport().Applied && session.Import == null, "A file that needs repair for its version offers no Import");
+        }
     }
     static void UnknownContentSurvivesImportAndSave() {
         var world = new World(Doc(Item("a", "p", 110)), "p");
