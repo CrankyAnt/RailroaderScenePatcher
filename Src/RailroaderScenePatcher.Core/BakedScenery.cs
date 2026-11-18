@@ -231,7 +231,7 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
             new Exclusion("Model.StationAgent", "station click spot", null, reason: StationAgentReason),
             new Exclusion(ConstructionController, "track construction controller", null, reason: ConstructionOutsideBridge),
-            new Exclusion("Character.SpawnPoint", "spawn point", "#94"),
+            new Exclusion(SpawnPoints.Component, "spawn point", null, reason: SpawnPointReason),
             new Exclusion("UI.Map.MapIcon", "map icon", null, reason: MapIconReason),
         });
         // Why a group with a map icon is left out. Station map icons, in the Station Icons folder, have their own family;
@@ -243,6 +243,8 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
         public const string TrackMarkerReason = "This group is not moved as a whole. Its track markers are edited one by one in the Track marker family.";
+        // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
+        public const string SpawnPointReason = "This group is not moved as a whole. Its spawn points are edited one by one in the Spawn point family.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
         public static readonly IReadOnlyList<string> RailBridgeFolders = Array.AsReadOnly(new[] { "Almond Bridge", "Plate Girder Bridge" });
         // The bridge roots that a later bridge ticket names: road bridges.

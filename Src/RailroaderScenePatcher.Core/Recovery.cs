@@ -130,6 +130,7 @@ namespace RailroaderScenePatcher.Core {
             if (structure == TrackMarkerScene.Structure) return Pair("Track bindings", "repairing-track-bindings.md");
             if (structure == CrossingPadScene.Structure) return Pair("Crossing pads", "rebinding-crossing-pads.md");
             if (structure == CrossingCoverageScene.Structure) return Pair("Crossing coverage", "correcting-crossing-coverage.md");
+            if (structure == SpawnPoints.Structure) return Pair("Spawn points", "moving-spawn-points.md");
             return Pair("Editing in the Map Editor", EditingGuide);
         }
         static KeyValuePair<string, string> Pair(string title, string file) => new KeyValuePair<string, string>(title, file);

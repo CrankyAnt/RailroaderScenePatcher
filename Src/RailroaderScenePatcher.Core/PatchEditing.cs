@@ -288,6 +288,8 @@ namespace RailroaderScenePatcher.Core {
                     if (target.Structure == BakedSceneryGroups.Structure) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
                     // So does a modification of a part of a baked scenery group.
                     if (target.Structure == BakedSceneryParts.Structure) minimum = Max(minimum, BakedSceneryParts.RequiredVersion);
+                    // So does a modification of a scene spawn point.
+                    if (target.Structure == SpawnPoints.Structure || (target.Structure == null && target.Component == SpawnPoints.Component)) minimum = Max(minimum, SpawnPoints.RequiredVersion);
                     // So does a modification of a station map icon.
                     if (StationMapIconScene.Requires(target)) minimum = Max(minimum, StationMapIconRules.RequiredVersion);
                     // So does a modification of an existing crossing mast or bell.

@@ -646,7 +646,6 @@ static class BakedSceneryTests {
         var cases = new[] {
             new { Name = "Alarka Jct Station", Component = "Map.Runtime.MaskComponents.RectangleMapMask", Kind = "scene ground mask", Ticket = "#90" },
             new { Name = "Bryson Depot", Component = "Model.StationAgent", Kind = "station click spot", Ticket = (string)null },
-            new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
             new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "map icon", Ticket = (string)null },
         };
         foreach (var item in cases) {

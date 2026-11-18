@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit and save fixed placement in the native map editor
 
-Use the native map editor to move, rotate, disable or restore a supported scene object. This guide also explains how Save, Undo and Redo handle those edits. You can currently edit [independent boards](moving-boards.md), [the Ela bridge](placing-bridges.md), and [baked scenery groups and their parts](moving-baked-scenery-groups.md).
+Use the native map editor to move, rotate, disable or restore a supported scene object. This guide also explains how Save, Undo and Redo handle those edits. You can currently edit [independent boards](moving-boards.md), [the Ela bridge](placing-bridges.md), [baked scenery groups and their parts](moving-baked-scenery-groups.md), and [player spawn points](moving-spawn-points.md).
 
 Automated tests cover the behavior described here with controlled scene, history and storage dependencies. This guide does not yet include a recorded journey through these steps in Railroader.
 

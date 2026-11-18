@@ -668,6 +668,17 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Use in the game");
                 PlainLabel(builder, CommandBand.UseInGame(selected, selected.GroupPath != null ? InventoryPresentationState.GroupOf(inventory, selected) : null));
             }
+            // A spawn point names each use the game has for it: the default start, rescue, teleport and quick search,
+            // and the start setups that name it.
+            if (selected.Family == SpawnPoints.Family) {
+                Section(builder, "Use in the game");
+                // The game offers only spawn points active in the hierarchy; among those with the same priority its sort
+                // keeps no fixed order, so the other active ones that share it are counted from the object list.
+                var priority = SpawnPoints.Priority(selected.Bindings);
+                var same = priority == null || inventory == null ? 0 : inventory.Entries.Count(entry => entry.Family == SpawnPoints.Family && entry.Active && !ReferenceEquals(entry, selected)
+                    && entry.Identity.Path != selected.Identity.Path && SpawnPoints.Priority(entry.Bindings) == priority);
+                foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), selected.Active, same)) PlainLabel(builder, use);
+            }
             Section(builder, "State");
             if (HeldAgainstConstruction) builder.AddLabel(Tint(Amber, CommandBand.ConstructionHoldWarning));
             // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
@@ -1655,6 +1666,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
+                    new[] { "Spawn point", "The scene spawn points where players start, are rescued and teleport to. Native spawns in the map data stay in the Map Editor's Spawns category." },
                     new[] { StationMapIconRules.Family, "The icons the map shows for stations. Move one where its station now stands after you move the station in the Map Editor." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
                     new[] { "Dimmed rows", "A dimmed group row holds matching parts but does not match the search itself." },
@@ -1678,9 +1690,10 @@ namespace RailroaderScenePatcher {
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. A board's terrain output regenerates after the move." },
-                    new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." } },
+                    new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
+                    new[] { "Spawn points", "The game reads a spawn point where it stands each time it starts, rescues or teleports a player. A disabled spawn point is not offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
-                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" } } },
+                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
                 Terms = new[] {
                     new[] { "Track binding", "The track location a marker is registered at. Changing it does not move the object." },

@@ -315,6 +315,7 @@ class Program {
         LakeSurfaceTests.Run();
         StationMapIconTests.Run();
         CoalLoaderTests.Run();
+        SpawnPointTests.Run();
         RailBridgeTests.Run();
         InteractiveBuildingTests.Run();
         PartCullingTests.Run();

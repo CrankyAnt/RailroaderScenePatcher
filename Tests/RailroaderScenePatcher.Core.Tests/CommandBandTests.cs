@@ -51,8 +51,8 @@ static class CommandBandTests {
             && CommandBand.Tooltip("Does something.", settled) == "Unavailable: " + BakedSceneryRules.TrackMarkerReason,
             "The message, the Inspection only line and the tooltip give the reason without its label: " + CommandBand.Tooltip("Does something.", settled));
         var spawn = Verdict("Alarka Spawn", new Node("Spawn").With("Character.SpawnPoint"));
-        Check(spawn.Ticket == "#94" && CommandBand.GroupInspectionOnly(spawn, family) == "Not yet supported: baked scenery groups that hold a spawn point cannot be edited",
-            "A group a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(spawn, family));
+        Check(spawn.Ticket == null && CommandBand.GroupInspectionOnly(spawn, family) == "Not editable as a group: " + BakedSceneryRules.SpawnPointReason,
+            "A group with a spawn point reads Not editable as a group and names the Spawn point family: " + CommandBand.GroupInspectionOnly(spawn, family));
         var bridge = Verdict("Almond Road Bridge", new Node("Deck").Solid());
         Check(bridge.Ticket == "#97" && bridge.ReasonIsSentence && CommandBand.GroupInspectionOnly(bridge, family) == "Not yet supported: " + bridge.Reason,
             "A whole-sentence reason a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(bridge, family));

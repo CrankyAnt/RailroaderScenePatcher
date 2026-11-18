@@ -14,16 +14,16 @@ The **Baked scenery group** family in the outliner lists one entry per group roo
 
 To be listed, a group must be saved in the scene, have a renderer, collider, light, storage pile or log pond at or below its root, and belong to no other family. The following objects have no group entry:
 
-- Objects without a renderer, collider, light, storage pile or log pond, such as a spawn point under `World/POIs`.
+- Objects without a renderer, collider, light, storage pile or log pond. A spawn point under `World/POIs` has its own **Spawn point** family; see [move player spawn points](moving-spawn-points.md).
 - Visual effects, such as the fireflies under `World/Environment Effects`.
 - Folders, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that folder is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask, spawn point or map icon. The same restriction applies to road bridges and crossbucks at unprotected crossings.
+Groups that contain game logic or shape the terrain need separate support. They are marked `inspection only`, and the **Object** tab explains why. This includes groups containing a station click spot, scene ground mask or map icon. The same restriction applies to road bridges and crossbucks at unprotected crossings.
 
-Groups containing track markers are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
+Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
 ## Which parts are listed
 

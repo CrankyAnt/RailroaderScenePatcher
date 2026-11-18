@@ -274,6 +274,11 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(MilepostScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": milepost capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
+                try { capabilities.Add(new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked)); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(SpawnPoints.Structure, e.GetBaseException().Message);
+                    context.Log.Info("Scene Patcher " + Version + ": spawn point capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
                 try { capabilities.Add(new StationMapIconScene(new MapIconWorld())); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(StationMapIconRules.Structure, e.GetBaseException().Message);
@@ -1203,7 +1208,7 @@ namespace RailroaderScenePatcher {
             } catch (Exception e) { feedback.Refuse(BindingPlace, action, e.GetBaseException().Message + "; enter end and distance by hand"); }
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
-        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure || selected.Identity.Structure == BakedSceneryParts.Structure || selected.Identity.Structure == StationMapIconRules.Structure || IsEquipment) && selected.Handle is GameObject;
+        bool Editable => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || selected.Identity.Structure == BridgeScene.Structure || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure || selected.Identity.Structure == CrossingCoverageScene.Structure || selected.Identity.Structure == CrossingPadScene.Structure || selected.Identity.Structure == BakedSceneryGroups.Structure || selected.Identity.Structure == BakedSceneryParts.Structure || selected.Identity.Structure == StationMapIconRules.Structure || selected.Identity.Structure == SpawnPoints.Structure || IsEquipment) && selected.Handle is GameObject;
         // The inspected object is an existing crossing mast or bell that conforms to its pattern.
         bool IsEquipment => selected != null && (selected.Identity.Structure == ExistingEquipmentScene.MastStructure || selected.Identity.Structure == ExistingEquipmentScene.BellStructure);
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.

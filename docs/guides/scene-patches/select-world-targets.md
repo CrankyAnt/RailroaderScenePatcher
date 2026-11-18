@@ -61,6 +61,7 @@ The box stops where the object, including its wider parts, meets the terrain or 
 An invisible object has no visible model in the world, so it has no object frame of its own. It shows a helper marker instead: its square marker, with the `+` on the object's pivot, the point that the object's position on the **Placement** tab names. Invisible objects include:
 
 - A light-only object, such as the `Spotlight Outdoor` groups at Whittier under the **Lights** category.
+- A spawn point, such as `World/POIs/Alarka` in the **Spawn point** family.
 - An object with only colliders, such as a click spot. Its helper marker also shows a frame for its colliders' bounds. This frame is never cut off at the ground. The `+` stays on the pivot, which can be at the edge of the frame rather than its middle.
 - An object whose renderers are all switched off or show only effects or shadows.
 
