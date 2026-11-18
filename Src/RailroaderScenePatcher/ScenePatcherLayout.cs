@@ -688,7 +688,7 @@ namespace RailroaderScenePatcher {
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
                     var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure);
-                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) placementMode = mode; })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
+                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
             var block = EditBlock() ?? PadBlock;

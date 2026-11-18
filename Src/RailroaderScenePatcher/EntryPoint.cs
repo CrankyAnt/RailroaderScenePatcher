@@ -717,7 +717,6 @@ namespace RailroaderScenePatcher {
                             if (Requests.Place == GizmoPlace) CancelRequest("you cancelled the gizmo before the action could run");
                             CancelGizmo(); presentation?.RequestRefresh(); return true;
                         case CommandBand.EscapeStep.CancelSnap:
-                            if (Requests.Place == SnapPlace) CancelRequest("you cancelled the snap before the action could run");
                             DiscardSnap(); presentation?.RequestRefresh(); return true;
                     }
                     return Time.frameCount <= gizmoEnded + 1;
@@ -987,7 +986,8 @@ namespace RailroaderScenePatcher {
             if (!GuidedSelect(null)) return;
             CancelGuided();
             var waited = Requests.ReleaseInspection(selection?.Pending != null, CancelSelection,
-                () => { CancelGizmo(); ClearSnap(); CloseCoverageForm(); CloseEquipmentForm(); selected = null; }, "the inspection was cleared before the request ran");
+                () => { selection?.Clear(); selectionProblem = null; CancelGizmo(); ClearSnap(); CloseCoverageForm(); CloseEquipmentForm(); selected = null; },
+                "the inspection was cleared before the request ran");
             if (waited) inventory?.CancelFreshnessCheck();
             presentation?.RequestRefresh();
         }
@@ -1195,8 +1195,16 @@ namespace RailroaderScenePatcher {
         void ResetSnapState() { preparedSnap = null; choosingSnap = false; choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
         void ClearSnap() { ResetSnapState(); EndWorldEditAction(); }
         void DiscardSnap() {
+            if (Requests.Place == SnapPlace) CancelRequest("you cancelled the snap before the action could run");
+            if (choosingSnap) { selection?.Cancel(); selectionProblem = null; }
             selection?.Consume();
             ClearSnap();
+        }
+        void ChangePlacementMode(int mode) {
+            if (placementMode == mode) return;
+            // Leaving Snap drops only its own pick and preview; a coverage or equipment preview on Connections stays.
+            if (placementMode == CommandBand.SnapMode && (choosingSnap || preparedSnap != null || Requests.Place == SnapPlace)) DiscardSnap();
+            placementMode = mode;
         }
         void BeginSnap(SelectionKind kind) {
             BeginSelection(kind, selected);

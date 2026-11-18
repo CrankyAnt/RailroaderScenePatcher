@@ -234,6 +234,8 @@ namespace RailroaderScenePatcher {
                 ? (origin == null ? "Select scene object" : "Select replacement scene object")
                 : (kind == SelectionKind.TrackSegment ? "Select replacement track segment" : "Select replacement track node"));
             session.Begin(kind, purpose, newSource?.Choice, inspectOnly);
+            overlay.ClearInteraction();
+            lastPointer = null;
             candidates = current;
             source = newSource;
             // A choice for the same object keeps that object's confirmed relation in view, so the track it follows
@@ -301,6 +303,15 @@ namespace RailroaderScenePatcher {
             ClearMarks();
         }
 
+        internal void Clear() {
+            session.Clear();
+            confirmedMark = null;
+            confirmedFor = null;
+            withdrawn = false;
+            lastPointer = null;
+            ClearMarks();
+        }
+
         // An edit used the confirmed target: nothing is confirmed any more, and its marking goes.
         internal void Consume() { session.Consume(); confirmedMark = null; confirmedFor = null; }
 
@@ -315,6 +326,7 @@ namespace RailroaderScenePatcher {
         }
 
         void ClearMarks() {
+            overlay.ClearInteraction();
             source = null;
             candidates = Array.Empty<SpatialCandidate>();
             excluded = null;

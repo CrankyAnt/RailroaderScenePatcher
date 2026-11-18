@@ -112,6 +112,7 @@ namespace RailroaderScenePatcher.Core {
             if (!IsPending) return;
             Offers = Array.AsReadOnly(hits.Where(c => c != null && c.Identity.Kind == Kind).ToArray());
             Candidate = Offers.Count == 1 ? Offers[0] : null;
+            Highlight = null;
             Problem = Offers.Count == 0 ? NoOffer :
                 Offers.Count > 1 ? SeveralOffers : null;
         }
@@ -206,6 +207,7 @@ namespace RailroaderScenePatcher.Core {
             IsPending = false;
             Offers = Array.Empty<SelectionCandidate>();
             Candidate = null;
+            Highlight = null;
             Problem = null;
         }
     }
@@ -245,6 +247,10 @@ namespace RailroaderScenePatcher.Core {
         public void Cancel() {
             Pending?.Cancel();
             Pending = null;
+        }
+        public void Clear() {
+            Cancel();
+            Consume();
         }
         // The confirmed identity was used by an edit: it is no longer something that waits to be used.
         public void Consume() { Confirmed = null; }

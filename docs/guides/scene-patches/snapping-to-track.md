@@ -10,7 +10,7 @@ Use this route in the native map editor for an object with a supported fixed-pla
 4. Select **Apply** at the bottom of the tab. A segment snap uses the closest point on that selected segment's cubic curve to the inspected object's position, including the segment ends. An endpoint snap uses exactly that node's position. Both keep the object's rotation, activity and logical binding. There is no lateral or height offset.
 5. Use the native **Undo** and **Redo** controls to reverse or reapply the completed edit. Use the native **Save** button to persist it, then reload the world when you need to verify fresh-world reconstruction. Reload ends the native map editor's Undo/Redo history.
 
-Use **Cancel** in the footer before confirmation, or **Discard** at the bottom of the tab afterwards, to discard the prepared snap. Closing the patcher panel also discards it. Refreshing or changing the inspected object clears a prepared snap.
+Click **Cancel** in the footer before confirmation or **Discard** at the bottom of the tab afterwards. Switching to another placement mode drops the snap target and any prepared snap. Closing the patcher panel, refreshing or changing the inspected object also clears a prepared snap.
 
 Starting **Move** or **Rotate** in **Gizmo** mode discards a prepared snap. Starting a world selection cancels an active gizmo and restores its captured state first. While the gizmo owns input, complete or cancel it before using the snap or numeric placement controls. Snap and completed gizmo gestures use the same native Undo/Redo and Save routes. See [move and rotate with a transform gizmo](using-transform-gizmos.md).
 

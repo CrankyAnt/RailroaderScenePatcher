@@ -31,9 +31,13 @@ namespace RailroaderScenePatcher.Core {
     // What a click selects among objects and groups: the objects, the winner's first, and the groups it picked, as
     // indices into the groups. The frame of a picked group is the one the pointer marks.
     public sealed class WorldPickResult {
-        internal WorldPickResult(IReadOnlyList<int> objects, IReadOnlyList<int> groups) { Objects = objects; Groups = groups; }
+        internal WorldPickResult(IReadOnlyList<int> objects, IReadOnlyList<int> groups, IReadOnlyList<int> hoveredObjects) {
+            Objects = objects; Groups = groups; HoveredObjects = hoveredObjects;
+        }
         public IReadOnlyList<int> Objects { get; }
         public IReadOnlyList<int> Groups { get; }
+        // An offer included because it shares a spot can still be outside the pointer's own hit area.
+        public IReadOnlyList<int> HoveredObjects { get; }
     }
     // Which candidate a click selects, and so which one the pointer marks before the click. One rule for every world
     // choice: Select in world, a replacement object, segment or node, and the snap and follow picks.
@@ -43,6 +47,8 @@ namespace RailroaderScenePatcher.Core {
         // hides more than half of the one behind it and the two crosses touch or overlap, so they read as one "+";
         // from 12 pixels on, each marker shows a half of its own that a click can aim at.
         public const double SameSpot = ObjectMarkingGeometry.MarkerSize / 2;
+        static bool OnMarker(PickTarget target, double x, double y) => target.Marked &&
+            Math.Abs(target.X - x) <= SameSpot && Math.Abs(target.Y - y) <= SameSpot;
         // The candidates a click at the pointer selects, as indices into targets: none, one, or the candidates of
         // one spot, the nearest first, from which the user chooses in a list.
         //
@@ -52,10 +58,9 @@ namespace RailroaderScenePatcher.Core {
         // every candidate whose shown marker stands on the same spot comes with it: the click cannot tell them apart.
         public static IReadOnlyList<int> Resolve(double x, double y, IReadOnlyList<PickTarget> targets) {
             if (targets == null || targets.Count == 0) return Array.Empty<int>();
-            const double half = ObjectMarkingGeometry.MarkerSize / 2;
             double Distance(int i) { double dx = targets[i].X - x, dy = targets[i].Y - y; return dx * dx + dy * dy; }
             var all = Enumerable.Range(0, targets.Count).ToArray();
-            var pool = all.Where(i => targets[i].Marked && Math.Abs(targets[i].X - x) <= half && Math.Abs(targets[i].Y - y) <= half).ToArray();
+            var pool = all.Where(i => OnMarker(targets[i], x, y)).ToArray();
             if (pool.Length == 0) pool = all.Where(i => targets[i].Area).ToArray();
             if (pool.Length == 0) return Array.Empty<int>();
             var winner = pool.OrderBy(Distance).ThenBy(i => i).First();
@@ -87,7 +92,8 @@ namespace RailroaderScenePatcher.Core {
                 var group = groups[-1 - entry];
                 foreach (var member in group.Objects) if (member >= 0 && member < targets.Count && !group.Unlisted.Contains(member) && !objects.Contains(member)) objects.Add(member);
             }
-            return new WorldPickResult(objects, picked);
+            var hovered = objects.Where(i => !hidden.Contains(i) && (targets[i].Area || OnMarker(targets[i], x, y))).ToArray();
+            return new WorldPickResult(objects, picked, hovered);
         }
         // The rows of the list a click on one spot opens, beside the pointer: to its right and from its height down,
         // or to its left without room on the right, moved up when the list would leave the screen at the bottom. The

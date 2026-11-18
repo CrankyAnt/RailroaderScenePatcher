@@ -38,8 +38,6 @@ namespace RailroaderScenePatcher {
                 (Track != null && Track.Contains(new MarkingPoint(pointer.x, pointer.y)));
         }
         readonly List<Shape> labels = new List<Shape>();
-        // The labels of the frame before, by candidate: the pointer over a label marks that label's candidate.
-        readonly List<KeyValuePair<SelectionCandidate, Rect>> previousLabels = new List<KeyValuePair<SelectionCandidate, Rect>>();
         IReadOnlyList<Rect> covered = Array.Empty<Rect>();
         GUIStyle textStyle;
         float trackRadius;
@@ -216,12 +214,16 @@ namespace RailroaderScenePatcher {
             keptBoxes.Clear();
             if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
             trackMaterial = null;
-            labels.Clear();
-            previousLabels.Clear();
+            ClearInteraction();
             kinds.Clear();
             grounds.Clear();
             controlled.Clear();
             listed.Clear();
+        }
+
+        internal void ClearInteraction() {
+            inspectedMark = null;
+            labels.Clear();
         }
 
         internal bool OverLabel(Vector2 pointer, IReadOnlyList<Rect> uiBounds) =>
@@ -504,7 +506,6 @@ namespace RailroaderScenePatcher {
             IReadOnlyList<SpatialCandidate> bound, Camera camera, Vector3 origin, IReadOnlyList<Rect> uiBounds, Texture2D backing, SpatialCandidate trackPoint = null) {
             covered = uiBounds;
             inspectedMark = source;
-            labels.Clear();
             budget.Begin();
             Prune();
 #if ISSUE42_OBSERVATION
@@ -531,19 +532,21 @@ namespace RailroaderScenePatcher {
             // candidates of one spot. Over a window or a label it marks nothing by that rule; a label marks its own.
             var projected = ProjectAll(candidates, camera, origin, out var measured);
             var overUi = covered.Any(r => r.Contains(pointer));
-            var labelled = overUi ? null : previousLabels.FirstOrDefault(l => l.Value.Contains(pointer)).Key;
+            var labelHit = overUi ? null : labels.FirstOrDefault(label => label.Label.Contains(pointer));
+            labels.Clear();
             var groups = Groups(candidates, measured, camera, origin, pending?.Candidate, source);
             OwnFrames(candidates, projected, measured, groups, camera, origin);
-            var pointed = pending == null || overUi || labelled != null ? null : Resolve(candidates, projected, groups, camera, origin, pointer);
-            var under = pointed == null ? new int[0] : pointed.Objects.ToArray();
+            var pointed = pending == null || overUi || labelHit != null ? null : Resolve(candidates, projected, groups, camera, origin, pointer);
+            var under = pointed?.HoveredObjects ?? Array.Empty<int>();
             var several = pending?.ListOpen == true;
             var offerLabels = several ? pending.Offers.Select(o => o.Label).ToArray() : null;
             for (var index = 0; index < candidates.Length; index++) {
                 var candidate = candidates[index]; var shape = projected[index];
-                bool offered = pending != null && pending.Offers.Contains(candidate.Choice) &&
-                    (several || ReferenceEquals(candidate.Choice, pending.Candidate));
+                bool inOffers = pending != null && pending.Offers.Contains(candidate.Choice);
                 bool chosen = pending != null && ReferenceEquals(candidate.Choice, pending.Candidate);
-                bool rowHovered = pending != null && (ReferenceEquals(candidate.Choice, pending.Highlight) || ReferenceEquals(candidate.Choice, labelled));
+                bool offered = inOffers && (several || chosen);
+                bool rowHovered = inOffers && (overUi && ReferenceEquals(candidate.Choice, pending.Highlight) ||
+                    ReferenceEquals(candidate.Choice, labelHit?.Candidate.Choice) && (chosen || (several && labelHit.Listed)));
                 // Hovering a row reveals that object's own frame, including when its group stands in for it.
                 if (groups.Hidden[index]) {
                     if (!offered || !several) continue;
@@ -556,7 +559,7 @@ namespace RailroaderScenePatcher {
                 }
                 if (shape == null) continue;
                 // A candidate the panel points at, or whose label the pointer is over, is marked as one under the pointer.
-                bool hovered = Array.IndexOf(under, index) >= 0 || rowHovered;
+                bool hovered = under.Contains(index) || rowHovered;
                 // Blue for the candidate a click would select and after it was clicked, until Confirm.
                 shape.Color = Tone(CommandBand.CandidateMark(chosen, hovered));
                 shape.Detailed = chosen || hovered;
@@ -630,8 +633,6 @@ namespace RailroaderScenePatcher {
                 shape.Label = PlaceLabel(shape, shapes, uiBounds, zones);
                 if (shape.Label.width > 0) labels.Add(shape);
             }
-            previousLabels.Clear();
-            foreach (var label in labels) previousLabels.Add(new KeyValuePair<SelectionCandidate, Rect>(label.Candidate.Choice, label.Label));
             var oldColor = GUI.color;
             var oldContent = GUI.contentColor;
             try {
