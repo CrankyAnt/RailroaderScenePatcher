@@ -33,7 +33,7 @@ Markings use the same colors as the panel:
 
 Labels have opaque backgrounds and keep the same text size on screen. Markings and labels stay outside native windows and controls. Candidates at the same spot appear as numbered rows in the choice list beside the pointer.
 
-An object shows its object frame within 500 meters of the camera. Beyond that distance, it shows only its square marker and any label, in the color its object frame would have. You can still click the marker. The inspected object keeps its gold object frame and square marker at every distance. An object with nothing of its own to frame, such as a part that is switched off, still has a small object frame around its `+` within 500 meters.
+An object shows its object frame within 500 meters of the camera. Beyond that distance, it shows only its square marker and any label, in the color its object frame would have. You can still click the marker. The inspected object keeps its gold object frame and square marker at every distance. An object with nothing visible of its own to frame shows a [helper marker](#helper-markers-for-invisible-objects) instead.
 
 Labels are centered below their markers. If a label would cover another marker or a native panel, it moves to the side or above. Inactive objects remain selectable through their square markers and identity labels. During a replacement choice, if the inspected object also has a candidate label, that label starts with `Inspected: …`.
 
@@ -47,7 +47,7 @@ An object frame includes the part at the square marker and nearby parts. It leav
 
 The object frame is the on-screen outline of a box that turns with the object. It follows an object angled to the view rather than enclosing it in a screen-aligned rectangle. Clicking beside the object, inside that rectangle but outside the object frame, does not select it.
 
-Bridge construction scenery is framed around the objects it shows and hides that have no inventory entry of their own. If there are none, it has a small object frame around its own `+`. It therefore never uses the bridge's object frame. Close up, the object frame remains visible even when the object fills the view. Every object frame is at least slightly larger than its square marker, so a small or distant object still has a visible outline around its `+`.
+Bridge construction scenery is framed around the objects it shows and hides that have no inventory entry of their own. If there are none, it shows a [helper marker](#helper-markers-for-invisible-objects) on its own pivot. It therefore never uses the bridge's object frame. Close up, the object frame remains visible even when the object fills the view. Every object frame is at least slightly larger than its square marker, so a small or distant object still has a visible outline around its `+`.
 
 The box stops where the object, including its wider parts, meets the terrain or ballast. It remains a single box:
 
@@ -55,6 +55,24 @@ The box stops where the object, including its wider parts, meets the terrain or 
 - A part that extends into a bank is framed up to the bank.
 - On sloping ground, the bottom of the box follows the lowest ground beneath the part, so a heap on a slope keeps a box-shaped object frame.
 - A bridge over a valley keeps its whole box. The track on its deck and the water beneath it do not count as ground.
+
+### Helper markers for invisible objects
+
+An invisible object has no visible model in the world, so it has no object frame of its own. It shows a helper marker instead: its square marker, with the `+` on the object's pivot, the point that the object's position on the **Placement** tab names. Invisible objects include:
+
+- A light-only object, such as the `Spotlight Outdoor` groups at Whittier under the **Lights** category.
+- An object with only colliders, such as a click spot. Its helper marker also shows a frame for its colliders' bounds. This frame is never cut off at the ground. The `+` stays on the pivot, which can be at the edge of the frame rather than its middle.
+- An object whose renderers are all switched off or show only effects or shadows.
+
+A static-batched building part that has not appeared since the map loaded is not invisible. Until it appears, it has a small object frame around its `+`.
+
+The collider frame follows the rules of an object frame: it includes the collider at the pivot and the colliders next to it, and leaves out a collider that is far away or much larger. A trigger zone counts only for an object that has no other collider, and a terrain collider never counts.
+
+Without colliders, a helper marker has a small object frame around its `+` within 500 meters of the camera. Beyond 500 meters, only the `+` shows, except on the inspected object, which keeps its frame at every distance.
+
+A helper marker shows wherever the object's marking shows, in the same colors: blue as the candidate, gold as the inspected object and green as a confirmed target. During **Select in world** it has its `+` like every other object. To select an invisible object, click its `+` or inside its frame, as for any other object. **Focus** moves the camera to the object's pivot. The gizmo stands on the pivot, and the helper marker moves with the object during a drag, after the drag and after native **Undo** and **Redo**.
+
+The patcher draws the helper marker on screen. It is not part of the scene, shows only during scene patch editing and is never saved in the scene patch file.
 
 ## Select objects in a group
 

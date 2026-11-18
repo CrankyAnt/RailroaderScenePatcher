@@ -283,6 +283,7 @@ class Program {
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();
         ObjectMarkingGeometryTests.RunBoxes();
+        HelperMarkerTests.Run();
         ShapeTests.Run();
         PatchEditingTests.Run();
         ReloadDecisionTests.Run();

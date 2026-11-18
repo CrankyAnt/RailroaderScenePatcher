@@ -373,7 +373,7 @@ namespace RailroaderScenePatcher {
             var moves = NativeInventory.MovesWithOrigin(part);
             return points.Select(point => { var map = NativeInventory.MapPosition(point, moves); return (IReadOnlyList<double>)new double[] { map.x, map.y, map.z }; }).ToArray();
         }
-        static IEnumerable<Vector3> Corners(Collider collider) {
+        internal static IEnumerable<Vector3> Corners(Collider collider) {
             Bounds local;
             if (collider is BoxCollider box) local = new Bounds(box.center, box.size);
             else if (collider is SphereCollider sphere) local = new Bounds(sphere.center, Vector3.one * sphere.radius * 2);
