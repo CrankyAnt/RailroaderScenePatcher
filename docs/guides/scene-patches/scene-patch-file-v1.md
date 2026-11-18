@@ -87,13 +87,15 @@ In the native map editor only the edited mod's scene patch file applies. The pat
 
 ## Relationships
 
-The `relationships` object accepts `trackMarker`, `crossingCoverage` and `crossingEquipment`, and must contain at least one of them. Each relationship has three settings:
+The `relationships` object accepts `trackMarker`, `crossingCoverage`, `crossingEquipment` and `constructionSegments`, and must contain at least one of them. Each relationship has three settings:
 
 | Setting | Meaning |
 | --- | --- |
 | Omitted | The relationship stays as it is. This mod does not touch it. |
 | A reference | Sets or replaces the relationship. |
 | `{ "detach": true }` | Clears the relationship. |
+
+The construction segments of a rail bridge cannot be detached; see [construction segments](#construction-segments).
 
 A `trackMarker` reference is an object with exactly these members:
 
@@ -261,9 +263,9 @@ A group root is a scene object one level below a folder of `World`, or, below `W
 
 The family leaves out a group holding any of the following at any depth: a scene ground mask, track marker, station click spot, spawn point or map icon. It also leaves out a group that holds a track construction controller (`Game.Mow.TrackConstructionScenery`) but is no rail bridge construction, and road bridges. Those objects and the crossbucks of unprotected crossings are inspection only. A group with a spawn point is not moved as a whole, because its spawn points are edited one by one in the [Spawn point](#spawn-point) family.
 
-Rail bridge constructions outside Ela are groups of this family under Bridge / Rail bridges: `World/Large Scenery/Bryson/Bridge 1`, `World/Large Scenery/Almond Bridge` and each plate girder bridge below `World/Large Scenery/Plate Girder Bridge`. The track they carry is native map data and keeps its own trestle or steel flags; a modification moves only the construction. Bryson Bridge 1 and the Almond Bridge carry a construction controller (`Game.Mow.TrackConstructionScenery`). It switches their parts on and off by the construction state of the track segments it names by ID, its construction segments. `"active": false` holds a group root or part off even when the controller would switch it on; without it, or with `"active": true`, the controller switches the object. A construction's `placement` must use `"mode": "fixed"`: a track-following placement of a rail bridge or of one of its parts fails before changing anything. The patcher reads construction segment IDs without resolving them, so a segment that no longer exists in the track graph causes no patcher failure. The game's own controller fails for such a segment.
+Rail bridge constructions outside Ela are groups of this family under Bridge / Rail bridges: `World/Large Scenery/Bryson/Bridge 1`, `World/Large Scenery/Almond Bridge` and each plate girder bridge below `World/Large Scenery/Plate Girder Bridge`. The track they carry is native map data and keeps its own trestle or steel flags; a modification moves only the construction. Bryson Bridge 1 and the Almond Bridge carry a construction controller (`Game.Mow.TrackConstructionScenery`). It switches their parts on and off by the construction state of the track segments it names by ID, its construction segments. `"active": false` holds a group root or part off even when the controller would switch it on; without it, or with `"active": true`, the controller switches the object. A construction's `placement` must use `"mode": "fixed"`: a track-following placement of a rail bridge or of one of its parts fails before changing anything. The patcher reads construction segment IDs without resolving them, so a segment that no longer exists in the track graph causes no patcher failure. What the game does with such a segment has not yet been observed in Railroader.
 
-A path that names no listed group root, or more than one, fails the modification before changing anything. A modification may set `placement`, `active`, or both.
+A path that names no listed group root, or more than one, fails the modification before changing anything. A modification may set `placement`, `active`, or both, and for Bryson Bridge 1 and the Almond Bridge also `relationships.constructionSegments`; see [construction segments](#construction-segments).
 
 The patcher sets the root's physical placement and its own activity; everything below the root moves with it, and the activity of the parts stays theirs. Placement is in map coordinates and converted through the current origin as for other objects below `World`. After a move the patcher refreshes the culling sphere of every enabled renderer and game-object culler in the group, moves the sphere of every simple culler, and synchronises the physics scene. A disabled group's renderer cullers release their spheres; a simple culler on the root stops switching the root while the group is disabled and resumes when it is enabled. The group must hold no missing script and no rigidbody.
 
@@ -468,6 +470,23 @@ Format version 1 has no earlier released shape; the array form of `modifications
 
 The patcher compares the file on disk with the scene patch file it last read or wrote. Whitespace, object-member order and the order of entries with stable identities do not affect equality, so reformatting alone does not trigger a version choice. When content differs, the editor offers **Use file version**, **Keep editor version** and **Import**. Until you choose one, Save writes nothing and shows the reason. Import compares the file with the text last read or written and the session's scene patch file with its state at the start of the session, so a Save during the session creates no conflict by itself. Import checks the declared `formatVersion` before any other content, and keeps unknown members of the file and of its modifications without executing them; a later Save writes them unchanged. The comparison runs when the game regains focus and when you click **Refresh** or **Save**. See [Edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md#choose-a-scene-patch-file-version).
 
+### Construction segments
+
+`constructionSegments` sets the construction segments of a rail bridge construction: the track segments whose construction state its construction controller (`Game.Mow.TrackConstructionScenery`) reads to show or hide the bridge's parts. It requires patcher 0.5.0 or later. Two targets hold it:
+
+- The group root of a rail bridge construction that carries its controller on the root: `World/Large Scenery/Bryson/Bridge 1` and `World/Large Scenery/Almond Bridge`, with `UnityEngine.Transform` as `component` and `baked-scenery-group-v1` as `structure`.
+- A construction controller on an object of its own, `World/Large Scenery/Ela/Ela Bridge Scenery`, with `Game.Mow.TrackConstructionScenery` as `component` and `bridge-construction-scenery-v1` as `structure`. Its construction segments are its only setting: a `placement` or `active` that differs from the object's own fails before changing anything, because the controller's position has no effect in the game and the bridge's construction visibility runs on it.
+
+| Setting | Meaning |
+| --- | --- |
+| Omitted | The construction keeps its native segments. |
+| `{ "segments": [<segment ID>, ...] }` | Replaces the construction segments with exactly these segments. |
+| `{ "detach": true }` | Fails before changing anything: a construction without segments has no meaning. |
+
+`segments` lists at least one segment ID, each once, in any order; the native map editor's Save writes them in ordinal order. Before changing anything, the modification fails if a segment is missing from the loaded track or more than one loaded segment carries its ID, and the message names that segment; no other segment is used. The construction's native segments are accepted as they are, also when one of them no longer exists. The modification also fails on any other target, including a plate girder bridge and a part of a construction.
+
+The patcher writes the segment IDs to the controller and drops the segments the controller cached. When every segment exists and the controller is enabled, the patcher then runs the controller's visibility update, which the game also runs when it enables the controller; in the game code, that update shows or hides the construction's parts by the construction state of the segments. With a missing segment, or a disabled controller, the patcher does not run it and the parts keep their visibility until the world reloads. The patcher verifies that the controller names exactly the segments of the modification. A failure after the write restores the controller's segments from before the attempt; an unverified restoration names the remaining construction segments and blocks further operations on the object until **Recheck** verifies it or the world reloads. Applying the same segments again writes nothing. Removing the modification returns the native segments. Whether the construction shows by the state of its new segments has not yet been observed in Railroader. See [repair the construction segments of a rail bridge](repairing-construction-segments.md).
+
 ### Canonical order
 
 A Save that writes the scene patch file writes its content in this order:
@@ -477,7 +496,8 @@ A Save that writes the scene patch file writes its content in this order:
 - The keys of `modifications`, `circuits`, `additions` and `crossingEquipment` are in ordinal order.
 - A modification: `target`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
 - `target`: `scene`, `path`, `component`, `structure`.
-- `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`.
+- `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
+- `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
 - `crossingCoverage`: `circuits`, `additions`.
 - `starterPlacement`: `setup`, `track`, `wreck`.
 - An entry under `circuits` or `additions`: `approachA`, `island`, `approachB`, `detach`.
@@ -509,6 +529,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | Any modification whose target `structure` is `existing-crossing-mast-v1` or `existing-crossing-bell-v1` | `0.5.0` |
 | Any modification with `relationships.crossingCoverage`, including a detection addition, a `Track.Crossings.GradeCrossingController` target component, or target `structure` `crossing-coverage-v1` | `0.5.0` |
 | Any modification with `relationships.crossingEquipment` | `0.5.0` |
+| Any modification with `relationships.constructionSegments`, or whose target `structure` is `bridge-construction-scenery-v1` | `0.5.0` |
 | Any modification whose target `structure` is `crossing-pad-v1` | `0.5.0` |
 | A modification with `Helpers.MilePost` as its target component or `milepost-v1` as its target `structure` | `0.5.0` |
 | Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |

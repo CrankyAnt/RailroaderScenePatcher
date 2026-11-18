@@ -228,11 +228,15 @@ namespace RailroaderScenePatcher.Core {
     // a scene patch file has to name, such as a replacement object, offers no candidate whose identity another candidate
     // shares: the scene patch file could not tell them apart, so offering one would only lead to a refusal.
     public static class SelectionOffers {
-        public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly, SelectionIdentity excluded = null) {
+        public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly, SelectionIdentity excluded = null) =>
+            For(candidates, inspectOnly, excluded == null ? null : new[] { excluded });
+        // excluded names the current bindings a choice must not offer again, such as a construction's current segments.
+        public static IReadOnlyList<SelectionCandidate> For(IEnumerable<SelectionCandidate> candidates, bool inspectOnly, IEnumerable<SelectionIdentity> excluded) {
             var all = (candidates ?? Enumerable.Empty<SelectionCandidate>()).Where(c => c != null).ToArray();
             if (inspectOnly) return all;
             var shared = new HashSet<SelectionIdentity>(all.GroupBy(c => c.Identity).Where(group => group.Count() > 1).Select(group => group.Key));
-            return all.Where(c => !c.Identity.Equals(excluded) && !shared.Contains(c.Identity)).ToArray();
+            var current = new HashSet<SelectionIdentity>((excluded ?? Enumerable.Empty<SelectionIdentity>()).Where(identity => identity != null));
+            return all.Where(c => !current.Contains(c.Identity) && !shared.Contains(c.Identity)).ToArray();
         }
     }
 

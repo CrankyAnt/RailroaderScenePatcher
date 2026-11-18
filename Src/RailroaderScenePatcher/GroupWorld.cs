@@ -11,7 +11,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the baked scenery group and part capabilities: the transform and activity of a group root
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // BakedSceneryRules, BakedSceneryGroups and BakedSceneryParts.
-    internal sealed class GroupWorld : IGroupWorld, IDisposable {
+    internal sealed class GroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
         internal const string SimpleCullerType = "Helpers.SimpleCuller", GameObjectCullerType = "Helpers.Culling.GameObjectCuller";
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -285,6 +285,13 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<object> Find(string scene, string path) =>
             BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g), path)).Cast<object>().ToArray();
         public string Refusal(object group) => Problem(group as GameObject);
+        // The construction segments of the controller on the group root itself, such as on Bryson Bridge 1 and the
+        // Almond Bridge folder; a group without one has no construction-segment relationship.
+        static Component OwnController(object group) => group is GameObject root && RailBridgeRoot(root) ? ConstructionSegmentNative.On(root) : null;
+        public IReadOnlyList<string> ConstructionSegments(object group) => ConstructionSegmentNative.Read(OwnController(group));
+        public IReadOnlyList<string> NativeConstructionSegments(object group) => ConstructionSegmentNative.NativeOf(OwnController(group));
+        public int SegmentMatches(string id) => ConstructionSegmentNative.Matches(id);
+        public void SetConstructionSegments(object group, IReadOnlyList<string> ids) => ConstructionSegmentNative.Write(OwnController(group), ids);
         // Why a group root cannot be edited, or null. Shared with the inventory.
         internal static string Problem(GameObject root) {
             if (!Loaded(root)) return "The group's scene is not loaded";

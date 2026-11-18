@@ -81,12 +81,17 @@ namespace RailroaderScenePatcher.Core {
         // The starter placement of a starter placement marker: the setup whose new-game car placement reads the marker, and
         // the marker's track location. Null leaves it untouched, and any other object reads null.
         public StarterSetting Starter { get; }
+        // The construction-segment relationship of a rail bridge construction: the segments its construction controller
+        // reads. Null leaves it untouched, and an object without a construction controller reads null.
+        public ConstructionSegments Segments { get; private set; }
+        // The same state with this construction-segment setting.
+        public ObjectState WithSegments(ConstructionSegments segments) => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = LeavesActivity, Segments = segments };
         // Tells the two meanings of a null Active apart for an object whose activity follows a track group. True: this is
         // one modification's own state, and the application leaves the activity as it is, including an explicit disable
         // that another modification installed. False: this is the complete desired state, and a null Active returns the
         // object to its group-driven activity, which releases an explicit disable.
         public bool LeavesActivity { get; private set; }
-        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true };
+        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true, Segments = Segments };
     }
     // A map context that holds map patches, as the native map editor's does while it edits a map patch. In a save a map
     // patch is never in the map context.
@@ -431,7 +436,7 @@ namespace RailroaderScenePatcher.Core {
             if (!underlying.TryGetValue(target, out state)) underlying.Add(target, state = scene.Read(target));
             if (state?.Placement?.Frame == null || !(scene is IFramedScene framed)) return state;
             var now = framed.FramePlacement(target);
-            return now == null ? state : new ObjectState(state.Placement.InFrame(now), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter);
+            return now == null ? state : new ObjectState(state.Placement.InFrame(now), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter).WithSegments(state.Segments);
         }
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;
@@ -456,11 +461,13 @@ namespace RailroaderScenePatcher.Core {
         // Refuses a relationship the object does not support and a relationship target that does not resolve uniquely.
         // A relationship scene also checks the settings its relationships make unsupported.
         internal void CheckRelationships(object target, ObjectState state) {
+            if (state?.Segments != null && !(scene is IConstructionSegmentScene)) throw new InvalidPatchDefinitionException(ConstructionSegmentRule.NoRelationship);
             if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
+            if (state?.Segments != null) throw new InvalidPatchDefinitionException(ConstructionSegmentRule.NoRelationship);
         }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
         internal bool IsUnsafe(object target) {
@@ -544,7 +551,7 @@ namespace RailroaderScenePatcher.Core {
             // left them, so an addition the scene patch file no longer lists is removed.
             if (state?.Equipment != null) {
                 var standing = scene.Read(target)?.Equipment ?? state.Equipment;
-                state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter);
+                state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter).WithSegments(state.Segments);
             }
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
@@ -554,14 +561,15 @@ namespace RailroaderScenePatcher.Core {
         }
         // One modification's state laid over a complete state: every value the modification sets replaces the one below.
         internal static ObjectState Overlay(ObjectState under, ObjectState mod) =>
-            new ObjectState(mod.Placement ?? under.Placement, mod.Active ?? under.Active, mod.Marker ?? under.Marker, CrossingCoverage.Overlay(under.Coverage, mod.Coverage), CrossingEquipment.Overlay(under.Equipment, mod.Equipment), StarterSetting.Overlay(under.Starter, mod.Starter));
+            new ObjectState(mod.Placement ?? under.Placement, mod.Active ?? under.Active, mod.Marker ?? under.Marker, CrossingCoverage.Overlay(under.Coverage, mod.Coverage), CrossingEquipment.Overlay(under.Equipment, mod.Equipment), StarterSetting.Overlay(under.Starter, mod.Starter))
+                .WithSegments(ConstructionSegments.Overlay(under.Segments, mod.Segments));
         // The state with a track-following placement evaluated at its anchor's current native pose. Throws before any
         // mutation when the anchor does not resolve.
         internal ObjectState Evaluate(ObjectState state) {
             var following = state?.Placement?.Following;
             if (following == null) return state;
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
-            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter);
+            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter).WithSegments(state.Segments);
             return state.LeavesActivity ? evaluated.LeavingActivity() : evaluated;
         }
         Modification Effective(string id, SortedDictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting, string owner, HashSet<string> shared) {
@@ -661,17 +669,18 @@ namespace RailroaderScenePatcher.Core {
                 else throw new InvalidOperationException("Unsupported placement");
             }
             if (item["active"] != null && item["active"].Type != JTokenType.Boolean) throw new InvalidOperationException("Invalid activity");
-            MarkerBinding marker = null; CrossingCoverage coverage = null; CrossingEquipment equipment = null;
+            MarkerBinding marker = null; CrossingCoverage coverage = null; CrossingEquipment equipment = null; ConstructionSegments segments = null;
             if (item["relationships"] != null) {
                 var relationships = item["relationships"] as JObject;
-                if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage", "crossingEquipment") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
+                if (relationships == null || !Only(relationships, "trackMarker", "crossingCoverage", "crossingEquipment", "constructionSegments") || !relationships.HasValues) throw new InvalidOperationException("Unsupported relationships");
                 if (relationships["trackMarker"] != null) marker = ParseTrackMarker(relationships["trackMarker"]);
                 if (relationships["crossingCoverage"] != null) coverage = ParseCoverage(relationships["crossingCoverage"]).OwnedBy(owner);
                 if (relationships["crossingEquipment"] != null) equipment = ParseEquipment(relationships["crossingEquipment"]).In(owner ?? "");
+                if (relationships["constructionSegments"] != null) segments = ParseSegments(relationships["constructionSegments"]);
             }
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
-            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter), Dependencies = dependencies };
+            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments), Dependencies = dependencies };
         }
         public const string TrackFollowingMode = "trackFollowing";
         // A placement relative to an explicitly selected segment location or endpoint node.
@@ -705,6 +714,24 @@ namespace RailroaderScenePatcher.Core {
                 return MarkerBinding.Detached;
             }
             return MarkerBinding.At(ParseLocation(marker, "relationship"));
+        }
+        // The construction segments of a rail bridge construction: segments lists the ids of the track segments the
+        // construction controller reads, each once, in any order. A detach object is read so the capability can refuse it
+        // with its reason: a construction without segments has no meaning.
+        static ConstructionSegments ParseSegments(JToken token) {
+            var value = token as JObject;
+            if (value == null) throw new InvalidOperationException("Invalid relationship: constructionSegments must be an object with segments, the IDs of the bridge's track segments");
+            if (value["detach"] != null) {
+                if (!Only(value, "detach") || value["detach"].Type != JTokenType.Boolean || !(bool)value["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone");
+                return ConstructionSegments.Detached;
+            }
+            if (!Only(value, "segments")) throw new InvalidOperationException("Unsupported relationship content");
+            var ids = value["segments"] as JArray;
+            if (ids == null || ids.Count == 0) throw new InvalidOperationException("Invalid relationship: segments must list at least one track segment ID");
+            if (ids.Any(id => id.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)id))) throw new InvalidOperationException("Invalid relationship: each construction segment must be a track segment ID");
+            var duplicate = ids.Select(id => (string)id).GroupBy(id => id, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1);
+            if (duplicate != null) throw new InvalidOperationException("Invalid relationship: construction segment " + duplicate.Key + " is listed more than once");
+            return ConstructionSegments.Of(ids.Select(id => (string)id));
         }
         // The starter placement of a starter placement marker: setup names the setup whose new-game car placement reads the
         // marker, and track sets the marker's track location. A detach object is read so the capability can refuse it with

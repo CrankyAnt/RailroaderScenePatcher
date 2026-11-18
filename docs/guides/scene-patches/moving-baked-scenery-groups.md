@@ -150,7 +150,7 @@ The track stays native map data. The native map editor moves it, and the track k
 
 Bryson Bridge 1 and the Almond Bridge each have a construction controller. It switches parts of the bridge on and off by the construction state of its construction segments: the track segments that the controller names by ID. On the **Object** tab of the construction and of its parts, **Use in the game** names these segments. The controller finds the segments by ID, not by position. Whether the construction shows its state correctly at a new place has not yet been observed in Railroader. A plate girder bridge has no construction controller, and its **Use in the game** reads as decorative.
 
-The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. If you split or replace the track natively, a segment can stop existing. The tab then shows its ID followed by `no longer exists`. The patcher reports no problem for it. The game's own construction controller fails when one of its segments no longer exists, so the construction no longer follows the state of its segments.
+The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. If you split or replace the track natively, a segment can stop existing. The tab then shows its ID followed by `no longer exists`. The patcher reports no problem for it. What the game does with such a segment has not yet been observed in Railroader. To set the construction segments to the new track, see [repair the construction segments of a rail bridge](repairing-construction-segments.md).
 
 ### Disable an object that the construction switches
 

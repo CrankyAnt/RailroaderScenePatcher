@@ -278,7 +278,7 @@ Wilmot | Wilmot Station | Group | Station building";
         var scene = new Inventory();
         scene.Objects.AddRange(new[] {
             Entry("World/Large Scenery/Ela/Ela Bridge", "Bridge", "Rail bridges", family: "Bridge"),
-            Entry("World/Large Scenery/Ela/Ela Bridge Scenery", "Bridge", "Rail bridges", only: "not yet supported", family: "Bridge construction scenery"),
+            Entry("World/Large Scenery/Ela/Ela Bridge Scenery", "Bridge", "Rail bridges", family: "Bridge construction scenery"),
             Entry("World/Large Scenery/Bryson/Bridge 1", "Bridge", "Rail bridges", only: "not yet supported"),
             Entry("World/Sign", family: "Track marker"),
         });

@@ -174,8 +174,11 @@ namespace RailroaderScenePatcher.Core {
             static readonly Shape Source = new Shape { Known = new[] { "scene", "path", "definition" } };
             static readonly Shape Equipment = new Shape { Known = new[] { "pattern", "source", "placement" }, Member = name => name == "source" ? Source : name == "placement" ? Placement : Unknown };
             static readonly Shape EquipmentEntries = new Shape { Member = name => Equipment };
-            static readonly Shape Relationships = new Shape { Known = new[] { "trackMarker", "crossingCoverage", "crossingEquipment" },
-                Member = name => name == "trackMarker" ? Location : name == "crossingCoverage" ? Coverage : name == "crossingEquipment" ? EquipmentEntries : Unknown };
+            // The construction segments are a set: their ids are written in ordinal order.
+            static readonly Shape SegmentIds = new Shape { SortedStrings = true };
+            static readonly Shape ConstructionSegments = new Shape { Known = new[] { "segments", "detach" }, Member = name => name == "segments" ? SegmentIds : Unknown };
+            static readonly Shape Relationships = new Shape { Known = new[] { "trackMarker", "crossingCoverage", "crossingEquipment", "constructionSegments" },
+                Member = name => name == "trackMarker" ? Location : name == "crossingCoverage" ? Coverage : name == "crossingEquipment" ? EquipmentEntries : name == "constructionSegments" ? ConstructionSegments : Unknown };
             static readonly Shape Target = new Shape { Known = new[] { "scene", "path", "component", "structure" } };
             static readonly Shape Dependencies = new Shape { SortedStrings = true };
             static readonly Shape Starter = new Shape { Known = new[] { "setup", "track", "wreck" }, Member = name => name == "track" ? Location : Unknown };

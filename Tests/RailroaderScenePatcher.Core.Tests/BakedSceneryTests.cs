@@ -99,9 +99,29 @@ class FakeRegistration { public FakeCuller Culler; public CullerKind Kind; publi
 // Controlled world: map coordinates are scene coordinates plus Origin on X. A culling refresh moves every culler of an
 // active group to where it stands; a disabled group holds no culling registration. The world runs the real own-culling
 // controller over controlled cullers, culling managers, renderers and lists.
-class FakeGroupWorld : IGroupWorld, IDisposable {
+class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
     // The patcher's state for the world ends while the scene stays.
     public void Dispose() => Culling.ReleaseAll();
+    // The construction controllers on group roots by root, with the segment ids each names; the loaded track segments by
+    // id with how many carry it. SegmentWrites counts the controller writes; StickySegments lets only the first write
+    // take effect, as a controller that no longer accepts a write.
+    public readonly Dictionary<object, string[]> SegmentsOf = new Dictionary<object, string[]>();
+    public readonly Dictionary<string, int> Graph = new Dictionary<string, int>(StringComparer.Ordinal);
+    readonly Dictionary<object, string[]> nativeSegments = new Dictionary<object, string[]>();
+    public int SegmentWrites;
+    public bool StickySegments;
+    public IReadOnlyList<string> ConstructionSegments(object target) => SegmentsOf.TryGetValue(target, out var ids) ? ids.ToArray() : null;
+    public IReadOnlyList<string> NativeConstructionSegments(object target) {
+        if (!nativeSegments.ContainsKey(target) && SegmentsOf.TryGetValue(target, out var ids)) nativeSegments[target] = ids.ToArray();
+        return nativeSegments.TryGetValue(target, out var native) ? native : null;
+    }
+    public int SegmentMatches(string id) => Graph.TryGetValue(id, out var count) ? count : 0;
+    public void SetConstructionSegments(object target, IReadOnlyList<string> ids) {
+        NativeConstructionSegments(target);
+        Mutations++; SegmentWrites++;
+        if (StickySegments && SegmentWrites > 1) return;
+        SegmentsOf[target] = ids.ToArray();
+    }
     public string[] Maps = { "map" };
     public IEnumerable<string> MapIds => Maps;
     public Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();

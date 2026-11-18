@@ -104,7 +104,7 @@ namespace RailroaderScenePatcher {
                 : "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
-        internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
+        internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location", ClearSegments = "Clear segments";
         // Why Clear location has nothing to clear: this mod sets no track location for the starter placement marker.
         internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This mod sets no track location for this marker, so there is nothing to clear.";
         // The name of a wreck edit, after the checkbox's new state.
@@ -184,6 +184,7 @@ namespace RailroaderScenePatcher {
             new[] { new[] { "Track" }, new[] { "Node" }, new[] { "Start" }, new[] { "Stop" } },
             new[] { new[] { "Set" }, new[] { "Detach" }, new[] { ClearBinding }, new[] { "Picked" } },
             new[] { new[] { "Set" }, new[] { "Detach" }, new[] { ClearLocation }, new[] { "Picked" } },
+            new[] { new[] { "Set" }, new[] { "Detach" }, new[] { ClearSegments }, new[] { "Picked" } },
             new[] { new[] { "Preview" }, new[] { "Detach" }, new[] { ClearCircuit }, new[] { "Apply" } },
             new[] { new[] { "Preview" }, new[] { "Delete" }, new[] { "Apply" } },
             new[] { new[] { "Retry" } },
@@ -203,7 +204,9 @@ namespace RailroaderScenePatcher {
             { "Copy ID", 63.48f }, { "Fit", 21.26f }, { "?", 9.17f }, { "x", 8.84f }, { "Guide", 47f },
             // Estimated from the game capture of the Repair row (Copy to clipboard 143 units wide with its padding) and
             // the glyph advances of the measured labels.
-            { "Keep editor version", 152f }, { "Copy to clipboard", 131f }, { "Copy", 41f }, { "Import", 52f } };
+            { "Keep editor version", 152f }, { "Copy to clipboard", 131f }, { "Copy", 41f }, { "Import", 52f },
+            // Estimated from the glyph advances of Clear location and Clear circuit.
+            { ClearSegments, 119f } };
         // One colour table for every world marking. Gold frames the inspected object. A candidate of a pick mode is
         // blue: more saturated while the pointer is over it, plain blue once it was clicked and until Confirm. A current
         // relation of the inspected object, native or set by a patch, is green, and more saturated under the pointer.
@@ -444,18 +447,59 @@ namespace RailroaderScenePatcher {
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery) shows or hides parts of the bridge by
         // the construction state of the track segments it names by id, wherever the bridge stands. Each segment is one
         // binding line of the group root and of every part below the controller, for the Connections tab. A segment that
-        // no longer exists in the track graph keeps its id with a remark and is no problem: repairing the segments is a
-        // later edit. exists is null when the track graph could not be read.
+        // no longer exists in the track graph keeps its id with a remark and is no problem marker, as #95 decided for a
+        // rail bridge construction; the Connections tab of the root offers the repair. The Ela controller's own
+        // inventory line still reports a missing segment as a problem (an open point). exists is null when the track
+        // graph could not be read.
         const string SegmentPrefix = "Construction segment=", MissingSegment = "; no longer exists";
         internal static string SegmentBinding(string id, bool? exists) => SegmentPrefix + (id ?? "") + (exists == false ? MissingSegment : "");
         internal static IReadOnlyList<string> ConstructionSegments(IEnumerable<string> bindings) =>
             (bindings ?? Enumerable.Empty<string>()).Where(line => line != null && line.StartsWith(SegmentPrefix, StringComparison.Ordinal))
                 .Select(line => { var id = line.Substring(SegmentPrefix.Length); return id.EndsWith(MissingSegment, StringComparison.Ordinal) ? id.Substring(0, id.Length - MissingSegment.Length) : id; }).ToArray();
+        // The track segments that an observation's binding lines name, each a current binding the world marks green while
+        // the Connections tab is open and offers as no candidate: a marker's segment, a span's lower and upper, and each
+        // construction segment of a rail bridge construction or of the Ela controller, its remark left off.
+        static readonly string[] BoundPrefixes = { "Marker segment=", "Lower segment=", "Upper segment=", SegmentPrefix, "Construction scenery segment=" };
+        internal static IReadOnlyList<string> BoundSegments(IEnumerable<string> bindings) {
+            var found = new List<string>();
+            foreach (var line in bindings ?? Enumerable.Empty<string>()) {
+                var prefix = line == null ? null : BoundPrefixes.FirstOrDefault(p => line.StartsWith(p, StringComparison.Ordinal));
+                if (prefix == null) continue;
+                var value = line.Substring(prefix.Length);
+                var end = value.IndexOf(';');
+                found.Add((end < 0 ? value : value.Substring(0, end)).Trim());
+            }
+            return found;
+        }
         internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments";
         // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
         // holds; known is null when the track graph could not be read. An empty id is a segment that does not exist.
         internal static IReadOnlyList<string> ConstructionBindings(IEnumerable<string> ids, ICollection<string> known) =>
             (ids ?? Enumerable.Empty<string>()).Select(id => SegmentBinding(id, known == null ? (bool?)null : !String.IsNullOrWhiteSpace(id) && known.Contains(id))).ToArray();
+        // The construction segment row of the Connections tab: the segment ids of a rail bridge construction, typed or
+        // picked in the world, as one field. Ids are separated by commas or spaces.
+        internal static IReadOnlyList<string> SegmentIds(string text) => (text ?? "").Split(new[] { ',', ' ', '	' }, StringSplitOptions.RemoveEmptyEntries).Select(id => id.Trim()).Where(id => id.Length != 0).ToArray();
+        // A set of segments as the field shows it, in ordinal order.
+        internal static string SegmentText(IEnumerable<string> ids) => String.Join(", ", (ids ?? Enumerable.Empty<string>()).OrderBy(id => id, StringComparer.Ordinal));
+        // Picked adds the confirmed segment to the field once.
+        internal static string AddSegment(string text, string id) {
+            var ids = SegmentIds(text).ToList();
+            if (!String.IsNullOrWhiteSpace(id) && !ids.Contains(id.Trim(), StringComparer.Ordinal)) ids.Add(id.Trim());
+            return String.Join(", ", ids);
+        }
+        // Why Set is unavailable: the general reason first, then an empty field or the construction's current set.
+        internal static string SegmentsReason(string block, string text, IReadOnlyList<string> current) {
+            if (block != null) return block;
+            var ids = SegmentIds(text);
+            if (ids.Count == 0) return "Enter at least one segment ID.";
+            return current != null && new HashSet<string>(ids, StringComparer.Ordinal).SetEquals(current) ? "The field holds the construction's current segments." : null;
+        }
+        internal const string SegmentDetachReason = "A construction without segments has no meaning. Select the segments of the bridge's track instead.";
+        internal static string ClearSegmentsReason(bool hasValue) => hasValue ? null : "This mod sets no construction segments for this object, so there is nothing to clear.";
+        // A construction controller on an object of its own, Ela Bridge Scenery: its construction segments are its only edit.
+        internal const string ConstructionSceneryFamily = "Bridge construction scenery";
+        internal const string ConstructionSceneryOperations = "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.";
+        internal const string ControllerNoPlacement = ConstructionSceneryScene.NoPlacement + ".", ControllerNoActivity = ConstructionSceneryScene.NoActivity + ".";
         // The amber warning for an object that an explicit disable holds off against its construction controller, on the
         // Object tab and in the footer's message area.
         internal const string ConstructionHoldWarning = "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.";
@@ -502,7 +546,7 @@ namespace RailroaderScenePatcher {
             name + ". Open its crossing controller's Connections tab to edit or remove it.";
         // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
         // or an added light, gate or bell, which its crossing edits.
-        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) ? null : NotYetSupported("Objects listed under " + family);
+        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) || family == ConstructionSceneryFamily ? null : NotYetSupported("Objects listed under " + family);
         // The track element an object follows, as the world marks it: the anchor's node, or the segment of its
         // location. Null without a following placement.
         internal static SelectionIdentity Followed(TrackFollowing following) =>
@@ -568,8 +612,8 @@ namespace RailroaderScenePatcher {
         // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
         // placement, and has every other mode inactive with the object's own reason.
         // An existing crossing mast or bell has one for Follow as well.
-        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false, bool railBridge = false) =>
-            pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
+        internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false, bool railBridge = false, bool controller = false) =>
+            controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
             : railBridge && mode == FollowMode ? RailBridgeNoFollow : null;
         // A rail bridge construction does not follow its track: move the track natively, then the construction onto it.
         internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + ". Move the track in the native map editor, then move the bridge onto it.";

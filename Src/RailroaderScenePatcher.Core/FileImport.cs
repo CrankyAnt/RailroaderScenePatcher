@@ -231,6 +231,7 @@ namespace RailroaderScenePatcher.Core {
                 case "trackMarker": return "the track binding";
                 case "crossingCoverage": return "the crossing coverage";
                 case "crossingEquipment": return "the added lights, gates and bells";
+                case "constructionSegments": return "the construction segments";
                 default: return "content this patcher version does not apply (" + member + ")";
             }
         }

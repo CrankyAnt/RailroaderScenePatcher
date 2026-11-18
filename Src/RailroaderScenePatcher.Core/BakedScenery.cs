@@ -759,10 +759,14 @@ namespace RailroaderScenePatcher.Core {
     }
     // Baked scenery groups: places and enables or disables a group root with everything below it. A group move is
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
-    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IDisposable {
+    // The root of a rail bridge construction that carries its construction controller, such as Bryson Bridge 1 and the
+    // Almond Bridge, also holds the construction-segment relationship.
+    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDisposable {
         public const string Structure = "baked-scenery-group-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
+        // The construction controllers on group roots; null in a world without them.
+        IConstructionSegmentWorld Segments => world as IConstructionSegmentWorld;
         public BakedSceneryGroups(IGroupWorld world, Capability capability = Capability.Unchecked, PartHolds holds = null) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; this.holds = holds ?? new PartHolds();
         }
@@ -779,9 +783,11 @@ namespace RailroaderScenePatcher.Core {
             if (refusal != null) throw new InvalidOperationException(refusal);
             if (!GroupChecks.Finite(world.Observe(target).Root.Placement)) throw new InvalidOperationException("The group's map coordinates are unavailable");
         }
-        // A group has no relationships; a placement the world refuses, such as the move of a lake surface whose water
-        // is part of a static batch, is refused here, before any mutation.
+        // A group has no relationships but the construction segments of a construction controller on its root; a
+        // placement the world refuses, such as the move of a lake surface whose water is part of a static batch, is
+        // refused here, before any mutation.
         public void CheckRelationships(object target, ObjectState state) {
+            ConstructionSegmentRule.Check(Segments, target, state?.Segments);
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
@@ -790,8 +796,9 @@ namespace RailroaderScenePatcher.Core {
             var refusal = state?.Placement == null ? null : world.PlacementRefusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
-        public object Capture(object target) => world.Observe(target);
-        public ObjectState Read(object target) => world.Observe(target).Root;
+        sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; }
+        public object Capture(object target) => new Snapshot { Observed = world.Observe(target), Segments = ConstructionSegmentRule.Read(Segments, target) };
+        public ObjectState Read(object target) => world.Observe(target).Root.WithSegments(ConstructionSegmentRule.Read(Segments, target));
         // The group root's placement applies first; every part with a fixed placement below it is then put back there.
         void Place(object target, Placement placement) {
             world.SetPlacement(target, placement);
@@ -803,9 +810,14 @@ namespace RailroaderScenePatcher.Core {
             world.RefreshCulling(target, plan);
             return plan;
         }
+        // The construction segments apply first: the controller then shows the construction's parts by their state, and
+        // the layout that every later check compares with is the one after that.
         public void Apply(object target, ObjectState state) {
-            var before = world.Observe(target);
             if (state.Placement != null) GroupChecks.CheckPlacement(state.Placement);
+            ConstructionSegmentRule.Apply(Segments, target, state.Segments);
+            var segments = ConstructionSegmentRule.Verify(Segments, target, state.Segments);
+            if (segments != null) throw new InvalidOperationException("Applied construction segments did not verify: " + segments);
+            var before = world.Observe(target);
             var active = state.Active ?? before.Root.Active ?? true;
             if (active && before.Root.Active != true) world.SetActive(target, true);
             if (state.Placement != null) Place(target, state.Placement);
@@ -817,9 +829,11 @@ namespace RailroaderScenePatcher.Core {
             if (difference != null) throw new InvalidOperationException("The group did not move as one: " + difference);
         }
         public bool Restore(object target, object snapshot) {
-            var captured = (GroupObservation)snapshot;
+            var taken = (Snapshot)snapshot; var captured = taken.Observed;
             try {
                 if (!ReferenceEquals(world.Observe(target).Parent, captured.Parent)) return false;
+                ConstructionSegmentRule.Apply(Segments, target, taken.Segments);
+                if (ConstructionSegmentRule.Verify(Segments, target, taken.Segments) != null) return false;
                 var root = captured.Root;
                 if (root.Active == true) world.SetActive(target, true);
                 if (root.Placement != null) Place(target, root.Placement);

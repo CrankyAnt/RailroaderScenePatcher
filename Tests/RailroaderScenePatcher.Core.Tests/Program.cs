@@ -317,6 +317,7 @@ class Program {
         CoalLoaderTests.Run();
         SpawnPointTests.Run();
         RailBridgeTests.Run();
+        ConstructionSegmentTests.Run();
         InteractiveBuildingTests.Run();
         PartCullingTests.Run();
         ExistingEquipmentTests.Run();

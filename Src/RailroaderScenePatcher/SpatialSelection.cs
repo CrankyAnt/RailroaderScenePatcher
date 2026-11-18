@@ -220,8 +220,8 @@ namespace RailroaderScenePatcher {
             return all.Where(c => offered.Contains(c.Choice)).ToArray();
         }
         bool inspectOnly;
-        SelectionIdentity excluded;
-        internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false, SelectionIdentity excluded = null, string purpose = null) {
+        IReadOnlyList<SelectionIdentity> excluded;
+        internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false, IReadOnlyList<SelectionIdentity> excluded = null, string purpose = null) {
             if (Pending != null) return;
             if (Camera.main == null) throw new InvalidOperationException("The native map editor camera is unavailable");
             WorldOffset();

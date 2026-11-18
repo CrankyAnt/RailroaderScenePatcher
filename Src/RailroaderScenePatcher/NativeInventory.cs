@@ -263,7 +263,7 @@ namespace RailroaderScenePatcher {
             }
             if (type == BoardScene.CullerType && BridgeWorld.SupportedPaths.Contains(BoardScene.PathOf(c.transform))) return "Bridge";
             if (type == BoardScene.CullerType && Get(go, BoardScene.MaskType) != null && Get(go, Marker) == null) return "Independent board";
-            if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == "World/Large Scenery/Ela/Ela Bridge Scenery") return "Bridge construction scenery";
+            if (type == ConstructionScenery && BoardScene.PathOf(c.transform) == ConstructionSceneryWorld.ElaPath) return CommandBand.ConstructionSceneryFamily;
             if (type == StationMapIconRules.Component && StationMapIconRules.Listed(BoardScene.PathOf(c.transform))) return StationMapIconRules.Family;
             return null;
         }
@@ -656,6 +656,9 @@ namespace RailroaderScenePatcher {
             string coverageRefusal = crossing ? "Crossing coverage editing is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
             var coverageEditable = crossing && coverageRefusal == null;
+            // A construction controller on an object of its own: its construction segments are its only edit.
+            var scenery = family == CommandBand.ConstructionSceneryFamily;
+            string sceneryRefusal = scenery ? ConstructionSegmentNative.Problem : null;
             // A kind no supported family covers is inspection only, which is another state than an object of a supported
             // family that cannot be edited: a marker of another type than Generic, and every family without an edit.
             // A starter placement marker is a supported kind with its own workflow.
@@ -670,7 +673,7 @@ namespace RailroaderScenePatcher {
             else if (family == "Track span") only = CommandBand.SpanInspectionOnly(spanHolder != null);
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell || icon || spawnPoint);
             if (only != null) markerEditable = false;
-            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : null;
+            var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
             var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Move, rotate, enable or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? "Set, replace or detach the marker's track binding. Edit placement and activity separately."
@@ -683,6 +686,7 @@ namespace RailroaderScenePatcher {
                 : ownBell ? (equipmentRefusal == null ? CommandBand.BellOperations : CommandBand.NotEditable(equipmentRefusal))
                 : spawnPoint ? (spawnRefusal == null ? SpawnPoints.Operations : CommandBand.NotEditable(spawnRefusal))
                 : icon ? (iconRefusal == null ? StationMapIconRules.Operations : CommandBand.NotEditable(iconRefusal))
+                : scenery ? (sceneryRefusal == null ? CommandBand.ConstructionSceneryOperations : CommandBand.NotEditable(sceneryRefusal))
                 : spanHolder != null ? CommandBand.DetectionSpanOperations
                 : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates and bells. The crossing and its original detection spans stay in place."
                 : CommandBand.NotEditable(coverageRefusal);

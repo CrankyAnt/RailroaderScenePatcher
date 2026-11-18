@@ -175,7 +175,7 @@ namespace RailroaderScenePatcher {
             return created;
         }
         const string BindingPlace = "Track binding", PlacementPlace = "Placement", GizmoPlace = CommandBand.GizmoPlace, SnapPlace = "Snap", ActivityPlace = "Activity",
-            ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells", WreckPlace = "Start derailed";
+            ModificationPlace = "Modification", SavePlace = "Save", TerrainPlace = "Terrain output", CoveragePlace = "Crossing coverage", LightGatePlace = "Lights and gates", BellPlace = "Bells", WreckPlace = "Start derailed", SegmentsPlace = "Construction segments";
         // The place of the open equipment form's messages: its bells or its lights and gates.
         string EquipmentPlace => equipmentSource?.IsDefinition == true ? BellPlace : LightGatePlace;
         bool staleLogged = true;
@@ -185,6 +185,8 @@ namespace RailroaderScenePatcher {
         const string FollowPlace = "Follow";
         readonly string[] placementFields = { "", "", "", "", "", "" };
         readonly string[] binding = { "", "a", "" };
+        // The construction segments field of a rail bridge construction: its segment ids, separated by commas.
+        readonly string[] segmentFields = { "" };
         TrackLocation pickedTrackLocation;
         ConfirmedSelection pickedTrackSelection;
         // Crossing coverage being edited: the circuit, four fields per role (segment, end, from, to) and the previewed change.
@@ -263,6 +265,10 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
                     capabilities.AddUnavailable(BakedSceneryParts.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": baked scenery group capability incompatible or unavailable: " + e.GetBaseException().Message);
+                }
+                try { capabilities.Add(new ConstructionSceneryScene(new ConstructionSceneryWorld())); }
+                catch (Exception e) {
+                    capabilities.AddUnavailable(ConstructionSceneryScene.Structure, e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
                 catch (Exception e) {
@@ -990,7 +996,11 @@ namespace RailroaderScenePatcher {
             ClearSnap();
             // A choice without a source object only inspects what it confirms; no scene patch file names it.
             try {
-                var excluded = coverageRole.HasValue ? crossingCoverageScene?.RoleSegment(origin.Handle, coverageCircuit, coverageRole.Value) : null;
+                // A coverage role does not offer its current segment, and a construction does not offer its current
+                // construction segments: picking one would add nothing.
+                var role = coverageRole.HasValue ? crossingCoverageScene?.RoleSegment(origin.Handle, coverageCircuit, coverageRole.Value) : null;
+                IReadOnlyList<SelectionIdentity> excluded = role != null ? new[] { role }
+                    : kind == SelectionKind.TrackSegment && ReferenceEquals(origin, selected) && HoldsConstructionSegments ? CurrentSegments().Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray() : null;
                 var purpose = coverageRole.HasValue ? "Select track segment for " + CircuitCoverage.RoleCaption(CircuitCoverage.Roles[coverageRole.Value]) : null;
                 selection.Begin(kind, origin, origin == null && kind == SelectionKind.SceneObject, excluded, purpose);
                 choosingCoverageRole = coverageRole;
@@ -1049,7 +1059,7 @@ namespace RailroaderScenePatcher {
             try {
                 var segments = inspected.Identity.Structure == CrossingCoverageScene.Structure
                     ? crossingCoverageScene?.CoveredSegments(inspected.Handle) ?? Array.Empty<string>()
-                    : Segments(inspected);
+                    : CommandBand.BoundSegments(inspected.Bindings);
                 return segments.Where(id => !String.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal)
                     .Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray();
             } catch { }
@@ -1062,16 +1072,6 @@ namespace RailroaderScenePatcher {
             if (key == boundKey) return;
             boundKey = key;
             selection.Binds(shown ? selected.Handle : null, shown ? BoundIdentities(selected) : Array.Empty<SelectionIdentity>());
-        }
-        // The track segments an observation's binding lines name: a marker's segment, a span's lower and upper.
-        static IEnumerable<string> Segments(SceneObservation entry) {
-            foreach (var line in entry.Bindings) {
-                var at = line.IndexOf(" segment=", StringComparison.Ordinal);
-                if (at < 0 || !(line.StartsWith("Marker segment=", StringComparison.Ordinal) || line.StartsWith("Lower segment=", StringComparison.Ordinal) || line.StartsWith("Upper segment=", StringComparison.Ordinal))) continue;
-                var value = line.Substring(at + " segment=".Length);
-                var end = value.IndexOf(';');
-                yield return (end < 0 ? value : value.Substring(0, end)).Trim();
-            }
         }
         // The gizmo stands on the inspected object for as long as the Gizmo mode is open: it is shown as soon as the mode
         // is chosen, comes back after every completed or cancelled drag, and goes when the mode, the tab or the
@@ -1282,7 +1282,16 @@ namespace RailroaderScenePatcher {
             return new[] { selected.Position[0], selected.Position[1], selected.Position[2], angles.x, angles.y, angles.z };
         }
         // Fills the binding fields from the inspected marker location.
-        void ReadBinding() { var current = CurrentBinding(); for (var i = 0; i < 3; i++) binding[i] = current[i]; }
+        void ReadBinding() { var current = CurrentBinding(); for (var i = 0; i < 3; i++) binding[i] = current[i]; segmentFields[0] = CommandBand.SegmentText(CurrentSegments()); }
+        // Whether the inspected object holds the construction-segment relationship: a rail bridge construction root that
+        // carries its construction controller, or a construction controller on an object of its own.
+        bool HoldsConstructionSegments => selected != null && (selected.Identity.Structure == ConstructionSceneryScene.Structure
+            || (selected.Identity.Structure == BakedSceneryGroups.Structure && selected.Handle is GameObject root && ConstructionSegmentNative.On(root) != null));
+        // The construction segments the inspected object's controller names now; empty when it holds none.
+        IReadOnlyList<string> CurrentSegments() {
+            if (!HoldsConstructionSegments || attachment == null) return Array.Empty<string>();
+            try { return attachment.Session.ConstructionSegmentsOf(selected.Identity)?.Ids ?? (IReadOnlyList<string>)Array.Empty<string>(); } catch { return Array.Empty<string>(); }
+        }
         // The inspected marker location as the binding fields show it; an empty segment for a detached marker.
         string[] CurrentBinding() {
             var fields = new[] { "", "a", "" };

@@ -56,6 +56,7 @@ namespace RailroaderScenePatcher.Core {
             if (before.Active != now?.Active) lines.Add("Enabled: now " + Activity(now?.Active) + ", before " + Activity(before.Active));
             if (!MarkerBinding.Same(before.Marker, now?.Marker)) lines.Add("Track binding: now " + Binding(now?.Marker) + ", before " + Binding(before.Marker));
             if (!CrossingCoverage.Same(before.Coverage, now?.Coverage)) lines.Add("Crossing coverage: does not match its value before the attempt");
+            if (before.Segments != null && !ConstructionSegments.Same(before.Segments, now?.Segments)) lines.Add("Construction segments: now " + (now?.Segments?.Display ?? "none") + ", before " + before.Segments.Display);
             if (now?.Coverage?.Residue?.Count > 0) lines.Add("Owned spans still registered: " + String.Join(", ", now.Coverage.Residue));
             if (lines.Count == 0) lines.Add("The settings match their values before the attempt. The patcher could not verify the related changes" + (String.IsNullOrEmpty(reason) ? "" : ". Reason: " + reason));
             return lines;
@@ -123,7 +124,9 @@ namespace RailroaderScenePatcher.Core {
                 case "Follow": return Pair("Following a track", "following-track.md");
                 case "Track binding": return structure == CrossingPadScene.Structure ? Pair("Crossing pads", "rebinding-crossing-pads.md") : Pair("Track bindings", "repairing-track-bindings.md");
                 case "Crossing coverage": return Pair("Crossing coverage", "correcting-crossing-coverage.md");
+                case "Construction segments": return Pair("Construction segments", "repairing-construction-segments.md");
             }
+            if (structure == ConstructionSceneryScene.Structure) return Pair("Construction segments", "repairing-construction-segments.md");
             if (structure == IndependentBoards.Structure) return Pair("Boards", "moving-boards.md");
             if (structure == BridgeScene.Structure) return Pair("Bridges", "placing-bridges.md");
             if (structure == StationMapIconRules.Structure) return Pair("Station map icons", "moving-station-map-icons.md");

@@ -733,7 +733,7 @@ namespace RailroaderScenePatcher {
         void DrawPlacement(UIPanelBuilder builder) {
             // A crossing pad has no placement of its own, and an object that cannot be edited has none to set: the tab
             // shows the placement, and no other mode is open.
-            if (IsPad || !Editable) placementMode = CommandBand.NumericMode;
+            if (IsPad || !Editable || IsController) placementMode = CommandBand.NumericMode;
             // A new-game car placement puts its cars at the marker's track point, which the world marks in gold; the
             // object position below plays no part in it.
             if (selected.Family == StarterPlacements.Family) {
@@ -749,11 +749,11 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);
-            var block = EditBlock() ?? PadBlock;
+            var block = EditBlock() ?? PadBlock ?? ControllerBlock;
             if (placementMode == 0) {
                 for (var group = 0; group < 2; group++) {
                     if (group != 0) builder.Spacer(6f);
@@ -1034,6 +1034,7 @@ namespace RailroaderScenePatcher {
         // and the fields of the binding come first; the current binding and the other observed bindings follow.
         void DrawConnections(UIPanelBuilder builder) {
             if (IsStarter) { DrawStarterLocation(builder); return; }
+            if (HoldsConstructionSegments) { DrawConstructionSegments(builder); return; }
             var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
             // A crossing pad has the binding of its marker: setting it regenerates the pad along the track there.
             var pad = selected.Identity.Structure == CrossingPadScene.Structure;
@@ -1062,6 +1063,34 @@ namespace RailroaderScenePatcher {
             foreach (var line in others) BindingFields(builder, line);
         }
 
+        // The Connections tab of a rail bridge construction: the construction segments its controller reads, as one field of
+        // segment ids. Segment chooses a track in the world and Picked adds it to the field; Set replaces the segments
+        // with exactly those in the field. The observed bindings follow, with one row per current segment.
+        void DrawConstructionSegments(UIPanelBuilder builder) {
+            var block = EditBlock();
+            Section(builder, "Replacement targets");
+            var busy = block ?? (selection == null ? "World selection is unavailable." : ChoiceBlock);
+            builder.HStack(row => {
+                Button(row, "Segment", () => BeginSelection(SelectionKind.TrackSegment, selected)).Inactive(busy != null)
+                    .Tooltip("Replacement segment", CommandBand.Tooltip("Choose a track segment in the world and confirm its identity. Click Picked to add it to the construction segments.", busy));
+            }).Height(RowHeight);
+            Section(builder, "Construction segments");
+            ValueRow(builder, "Segments", null, new[] { "IDs" }, segmentFields, 0, block,
+                "The track segments whose construction state decides which parts of this bridge the game shows. Separate the IDs with commas. Set replaces the construction's segments with exactly these; the bridge does not move.", column => false);
+            Section(builder, "Observed bindings");
+            var others = selected.Bindings.Where(line => !IsReader(line)).ToArray();
+            if (others.Length == 0) Line(builder, "None observed", null, null);
+            foreach (var line in others) BindingFields(builder, line);
+        }
+        void ApplySegments() {
+            var identity = selected.Identity;
+            var ids = CommandBand.SegmentIds(segmentFields[0]);
+            if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "enter at least one segment ID"); return; }
+            Edit(SegmentsPlace, "Construction segments", (current, inspection) => current.SetConstructionSegments(identity, ids, inspection), true);
+        }
+        bool HasSegmentValue(TargetIdentity identity) {
+            try { return attachment != null && identity != null && attachment.Session.HasConstructionSegments(identity); } catch { return false; }
+        }
         // The Connections tab of a starter placement marker: on-track placement of its track location, which the start setup
         // reads as the front of the car cut. Segment chooses the track in the world, and the click on it gives the
         // distance; the fields can also be typed. The current location follows, with the setups that read it.
@@ -1372,7 +1401,7 @@ namespace RailroaderScenePatcher {
             var identity = selected?.Identity;
             switch (id) {
                 case PlacementTab:
-                    block = block ?? PadBlock;
+                    block = block ?? PadBlock ?? ControllerBlock;
                     // Without fields there is nothing to apply or to read: an object whose placement stands as running
                     // lines has no value controls.
                     if ((placementMode == 0 || IsPad) && block != null) return new Act[0];
@@ -1485,6 +1514,19 @@ namespace RailroaderScenePatcher {
                             HasPickedBinding ? Slot("Cancel", "Restore the current track location in the fields.", null, CancelPickedBinding) :
                             Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment", 1, 70) };
                     }
+                    if (HoldsConstructionSegments) {
+                        var current = CurrentSegments();
+                        var chosen = ConfirmedForInspected?.Identity;
+                        var pickedSegment = chosen != null && chosen.Kind == SelectionKind.TrackSegment;
+                        return new[] {
+                            Typed(Slot("Set", "Replace the construction segments with exactly the segments in the field. The bridge does not move.", null, ApplySegments, "Set construction segments", 1, 56),
+                                () => CommandBand.SegmentsReason(block, segmentFields[0], current)),
+                            Slot("Detach", "Detach the construction from its segments.", block ?? CommandBand.SegmentDetachReason, () => { }, "Detach construction segments", 1, 72),
+                            Slot(CommandBand.ClearSegments, "Clear this mod's value for the construction segments; the construction returns to its native segments.", block ?? CommandBand.ClearSegmentsReason(HasSegmentValue(identity)),
+                                () => Edit(SegmentsPlace, "Clearing the construction segments value", (edit, inspection) => edit.SetConstructionSegments(identity, null, inspection)), null, 1, 124),
+                            Slot("Picked", "Add the confirmed segment to the segments field.", block ?? (pickedSegment ? null : "Choose a segment with Segment and confirm it first."),
+                                () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier); FieldsChanged(); }, "Picked segment", 1, 70) };
+                    }
                     var pad = structure == CrossingPadScene.Structure;
                     // An object without a binding names that first; why it cannot be edited in general comes second.
                     var unavailable = pad || structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure ? block : selected == null ? block : BindingUnavailable();
@@ -1515,15 +1557,20 @@ namespace RailroaderScenePatcher {
                     // bridge's construction controller switches, cannot hold an Enabled setting.
                     var switched = block == null && target != null && (selected.GroupPath != null || selected.Family == BakedSceneryRules.Family) ? GroupWorld.ActivityProblem(target) : block == null && target != null && IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                     return new[] {
-                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
+                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? ControllerActivity ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
-                        Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
+                        Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? ControllerActivity ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
                             () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
                 }
             }
         }
         // Why no placement mode edits the inspected object when it is a crossing pad; null for any other object.
         string PadBlock => IsPad ? CommandBand.PadFollowsTrack : null;
+        // A construction controller on an object of its own takes no placement and no Enabled setting: its position has
+        // no effect, and the construction's visibility control runs on it.
+        bool IsController => selected?.Identity.Structure == ConstructionSceneryScene.Structure;
+        string ControllerBlock => IsController ? CommandBand.ControllerNoPlacement : null;
+        string ControllerActivity => IsController ? CommandBand.ControllerNoActivity : null;
         bool HasStarterTrack(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasStarterTrack(identity); } catch { return false; }
         }
@@ -1704,8 +1751,9 @@ namespace RailroaderScenePatcher {
                     new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and culls it with its own equipment. A rejected device names why it does not qualify." },
                     new[] { "Bells", "Adds a bell with sound from a bell definition in the content library. It rings when the crossing controller rings its own bell. Rejected definitions show why they cannot be used." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
-                    new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." } },
-                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
+                    new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
+                    new[] { "Construction segments", "The track segments whose construction state decides which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They cannot be detached. Clear segments returns the native segments." } },
+                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {
                     new[] { "Remove modification", "Deletes this mod's modification and restores the object's underlying state, not an earlier patched position." },

@@ -271,6 +271,8 @@ namespace RailroaderScenePatcher.Core {
                     if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == "Track.TrackMarker")) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
                     // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available on this build.
                     if ((item["relationships"] as JObject)?["crossingCoverage"] != null || (item["relationships"] as JObject)?["crossingEquipment"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
+                    // Construction segments need their capability whether or not it is available on this build.
+                    if ((item["relationships"] as JObject)?["constructionSegments"] != null) minimum = Max(minimum, ConstructionSegmentRule.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available on this build.
                     if ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == BridgeScene.Structure) minimum = Max(minimum, "0.5.0");
                     // A starter placement needs its capability whether or not it is available on this build.
@@ -427,6 +429,7 @@ namespace RailroaderScenePatcher.Core {
             if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
             if (state.Starter?.Track != null) lines.Add("Track location: from " + Location(before?.Starter?.Track) + " to " + Location(state.Starter.Track));
             if (state.Starter?.Wreck != null) lines.Add("Start derailed: from " + (before?.Starter?.Wreck == null ? "unknown" : before.Starter.Wreck.Value ? "Yes" : "No") + " to " + (state.Starter.Wreck.Value ? "Yes" : "No"));
+            if (state.Segments != null) lines.Add("Construction segments: from " + (before?.Segments?.Display ?? "unknown") + " to " + state.Segments.Display);
             if (state.Coverage != null) foreach (var circuit in state.Coverage.Circuits)
                 lines.Add((DetectionAddition.Id(circuit.Key) == null ? "Circuit " + circuit.Key : "Detection addition " + DetectionAddition.Id(circuit.Key)) + ": " + circuit.Value);
             return lines;
@@ -623,6 +626,27 @@ namespace RailroaderScenePatcher.Core {
                 return value;
             }, null, "bind-");
         }
+        // Sets or replaces this mod's construction segments of a rail bridge construction with exactly the selected
+        // segments. Null ids clear the mod's value: the construction returns to its effective underlying segments. detach
+        // writes an explicit detach, which every capability refuses with its reason. Placement and activity keep their mod
+        // values.
+        public Outcome SetConstructionSegments(TargetIdentity target, IReadOnlyList<string> ids, InspectedTarget inspected, bool detach = false) {
+            return Change(ids == null && !detach ? "Clear construction segments" : "Edit construction segments", target, inspected, existing => {
+                if (existing != null) PatchEngine.Parse(existing);
+                var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+                var relationships = value["relationships"] as JObject;
+                if (ids == null && !detach) {
+                    if (relationships?["constructionSegments"] == null) throw new InvalidOperationException("This object has no construction segments set by this mod in the active scene patch file");
+                    relationships.Remove("constructionSegments");
+                    if (!relationships.HasValues) value.Remove("relationships");
+                    return Empty(value) ? null : value;
+                }
+                if (relationships == null) value["relationships"] = relationships = new JObject();
+                relationships["constructionSegments"] = detach ? new JObject { ["detach"] = true } : new JObject { ["segments"] = new JArray(ConstructionSegments.Of(ids).Sorted.Select(id => (JToken)id).ToArray()) };
+                if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
+                return value;
+            }, null, "segments-");
+        }
         // Selects tracks for, or detaches, one circuit of this mod's crossing coverage. Other circuits keep their mod values or
         // effective coverage. A null coverage clears the entry set by this mod for the circuit: it returns to its effective underlying coverage.
         public Outcome Cover(TargetIdentity target, string circuit, CircuitCoverage coverage) { return Cover(target, circuit, coverage, null); }
@@ -647,6 +671,21 @@ namespace RailroaderScenePatcher.Core {
         public CoveragePreview PreviewAddition(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
             if (tracks != null && tracks.Kind != CircuitKind.Added) return new CoveragePreview(Array.Empty<string>(), "Explicitly select the tracks of the approach A, island and approach B spans for the addition");
             return Preview(target, id, tracks, inspected, true);
+        }
+        // The construction segments the object's construction controller names now, or null for an object without one.
+        public ConstructionSegments ConstructionSegmentsOf(TargetIdentity target) {
+            var resolved = engine.ResolveUnique(target);
+            return scene.Read(resolved).Segments;
+        }
+        // Whether the active scene patch file sets construction segments for this object. Read from the scene patch file alone.
+        public bool HasConstructionSegments(TargetIdentity target) {
+            if (scenePatchFile == null || target == null) return false;
+            foreach (var item in scenePatchFile.Items) {
+                var other = item["target"] as JObject;
+                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (item["relationships"]?["constructionSegments"] != null) return true;
+            }
+            return false;
         }
         // The crossing's current coverage of every circuit, read from the scene.
         public CrossingCoverage Coverage(TargetIdentity target) {
@@ -1030,6 +1069,11 @@ namespace RailroaderScenePatcher.Core {
             if (starter != null && Changed(existing?["starterPlacement"]?["wreck"], starter["wreck"]) && state.Starter?.Wreck != null && under.Starter?.Wreck == state.Starter.Wreck)
                 starter.Remove("wreck");
             if (starter != null && !starter.Properties().Any(p => p.Name != "setup")) result.Remove("starterPlacement");
+            relationships = result["relationships"] as JObject;
+            if (relationships != null && Changed(existing?["relationships"]?["constructionSegments"], relationships["constructionSegments"]) && state.Segments != null && under.Segments != null && ConstructionSegments.Same(state.Segments, under.Segments)) {
+                relationships.Remove("constructionSegments");
+                if (!relationships.HasValues) result.Remove("relationships");
+            }
             if (PreservingJson.SameModification(result, value)) return value;
             return Empty(result) ? null : result;
         }
@@ -1194,7 +1238,7 @@ namespace RailroaderScenePatcher.Core {
         // as current after its track turned by less than that angle, and the object would not follow.
         const double AngleToleranceDegrees = 0.01;
         static bool Same(ObjectState a, ObjectState b) {
-            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !CrossingEquipment.Same(a.Equipment, b.Equipment) || !StarterSetting.Same(a.Starter, b.Starter)) return false;
+            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !CrossingEquipment.Same(a.Equipment, b.Equipment) || !StarterSetting.Same(a.Starter, b.Starter) || !ConstructionSegments.Same(a.Segments, b.Segments)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }
