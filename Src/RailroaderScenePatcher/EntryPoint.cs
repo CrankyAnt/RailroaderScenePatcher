@@ -136,7 +136,7 @@ namespace RailroaderScenePatcher {
             get => inspected;
             set {
                 inspected = value;
-                selection?.Inspect(value?.Handle);
+                selection?.Inspect(value);
             }
         }
         string selectionProblem;

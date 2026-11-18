@@ -107,16 +107,29 @@ static class SelectionTests {
         session.Pending.Offer(new[] { board });
         Check(session.Confirm(), "Confirm the object to inspect");
         var inspected = session.Confirmed;
-        Check(!session.Inspect(board.Handle) && ReferenceEquals(inspected, session.Confirmed), "Confirming the inspection keeps the choice on that object");
-        Check(session.Inspect(new object()) && session.Confirmed == null, "Inspecting another object ends an inspection-only confirmation");
-        Check(!session.Inspect(board.Handle) && session.Confirmed == null, "Returning to the original object does not revive its choice");
+        Check(!session.Inspect(board.Handle, boardId) && ReferenceEquals(inspected, session.Confirmed), "Confirming the inspection keeps the choice on that object");
+        Check(session.Inspect(new object(), null) && session.Confirmed == null, "Inspecting another object ends an inspection-only confirmation");
+        Check(!session.Inspect(board.Handle, boardId) && session.Confirmed == null, "Returning to the original object does not revive its choice");
 
         session.Begin(SelectionKind.TrackSegment, "Follow", board);
         session.Pending.Offer(new[] { track });
         Check(session.Confirm(), "Confirm a Follow target for the inspected object");
         var follow = session.Confirmed;
-        Check(!session.Inspect(board.Handle) && ReferenceEquals(follow, session.Confirmed), "Keeping the same inspection retains its confirmed Follow target");
-        Check(session.Inspect(new object()) && session.Confirmed == null, "A Follow target cannot carry to another live object");
+        Check(!session.Inspect(board.Handle, boardId) && ReferenceEquals(follow, session.Confirmed), "Keeping the same inspection retains its confirmed Follow target");
+        Check(session.Inspect(new object(), null) && session.Confirmed == null, "A Follow target cannot carry to another live object");
+
+        // One GameObject with two components gives two inventory entries with one handle. A pick confirmed for one
+        // entry belongs to that entry only, while a refresh of the same entry keeps it.
+        var signalId = SelectionIdentity.SceneObject(new TargetIdentity("scene", "Bryson House Track", "CrossingSignal"));
+        session.Begin(SelectionKind.TrackSegment, "Picked segment", board);
+        session.Pending.Offer(new[] { track });
+        Check(session.Confirm(), "Confirm a segment for the first entry of the object");
+        var picked = session.Confirmed;
+        var refreshedId = SelectionIdentity.SceneObject(new TargetIdentity("scene", "Bryson House Track", "Culler"));
+        Check(!session.Inspect(board.Handle, refreshedId) && ReferenceEquals(picked, session.Confirmed), "A refresh of the same entry keeps its confirmed segment");
+        Check(picked.AppliesTo(board.Handle, refreshedId) && !picked.AppliesTo(board.Handle, signalId), "The confirmed segment applies to its own entry, not to the other entry of the same object");
+        Check(session.Inspect(board.Handle, signalId) && session.Confirmed == null, "Switching to another entry of the same object ends the confirmation");
+        Check(!session.Inspect(board.Handle, boardId) && session.Confirmed == null, "Returning to the first entry does not revive its confirmed segment");
     }
     static void ConfirmationFindsOneIdentity() {
         var scene = new FindingCandidates();

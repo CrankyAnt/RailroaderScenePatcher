@@ -764,6 +764,8 @@ namespace RailroaderScenePatcher {
                     : "Next: Track or Node, then click in the world, Confirm and Start.") + "</style>", null, null);
             }
         }
+        // The confirmed choice made for the inspected inventory entry, not for another entry of the same object.
+        ConfirmedSelection ConfirmedForInspected => selection?.ConfirmedFor(selected) == true ? selection.Confirmed : null;
         // The confirmed track or endpoint that belongs to the inspected object, for following.
         ConfirmedSelection FollowTarget() {
             var confirmed = selection?.Confirmed;
@@ -1424,7 +1426,7 @@ namespace RailroaderScenePatcher {
                             Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Click Preview first." : null), apply, null, 1, 62) };
                     }
                     if (structure == StarterPlacementScene.Structure) {
-                        var confirmedTrack = selection?.Confirmed?.Identity;
+                        var confirmedTrack = ConfirmedForInspected?.Identity;
                         var picked = confirmedTrack != null && confirmedTrack.Kind == SelectionKind.TrackSegment;
                         return new[] {
                             Typed(Slot("Set", "Place the front of the car cut at the entered track location. The whole cut is checked first; the object does not move.", null, ApplyStarterLocation, "Set track location", 1, 56),
@@ -1438,7 +1440,7 @@ namespace RailroaderScenePatcher {
                     var pad = structure == CrossingPadScene.Structure;
                     // An object without a binding names that first; why it cannot be edited in general comes second.
                     var unavailable = pad || structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure ? block : selected == null ? block : BindingUnavailable();
-                    var confirmed = selection?.Confirmed?.Identity;
+                    var confirmed = ConfirmedForInspected?.Identity;
                     var segment = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
                     return new[] {
                         Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding", 1, 56), () => CommandBand.FieldReason(unavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds)),

@@ -141,7 +141,8 @@ namespace RailroaderScenePatcher {
         readonly SelectionSession session;
         SpatialCandidate[] candidates = Array.Empty<SpatialCandidate>();
         SpatialCandidate source;
-        // The confirmed target and the object it was confirmed for, kept for its world marking.
+        // The confirmed target, kept for its world marking. The confirmation itself knows the inventory entry it was
+        // confirmed for.
         SpatialCandidate confirmedMark;
         // The track element the inspected object follows, and the object. Its marking is rebuilt from the element
         // itself a few times a second, so it moves with the track; the element is looked up once.
@@ -239,7 +240,7 @@ namespace RailroaderScenePatcher {
             source = newSource;
             // A choice for the same object keeps that object's confirmed relation in view, so the track it follows
             // stays green beside the blue candidate. A choice for another object starts without one.
-            if (Confirmed?.AppliesTo(origin?.Handle) != true) confirmedMark = null;
+            if (!ConfirmedFor(origin)) confirmedMark = null;
         }
 
         internal void Pick(Vector2 pointer, IReadOnlyList<Rect> covered) {
@@ -311,7 +312,14 @@ namespace RailroaderScenePatcher {
 
         // An edit used the confirmed target: nothing is confirmed any more, and its marking goes.
         internal void Consume() { session.Consume(); confirmedMark = null; }
-        internal void Inspect(object handle) { if (session.Inspect(handle)) confirmedMark = null; }
+        internal void Inspect(SceneObservation entry) { if (session.Inspect(entry?.Handle, IdentityOf(entry))) confirmedMark = null; }
+        // Whether the confirmed choice belongs to this inventory entry, and not to another entry of the same object.
+        internal bool ConfirmedFor(SceneObservation entry) => entry != null && Confirmed?.AppliesTo(entry.Handle, IdentityOf(entry)) == true;
+        bool ConfirmedFor(SelectionCandidate choice) => choice != null && Confirmed?.AppliesTo(choice.Handle, choice.Identity) == true;
+        static SelectionIdentity IdentityOf(SceneObservation entry) {
+            var target = entry?.Identity;
+            return target == null || new[] { target.Scene, target.Path, target.Component }.Any(String.IsNullOrWhiteSpace) ? null : SelectionIdentity.SceneObject(target);
+        }
 
         // The surface under the objects may have changed; their frames are cut at it anew.
         internal void ClearSurface() { overlay.ClearSurface(); }
@@ -339,8 +347,8 @@ namespace RailroaderScenePatcher {
             var original = source ?? (inspected == null ? null : SpatialSelectionScene.Observe(inspected));
             // The confirmed relation belongs to the object it was chosen for, and is not the inspected object itself.
             var confirmed = Confirmed;
-            var relation = confirmed?.Source != null && confirmed.AppliesTo(inspected?.Handle) && confirmedMark != null &&
-                (Pending == null || confirmed.AppliesTo(source?.Choice.Handle)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
+            var relation = confirmed?.Source != null && ConfirmedFor(inspected) && confirmedMark != null &&
+                (Pending == null || ConfirmedFor(source?.Choice)) && !ReferenceEquals(confirmedMark.Choice.Handle, inspected.Handle) ? confirmedMark : null;
             // The track point is its own marking, apart from the object's: a car placement reads that point, not the
             // object position. Its evidence tells it from the object's own candidate.
             var point = inspected != null && trackPoint != null && trackPoint.Length == 3

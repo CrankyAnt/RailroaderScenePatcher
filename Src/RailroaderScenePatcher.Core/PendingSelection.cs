@@ -73,19 +73,22 @@ namespace RailroaderScenePatcher.Core {
     }
 
     public sealed class ConfirmedSelection {
-        readonly object inspectionOwner;
+        readonly SelectionCandidate owner;
         public SelectionIdentity Identity { get; }
         public SelectionIdentity Source { get; }
         public IReadOnlyList<string> MapIds { get; }
 
-        internal ConfirmedSelection(SelectionIdentity identity, SelectionIdentity source, object inspectionOwner, string[] maps) {
+        internal ConfirmedSelection(SelectionIdentity identity, SelectionIdentity source, SelectionCandidate owner, string[] maps) {
             Identity = identity;
             Source = source;
-            this.inspectionOwner = inspectionOwner;
+            this.owner = owner;
             MapIds = Array.AsReadOnly((string[])maps.Clone());
         }
 
-        public bool AppliesTo(object inspectedHandle) => ReferenceEquals(inspectionOwner, inspectedHandle);
+        // Whether the choice belongs to the inspected inventory entry. One object with two components gives two
+        // entries with one handle, so the entry's identity decides; the handle decides only without an identity.
+        public bool AppliesTo(object inspectedHandle, SelectionIdentity inspectedIdentity) =>
+            inspectedIdentity != null ? inspectedIdentity.Equals(owner.Identity) : inspectedHandle != null && ReferenceEquals(owner.Handle, inspectedHandle);
     }
 
     public sealed class PendingSelection {
@@ -180,7 +183,7 @@ namespace RailroaderScenePatcher.Core {
                     : "The candidate changed or no longer resolves uniquely: " + difference + ". Pick again.");
             if (!maps.SequenceEqual(scene.MapIds, StringComparer.Ordinal))
                 return Reject("The loaded map changed. Cancel and start a new selection.");
-            Confirmed = new ConfirmedSelection(Candidate.Identity, Source?.Identity, Source?.Handle ?? Candidate.Handle, maps);
+            Confirmed = new ConfirmedSelection(Candidate.Identity, Source?.Identity, Source ?? Candidate, maps);
             End();
             return true;
         }
@@ -262,8 +265,8 @@ namespace RailroaderScenePatcher.Core {
             Consume();
         }
         // A choice survives the same inspection, including a refresh of its observations.
-        public bool Inspect(object inspectedHandle) {
-            if (Confirmed == null || Confirmed.AppliesTo(inspectedHandle)) return false;
+        public bool Inspect(object inspectedHandle, SelectionIdentity inspectedIdentity) {
+            if (Confirmed == null || Confirmed.AppliesTo(inspectedHandle, inspectedIdentity)) return false;
             Consume();
             return true;
         }

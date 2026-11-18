@@ -109,7 +109,7 @@ World choices for replacements, snaps and track-following placement use the same
 
 Use **Focus** in the footer to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source object.
 
-After you check the candidate, click **Confirm**. The patcher records the confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. Inspecting another object ends that confirmation. A choice made through **Select in world** alone has no source object and does not show that line.
+After you check the candidate, click **Confirm**. The patcher records the confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. Inspecting another inventory entry ends that confirmation, also when it belongs to the same object. A choice made through **Select in world** alone has no source object and does not show that line.
 
 If the candidate is missing, ambiguous or has changed since you selected it, check the world and select it again. If the source object or loaded map context has changed, cancel the choice and start again.
 
