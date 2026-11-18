@@ -19,6 +19,7 @@ static class GameDefinedGroupTests {
         Membership();
         BakedSceneryGroupMembership();
         CategoryGroupMembership();
+        RoadBridgeGroup();
         SkippedGroupLine();
         Distances();
         Marking();
@@ -137,6 +138,52 @@ static class GameDefinedGroupTests {
         Check(plus.Count == 2 && Covers(plus, 0, 0) && Covers(plus, -4, 0) && Covers(plus, 0, 4) && !Covers(plus, -4, -4), "a part's marker carries a plus through its centre");
         Check(!Covers(square, 0, 0) && Covers(square, -4, -4) && Covers(square, 4, 4) && Covers(square, -4, 4) && Covers(square, 0, -5), "a group's marker carries a hollow square, which leaves the centre open");
         Check(plus.Concat(square).All(b => b.X >= -ObjectMarkingGeometry.MarkerSize / 2 && b.Right <= ObjectMarkingGeometry.MarkerSize / 2 && b.Y >= -ObjectMarkingGeometry.MarkerSize / 2 && b.Bottom <= ObjectMarkingGeometry.MarkerSize / 2), "both symbols stay inside the square marker");
+    }
+    // A road bridge is a group: a road bridge with several inventory objects, here its root and two sign markers on
+    // it, shows one square marker and one frame beyond 125 metres and its objects at that distance or less. The base
+    // map of Railroader 0.6.3 has no such road bridge: each of its road bridges holds one inventory object.
+    static void RoadBridgeGroup() {
+        const string Road = "World/Roads Sylva", Bridge = Road + "/Sylva Road Bridge";
+        // The rule lists the bridge as a group root under Bridge / Road bridges, whatever stands on it.
+        var world = new Node("World", new Node("Roads Sylva", new Node("Sylva Road Bridge", new Node("Deck").Solid(),
+            new Node("Sign N").With("Track.TrackMarker").Solid().Family(), new Node("Sign S").With("Track.TrackMarker").Solid().Family())));
+        var verdict = BakedSceneryRules.Classify(world).Single(v => v.Path == Bridge);
+        Check(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", "a road bridge is a group root under Bridge / Road bridges");
+        var objects = new[] {
+            Object("Sylva Road Bridge", Road, baked: true),            // 0
+            Object("Sign N", Bridge, marker: true),                    // 1
+            Object("Sign S", Bridge, marker: true),                    // 2
+            Object("Milepost", Road),                                  // 3: beside the bridge
+        };
+        var groups = GameDefinedGroups.Of(objects);
+        Check(Members(groups) == "BakedSceneryGroup:0,1,2" && groups[0].Listed.SequenceEqual(new[] { 0, 1, 2 }) && groups[0].Root < 0, "a road bridge with several inventory objects is one group that lists them all (got " + Members(groups) + ")");
+        // The bridge deck from x -30 to 30 and a sign at each end, 1000 m north of the origin.
+        var anchors = new[] { new WorldPoint(0, 0, 1000), new WorldPoint(-30, 0, 1000), new WorldPoint(30, 0, 1000) };
+        GroupMarking At(double z, out ObjectMarkingFrame[] own) {
+            var eye = new WorldPoint(0, 0, z);
+            own = new[] {
+                ObjectMarkingGeometry.Frame(anchors[0], eye, new[] { Box("deck", 0, 1, 1000, 30, 1, 4) }, Camera(eye), View, null),
+                ObjectMarkingGeometry.Frame(anchors[1], eye, new[] { Box("north", -30, 3, 1000, 1, 3, 1) }, Camera(eye), View, null),
+                ObjectMarkingGeometry.Frame(anchors[2], eye, new[] { Box("south", 30, 3, 1000, 1, 3, 1) }, Camera(eye), View, null),
+            };
+            return ObjectMarkingGeometry.GroupFrame(eye, anchors, own, null, null, Camera(eye), View);
+        }
+        // 196 m from the bounds: one square marker and one frame around the deck and both signs.
+        var far = At(800, out var frames);
+        Check(far.Shows == GroupShows.MarkerAndFrame && far.Frame.HasValue && Math.Abs(far.Distance - 196) < 1e-9, "beyond 125 metres the road bridge shows one square marker and one frame (got " + far.Shows + " at " + far.Distance + ")");
+        Check(frames.All(f => f.Frame.HasValue && far.Frame.Value.X <= f.Frame.Value.X + 1e-6 && far.Frame.Value.Right >= f.Frame.Value.Right - 1e-6 && far.Frame.Value.Y <= f.Frame.Value.Y + 1e-6 && far.Frame.Value.Bottom >= f.Frame.Value.Bottom - 1e-6),
+            "the one frame surrounds the frames of all the bridge's objects");
+        Check(Enumerable.Range(0, 3).All(i => !GameDefinedGroups.ShowsOwn(far.Shows, false, false)), "beyond 125 metres no object of the bridge shows a marker of its own");
+        // The one marker lists the bridge's objects and not the milepost beside it.
+        var picked = WorldPick.Resolve(300, 300, new[] { T(260, 300), T(250, 300), T(350, 300), T(600, 300) }, new[] { new PickGroup(T(300, 300, true), groups[0].Members.ToArray(), new int[0]) });
+        Check(Picked(picked) == "0,1,2 g0", "a click on the bridge's square marker lists its objects (got " + Picked(picked) + ")");
+        // 96 m and exactly 125 m from the bounds: each object shows on its own.
+        foreach (var z in new double[] { 900, 871 }) {
+            var near = At(z, out _);
+            Check(near.Shows == GroupShows.Objects && Enumerable.Range(0, 3).All(i => GameDefinedGroups.ShowsOwn(near.Shows, false, false, i == groups[0].Root)), "at 125 metres or less the objects of the road bridge show on their own (got " + near.Shows + " at " + near.Distance + ")");
+        }
+        // Beyond 500 metres only the square marker remains.
+        Check(At(400, out _).Shows == GroupShows.MarkerOnly, "beyond 500 metres the road bridge shows only its square marker");
     }
     static void SkippedGroupLine() =>
         Check(GameDefinedGroups.SkippedLine("BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer", "none of its objects has a usable position") ==
