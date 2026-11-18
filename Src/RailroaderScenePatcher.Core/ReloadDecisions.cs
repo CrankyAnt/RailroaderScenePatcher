@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
     public enum ReloadChoice { Cancel, Save, Discard }
@@ -11,8 +12,12 @@ namespace RailroaderScenePatcher.Core {
             return CanSaveForReload ? warning : String.IsNullOrEmpty(warning) ? SaveRefusal : warning + " " + SaveRefusal;
         }
         public string ExitPrompt(bool nativeDirty) {
-            var warning = ReloadWarning(nativeDirty);
-            return warning == null ? null : "Exit the Map Editor? " + warning + " Exit discards unsaved work. Cancel returns to the Map Editor.";
+            var warning = ExitWarning(nativeDirty);
+            if (warning == null && CanSaveForReload) return null;
+            var pending = VersionState == FileVersionState.Changed ? " A file version choice is still pending."
+                : VersionState == FileVersionState.Repair ? " The scene patch file still needs repair." : "";
+            return "Exit the Map Editor?" + (warning == null ? "" : " " + ScenePatchFile.Sentence(warning) + ".")
+                + pending + " Exit discards unsaved work.";
         }
         // Live scene edits and outside file choices need no reload. An unrecovered native
         // history cannot resume recording coherent edits until the native map editor is reloaded.
@@ -29,7 +34,7 @@ namespace RailroaderScenePatcher.Core {
                     save();
                     var warning = ExitWarning(nativeDirty());
                     if (warning != null) return "Reload cancelled. " + warning + (LastSave?.Error == null ? "" : " Last Save failed: " + LastSave.Error
-                        + ". Completed writes: " + (LastSave.Completed.Count == 0 ? "none" : String.Join(", ", LastSave.Completed)) + ".");
+                        + ". Completed writes: " + (LastSave.Completed.Count == 0 ? "none" : String.Join(", ", LastSave.Completed.Select(DisplayItem))) + ".");
                 } else if (choice != ReloadChoice.Discard) return "Reload cancelled. The decision was not recognized.";
                 reload();
                 return null;

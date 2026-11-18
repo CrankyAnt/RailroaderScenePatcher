@@ -20,9 +20,16 @@ namespace RailroaderScenePatcher {
         bool freshStartSeen;
         // The diagnostics of the edited mod's scene patch file from world load, or from the last recovery.
         readonly System.Collections.Generic.List<string> editedDiagnostics = new System.Collections.Generic.List<string>();
-        static string FullDiagnosis(PatchEditingSession session) => session.ScenePatchFileDiagnostics.Count == 0 ? (session.VersionMessage ?? "") : String.Join("\n\n", session.ScenePatchFileDiagnostics.Select(d =>
-            (String.IsNullOrEmpty(d.Path) ? "Scene patch file" : d.Path) + ", " + (d.StartLine == 0 ? "line unavailable" : d.StartLine == d.EndLine ? "line " + d.StartLine : "lines " + d.StartLine + " to " + d.EndLine)
-            + ": " + d.Message + "\n" + d.Fragment + "\nExpected: " + d.Expected));
+        static string FullDiagnosis(PatchEditingSession session) => session.ScenePatchFileDiagnostics.Count == 0 ? (session.VersionMessage ?? "") : String.Join("\n\n",
+            session.ScenePatchFileDiagnostics.Select(problem => {
+                var location = String.IsNullOrEmpty(problem.Path) ? "Scene patch file" : problem.Path;
+                if (problem.StartLine > 0)
+                    location += problem.StartLine == problem.EndLine ? ", line " + problem.StartLine : ", lines " + problem.StartLine + " to " + problem.EndLine;
+                return location + ": " + CommandBand.Sentence(problem.Message)
+                    + (String.IsNullOrEmpty(problem.Fragment) ? "" : "\n" + problem.Fragment)
+                    + (String.IsNullOrEmpty(problem.Expected) ? "" : "\nExpected: " + problem.Expected)
+                    + (String.IsNullOrEmpty(problem.TechnicalDetail) ? "" : "\nTechnical detail: " + problem.TechnicalDetail);
+            }));
         void ChooseFileVersion(bool useFile) {
             var session = attachment.Session;
             var result = useFile ? session.UseFileVersion() : session.KeepEditorVersion();
@@ -31,7 +38,7 @@ namespace RailroaderScenePatcher {
             else {
                 attachment.Fault = null;
                 if (useFile) { ReplaceScenePatchFileDiagnostics(session.LastVersionApplication); Inspect(); }
-                feedback.Report(RecoveryPlace, !useFile && session.LastBackup != null && session.VersionMessage != null ? "Editor version kept. The next Save replaces the file with this version." : session.VersionMessage ?? (useFile ? "File version applied." : "Editor version kept. The next Save replaces the file with this version."));
+                feedback.Report(RecoveryPlace, useFile ? "File version applied." : "Editor version kept.");
             }
             // The choice may close the file panel: the window's controls and the title bar follow it.
             VersionChanged(); attachment.RefreshChrome();
@@ -66,7 +73,7 @@ namespace RailroaderScenePatcher {
             var session = attachment?.Session;
             if (session == null) return "";
             return String.Join("|", recoveryStep, session.Blocked, session.LastBackup, session.FreshStartPending, session.CanStartFresh,
-                String.Join("\n", session.ScenePatchFileDiagnostics.Select(d => d.Path + d.StartLine + d.Message)));
+                String.Join("\n", session.ScenePatchFileDiagnostics.Select(d => d.Path + d.StartLine + d.Message + d.TechnicalDetail)));
         }
         void DrawScenePatchFileRecovery(UIPanelBuilder builder) {
             var session = attachment?.Session;
@@ -79,10 +86,12 @@ namespace RailroaderScenePatcher {
             foreach (var problem in problems) {
                 FieldLabel(builder, problem.Path.Length == 0 ? "Scene patch file" : problem.Path);
                 builder.AddLabel(PathBreaks(Literal(problem.Message)));
-                Field(builder, problem.StartLine == 0 ? "Lines" : problem.StartLine == problem.EndLine ? "Line" : "Lines",
-                    problem.StartLine == 0 ? "None. The field is missing." : problem.StartLine == problem.EndLine ? problem.StartLine.ToString() : problem.StartLine + " to " + problem.EndLine);
-                Field(builder, "Text there", problem.Fragment);
-                Field(builder, "Expected", problem.Expected);
+                if (problem.StartLine > 0)
+                    Field(builder, problem.StartLine == problem.EndLine ? "Line" : "Lines",
+                        problem.StartLine == problem.EndLine ? problem.StartLine.ToString() : problem.StartLine + " to " + problem.EndLine);
+                if (!String.IsNullOrEmpty(problem.Fragment)) Field(builder, "Text there", problem.Fragment);
+                if (!String.IsNullOrEmpty(problem.Expected)) Field(builder, "Expected", problem.Expected);
+                if (!String.IsNullOrEmpty(problem.TechnicalDetail)) Field(builder, "Technical detail", problem.TechnicalDetail);
             }
             if (problems.Count != 0 || session.Blocked != null) {
                 builder.HStack(row => {
@@ -95,16 +104,17 @@ namespace RailroaderScenePatcher {
             if (session.LastBackup != null)
                 FieldMarkup(builder, "Backup of the original", PathBreaks(Literal(session.LastBackup + (session.FreshStartPending ? " (Save replaces the original with the new empty scene patch file)" : ""))));
             if (problems.Count != 0)
-                Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(session));
+                Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(session))
+                    .Tooltip("Copy to clipboard", "Copy the full diagnosis to share or save it.");
             if (session.Blocked == null) { recoveryStep = RecoveryStep.None; return; }
             switch (recoveryStep) {
                 case RecoveryStep.ReviewReread:
                     PlainLabel(builder, "The patcher reads the current file and applies its modifications to the objects immediately. You can then edit it in this session. The file is not written. Anything you deleted stays deleted, including content this patcher does not understand.");
-                    Confirmation(builder, "Read again", "Read the corrected file, apply its modifications and edit it in this session.", () => Recover("Read again", session.Reread(true, attachment.NativeDirty)));
+                    Confirmation(builder, "Read again", "Click after you finish correcting the file.", () => Recover("Read again", session.Reread(true, attachment.NativeDirty)));
                     break;
                 case RecoveryStep.ReviewFreshStart when session.CanStartFresh:
                     PlainLabel(builder, "Start fresh removes all content from the scene patch file, including content this patcher does not understand. The original is first copied to a backup beside it. Save then replaces the original with an empty scene patch file.");
-                    Confirmation(builder, "Back up and start fresh", "Copy the original to a backup and start an empty scene patch file that Save writes.", () => Recover("Start fresh", session.FreshStart(true, attachment.NativeDirty)));
+                    Confirmation(builder, "Back up and start fresh", "Click only if you intend to replace the entire file.", () => Recover("Start fresh", session.FreshStart(true, attachment.NativeDirty)));
                     break;
                 default:
                     builder.HStack(row => {

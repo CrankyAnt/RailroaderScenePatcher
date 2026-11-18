@@ -192,6 +192,7 @@ namespace RailroaderScenePatcher {
         // earlier target as confirmed beside fields that were cleared.
         bool withdrawn;
         internal ConfirmedSelection Confirmed => withdrawn ? null : session.Confirmed;
+        internal string ConfirmedName => confirmedMark?.Observation?.DisplayName ?? confirmedMark?.Choice.Label;
 
         internal SpatialSelection(IInspectionScene inventory, Func<IReadOnlyList<SceneObservation>> entries = null) {
             scene = new SpatialSelectionScene(inventory, entries);

@@ -471,7 +471,7 @@ static class BakedPartTests {
                 Assert(edit(), name + " applies");
                 Assert(inventory.ReobserveRelated(Entry(handle)) != null, "the edited object is observed again");
                 inventory.CheckFreshness();
-                if (objectOnly) { Assert(inventory.IsStale && inventory.StaleReason.Contains("Jetty/Post"), "Observing the edited object alone leaves the post stale: " + inventory.StaleReason); break; }
+                if (objectOnly) { Assert(inventory.IsStale && inventory.StaleReason.Contains("Post"), "Observing the edited object alone leaves the post stale: " + inventory.StaleReason); break; }
                 Assert(!inventory.IsStale, "After " + name + " the inventory stays current: " + inventory.StaleReason);
             }
         }

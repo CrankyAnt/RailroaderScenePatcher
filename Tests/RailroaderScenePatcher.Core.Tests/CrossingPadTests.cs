@@ -254,7 +254,7 @@ static class CrossingPadTests {
         var incompatible = new SceneCapabilities(() => new[] { "map" });
         incompatible.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); incompatible.AddUnavailable(CrossingPadScene.Structure, "pad builder missing");
         var isolated = new PatchEngine(incompatible).Apply(Doc(Binding("pad", At("Sj7c", "a", 186)) + "," + signBinding.Replace("\"distance\":2", "\"distance\":3")));
-        Assert(!isolated.Outcomes["pad"].Applied && isolated.Outcomes["pad"].Error.Contains("crossing-pad-v1 capability is incompatible") && isolated.Outcomes["sign"].Applied, "An unavailable pad capability fails only pad modifications: " + isolated.Outcomes["pad"].Error);
+        Assert(!isolated.Outcomes["pad"].Applied && isolated.Outcomes["pad"].Error.Contains("The patcher cannot edit this object on this game build") && isolated.Outcomes["sign"].Applied, "An unavailable pad capability fails only pad modifications: " + isolated.Outcomes["pad"].Error);
     }
     static void PreflightRefusalChangesNothing() {
         var (world, pad, rear, scene) = Setup();
@@ -264,7 +264,8 @@ static class CrossingPadTests {
         (world, pad, rear, scene) = Setup();
         world.Buckets["Sj7c"]["Mg74"] = ("a", 1, rear);
         outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)))).Outcomes["rebind"];
-        Assert(!outcome.Applied && outcome.Error.Contains("registration") && world.Mutations == 0 && Mesh(world, pad) == Baseline, "An incoherent registration refuses before mutation: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("track information for this marker is out of sync")
+            && outcome.Error.EndsWith(" Reload the Map Editor before editing it.", StringComparison.Ordinal) && world.Mutations == 0 && Mesh(world, pad) == Baseline, "An incoherent registration refuses before mutation: " + outcome.Error);
         (world, pad, rear, scene) = Setup();
         world.Owners.Add(new FakeOwner { Name = "Consumer", Fields = { new ReferenceField("marker", true, () => pad) } });
         outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Sj7c", "a", 186.9477)))).Outcomes["rebind"];
@@ -480,7 +481,7 @@ static class CrossingPadTests {
                 Assert(feedback.Run("follow", "Track following", null, inventory, refreshed, inspection => session.Follow(refreshed.Identity, anchor, inspection)),
                     "After a refresh, following again with the held target applies: " + feedback.Result);
             } else {
-                Assert(!followed && feedback.Result.Contains("crossing-pad-v1 capability is incompatible") && !feedback.Result.Contains("Inspected target context changed"), "An unavailable pad capability names its cause: " + feedback.Result);
+                Assert(!followed && feedback.Result.Contains("The patcher cannot edit this object on this game build") && !feedback.Result.Contains("Inspected target context changed"), "An unavailable pad capability names its cause: " + feedback.Result);
                 Assert(world.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && Mesh(world, pad) == Baseline, "The refused follow changes nothing");
             }
         }

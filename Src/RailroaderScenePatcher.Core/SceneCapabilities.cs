@@ -69,9 +69,9 @@ namespace RailroaderScenePatcher.Core {
             return found;
         }
         IScene Owner(object target) {
-            if (target is Unavailable missing) throw new InvalidOperationException("The " + missing.Structure + " capability is incompatible with this game build: " + missing.Reason + ". Report this to the patcher maintainer");
-            if (target == null || !owners.TryGetValue(target, out var owner)) throw new InvalidOperationException("No capability resolved this object");
-            if (owner.Capability == Capability.Incompatible) throw new InvalidOperationException("The capability for this object is incompatible with this game build. Report this to the patcher maintainer");
+            if (target is Unavailable missing) throw new InvalidOperationException("The patcher cannot edit this object on this game build. Report this to the patcher maintainer. Details: " + missing.Reason);
+            if (target == null || !owners.TryGetValue(target, out var owner)) throw new InvalidOperationException("The patcher could not find this object");
+            if (owner.Capability == Capability.Incompatible) throw new InvalidOperationException("The patcher cannot edit this object on this game build. Report this to the patcher maintainer");
             return owner;
         }
         public void Preflight(object target) { Owner(target).Preflight(target); }

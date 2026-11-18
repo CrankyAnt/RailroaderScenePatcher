@@ -22,11 +22,12 @@ namespace RailroaderScenePatcher.Core {
         public bool Truncated { get; private set; }
         public string Message { get; private set; }
         public string Expected { get; private set; }
+        public string TechnicalDetail { get; private set; }
         // The format reference that describes the expected structure and values.
         public string Reference => FormatReference;
         // The guide that describes the corrections scene patch editing offers for a protected scene patch file.
         public string Corrections => RecoveryReference;
-        internal static ScenePatchFileDiagnostic Create(string text, string path, string message, string expected, JToken token = null, int line = 0) {
+        internal static ScenePatchFileDiagnostic Create(string text, string path, string message, string expected, JToken token = null, int line = 0, string technicalDetail = null) {
             var start = (token as IJsonLineInfo)?.HasLineInfo() == true ? ((IJsonLineInfo)token).LineNumber : line;
             var end = start;
             if (start > 0 && token is JContainer container)
@@ -35,13 +36,14 @@ namespace RailroaderScenePatcher.Core {
             var span = Math.Max(1, end - start + 1);
             var fragment = start > 0 && start <= lines.Length
                 ? String.Join("\n", lines.Skip(start - 1).Take(Math.Min(FragmentLines, span)))
-                : "The text has no line for this problem.";
+                : text == null ? "" : "The text has no line for this problem.";
             // A problem longer than the fragment says that its text goes on.
             var cut = start > 0 && span > FragmentLines;
             if (cut) fragment += "\n... " + (span - FragmentLines) + " more " + (span - FragmentLines == 1 ? "line" : "lines") + ", to line " + end;
             // A scene patch file written on one long line still shows a bounded fragment.
             if (fragment.Length > FragmentCharacters) { fragment = fragment.Substring(0, FragmentCharacters) + "..."; cut = true; }
-            return new ScenePatchFileDiagnostic { Path = path ?? "", StartLine = start, EndLine = end, Fragment = fragment, Message = message, Expected = expected, Truncated = cut };
+            return new ScenePatchFileDiagnostic { Path = path ?? "", StartLine = start, EndLine = end, Fragment = fragment, Message = message, Expected = expected,
+                TechnicalDetail = technicalDetail, Truncated = cut };
         }
     }
 }

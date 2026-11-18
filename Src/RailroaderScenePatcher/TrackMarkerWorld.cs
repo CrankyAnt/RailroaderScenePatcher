@@ -205,7 +205,7 @@ namespace RailroaderScenePatcher {
         // A placement-only check reads this object alone: the setup placements and the direct-reference scan concern
         // consumers of the marker's location, which a placement update does not change.
         internal static string Consumers(GameObject go, Component m, ReferenceScan references, HolderIndex setups, Func<object, string, bool> allowed, bool placementOnly = false, Func<Delegate, bool> allowedListener = null) {
-            if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID; its graph registration cannot be identified";
+            if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID, so the patcher cannot find its track location";
             // A listener of location changes is a dependent consumer this adapter does not refresh, unless the pattern owns it.
             if (Field(m, "OnLocationChanged") is Delegate listeners && listeners.GetInvocationList().Any(l => allowedListener == null || !allowedListener(l))) return "Another component consumes this marker's location changes; its dependent state is not supported";
             var relative = Get(go, Relative);

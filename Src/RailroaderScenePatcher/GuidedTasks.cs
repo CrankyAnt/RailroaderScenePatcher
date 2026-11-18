@@ -17,8 +17,8 @@ namespace RailroaderScenePatcher {
         SnapRequest guidedSnap;
         string guidedInspectorTab;
         const string GuidedPlace = "Guided task";
-        const string GuidedRecovery = "Select Target to discard the draft, then Refresh, inspect the object and start again. After incomplete cleanup, return to Inspector and use Recheck before retrying.";
-        const string GuidedValuesRecovery = "Select Back to correct the values or Target to start again.";
+        const string GuidedRecovery = "Click Target to discard the draft. Click Refresh, then inspect the object and start again.";
+        const string GuidedValuesRecovery = "Click Back to correct the values or click Target to start again.";
         string InspectorFeedbackView() => inspectorTab.Value + "/" + (inspectorTab.Value == PlacementTab ? placementMode : 0);
         string GuidedFeedbackView() => GuidedPlace + "/" + guided.Step;
 
@@ -105,7 +105,7 @@ namespace RailroaderScenePatcher {
             var kind = IsStarter ? GuidedTaskKind.StarterPlacement : GuidedTaskKind.Binding;
             var reason = GuidedBlock(kind);
             Button(builder, "Repair with guided task", () => StartGuided(kind)).Inactive(reason != null)
-                .Tooltip("Repair track binding", CommandBand.Tooltip("Start a guided task to repair this track binding problem.", reason));
+                .Tooltip("Repair with guided task", CommandBand.Tooltip("Start a guided task to repair this track binding problem.", reason));
         }
         void DrawGuided(UIPanelBuilder builder) {
             guidedTab.Value = guided.Step == GuidedTaskStep.Applied ? "Apply" : guided.Step.ToString();
@@ -129,7 +129,7 @@ namespace RailroaderScenePatcher {
                     }
                 } else if (guided.Step == GuidedTaskStep.Values) DrawGuidedValues(body);
                 else if (guided.Step == GuidedTaskStep.Review) DrawGuidedReview(body);
-                else PlainLabel(body, "The edit is complete. Use the Map Editor's Undo and Save as you would after an Inspector edit.");
+                else PlainLabel(body, "The edit is complete. Save when you're done.");
             });
             var fill = view.GetComponent<LayoutElement>();
             if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
@@ -141,7 +141,7 @@ namespace RailroaderScenePatcher {
             switch (guided.Kind) {
                 case GuidedTaskKind.Placement:
                     for (var group = 0; group < 2; group++)
-                        ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, guidedFields, group * 3, ChoiceBlock, "Enter map coordinates in meters and rotation in degrees.", column => true);
+                        ValueRow(builder, CommandBand.PlacementGroups[group], CommandBand.PlacementUnits[group], CommandBand.Axes, guidedFields, group * 3, ChoiceBlock, group == 0 ? "Map coordinates" : "Euler angles", column => true);
                     break;
                 case GuidedTaskKind.Snap:
                     Field(builder, "Snap target", preparedSnap?.Identity.ToString() ?? "Choose a track or endpoint in the world and confirm it.");
@@ -187,12 +187,14 @@ namespace RailroaderScenePatcher {
             return null;
         }
         string GuidedUnchanged() {
+            var follow = attachment?.Session.FollowingOf(guided.Target.Identity) != null;
+            const string track = " The object keeps following the same track at the new offset.";
             switch (guided.Kind) {
-                case GuidedTaskKind.Placement: return "Activity and logical bindings stay unchanged. If the object follows a track, it continues to follow that track at the new offset.";
-                case GuidedTaskKind.Snap: return "Rotation, activity and logical bindings stay unchanged. If the object follows a track, it continues to follow that track at the new offset.";
-                case GuidedTaskKind.Activity: return "Placement and logical bindings stay unchanged.";
-                case GuidedTaskKind.StarterPlacement: return "The marker object's position and activity stay unchanged, as do the wreck setting and other car placements.";
-                default: return IsPad ? "Activity stays unchanged. The pad regenerates along the track at its marker's new location." : "Physical placement and activity stay unchanged.";
+                case GuidedTaskKind.Placement: return "Activity and logical bindings." + (follow ? track : "");
+                case GuidedTaskKind.Snap: return "Rotation, activity and logical bindings." + (follow ? track : "");
+                case GuidedTaskKind.Activity: return "Placement and logical bindings.";
+                case GuidedTaskKind.StarterPlacement: return "The marker's position and activity, the wreck setting and other car placements.";
+                default: return IsPad ? "Activity. The pad follows its marker to the new location." : "Physical placement and activity.";
             }
         }
         void DrawGuidedReview(UIPanelBuilder builder) {
@@ -252,7 +254,7 @@ namespace RailroaderScenePatcher {
                 }), Slot("Another guided task", "Return to the task list.", null, GuidedTarget) };
             if (guided.Step == GuidedTaskStep.Target) return new[] { Slot("Inspector", "Return to Inspector.", wait, LeaveGuided) };
             if (guided.Step == GuidedTaskStep.Values) {
-                var back = Slot("Back", "Discard the draft and release the target.", wait, GuidedTarget);
+                var back = Slot("Back", "Discard the draft and return to the task list.", wait, GuidedTarget);
                 var next = Typed(Slot("Next", "Review your changes without applying them.", wait, ReviewGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock());
                 if (guided.Kind == GuidedTaskKind.Snap) return new[] { back,
                     Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
@@ -264,8 +266,8 @@ namespace RailroaderScenePatcher {
             }
             return new[] {
                 Slot("Back", "Return to Values and keep the draft.", wait, () => { guided.Back(); feedback.View(GuidedFeedbackView()); guidedFields = guided.Draft; if (guided.Kind == GuidedTaskKind.Snap) preparedSnap = guidedSnap; }),
-                Typed(Slot("Apply", "Apply the changes you reviewed using the same operation as Inspector.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock()),
-                Slot("Target", "Discard the draft and release the target. If the target is stale or the edit failed, use Refresh, inspect the object and start again.", wait, GuidedTarget) };
+                Typed(Slot("Apply", "Apply the reviewed changes.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock()),
+                Slot("Target", "Discard the draft and return to the task list.", wait, GuidedTarget) };
         }
         Outcome GuidedOperation(PatchEditingSession session) {
             var identity = guided.Target.Identity;
@@ -304,7 +306,8 @@ namespace RailroaderScenePatcher {
                 checkedTarget = true;
                 return GuidedOperation(session);
             }, consumes, applied => {
-                guided.Complete(applied, null, applied ? null : checkedTarget ? GuidedValuesRecovery : GuidedRecovery);
+                var cleanup = !applied && guided.Target != null && attachment?.Session.CleanupUnverified(guided.Target.Identity) == true;
+                guided.Complete(applied, null, applied ? null : cleanup ? "Return to Inspector and click Recheck before trying again." : checkedTarget ? GuidedValuesRecovery : GuidedRecovery);
                 feedback.View(GuidedFeedbackView(), preserve: true);
                 presentation?.RequestRefresh();
             });

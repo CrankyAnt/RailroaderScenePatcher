@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace RailroaderScenePatcher.Core {
     // Storage that can secure the exact bytes of the edited mod's scene patch file before scene patch editing replaces it.
@@ -18,6 +19,9 @@ namespace RailroaderScenePatcher.Core {
     public sealed partial class PatchEditingSession {
         const string ProtectedSuffix = ". The scene patch file is protected from overwrite. Correct it outside scene patch editing and read it again, or start fresh behind a backup of the original.";
         const string MetadataSuffix = ". Scene patch editing and Save of the scene patch file are unavailable. Correct Info.json outside scene patch editing and read it again.";
+        const string InvalidUtf8Message = "The scene patch file is not valid UTF-8 text.";
+        static ScenePatchFileDiagnostic InvalidUtf8Diagnostic(DecoderFallbackException error) =>
+            ScenePatchFileDiagnostic.Create(null, "", InvalidUtf8Message, null, technicalDetail: error.Message);
         // Whether the session is blocked by its scene patch file itself, rather than by the mod's metadata; only then can a
         // fresh start replace what blocks it.
         bool scenePatchFileProblem;
@@ -37,13 +41,13 @@ namespace RailroaderScenePatcher.Core {
         // Why a read scene patch file cannot be edited in this session, or null; sets the diagnostics of that read.
         string Refusal(ScenePatchFile loaded, string text) {
             ScenePatchFileDiagnostics = loaded.Diagnostics;
-            if (!loaded.CanWrite) return loaded.Error;
+            if (!loaded.CanWrite) return loaded.Diagnostics[0].Message;
             if (loaded.EditError != null) return loaded.EditError;
             var map = loaded.Root["sourceMap"]["mapId"];
             var message = SceneTargetMapCheck.Problem(scene, (string)map);
             if (message == null) return null;
             var expected = message == SceneTargetMapCheck.Mismatch ? "The ID of the edited map or one of its map layers, excluding any map patch. Valid IDs: " + String.Join(", ", SceneTargetMapCheck.Valid(scene))
-                : "The bottom map layer's ID: " + SceneTargetMapFor(scene.MapIds);
+                : null;
             ScenePatchFileDiagnostics = loaded.Diagnostics.Concat(new[] { ScenePatchFileDiagnostic.Create(text, "sourceMap.mapId", message, expected, map) }).ToArray();
             return message;
         }
@@ -52,7 +56,7 @@ namespace RailroaderScenePatcher.Core {
         void CheckRecoverable(bool nativeDirty) {
             if (Blocked == null || scenePatchFile != null) throw new InvalidOperationException("The scene patch file is not protected; recovery is only for a protected scene patch file");
             if (nativeDirty || identity.Current != savedIdentity || unrecovered != null || uncertain)
-                throw new InvalidOperationException("Save the native map work and reopen the native map editor before recovery, so no history is replaced");
+                throw new InvalidOperationException("Save your map edits and reopen the Map Editor before trying to recover the scene patch file.");
         }
         // Reads the edited mod's scene patch file again after the modder corrected it outside scene patch editing, and makes
         // it the session's scene patch file when it reads as a scene patch file of this session. The file is not written. The scene patch file's
@@ -65,11 +69,14 @@ namespace RailroaderScenePatcher.Core {
                 CheckRecoverable(nativeDirty);
                 string text;
                 try { text = storage.ReadScenePatchFile(); }
-                catch (ArgumentException e) { throw new InvalidOperationException("The scene patch file is not UTF-8 text. " + ScenePatchFile.Sentence(e.Message) + ". The scene patch file stays protected"); }
-                if (text == null) throw new InvalidOperationException("The scene patch file no longer exists; restore the file and read it again, or reopen the native map editor to start a new one");
+                catch (DecoderFallbackException e) {
+                    ScenePatchFileDiagnostics = new[] { InvalidUtf8Diagnostic(e) };
+                    throw new InvalidOperationException(InvalidUtf8Message + " The scene patch file stays protected.");
+                }
+                if (text == null) throw new InvalidOperationException("The scene patch file no longer exists. Restore the file and read it again, or reopen the Map Editor to start a new one.");
                 var loaded = ScenePatchFile.Load(text);
                 var refusal = Refusal(loaded, text);
-                if (refusal != null) { scenePatchFileProblem = true; throw new InvalidOperationException(refusal + ". The scene patch file stays protected"); }
+                if (refusal != null) { scenePatchFileProblem = true; throw new InvalidOperationException(ScenePatchFile.Sentence(refusal) + ". The scene patch file stays protected."); }
                 string metadata;
                 try { metadata = storage.ReadModInfo(); }
                 catch (Exception e) { scenePatchFileProblem = false; throw new InvalidOperationException("The edited mod's Info.json cannot be read. " + ScenePatchFile.Sentence(e.Message) + ". Scene patch editing stays unavailable"); }
@@ -89,7 +96,7 @@ namespace RailroaderScenePatcher.Core {
                 CheckRecoverable(nativeDirty);
                 if (!scenePatchFileProblem) throw new InvalidOperationException("The scene patch file is not what blocks scene patch editing; correct Info.json and read it again");
                 if (!(storage is IRecoveryStorage recovery)) throw new InvalidOperationException("This storage cannot secure a backup of the original scene patch file");
-                if (!ScenePatchFileExists()) throw new InvalidOperationException("The scene patch file no longer exists; reopen the native map editor to start a new one");
+                if (!ScenePatchFileExists()) throw new InvalidOperationException("The scene patch file no longer exists. Reopen the Map Editor to start a new one.");
                 var backup = recovery.BackupScenePatchFile();
                 if (String.IsNullOrWhiteSpace(backup) || !recovery.MatchesPatchBackup(backup)) throw new InvalidOperationException("The backup of the original scene patch file could not be verified; the original stays protected");
                 scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); ResetStartState();
@@ -114,7 +121,7 @@ namespace RailroaderScenePatcher.Core {
                 return;
             }
             if (!((IRecoveryStorage)storage).MatchesPatchBackup(replacementBackup))
-                throw new InvalidOperationException("the original scene patch file or its backup changed after fresh start. Both are kept; reopen the native map editor to read the scene patch file again");
+                throw new InvalidOperationException("the original scene patch file or its backup changed after fresh start. Both are kept. Reopen the Map Editor to read the scene patch file again.");
         }
     }
 }

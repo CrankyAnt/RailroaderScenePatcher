@@ -156,7 +156,7 @@ The editing session never retries a failed edit automatically. Every correction 
 
 ## Leave the native map editor
 
-If work is outstanding, the exit confirmation names it, for example `Unsaved work: native map data, scene patch file.` Click **Cancel** to return to the native map editor or **Exit** to discard unsaved work.
+If work is outstanding, the exit confirmation names it, for example `Unsaved work: map data, scene patch file.` Click **Cancel** to return to the native map editor or **Exit** to discard unsaved work.
 
 For the fields written by Save, see [scene patch file v1](scene-patch-file-v1.md).
 

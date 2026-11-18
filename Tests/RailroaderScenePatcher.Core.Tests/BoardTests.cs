@@ -222,7 +222,7 @@ static class BoardTests {
     static void PreflightRefusalLeavesBoardUnchanged() {
         foreach (var (name, change, reason) in new (string, Action<FakeBoard>, string)[] {
             ("track dependency", b => b.Unexpected = "Track.TrackMarker", "Track.TrackMarker"),
-            ("height-flattening mask", b => b.Flattens = true, "flattens terrain height"),
+            ("height-flattening mask", b => b.Flattens = true, "changes the terrain height"),
             ("disabled culler", b => b.CullerEnabled = false, "renderer culler"),
             ("two masks", b => b.Masks = 2, "exactly one"),
             ("inactive parent", b => b.ParentsActive = false, "parents"),

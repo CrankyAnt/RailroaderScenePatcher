@@ -135,6 +135,10 @@ static class FileVersionTests {
         files.Data[storage.PatchPath] = new byte[] { 0xff };
         feedback.CheckFileVersion(session, "Scene patch file");
         if (session.VersionState != FileVersionState.Repair || feedback.Messages.Count != 0) throw new Exception("Polling after Keep and Save detects invalid UTF-8 and replaces the old result");
+        var encoding = session.ScenePatchFileDiagnostics.Single();
+        if (session.VersionMessage != "File needs repair: The scene patch file is not valid UTF-8 text." || encoding.StartLine != 0 || encoding.Fragment.Length != 0
+            || String.IsNullOrEmpty(encoding.TechnicalDetail) || session.VersionMessage.Contains(encoding.TechnicalDetail))
+            throw new Exception("A repair explains the encoding problem and keeps the decoder message in the details: " + session.VersionMessage);
         if (!session.KeepEditorVersion().Applied || session.LastBackup == null) throw new Exception("Fixture backup failed");
         feedback.ObserveFileVersion(session, "Scene patch file");
         feedback.Report("Scene patch file", "Backup retained.");

@@ -25,8 +25,8 @@ namespace RailroaderScenePatcher {
         internal static string Refusal(MarkerShape shape) {
             if (shape.Markers != 1) return shape.Markers == 0 ? "The object holds no track marker" : "The object holds several track markers";
             if (shape.MissingScript) return "Missing script on the marker object";
-            if (shape.Milepost) return "This operation is for Generic track markers. Edit mileposts through the milepost capability";
-            if (shape.PadBuilder) return "Crossing pad markers use the crossing-pad capability; this Generic-marker operation does not apply";
+            if (shape.Milepost) return "Use the milepost's own settings to edit it";
+            if (shape.PadBuilder) return "Edit this marker through its crossing pad";
             if (shape.Type != "Generic") return "Only Generic track markers are supported; this marker is " + shape.Type;
             return null;
         }

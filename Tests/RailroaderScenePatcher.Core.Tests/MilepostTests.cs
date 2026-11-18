@@ -195,7 +195,7 @@ static class MilepostTests {
         (world, t46, t47, scene) = Setup();
         world.Buckets["Stky0cg9c"]["Mdow"] = ("a", 1, t47);
         result = new PatchEngine(scene).Apply(Doc(Item("foreign", Bind(Detach))));
-        Assert(!result.Outcomes["foreign"].Applied && result.Outcomes["foreign"].Error.Contains("registration") && world.Mutations == 0, "An incoherent registration refuses before mutation: " + result.Outcomes["foreign"].Error);
+        Assert(!result.Outcomes["foreign"].Applied && result.Outcomes["foreign"].Error.Contains("track information for this marker is out of sync") && world.Mutations == 0, "An incoherent registration refuses before mutation: " + result.Outcomes["foreign"].Error);
     }
     static void PostMutationFailureRestoresOrGuardsRetry() {
         var injections = new Action<FakeMilepostWorld>[] { w => w.ThrowAfterLocation = true, w => w.SkipRegister = true, w => w.ChangeMileageOnLocation = true };

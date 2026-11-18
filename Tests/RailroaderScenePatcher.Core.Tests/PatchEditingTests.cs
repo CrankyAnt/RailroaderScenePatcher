@@ -227,7 +227,7 @@ static class PatchEditingTests {
             var w = new World(Doc(Mod("move-p", "p", Fixed(112))), info: c.Info);
             w.MapEditor.NativeEdit(1); w.Session.Edit(P, PlacementAt(120), null);
             var refusal = w.MapEditor.ClickSave();
-            Assert(refusal != null && refusal.Contains(c.Expect) && refusal.StartsWith("Dependency metadata was not written: ", StringComparison.Ordinal), "The dependency check refuses Save: " + refusal);
+            Assert(refusal != null && refusal.Contains(c.Expect) && refusal.StartsWith("The patcher dependency was not written: ", StringComparison.Ordinal), "The dependency check refuses Save: " + refusal);
             Assert(w.MapEditor.TerrainWrites == 0 && w.MapEditor.NativeWrites == 0 && w.MapEditor.Alerts == 0 && w.Store.InfoWrites == 0 && w.Store.PatchWrites == 0 && w.Store.Info == c.Info && w.MapEditor.IsDirty,
                 "The refusal comes before terrain, map, metadata or scene patch file are written: " + c.Expect);
         }
@@ -333,8 +333,8 @@ static class PatchEditingTests {
         var accepted = InPatch(bottom);
         Assert(accepted.Session.Blocked == null && accepted.Box.X == 12, "A scene patch file naming the bottom map layer is accepted in the map patch: " + accepted.Session.Blocked);
         Assert(accepted.Session.Edit(P, PlacementAt(130), null).Applied && accepted.MapEditor.Save() == null && (string)accepted.Saved["sourceMap"]["mapId"] == "rr/bushnell-whittier", "Editing and Save keep the bottom map layer");
-        var hint = refused.Session.ScenePatchFileDiagnostics.Single(d => d.Path == "sourceMap.mapId").Expected;
-        Assert(hint.Contains("rr/bushnell-whittier") && !hint.Contains("author/station-patch"), "The expected value leaves the map patch out: " + hint);
+        var diagnosis = refused.Session.ScenePatchFileDiagnostics.Single(d => d.Path == "sourceMap.mapId");
+        Assert(diagnosis.Expected == null && diagnosis.Message.EndsWith("Use the bottom map layer, rr/bushnell-whittier.", StringComparison.Ordinal), "The repair gives the bottom map layer once: " + diagnosis.Message);
         var other = InPatch(Doc(Mod("move-p", "p", Fixed(112))).Replace("\"mapId\":\"map\"", "\"mapId\":\"other/map\""));
         var otherHint = other.Session.ScenePatchFileDiagnostics.Single(d => d.Path == "sourceMap.mapId").Expected;
         Assert(other.Session.Blocked != null && other.Session.Blocked.StartsWith(SceneTargetMapCheck.Mismatch, StringComparison.Ordinal) && otherHint.Contains("rr/bushnell-whittier") && !otherHint.Contains("author/station-patch"),
@@ -480,6 +480,7 @@ static class PatchEditingTests {
         var w = new World();
         w.MapEditor.NativeEdit(1); w.Session.Edit(P, PlacementAt(112), null);
         Assert(w.Session.Outstanding(w.MapEditor.NativeDirty).SequenceEqual(new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata }), "This mod's modification needs native data, scene patch file and dependency metadata");
+        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: map data, scene patch file, patcher dependency.", "The exit warning uses lowercase labels for all three writes.");
         Assert(w.MapEditor.Save() == null && w.MapEditor.NativeWrites == 1 && w.Store.PatchWrites == 1 && w.Store.InfoWrites == 1, "One Save writes all three participants");
         Assert(Required(w).SequenceEqual(new[] { "rr/game >=0.6.2", "crankyant/scene-patcher >=0.1.0" }) && (string)JObject.Parse(w.Store.Info)["version"] == "1.0.0", "The dependency is added without disturbing other metadata");
         Assert(w.Session.LastSave.Outstanding.Count == 0 && w.Session.LastSave.Completed.Count == 3 && !w.MapEditor.IsDirty && w.Box.X == 12, "A complete Save reports clean and leaves the world as edited");
@@ -492,13 +493,13 @@ static class PatchEditingTests {
         var w = new World();
         w.Session.Edit(P, PlacementAt(112), null);
         w.Store.FailInfo = true; var message = w.MapEditor.Save();
-        Assert(message.Contains("metadata write injected") && message.Contains("completed writes: none") && message.EndsWith(Tail + "native map data, scene patch file, dependency metadata. Edits remain in memory. Correct the cause and Save again."), "A metadata failure names every outstanding participant: " + message);
+        Assert(message.Contains("metadata write injected") && message.Contains("completed writes: none") && message.EndsWith(Tail + "map data, scene patch file, patcher dependency. Edits remain in memory. Correct the cause and Save again."), "A metadata failure names every outstanding participant: " + message);
         Assert(w.MapEditor.IsDirty && w.Box.X == 12 && w.ScenePatchFile["modifications"].Count() == 1 && w.Store.Patch == null && w.MapEditor.NativeWrites == 0, "The failed Save keeps the edit in memory and writes nothing further");
         w.Store.FailInfo = false; w.Store.FailPatch = true; message = w.MapEditor.Save();
-        Assert(message.Contains("patch write injected") && message.Contains("completed writes: dependency metadata" + Tail + "native map data, scene patch file."), "A patch failure identifies the completed metadata write: " + message);
+        Assert(message.Contains("patch write injected") && message.Contains("completed writes: patcher dependency" + Tail + "map data, scene patch file."), "A patch failure identifies the completed metadata write: " + message);
         Assert(w.MapEditor.IsDirty && w.Session.LastSave.Completed.SequenceEqual(new[] { PatchEditingSession.Metadata }) && w.Store.InfoWrites == 1, "Completed writes are not reversed and the native map editor stays dirty");
         w.Store.FailPatch = false; w.MapEditor.FailNative = true; message = w.MapEditor.Save();
-        Assert(message.Contains("native write injected") && message.Contains("completed writes: scene patch file" + Tail + "native map data."), "A native failure after the patch write stays identified: " + message);
+        Assert(message.Contains("native write injected") && message.Contains("completed writes: scene patch file" + Tail + "map data."), "A native failure after the patch write stays identified: " + message);
         Assert(w.MapEditor.IsDirty && w.Store.PatchWrites == 1 && w.Box.X == 12, "A partial Save never reports clean");
         w.MapEditor.FailNative = false;
         Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && w.Store.PatchWrites == 1 && w.Store.InfoWrites == 1 && w.MapEditor.NativeWrites == 1, "The retry writes only the outstanding participant");
@@ -705,7 +706,7 @@ static class PatchEditingTests {
         Assert(error.Session.IncompleteOperation.Contains("native action injected") && error.Session.LastSave.Outstanding.SequenceEqual(new[] { PatchEditingSession.NativeData }), "The incomplete operation stays identified through Save, in the diagnosis and the Save report");
         var count = error.MapEditor.ChangeCount; error.MapEditor.NativeEdit(5);
         Assert(error.MapEditor.NativeValue == 5 && error.MapEditor.ChangeCount == count && !error.MapEditor.NativeDirty && error.MapEditor.UndoGroups.Count == 1, "The open partial group swallows a later native edit: neither the change count nor the undo stack records it");
-        Assert(error.MapEditor.IsDirty && error.Session.ExitWarning(error.MapEditor.NativeDirty).Contains("native map data") && error.Session.ExitWarning(false).Contains("native action injected"), "The untracked edit after Save is still reported as unsaved, and exit names the unrecovered history");
+        Assert(error.MapEditor.IsDirty && error.Session.ExitWarning(error.MapEditor.NativeDirty).Contains("map data") && error.Session.ExitWarning(false).Contains("native action injected"), "The untracked edit after Save is still reported as unsaved, and exit names the unrecovered history");
         Assert(error.MapEditor.Save() == null && error.MapEditor.IsDirty, "A repeated Save cannot establish a clean state either");
         var own = new World();
         own.Session.Edit(P, PlacementAt(112), null); own.MapEditor.Save();
@@ -788,9 +789,9 @@ static class PatchEditingTests {
         var w = new World();
         Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == null, "A clean native map editor has no exit warning");
         w.Session.Edit(P, PlacementAt(112), null); w.MapEditor.FailNative = true; w.MapEditor.Save();
-        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: native map data.", "After a partial Save the exit warning names the outstanding native work");
+        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: map data.", "After a partial Save the exit warning names the outstanding native work");
         w.MapEditor.FailNative = false; w.MapEditor.Save(); w.Session.Edit(P, PlacementAt(120), null);
-        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: native map data, scene patch file.", "The exit warning names outstanding native and patcher work");
+        Assert(w.Session.ExitWarning(w.MapEditor.NativeDirty) == "Unsaved work: map data, scene patch file.", "The exit warning names outstanding native and patcher work");
     }
     static void NumericEditReachesWorldAndScenePatchFile() {
         var w = new World();

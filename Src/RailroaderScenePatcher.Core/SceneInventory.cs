@@ -214,7 +214,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<SceneObservation> Entries { get; private set; } = Array.Empty<SceneObservation>();
         public bool IsStale { get; private set; } = true;
         // How a refusal because the snapshot is stale begins.
-        public const string StaleRefusal = "Inventory is stale";
+        public const string StaleRefusal = "The object list is stale";
         // Why the snapshot is stale: the first difference a check found, or its failure. Null while it is not stale.
         public string StaleReason { get; private set; } = "not yet scanned";
         public SceneInventory(IInspectionScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
@@ -353,7 +353,7 @@ namespace RailroaderScenePatcher.Core {
             if (seen != Entries.Count) { MarkStale(seen + " observations instead of " + Entries.Count); return; }
             for (var i = 0; i < matches.Length; i++) if (matches[i] != 1) { MarkStale(Name(Entries[i]) + (matches[i] == 0 ? (near != null && near[i] != null ? " changed (" + Entries[i].Difference(near[i]) + ")" : " changed or is missing") : " is observed " + matches[i] + " times")); return; }
         }
-        static string Name(SceneObservation entry) => entry.Identity.Scene + "/" + entry.Identity.Path + " [" + entry.Identity.Component + "]";
+        static string Name(SceneObservation entry) => entry.DisplayName;
         void MarkStale(string reason) { if (!IsStale) StaleReason = reason; IsStale = true; }
         // Continues the stepped comparison, or starts one: at least one unit of the scan, then further units while more()
         // holds. A pass marks the snapshot stale on the difference CheckFreshness would find, or on a failure. It replaces

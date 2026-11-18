@@ -14,7 +14,7 @@ You cannot apply a numeric placement, activity or binding draft that matches the
 
 ## Go back or cancel
 
-From **Review**, select **Back** to return to **Values** and keep your draft. Select **Target** to discard it and release the target. **Back** from **Values** also discards the draft and releases the target.
+From **Review**, click **Back** to return to **Values** and keep your draft. Click **Target** to discard the draft and return to the task list. In **Values**, **Back** also discards the draft and returns to the task list.
 
 Selecting **Inspector** cancels an unfinished task without applying the draft and restores the previous inspector tab. Closing the window also discards the task.
 
@@ -26,9 +26,9 @@ With the pointer over the window, Escape closes an open choice list first. Furth
 
 If the target is stale or the edit is refused or fails, the task stays in **Review**. Read the result in the footer.
 
-- For a stale target, select **Target**, then **Refresh**, inspect the object and start again.
-- For a refused operation, select **Back** to correct the values or **Target** to restart.
-- After incomplete cleanup, return to **Inspector** and use **Recheck** before retrying. **Refresh** applies no changes and does not verify cleanup.
+- For a stale target, click **Target**, then click **Refresh**, inspect the object and start again.
+- For a refused operation, click **Back** to correct the values or click **Target** to restart.
+- If cleanup is incomplete, the footer tells you to return to **Inspector** and click **Recheck** before trying again. **Refresh** applies no changes and does not verify cleanup.
 
 Recovery options for the scene patch file are in Session details.
 

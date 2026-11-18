@@ -163,7 +163,7 @@ static class FailureRecoveryTests {
         var unread = RemainingState.Describe(before, () => throw new InvalidOperationException("injected read"));
         Assert(unread.Count == 1 && unread[0].Contains("could not be read") && unread[0].Contains("uncertain"), "A state that cannot be read is uncertain");
         var same = RemainingState.Describe(before, () => new ObjectState(At(4), true), "mask registration");
-        Assert(same.Count == 1 && same[0].Contains("dependent state") && same[0].Contains("mask registration") && same[0].Contains("uncertain"), "Agreeing settings with an unverified capability check stay uncertain");
+        Assert(same.Count == 1 && same[0].Contains("could not verify the related changes") && same[0].Contains("mask registration") && same[0].StartsWith("The settings match their values before the attempt.", StringComparison.Ordinal), "Agreeing settings with an unverified capability check stay uncertain");
         Assert(RemainingState.Describe(null, () => before)[0].Contains("uncertain"), "Without the prior state nothing can be compared");
         var disabled = RemainingState.Describe(before, () => new ObjectState(At(4), false));
         Assert(disabled.Single() == "Enabled: now No, before Yes", "A changed activity is named: " + disabled.Single());
@@ -173,7 +173,7 @@ static class FailureRecoveryTests {
         Assert(RecoveryGuidance.For(w.Session.Edit(Q, At(40), null), "Placement", "Placement", null) == null, "An applied outcome needs no guidance");
         w.Scene.FailNextApplies = 1;
         var restored = RecoveryGuidance.For(w.Session.Edit(P, At(70), null), "Placement", "Placement", IndependentBoards.Structure);
-        Assert(restored.Kind == FailureKind.Restored && restored.Guide == "writing-fixed-placement.md" && restored.Correction.Contains("back as it was"), "A restored placement failure links the placement guide");
+        Assert(restored.Kind == FailureKind.Restored && restored.Guide == "writing-fixed-placement.md" && restored.Line("Placement").Contains("was undone") && restored.Correction.Contains("Correct the cause and try again."), "A restored placement failure links the placement guide");
         var pin = w.Pin(P); w.P.X = 5;
         var stale = RecoveryGuidance.For(w.Session.Edit(P, At(71), null, pin), "Modification", "Removal", BridgeScene.Structure);
         w.Scene.FailNextApplies = 1; w.Scene.RefuseState = s => s.Placement?.Position[0] != 80;
@@ -209,7 +209,7 @@ static class FailureRecoveryTests {
         bool Run(Func<InspectedTarget, Outcome> change) { w.Inventory.Refresh(); return feedback.Run("Placement", "Placement", null, w.Inventory, w.Inventory.Entries.Single(e => e.Identity.Path == "p"), change); }
         Assert(!Run(inspection => w.Session.Edit(P, null, null, inspection)) && feedback.Result.StartsWith("Placement refused. Nothing to change. Nothing changed.", StringComparison.Ordinal) && feedback.Recovery.Kind == FailureKind.Refused, "A refusal says nothing changed: " + feedback.Result);
         w.Scene.FailNextApplies = 1;
-        Assert(!Run(inspection => w.Session.Edit(P, At(70), null, inspection)) && feedback.Result.StartsWith("Placement failed and was undone. ", StringComparison.Ordinal) && feedback.Result.Contains("back as it was"), "A restored failure says it was undone: " + feedback.Result);
+        Assert(!Run(inspection => w.Session.Edit(P, At(70), null, inspection)) && feedback.Result.StartsWith("Placement failed and was undone. ", StringComparison.Ordinal) && feedback.Result.Contains("The scene patch file is unchanged.") && !feedback.Result.Contains("back as it was"), "A restored failure says it was undone once: " + feedback.Result);
         w.Scene.FailNextApplies = 1; w.Scene.RefuseState = s => s.Placement?.Position[0] != 80;
         Assert(!Run(inspection => w.Session.Edit(P, At(80), null, inspection)) && feedback.Result.StartsWith("Placement failed; cleanup is incomplete. ", StringComparison.Ordinal) && feedback.Result.Contains("What remains: Position: now 80") && feedback.Result.Contains("Recheck"), "An incomplete cleanup names what remains and Recheck: " + feedback.Result);
         w.Scene.RefuseState = null;
@@ -235,9 +235,12 @@ static class FailureRecoveryTests {
         var waiting = session.Edit(P, At(71), null);
         var guidance = RecoveryGuidance.For(waiting, "Placement", "Placement", IndependentBoards.Structure);
         Assert(waiting.Failure == FailureKind.AwaitingOutput && waiting.Remaining.Count == 0 && p.X == 4, "An edit while the restored output is pending is refused as waiting, not blocked: " + waiting.Failure + " " + waiting.Error);
-        Assert(guidance.Heading == "was undone; waiting for terrain" && guidance.Correction.Contains("Recheck is not needed") && !guidance.Line("Placement").Contains("incomplete cleanup"), "The waiting refusal reads as pending terrain: " + guidance.Line("Placement"));
+        Assert(guidance.Heading == "is waiting for terrain" && guidance.Correction.Contains("click Retry on the Changes tab")
+            && guidance.Line("Placement").Contains("The game is still regenerating terrain after an earlier edit.")
+            && !guidance.Line("Placement").Contains("was undone"), "The second edit reports the pending terrain without claiming it was undone: " + guidance.Line("Placement"));
         Assert(!session.CleanupUnverified(P), "Pending output is not an unverified cleanup");
-        Assert(session.GuardOutcome(P)?.Failure == FailureKind.AwaitingOutput, "The guard the panel checks first reports the pending output, not a cleanup");
+        var guard = RecoveryGuidance.For(session.GuardOutcome(P), "Placement", "Placement", IndependentBoards.Structure);
+        Assert(guard?.Kind == FailureKind.AwaitingOutput && guard.Heading == "is waiting for terrain", "The guard the panel checks first also reports that the edit is waiting.");
         scene.Pending = false;
         Assert(session.Edit(P, At(72), null).Applied && p.X == 72, "Once the output completes the object accepts edits");
         // The engine reports the same at world load.
@@ -278,7 +281,7 @@ static class FailureRecoveryTests {
         var feedback = new RailroaderScenePatcher.EditFeedback();
         scene.FailNextApplies = 1; scene.Pending = true;
         feedback.Run("Placement", "Placement", null, inventory, inventory.Entries.Single(), inspection => session.Edit(P, At(70), null, inspection));
-        Assert(feedback.Messages[0].Recovery?.Kind == FailureKind.AwaitingOutput && feedback.Result.Contains("failed") && RailroaderScenePatcher.CommandBand.RecoveryWarning(feedback.Messages[0].Recovery.Kind), "The message reads 'failed' yet takes the warning colour by its kind: " + feedback.Result);
+        Assert(feedback.Messages[0].Recovery?.Kind == FailureKind.AwaitingOutput && feedback.Result.Contains("was undone; waiting for terrain") && RailroaderScenePatcher.CommandBand.RecoveryWarning(feedback.Messages[0].Recovery.Kind), "The message reports the restoration and takes the warning colour by its kind: " + feedback.Result);
     }
     static string RepositoryRoot() {
         var directory = new System.IO.DirectoryInfo(AppContext.BaseDirectory);

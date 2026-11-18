@@ -229,9 +229,9 @@ namespace RailroaderScenePatcher.Core {
                 diagnostics.Add(ScenePatchFileDiagnostic.Create(original, place?.Path ?? "", EditError, "Numbers written as plain JSON literals; correct values such as NaN or Infinity outside scene patch editing", place ?? (JToken)Root));
             }
         }
-        static ScenePatchFile Protected(string json, string message, string path, string expected, JToken token = null, int line = 0) {
-            var rejected = new ScenePatchFile(null, message, json);
-            rejected.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, path, message, expected, token, line));
+        static ScenePatchFile Protected(string json, string message, string path, string expected, JToken token = null, int line = 0, string technicalDetail = null) {
+            var rejected = new ScenePatchFile(null, technicalDetail == null ? message : message + ". " + Sentence(technicalDetail), json);
+            rejected.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, path, message, expected, token, line, technicalDetail));
             return rejected;
         }
         const string VersionExpected = "\"formatVersion\": 1 as the first thing the scene patch file declares; a newer scene patch file needs the patcher version that wrote it";
@@ -246,7 +246,7 @@ namespace RailroaderScenePatcher.Core {
                 if (root == null)
                     return Protected(json, "Invalid scene patch file envelope. The scene patch file must be a JSON object", "", "A JSON object with formatVersion, sourceMap and modifications", source.Root);
                 if (!(root["sourceMap"] is JObject sceneTargetMap) || sceneTargetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)sceneTargetMap["mapId"]))
-                    return Protected(json, "Invalid scene patch file map context or modifications. The sourceMap needs a mapId", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the scene target map>\" } with the ID of the edited map or one of its map layers. Use a map definition that is not a map patch, normally the bottom map layer", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
+                    return Protected(json, "The scene patch file needs a map ID", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the scene target map>\" } with the ID of the edited map or one of its map layers. Use a map definition that is not a map patch, normally the bottom map layer", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
                 if (!(root["modifications"] is JObject modifications))
                     return Protected(json, "Invalid scene patch file map context or modifications. The modifications must be an object keyed by modification ID", "modifications", "\"modifications\": { \"<modification ID>\": { ... } }", root["modifications"]);
                 foreach (var property in modifications.Properties())
@@ -264,7 +264,7 @@ namespace RailroaderScenePatcher.Core {
                 return loaded;
             } catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) {
                 var reader = e as JsonReaderException;
-                return Protected(json, "Unreadable scene patch file. " + Sentence(e.Message), reader?.Path ?? "", "Valid JSON with each property name once per object", null, reader?.LineNumber ?? 0);
+                return Protected(json, "Unreadable scene patch file", reader?.Path ?? "", null, line: reader?.LineNumber ?? 0, technicalDetail: e.Message);
             }
         }
         // Why the text's declared format version keeps any of its content from being read, or null. Before this answer

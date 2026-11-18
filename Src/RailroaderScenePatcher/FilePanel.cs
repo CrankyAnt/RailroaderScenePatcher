@@ -46,13 +46,9 @@ namespace RailroaderScenePatcher {
         }
         void DrawRepair(UIPanelBuilder builder, PatchEditingSession session) {
             PlainLabel(builder, CommandBand.Sentence(session.VersionMessage));
-            foreach (var problem in session.ScenePatchFileDiagnostics) {
-                FieldLabel(builder, problem.Path.Length == 0 ? "Scene patch file" : problem.Path);
-                builder.AddLabel(PathBreaks(Literal(problem.Message)));
-                Field(builder, problem.StartLine == 0 ? "Lines" : problem.StartLine == problem.EndLine ? "Line" : "Lines",
-                    problem.StartLine == 0 ? "None. The field is missing." : problem.StartLine == problem.EndLine ? problem.StartLine.ToString() : problem.StartLine + " to " + problem.EndLine);
-                if (!String.IsNullOrEmpty(problem.Fragment)) Field(builder, "Text there", problem.Fragment);
-            }
+            foreach (var problem in session.ScenePatchFileDiagnostics.Where(problem => problem.StartLine > 0))
+                Field(builder, problem.StartLine == problem.EndLine ? "Line" : "Lines",
+                    problem.StartLine == problem.EndLine ? problem.StartLine.ToString() : problem.StartLine + " to " + problem.EndLine);
             FieldMarkup(builder, FilePanelState.KeepEditor, PathBreaks(Literal(FilePanelState.RepairKeepEffect(session))));
         }
         void DrawImport(UIPanelBuilder builder, PatchEditingSession session) {
@@ -80,11 +76,11 @@ namespace RailroaderScenePatcher {
         Act[] FilePanelActs(FilePanelState.Kind kind, PatchEditingSession session) {
             switch (kind) {
                 case FilePanelState.Kind.VersionChoice: return new[] {
-                    Slot(FilePanelState.UseFile, FilePanelState.UseFileEffect, null, () => ChooseFileVersion(true)),
-                    Slot(FilePanelState.KeepEditor, FilePanelState.KeepEditorEffect, null, () => ChooseFileVersion(false)),
-                    Slot(FilePanelState.Import, FilePanelState.ImportEffect, null, OpenImport) };
+                    Slot(FilePanelState.UseFile, "Use the changes from the file on disk.", null, () => ChooseFileVersion(true)),
+                    Slot(FilePanelState.KeepEditor, "Continue editing with your current version.", null, () => ChooseFileVersion(false)),
+                    Slot(FilePanelState.Import, "Review which changes to bring into the editor.", null, OpenImport) };
                 case FilePanelState.Kind.Repair: return new[] {
-                    Slot(FilePanelState.KeepEditor, FilePanelState.RepairKeepEffect(session), !session.VersionFileMissing && session.BackupPreview == null ? "The backup path is unavailable." : null, () => ChooseFileVersion(false)),
+                    Slot(FilePanelState.KeepEditor, "Continue editing with your current version.", !session.VersionFileMissing && session.BackupPreview == null ? "The backup path is unavailable." : null, () => ChooseFileVersion(false)),
                     Slot(FilePanelState.Details, "Open Details to read the full diagnosis for this session.", null, () => presentation.ToggleDetails()),
                     Slot(FilePanelState.Copy, "Copy the full diagnosis.", null, () => { GUIUtility.systemCopyBuffer = FullDiagnosis(session); feedback.Report(RecoveryPlace, "Diagnosis copied to the clipboard."); }) };
                 case FilePanelState.Kind.Import: return new[] {

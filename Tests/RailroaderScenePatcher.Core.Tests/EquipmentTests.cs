@@ -344,7 +344,7 @@ static class EquipmentTests {
         var f = new Fixture();
         var scene = new CrossingCoverageScene(f.Coverage, Capability.Unchecked);
         var result = new PatchEngine(scene).Apply(Doc(Equip("signals", Addition("west"))));
-        Assert(!result.Outcomes["signals"].Applied && result.Outcomes["signals"].Error.Contains("crossing-equipment capability is unavailable") && f.World.Mutations == 0, "Without the equipment capability the relationship is refused: " + result.Outcomes["signals"].Error);
+        Assert(!result.Outcomes["signals"].Applied && result.Outcomes["signals"].Error.Contains("Crossing equipment editing is unavailable") && f.World.Mutations == 0, "Without the equipment capability the relationship is refused: " + result.Outcomes["signals"].Error);
         var board = new Scene(); board.Objects["p"] = new List<object> { new Box() };
         var other = new PatchEngine(board).Apply(Doc("\"x\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"relationships\":{\"crossingEquipment\":{" + Addition("west") + "}},\"dependsOn\":[]}"));
         Assert(!other.Outcomes["x"].Applied && other.Outcomes["x"].Error.Contains("no supported crossing-equipment relationship"), "An object without the relationship refuses it");

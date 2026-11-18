@@ -155,6 +155,8 @@ namespace RailroaderScenePatcher.Core {
     // shared native history, and the truth about which required writes are still outstanding.
     public sealed partial class PatchEditingSession {
         public const string NativeData = "native map data", PatchData = "scene patch file", Metadata = "dependency metadata";
+
+        public static string DisplayItem(string item) => item == NativeData ? "map data" : item == Metadata ? "patcher dependency" : item;
         readonly PatchEngine engine;
         readonly IScene scene;
         readonly INativeHistory history;
@@ -226,18 +228,22 @@ namespace RailroaderScenePatcher.Core {
             identity = new HistoryIdentity(history); savedIdentity = identity.Current;
             if (history is INativeHistoryActions) { nativeIdentity = new HistoryIdentity(new NativeOnlyHistory(history, action => patchActions.TryGetValue(action, out _))); savedNativeIdentity = nativeIdentity.Current; }
             string scenePatchFileError = null, metadataError = null;
-            try { diskText = storage.ReadScenePatchFile(); } catch (Exception e) { scenePatchFileError = e.Message; }
+            try { diskText = storage.ReadScenePatchFile(); }
+            catch (System.Text.DecoderFallbackException e) {
+                scenePatchFileError = InvalidUtf8Message;
+                ScenePatchFileDiagnostics = new[] { InvalidUtf8Diagnostic(e) };
+            } catch (Exception e) { scenePatchFileError = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(e.Message); }
             try { info = storage.ReadModInfo(); } catch (Exception e) { metadataError = e.Message; }
             // Unreadable mod metadata blocks the session whatever the scene patch file holds; starting the scene patch file fresh would not help.
             if (metadataError != null) { Blocked = "The edited mod's Info.json cannot be read. " + ScenePatchFile.Sentence(metadataError) + MetadataSuffix; return; }
-            if (scenePatchFileError != null) Blocked = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(scenePatchFileError);
+            if (scenePatchFileError != null) Blocked = scenePatchFileError;
             else try {
                 if (diskText == null) { scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); ResetStartState(); return; }
                 var loaded = ScenePatchFile.Load(diskText);
                 Blocked = Refusal(loaded, diskText);
                 if (Blocked == null) { scenePatchFile = loaded; saved = PreservingJson.Parse(diskText).Root; ResetStartState(); }
             } catch (Exception e) { Blocked = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(e.Message); }
-            if (Blocked != null) { scenePatchFileProblem = true; Blocked += ProtectedSuffix; }
+            if (Blocked != null) { scenePatchFileProblem = true; Blocked = ScenePatchFile.Sentence(Blocked) + ProtectedSuffix; }
         }
         // Why scene patch editing and patch persistence are unavailable in this session, or null.
         public string Blocked { get; private set; }
@@ -715,7 +721,7 @@ namespace RailroaderScenePatcher.Core {
         // The loaded devices offered as sources for the crossing, eligible or with their concrete rejection reason.
         public IReadOnlyList<SourceCandidate> EquipmentSources(TargetIdentity target) {
             var resolved = engine.ResolveUnique(target);
-            if (!(scene is ICrossingEquipmentScene equipment)) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
+            if (!(scene is ICrossingEquipmentScene equipment)) throw new InvalidOperationException("Crossing equipment editing is unavailable");
             return equipment.EquipmentCandidates(resolved);
         }
         // The initialization and culling state of one of this mod's additions, or null when it is not present.
@@ -970,7 +976,7 @@ namespace RailroaderScenePatcher.Core {
             outcome.Error = e.Message;
             var attempt = e as AttemptFailure;
             outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
-            if (attempt != null) outcome.Remaining = attempt.Remaining;
+            if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; }
         }
         // Whether an earlier failure left the object's cleanup unverified, and the remaining or uncertain state it named.
         // Read from the identities the engine resolved, without searching or mutating the scene, so the panel can ask
@@ -981,7 +987,7 @@ namespace RailroaderScenePatcher.Core {
         // It is read without searching the scene, so the panel checks it before it compares the scene: the object an
         // incomplete cleanup left changed is refused for that cleanup, not as a stale inspection.
         public Outcome GuardOutcome(TargetIdentity target) {
-            var guard = engine.GuardFor(target, "Target cleanup is unverified. Recheck the object or reload before another edit");
+            var guard = engine.GuardFor(target, "Cleanup is unverified");
             if (guard == null) return null;
             var outcome = new Outcome();
             Fail(outcome, guard);
@@ -1190,7 +1196,7 @@ namespace RailroaderScenePatcher.Core {
             if (alignNativeCleanPending && error == null && nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current;
             alignNativeCleanPending = false;
             if (error == null) return;
-            unrecovered = "Native Undo or Redo stopped on an error: " + error.Message + ". The native history is unrecovered and may no longer record edits. Save still writes the current state, but the native map editor stays unsaved until it is reloaded.";
+            unrecovered = "Undo or Redo stopped on an error: " + error.Message + ". Undo history could not be recovered and may stop recording edits. Save still writes the current changes. Reload the Map Editor to clear its unsaved status.";
             IncompleteOperation = unrecovered;
         }
         // Raised after a history change outside native Undo and Redo was accounted, such as a patch-only edit, so the native
@@ -1244,7 +1250,7 @@ namespace RailroaderScenePatcher.Core {
         public string ExitWarning(bool nativeDirty) {
             var outstanding = Outstanding(nativeDirty);
             if (outstanding.Count == 0) return null;
-            return "Unsaved work: " + String.Join(", ", outstanding) + "." + (IncompleteOperation == null ? "" : " " + IncompleteOperation);
+            return "Unsaved work: " + String.Join(", ", outstanding.Select(DisplayItem)) + "." + (IncompleteOperation == null ? "" : " " + IncompleteOperation);
         }
 
         // Why Save is refused now, or null: the file is checked again first, so a pending version choice, a file that needs
@@ -1266,7 +1272,7 @@ namespace RailroaderScenePatcher.Core {
         string DependencyRefusal() {
             if (scenePatchFile.Modifications.Count == 0) return null;
             try { DependencyMetadata.Raise(storage.ReadModInfo(), modId, MinimumPatcherVersion); return null; }
-            catch (Exception e) { return "Dependency metadata was not written: " + e.Message; }
+            catch (Exception e) { return "The patcher dependency was not written: " + e.Message; }
         }
         // The Save route. BeginSave runs before the native map write and throws when a patcher write fails;
         // CompleteNativeSave follows the native write; FailSave follows any exception of the attempt.
@@ -1281,7 +1287,7 @@ namespace RailroaderScenePatcher.Core {
                     var raised = DependencyMetadata.Raise(fresh, modId, MinimumPatcherVersion);
                     if (raised != null) { storage.WriteModInfo(raised); written.Add(Metadata); }
                     info = raised ?? fresh;
-                } catch (Exception e) { throw new InvalidOperationException("Dependency metadata was not written: " + e.Message, e); }
+                } catch (Exception e) { throw new InvalidOperationException("The patcher dependency was not written: " + e.Message, e); }
             }
             if (!PatchOutstanding) return;
             try {
@@ -1299,8 +1305,8 @@ namespace RailroaderScenePatcher.Core {
         }
         public string FailSave(Exception error) {
             LastSave = new SaveReport(written, Outstanding(true), error.Message);
-            return error.Message.TrimEnd('.') + ". Scene Patcher: completed writes: " + (written.Count == 0 ? "none" : String.Join(", ", written))
-                + "; outstanding: " + String.Join(", ", LastSave.Outstanding) + ". Edits remain in memory. Correct the cause and Save again.";
+            return error.Message.TrimEnd('.') + ". Scene Patcher: completed writes: " + (written.Count == 0 ? "none" : String.Join(", ", written.Select(DisplayItem)))
+                + "; outstanding: " + String.Join(", ", LastSave.Outstanding.Select(DisplayItem)) + ". Edits remain in memory. Correct the cause and Save again.";
         }
     }
 }

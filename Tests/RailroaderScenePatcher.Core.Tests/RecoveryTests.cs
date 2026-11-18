@@ -51,6 +51,13 @@ static class RecoveryTests {
         public string[] Backups => Directory.GetFiles(Path.Combine(Root, "Data"), "scene-patches.json.backup-*");
         public void Dispose() { try { Directory.Delete(Root, true); } catch { } }
     }
+    sealed class RecoveryFiles : DiskFiles {
+        public string UnreadablePath;
+        public override byte[] Read(string path) {
+            if (path == UnreadablePath) throw new ArgumentException("The scene patch file path is invalid.");
+            return base.Read(path);
+        }
+    }
     static byte[] Utf8(string text) => new UTF8Encoding(false).GetBytes(text);
 
     public static void Run() {
@@ -150,15 +157,16 @@ static class RecoveryTests {
     static void DiagnosticsLocateTheProblem() {
         var text = "{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\n    \"mapId\": \"\"\n  },\n  \"modifications\": {}\n}\n";
         var d = ScenePatchFile.Load(text).Diagnostics.Single();
-        Assert(d.Path == "sourceMap.mapId" && d.StartLine == 4 && d.EndLine == 4 && d.Fragment == "    \"mapId\": \"\"" && d.Expected.Contains("mapId") && d.Message.Contains("sourceMap needs a mapId"),
+        Assert(d.Path == "sourceMap.mapId" && d.StartLine == 4 && d.EndLine == 4 && d.Fragment == "    \"mapId\": \"\"" && d.Expected.Contains("mapId") && d.Message == "The scene patch file needs a map ID",
             "A wrong value is located by path, line and fragment with the expected value: " + d.Path + " " + d.StartLine + " " + d.Fragment);
         Assert(d.Reference == ScenePatchFileDiagnostic.FormatReference && d.Reference.EndsWith("scene-patch-file-v1.md", StringComparison.Ordinal) && d.Corrections.EndsWith("recover-scene-patch-files.md", StringComparison.Ordinal),
             "A diagnostic links the format reference and the corrections guide");
         var missing = ScenePatchFile.Load("{\"formatVersion\":1,\"modifications\":{}}").Diagnostics.Single();
         Assert(missing.Path == "sourceMap.mapId" && missing.StartLine == 0 && missing.Fragment.Contains("no line"), "A missing field has no line: " + missing.StartLine);
         var broken = ScenePatchFile.Load("{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n").Diagnostics.Single();
-        Assert(!broken.Message.Contains("..") && !broken.Message.Contains(": "), "A parser message is one sentence without a second label or full stop: " + broken.Message);
-        Assert(broken.Message.StartsWith("Unreadable", StringComparison.Ordinal) && broken.StartLine >= 4, "Unreadable JSON is located at the line where reading stopped: " + broken.StartLine);
+        Assert(!String.IsNullOrEmpty(broken.TechnicalDetail) && !broken.Message.Contains(broken.TechnicalDetail), "Only Details includes the technical parser message.");
+        Assert(broken.Message == "Unreadable scene patch file" && broken.StartLine >= 4 && broken.Expected == null,
+            "Unreadable JSON reports the line where reading stopped and keeps the exact parser error in the technical detail: " + broken.StartLine);
         var block = "{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n    \"later\": {\n" + String.Join(",\n", Enumerable.Range(0, 20).Select(i => "      \"f" + i + "\": " + i)) + "\n    }\n  }\n}\n";
         var later = ScenePatchFile.Load(block);
         var unknown = later.Diagnostics.Single();
@@ -180,12 +188,18 @@ static class RecoveryTests {
     static void RereadAdoptsAnOutsideCorrection() {
         var broken = Doc(Mod("move", "p", Fixed(112)), version: "2");
         using (var folder = new Folder(Utf8(broken))) {
-            var w = new World(new ModStorage(folder.Root));
+            var files = new RecoveryFiles();
+            var w = new World(new ModStorage(folder.Root, files));
             Assert(w.Session.Blocked != null, "The newer scene patch file is protected");
             var unconfirmed = w.Session.Reread(false);
             Assert(!unconfirmed.Applied && unconfirmed.Error.Contains("Confirm") && w.Session.Blocked != null, "Reading again needs confirmation");
             var still = w.Session.Reread(true);
             Assert(!still.Applied && still.Error.Contains("Newer format version") && w.Session.Blocked != null && w.Session.ScenePatchFileDiagnostics.Single().Path == "formatVersion", "An uncorrected scene patch file stays protected with its diagnostics: " + still.Error);
+            files.UnreadablePath = folder.PatchPath;
+            var pathError = w.Session.Reread(true);
+            Assert(!pathError.Applied && pathError.Error == "The scene patch file path is invalid." && w.Session.Blocked != null
+                && w.Session.ScenePatchFileDiagnostics.Single().Path == "formatVersion", "Read again preserves protection and reports the argument error without treating it as invalid UTF-8.");
+            files.UnreadablePath = null;
             var corrected = Doc(Mod("move", "p", Fixed(112)) + "," + Mod("later", "q", "\"futureOperation\":true"), "\"futureRoot\":7,");
             File.WriteAllBytes(folder.PatchPath, Utf8(corrected));
             var reread = w.Session.Reread(true);
@@ -225,7 +239,10 @@ static class RecoveryTests {
         var original = new byte[] { 0x7b, 0x22, 0x66, 0xff, 0xfe, 0x22, 0x0a };
         using (var folder = new Folder(original)) {
             var w = new World(new ModStorage(folder.Root));
-            Assert(w.Session.Blocked != null && w.Session.Blocked.StartsWith("The edited mod's scene patch file cannot be read", StringComparison.Ordinal) && w.Session.CanStartFresh, "A scene patch file that is not UTF-8 is protected: " + w.Session.Blocked);
+            var encoding = w.Session.ScenePatchFileDiagnostics.Single();
+            Assert(w.Session.Blocked != null && w.Session.Blocked.StartsWith("The scene patch file is not valid UTF-8 text.", StringComparison.Ordinal)
+                && !String.IsNullOrEmpty(encoding.TechnicalDetail) && !w.Session.Blocked.Contains(encoding.TechnicalDetail) && w.Session.CanStartFresh,
+                "A file with invalid UTF-8 is protected and its decoder error is kept in the diagnosis: " + w.Session.Blocked);
             var unconfirmed = w.Session.FreshStart(false);
             Assert(!unconfirmed.Applied && folder.Backups.Length == 0 && w.Session.Blocked != null, "Fresh start needs confirmation and secures nothing without it");
             var fresh = w.Session.FreshStart(true);

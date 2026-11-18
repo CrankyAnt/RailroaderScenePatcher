@@ -107,7 +107,7 @@ namespace RailroaderScenePatcher {
         internal Action<string> Log = _ => { };
         internal Action VersionChanged = () => { };
         internal Action<string> SaveRefused = _ => { };
-        internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list); }
+        internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list.Select(PatchEditingSession.DisplayItem)); }
         readonly EventInfo changed;
         readonly Action handler;
         readonly NativeDirtyTracker nativeDirty;
@@ -208,7 +208,7 @@ namespace RailroaderScenePatcher {
             if (current == null) return;
             current.Session.CompleteNativeSave();
             current.NativeSaved();
-            current.Log("Save completed: " + String.Join(", ", current.Session.LastSave.Completed) + "; outstanding: " + current.Outstanding());
+            current.Log("Save completed: " + String.Join(", ", current.Session.LastSave.Completed.Select(PatchEditingSession.DisplayItem)) + "; outstanding: " + current.Outstanding());
         }
         static Exception SaveFinalizer(object __instance, Exception __exception) {
             var current = For(__instance);

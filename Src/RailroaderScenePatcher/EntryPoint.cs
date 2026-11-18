@@ -290,7 +290,7 @@ namespace RailroaderScenePatcher {
         internal void PrepareRuntime(IModContext value) {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
-            native = new NativeInventory(g => scene == null ? "Independent board capability unavailable" : scene.Refusal(g));
+            native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
             ModScenePatchFiles.Log = message => context?.Log.Info(message);
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked)); }
@@ -466,7 +466,7 @@ namespace RailroaderScenePatcher {
                 attachment.VersionChanged = VersionChanged;
                 attachment.SaveRefused = reason => {
                     feedback.Refuse(SavePlace, "Save", reason);
-                    var alert = CommandBand.SaveRefusalAlert(presentation != null && presentation.IsOpen, reason);
+                    var alert = CommandBand.SaveRefusalAlert(presentation != null && presentation.IsOpen, reason, attachment.Session.VersionState == FileVersionState.Changed && reason == attachment.Session.SaveRefusal);
                     if (alert != null) UI.Common.ModalAlertController.PresentOkay(alert.Value.Title, alert.Value.Message);
                 };
                 attachment.Session.Replayed = identity => replayed.Add(identity);
@@ -490,7 +490,7 @@ namespace RailroaderScenePatcher {
             ClearSnap(); snap = null;
             CancelGizmo();
             // A request made in this native map editor does not run in the next one.
-            CancelRequest("the native map editor was left before the request ran");
+            CancelRequest("you left the Map Editor before the request ran");
             ModScenePatchFiles.Written = null;
             if (attachment == null) return;
             if (ReferenceEquals(Hooks.Current, attachment)) Hooks.Current = null;
@@ -914,7 +914,7 @@ namespace RailroaderScenePatcher {
         internal void EndAttempt() {
             presentation?.Dispose(); presentation = null; attachedMapEditor = null; refusedMapEditor = null; presentationSnapshot = null;
             Detach(); selection?.Cancel();
-            Requests.Cancel("the native map editor was left before the request ran"); refreshFrame = 0; replayFrame = 0; refreshTarget = null;
+            Requests.Cancel("you left the Map Editor before the request ran"); refreshFrame = 0; replayFrame = 0; refreshTarget = null;
             replayed.Clear(); moved.Clear();
             inventory?.CancelFreshnessCheck();
             if (escapeHeld) { try { UI.GameInput.UnregisterEscapeHandler(UI.GameInput.EscapeHandler.Transient); } catch { } escapeHeld = false; }
@@ -1175,7 +1175,7 @@ namespace RailroaderScenePatcher {
             : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
             : !Editable ? CommandBand.EditReason(selected?.Operations)
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
-            : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the inventory." : null;
+            : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the object list." : null;
         // Why the inspected starter placement marker's modification cannot be changed now, whatever the tab, or null: what
         // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
         string StarterBlock() =>
@@ -1183,7 +1183,7 @@ namespace RailroaderScenePatcher {
             : FileLockReason != null ? FileLockReason
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
-            : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the inventory." : null;
+            : !(selected?.Handle is GameObject live) || live == null ? "The inspected object no longer exists. Refresh the object list." : null;
         void ResetSnapState() { preparedSnap = null; choosingSnap = false; choosingCoverageRole = null; preparedCoverage = null; preparedEquipment = null; }
         void ClearSnap() { ResetSnapState(); EndWorldEditAction(); }
         void BeginSnap(SelectionKind kind) {

@@ -238,7 +238,11 @@ class Program {
         var preciseUnknown = Doc("").Replace("\"modifications\"", "\"futureNumber\":0.123456789012345678901234567890123456789,\"modifications\"");
         Assert(ScenePatchFile.Load(preciseUnknown).Write().Contains("0.123456789012345678901234567890123456789"), "Unknown numeric content retains its exact meaning");
         Assert(!ScenePatchFile.Load("{broken").CanWrite && !ScenePatchFile.Load("{\"formatVersion\":2,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}").CanWrite, "Unreadable and newer scene patch files are protected");
-        Assert(ScenePatchFile.Load("{\"formatVersion\":1}").Error.StartsWith("Invalid scene patch file"), "Malformed known scene patch files remain distinguishable from unsupported format recovery");
+        const string missingMapId = "{\"formatVersion\":1}";
+        var malformedCurrentFormat = ScenePatchFile.Load(missingMapId);
+        Assert(!malformedCurrentFormat.CanWrite && ScenePatchFile.FormatProblem(missingMapId) == null
+            && malformedCurrentFormat.Diagnostics.Single().Path == "sourceMap.mapId",
+            "A current-format file with a missing map ID reports the missing value as its problem");
         AssertWriteProtected("{broken");
         AssertWriteProtected(Doc("").Replace("\"formatVersion\":1", "\"formatVersion\":2"));
         AssertWriteProtected(Doc("").Replace("\"formatVersion\":1", "\"formatVersion\":1,\"formatVersion\":1"));

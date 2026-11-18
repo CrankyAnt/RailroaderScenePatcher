@@ -22,8 +22,19 @@ namespace RailroaderScenePatcher {
             // Dot and word have one colour: green when good, amber otherwise.
             internal string Color => Good ? Green : Amber;
         }
-        internal static Lamp Inventory(bool stale) => new Lamp(stale ? "Stale" : "Current", "Current", !stale);
-        internal static Lamp Save(bool unsaved) => new Lamp(unsaved ? "Unsaved" : "Saved", "Unsaved", !unsaved);
+        internal static Lamp Inventory(bool stale, bool available = true) =>
+            new Lamp(!available ? "Paused" : stale ? "Stale" : "Current", "Current", available && !stale);
+        internal static Lamp Save(bool unsaved, bool available = true) =>
+            new Lamp(unsaved ? "Unsaved" : available ? "Saved" : "Blocked", "Unsaved", available && !unsaved);
+
+        internal static string SaveNotice(IReadOnlyList<string> outstanding, FileVersionState version, bool fileMissing) {
+            var reason = version == FileVersionState.Changed ? "The scene patch file changed outside scene patch editing. Choose a file version before saving."
+                : version != FileVersionState.Repair ? null
+                : fileMissing ? "Restore the scene patch file or click Keep editor version before saving."
+                : "The scene patch file needs repair. Resolve the issue before saving.";
+            return outstanding.Count == 0 ? reason : String.Join(", ", outstanding.Select(PatchEditingSession.DisplayItem)) + ". " +
+                (reason ?? "Click Save to write these changes.");
+        }
         // The left band's fixed widths in canvas units: the Refresh button as the game lays it out (74.15 measured), the
         // spacing between the band's items, a lamp's dot and the gap to its word, and the width each lamp reserves for
         // its longer word. They are constants, not measurements taken while the band is built: a text measured before
@@ -45,7 +56,7 @@ namespace RailroaderScenePatcher {
         internal static bool WordsFit(float band) => LeftBandWidth <= band + 0.5f;
         // The tooltip of a lamp: its title is the state word, and its text starts with that word, so a lamp without its
         // word still says it.
-        internal static string LampTooltip(Lamp lamp, string reason) => String.IsNullOrEmpty(reason) ? lamp.Word + "." : lamp.Word + ": " + reason;
+        internal static string LampTooltip(Lamp lamp, string reason) => String.IsNullOrEmpty(reason) ? lamp.Word + "." : lamp.Word + ": " + Char.ToUpperInvariant(reason[0]) + reason.Substring(1);
         // Why a command of the right band is disabled now, or null. A disabled command stays in place. Select in world
         // is disabled only while a world choice is pending, Focus and Copy ID only when nothing is inspected; a world
         // selection that could not be set up at all has nothing to start.
@@ -86,8 +97,10 @@ namespace RailroaderScenePatcher {
         // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
         // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
         // ignored click.
-        internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason) =>
-            windowOpen ? ((string Title, string Message)?)null : ("Save refused", "Nothing was saved. " + Sentence(reason));
+        internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason, bool versionChoice = false) =>
+            windowOpen ? ((string Title, string Message)?)null : ("Save refused", versionChoice
+                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene patches to choose which version to keep."
+                : "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location";
@@ -117,7 +130,7 @@ namespace RailroaderScenePatcher {
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable
-            ? "Activity follows the track group. Disable holds it inactive; Clear activity returns it to the group; an explicit enable is refused."
+            ? "Activity follows the track group. Disable holds it inactive. Clear activity returns control to the track group."
             : "Activity follows the track group.";
         // Why the activity control cannot run, or null. The patcher refuses an explicit enable of an object whose activity
         // follows its track group, so Enable is inactive with that reason beforehand; Disable stays available.
@@ -262,13 +275,13 @@ namespace RailroaderScenePatcher {
             : snap ? EscapeStep.CancelSnap
             : EscapeStep.None;
         // The supported edits of a group root of the Baked scenery group family.
-        internal const string GroupOperations = "Fixed placement and activity of the whole group; culling and colliders follow the group. Decorative: moving or disabling it changes no game function";
+        internal const string GroupOperations = "Move, rotate, enable or disable the whole group. Its parts move with it.";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
         // The supported edits of a part of a listed baked scenery group.
-        internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves. Moving or disabling it does not affect game functions";
+        internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
         internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
         // The reason an object is inspection only: its kind has no edit yet. kind names it, such as "the Milepost family".
-        internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + "the patcher has no edit for " + kind + " yet";
+        internal static string NotYetSupported(string kind) => NotYetSupportedPrefix + kind + " cannot be edited";
         // The reason an object is inspection only, given as a whole clause.
         internal static string NotYetSupportedBecause(string reason) => NotYetSupportedPrefix + reason;
         // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
@@ -285,11 +298,11 @@ namespace RailroaderScenePatcher {
                 : new[] { "Why a device is rejected", "adding-crossing-equipment.md#rejected-sources" };
         }
         internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
-        internal static string AddedEquipmentOperations(string id, string scope, bool bell = false) =>
-            (bell ? "Added bell " : "Added light or gate ") + id + " of " + scope + ". Use its crossing controller's Connections tab to edit or remove it.";
+        internal static string AddedEquipmentOperations(string name) =>
+            name + ". Open its crossing controller's Connections tab to edit or remove it.";
         // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
         // or an added light, gate or bell, which its crossing edits.
-        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) ? null : NotYetSupported("the " + family + " family");
+        internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) ? null : NotYetSupported("Objects listed under " + family);
         // The track element an object follows, as the world marks it: the anchor's node, or the segment of its
         // location. Null without a following placement.
         internal static SelectionIdentity Followed(TrackFollowing following) =>
@@ -368,9 +381,9 @@ namespace RailroaderScenePatcher {
         internal const string PadFollowsTrack = "A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections.";
         internal static string PadModeBlock(int mode) => mode == NumericMode || mode == GizmoMode || mode == SnapMode || mode == FollowMode ? PadFollowsTrack : null;
         // What a milepost's Supported edits says: placement, activity and binding as separate settings, and what stays unchanged.
-        internal const string MilepostOperations = "Edit the milepost's fixed placement and activity, or set, replace or detach its track binding. These are separate settings. Binding edits update the marker's location and track-graph registration. The model, mile value and displayed text stay unchanged";
+        internal const string MilepostOperations = "Move, rotate, enable or disable the milepost. You can also set, replace or detach its track binding. The model and displayed mile value stay the same.";
         // What a crossing pad's Supported edits says: its binding and its activity, and no placement of its own.
-        internal const string PadOperations = "Pad binding: set or replace the marker location with its graph registration and regenerate the pad geometry and culling; activity is a separate setting. The pad follows its track, so it has no placement of its own";
+        internal const string PadOperations = "The pad moves only when you change its track location. The game rebuilds it along the track. Enable or disable it separately.";
         // Whether the fields of an edit hold the object's current values: the edit would change nothing, so its
         // control is disabled, as a native field ignores a value equal to the one it shows. Numbers compare as
         // numbers, other text without case or outer spaces.
@@ -404,7 +417,7 @@ namespace RailroaderScenePatcher {
         // object's value without this mod says that the modification no longer sets it; completed replaces the
         // plain result of an edit that did something else than its name says.
         internal static string EditResult(string action, bool unchanged, bool reverted, string completed) =>
-            unchanged ? action + ": nothing changed; the object has this value already."
+            unchanged ? action + ": the object has this value already."
             : reverted ? action + " completed. The value equals the object's value without this mod, so the modification no longer sets it."
             : completed ?? action + " completed.";
         // The name of a candidate among the offers of a world choice: its number when several are offered, the same
@@ -429,7 +442,7 @@ namespace RailroaderScenePatcher {
                 // A presentation name is not another hierarchy segment. Prepending a wrapper parent for equal
                 // added names would hide that name again when the line is shortened; list numbers distinguish them.
                 if (observedPath != null && visibleName != observedPath.Substring(observedPath.LastIndexOf('/') + 1))
-                    text = visibleName + (inactive ? " [inactive]" : "") + " (" + family + ")";
+                    text = visibleName + (inactive ? " [inactive]" : "") + (IsAddedFamily(family) ? "" : " (" + family + ")");
                 else {
                     var depth = 1;
                     var others = new List<string[]>();

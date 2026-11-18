@@ -27,15 +27,15 @@ The row under the pointer has a blue background. Hover over a row or the candida
 
 Markings use the same colors as the panel:
 
-- Blue marks the candidate. Its label starts with `New: …`.
+- Blue marks the candidate. Its label starts with `Candidate: …` when the choice list is closed.
 - Gold marks the inspected object. It has an object frame and a square marker at the center, with no label to obstruct its gizmo. The panel shows any detected problem.
-- Green marks a confirmed target until you use or withdraw it. Its label starts with `Confirmed: …` and appears while you inspect the object it was chosen for. While this target is green, the marking for the track the object is currently bound to or follows is hidden. That marking returns when you use or withdraw the target.
+- Green marks a confirmed target until you use or withdraw it. Its world label starts with `Confirmed choice: …` and appears while you inspect the object it was chosen for. While this target is green, the marking for the track the object is currently bound to or follows is hidden. That marking returns when you use or withdraw the target.
 
 Labels have opaque backgrounds and keep the same text size on screen. Markings and labels stay outside native windows and controls. Candidates at the same spot appear as numbered rows in the choice list beside the pointer.
 
 An object shows its object frame within 500 meters of the camera. Beyond that distance, it shows only its square marker and any label, in the color its object frame would have. You can still click the marker. The inspected object keeps its gold object frame and square marker at every distance. An object with nothing of its own to frame, such as a part that is switched off, still has a small object frame around its `+` within 500 meters.
 
-Labels are centered below their markers. If a label would cover another marker or a native panel, it moves to the side or above. Inactive objects remain selectable through their square markers and identity labels. During a replacement choice, if the source object also appears among overlapping candidates, its label reads `Object / Choice: …` until you select it.
+Labels are centered below their markers. If a label would cover another marker or a native panel, it moves to the side or above. Inactive objects remain selectable through their square markers and identity labels. During a replacement choice, if the inspected object also has a candidate label, that label starts with `Inspected: …`.
 
 ### What an object frame includes
 
@@ -95,7 +95,7 @@ When you inspect a part, the **Object** tab starts with `Part of:` and the group
 
 On the inspected object's **Connections** tab, click **Object**, **Segment** or **Node**. For crossing coverage, open a circuit or detection addition and click **Segment** beside the role you want to change. The source object keeps its gold object frame to show which object the choice belongs to.
 
-For a segment, click the track in the world. For a node, click its marking. The footer's first message slot shows the candidate in blue as `New: …` under **World choice**. **Details** shows the segment ID and both endpoint IDs, or the node ID and map position.
+For a segment, click the track in the world. For a node, click its marking. Under **World choice**, the footer shows the candidate in blue as `Candidate: …` or `Candidate <n>: …` if it has a number in the choice list. **Details** shows the segment ID and both endpoint IDs, or the node ID and map position.
 
 Hover over a track to see a selectable ribbon along its curve. The ribbon covers the rails and ties and keeps a minimum width on screen at a distance. Clicking a shared endpoint or overlapping ribbons offers every matching candidate so you can choose explicitly.
 
@@ -107,7 +107,7 @@ World choices for replacements, snaps and track-following placement use the same
 
 Use **Focus** in the footer to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source object.
 
-After you check the candidate, click **Confirm**. The patcher records the confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed: …` line. A choice made through **Select in world** alone has no source object and does not show that line.
+After you check the candidate, click **Confirm**. The patcher records the confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. A choice made through **Select in world** alone has no source object and does not show that line.
 
 If the candidate is missing, ambiguous or has changed since you selected it, check the world and select it again. If the source object or loaded map context has changed, cancel the choice and start again.
 

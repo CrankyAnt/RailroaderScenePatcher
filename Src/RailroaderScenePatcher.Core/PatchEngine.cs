@@ -108,8 +108,8 @@ namespace RailroaderScenePatcher.Core {
             var maps = scene.MapIds.ToArray();
             if (!maps.Contains(mapId, StringComparer.Ordinal)) return Mismatch;
             if (scene is IMapPatchContext context && (context.MapPatchIds ?? Enumerable.Empty<string>()).Contains(mapId, StringComparer.Ordinal))
-                return "The scene target map " + mapId + " is a map patch. The game would skip this scene patch file in a save because a map patch is never the loaded map or one of its layers. Use the bottom map layer, "
-                    + PatchEditingSession.SceneTargetMapFor(maps) + ", as the scene target map";
+                return mapId + " is a map patch. The game skips scene patch files that name a map patch. Use the bottom map layer, "
+                    + PatchEditingSession.SceneTargetMapFor(maps) + ".";
             return null;
         }
     }
@@ -138,6 +138,7 @@ namespace RailroaderScenePatcher.Core {
         public bool Reverted { get; internal set; }
         // What a failure did to the scene: refused before mutation, restored, or left with incomplete cleanup.
         public FailureKind Failure { get; internal set; }
+        internal bool WasGuarded { get; set; }
         // For an incomplete cleanup: the remaining or uncertain state, one line per setting.
         public IReadOnlyList<string> Remaining { get; internal set; } = Array.Empty<string>();
     }
@@ -415,7 +416,7 @@ namespace RailroaderScenePatcher.Core {
                 if (outcome.Failure == FailureKind.None) {
                     var attempt = e as AttemptFailure;
                     outcome.Failure = attempt?.Kind ?? FailureKind.Refused;
-                    if (attempt != null) outcome.Remaining = attempt.Remaining;
+                    if (attempt != null) { outcome.Remaining = attempt.Remaining; outcome.WasGuarded = attempt.WasGuarded; }
                 }
                 failed[key] = outcome; Observe("failed", scenePatchFileKey, id, error: e.Message);
             }
@@ -501,7 +502,7 @@ namespace RailroaderScenePatcher.Core {
         // The refusal of an operation on a guarded target: a restored target that waits for its dependent output is
         // not an incomplete cleanup and needs no Recheck; any other guard is.
         internal Exception Guarded(object target, string blocked) => AwaitingOutput(target)
-            ? new AttemptFailure(FailureKind.AwaitingOutput, "An earlier failed attempt was undone. The game is still regenerating dependent output, such as terrain. This object can be changed again once that output is complete")
+            ? new AttemptFailure(FailureKind.AwaitingOutput, "The game is still regenerating terrain after an earlier edit.", wasGuarded: true)
             : (Exception)new AttemptFailure(FailureKind.Blocked, blocked, Remaining(target));
         // The remaining or uncertain state an unverified cleanup left on the target, or empty.
         internal IReadOnlyList<string> Remaining(object target) => target != null && unsafeTargets.Contains(target) && remainingState.TryGetValue(target, out var lines) ? lines : Array.Empty<string>();

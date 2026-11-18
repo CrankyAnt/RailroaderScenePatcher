@@ -3,6 +3,7 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using System.Text;
 using Newtonsoft.Json.Linq;
 
 namespace RailroaderScenePatcher.Core {
@@ -64,15 +65,18 @@ namespace RailroaderScenePatcher.Core {
                 var loaded = text == null ? null : ScenePatchFile.Load(text);
                 var refusal = loaded == null ? "The file no longer exists" : Refusal(loaded, text);
                 VersionState = refusal == null ? FileVersionState.Changed : FileVersionState.Repair;
-                VersionMessage = refusal == null ? (previous == FileVersionState.Repair ? "The file is readable again. " : "") + "The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version." : "File needs repair: " + refusal;
+                VersionMessage = refusal == null ? (previous == FileVersionState.Repair ? "The file is readable again. " : "") + "The scene patch file changed outside scene patch editing. Save won't overwrite it until you choose a version."
+                    : "File needs repair: " + ScenePatchFile.Sentence(refusal) + ".";
                 if (VersionState == FileVersionState.Repair && backupPreview == null && storage is IVersionBackupStorage backup) backupPreview = backup.ReserveVersionBackup();
                 // A file that needs repair offers no Import; an overview of an earlier version of the file closes.
                 if (VersionState == FileVersionState.Repair) Import = null;
                 else if (Import != null && observedVersion != Import.Fingerprint) { Import = null; ImportOutdated = true; }
             } catch (Exception e) {
                 VersionState = FileVersionState.Repair; Import = null;
-                VersionMessage = "File needs repair: " + e.Message;
-                ScenePatchFileDiagnostics = new[] { ScenePatchFileDiagnostic.Create(null, "", e.Message, "A readable scene patch file") };
+                var diagnosis = e is DecoderFallbackException encodingError ? InvalidUtf8Diagnostic(encodingError)
+                    : ScenePatchFileDiagnostic.Create(null, "", e.Message, "A readable scene patch file");
+                ScenePatchFileDiagnostics = new[] { diagnosis };
+                VersionMessage = "File needs repair: " + ScenePatchFile.Sentence(diagnosis.Message) + ".";
                 if (backupPreview == null && storage is IVersionBackupStorage backup) backupPreview = backup.ReserveVersionBackup();
             }
         }
@@ -136,7 +140,7 @@ namespace RailroaderScenePatcher.Core {
                     TargetIdentity target; object resolved;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
-                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before using the file version");
+                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before using the file version");
                     scene.Preflight(resolved);
                     engine.GuardMutation(target, resolved, context, null);
                     if (!snapshots.Any(pair => ReferenceEquals(pair.Item1, resolved))) snapshots.Add(Tuple.Create(resolved, scene.Capture(resolved)));
@@ -160,7 +164,7 @@ namespace RailroaderScenePatcher.Core {
                     TargetIdentity target; object resolved;
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
-                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before using the file version");
+                    if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before using the file version");
                     scene.Preflight(resolved);
                     mutationStarted = true;
                     Commit(target, resolved, null, property.Name, item, null);

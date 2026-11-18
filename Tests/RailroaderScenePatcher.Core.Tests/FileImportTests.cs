@@ -299,7 +299,7 @@ static class FileImportTests {
         world.Outside(Doc(Item("a", "p", 119)));
         Assert(FilePanelState.Of(session) == FilePanelState.Kind.VersionChoice && FilePanelState.Heading(FilePanelState.Kind.VersionChoice) == "Version choice", "A pending choice opens the Version choice panel");
         Assert(EditFeedback.Primary(session, false, false) == EditFeedback.PrimaryMessage.None, "The message area holds no version choice");
-        Assert(FilePanelState.KeepEditorEffect.Contains("lets you save again") && FilePanelState.KeepEditorEffect.Contains("next Save replaces the file"), "Keep editor version states both effects before the choice");
+        Assert(FilePanelState.KeepEditorEffect == "The next Save replaces the file with the editor version.", "Keep editor version explains what the next Save writes");
         Assert(CommandBand.Tooltip("Inspect.", FilePanelState.Reason(FilePanelState.Of(session))) == "Unavailable: Choose a version in the Version choice panel first.", "A control outside the panel shows its reason");
         Assert(session.OpenImport().Applied && FilePanelState.Of(session) == FilePanelState.Kind.Import && FilePanelState.Heading(FilePanelState.Kind.Import) == "Import", "Import replaces the choice in the same panel");
         session.CancelImport();

@@ -301,7 +301,7 @@ static class BindingTests {
         mapEditor.Undo(); Assert(Entry(world, whistle) == "S377|a|7.511661" && whistle.CachedGroup == "bryson", "Undo restores its binding and registration");
         var before = world.Mutations;
         var padEdit = session.Bind(InCrossing(PadPath), MarkerBinding.At(new TrackLocation("Nnew", "a", 3)));
-        Assert(!padEdit.Applied && padEdit.Error.Contains("crossing-pad capability"), "The crossing pad stays with its own capability: " + padEdit.Error);
+        Assert(!padEdit.Applied && padEdit.Error.Contains("Edit this marker through its crossing pad"), "The crossing pad stays with its own capability: " + padEdit.Error);
         var crossingEdit = session.Bind(InCrossing(CrossingMarkerPath), MarkerBinding.Detached);
         Assert(!crossingEdit.Applied && crossingEdit.Error.Contains("this marker is Crossing"), "A Crossing-type marker stays outside the Generic pattern: " + crossingEdit.Error);
         Assert(!session.Edit(InCrossing(PadPath), new Placement(new[] { 1030.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied, "The pad's placement stays outside the Generic pattern");
@@ -415,7 +415,7 @@ static class BindingTests {
         (world, sign, other, markers) = Setup();
         world.Buckets["Sjdl"]["Mi4f"] = ("a", 1, other);
         var foreign = new PatchEngine(markers).Apply(Doc(Binding("foreign", Detach)));
-        Assert(!foreign.Outcomes["foreign"].Applied && foreign.Outcomes["foreign"].Error.Contains("registration") && world.Mutations == 0, "An incoherent registration refuses the edit before mutation: " + foreign.Outcomes["foreign"].Error);
+        Assert(!foreign.Outcomes["foreign"].Applied && foreign.Outcomes["foreign"].Error.Contains("track information for this marker is out of sync") && world.Mutations == 0, "An incoherent registration refuses the edit before mutation: " + foreign.Outcomes["foreign"].Error);
         var unknown = new PatchEngine(Setup().scene).Apply(Doc(Binding("future", "{\"segment\":\"Nnew\",\"end\":\"a\",\"distance\":1,\"offset\":2}")));
         Assert(!unknown.Outcomes["future"].Applied && unknown.Outcomes["future"].Error.StartsWith("Unsupported", StringComparison.Ordinal), "Unknown relationship content is preserved without execution");
         var otherKind = new PatchEngine(Setup().scene).Apply(Doc("\"span\":{" + Target() + ",\"relationships\":{\"trackSpan\":{}},\"dependsOn\":[]}"));

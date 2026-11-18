@@ -49,7 +49,7 @@ static class CommandBandTests {
     static void ReasonsReadAsOnePlainSentence() {
         Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
         // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.
-        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")) != "Inspection only: The patcher has no edit for baked scenery groups that hold a car loader yet.")
+        if (CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")) != "Inspection only: Baked scenery groups that hold a car loader cannot be edited.")
             throw new Exception("The Inspection only line stacks labels: " + CommandBand.InspectionOnlyLine(CommandBand.NotYetSupported("baked scenery groups that hold a car loader")));
         var starter = StarterPlacements.ObjectSettings + ".";
         var blocked = CommandBand.NotEditable(StarterPlacements.ObjectSettings);
@@ -59,8 +59,8 @@ static class CommandBandTests {
             new[] { CommandBand.ModeBlock(CommandBand.GizmoMode, false, false, blocked), starter },
             new[] { StarterPlacements.NoDetach, StarterPlacements.NoDetach + "." },
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
-            new[] { CommandBand.NotYetSupported("the Milepost family"), "The patcher has no edit for the Milepost family yet." },
-            new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The patcher has no edit for the Track span family yet." },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
+            new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The Track span family cannot be edited." },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects share this hierarchy path and component, so a patch cannot name one of them." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
@@ -102,8 +102,16 @@ static class CommandBandTests {
         Check(CommandBand.RestoredContent(636, 660, 24) == 636 && CommandBand.RestoredContent(364, 410, 46) == 364, "A content size saved at the minimum window is restored as saved, not raised to the window's minimum");
         Check(CommandBand.RestoredContent(900, 660, 24) == 900 && CommandBand.RestoredContent(100, 660, 24) == 636, "A larger saved size stays, and a smaller one is raised to the minimum window's content");
         // A lamp without its word says it in the tooltip, first.
-        Check(CommandBand.LampTooltip(CommandBand.Inventory(true), "Loc: Walker Branch changed (position)") == "Stale: Loc: Walker Branch changed (position)", "The tooltip text starts with the state word");
+        Check(CommandBand.LampTooltip(CommandBand.Inventory(true), "the scene changed") == "Stale: The scene changed", "The tooltip text starts with the state word");
         Check(CommandBand.LampTooltip(CommandBand.Save(false), null) == "Saved." && CommandBand.LampTooltip(CommandBand.Save(true), "") == "Unsaved.", "Without a reason the tooltip is the word");
+        Check(CommandBand.Inventory(true, false).Word == "Paused" && !CommandBand.Inventory(true, false).Good &&
+            CommandBand.Save(false, false).Word == "Blocked" && !CommandBand.Save(false, false).Good, "A file lock pauses inspection and unavailable saving cannot show green Saved");
+        var writes = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
+        Check(CommandBand.LampTooltip(CommandBand.Save(true), CommandBand.SaveNotice(writes, FileVersionState.None, false)) ==
+            "Unsaved: Map data, scene patch file, patcher dependency. Click Save to write these changes.", "Only the start of the joined Save list is capitalized.");
+        Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Repair, false)) ==
+            "Blocked: The scene patch file needs repair. Resolve the issue before saving.", "A blocked lamp has one status label and its own repair guidance.");
+        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene patches to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
         Check(CommandBand.InventoryWord >= 60 && CommandBand.SaveWord >= CommandBand.InventoryWord, "The reserved widths hold the longer word of each lamp");
     }
     static void CommandsAreDisabledOnlyForTheirOwnReason() {
@@ -254,7 +262,7 @@ static class CommandBandTests {
         // under its own family, not Inspection only, and its object says where it is edited.
         Check(CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false) == null && CommandBand.InspectionOnly("Crossing light", false).StartsWith("Not yet supported: ", StringComparison.Ordinal)
             && CommandBand.InspectionOnly("Crossing light", true) == null, "An added light or gate is not inspection only; another family without an edit is");
-        var operations = CommandBand.AddedEquipmentOperations("signal-1-added", "author/pack");
+        var operations = CommandBand.AddedEquipmentOperations("Signal 1 (added)");
         Check(operations.Contains("Connections tab") && CommandBand.Refusal(operations) == null && !operations.StartsWith("Not yet supported", StringComparison.Ordinal), "Its supported edits name the crossing's Connections tab: " + operations);
         var added = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "RailroaderScenePatcher.OwnedEquipment"), CommandBand.AddedEquipmentFamily, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], operations, null, null, null, CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false));
@@ -264,9 +272,9 @@ static class CommandBandTests {
         Check(listed.Count == 2 && listed[0].Key == CommandBand.AddedEquipmentFamily && listed[0].Value.Single() == added && listed[1].Key == InventoryPresentationState.InspectionOnlyGroup && listed[1].Value.Single() == light,
             "The added light or gate has its own family folder; only the light without an edit is Inspection only: " + String.Join(", ", listed.Select(g => g.Key)));
         // An added bell is a supported family of its own, edited on its crossing's Connections tab as well.
-        var bellOperations = CommandBand.AddedEquipmentOperations("crossing-bell-added", "author/pack", true);
+        var bellOperations = CommandBand.AddedEquipmentOperations("Brass bell (added)");
         Check(CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false) == null && CommandBand.IsAddedFamily(CommandBand.AddedBellFamily) && !CommandBand.IsAddedFamily("Crossing bell")
-            && bellOperations.StartsWith("Added bell crossing-bell-added of author/pack", StringComparison.Ordinal) && bellOperations.Contains("Connections tab") && CommandBand.Refusal(bellOperations) == null,
+            && bellOperations.StartsWith("Brass bell (added).", StringComparison.Ordinal) && bellOperations.Contains("Connections tab") && CommandBand.Refusal(bellOperations) == null,
             "An added bell is not inspection only and names where it is edited: " + bellOperations);
         var bell = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/CrankyAnt Scene Patcher equipment author:pack crossing-bell-added", "RailroaderScenePatcher.OwnedEquipment"), CommandBand.AddedBellFamily, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], bellOperations, null, null, null, CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false));
@@ -300,7 +308,7 @@ static class CommandBandTests {
         var cramped = PanelPlacement.Beside(200, 900, 0, 364, 400, 1000, 800, 8);
         Check(cramped.X == 0, "Without room on either side it takes the side with more room, at the screen's edge: " + cramped.X);
         Check(PanelPlacement.Beside(100, 950, 0, 364, 400, 1000, 800, 8).X == 0 && PanelPlacement.Beside(100, 900, 0, 364, 400, 1000, 800, 8).X == 636, "More room at the left takes the left edge; equal room takes the right edge");
-        Check(CommandBand.NotYetSupported("the Milepost family") == "Not yet supported: the patcher has no edit for the Milepost family yet" && CommandBand.Refusal(CommandBand.NotYetSupported("the Milepost family")) == null,
+        Check(CommandBand.NotYetSupported("the Milepost family") == "Not yet supported: the Milepost family cannot be edited" && CommandBand.Refusal(CommandBand.NotYetSupported("the Milepost family")) == null,
             "A kind without an edit says that it is not supported yet, which is no refusal of a supported family");
         // The followed track element is the one the world marks green: the anchor's node, or its location's segment.
         Check(CommandBand.Followed(null) == null, "An object that follows nothing has no followed element");
@@ -320,7 +328,7 @@ static class CommandBandTests {
         Check(CommandBand.RunningLine(new[] { "A", "B" }, new[] { "1" }, null) == "A 1  B -", "A line without a unit ends with its last value");
         // The reason an object cannot be edited is its own, wherever it is given, as one plain sentence.
         foreach (var row in new[] {
-            new[] { CommandBand.NotYetSupported("the Milepost family"), "The patcher has no edit for the Milepost family yet." },
+            new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
             new[] { CommandBand.NotEditable("the marker is inside a crossing"), "The marker is inside a crossing." },
             new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", "2 objects share this hierarchy path and component, so a patch cannot name one of them." },
             new[] { "Fixed placement and activity", "This object cannot be edited here." }, new[] { null, "This object cannot be edited here." }, new[] { " ", "This object cannot be edited here." } })
@@ -330,7 +338,7 @@ static class CommandBandTests {
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
             Check(CommandBand.PadModeBlock(mode) == CommandBand.PadFollowsTrack, "Placement mode " + mode + " is inactive for a crossing pad");
         Check(CommandBand.PadFollowsTrack.Contains("follows its track") && CommandBand.PadFollowsTrack.Contains("under Connections"), "The reason says the pad follows its track and where to bind it");
-        Check(CommandBand.PadOperations.StartsWith("Pad binding:", StringComparison.Ordinal) && !CommandBand.PadOperations.Contains("fixed placement") && CommandBand.PadOperations.Contains("no placement of its own"), "A pad's Supported edits promises no placement");
+        Check(CommandBand.PadOperations.StartsWith("The pad moves only when you change its track location.", StringComparison.Ordinal) && !CommandBand.PadOperations.Contains("fixed placement") && CommandBand.PadOperations.Contains("Enable or disable it separately."), "A pad's Supported edits promises no placement");
         // An edit whose fields hold the current values is disabled.
         foreach (var row in new[] {
             new object[] { new[] { "4387.212", "528.6", "0" }, new[] { "4387.212", "528.6", "0" }, true },
@@ -380,10 +388,10 @@ static class CommandBandTests {
         // The result of an edit says what happened.
         foreach (var row in new[] {
             new object[] { false, false, null, "Enable completed." },
-            new object[] { true, false, null, "Enable: nothing changed; the object has this value already." },
+            new object[] { true, false, null, "Enable: the object has this value already." },
             new object[] { false, true, null, "Enable completed. The value equals the object's value without this mod, so the modification no longer sets it." },
             new object[] { false, false, "Enable did something else.", "Enable did something else." },
-            new object[] { true, true, "x", "Enable: nothing changed; the object has this value already." } })
+            new object[] { true, true, "x", "Enable: the object has this value already." } })
             Check(CommandBand.EditResult("Enable", (bool)row[0], (bool)row[1], (string)row[2]) == (string)row[3], "An edit's result reads: " + row[3]);
         // One rule for every shown number: three decimals, no trailing zeros, never scientific notation, no negative zero.
         foreach (var row in new[] { new object[] { 528.405334, "528.405" }, new object[] { 70.04144, "70.041" }, new object[] { 1.13392689E-05, "0" }, new object[] { -1.13392689E-05, "0" }, new object[] { 25692.9766, "25692.977" },
@@ -403,7 +411,7 @@ static class CommandBandTests {
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode }) {
             Check(CommandBand.ModeBlock(mode, false, true, "Fixed placement") == null, "Mode " + mode + " is open for an object that can be edited");
             Check(CommandBand.ModeBlock(mode, true, true, "x") == CommandBand.PadFollowsTrack, "Mode " + mode + " is inactive for a pad");
-            Check(CommandBand.ModeBlock(mode, false, false, why) == (mode == CommandBand.NumericMode ? null : "The patcher has no edit for the Milepost family yet."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
+            Check(CommandBand.ModeBlock(mode, false, false, why) == (mode == CommandBand.NumericMode ? null : "The Milepost family cannot be edited."), "Mode " + mode + " of an object that cannot be edited: only Numeric stays, the others give the object's reason");
         }
         Check(CommandBand.ShowsCurrentRelations(false) && !CommandBand.ShowsCurrentRelations(true), "A confirmed target that is not yet used is the one green relation");
         // A candidate among several offers carries one number everywhere.
@@ -439,8 +447,8 @@ static class CommandBandTests {
         var entries = new[] { Added("signal-1-added-2"), Added("signal-1-added-3") };
         var labels = entries.Select(entry => entry.Family + ": " + entry.Identity.Path).ToArray();
         for (var i = 0; i < entries.Length; i++) {
-            if (CommandBand.ChoiceLabel(labels[i], labels, 60, entries[i]) != "Signal 1 (added) (Added light or gate)"
-                || CommandBand.ChoiceLine("Object", i + 1, 2, labels[i], labels, entries[i]) != "Object " + (i + 1) + ": Signal 1 (added) (Added light or gate).") return false;
+            if (CommandBand.ChoiceLabel(labels[i], labels, 60, entries[i]) != "Signal 1 (added)"
+                || CommandBand.ChoiceLine("Object", i + 1, 2, labels[i], labels, entries[i]) != "Object " + (i + 1) + ": Signal 1 (added).") return false;
         }
         return true;
     }
@@ -531,8 +539,8 @@ static class CommandBandTests {
         Check(ran == 1 && !queue.Pending, "A waiting request runs once");
         // Leaving the native map editor.
         queue.Enqueue("Crossing coverage", "Coverage preview", () => ran++);
-        queue.Cancel("the native map editor was left before the request ran");
-        Check(ran == 1 && feedback.Result == "Coverage preview refused. The native map editor was left before the request ran.", "Leaving the native map editor cancels a preview too: " + feedback.Result);
+        queue.Cancel("you left the Map Editor before the request ran");
+        Check(ran == 1 && feedback.Result == "Coverage preview refused. You left the Map Editor before the request ran.", "Leaving the native map editor cancels a preview too: " + feedback.Result);
         // Clearing the inspection drops the object's results and keeps the refusal of the request that waited for it.
         var board = new object(); var other = new object();
         feedback.Inspecting(board);

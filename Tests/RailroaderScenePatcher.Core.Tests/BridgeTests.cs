@@ -179,7 +179,7 @@ static class BridgeTests {
         var board = "\"board\":{\"target\":{\"scene\":\"s\",\"path\":\"p\",\"component\":\"c\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
         var result = new PatchEngine(capabilities).Apply(Doc(Bridge("bridge") + "," + board));
         Assert(result.Error == null && result.Outcomes["board"].Applied && box.X == 12, "Unrelated supported work stays available");
-        Assert(!result.Outcomes["bridge"].Applied && result.Outcomes["bridge"].Error.Contains("incompatible with this game build"), "The bridge operation reports the incompatible capability: " + result.Outcomes["bridge"].Error);
+        Assert(!result.Outcomes["bridge"].Applied && result.Outcomes["bridge"].Error.Contains("The patcher cannot edit this object on this game build"), "The bridge operation reports the incompatible capability: " + result.Outcomes["bridge"].Error);
         Assert(new SceneCapabilities(() => new[] { "map" }).Capability == Capability.Incompatible, "Without any capability nothing can be placed");
     }
     static void EditingUndoRedoAndRemovalRestoreBridge() {

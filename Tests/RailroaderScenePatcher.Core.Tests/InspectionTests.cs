@@ -198,7 +198,7 @@ static class InspectionTests {
         scene.Parts.Add(new Part { Name = "Grade Crossing/CrankyAnt equipment 2/Signal 1/Gate", Family = "Crossing gate", Owned = true }); inventory.CheckFreshness();
         Check(!inventory.IsStale, "Rebuilding an added copy, as a Redo does, keeps the snapshot fresh: " + inventory.StaleReason);
         native.Active = false; inventory.CheckFreshness();
-        Check(inventory.IsStale && inventory.StaleReason.Contains(native.Name), "A change of a map object still marks the snapshot stale: " + inventory.StaleReason);
+        Check(inventory.IsStale && inventory.StaleReason.StartsWith("Gate changed", StringComparison.Ordinal), "A change of a map object still marks the snapshot stale: " + inventory.StaleReason);
     }
     static void ComponentsLeavingDuringAPass() {
         PartScene Parts(out SceneInventory inventory, out Part widget, out Part sign, out Part holder, out Part board) {
@@ -244,7 +244,7 @@ static class InspectionTests {
         for (var i = 0; i < 5; i++) checkedInventory.AdvanceFreshnessCheck(one);
         holder.Gone = true;
         checkedInventory.AdvanceFreshnessCheck(() => true);
-        Check(checkedInventory.IsStale && checkedInventory.StaleReason.Contains("scene/Sign"), "A referrer that leaves during a pass marks the snapshot stale and names the changed observation: " + checkedInventory.StaleReason);
+        Check(checkedInventory.IsStale && checkedInventory.StaleReason.Contains("Sign"), "A referrer that leaves during a pass marks the snapshot stale and names the changed observation: " + checkedInventory.StaleReason);
         Check(Refused(() => checkedInventory.Pin(checkedInventory.Entries[1])), "A stale snapshot still refuses a pin");
         checkedInventory.Refresh();
         Check(!checkedInventory.IsStale && checkedInventory.StaleReason == null && checkedInventory.Entries[0].Dependencies.Count == 0, "Refresh observes the scene without the referrer and clears the reason");
@@ -253,7 +253,7 @@ static class InspectionTests {
         parts = Parts(out checkedInventory, out widget, out sign, out holder, out board);
         sign.Active = false;
         checkedInventory.AdvanceFreshnessCheck(() => true);
-        Check(checkedInventory.IsStale && checkedInventory.StaleReason.Contains("scene/Sign"), "A changed value names its observation: " + checkedInventory.StaleReason);
+        Check(checkedInventory.IsStale && checkedInventory.StaleReason.Contains("Sign"), "A changed value names its observation: " + checkedInventory.StaleReason);
         parts = Parts(out checkedInventory, out widget, out sign, out holder, out board);
         parts.Parts.Add(new Part { Name = "Late", Family = "Track marker", Gone = false });
         checkedInventory.CheckFreshness();
@@ -273,21 +273,21 @@ static class InspectionTests {
         scene.Observations = () => new[] { new SceneObservation(box, new TargetIdentity("scene", "p", "Culler"), "Board", true, box.Position, box.Rotation, new string[0], new string[0], new string[0], "Fixed placement") };
         var inventory = new SceneInventory(scene);
         var notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
-        Check(notice == "Inventory is stale: not yet scanned. Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
+        Check(notice == "not yet scanned. Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(null)), "An unscanned inventory refuses edits and says so: " + notice);
         inventory.Refresh();
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, false);
-        Check(notice == "Inventory snapshot. Changes are checked while this panel is open. Refresh after native edits.", "A current inventory with current definitions is a snapshot: " + notice);
+        Check(notice == "The object list is up to date. You can inspect objects and start edits.", "A current inventory with current definitions is a snapshot: " + notice);
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, true);
-        Check(notice == "Inventory is stale: the supplied definitions changed or were not read. Refresh before relying on these observations." && inventory.Pin(inventory.Entries.Single()) != null,
+        Check(notice == "the supplied definitions changed or were not read. Refresh before relying on these observations." && inventory.Pin(inventory.Entries.Single()) != null,
             "Changed definitions alone are named as stale without a refusal the pin does not make: " + notice);
         box.X = 8; inventory.CheckFreshness();
         foreach (var definitionsStale in new[] { false, true }) {
             notice = RailroaderScenePatcher.InventoryPresentationState.Notice(inventory, definitionsStale);
-            Check(notice == "Inventory is stale: scene/p [Culler] changed (position). Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
+            Check(notice == "p changed (position). Refresh before relying on these observations. " + refused && Refused(() => inventory.Pin(inventory.Entries.Single())),
                 "A stale inventory names its own reason and the refusal, whatever the definitions: " + notice);
         }
         notice = RailroaderScenePatcher.InventoryPresentationState.Notice(null, false);
-        Check(notice == "Inventory is stale: inspection is unavailable. Refresh before relying on these observations. " + refused, "A missing inventory refuses edits and says so: " + notice);
+        Check(notice == "inspection is unavailable. Refresh before relying on these observations. " + refused, "A missing inventory refuses edits and says so: " + notice);
     }
 
     // Every edit that is refused or ignored names its reason for the panel and the log.
@@ -303,7 +303,7 @@ static class InspectionTests {
 
         box.X = 8;
         Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 0 && box.X == 8, "A stale inventory refuses the edit before it runs");
-        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. Inventory is stale (scene/p [Culler] changed (position)); refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
+        Check(feedback.Place == "placement" && feedback.Result == "Placement refused. The object list is stale (p changed (position)); refresh and inspect again." && log.Single() == feedback.Result, "The stale refusal names its reason for the panel and the log: " + feedback.Result);
         inventory.Refresh(); log.Clear();
         Check(!feedback.Run("binding", "Track binding", "a world selection is pending; confirm or cancel it first", inventory, inventory.Entries.Single(), move) && calls == 0,
             "An edit during a pending interaction does not run");
@@ -315,7 +315,7 @@ static class InspectionTests {
             feedback.Result == "Placement refused. Injected edit failure." && log.Single() == feedback.Result, "A failing edit names its failure: " + feedback.Result);
         log.Clear();
         scene.FailApply = true;
-        Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 1 && feedback.Result.StartsWith("Placement failed and was undone. The change failed. The object is back as it was. Reason:", StringComparison.Ordinal) && feedback.Recovery?.Kind == FailureKind.Restored && log.Single() == feedback.Result,
+        Check(!feedback.Run("placement", "Placement", null, inventory, inventory.Entries.Single(), move) && calls == 1 && feedback.Result.StartsWith("Placement failed and was undone. Injected.", StringComparison.Ordinal) && feedback.Recovery?.Kind == FailureKind.Restored && log.Single() == feedback.Result,
             "A failure after mutation is reported as undone, not as a refusal, with the engine's reason: " + feedback.Result);
         scene.FailApply = false; log.Clear(); inventory.Refresh();
         feedback.Refuse("binding", "Track binding", "enter a segment ID");
@@ -698,7 +698,7 @@ static class InspectionTests {
         Check(!inventory.IsStale, "The stepped check allows the same rounding");
         fixture.Objects[0] = Post(25693.0766);
         inventory.CheckFreshness();
-        Check(inventory.IsStale && inventory.StaleReason == "scene/World/Mile Posts/T-60 [Helpers.MilePost] changed (position)", "A move of ten centimetres marks the snapshot stale and the reason names the position: " + inventory.StaleReason);
+        Check(inventory.IsStale && inventory.StaleReason == "T-60 changed (position)", "A move of ten centimetres marks the snapshot stale and the reason names the position: " + inventory.StaleReason);
         inventory.Refresh();
         fixture.Objects[0] = Post(25693.0766, "Marker segment=S2; end=A; distance=10");
         inventory.AdvanceFreshnessCheck(() => true);
@@ -767,10 +767,10 @@ static class InspectionTests {
         Check(!inventory.IsStale && inventory.CompletedPasses == 1, "A stepped pass after the origin move agrees: " + inventory.StaleReason);
         kept[0] += 1;
         inventory.CheckFreshness();
-        Check(inventory.IsStale && inventory.StaleReason == "scene/Setups/marker [Component] changed (position)", "A move of the object the game does not shift is detected: " + inventory.StaleReason);
+        Check(inventory.IsStale && inventory.StaleReason == "marker changed (position)", "A move of the object the game does not shift is detected: " + inventory.StaleReason);
         inventory.Refresh(); moved[2] += 1;
         inventory.CheckFreshness();
-        Check(inventory.IsStale && inventory.StaleReason == "scene/World/board [Component] changed (position)", "A move of a shifted object is detected after the origin moved: " + inventory.StaleReason);
+        Check(inventory.IsStale && inventory.StaleReason == "board changed (position)", "A move of a shifted object is detected after the origin moved: " + inventory.StaleReason);
         var refused = false;
         try { MapOrigin.Position(moved, new double[2], true); } catch (ArgumentException) { refused = true; }
         Check(refused, "An offset that does not fit the position is refused");
@@ -850,7 +850,7 @@ static class InspectionTests {
         Check(inventory.Entries[0].Active && inventory.Entries[0].RuntimeState.Single() == "Culled object active=False", "A refresh while the object is culled still observes it as active, and shows the culled state");
         on[1] = true; on[0] = false;
         inventory.CheckFreshness();
-        Check(inventory.IsStale && inventory.StaleReason == "scene/Crossing/Signal 1/Signal 1 [Lamp] changed (activity)", "Switching the signal itself off is detected: " + inventory.StaleReason);
+        Check(inventory.IsStale && inventory.StaleReason == "Signal 1 changed (activity)", "Switching the signal itself off is detected: " + inventory.StaleReason);
         on[0] = true; inventory.Refresh(); on[2] = false;
         inventory.CheckFreshness();
         Check(inventory.IsStale && inventory.StaleReason.EndsWith("changed (activity)", StringComparison.Ordinal), "Switching off an object above the culled one is detected: " + inventory.StaleReason);
@@ -943,7 +943,7 @@ static class InspectionTests {
         scene.All[2] = Of(other, "other", "changed");
         inventory.ReobserveRelated(updated);
         inventory.CheckFreshness();
-        Check(inventory.IsStale && inventory.StaleReason.StartsWith("scene/other [Component] changed (bindings", StringComparison.Ordinal), "A change of an unrelated object still marks the inventory stale: " + inventory.StaleReason);
+        Check(inventory.IsStale && inventory.StaleReason.StartsWith("other changed (bindings", StringComparison.Ordinal), "A change of an unrelated object still marks the inventory stale: " + inventory.StaleReason);
         Check(inventory.ReobserveRelated(Of(crossing, "crossing", "x")) == null, "An observation that is no entry is not re-observed");
         // A scene that does not know what belongs with an object re-observes the object alone.
         var targeted = new TargetedScene(); var box = new Box { X = 7 };
@@ -1210,8 +1210,8 @@ static class InspectionTests {
     static void RepeatedMessagesCollapse() {
         var log = new List<string>();
         var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
-        feedback.Refuse("Placement", "Placement", "Inventory is stale");
-        feedback.Refuse("Placement", "Placement", "Inventory is stale");
+        feedback.Refuse("Placement", "Placement", "The object list is stale");
+        feedback.Refuse("Placement", "Placement", "The object list is stale");
         Check(feedback.Messages.Count == 1 && log.Count == 2, "The same refusal again is one message, and both are logged");
         feedback.Refuse("Placement", "Placement", "enter six numbers");
         feedback.Report("Placement", "Placement completed.");

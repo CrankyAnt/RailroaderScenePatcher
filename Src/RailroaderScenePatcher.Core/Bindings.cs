@@ -214,7 +214,7 @@ namespace RailroaderScenePatcher.Core {
             holders.TryGetValue(target, out var refs) ? (IReadOnlyList<KeyValuePair<object, string>>)refs : Array.Empty<KeyValuePair<object, string>>();
         // Why the target cannot be edited because of its holders, or null. An incomplete scan refuses every target.
         public string Refusal(object target, Func<object, string, bool> allowed, Func<object, string> label) {
-            if (!Complete) return "The direct-reference scan could not read " + unreadable.Count + " field" + (unreadable.Count == 1 ? "" : "s") + ", first " + unreadable[0] + "; other holders of this marker are unknown, so the binding capability refuses it";
+            if (!Complete) return "The direct-reference scan could not read " + unreadable.Count + " field" + (unreadable.Count == 1 ? "" : "s") + ", first " + unreadable[0] + ". The patcher could not check which other objects use this marker, so its binding cannot be changed";
             var holder = HoldersOf(target).FirstOrDefault(h => !allowed(h.Key, h.Value));
             return holder.Key == null ? null : label(holder.Key) + "." + holder.Value + " holds this marker; that consumer is not supported";
         }
@@ -387,7 +387,7 @@ namespace RailroaderScenePatcher.Core {
         string Incoherent(object target, string difference) {
             var holders = Holders(target);
             return holders != null && holders.Duplicate ? holders.Mismatch(target, difference)
-                : "The marker's graph registration does not match its location and activity: " + difference + ". Reload before editing it";
+                : "The game's track information for this marker is out of sync. " + difference.TrimEnd('.') + ". Reload the Map Editor before editing it.";
         }
         internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
@@ -538,11 +538,11 @@ namespace RailroaderScenePatcher.Core {
             // Another holder's registration under the same marker id is never a registration of this marker.
             var entries = (world.Registrations(target) ?? Array.Empty<MarkerRegistration>()).Where(e => e.Owner == null || ReferenceEquals(e.Owner, target)).ToList();
             var expected = world.Registers(target) && Resolvable(location);
-            if (!expected) return entries.Count == 0 ? null : entries.Count + " graph registrations remain for an unregistered marker";
-            if (entries.Count != 1) return entries.Count + " graph registrations instead of one";
+            if (!expected) return entries.Count == 0 ? null : entries.Count == 1 ? "The game still lists a track location for this marker." : "The game still lists " + entries.Count + " track locations for this marker.";
+            if (entries.Count != 1) return "The game lists " + entries.Count + " track locations for this marker. It should list one.";
             var entry = entries[0];
-            if (!entry.HoldsMarker) return "the graph registration under this ID belongs to another object";
-            if (entry.Bucket != location.Segment || !TrackLocation.Same(entry.Location, location)) return "the graph registers the marker at " + entry.Location + " instead of " + location;
+            if (!entry.HoldsMarker) return "This marker ID points to another object.";
+            if (entry.Bucket != location.Segment || !TrackLocation.Same(entry.Location, location)) return "The game lists " + entry.Location + " as the track location for this marker. The marker uses " + location + ".";
             return null;
         }
         internal static bool Near(IReadOnlyList<double> a, IReadOnlyList<double> b) {

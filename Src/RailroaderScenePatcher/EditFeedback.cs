@@ -20,6 +20,9 @@ namespace RailroaderScenePatcher {
         internal static PrimaryMessage Primary(bool backupDiagnosis, bool working, bool worldChoice) =>
             working ? PrimaryMessage.Working
             : worldChoice ? PrimaryMessage.WorldChoice : backupDiagnosis ? PrimaryMessage.BackupDiagnosis : PrimaryMessage.None;
+        internal static string BackupNotice(PatchEditingSession session) =>
+            "The original file is backed up at " + session.LastBackup + ". " + session.VersionMessage;
+
         // One result with the action group it came from, such as Placement or Track binding.
         internal sealed class Message {
             internal string Source { get; }

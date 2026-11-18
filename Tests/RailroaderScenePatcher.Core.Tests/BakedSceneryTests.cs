@@ -590,7 +590,7 @@ static class BakedSceneryTests {
             new { Name = "Sylva Paperboard", Component = "Scenery.BulkIndustryStorageSynchronizer", Kind = "industry storage display", Ticket = "#98" },
             new { Name = "Trestle Scenery", Component = "Game.Mow.TrackConstructionScenery", Kind = "bridge construction scenery", Ticket = "#95" },
             new { Name = "Alarka", Component = "Character.SpawnPoint", Kind = "spawn point", Ticket = "#94" },
-            new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "map icon", Ticket = "#89" },
+            new { Name = "Station Icons", Component = "UI.Map.MapIcon", Kind = "station icon", Ticket = "#89" },
             new { Name = "Roundhouse 3", Component = "RollingStock.Controls.KeyValuePickableToggle", Kind = "pickable toggle", Ticket = "#91" },
         };
         foreach (var item in cases) {
@@ -603,7 +603,7 @@ static class BakedSceneryTests {
         // A group that holds track markers is left out because the markers keep their own family; no ticket covers it yet.
         var signs = At(BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Signs", new Node("Yard Limit").With("Track.TrackMarker").Solid().Family()))))), "World/Large Scenery/Bryson/Bryson Signs");
         Assert(signs?.Disposition == GroupDisposition.InspectionOnly && signs.Ticket == null && signs.ReasonIsSentence &&
-            signs.Reason == "the group holds track markers, which keep their own family, and moving such a group as a whole is not supported yet", "A group with track markers states why it is left out, without a ticket: " + signs?.Reason + " " + signs?.Ticket);
+            signs.Reason == "This group contains track markers, so it cannot be moved as a whole.", "A group with track markers states why it is left out, without a ticket: " + signs?.Reason + " " + signs?.Ticket);
         ResearchHierarchy();
     }
     // The paths, components and physical presence recorded for the level4 scene of the base-game map

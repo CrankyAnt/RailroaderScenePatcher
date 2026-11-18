@@ -131,8 +131,8 @@ namespace RailroaderScenePatcher.Core {
             if (!facts.HasCuller || !facts.CullerEnabled) return "The board's renderer culler must be present and enabled";
             if (facts.Masks != 1 || !facts.MaskEnabled) return "The board must carry exactly one enabled circle map mask";
             if (!facts.ParentsActive) return "The board's parents must be active";
-            if (facts.FlattensHeight) return "The board's circle map mask flattens terrain height, which this capability does not support";
-            if (facts.UnexpectedDependency != null) return "The board hierarchy contains " + facts.UnexpectedDependency + ", whose dependent state this capability does not refresh";
+            if (facts.FlattensHeight) return "The board changes the terrain height, which prevents editing it here";
+            if (facts.UnexpectedDependency != null) return "Editing this board would leave one of its attached objects out of date: " + facts.UnexpectedDependency;
             return null;
         }
         public void Preflight(object target) {

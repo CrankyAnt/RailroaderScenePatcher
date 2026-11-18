@@ -28,13 +28,13 @@ namespace RailroaderScenePatcher {
             : null;
         internal const string UseFile = "Use file version", KeepEditor = "Keep editor version", Import = "Import", Details = "Details", Copy = "Copy to clipboard", Cancel = "Cancel";
         // What each choice does, stated before it is taken.
-        internal const string UseFileEffect = "Applies the file immediately and discards your unsaved scene patch edits. Their steps remain in Undo and Redo but no longer change anything. Your native map edits are unaffected. No reload is needed.";
-        internal const string KeepEditorEffect = "Keeps your scene patch edits and lets you save again. The next Save replaces the file with the editor version.";
+        internal const string UseFileEffect = "Applies the file immediately and discards your unsaved scene patch edits. Their steps remain in Undo and Redo but no longer change anything. Your other map edits stay as they are. No reload is needed.";
+        internal const string KeepEditorEffect = "The next Save replaces the file with the editor version.";
         internal const string ImportEffect = "Shows the file's changes and any conflicts with your edits before applying anything. Your other edits keep their values.";
         internal static string RepairKeepEffect(PatchEditingSession session) => session.VersionFileMissing
-            ? "There is no file to back up. You can save again. The next Save creates the file from the editor version."
+            ? "There is no file to back up. The next Save creates the file from the editor version."
             : session.BackupPreview == null ? "The backup path is unavailable."
-            : "Writes a backup to " + session.BackupPreview + ". You can then save again. The next Save replaces the file with the editor version.";
+            : "Writes a backup to " + session.BackupPreview + ". " + KeepEditorEffect;
         internal const string ImportOutdated = "Import closed because the file changed again. Review the updated version choice.";
         internal const string ImportIntro = "Import applies all changes below and your choices for all conflicts together. It adds no Undo step. Nothing is written until you click Save in the Map Editor.";
         internal static string KindLabel(ImportChangeKind kind) => kind == ImportChangeKind.New ? "New" : kind == ImportChangeKind.Removed ? "Removed" : "Changed";

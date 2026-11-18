@@ -475,7 +475,7 @@ namespace RailroaderScenePatcher {
             });
             var rotation = go.transform.rotation;
             var board = family == "Independent board";
-            string refusal = board ? "the board capability is unavailable" : null;
+            string refusal = board ? "Board editing is unavailable" : null;
             if (board && boardRefusal != null) Read(() => refusal = boardRefusal(go));
             // Why an object of a supported family cannot be edited is no detected problem: it stands under Supported
             // edits.
@@ -483,17 +483,17 @@ namespace RailroaderScenePatcher {
             string bridgeRefusal = null;
             if (bridge) Read(() => bridgeRefusal = BridgeWorld.PatternProblem(go));
             var marked = family == "Track marker";
-            string markerRefusal = marked ? "the track-marker capability is unavailable" : null;
+            string markerRefusal = marked ? "Track marker editing is unavailable" : null;
             if (marked) Read(() => markerRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : TrackMarkerWorld.Problem(go, markerReferrers, setups));
             var markerEditable = marked && markerRefusal == null;
             var pad = family == "Crossing pad marker";
-            string padRefusal = pad ? "the crossing-pad capability is unavailable" : null;
+            string padRefusal = pad ? "Crossing pad editing is unavailable" : null;
             if (pad) Read(() => padRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : CrossingPadWorld.PadProblem(go, markerReferrers, setups));
             var padEditable = pad && padRefusal == null;
             var milepost = family == "Milepost";
-            string milepostRefusal = milepost ? "the milepost capability is unavailable" : null;
+            string milepostRefusal = milepost ? "Milepost editing is unavailable" : null;
             if (milepost) Read(() => milepostRefusal = referrerError != null ? "the marker reference scan failed: " + referrerError
                 : MilepostWorld.MilepostProblem(go, markerReferrers, setups));
             var milepostEditable = milepost && milepostRefusal == null;
@@ -502,7 +502,7 @@ namespace RailroaderScenePatcher {
             string partRefusal = null, groupPath = null;
             if (part) Read(() => { partRefusal = GroupWorld.PartProblem(go); groupPath = GroupWorld.PartVerdictOf(go)?.GroupPath; });
             var crossing = family == "Crossing controller";
-            string coverageRefusal = crossing ? "the crossing-coverage capability is unavailable" : null;
+            string coverageRefusal = crossing ? "Crossing coverage editing is unavailable" : null;
             if (crossing) Read(() => coverageRefusal = CrossingCoverageWorld.Problem(go));
             var coverageEditable = crossing && coverageRefusal == null;
             // A kind no supported family covers is inspection only, which is another state than an object of a supported
@@ -519,18 +519,18 @@ namespace RailroaderScenePatcher {
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost);
             if (only != null) markerEditable = false;
             var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : null;
-            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Fixed placement and activity; culling, mask registration and terrain output follow through native refresh" : CommandBand.NotEditable(refusal))
-                : bridge ? (bridgeRefusal == null ? "Fixed placement and activity of the bridge root with its colliders; separate track-owned scenery stays unchanged. Requires successful preflight" : CommandBand.NotEditable(bridgeRefusal))
-                : markerEditable ? "Track binding: set, replace or detach the marker location with its graph registration; fixed placement and activity of the object stay separate settings"
+            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
+                : bridge ? (bridgeRefusal == null ? "Move, rotate, enable or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
+                : markerEditable ? "Set, replace or detach the marker's track binding. Edit placement and activity separately."
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
                 : pad ? CommandBand.NotEditable(padRefusal)
                 : milepostEditable ? CommandBand.MilepostOperations
                 : milepost ? CommandBand.NotEditable(milepostRefusal)
-                : coverageEditable ? "Select the tracks each circuit detects, or explicitly detach it. Add detection for extra tracks you explicitly select, or add eligible lights, gates and bells driven by the crossing controller. Native spans stay registered and the crossing itself does not move"
+                : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates and bells. The crossing and its original detection spans stay in place."
                 : CommandBand.NotEditable(coverageRefusal);
             // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
-            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.Id, added.Scope, added.Pattern == EquipmentAddition.BellPattern); }
+            if (c is OwnedEquipment added) { structure = null; operations = CommandBand.AddedEquipmentOperations(added.DisplayName); }
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
@@ -567,6 +567,7 @@ namespace RailroaderScenePatcher {
             // Existence is not proof that the binding names the intended track.
         }
         // The track graph's named-location entries under the marker's ID: the registration that ID lookups find.
+        internal const string ListedTrackLocation = "Track location listed by the game:";
         static void Registrations(Component marker, List<string> bindings) {
             var id = Text(Field(marker, "id"));
             var graph = Native.Read(Native.Type("Track.Graph"), "Shared") ?? throw new InvalidOperationException("Track graph unavailable");
@@ -575,10 +576,12 @@ namespace RailroaderScenePatcher {
             foreach (DictionaryEntry bucket in buckets) {
                 if (!(bucket.Value is IDictionary entries) || !entries.Contains(id)) continue;
                 var named = entries[id]; var at = Field(named, "Location"); var segment = Field(at, "segment");
-                bindings.Add("Graph registration in bucket " + Text(bucket.Key) + ": segment=" + (segment == null ? "none" : Text(Field(segment, "id"))) + "; end=" + Text(Field(at, "end")) + "; distance=" + Text(Field(at, "distance")) + "; owner=" + (ReferenceEquals(Field(named, "ObjectValue"), marker) ? "this marker" : "another object"));
+                var location = (segment == null ? "no segment" : Text(Field(segment, "id"))) + " / " + Text(Field(at, "end")) + " / " + Text(Field(at, "distance"));
+                bindings.Add(ListedTrackLocation + " " + location + (segment != null && Equals(Field(segment, "id"), bucket.Key) ? "" : " under segment " + Text(bucket.Key)) +
+                    (ReferenceEquals(Field(named, "ObjectValue"), marker) ? "." : ". This location belongs to another object."));
                 found++;
             }
-            if (found == 0) bindings.Add("Graph registration: none");
+            if (found == 0) bindings.Add(ListedTrackLocation + " none.");
         }
         static string Describe(object value) => value is Component c ? Label(c) : value is GameObject go ? go.scene.name + "/" + BoardScene.PathOf(go.transform) : Text(value);
     }

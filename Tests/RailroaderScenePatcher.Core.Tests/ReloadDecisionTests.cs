@@ -89,7 +89,7 @@ static class ReloadDecisionTests {
         w.Session.Edit(P, PlacementAt(112), null); w.MapEditor.NativeEdit(7);
         w.MapEditor.FailNative = true;
         var message = w.Session.Reload(ReloadChoice.Save, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++);
-        Assert(message.Contains("native map data") && message.Contains("native write injected") && reloads == 0
+        Assert(message.Contains("Unsaved work: map data.") && message.Contains("native write injected") && reloads == 0
             && w.Store.PatchWrites == 1 && w.MapEditor.IsDirty && w.Box.X == 12 && w.MapEditor.NativeValue == 7,
             "A partial Save blocks reload and names completed and outstanding writes and the failure");
         Assert(w.Session.Reload(ReloadChoice.Cancel, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++) == null
@@ -99,7 +99,7 @@ static class ReloadDecisionTests {
             && reloads == 1 && w.Store.PatchWrites == 1 && !w.MapEditor.IsDirty, "Retry completes outstanding writes before reloading");
         w.MapEditor.NativeEdit(8); w.MapEditor.ThrowInNativeAction = true; w.MapEditor.Undo();
         message = w.Session.Reload(ReloadChoice.Save, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++);
-        Assert(message.Contains("history is unrecovered") && reloads == 1, "Save cannot silently discard work after an unrecovered native history error");
+        Assert(message.Contains("Undo history could not be recovered") && reloads == 1, "Save cannot silently discard work after an unrecovered native history error");
         Assert(w.Session.Reload(ReloadChoice.Discard, () => w.MapEditor.NativeDirty, () => w.MapEditor.Save(), () => reloads++) == null
             && reloads == 2, "An explicit discard remains available after incomplete persistence");
     }
@@ -111,15 +111,15 @@ static class ReloadDecisionTests {
         w.MapEditor.Undo(); w.MapEditor.Redo(); w.Session.Remove(P);
         Assert(w.Session.ReloadRequirement == null, "Undo, Redo and removal retain effective live updates without a stale reload flag");
         w.MapEditor.NativeEdit(3); w.MapEditor.ThrowInNativeAction = true; w.MapEditor.Undo();
-        Assert(w.Session.ReloadRequirement.Contains("history is unrecovered"), "An unrecovered native history remains a concrete reload requirement");
+        Assert(w.Session.ReloadRequirement.Contains("Undo history could not be recovered"), "An unrecovered native history remains a concrete reload requirement");
         w.MapEditor.Save();
-        Assert(w.Session.ReloadRequirement.Contains("history is unrecovered"), "Save does not claim to repair native history");
+        Assert(w.Session.ReloadRequirement.Contains("Undo history could not be recovered"), "Save does not claim to repair native history");
     }
     static void ReloadPreservesSaveFailureDetails() {
         var w = new World(); var reloads = 0;
         var message = w.Session.Reload(ReloadChoice.Save, () => false,
-            () => { throw new IOException("completed writes: scene patch file; outstanding: native map data", new IOException("disk cause")); }, () => reloads++);
-        Assert(reloads == 0 && message.Contains("completed writes: scene patch file") && message.Contains("outstanding: native map data"),
+            () => { throw new IOException("completed writes: scene patch file; outstanding: map data", new IOException("disk cause")); }, () => reloads++);
+        Assert(reloads == 0 && message.Contains("completed writes: scene patch file") && message.Contains("outstanding: map data"),
             "A thrown native Save report keeps its completed and outstanding writes rather than only the inner cause");
     }
 }

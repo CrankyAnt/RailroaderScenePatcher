@@ -497,7 +497,7 @@ namespace RailroaderScenePatcher {
             if (shape == null) return;
             shape.Color = Tone(CommandBand.RelationMark(shape.Contains(pointer)));
             shape.Detailed = true;
-            shape.Text = label + Short(relation.Choice.Label);
+            shape.Text = label + Short(relation.Observation?.DisplayName ?? relation.Choice.Label);
             shapes.Add(shape);
         }
         internal void Draw(SpatialCandidate[] candidates, PendingSelection pending, SpatialCandidate source, bool hasSource, SpatialCandidate confirmed, SpatialCandidate followed,
@@ -563,7 +563,7 @@ namespace RailroaderScenePatcher {
                 shape.Listed = offered && several;
                 shape.Strong = rowHovered;
                 if (offered) shape.Text = several ? pending.Number(candidate.Choice) + "  " + CommandBand.ChoiceLabel(candidate.Choice.Label, offerLabels, 60, candidate.Observation)
-                    : (chosen ? "New: " : "Choice: ") + Short(candidate.Choice.Label);
+                    : "Candidate: " + Short(candidate.Observation?.DisplayName ?? candidate.Choice.Label);
                 // Every candidate of the mode carries its "+" marker without the pointer over it; a track within a
                 // distance of the camera, so that a wide view is not filled with them.
                 if (shape.Listed || shape.Detailed || Marked(shape, candidate, camera, origin)) shapes.Add(shape);
@@ -584,7 +584,7 @@ namespace RailroaderScenePatcher {
                 // The inspected object keeps its frame and marker at any camera distance and while culling hides it.
                 var shape = Project(source, camera, origin, Double.PositiveInfinity, out _);
                 if (marked != null) {
-                    if (hasSource) marked.Text = "Object / " + marked.Text;
+                    if (hasSource) marked.Text = "Inspected: " + Short(source.Observation?.DisplayName ?? source.Choice.Label);
                 } else if (shape != null) {
                     // The gold frame and the marker at its center say which object is inspected; a world label would
                     // stand in the gizmo's way, and the panel names the object.
@@ -608,7 +608,7 @@ namespace RailroaderScenePatcher {
             // The current relations of the inspected object stay marked in green while it is inspected: a target
             // confirmed in the world, the track it follows, and, while the Connections tab is open, what it is bound to.
             // The offered marking of the same element leads.
-            Relation(shapes, confirmed, "Confirmed: ", camera, origin, pointer);
+            Relation(shapes, confirmed, "Confirmed choice: ", camera, origin, pointer);
             if (CommandBand.ShowsCurrentRelations(confirmed != null)) {
                 Relation(shapes, followed, "Follows: ", camera, origin, pointer);
                 if (bound != null) foreach (var relation in bound) Relation(shapes, relation, "Bound: ", camera, origin, pointer);

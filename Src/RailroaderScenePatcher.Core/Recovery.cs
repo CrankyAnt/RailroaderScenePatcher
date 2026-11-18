@@ -31,7 +31,10 @@ namespace RailroaderScenePatcher.Core {
     }
     // A failure after a mutation started, with what it left behind.
     internal sealed class AttemptFailure : InvalidOperationException {
-        internal AttemptFailure(FailureKind kind, string message, IReadOnlyList<string> remaining = null) : base(message) { Kind = kind; Remaining = remaining ?? Array.Empty<string>(); }
+        internal AttemptFailure(FailureKind kind, string message, IReadOnlyList<string> remaining = null, bool wasGuarded = false) : base(message) {
+            Kind = kind; Remaining = remaining ?? Array.Empty<string>(); WasGuarded = wasGuarded;
+        }
+        internal bool WasGuarded { get; }
         internal FailureKind Kind { get; }
         internal IReadOnlyList<string> Remaining { get; }
     }
@@ -54,7 +57,7 @@ namespace RailroaderScenePatcher.Core {
             if (!MarkerBinding.Same(before.Marker, now?.Marker)) lines.Add("Track binding: now " + Binding(now?.Marker) + ", before " + Binding(before.Marker));
             if (!CrossingCoverage.Same(before.Coverage, now?.Coverage)) lines.Add("Crossing coverage: does not match its value before the attempt");
             if (now?.Coverage?.Residue?.Count > 0) lines.Add("Owned spans still registered: " + String.Join(", ", now.Coverage.Residue));
-            if (lines.Count == 0) lines.Add("The settings match their values before the attempt. The dependent state is still uncertain because the capability could not verify it" + (String.IsNullOrEmpty(reason) ? "" : ". Reason: " + reason));
+            if (lines.Count == 0) lines.Add("The settings match their values before the attempt. The patcher could not verify the related changes" + (String.IsNullOrEmpty(reason) ? "" : ". Reason: " + reason));
             return lines;
         }
         static string Activity(bool? active) => active == null ? "group-driven" : active.Value ? "Yes" : "No";
@@ -62,8 +65,9 @@ namespace RailroaderScenePatcher.Core {
     }
     // The correction guidance for one failed scene patch editing action: what went wrong, what to do, and the guide of the operation.
     public sealed class Recovery {
-        internal Recovery(FailureKind kind, string problem, string correction, string guide, string guideTitle, IReadOnlyList<string> remaining) {
-            Kind = kind; Problem = problem; Correction = correction; Guide = guide; GuideTitle = guideTitle; Remaining = remaining;
+        readonly bool wasGuarded;
+        internal Recovery(FailureKind kind, string problem, string correction, string guide, string guideTitle, IReadOnlyList<string> remaining, bool wasGuarded) {
+            Kind = kind; Problem = problem; Correction = correction; Guide = guide; GuideTitle = guideTitle; Remaining = remaining; this.wasGuarded = wasGuarded;
         }
         public FailureKind Kind { get; }
         // The reason the action reported.
@@ -79,7 +83,7 @@ namespace RailroaderScenePatcher.Core {
             get {
                 switch (Kind) {
                     case FailureKind.Restored: return "failed and was undone";
-                    case FailureKind.AwaitingOutput: return "was undone; waiting for terrain";
+                    case FailureKind.AwaitingOutput: return wasGuarded ? "is waiting for terrain" : "was undone; waiting for terrain";
                     case FailureKind.IncompleteCleanup: return "failed; cleanup is incomplete";
                     case FailureKind.Blocked: return "is blocked by incomplete cleanup";
                     default: return "refused";
@@ -88,8 +92,17 @@ namespace RailroaderScenePatcher.Core {
         }
         // One line for the message area, read as one label followed by plain sentences, as every refusal in the message
         // area reads: the action with its heading, the problem, what remains and the correction.
-        public string Line(string action) => action + " " + Heading + ". " + Sentence(Problem) +
-            (Remaining.Count == 0 ? "" : " What remains: " + String.Join("; ", Remaining) + ".") + " " + Correction;
+        public string Line(string action) {
+            var detail = Kind == FailureKind.Blocked ? "" : Problem;
+            if (Kind == FailureKind.Restored || Kind == FailureKind.AwaitingOutput || Kind == FailureKind.IncompleteCleanup) {
+                const string reason = " Reason: ";
+                var start = detail.IndexOf(reason, StringComparison.Ordinal);
+                if (start >= 0) detail = detail.Substring(start + reason.Length);
+            }
+            return action + " " + Heading + "." + (String.IsNullOrEmpty(detail) ? "" : " " + Sentence(detail)) +
+                (Remaining.Count == 0 ? "" : " What remains: " + String.Join("; ", Remaining.Select(line => line.TrimEnd('.'))) + ".") +
+                (String.IsNullOrEmpty(Correction) ? "" : " " + Correction);
+        }
         static string Sentence(string text) {
             text = (text ?? "").Trim();
             if (text.Length == 0) return text;
@@ -126,20 +139,21 @@ namespace RailroaderScenePatcher.Core {
             if (outcome == null || outcome.Applied) return null;
             var guide = Guide(place, action, structure);
             var problem = String.IsNullOrWhiteSpace(outcome.Error) ? "no reason was reported for the failure" : outcome.Error;
-            return new Recovery(outcome.Failure == FailureKind.None ? FailureKind.Refused : outcome.Failure, problem, Correction(outcome.Failure, problem), guide.Value, guide.Key, outcome.Remaining);
+            return new Recovery(outcome.Failure == FailureKind.None ? FailureKind.Refused : outcome.Failure, problem, Correction(outcome.Failure, problem), guide.Value, guide.Key, outcome.Remaining, outcome.WasGuarded);
         }
         static string Correction(FailureKind kind, string problem) {
             switch (kind) {
-                case FailureKind.Restored: return "The object is back as it was. The scene patch file is unchanged. Correct the cause and apply again. Each attempt checks the object again.";
-                case FailureKind.AwaitingOutput: return "The failed edit was undone and the object is back as it was. The game is still regenerating its terrain. Wait for the terrain to update before editing again, or select Retry on the Changes tab. Recheck is not needed.";
-                case FailureKind.IncompleteCleanup: return "Editing this object is blocked until Recheck confirms that it matches the scene patch file, or you reload the Map Editor. Recheck compares the object with the file and applies the file's settings wherever they differ.";
-                case FailureKind.Blocked: return "Cleanup after an earlier failed edit could not be verified for this object. Select Recheck or reload the Map Editor.";
+                case FailureKind.Restored: return "The scene patch file is unchanged. Correct the cause and try again.";
+                case FailureKind.AwaitingOutput: return "Wait for the terrain to update before editing again, or click Retry on the Changes tab.";
+                case FailureKind.IncompleteCleanup:
+                case FailureKind.Blocked: return "Click Recheck or reload the Map Editor.";
                 case FailureKind.DependencyFailed: return "First correct the modification that this one depends on.";
             }
-            if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. Refresh the inventory, inspect the object again and repeat the action.";
-            if (Mentions(problem, "resolve uniquely")) return "Nothing changed. The object is missing from the loaded scene, or more than one object matches. Refresh the inventory and inspect it again.";
+            if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. Refresh the object list, inspect the object again and repeat the action.";
+            if (Mentions(problem, "resolve uniquely")) return "Nothing changed. The object is missing from the loaded scene, or more than one object matches. Refresh the object list and inspect it again.";
             if (Mentions(problem, "protected from overwrite")) return "Nothing changed. This scene patch file cannot be overwritten.";
-            return "Nothing changed. Correct the value or selection named above and apply again. Each attempt checks the object again.";
+            if (Mentions(problem, "Reload before", "Reload the Map Editor before")) return "";
+            return "Nothing changed. Correct the problem and try again.";
         }
         static bool Mentions(string text, params string[] words) => words.Any(w => text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
     }

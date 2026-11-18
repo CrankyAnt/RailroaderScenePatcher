@@ -198,7 +198,7 @@ namespace RailroaderScenePatcher {
                     }
                 }
                 var tooltip = titleHelp.GetComponent<UI.Tooltips.UITooltipProvider>() ?? titleHelp.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
-                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", CommandBand.Tooltip(HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Explain the whole Scene patches window.", lockReason));
+                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", CommandBand.Tooltip(HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Open Scene Patcher help.", lockReason));
                 titleHelp.SetAsLastSibling();
             } catch (Exception e) {
                 if (titleHelp != null) UnityEngine.Object.Destroy(titleHelp.gameObject);

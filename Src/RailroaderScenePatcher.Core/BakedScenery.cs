@@ -218,11 +218,11 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion("Scenery.BulkIndustryStorageSynchronizer", "industry storage display", "#98"),
             new Exclusion("Game.Mow.TrackConstructionScenery", "bridge construction scenery", "#95"),
             new Exclusion("Character.SpawnPoint", "spawn point", "#94"),
-            new Exclusion("UI.Map.MapIcon", "map icon", "#89"),
+            new Exclusion("UI.Map.MapIcon", "station icon", "#89", reason: "This group contains a station icon, so it cannot be edited as a group."),
             new Exclusion("RollingStock.Controls.KeyValuePickableToggle", "pickable toggle", "#91"),
         });
         // Why a group with track markers is left out: the markers keep their own family. No ticket covers it yet.
-        public const string TrackMarkerReason = "the group holds track markers, which keep their own family, and moving such a group as a whole is not supported yet";
+        public const string TrackMarkerReason = "This group contains track markers, so it cannot be moved as a whole.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
         public static readonly IReadOnlyList<string> RailBridgeFolders = Array.AsReadOnly(new[] { "Almond Bridge", "Plate Girder Bridge" });
         // The bridge roots that a later bridge ticket names: road bridges, and rail bridge constructions outside Ela, whose
@@ -269,7 +269,7 @@ namespace RailroaderScenePatcher.Core {
             // Physical presence comes first: an object without a renderer, collider or light is not listed, whatever it holds.
             if (!Physical(node)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
             var bridge = BridgeTicket(town, node.Name);
-            if (bridge != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, "baked scenery groups that are " + (bridge == "#97" ? "road bridges" : "rail bridge constructions outside Ela"), bridge)); return; }
+            if (bridge != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, bridge == "#97" ? "Road bridges cannot be edited." : "Rail bridges outside Ela cannot be edited.", bridge, true)); return; }
             var excluded = FirstExclusion(node);
             if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
             verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.Group, null));

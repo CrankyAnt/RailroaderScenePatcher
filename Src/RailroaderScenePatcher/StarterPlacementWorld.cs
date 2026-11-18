@@ -84,7 +84,7 @@ namespace RailroaderScenePatcher {
             var refusal = MarkerPattern.Refusal(new MarkerShape(markers.Length, go.GetComponents<Component>().Any(c => c == null), Get(go, Milepost) != null, Get(go, PadBuilder) != null,
                 m == null ? null : Convert.ToString(Field(m, "type"))));
             if (refusal != null) return refusal;
-            if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID; its graph registration cannot be identified";
+            if (String.IsNullOrWhiteSpace(Field(m, "id") as string)) return "The marker has no ID, so the patcher cannot find its track location";
             if (Field(m, "OnLocationChanged") is Delegate listeners && listeners.GetInvocationList().Length != 0) return "Another component consumes this marker's location changes; its dependent state is not supported";
             var relative = Get(go, Relative);
             if (relative != null && Field(relative, "targetActiveFollowsTrackGroup") is bool follows && follows) return "The object's activity follows a track group; a starter placement marker with group-driven activity is not supported";

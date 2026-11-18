@@ -75,7 +75,7 @@ namespace RailroaderScenePatcher {
             try {
                 if (current != null) throw new InvalidOperationException("Another scene-patch gizmo is shown");
                 controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as Behaviour;
-                if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new InvalidOperationException("The native map editor changed");
+                if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new InvalidOperationException("The Map Editor changed");
                 var matches = scene.Resolve(identity);
                 if (matches.Count != 1) throw new InvalidOperationException("Target must resolve uniquely");
                 inspected.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
@@ -84,8 +84,8 @@ namespace RailroaderScenePatcher {
                 var position = MapToWorld(shown);
                 var nativeGizmo = Native.Read(controller, "TransformGizmo");
                 var native = nativeGizmo == null ? null : Native.Read(nativeGizmo, "_gizmo") as TransformGizmo;
-                if (native == null) throw new InvalidOperationException("The native map editor gizmo is unavailable");
-                if (native.IsDragging) throw new InvalidOperationException("Release the native map editor gizmo first");
+                if (native == null) throw new InvalidOperationException("The Map Editor gizmo is unavailable");
+                if (native.IsDragging) throw new InvalidOperationException("Release the Map Editor gizmo first");
                 var box = Native.Read(controller, "BoxSelect");
                 if (box != null && (bool)Native.Read(box, "IsDragging")) {
                     Native.Call(box, "Cancel");
@@ -104,7 +104,7 @@ namespace RailroaderScenePatcher {
                 current = this;
                 visual = gameObject.AddComponent<TransformGizmo>();
                 visual.Camera = Camera.main;
-                if (visual.Camera == null) throw new InvalidOperationException("The native map editor camera is unavailable");
+                if (visual.Camera == null) throw new InvalidOperationException("The Map Editor camera is unavailable");
                 visual.Space = TransformGizmoSpace.World; visual.Mode = mode; visual.Visible = true;
                 visual.SetPose(position, Rotation(shown));
                 lastPose = position;
@@ -205,7 +205,7 @@ namespace RailroaderScenePatcher {
             hooks = null;
             try {
                 if (cleanup.Count != 0) {
-                    var message = "Gizmo cleanup is unverified; reload the native map editor: " + String.Join("; ", cleanup);
+                    var message = "The patcher could not verify cleanup after using the gizmo. Reload the Map Editor. " + String.Join("; ", cleanup);
                     attachment.Fault = message;
                     if (notify) finished?.Invoke(result, message);
                 } else if (notify) finished?.Invoke(result, result?.Error == null ? "Gizmo drag cancelled; the prior placement is restored." : "Gizmo cancellation failed: " + result.Error);

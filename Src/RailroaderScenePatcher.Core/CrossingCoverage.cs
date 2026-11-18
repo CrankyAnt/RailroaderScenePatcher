@@ -253,7 +253,7 @@ namespace RailroaderScenePatcher.Core {
         public bool EquipmentAvailable => equipment != null;
         // The loaded devices scene patch editing offers as equipment sources for the controller, eligible or with their rejection reason.
         public IReadOnlyList<SourceCandidate> EquipmentCandidates(object target) {
-            if (equipment == null) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
+            if (equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
             BaselineOf(target);
             return equipment.Candidates(target);
         }
@@ -367,7 +367,7 @@ namespace RailroaderScenePatcher.Core {
             if (state.Placement != null || state.Active != null) throw new InvalidOperationException("A crossing-coverage target accepts only relationships.crossingCoverage and relationships.crossingEquipment; placement and activity of the crossing are not supported");
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state.Equipment != null) {
-                if (equipment == null) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
+                if (equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
                 equipment.Check(target, state.Equipment);
                 var baseline = BaselineOf(target);
                 var change = EquipmentChange(target, baseline, state.Equipment);
@@ -439,7 +439,7 @@ namespace RailroaderScenePatcher.Core {
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state.Placement != null && !Placements.Same(state.Placement, new Placement(world.Position(target), world.Rotation(target)))) throw new InvalidOperationException("Crossing coverage does not move the crossing");
             if (state.Active != null && state.Active.Value != world.Active(target)) throw new InvalidOperationException("Crossing coverage does not change the crossing's activity");
-            if (state.Equipment != null && equipment == null) throw new InvalidOperationException("The crossing-equipment capability is unavailable");
+            if (state.Equipment != null && equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
             var baseline = BaselineOf(target);
             if (state.Coverage != null) {
                 var desired = Effective(target, baseline, state.Coverage);

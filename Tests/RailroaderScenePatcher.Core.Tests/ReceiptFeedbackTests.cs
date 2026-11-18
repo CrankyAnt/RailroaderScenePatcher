@@ -81,6 +81,10 @@ static class ReceiptPriorityTests {
         if (!session.KeepEditorVersion().Applied || EditFeedback.Primary(session, false, false) != EditFeedback.PrimaryMessage.BackupDiagnosis)
             throw new Exception("A repair backup reports its diagnosis until Save");
         var diagnosis = session.ScenePatchFileDiagnostics[0];
+        var notice = EditFeedback.BackupNotice(session);
+        if (notice != "The original file is backed up at Data/scene-patches.json.backup-test. Scene Patcher will not change the backup. Delete it when you no longer need it. It will be published with the mod while it remains there."
+            || notice.Contains(diagnosis.Message))
+            throw new Exception("The footer names the backup and its publication warning. Details retains the diagnosis: " + notice);
         session.BeginSave();
         if (EditFeedback.Primary(session, false, false) != EditFeedback.PrimaryMessage.None)
             throw new Exception("Successful Save releases the first footer slot for current feedback");
@@ -116,7 +120,12 @@ static class ExitPromptTests {
         session.CheckFileVersion();
         if (session.ExitWarning(false) != null) throw new Exception("Fixture has no unsaved work except the pending choice");
         var message = session.ExitPrompt(false);
-        if (message == null || message.Contains("?  ") || message.Contains("Exit discards it") || !message.Contains("unsaved work"))
-            throw new Exception("A standalone version-choice exit prompt has normal spacing and names the work Exit discards");
+        if (message != "Exit the Map Editor? A file version choice is still pending. Exit discards unsaved work.")
+            throw new Exception("The exit prompt describes a pending version choice without repeating the diagnosis: " + message);
+        store.Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{},\"extra\":\"unterminated";
+        session.CheckFileVersion();
+        message = session.ExitPrompt(false);
+        if (message != "Exit the Map Editor? The scene patch file still needs repair. Exit discards unsaved work.")
+            throw new Exception("The exit prompt describes repair without repeating the parser diagnostic: " + message);
     }
 }
