@@ -89,7 +89,7 @@ namespace RailroaderScenePatcher {
         const string MastFamily = ExistingEquipmentScene.MastFamily, BellFamily = ExistingEquipmentScene.BellFamily;
         const string Marker = "Track.TrackMarker", Span = "Track.TrackSpan", Relative = "Track.TrackRelativePosition";
         const string Crossing = "Track.Crossings.GradeCrossingController", Milepost = "Helpers.MilePost";
-        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile", CarLoader = "RollingStock.CarContentSwapper", LogPond = BakedSceneryRules.LogPond, LakeSurface = BakedSceneryRules.LakeSurface;
+        const string ConstructionScenery = "Game.Mow.TrackConstructionScenery", Pile = "Scenery.Pile", LogPond = BakedSceneryRules.LogPond, LakeSurface = BakedSceneryRules.LakeSurface;
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         // Why a board candidate cannot be edited, from the board capability; null when that capability is unavailable.
         readonly Func<GameObject, string> boardRefusal;
@@ -548,13 +548,6 @@ namespace RailroaderScenePatcher {
             if ((groupRoot || part) && Get(go, Pile) == null) Read(() => {
                 var piles = components.Count(component => component != null && TypeName(component) == Pile);
                 if (piles != 0) bindings.Add(CommandBand.PilesBinding(piles));
-            });
-            // A car loader looks for a car under the object it stands on: each search reads the object's transform,
-            // while a car it is filling keeps loading where the search found it. The load it fills is a binding, by the
-            // id the game reads.
-            if ((groupRoot || part) && Get(go, CarLoader) != null) Read(() => {
-                bindings.Add(CommandBand.LoaderBindingOf(Get(go, CarLoader)));
-                dependencies.Add("Car loader: cars under this object are loaded where it stands");
             });
             // A rail bridge construction shows or hides its parts by the construction state of the track segments its
             // controller names, wherever it stands: each segment is a binding of the group root and of every part below the

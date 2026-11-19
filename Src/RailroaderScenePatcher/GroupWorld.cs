@@ -737,7 +737,7 @@ namespace RailroaderScenePatcher {
         static readonly Tuple<Type, FieldInfo>[] drivenFields = BakedSceneryRules.DrivenFields
             .Select(d => { var type = Native.Type(d.Component); return Tuple.Create(type, type?.GetField(d.Field, Native.Flags)); })
             .Where(d => d.Item1 != null && d.Item2 != null && typeof(Component).IsAssignableFrom(d.Item2.FieldType)).ToArray();
-        // A component of BakedSceneryRules.Animators, such as the KeyValueBoolAnimator of the coal loader's chute,
+        // A component of BakedSceneryRules.Animators, such as the KeyValueBoolAnimator of a stall's doors,
         // animates the object it stands on.
         static readonly Type[] animators = BakedSceneryRules.Animators.Select(Native.Type).Where(type => type != null).ToArray();
         static void AddDriven(Transform world, HashSet<Transform> found) {

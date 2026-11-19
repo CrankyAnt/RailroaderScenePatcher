@@ -232,6 +232,7 @@ namespace RailroaderScenePatcher.Core {
             new Exclusion(ConstructionController, "track construction controller", null, reason: ConstructionOutsideBridge),
             new Exclusion(SpawnPoints.Component, "spawn point", null, reason: SpawnPointReason),
             new Exclusion("UI.Map.MapIcon", "map icon", null, reason: MapIconReason),
+            new Exclusion("RollingStock.CarContentSwapper", "car loader", null, reason: CarLoaderReason),
         });
         // Why a group with a map icon is left out. Station map icons, in the Station Icons folder, have their own family;
         // a map icon elsewhere is in no family and has no edit. No ticket is needed.
@@ -242,6 +243,10 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
         public const string TrackMarkerReason = "This group is not moved as a whole. Its track markers are edited one by one in the Track marker family.";
+        // Why a group with a car loader (RollingStock.CarContentSwapper) is left out. Railroader 0.6.3 has one, the Robinson
+        // Gap Mine Coal Loader, and it loads nothing: the base map loads Robinson Gap coal by teleport between the spans of
+        // its industry (a TeleportLoadingIndustry in Map.json), so moving the loader would not move loading. No ticket.
+        public const string CarLoaderReason = "This group holds a car loader. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading.";
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
         public const string SpawnPointReason = "This group is not moved as a whole. Its spawn points are edited one by one in the Spawn point family.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
@@ -425,8 +430,8 @@ namespace RailroaderScenePatcher.Core {
             }
         }
         // The components that animate the object they stand on, and everything below it, while the game runs. Railroader
-        // 0.6.3: a KeyValueBoolAnimator plays its clip on its own Animator whenever its key changes, as the chute of the
-        // Robinson Gap Mine Coal Loader (Model/MineLoader) does while it loads. The game's adapter adds these objects to
+        // 0.6.3: a KeyValueBoolAnimator plays its clip on its own Animator whenever its key changes, as the doors of a
+        // roundhouse stall do when they open. The game's adapter adds these objects to
         // the transforms it treats as animated (GroupWorld.AddDriven), so the part rule and the group observation agree.
         public static readonly IReadOnlyList<string> Animators = Array.AsReadOnly(new[] { "RollingStock.Controls.KeyValueBoolAnimator" });
         public static bool Animates(IEnumerable<string> components) => components != null && components.Any(type => type != null && Animators.Contains(type));

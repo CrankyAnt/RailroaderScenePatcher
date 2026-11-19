@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to crossbucks at unprotected crossings and to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
+Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to crossbucks at unprotected crossings and to groups containing a station click spot, map icon or car loader. The `Coal Loader` group at Robinson Gap Mine holds a car loader and stays `inspection only`: the game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
 Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -108,22 +108,6 @@ If the game's ground mask members are unavailable in a build, the group is refus
 Hemingway flagstopstation is not a group. Its Generic track marker stands on the root of the building, so the object stays in the **Track marker** family. Only this station building gets mask handling in that family. A placement of its marker is refused before anything changes, because its ground mask flattens the terrain height. An existing scene patch file that moves the marker fails that modification on load with the reason `The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`, and the file's other modifications still apply. On its **Object** tab, **Dependencies** names the object that holds the mask, because the **Track marker** family has no parts. The masks of other marker objects, such as a sign with a circle mask, are left as that family already left them: the patcher neither rebuilds nor refuses them.
 
 The game's progression switches the `Cochran flagstopstation`, `Alarka Depot` and `Alarka Jct Station` groups and the track marker on `Hemingway flagstopstation` on and off: when the map loads and whenever the industries change. Without a disable, the patcher leaves that switching to the game. A disable holds against it: the object stays off when progression would switch it on. The **Object** tab and the footer's message area then show an amber warning that the object stays off in the game although the game's progression switches it on, because your disable holds against it. **Enable**, **Clear activity**, Undo or **Remove modification** returns the object to the state that progression gives it now. While progression keeps an object off that you did not disable, **Enabled** reads `Yes; the game switches it off now`. If the disable could not hold, because the patcher cannot share the object's activity with progression in this load or the game's progression members are unavailable, **Disable** is unavailable and its tooltip gives the reason. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches). Not yet observed in Railroader.
-
-## Move the coal loader with the track under it
-
-The `Coal Loader` group at Robinson Gap Mine, under **Industry building**, carries the scene's car loader on its group root. The car loader looks for a car under the group root's position and fills it with the load that the scene sets for it. It reads no industry storage. When you move the group, the patcher moves this scene object, so the position the car loader reads moves with it. The patcher does not change the load.
-
-The native Prop `aj-coal-loader-mine` stands beside the group, about 3 m away. It is native map data, so moving the group leaves it in place.
-
-On the group's **Object** tab, **Use in the game** reads `Loading point: cars under it are loaded.` The group's only part is `Coal Loader / Model / Spotlight Outdoor`, and its tab says that moving or disabling it does not change loading. `Model / MineLoader`, the chute and frame that the game animates while it loads, moves with the group and has no row of its own.
-
-Track and Props are native map data, so move them first:
-
-1. In the native map editor, move the track under the loader and the Prop `aj-coal-loader-mine` to the new place.
-1. In **Scene patches**, select `Coal Loader` under **Baked scenery group** > **Industry building** and move the group so that its group root stands above the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor).
-1. Click **Save** in the native map editor.
-
-A car that the loader is filling when you move the group keeps loading at the old place until the car leaves; the next search uses the new position. While the group is disabled, its car loader does not run.
 
 ## Buildings with lanterns and doors
 

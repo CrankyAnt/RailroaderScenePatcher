@@ -300,29 +300,12 @@ namespace RailroaderScenePatcher {
         // every object that is no pile. An industry loads and unloads on the track spans of the native map data, so
         // its decorative buildings and its storage display move without changing that; a pile shows its industry's
         // storage by the ids the game reads, wherever it stands.
-        // holdsPiles: the group root or part holds storage piles below it. loadingPoint: the object holds a car loader,
-        // which loads the cars under where the object stands; groupLoads: the object is a part of a group whose root
-        // holds one, so the part does not decide where cars load.
-        internal static string UseInGame(bool part, string category, string storage, bool holdsPiles, bool loadingPoint = false, bool groupLoads = false) {
-            if (loadingPoint) return LoadingPoint;
-            if (groupLoads) return "Decorative. Cars are loaded under the group's loading point, so moving or disabling this part does not change loading.";
+        // holdsPiles: the group root or part holds storage piles below it.
+        internal static string UseInGame(bool part, string category, string storage, bool holdsPiles) {
             if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile does not change the storage, and the industry keeps working on its native track spans.";
             if (category != BakedSceneryCategories.IndustryBuilding && category != BakedSceneryCategories.StorageDisplay) return part ? PartDecorative : Decorative;
             return "Decorative. The industry works on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " does not change loading or unloading." +
                 (holdsPiles ? " Its piles keep showing the industry's storage." : "");
-        }
-        // A car loader (RollingStock.CarContentSwapper) loads the car under the object it stands on, wherever that is.
-        internal const string LoadingPoint = "Loading point: cars under it are loaded.";
-        // The load a car loader fills, by the id the game reads, as one binding line on the object that holds it.
-        const string LoaderPrefix = "Car loader=";
-        internal static string LoaderBinding(string loadId) => LoaderPrefix + (String.IsNullOrWhiteSpace(loadId) ? "no load" : "load " + loadId);
-        internal static bool HoldsLoader(IEnumerable<string> bindings) => bindings?.Any(line => line != null && line.StartsWith(LoaderPrefix, StringComparison.Ordinal)) == true;
-        // The binding of a car loader as the game serializes it: the load id in its outputContent, the only content it
-        // fills cars with. A loader without that field fails the readout (MissingFieldException).
-        internal static string LoaderBindingOf(object loader) {
-            if (loader == null) throw new ArgumentNullException(nameof(loader));
-            var content = Member(loader, "outputContent");
-            return LoaderBinding(Convert.ToString(Member(content, "loadId"), System.Globalization.CultureInfo.InvariantCulture));
         }
         static object Member(object owner, string name) {
             if (owner == null) return null;
@@ -399,11 +382,10 @@ namespace RailroaderScenePatcher {
             return said.Count == 0 ? null : String.Join(" ", said);
         }
         // The Use in the game text for an entry of the Baked scenery group family: for a part, its group's entry gives
-        // the category and whether the group holds a car loader; group is null for a group root or a part whose group
-        // is not in the inventory.
+        // the category; group is null for a group root or a part whose group is not in the inventory.
         internal static string UseInGame(SceneObservation selected, SceneObservation group) {
             var isPart = selected.GroupPath != null;
-            var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings, isPart ? group?.Bindings : null);
+            var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings);
             return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Subcategory : selected.Subcategory) == BakedSceneryCategories.RoadBridges);
         }
         // A road bridge construction is decorative, and its road is native map data: moving the bridge does not move
@@ -447,19 +429,16 @@ namespace RailroaderScenePatcher {
             return lines;
         }
         // What the Object tab says under Use in the game for a group root or part of the Baked scenery group family,
-        // chosen from its bindings alone, and for a part also from its group's bindings: a car loader's object and the
-        // other parts of its group, the log pond itself, an object above a log pond, and otherwise the text of UseInGame
-        // above, with piles as #98 has them. storage names what the pile or log pond shows, or null.
-        internal static string UseInGame(bool part, string category, string storage, IEnumerable<string> bindings, IEnumerable<string> groupBindings = null) {
+        // chosen from its bindings alone: the log pond itself, an object above a log pond, and otherwise the text of
+        // UseInGame above, with piles as #98 has them. storage names what the pile or log pond shows, or null.
+        internal static string UseInGame(bool part, string category, string storage, IEnumerable<string> bindings) {
             var lines = (bindings ?? Enumerable.Empty<string>()).Where(line => line != null).ToArray();
             var shown = storage ?? "industry's storage";
             var segments = ConstructionSegments(lines);
             if (segments.Count != 0)
                 return "The construction state of track segment" + (segments.Count == 1 ? " " : "s ") + Listing(segments) + " decides which parts of this bridge the game shows.";
-            if (HoldsLoader(lines)) return LoadingPoint;
             var interactive = Interactive(part, lines);
             if (interactive != null) return interactive;
-            if (part && HoldsLoader(groupBindings)) return UseInGame(part, category, null, false, groupLoads: true);
             if (lines.Contains(LogPondSelf))
                 return "This log pond shows the " + shown + ". Moving or disabling the log pond does not change the storage, and the industry keeps working on its native track spans.";
             if (lines.Any(line => line.StartsWith(LogPondsBelowPrefix, StringComparison.Ordinal)))

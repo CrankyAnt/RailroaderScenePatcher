@@ -665,8 +665,7 @@ namespace RailroaderScenePatcher {
             }
             // A group of the Baked scenery group family, and each part of it, is decorative: the game reads nothing from
             // where it stands. An industry's buildings and storage display say that the industry works on its native
-            // track spans, and a storage pile names the storage it shows. The object that holds a car loader is its
-            // loading point, and the other parts of its group say that they do not change loading.
+            // track spans, and a storage pile names the storage it shows.
             if (selected.InspectionOnly == null && selected.Family == BakedSceneryRules.Family) {
                 Section(builder, "Use in the game");
                 PlainLabel(builder, CommandBand.UseInGame(selected, selected.GroupPath != null ? InventoryPresentationState.GroupOf(inventory, selected) : null));

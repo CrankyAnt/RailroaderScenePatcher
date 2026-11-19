@@ -99,11 +99,6 @@ static class LakeSurfaceTests {
         Assert(CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, new[] { CommandBand.PilesBinding(2) }) == CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, true)
             && CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", new[] { CommandBand.StorageBinding("a.b", "pulpwood") }) == CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", false),
             "Piles keep their texts");
-        // The car loader texts of #92 come out of the same chooser: the loader's object, and a part of its group.
-        var loader = new[] { CommandBand.LoaderBinding("coal") };
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.IndustryBuilding, null, loader) == CommandBand.LoadingPoint
-            && CommandBand.UseInGame(true, BakedSceneryCategories.IndustryBuilding, null, new string[0], loader) == CommandBand.UseInGame(true, BakedSceneryCategories.IndustryBuilding, null, false, groupLoads: true),
-            "The car loader keeps its texts in the bindings chooser");
         // A lake surface's dependency names what moves with it and what stays native, and whether its water is part of
         // a static batch, which the game run reads from the inspection.
         Assert(CommandBand.LakeSurfaceDependency(false) == "Lake surface: the water surface moves with this object. Native lake masks and rivers shape and color the terrain and stay with the native map editor",
