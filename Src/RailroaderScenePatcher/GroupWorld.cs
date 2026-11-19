@@ -328,8 +328,13 @@ namespace RailroaderScenePatcher {
         // camera distance. An object a construction controller switches takes an explicit disable, which holds.
         internal static string ActivityProblem(GameObject go) => go == null ? null : SwitchedPart(go);
         public string FollowingRefusal(object target) => FollowingProblem(target as GameObject);
-        // Why the group root or part takes no track-following placement, or null: a rail bridge construction and its parts.
-        internal static string FollowingProblem(GameObject go) => go != null && (RailBridgeRoot(go) || RailBridgeRoot(GroupRootOf(go))) ? BakedSceneryRules.RailBridgeNoFollowing : null;
+        // Why the group root or part takes no track-following placement, or null: a rail or road bridge construction and its parts.
+        internal static string FollowingProblem(GameObject go) {
+            if (go == null) return null;
+            var verdict = VerdictOf(go);
+            if (verdict?.Disposition != GroupDisposition.Group) verdict = VerdictOf(GroupRootOf(go));
+            return verdict?.Disposition == GroupDisposition.Group ? BakedSceneryRules.FollowingRefusal(verdict.Subcategory) : null;
+        }
         static bool RailBridgeRoot(GameObject go) { var verdict = VerdictOf(go); return verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges; }
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery): the track segment ids it reads and
         // the objects of its entries, which it switches on and off by the construction state of those segments. Read
@@ -514,8 +519,10 @@ namespace RailroaderScenePatcher {
                 }
             var own = GroupOf(OwnSimple(root));
             var verdict = VerdictOf(root);
-            var rail = verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges;
-            return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled, rail ? Colliders(t) : null, rail ? TrackScenery(root) : null);
+            // Every edit of a bridge construction verifies its colliders; a rail bridge also the track-owned scenery beside it.
+            var bridge = verdict?.Disposition == GroupDisposition.Group && verdict.Category == BakedSceneryCategories.Bridge;
+            var rail = bridge && verdict.Subcategory == BakedSceneryCategories.RailBridges;
+            return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled, bridge ? Colliders(t) : null, rail ? TrackScenery(root) : null);
         }
         // The generated trestles near a rail bridge, as the Ela bridge describes them: selected at the first observation
         // of each bridge, so a moved bridge keeps comparing the same ones.
@@ -526,7 +533,7 @@ namespace RailroaderScenePatcher {
             if (!trestles.TryGetValue(root, out var selected)) trestles[root] = selected = BridgeWorld.TrestlesNear(trestle, root.transform.position);
             return BridgeWorld.DescribeTrestles(selected);
         }
-        // The colliders the scene saves at and below a rail bridge construction's root, with copied values, as the Ela
+        // The colliders the scene saves at and below a rail or road bridge construction's root, with copied values, as the Ela
         // bridge observes its colliders. What the game builds while it runs does not count.
         static IEnumerable<ColliderState> Colliders(Transform root) {
             var found = new List<ColliderState>();

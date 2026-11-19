@@ -285,7 +285,10 @@ class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
     public Dictionary<object, string> PlacementRefused = new Dictionary<object, string>();
     public string PlacementRefusal(object target) => PlacementRefused.TryGetValue(target, out var reason) ? reason : null;
     public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
-    public string FollowingRefusal(object target) => (target is FakeGroup group ? group : ((FakePart)target).Group).RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : null;
+    public string FollowingRefusal(object target) {
+        var group = target is FakeGroup root ? root : ((FakePart)target).Group;
+        return group.RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : BakedSceneryRules.FollowingRefusal(GroupVerdict(PathOf(group))?.Subcategory);
+    }
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;
         var parent = part.Parent == null ? new Placement(Map(group.Position), (double[])group.Rotation.Clone()) : new Placement(Map(ScenePosition(part.Parent)), Turn.Multiply(group.Rotation, part.Parent.Rotation));
@@ -624,7 +627,7 @@ static class BakedSceneryTests {
         var verdicts = BakedSceneryRules.Classify(world);
         Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island") == null, "A crossing and a road bridge make a folder, not a group");
         Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup")?.Disposition == GroupDisposition.ExistingFamily, "The crossing in the folder keeps its family");
-        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m")?.Ticket == "#97", "The road bridge in the folder is a group root for the road bridge ticket");
+        Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m") is GroupRootVerdict island && island.Disposition == GroupDisposition.Group && island.Subcategory == BakedSceneryCategories.RoadBridges, "The road bridge in the folder is a group root under Road bridges");
         var crossbucks = verdicts.Where(v => v.Path.StartsWith("World/Roads Bryson/Old River Rd/", StringComparison.Ordinal) && v.Path.EndsWith(")", StringComparison.Ordinal)).ToArray();
         Assert(At(verdicts, "World/Roads Bryson/Old River Rd") == null && crossbucks.Length == 6 && crossbucks.All(v => v.Disposition == GroupDisposition.InspectionOnly && v.Ticket == "#107"),
             "Old River Rd is a folder of three unprotected crossings, whose six crossbucks are inspection only for #107");
@@ -701,7 +704,7 @@ static class BakedSceneryTests {
             Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges, path + " is a rail bridge construction outside Ela: " + verdict?.Disposition + " " + verdict?.Reason);
         }
         foreach (var path in new[] { "World/Large Scenery/Almond/Almond Road Bridge", "World/Roads Sylva/Sylva Road Bridge 20m" })
-            Assert(At(verdicts, path)?.Disposition == GroupDisposition.InspectionOnly && At(verdicts, path).Ticket == "#97", path + " is a road bridge for #97");
+            Assert(At(verdicts, path)?.Disposition == GroupDisposition.Group && At(verdicts, path).Subcategory == BakedSceneryCategories.RoadBridges, path + " is a road bridge: " + At(verdicts, path)?.Disposition);
         // Physical presence comes first: a spawn point root has no renderer, collider or light.
         foreach (var path in new[] { "World/POIs/Alarka", "World/POIs/Bryson" })
             Assert(At(verdicts, path)?.Disposition == GroupDisposition.NotListed && At(verdicts, path).Reason == BakedSceneryRules.NoPhysicalPresence, path + " has no physical presence and is not listed");

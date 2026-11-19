@@ -318,6 +318,7 @@ class Program {
         GroundMaskTests.Run();
         SpawnPointTests.Run();
         RailBridgeTests.Run();
+        RoadBridgeTests.Run();
         ConstructionSegmentTests.Run();
         InteractiveBuildingTests.Run();
         PartCullingTests.Run();

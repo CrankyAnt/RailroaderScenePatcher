@@ -606,9 +606,12 @@ namespace RailroaderScenePatcher {
             builder.Spacer(TabGap);
         }
 
-        // A rail bridge construction outside Ela, or a part of one: it takes no track-following placement.
-        bool IsRailBridge => selected != null && selected.Family == BakedSceneryRules.Family
-            && (selected.GroupPath == null ? selected.Subcategory : InventoryPresentationState.GroupOf(inventory, selected)?.Subcategory) == BakedSceneryCategories.RailBridges;
+        // A rail bridge construction outside Ela or a road bridge construction, or a part of one: it takes no
+        // track-following placement.
+        string BridgeSubgroup => selected == null || selected.Family != BakedSceneryRules.Family ? null
+            : selected.GroupPath == null ? selected.Subcategory : InventoryPresentationState.GroupOf(inventory, selected)?.Subcategory;
+        bool IsRailBridge => BridgeSubgroup == BakedSceneryCategories.RailBridges;
+        bool IsRoadBridge => BridgeSubgroup == BakedSceneryCategories.RoadBridges;
         // An explicit disable holds the inspected object off against its track construction: the amber warning shows on
         // the Object tab and in the footer.
         bool HeldAgainstConstruction => selected?.Handle is GameObject held && GroupWorld.HeldAgainstConstruction(held);
@@ -749,7 +752,7 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController, MoveBlock);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController, MoveBlock, IsRoadBridge);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
                 }
             }, true);

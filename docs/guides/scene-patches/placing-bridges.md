@@ -4,7 +4,7 @@
 
 This guide shows how to move, rotate, disable and restore a supported bridge, and what stays where it is. Bridge placement moves the bridge's own hierarchy, including its colliders and culling. It does not move track, generated trestles or the construction scenery beside the bridge, and it does not change which track the bridge belongs to.
 
-The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Rail bridges outside Ela, such as Bryson Bridge 1, the Almond Bridge and the plate girder bridges, are baked scenery groups; see [rail bridges outside Ela](moving-baked-scenery-groups.md#rail-bridges-outside-ela). Road bridges show up in the inventory without an edit. A bridge target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
+The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `World/Large Scenery/Ela/Ela Bridge` with a `Helpers.Culling.RendererCuller` component. Rail bridges outside Ela, such as Bryson Bridge 1, the Almond Bridge and the plate girder bridges, are baked scenery groups; see [rail bridges outside Ela](moving-baked-scenery-groups.md#rail-bridges-outside-ela). Road bridges are baked scenery groups too; see [road bridges](moving-baked-scenery-groups.md#road-bridges). A bridge target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Move the bridge in the native map editor
 

@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to road bridges, to crossbucks at unprotected crossings and to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks).
+Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to crossbucks at unprotected crossings and to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
 Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -176,6 +176,36 @@ You can disable the construction root, a part or a plate girder bridge. A disabl
 
 A part moved outside its culler's sphere gets its own culling sphere, as described in [what the patcher checks](#what-the-patcher-checks). For a part that the controller switches, its own sphere shows the part only while the controller shows it.
 
+## Road bridges
+
+You can move, rotate or disable a road bridge construction so that it stands where you moved its road in the native map editor. Each road bridge is a group under **Bridge** > **Road bridges**, with its deck, abutments and other objects as parts:
+
+- `Almond Road Bridge` and `Whittier Haywood Road Bridge` below `World/Large Scenery`.
+- `Concrete Road Bridge - 20m` below `World/Roads Bryson`, and `Concrete Road Bridge - 60m` in the folder `World/Roads Bryson/US19 Gov Island`.
+- `Dillsboro Haywood Road Bridge`, `Dillsboro Road Bridge 1`, `Dillsboro Road Bridge 2` and `Old Home Town Road Bridge` below `World/Roads Dillsboro`.
+- `Sylva Road Bridge`, `Sylva Road Bridge 20m` and `Sylva Road Bridge 20m (1)` below `World/Roads Sylva`.
+- `Concrete Road Bridge - 20m` and `Whittier Road Bridge` below `World/Roads Whittier`.
+- `Wilmot Road Bridge` below `World/Roads Wilmot`.
+
+The road stays native map data. The native map editor moves it, and a bridge move does not move it. A road bridge does not follow track: **Follow** is unavailable for a road bridge and its parts, with the reason `Road bridges use fixed placement. Track-following placement does not apply to them. Move the road in the native map editor, then move the bridge onto it.`, and a hand-written track-following placement is refused before anything changes. Move the road first, and then move the bridge onto it:
+
+1. In the native map editor, move the road that the bridge carries.
+1. In **Scene patches**, select the bridge under **Baked scenery group** > **Bridge** > **Road bridges** and move it onto the moved road, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only one object of the bridge, select that part instead.
+1. Click **Save** in the native map editor.
+
+The bridge moves with its colliders and its culling. Each road bridge carries a renderer culler on its root; the patcher moves the culler's sphere to the bridge and keeps its radius. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere or capsule collider follow the bridge.
+
+Each road bridge also holds a scene ground mask, a `RectangleMapMask` on the root of the group, as long as the bridge. In Railroader 0.6.3 the scene sets it up as a tree-cutting mask, so it is expected to keep trees off the bridge. On the **Object** tab of the bridge, **Dependencies** says that the root of the group holds the scene ground mask, and **Use in the game** says that the bridge is decorative, that its road is native map data and what the mask does. When the bridge moves, the patcher asks the game to rebuild the mask, so that the mask registers once with its center and rotation at the bridge, and tracks the terrain output at the old and the new place, as described in [buildings with ground masks](#buildings-with-ground-masks). The **Terrain** section on the **Changes** tab shows that output, and **Retry** asks again for a write that stops. A move of one part leaves the mask on the root where it is. Disabling the bridge releases the mask, and enabling registers it again. Not yet observed in Railroader.
+
+Two bridges differ:
+
+- The mask of `Old Home Town Road Bridge` also flattens the terrain height. As for the station buildings, the patcher refuses a move of this bridge before anything changes, with `The ground mask on Old Home Town Road Bridge flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`. **Gizmo**, **Snap** and **Follow** are unavailable for it and the **Numeric** fields are unavailable too. You can disable the bridge and move or disable its parts.
+- The mask component of `Whittier Road Bridge` is disabled in the scene. It holds no registration, so the bridge moves without a rebuild and without terrain output. Its **Dependencies** name no ground mask, **Use in the game** names no terrain, and the **Changes** tab shows no **Terrain** section for it.
+
+The 60-metre bridge at US19 Gov Island stands beside the grade-crossing setup of that crossing, in the same folder, and is not part of it. A move of the bridge leaves the crossing, its lights, gates and bells where they are. To move the crossing's lights, gates and bells, see [move existing crossing equipment](moving-crossing-equipment.md).
+
+Two smoke decals at Dillsboro, `World/Roads Dillsboro/Bridge Smoke Decal Projector` and `Bridge Smoke Decal Projector (1)`, stand 9 m from the root of `Dillsboro Road Bridge 1` and 4 m from the root of `Old Home Town Road Bridge`, and are expected to darken those bridges above the track. They are scene objects of their own beside the bridges, not parts of them, and the patcher does not list them because a decal projector has no renderer, collider or light. A moved bridge is expected to leave its soot decal at the old place. Not yet observed in Railroader.
+
 ## Write the modification by hand
 
 Click **Copy ID** in the command band to copy the identity. Add a modification under a key of your choice in the `modifications` object of `Data/scene-patches.json`, as described in [scene patch file v1](scene-patch-file-v1.md):
@@ -259,6 +289,8 @@ Without the game's ground mask members, the groups that hold a mask are refused,
 Lake surfaces are not yet measured in Railroader. Automated tests check their listing, edits, refusal, restoration, Undo, Redo, Save and reload with controlled groups. Not yet observed in the game: whether the water and the logs appear at the new place, whether the log pond keeps following the sawmill's storage there, whether a moved lake appears and disappears by camera distance at its new place, and whether the game draws the lake surfaces of the base map from a static batch.
 
 Automated tests also check part edits and a moved part's separate culling sphere with a controlled group.
+
+Road bridges are not yet measured in Railroader. Automated tests use a controlled bridge, mask and terrain system. They check the listing, moves with the mask, colliders and culling, the disabled and the flattening mask, refused track following, failure restoration, the terrain output with **Retry**, Undo, Redo, **Remove modification**, Save and reload. Not yet observed in the game: whether the mask keeps trees off a bridge, whether trees return at the old place and disappear at the new place, collision and culling at the new place, the crossing beside the US19 Gov Island bridge after a move of that bridge, and where the soot decals at Dillsboro show. A road bridge mask is as long as its bridge, so a long one can cross a terrain tile border: 200 m for `Almond Road Bridge`, 100 m for `Dillsboro Road Bridge 2` and 60 m for the bridge at US19 Gov Island. The terrain output is tracked on the tile of the mask's center only, and **Retry** asks again only for that tile, so the **Changes** tab can show the output as complete while a neighboring tile is still being rebuilt. The smoke decals at Dillsboro cannot be moved with the patcher in this version.
 
 Rail bridges outside Ela are not yet measured in Railroader. Automated tests use a controlled construction. They check the listing, moves with colliders and culling, a disable that holds against the construction controller, own culling that follows the controller, refused track following, failure restoration, Undo, Redo, Save and reload. Not yet observed in the game: collision and culling at the new place, the native track's trestle or steel flags, construction visibility after a construction-state change, and a train crossing a moved bridge.
 

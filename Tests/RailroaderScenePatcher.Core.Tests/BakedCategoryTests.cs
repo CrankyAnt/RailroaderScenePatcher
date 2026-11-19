@@ -226,7 +226,7 @@ Wilmot | Wilmot Station | Group | Station building";
             // A group root names every component below it among its dependencies, as the native inventory does.
             Entry(Dealer, "Industry building", dependencies: new[] { "Component scene/" + Dealer + "/Heap [UnityEngine.MeshRenderer]", "Culling and colliders of every part follow the group root" }),
             Entry(Dealer + "/Heap", groupPath: Dealer),
-            Entry("World/Large Scenery/Almond/Almond Road Bridge", "Bridge", "Road bridges", only: "not yet supported"),
+            Entry("World/Large Scenery/Almond/Almond Road Bridge", "Bridge", "Road bridges"),
             Entry(Bryson + "Bryson Depot", "Station building"),
             Entry("World/Large Scenery/Sylva/New Pond", only: "not yet supported"),
             Entry("World/Sign", family: "Track marker"),
@@ -268,7 +268,7 @@ Wilmot | Wilmot Station | Group | Station building";
         var verdicts = BakedSceneryRules.Classify(world);
         foreach (var path in new[] { "World/Roads Bryson/Concrete Road Bridge - 20m", "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m" }) {
             var verdict = At(verdicts, path);
-            Check(verdict?.Disposition == GroupDisposition.InspectionOnly && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", path + " is a road bridge the table does not name: it stands under Bridge / Road bridges (got " + verdict?.Category + ")");
+            Check(verdict?.Disposition == GroupDisposition.Group && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", path + " is a road bridge the table does not name: it stands under Bridge / Road bridges (got " + verdict?.Category + ")");
         }
         var span = At(verdicts, "World/Large Scenery/Newtown/Plate Girder Span");
         Check(span?.Category == "Bridge" && span.Subcategory == "Rail bridges", "a rail bridge construction the table does not name stands under Bridge / Rail bridges");

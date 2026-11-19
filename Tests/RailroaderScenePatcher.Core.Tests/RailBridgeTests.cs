@@ -360,7 +360,7 @@ static class RailBridgeTests {
 
     // Each rail bridge construction root outside Ela is listed once as a group of the family under Bridge / Rail bridges:
     // Bryson Bridge 1 and the Almond Bridge, whose root is the folder that carries its controller and culler, each with
-    // its parts, and every plate girder bridge on its own. Road bridges stay inspection only.
+    // its parts, and every plate girder bridge on its own. Road bridges stand under Road bridges.
     static void InventoryListsEachConstructionOnceWithItsParts() {
         var verdicts = BakedSceneryRules.Classify(World());
         var roots = new[] { Bryson, Almond }.Concat(GirderNames.Select(name => Girders + name)).ToArray();
@@ -389,7 +389,7 @@ static class RailBridgeTests {
         Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", "AutoTrestle.AutoTrestle" }) == "The rail bridge holds the track-owned component AutoTrestle.AutoTrestle, which belongs to the native track, so it cannot be moved, enabled or disabled"
             && BakedSceneryRules.TrackOwnedRefusal(new[] { "Track.TrackSegment" }) != null, "A generated trestle or a track component refuses the bridge");
         var road = At(verdicts, Large + "Almond/Almond Road Bridge");
-        Assert(road?.Disposition == GroupDisposition.InspectionOnly && road.Ticket == "#97" && road.Subcategory == BakedSceneryCategories.RoadBridges, "A road bridge stays inspection only");
+        Assert(road?.Disposition == GroupDisposition.Group && road.Subcategory == BakedSceneryCategories.RoadBridges, "A road bridge is no rail bridge: it stands under Road bridges");
         Assert(BakedSceneryCategories.Find(Almond)?.Folder == false && BakedSceneryCategories.Find(Almond + "/Abutments") == null, "The category table names the Almond Bridge itself as the group");
     }
 }

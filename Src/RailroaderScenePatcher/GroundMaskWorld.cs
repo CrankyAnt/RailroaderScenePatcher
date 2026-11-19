@@ -37,11 +37,14 @@ namespace RailroaderScenePatcher {
         internal static void Unavailable() => Available = false;
         // Whether a scene ground mask stands at or below the object, by the scene's own objects.
         internal static bool Holds(GameObject go) => go != null && maskBase != null && Components(go).Length != 0;
-        // The scene objects at and below the object that hold a mask, and whether one of the masks flattens the height.
+        // The scene objects at and below the object that hold a mask the inspector names, and whether one of the masks
+        // flattens the height. A mask whose component the scene disabled, as on the Whittier Road Bridge, registers
+        // nothing wherever its object stands, so it gives no dependency line and no terrain output; one that flattens
+        // the height still counts, because its move is refused.
         internal static IReadOnlyList<GameObject> Holders(GameObject go, out bool flattens) {
             var found = go == null || maskBase == null ? new Component[0] : Components(go);
             flattens = found.Any(Flattens) && !FlatteningAllowed;
-            return found.Select(c => c.gameObject).Distinct().ToArray();
+            return found.Where(c => Flattens(c) || !(c is Behaviour behaviour) || behaviour.enabled).Select(c => c.gameObject).Distinct().ToArray();
         }
         static bool Flattens(Component mask) => flatten != null && shaped.IsInstanceOfType(mask) && (bool)flatten.GetValue(mask);
         // Test only: the fault build can lift the flattening refusal, and the inspector then offers the move.

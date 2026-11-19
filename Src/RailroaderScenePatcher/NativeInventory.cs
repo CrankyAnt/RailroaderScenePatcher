@@ -566,7 +566,7 @@ namespace RailroaderScenePatcher {
             // group root, a part above it and a marker object above it name that part.
             if (groupRoot || part || family == "Track marker") Read(() => {
                 var holders = GroundMaskWorld.Holders(go, out var flattens);
-                if (holders.Count != 0) dependencies.Add(CommandBand.GroundMaskDependency(holders.Count == 1 && holders[0] == go, holders.Select(holder => holder.name), flattens, groupRoot || part));
+                if (holders.Count != 0) dependencies.Add(CommandBand.GroundMaskDependency(holders.Count == 1 && holders[0] == go, holders.Select(holder => holder.name), flattens, groupRoot || part, groupRoot));
             });
             // A building with pickable toggles: each entry names the toggles, the key-value object and the name text it
             // owns, its own object and those below it outside its parts, and counts the toggles in its parts. Other

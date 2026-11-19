@@ -246,13 +246,13 @@ namespace RailroaderScenePatcher.Core {
         public const string SpawnPointReason = "This group is not moved as a whole. Its spawn points are edited one by one in the Spawn point family.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
         public static readonly IReadOnlyList<string> RailBridgeFolders = Array.AsReadOnly(new[] { "Almond Bridge", "Plate Girder Bridge" });
-        // The bridge roots that a later bridge ticket names: road bridges.
-        public static string BridgeTicket(string town, string name) =>
-            name != null && name.IndexOf("Road Bridge", StringComparison.Ordinal) >= 0 ? "#97" : null;
+        // A road bridge construction, wherever it stands: a root whose name contains Road Bridge. Its road is native
+        // map data; the bridge carries a renderer culler and its own scene ground mask.
+        public static bool RoadBridge(string name) => name != null && name.IndexOf("Road Bridge", StringComparison.Ordinal) >= 0;
         // A rail bridge construction outside Ela: its root stands in a folder of its own below World/Large Scenery, or is
         // that folder, or is named as a Bryson or plate girder bridge. town is that folder's name, or null outside it.
         public static bool RailBridge(string town, string name) =>
-            name != null && BridgeTicket(town, name) == null && (RailBridgeFolders.Contains(town) || name == "Bridge 1" || name.StartsWith("Plate Girder", StringComparison.Ordinal));
+            name != null && !RoadBridge(name) && (RailBridgeFolders.Contains(town) || name == "Bridge 1" || name.StartsWith("Plate Girder", StringComparison.Ordinal));
         // The construction controller of a rail bridge (Game.Mow.TrackConstructionScenery): it switches the objects of
         // its entries on and off by the construction state of the track segments it names, wherever it stands.
         public const string ConstructionController = "Game.Mow.TrackConstructionScenery";
@@ -261,6 +261,13 @@ namespace RailroaderScenePatcher.Core {
         // Why a rail bridge construction or a part of one takes no track-following placement: its track is native map
         // data, and the construction is placed onto the moved track with fixed placement.
         public const string RailBridgeNoFollowing = "Rail bridges use fixed placement. Track-following placement does not apply to them";
+        // Why a road bridge construction or a part of one takes no track-following placement: it stands where its road
+        // goes, which is native map data, and track following follows track.
+        public const string RoadBridgeNoFollowing = "Road bridges use fixed placement. Track-following placement does not apply to them";
+        // Why a group of the subgroup, or a part of one, takes no track-following placement, or null: a bridge of
+        // either subgroup is placed onto its moved track or road with fixed placement.
+        public static string FollowingRefusal(string subcategory) =>
+            subcategory == BakedSceneryCategories.RailBridges ? RailBridgeNoFollowing : subcategory == BakedSceneryCategories.RoadBridges ? RoadBridgeNoFollowing : null;
         // Why a rail bridge construction with track-owned components in its hierarchy cannot be edited: the track and
         // what the game builds for it belong to the native map data, which a construction move must leave in place.
         public static string TrackOwnedRefusal(IEnumerable<string> types) {
@@ -279,7 +286,7 @@ namespace RailroaderScenePatcher.Core {
         static bool Unprotected(IHierarchyNode node) =>
             node.Children.Any(Pad) && node.Children.All(child => Pad(child) || MarkerObject(child) || Crossbuck(child));
         static bool Crossing(IHierarchyNode node) => Protected(node) || Unprotected(node);
-        static bool RoadBridge(IHierarchyNode node) => BridgeTicket(null, node.Name) == "#97";
+        static bool RoadBridge(IHierarchyNode node) => RoadBridge(node.Name);
         // One or more crossings, or crossings and road bridges.
         static bool CrossingFolder(IHierarchyNode node) =>
             !node.HasFamily && node.Children.Any(Crossing) && node.Children.All(child => Crossing(child) || RoadBridge(child));
@@ -302,21 +309,17 @@ namespace RailroaderScenePatcher.Core {
             }
             // Physical presence comes first: an object without a renderer, collider or light is not listed, whatever it holds.
             if (!Physical(node)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
-            var bridge = BridgeTicket(town, node.Name);
             // A bridge takes its category from this rule wherever it stands, also outside the category table, as
             // the road bridges below the World/Roads folders do.
-            if (bridge != null) {
-                verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, "Road bridges cannot be edited.", bridge, true) {
-                    Category = BakedSceneryCategories.Bridge, Subcategory = BakedSceneryCategories.RoadBridges });
-                return;
-            }
+            var road = RoadBridge(node.Name);
             var rail = RailBridge(town, node.Name);
             // A supported rail bridge construction holds its own construction controller; any other group holding one is left out.
             var excluded = FirstExclusion(node, rail ? ConstructionController : null);
-            if (rail) {
+            if (road || rail) {
+                var subgroup = road ? BakedSceneryCategories.RoadBridges : BakedSceneryCategories.RailBridges;
                 verdicts.Add(excluded != null
-                    ? new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = BakedSceneryCategories.Bridge, Subcategory = BakedSceneryCategories.RailBridges }
-                    : new GroupRootVerdict(node, path, GroupDisposition.Group, null) { Category = BakedSceneryCategories.Bridge, Subcategory = BakedSceneryCategories.RailBridges });
+                    ? new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup }
+                    : new GroupRootVerdict(node, path, GroupDisposition.Group, null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup });
                 return;
             }
             if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }
@@ -530,7 +533,7 @@ namespace RailroaderScenePatcher.Core {
         // generated trestles of its track, which no edit may change; null for any other group.
         public string SeparateScenery { get; }
         // The colliders the scene saves at and below the root, for a group whose collider state every edit verifies: a
-        // rail bridge construction. Empty for any other group. Their placement is the parts' placement.
+        // rail or road bridge construction. Empty for any other group. Their placement is the parts' placement.
         public IReadOnlyList<ColliderState> Colliders { get; }
         // Whether the simple culler on the root switches the root by camera distance; null without one. It pauses while
         // the group is disabled.
@@ -577,8 +580,8 @@ namespace RailroaderScenePatcher.Core {
         // Why the part's activity cannot be set, or null: a game-object culler switches it by camera distance and would
         // override a stored setting. The patcher then never sets that part's activity.
         string ActivityRefusal(object part);
-        // Why the group root or part takes no track-following placement, or null: a rail bridge construction and its
-        // parts use fixed placement. Refused before any mutation.
+        // Why the group root or part takes no track-following placement, or null: a rail or road bridge construction
+        // and its parts use fixed placement. Refused before any mutation.
         string FollowingRefusal(object target);
         // Why the placement of the group root or part cannot be set, or null: a lake surface at or below it whose water
         // mesh is part of a static batch would stay drawn at its old place while every transform check passes. A
