@@ -551,14 +551,20 @@ namespace RailroaderScenePatcher.Core {
         const string MarkerIdKey = "marker ID ";
         internal static string SharedAddition(string id) => id.StartsWith(MarkerIdKey, StringComparison.Ordinal) ? ReplacementMarkerIds.Shared(id.Substring(MarkerIdKey.Length))
             : "Addition ID " + id + " is used by more than one modification; an addition ID names one addition in its scene patch file";
-        // Underlying state overlaid with every effective modification of this scene patch file for the object. The owner is the key
-        // of the scene patch file, which scopes the identities of its additions.
-        internal ObjectState Desired(JObject modifications, object target, string owner = "") {
+        // The modifications of this scene patch file that take effect on the object, in the order Desired overlays them: the
+        // entries that parse, share no addition ID and whose dependencies take effect.
+        internal IReadOnlyList<Modification> EffectiveFor(JObject modifications, object target, string owner = "") {
             var entries = Entries(modifications);
             var effective = new Dictionary<string, Modification>(StringComparer.Ordinal);
             var order = new List<Modification>(); var targets = new Dictionary<Modification, object>();
             var shared = SharedAdditionIds(entries.Values);
             foreach (var id in entries.Keys) Effective(id, entries, effective, order, targets, new HashSet<string>(), owner, shared);
+            return order.Where(item => ReferenceEquals(targets[item], target)).ToList();
+        }
+        // Underlying state overlaid with every effective modification of this scene patch file for the object. The owner is the key
+        // of the scene patch file, which scopes the identities of its additions.
+        internal ObjectState Desired(JObject modifications, object target, string owner = "") {
+            var own = EffectiveFor(modifications, target, owner);
             var state = Underlying(target);
             // The equipment without this mod is what stands now, less this mod's additions: other mods' additions stay as they
             // are, and this mod's additions exist only through its scene patch file, even when an earlier application in this world
@@ -567,10 +573,7 @@ namespace RailroaderScenePatcher.Core {
                 var standing = scene.Read(target)?.Equipment ?? state.Equipment;
                 state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter).WithSegments(state.Segments).WithMarkerId(state.MarkerId);
             }
-            foreach (var item in order) {
-                if (!ReferenceEquals(targets[item], target)) continue;
-                state = Overlay(state, item.State);
-            }
+            foreach (var item in own) state = Overlay(state, item.State);
             return Evaluate(state);
         }
         // One modification's state laid over a complete state: every value the modification sets replaces the one below.

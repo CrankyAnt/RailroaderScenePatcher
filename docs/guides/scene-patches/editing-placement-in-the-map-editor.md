@@ -148,7 +148,7 @@ Click **Guide** to open the guide for the failed operation. The button is unavai
 
 ### Resolve an incomplete cleanup
 
-Click **Recheck** to find and inspect the object again, compare it with the scene patch file, and apply the file's state where they differ. Only state named in the file remains. For example, Recheck removes a detection addition left half built by the failed edit. It reuses an addition already named in the file instead of rebuilding it.
+Click **Recheck** to find and inspect the object again, compare it with the scene patch file, and apply the file's state where they differ. Only state named in the file remains. For example, Recheck removes a detection addition left half built by the failed edit. It reuses an addition already named in the file instead of rebuilding it. Before changing anything, Recheck checks the object's modifications as a world load does. If one is refused, for example because the source of a crossing addition does not conform to its pattern, Recheck is `refused` with that reason and changes nothing. A refused Recheck does not end an incomplete cleanup: edits of the object stay blocked. Reload the native map editor, then correct or remove the refused modification.
 
 Once the object agrees with the file, you can edit it again. If Recheck cannot make them agree, the message lists the remaining differences and edits stay blocked. Reloading the native map editor also allows editing again. **Refresh** only reads the scene. It changes nothing and does not lift this block.
 

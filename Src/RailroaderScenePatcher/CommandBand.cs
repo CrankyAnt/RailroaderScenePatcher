@@ -644,8 +644,10 @@ namespace RailroaderScenePatcher {
                 : new[] { "Why a device is rejected", "adding-crossing-equipment.md#rejected-sources" };
         }
         internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
-        internal static string AddedEquipmentOperations(string name) =>
-            name + ". Open its crossing controller's Connections tab to edit or remove it.";
+        // Where added equipment is edited, one sentence for its supported edits and for why it cannot be edited as an
+        // object of its own.
+        internal const string AddedEquipmentReason = "To edit or remove this added equipment, use its crossing controller's Connections tab.";
+        internal static string AddedEquipmentOperations(string name) => name + ". " + AddedEquipmentReason;
         // Why an object of the family is inspection only, or null when a supported operation covers it: a supported kind,
         // or an added light, gate or bell, which its crossing edits.
         internal static string InspectionOnly(string family, bool supportedKind) => supportedKind || IsAddedFamily(family) || family == ConstructionSceneryFamily ? null : NotYetSupported("Objects listed under " + family);
@@ -669,6 +671,7 @@ namespace RailroaderScenePatcher {
         // one plain sentence: the message's source and the tooltip's Unavailable: are its only label.
         internal static string EditReason(string operations) {
             var own = operations?.Trim();
+            if (own != null && own.EndsWith(". " + AddedEquipmentReason, StringComparison.Ordinal)) return AddedEquipmentReason;
             if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal) || own.StartsWith(NotEditableAsGroupPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
             return Sentence(own);
         }

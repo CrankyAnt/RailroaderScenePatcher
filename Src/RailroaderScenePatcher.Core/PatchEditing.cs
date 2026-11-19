@@ -854,19 +854,40 @@ namespace RailroaderScenePatcher.Core {
             if (modEquipment == null) return Array.Empty<EquipmentEntry>();
             CrossingEquipment observed = null;
             try { observed = scene.Read(resolved).Equipment; } catch (InvalidOperationException) { }
+            // Why each addition on its own is refused, or null. The additions of one modification are one coherent operation:
+            // a refused addition stops the others, so a valid addition that is not built names the refused ones rather than
+            // offering a Recheck that refuses the same way.
+            string Refusal(EquipmentAddition addition) {
+                try { engine.CheckRelationships(resolved, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false))); return null; }
+                catch (InvalidOperationException e) { return e.Message; }
+            }
+            var refusals = modEquipment.Additions.ToDictionary(a => a.Key, Refusal, StringComparer.Ordinal);
+            var refused = modEquipment.Additions.Where(a => refusals[a.Key] != null).Select(a => a.Id).ToList();
+            string whole = null;
+            if (refused.Count == 0) whole = ModificationRefusal(existing, resolved);
+            var stopped = refused.Count == 0 ? whole
+                : (refused.Count == 1 ? "addition " + refused[0] + " is" : "additions " + String.Join(", ", refused.Take(refused.Count - 1)) + " and " + refused[refused.Count - 1] + " are")
+                    + " refused, so no addition of this crossing is built";
             var entries = new List<EquipmentEntry>();
             foreach (var addition in modEquipment.Additions) {
                 var built = observed?.Find(addition.Key);
-                string problem = null;
-                if (built == null) {
-                    try {
-                        engine.CheckRelationships(resolved, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false)));
-                        problem = "it is not built in this world; Recheck builds it";
-                    } catch (InvalidOperationException e) { problem = e.Message; }
-                }
+                var problem = built != null ? null : refusals[addition.Key] ?? stopped ?? "it is not built in this world; Recheck builds it";
                 entries.Add(new EquipmentEntry(addition, built, problem));
             }
             return entries;
+        }
+        // Why the modification as a whole does not take effect on the object, or null: the world load's failure of this
+        // entry, an addition ID it shares, a dependency that does not take effect, or a refusal of its whole state.
+        string ModificationRefusal(JObject item, object resolved) {
+            var key = ScenePatchFile.Key(item);
+            var failure = NotAppliedOf(key);
+            if (failure != null) return failure.Reason;
+            var shared = PatchEngine.AdditionIds(item).FirstOrDefault(PatchEngine.SharedAdditionIds(scenePatchFile.Items).Contains);
+            if (shared != null) return PatchEngine.SharedAddition(shared);
+            var dependency = engine.IneffectiveReason(scenePatchFile.Modifications, key, scenePatchFileKey);
+            if (dependency != null) return dependency;
+            try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(item, scenePatchFileKey).State.LeavingActivity())); return null; }
+            catch (InvalidOperationException e) { return e.Message; }
         }
         public string NewEquipmentId(string stem) {
             stem = new string((stem ?? "").Select(c => Char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '-').ToArray()).Trim('-');
@@ -1355,6 +1376,12 @@ namespace RailroaderScenePatcher.Core {
                 var mapContext = scene.MapIds.ToArray();
                 scene.Preflight(resolved);
                 var desired = engine.Desired(scenePatchFile.Modifications, resolved, scenePatchFileKey);
+                // Each modification that takes effect on the object is checked before any change, as the world load checks it:
+                // a refused source or relationship target is a refusal that leaves the object as it is, not a failed attempt
+                // whose cleanup is uncertain. The entries the desired state leaves out, such as one that shares an addition ID,
+                // misses a dependency or is not executed, are left out here too.
+                foreach (var own in engine.EffectiveFor(scenePatchFile.Modifications, resolved, scenePatchFileKey))
+                    engine.CheckRelationships(resolved, engine.Evaluate(own.State.LeavingActivity()));
                 if (!Same(scene.Read(resolved), desired)) {
                     engine.GuardMutation(target, resolved, mapContext, inspected);
                     try {

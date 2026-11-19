@@ -475,6 +475,13 @@ static class CommandBandTests {
             new[] { "Fixed placement and activity", "This object cannot be edited here." }, new[] { null, "This object cannot be edited here." }, new[] { " ", "This object cannot be edited here." } })
             Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
         Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");
+        // An added light, gate or bell is edited on its crossing controller's Connections tab: its editing message and the
+        // Unavailable: tooltips of its disabled controls name that route, not the generic fallback.
+        Check(CommandBand.AddedEquipmentOperations("Brass bell (added)") == "Brass bell (added). " + CommandBand.EditReason(CommandBand.AddedEquipmentOperations("Brass bell (added)")),
+            "The supported edits of added equipment and its editing message give the route in the same sentence: " + CommandBand.AddedEquipmentOperations("Brass bell (added)"));
+        foreach (var name in new[] { "Brass bell (added)", "Signal 1 (added)" })
+            Check(CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)) == "To edit or remove this added equipment, use its crossing controller's Connections tab.",
+                "The editing message of added equipment names its edit route: " + CommandBand.EditReason(CommandBand.AddedEquipmentOperations(name)));
         // No placement mode moves a crossing pad: each is inactive for a pad, with the one reason.
         foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
             Check(CommandBand.PadModeBlock(mode) == CommandBand.PadFollowsTrack, "Placement mode " + mode + " is inactive for a crossing pad");

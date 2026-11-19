@@ -176,6 +176,10 @@ static class EquipmentTests {
         TheEditingProposesADistinctIdAndAPlacementAtTheCrossing();
         EditingKeepsAnotherModsEquipment();
         AFailedAdditionIsListedAndRemovable();
+        RecheckRefusesARefusedAdditionWithoutMutation();
+        RecheckChecksOnlyTheModificationsThatTakeEffect();
+        RecheckRefusalKeepsAnIndependentModificationOfTheObject();
+        AValidAdditionNamesTheModificationsOtherRefusal();
         SmallMovesReachTheSceneAndUntouchedValuesStay();
         UnknownSourceOrPlacementContentIsUnsupported();
         Console.WriteLine("PASS: crossing light and gate eligibility, construction, refusal, restoration and scene patch editing");
@@ -556,6 +560,92 @@ static class EquipmentTests {
         var removed = session.RemoveEquipment(Crossing, "lost");
         Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.ScenePatchFileText.Contains("lost"), "The failed addition is removed from the scene patch file: " + removed.Error);
         Assert(session.AddEquipment(Crossing, West()).Applied && f.Live.Count == 1, "Afterwards the crossing takes equipment again");
+    }
+    // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the
+    // world load refuses it. Recheck refuses it the same way before any change: nothing was mutated, so no cleanup is
+    // incomplete and the crossing stays editable. The valid additions say why they are not built instead of offering Recheck.
+    static void RecheckRefusesARefusedAdditionWithoutMutation() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("bell-as-light-a", "World/Rejected/bell", 5) + "," + Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20)));
+        var load = engine.Apply(scenePatchFile, "author/pack");
+        Assert(!load.Outcomes["equip-crossing"].Applied && f.World.Mutations == 0 && f.Live.Count == 0, "The world load refuses the modification before any change: " + load.Outcomes["equip-crossing"].Error);
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var entries = session.EquipmentEntries(Crossing);
+        var rejected = entries.Single(e => e.Addition.Id == "bell-as-light-a");
+        Assert(rejected.Built == null && rejected.Problem.Contains("does not conform to " + EquipmentAddition.LightGatePattern), "The rejected addition gives its own reason: " + rejected.Problem);
+        foreach (var valid in entries.Where(e => e.Addition.Id != "bell-as-light-a"))
+            Assert(valid.Built == null && !valid.Problem.Contains("Recheck builds it") && valid.Problem.Contains("bell-as-light-a"),
+                "A valid addition that the refusal stops names the refused addition instead of offering Recheck: " + valid.Problem);
+        var recheck = session.Recheck(Crossing);
+        Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Remaining.Count == 0 && recheck.Error.Contains("does not conform to " + EquipmentAddition.LightGatePattern),
+            "Recheck refuses the modification with the rejected addition's reason: " + recheck.Failure + " " + recheck.Error);
+        Assert(f.World.Mutations == 0 && f.Live.Count == 0 && !session.CleanupUnverified(Crossing), "Recheck changed nothing and leaves no unverified cleanup");
+        var removed = session.RemoveEquipment(Crossing, "bell-as-light-a");
+        Assert(removed.Applied && f.Live.Count == 2 && f.Live.All(a => a.Record.Id != "bell-as-light-a"), "Removing the rejected addition builds the valid ones: " + removed.Error);
+    }
+    // Recheck checks exactly the modifications that take effect on the object, as the desired state overlays them. An entry
+    // that shares an equipment ID, one whose dependency is missing and one the patcher does not execute are left out, so
+    // none of them refuses a Recheck that clears a real unverified cleanup.
+    static void RecheckChecksOnlyTheModificationsThatTakeEffect() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        f.World.FailConstructAfter = 1; f.World.StickyDestroy = true;
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20))
+            + "," + Equip("a-shared", Addition("twin", "World/Rejected/bell", 5)) + "," + Equip("b-shared", Addition("twin", x: 6), OtherPath)
+            + "," + Equip("c-orphan", Addition("orphan", "World/Rejected/bell", 7), deps: "[\"absent\"]")
+            + "," + EquipRaw("d-unsupported", "{" + Addition("odd", "World/Rejected/bell", 8, extra: ",\"colour\":\"red\"") + "}"));
+        var load = engine.Apply(scenePatchFile, "author/pack");
+        Assert(load.Outcomes["equip-crossing"].Failure == FailureKind.IncompleteCleanup, "The valid modification leaves an incomplete cleanup at load: " + load.Outcomes["equip-crossing"].Error);
+        Assert(!load.Outcomes["a-shared"].Applied && !load.Outcomes["c-orphan"].Applied && !load.Outcomes["d-unsupported"].Applied, "The other entries are not applied at load");
+        f.World.StickyDestroy = false;
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        Assert(session.CleanupUnverified(Crossing), "The crossing is guarded");
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && !session.CleanupUnverified(Crossing), "Recheck ignores the entries that take no effect and clears the guard: " + recheck.Failure + " " + recheck.Error);
+        Assert(f.Live.Select(a => a.Record.Id).OrderBy(i => i, StringComparer.Ordinal).SequenceEqual(new[] { "east", "west" }), "Only the effective additions stand: " + String.Join(", ", f.Live.Select(a => a.Record.Id)));
+    }
+    // A refused modification beside an independent valid one on the same object: the world load applies the valid one, and
+    // Recheck refuses with the refused one's reason before any change, so the valid one keeps its state.
+    static void RecheckRefusalKeepsAnIndependentModificationOfTheObject() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("a-refused", Addition("bad", "World/Rejected/bell", 5)) + "," + Equip("b-valid", Addition("west")));
+        var load = engine.Apply(scenePatchFile, "author/pack");
+        Assert(!load.Outcomes["a-refused"].Applied && load.Outcomes["b-valid"].Applied && f.Live.Single().Record.Id == "west", "The load applies the independent modification");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        f.World.Mutations = 0;
+        var recheck = session.Recheck(Crossing);
+        Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("does not conform"), "Recheck refuses with the refused modification's reason: " + recheck.Failure + " " + recheck.Error);
+        Assert(f.World.Mutations == 0 && f.Live.Single().Record.Id == "west" && !session.CleanupUnverified(Crossing), "The independent modification keeps its addition and nothing is guarded");
+    }
+    // A valid addition of a modification that is refused for another reason than an addition, such as its detection or a
+    // missing dependency, names that reason instead of offering a Recheck that refuses the same way.
+    static void AValidAdditionNamesTheModificationsOtherRefusal() {
+        string Loc(double d) => "{\"segment\":\"Sgone\",\"end\":\"a\",\"distance\":" + N(d) + "}";
+        string Range(double a, double b) => "{\"from\":" + Loc(a) + ",\"to\":" + Loc(b) + "}";
+        var detection = "\"north\":{\"approachA\":" + Range(308, 550) + ",\"island\":" + Range(292, 308) + ",\"approachB\":" + Range(292, 50) + "}";
+        var cases = new Dictionary<string, string> {
+            ["detection"] = "\"both\":{" + Target() + ",\"relationships\":{\"crossingCoverage\":{\"additions\":{" + detection + "}},\"crossingEquipment\":{" + Addition("west") + "}},\"dependsOn\":[]}",
+            ["dependency"] = Equip("both", Addition("west"), deps: "[\"absent\"]"),
+        };
+        foreach (var c in cases) {
+            var f = new Fixture();
+            var engine = new PatchEngine(f.Scene);
+            var load = engine.Apply(Doc(c.Value), "author/pack");
+            Assert(!load.Outcomes["both"].Applied && f.Live.Count == 0, c.Key + ": the load refuses the modification: " + load.Outcomes["both"].Error);
+            var store = new Store { Patch = Doc(c.Value) }; var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            var entry = session.EquipmentEntries(Crossing).Single();
+            Assert(entry.Built == null && entry.Problem != null && !entry.Problem.Contains("Recheck builds it"), c.Key + ": the valid addition names the refusal: " + entry.Problem);
+            if (c.Key == "dependency") Assert(entry.Problem.Contains("absent"), "It names the missing dependency: " + entry.Problem);
+        }
     }
     // A move as small as the native map editor stores reaches the scene, and a value the form did not change keeps the scene patch file's
     // literal, so an untouched apply is no change and a one-axis change rewrites only that axis.
