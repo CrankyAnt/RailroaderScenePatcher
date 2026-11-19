@@ -602,9 +602,13 @@ namespace RailroaderScenePatcher.Core {
         // Moves the culling sphere of every culler in the group to its culler, each at the radius the scene gives it,
         // and brings the own culling of moved parts to the plan.
         void RefreshCulling(object group, CullingPlan plan);
-        // The corners, in map coordinates, of the renderer, collider and light bounds at and below a part, leaving out
-        // the named parts and what stands below them.
+        // The corners, in map coordinates, of the renderer, collider, light and storage pile bounds at and below a part,
+        // leaving out the named parts and what stands below them. A renderer or collider whose bounds cannot be read, such
+        // as a renderer without a mesh on an inactive object, counts as one point at its object. Empty when none of these
+        // is there: the object has no presence of its own, which own culling reads from the empty list.
         IReadOnlyList<IReadOnlyList<double>> Presence(object part, IReadOnlyList<object> without);
+        // The part's position in map coordinates: own culling places the sphere of a moved part without presence there.
+        IReadOnlyList<double> Anchor(object part);
         // Whether the part stands below the object, a group root or another part, and still exists.
         bool Below(object part, object above);
         // Whether the object, a group root or a part, still exists.
@@ -718,7 +722,7 @@ namespace RailroaderScenePatcher.Core {
         // except leaves out a hold that is being released.
         internal static CullingPlan Plan(IGroupWorld world, PartHolds holds, object group, object except = null) {
             var observed = world.Observe(group);
-            return CullingPlan.Compute(group, observed, holds.Moved(world, group, observed, except), world.Presence);
+            return CullingPlan.Compute(group, observed, holds.Moved(world, group, observed, except), world.Presence, world.Anchor);
         }
         // An enabled group's culling spheres stand at their cullers, each at the radius the scene gives it, and every
         // moved part the plan names has its own sphere at the part, enclosing it. A disabled group holds no sphere.

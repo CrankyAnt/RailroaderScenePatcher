@@ -66,6 +66,14 @@ static class PartCullingTests {
         ListedObjectIsHandedOverAndReturns();
         ListedObjectStaysItsCullers();
         MovedPartBelowAListedObjectShows();
+        MovedPartBelowAnEmptyListedObjectLeavesNoSphereBehind();
+        PresenceMayBeEmptyAndTheAnchorStandsInForIt();
+        EmptyListedObjectKeepsAStandInForAGameSphere();
+        SeveralMovedPartsBelowAnEmptyListedObject();
+        ListedObjectWithPresenceOfItsOwnKeepsItsStandIn();
+        EmptyListedObjectThroughUndoRedoAndRemove();
+        UnreadableBoundsCountAsPresence();
+        NestedListedObjectsPlanTheSameInAnyOrder();
         MovedPartBelowAMovedListedObjectShows();
         PartInsideAListedSphereButOutsideTheSimpleSphereGetsItsOwn();
         GameObjectCullersStandOnGradeCrossings();
@@ -378,6 +386,192 @@ static class PartCullingTests {
             Assert(Applies(f, Part("far-post", "Jetty/Post", new[] { 1101.0, 10, 14 })), "The part moves back");
             Assert(Spheres(f).Count == 0 && lister.Lists.Single() == f.Jetty && !f.Jetty.Active, "The listed object returns to its culler's list once, with the culler's current state");
         }
+    }
+
+    // A crossing mast: the culler lists the mast's outer object, which shows nothing of its own, and the light object
+    // below it moves 59 m. The outer object follows the light object's own sphere: no sphere stays in the culler's place,
+    // and the light object never vanishes while its own sphere is visible, whatever the culler's sphere shows.
+    static void MovedPartBelowAnEmptyListedObjectLeavesNoSphereBehind() {
+        foreach (var simple in new[] { true, false }) {
+            var f = Plain(); f.Jetty.Empty = true;
+            if (!simple) { f.Group.Cullers.Clear(); f.Group.RootCulling = null; }
+            var lister = new FakeCuller { Id = ".|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { f.Jetty }, Radius = 8, Authored = 8 }; f.Group.Cullers.Add(lister);
+            Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost)), "The part below the empty listed object moves out");
+            var own = Spheres(f).Single(s => s.Owner == f.Post);
+            Assert(Spheres(f).Count == 1 && !Spheres(f).Any(s => s.Owner == f.Jetty), "Only the moved part holds an own sphere; none stays in the culler's place: " + String.Join("; ", Spheres(f).Select(s => N(f.World.Native.Sphere(s)))));
+            Assert(Near(f.World.Native.Sphere(own).ToArray(), new[] { 1160.0, 10, 14, Math.Sqrt(0.75) }), "The own sphere stands at the moved part: " + N(f.World.Native.Sphere(own)));
+            Assert(lister.Lists.Count == 0 && lister.Radius == 8 && f.World.Culling.HandedOver(lister).Single() == f.Jetty, "The empty listed object is handed over");
+            Assert(f.World.Culling.Regions(f.Group).Select(r => r.Owner).SequenceEqual(new object[] { f.Post }), "An inspection lists only the moved part's own sphere");
+            lister.Shows = false;
+            Assert(f.Jetty.Active && f.Post.Active, "With the culler's sphere hidden, the moved part shows while its own sphere is visible");
+            f.World.Show(own, false);
+            Assert(!f.Jetty.Active, "With its own sphere hidden the empty listed object is off");
+            f.World.Show(own, true);
+            Assert(f.Jetty.Active && f.Post.Active, "Its own sphere shows it again");
+            Assert(Applies(f, Part("far-post", "Jetty/Post", new[] { 1101.0, 10, 14 })), "The part moves back");
+            Assert(Spheres(f).Count == 0 && lister.Lists.Single() == f.Jetty && !f.Jetty.Active, "The listed object returns to its culler's list once, with the culler's current state");
+        }
+    }
+
+    // The game-object culler of the empty-container tests: it lists the jetty, with its sphere at the root.
+    static FakeCuller Lister(Fixture f, double radius = 8) {
+        var lister = new FakeCuller { Id = ".|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { f.Jetty }, Radius = radius, Authored = radius };
+        f.Group.Cullers.Add(lister); return lister;
+    }
+    // Another part below the jetty, at the offset from the group root, under the path Jetty/<name>.
+    static FakePart BelowJetty(Fixture f, string name, double[] offset, FakePart parent = null) {
+        var path = parent == null ? "Jetty/" + name : f.World.PartsAt.Single(p => p.Value.Contains(parent)).Key.Substring(Mill.Length + 1) + "/" + name;
+        var part = f.Group.Add(new FakePart { Id = path + "#" + (f.Group.Parts.Count + 1), Offset = offset, Parent = parent ?? f.Jetty });
+        f.World.PartsAt[Mill + "/" + path] = new List<object> { part };
+        return part;
+    }
+
+    // A renderer or collider whose bounds cannot be read, such as a renderer without a mesh on an inactive object, counts
+    // with its object's position: an object whose only content it is keeps the stand-in, as the game can switch that
+    // content on while the plan stands.
+    static void UnreadableBoundsCountAsPresence() {
+        foreach (var kind in new[] { "renderer", "collider" }) {
+            var f = Plain(); f.Jetty.Empty = true; f.Jetty.Unreadable = true;
+            if (kind == "renderer") f.Jetty.Renders = true; else f.Jetty.Collides = true;
+            var corners = f.World.Presence(f.Jetty, new object[] { f.Post });
+            Assert(corners.Count == 1 && Near(corners[0], new[] { 1100.0, 10, 14 }), "A " + kind + " with unreadable bounds counts as one point at its object");
+            Lister(f);
+            Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost)), "The post moves out (" + kind + ")");
+            var standIn = Spheres(f).SingleOrDefault(s => s.Owner == f.Jetty);
+            Assert(standIn != null && Near(f.World.Native.Sphere(standIn).ToArray(), new[] { 1100.0, 10, 20, 8 }), "A jetty whose only " + kind + " has unreadable bounds keeps the stand-in");
+        }
+    }
+
+    // Nested listed objects under two game-object cullers, without a simple culler: the jetty is listed by a wide culler
+    // and the frame below it, empty, by a narrow one. The post moves far, so the jetty becomes a container with a
+    // stand-in; the pin below the frame moves inside the wide sphere only, so it follows the jetty's stand-in. The frame
+    // then keeps a stand-in of its own, whichever culler the plan reads first.
+    static void NestedListedObjectsPlanTheSameInAnyOrder() {
+        foreach (var wideFirst in new[] { true, false }) {
+            var f = Plain(); f.Group.Cullers.Clear(); f.Group.RootCulling = null;
+            var frame = BelowJetty(f, "Frame", new[] { 0.0, 0, -6 }); frame.Empty = true;
+            var pin = BelowJetty(f, "Pin", new[] { 0.0, 0, -6 }, frame);
+            var wide = new FakeCuller { Id = ".|Wide|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { f.Jetty }, Radius = 100, Authored = 100 };
+            var narrow = new FakeCuller { Id = ".|Narrow|Helpers.Culling.GameObjectCuller", Switcher = true, Lists = { frame }, Radius = 2, Authored = 2 };
+            if (wideFirst) { f.Group.Cullers.Add(wide); f.Group.Cullers.Add(narrow); } else { f.Group.Cullers.Add(narrow); f.Group.Cullers.Add(wide); }
+            Assert(Applies(f, Part("far-post", "Jetty/Post", new[] { 1100.0, 10, 5020 }), Part("near-pin", "Jetty/Frame/Pin", new[] { 1100.0, 10, 40 })), "The post and the pin move (" + (wideFirst ? "wide" : "narrow") + " culler first)");
+            var owners = Spheres(f).Select(s => s.Owner).ToList();
+            Assert(owners.Count == 3 && owners.Contains(f.Post) && owners.Contains(f.Jetty) && owners.Contains(frame) && !owners.Contains(pin),
+                "The post has its own sphere, and the jetty and the frame each keep a stand-in: " + String.Join(", ", Spheres(f).Select(s => N(f.World.Native.Sphere(s)))));
+            Assert(Near(f.World.Native.Sphere(Spheres(f).Single(s => s.Owner == frame)).ToArray(), new[] { 1100.0, 10, 20, 2 }), "The frame's stand-in is its culler's sphere");
+            Assert(wide.Lists.Count == 0 && narrow.Lists.Count == 0, "Both listed objects are handed over");
+            var jetty = Spheres(f).Single(s => s.Owner == f.Jetty); var own = Spheres(f).Single(s => s.Owner == frame);
+            f.World.Show(own, false);
+            Assert(frame.Active && pin.Active, "With the frame's stand-in hidden, the pin shows by the jetty's stand-in");
+            f.World.Show(jetty, false);
+            Assert(!pin.Active, "With both hidden the pin is culled");
+        }
+    }
+
+    // The contract of IGroupWorld.Presence: no corners for an object without a renderer, collider or light at or below
+    // it, one point per light only where no renderer stands, and the anchor, the object's map position, stands in for
+    // the presence of a moved part that has none: such a part keeps a sphere of its own at its place.
+    static void PresenceMayBeEmptyAndTheAnchorStandsInForIt() {
+        var f = Plain();
+        f.Jetty.Empty = true; f.Post.Empty = true;
+        Assert(f.World.Presence(f.Jetty, null).Count == 0 && f.World.Presence(f.Post, null).Count == 0, "An object without presence has no corners");
+        f.Post.Lights = true;
+        Assert(f.World.Presence(f.Jetty, null).Count == 1 && Near(f.World.Presence(f.Jetty, null)[0], new[] { 1101.0, 10, 14 }), "A light counts as one point where no renderer stands");
+        f.Jetty.Renders = true;
+        Assert(f.World.Presence(f.Jetty, null).Count == 8, "A renderer takes the place of the light");
+        f.Jetty.Empty = true; f.Post.Empty = true; f.Post.Collides = true;
+        Assert(f.World.Presence(f.Jetty, null).Count == 8 && f.World.Presence(f.Jetty, new object[] { f.Post }).Count == 0, "A collider fills its cube; a named part is left out");
+        var g = Plain(); g.Post.Empty = true;
+        Assert(Applies(g, Part("far-post", "Jetty/Post", FarPost)), "An empty part moves out");
+        var own = Spheres(g).Single();
+        Assert(own.Owner == g.Post && Near(g.World.Native.Sphere(own).ToArray(), new[] { 1160.0, 10, 14, 0 }), "It keeps a sphere of its own at its anchor: " + N(g.World.Native.Sphere(own)));
+    }
+
+    // The review's case: the empty jetty is listed with a sphere of 8 m, and the post moves to 1100, 10, 28.8: outside
+    // the listed sphere, inside the root's simple sphere of 10 m. The post follows the game's sphere of the simple culler,
+    // which is no own sphere, so the jetty keeps the stand-in and leaves the list.
+    static void EmptyListedObjectKeepsAStandInForAGameSphere() {
+        var f = Plain(); var root = Root(f); f.Jetty.Empty = true;
+        var lister = Lister(f);
+        Assert(Applies(f, Part("near-post", "Jetty/Post", new[] { 1100.0, 10, 28.8 })), "The post moves out of the listed sphere");
+        var standIn = Spheres(f).SingleOrDefault(s => s.Owner == f.Jetty);
+        Assert(standIn != null && Near(f.World.Native.Sphere(standIn).ToArray(), new[] { 1100.0, 10, 20, 8 }) && !Spheres(f).Any(s => s.Owner == f.Post), "The jetty keeps the stand-in; the post follows the simple culler's sphere");
+        Assert(lister.Lists.Count == 0 && f.World.Culling.HandedOver(lister).Single() == f.Jetty, "The jetty leaves the list, so its culler cannot switch it");
+        lister.Shows = false; f.World.Show(standIn, false);
+        Assert(f.Jetty.Active && f.Post.Active, "With the listed sphere hidden and the simple sphere visible, the post shows");
+    }
+
+    // Two parts below the empty jetty move to different places. The jetty follows both own spheres and needs no
+    // stand-in. When one part returns, the sphere that holds the jetty changes, and the hand-over reports the new one.
+    static void SeveralMovedPartsBelowAnEmptyListedObject() {
+        foreach (var returning in new[] { "Post", "Rail" }) {
+            var f = Plain(); f.Jetty.Empty = true;
+            var rail = BelowJetty(f, "Rail", new[] { -1.0, 0, -6 });
+            var lister = Lister(f);
+            Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Part("far-rail", "Jetty/Rail", new[] { 1100.0, 10, 5020 })), "Both parts move out");
+            Assert(Spheres(f).Count == 2 && !Spheres(f).Any(s => s.Owner == f.Jetty) && lister.Lists.Count == 0, "Each part has its own sphere; none stays in the culler's place, and the jetty leaves the list");
+            var post = Spheres(f).Single(s => s.Owner == f.Post); var far = Spheres(f).Single(s => s.Owner == rail);
+            Assert(Near(f.World.Native.Sphere(far).Take(3).ToArray(), new[] { 1100.0, 10, 5020 }) && Near(f.World.Native.Sphere(post).Take(3).ToArray(), FarPost), "Each sphere stands at its part");
+            lister.Shows = false;
+            f.World.Show(post, false);
+            Assert(f.Jetty.Active && rail.Active && !f.Post.Active, "With one sphere visible the jetty stays on for that part");
+            f.World.Show(far, false);
+            Assert(!f.Jetty.Active, "With both hidden the jetty is off");
+            f.World.Show(post, true); f.World.Show(far, true);
+            var stays = returning == "Post" ? rail : f.Post;
+            Assert(Applies(f, Part("far-post", "Jetty/Post", returning == "Post" ? new[] { 1101.0, 10, 14 } : FarPost), Part("far-rail", "Jetty/Rail", returning == "Rail" ? new[] { 1099.0, 10, 14 } : new[] { 1100.0, 10, 5020 })), returning + " returns");
+            // The returned part shows again below the jetty, so the jetty is no longer empty: a stand-in takes it over.
+            var standIn = Spheres(f).SingleOrDefault(s => s.Owner == f.Jetty); var left = Spheres(f).SingleOrDefault(s => s.Owner == stays);
+            Assert(Spheres(f).Count == 2 && standIn != null && left != null && lister.Lists.Count == 0 && f.World.Culling.HandedOver(lister).Single() == f.Jetty, "The other part keeps its sphere, and the jetty, with the returned part in it, is handed over to a stand-in");
+            f.World.Show(left, false); f.World.Show(standIn, false);
+            Assert(!f.Jetty.Active && f.World.Culling.HandedOver().Single().Item3 == false, "The hand-over reports the stand-in that holds the jetty now: hidden, the jetty is off");
+            f.World.Show(standIn, true);
+            Assert(f.Jetty.Active && f.World.Culling.HandedOver().Single().Item3, "Visible again, it reports the jetty shown");
+        }
+        // With an empty returned part the jetty stays empty: the remaining part's sphere takes it over.
+        foreach (var returning in new[] { "Post", "Rail" }) {
+            var f = Plain(); f.Jetty.Empty = true;
+            var rail = BelowJetty(f, "Rail", new[] { -1.0, 0, -6 });
+            (returning == "Post" ? f.Post : rail).Empty = true;
+            var lister = Lister(f);
+            Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Part("far-rail", "Jetty/Rail", new[] { 1100.0, 10, 5020 })), "Both parts move out");
+            Assert(Spheres(f).Count == 2 && !Spheres(f).Any(s => s.Owner == f.Jetty), "No stand-in");
+            var stays = returning == "Post" ? rail : f.Post;
+            Assert(Applies(f, Part("far-post", "Jetty/Post", returning == "Post" ? new[] { 1101.0, 10, 14 } : FarPost), Part("far-rail", "Jetty/Rail", returning == "Rail" ? new[] { 1099.0, 10, 14 } : new[] { 1100.0, 10, 5020 })), "The empty " + returning + " returns");
+            var left = Spheres(f).Single();
+            Assert(left.Owner == stays && lister.Lists.Count == 0 && f.World.Culling.HandedOver(lister).Single() == f.Jetty, "The other part keeps its sphere, and the jetty stays handed over without a stand-in");
+            f.World.Show(left, false);
+            Assert(!f.Jetty.Active && f.World.Culling.HandedOver().Single().Item3 == false, "The hand-over reports the remaining sphere: hidden, the jetty is off");
+            f.World.Show(left, true);
+            Assert(f.Jetty.Active && f.World.Culling.HandedOver().Single().Item3, "Visible again, it reports the jetty shown");
+        }
+    }
+
+    // A listed object with presence of its own keeps the stand-in: an unmoved child that shows, or only a light or a
+    // collider on the object itself.
+    static void ListedObjectWithPresenceOfItsOwnKeepsItsStandIn() {
+        foreach (var kind in new[] { "child", "light", "collider" }) {
+            var f = Plain(); f.Jetty.Empty = true;
+            if (kind == "child") BelowJetty(f, "Rail", new[] { -1.0, 0, -6 });
+            if (kind == "light") f.Jetty.Lights = true;
+            if (kind == "collider") f.Jetty.Collides = true;
+            Lister(f);
+            Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost)), "The post moves out (" + kind + ")");
+            var standIn = Spheres(f).SingleOrDefault(s => s.Owner == f.Jetty);
+            Assert(standIn != null && Near(f.World.Native.Sphere(standIn).ToArray(), new[] { 1100.0, 10, 20, 8 }), "A jetty with a " + kind + " of its own keeps the stand-in in the culler's place");
+        }
+    }
+
+    // The empty case through the scene patch editing session: Undo, Redo and Remove modification.
+    static void EmptyListedObjectThroughUndoRedoAndRemove() {
+        var f = Plain(); f.Jetty.Empty = true; var lister = Lister(f); var (_, mapEditor, session) = Session(f);
+        Assert(session.Edit(PartId("Jetty/Post"), new Placement(FarPost, Identity), null).Applied, "The post moves out");
+        Assert(Spheres(f).Count == 1 && Spheres(f).Single().Owner == f.Post && lister.Lists.Count == 0, "One own sphere at the post, the jetty handed over");
+        mapEditor.Undo();
+        Assert(Spheres(f).Count == 0 && lister.Lists.Single() == f.Jetty, "Undo releases the sphere and returns the jetty to the list");
+        mapEditor.Redo();
+        Assert(Spheres(f).Count == 1 && Spheres(f).Single().Owner == f.Post && lister.Lists.Count == 0 && f.World.Culling.Regions(f.Group).Single().Owner == f.Post, "Redo restores only the post's sphere");
+        Assert(session.Remove(PartId("Jetty/Post")).Applied && Spheres(f).Count == 0 && lister.Lists.Single() == f.Jetty, "Remove modification returns everything");
     }
 
     // The listed jetty moves out of its game-object culler's sphere and gets a sphere of its own in the culler's place.

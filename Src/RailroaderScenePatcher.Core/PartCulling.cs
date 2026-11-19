@@ -127,9 +127,10 @@ namespace RailroaderScenePatcher.Core {
         }
         // moved: the parts whose placement differs from the placement the scene gives them. presence: the corners, in
         // map coordinates, of the renderer, collider and light bounds at and below an object, leaving out the named
-        // objects and what stands below them: a moved part below another one has bounds of its own. An unedited part
-        // is never in moved, so the culling of unedited content stays the game's.
-        public static CullingPlan Compute(object group, GroupObservation observed, IEnumerable<object> moved, Func<object, IReadOnlyList<object>, IReadOnlyList<IReadOnlyList<double>>> presence) {
+        // objects and what stands below them: a moved part below another one has bounds of its own. Empty for an object
+        // without presence of its own. anchor: an object's map position, which stands in for the bounds of a moved part
+        // without presence. An unedited part is never in moved, so the culling of unedited content stays the game's.
+        public static CullingPlan Compute(object group, GroupObservation observed, IEnumerable<object> moved, Func<object, IReadOnlyList<object>, IReadOnlyList<IReadOnlyList<double>>> presence, Func<object, IReadOnlyList<double>> anchor = null) {
             if (observed == null) throw new ArgumentNullException(nameof(observed));
             var plan = new CullingPlan();
             if (observed.Root.Active == false) { plan.Suspended = true; return plan; }
@@ -145,12 +146,20 @@ namespace RailroaderScenePatcher.Core {
             // A disabled part, or a part below one, shows nowhere and gets no sphere.
             var held = edited.Where(On).ToList();
             var cache = new Dictionary<object, IReadOnlyList<IReadOnlyList<double>>>(ByIdentity.Instance);
-            IReadOnlyList<IReadOnlyList<double>> Corners(object node) {
+            // What the object shows of its own, outside the moved parts below it; empty when it shows nothing.
+            IReadOnlyList<IReadOnlyList<double>> Own(object node) {
                 if (!cache.TryGetValue(node, out var corners)) cache[node] = corners = presence?.Invoke(node, edited.Where(part => !ReferenceEquals(part, node) && AtOrBelow(part, node)).ToArray()) ?? new IReadOnlyList<double>[0];
                 return corners;
             }
+            // The bounds a sphere must enclose: the object's own presence, or its anchor for an object without one.
+            IReadOnlyList<IReadOnlyList<double>> Corners(object node) {
+                var corners = Own(node);
+                if (corners.Count != 0 || anchor == null) return corners;
+                var at = anchor(node);
+                return at == null ? corners : new[] { at };
+            }
             var cullers = observed.Cullers.Where(c => c.Handle != null && c.Culler != null && (c.Authored ?? c.Radius) != null && (ReferenceEquals(c.Handle, group) || parts.ContainsKey(c.Handle))).ToList();
-            Sphere Own(GroupCuller culler) => new Sphere { Id = culler.Id, Centre = culler.Expected, Radius = (culler.Authored ?? culler.Radius).Value, Node = culler.Handle, Culler = culler, Game = culler.Kind == CullerKind.Simple };
+            Sphere Game(GroupCuller culler) => new Sphere { Id = culler.Id, Centre = culler.Expected, Radius = (culler.Authored ?? culler.Radius).Value, Node = culler.Handle, Culler = culler, Game = culler.Kind == CullerKind.Simple };
             Sphere Region(GroupCuller culler, CullerKind kind, object owner) {
                 var corners = Corners(owner);
                 var centre = new double[3];
@@ -183,7 +192,7 @@ namespace RailroaderScenePatcher.Core {
                     if (!On(listed)) continue;
                     if (!Moved(listed) && (ReferenceEquals(culler.Handle, group) || !Moved(culler.Handle))) continue;
                     var corners = Corners(listed);
-                    if (corners.Count == 0 || Encloses(Own(culler), corners)) continue;
+                    if (corners.Count == 0 || Encloses(Game(culler), corners)) continue;
                     var region = Region(culler, CullerKind.GameObject, listed);
                     gates[listed] = region.Id; gateSpheres[listed] = region; escaped.Add(listed);
                     Follows(culler).Add(new KeyValuePair<object, string>(listed, region.Id));
@@ -209,7 +218,7 @@ namespace RailroaderScenePatcher.Core {
                     if (ownSimple.TryGetValue(above, out var region)) chain.Add(region);
                     if (gateSpheres.TryGetValue(above, out var gate)) chain.Add(gate);
                     else if (listedBy.ContainsKey(above)) chain.Add(StandIn(above));
-                    if (simpleAt.TryGetValue(above, out var culler)) chain.Add(Own(culler));
+                    if (simpleAt.TryGetValue(above, out var culler)) chain.Add(Game(culler));
                 }
                 if (chain.Count == 0) continue;
                 var follows = chain.FindIndex(sphere => Encloses(sphere, corners));
@@ -243,8 +252,21 @@ namespace RailroaderScenePatcher.Core {
             // A listed object that did not leave its culler's sphere, with a moved part below it that follows another
             // sphere, or that itself follows another simple sphere, is handed over like a container: a stand-in for the
             // culler's sphere takes it, so the object can stay on for the moved part while the culler would hide it.
+            // A listed object that shows nothing of its own, such as the outer object of a crossing mast, needs no
+            // stand-in while every moved part below it follows an own sphere: the first of those spheres takes it, and
+            // it stays on while any of them shows, so no sphere stays in the culler's place. A moved part that follows
+            // the game's sphere of a simple culler, or another stand-in, keeps the stand-in, as the object must then
+            // leave its culler's list for a sphere of its own.
+            // The own spheres of moved parts, read before any stand-in is planned, so the order of the listed objects
+            // does not decide whether a stand-in counts as one.
+            var owned = new HashSet<string>(plan.regions.Select(r => r.Id), StringComparer.Ordinal);
             var containers = new HashSet<object>(ByIdentity.Instance);
             foreach (var listed in listedBy.Keys.Where(l => !gates.ContainsKey(l) && (extra.ContainsKey(l) || driver.ContainsKey(l))).ToList()) {
+                if (!driver.ContainsKey(listed) && Own(listed).Count == 0 && extra[listed].All(owned.Contains)) {
+                    gates[listed] = extra[listed][0];
+                    Follows(listedBy[listed]).Add(new KeyValuePair<object, string>(listed, gates[listed]));
+                    continue;
+                }
                 var standIn = Fixed(listedBy[listed], listed);
                 Follows(listedBy[listed]).Add(new KeyValuePair<object, string>(listed, standIn.Id));
                 if (driver.ContainsKey(listed)) gates[listed] = standIn.Id; else containers.Add(listed);
@@ -260,7 +282,7 @@ namespace RailroaderScenePatcher.Core {
                     if (corners.Count == 0) continue;
                     var chain = new List<Sphere>();
                     for (var above = Up(part); !ReferenceEquals(above, culler.Handle); above = Up(above)) if (regions.TryGetValue(above, out var region)) chain.Add(region);
-                    chain.Add(Own(culler));
+                    chain.Add(Game(culler));
                     var follows = chain.FindIndex(sphere => Encloses(sphere, corners));
                     if (follows < 0) { regions[part] = Region(culler, CullerKind.Renderer, part); escaped.Add(part); Follows(culler).Add(new KeyValuePair<object, string>(part, regions[part].Id)); }
                     else Follows(culler).Add(new KeyValuePair<object, string>(part, follows == chain.Count - 1 ? null : chain[follows].Id));
@@ -574,7 +596,11 @@ namespace RailroaderScenePatcher.Core {
                 state.Listed.Remove(listed);
             }
             foreach (var handOver in plan.HandOvers.Where(h => h.Kind == CullerKind.GameObject && host.Alive(h.Culler)))
-                foreach (var follow in handOver.Follows.Where(f => f.Value != null && Registered(f.Value) && !state.Listed.Any(l => ReferenceEquals(l.Node, f.Key)))) {
+                foreach (var follow in handOver.Follows.Where(f => f.Value != null && Registered(f.Value))) {
+                    // An object already taken out follows the sphere the plan names now, such as the other moved part's
+                    // when one of two parts below an empty object returns.
+                    var held = state.Listed.FirstOrDefault(l => ReferenceEquals(l.Node, follow.Key));
+                    if (held != null) { held.Region = follow.Value; continue; }
                     var index = host.Unlist(handOver.Culler, follow.Key);
                     if (index >= 0) state.Listed.Add(new ListedState { Culler = handOver.Culler, Node = follow.Key, Index = index, Region = follow.Value });
                 }

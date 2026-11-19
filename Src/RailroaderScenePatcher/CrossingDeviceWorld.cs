@@ -247,6 +247,7 @@ namespace RailroaderScenePatcher {
         public void SetPartPlacement(object target, Placement placement) => groups.SetPartPlacement(Device(target, bells ? "bell" : "mast"), placement);
         public void RefreshCulling(object group, CullingPlan plan) => groups.RefreshCulling(group, plan);
         public IReadOnlyList<IReadOnlyList<double>> Presence(object part, IReadOnlyList<object> without) => groups.Presence(part, without);
+        public IReadOnlyList<double> Anchor(object part) => groups.Anchor(part);
         public bool Below(object part, object above) => groups.Below(part, above);
         public bool Alive(object handle) => groups.Alive(handle);
     }

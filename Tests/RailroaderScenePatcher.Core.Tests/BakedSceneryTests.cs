@@ -48,6 +48,14 @@ class FakePart {
     public FakePart Parent; public FakeGroup Group;
     // The edge of the cube its renderer, collider and light bounds fill around its position.
     public double Size = 1;
+    // What gives the part its presence, as the native world counts it: a renderer or a collider fills the cube; a light
+    // counts as one point at the part, and only where no renderer stands at or below the object asked about.
+    public bool Renders = true, Collides, Lights;
+    // The bounds of its renderer or collider cannot be read, as of a renderer without a mesh on an inactive object: it
+    // counts as one point at the part.
+    public bool Unreadable;
+    // An empty part has no renderer, collider or light of its own, as the outer object of a crossing mast.
+    public bool Empty { get => !Renders && !Collides && !Lights; set { if (value) Renders = Collides = Lights = false; } }
     // The renderer on the part, for the renderer cullers that list it.
     public readonly FakeRenderer Renderer;
     public FakePart() { Renderer = new FakeRenderer { On = this }; }
@@ -260,16 +268,19 @@ class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable, IDis
         Constructions.Settle(group.Parts.Where(p => p.Constructed).Cast<object>().Concat(group.Constructed ? new object[] { group } : new object[0]));
     }
     // The corners of the cube around the part and around every part below it, leaving out the named parts and what
-    // stands below them.
+    // stands below them, by the native contract of IGroupWorld.Presence: empty for an object without presence.
     public IReadOnlyList<IReadOnlyList<double>> Presence(object target, IReadOnlyList<object> without) {
         var part = (FakePart)target; var corners = new List<IReadOnlyList<double>>();
-        foreach (var p in part.Group.Parts.Where(p => p == part || IsBelow(p, part))) {
-            if (without != null && without.Any(w => w == p || (w is FakePart above && IsBelow(p, above)))) continue;
+        var counted = part.Group.Parts.Where(p => (p == part || IsBelow(p, part)) && (without == null || !without.Any(w => w == p || (w is FakePart above && IsBelow(p, above))))).ToList();
+        foreach (var p in counted.Where(p => p.Renders || p.Collides)) {
             var at = Map(ScenePosition(p));
+            if (p.Unreadable) { corners.Add(at); continue; }
             for (var i = 0; i < 8; i++) corners.Add(new[] { at[0] + ((i & 1) == 0 ? -1 : 1) * p.Size / 2, at[1] + ((i & 2) == 0 ? -1 : 1) * p.Size / 2, at[2] + ((i & 4) == 0 ? -1 : 1) * p.Size / 2 });
         }
+        if (!counted.Any(p => p.Renders)) foreach (var p in counted.Where(p => p.Lights)) corners.Add(Map(ScenePosition(p)));
         return corners;
     }
+    public IReadOnlyList<double> Anchor(object target) => Map(ScenePosition((FakePart)target));
     // The part rule's verdicts by path, when set: a path resolves and is refused as GroupWorld resolves and refuses it
     // (BakedSceneryRules.Resolves, BakedSceneryRules.PartRefusal).
     public Dictionary<string, PartVerdict> Verdicts;

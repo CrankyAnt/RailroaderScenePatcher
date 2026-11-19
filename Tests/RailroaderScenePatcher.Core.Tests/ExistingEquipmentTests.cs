@@ -49,10 +49,11 @@ static class ExistingEquipmentTests {
         void Build() {
             Controller = new FakeGroup();
             Controller.Parts.Clear(); Controller.Cullers.Clear(); Controller.RootCulling = null;
-            Outer1 = Controller.Add(new FakePart { Id = "Signal 1#1", Offset = new[] { -6.0, 0, 4 } });
+            // As in the game, the object above a mast shows nothing of its own: every renderer is on the light object or below it.
+            Outer1 = Controller.Add(new FakePart { Id = "Signal 1#1", Offset = new[] { -6.0, 0, 4 }, Empty = true });
             Mast1 = Controller.Add(new FakePart { Id = "Signal 1/Signal 1#2", Offset = new[] { -6.0, 0, 4 }, Parent = Outer1 });
             Gate1 = Controller.Add(new FakePart { Id = "Signal 1/Signal 1/Wishbone#3", Offset = new[] { -6.0, 3, 4 }, Parent = Mast1 });
-            Outer2 = Controller.Add(new FakePart { Id = "Signal 2#4", Offset = new[] { 6.0, 0, -4 } });
+            Outer2 = Controller.Add(new FakePart { Id = "Signal 2#4", Offset = new[] { 6.0, 0, -4 }, Empty = true });
             Mast2 = Controller.Add(new FakePart { Id = "Signal 2/Signal 2#5", Offset = new[] { 6.0, 0, -4 }, Parent = Outer2 });
             Bell = Controller.Add(new FakePart { Id = "Crossing Bell#6", Offset = new[] { 0.0, 0, 0 } });
             Culler = new FakeCuller { Id = ".|Helpers.Culling.GameObjectCuller", Switcher = true, Radius = 30, Authored = 30, Lists = { Outer1, Outer2 } };
@@ -146,7 +147,7 @@ static class ExistingEquipmentTests {
     }
 
     // A mast moved out of its crossing culler's sphere gets a sphere of its own: the culler keeps its radius, the
-    // object above the mast leaves the culler's list for a stand-in, and the mast shows by its own sphere.
+    // object above the mast leaves the culler's list and follows the mast's sphere, and no sphere stays at the old place.
     static void MovedMastKeepsItsOwnCulling() {
         var f = new Fixture();
         var outcome = f.Engine.Apply(Doc(Mast("far-mast", position: Far))).Outcomes["far-mast"];
@@ -155,9 +156,9 @@ static class ExistingEquipmentTests {
         var own = f.World.Native.Registered.SingleOrDefault(r => r.Owner == f.Mast1);
         Assert(own != null && Near(own.Centre, new[] { 400.0, 11.5, 20 }) && own.Radius < 5, "The moved mast has a culling sphere of its own at the mast: " + (own == null ? "none" : N(own.Centre) + " r" + own.Radius));
         Assert(!f.Culler.Lists.Contains(f.Outer1) && f.Culler.Lists.Contains(f.Outer2) && f.World.Culling.HandedOver(f.Culler).Contains(f.Outer1), "The object above the moved mast is handed over; the other mast stays the culler's");
+        Assert(f.World.Native.Registered.Count == 1 && f.World.Culling.Regions(f.Controller).Select(r => r.Owner).SequenceEqual(new object[] { f.Mast1 }), "The mast's own sphere is the only one: none stays at the old place, and an inspection lists only that one");
         // The camera leaves the crossing and faces the mast: the mast stays on; then it leaves the mast: the mast goes off.
-        var standIn = f.World.Native.Registered.Single(r => r.Owner == f.Outer1);
-        f.World.Show(standIn, false);
+        f.Culler.Shows = false;
         Assert(f.Outer1.Active && f.Mast1.Active, "While its own sphere is visible the moved mast never vanishes, whatever the crossing's culler would do");
         f.World.Show(own, false);
         Assert(!f.Mast1.Active, "Out of view the moved mast is culled");
@@ -166,6 +167,15 @@ static class ExistingEquipmentTests {
         // Back inside the sphere, everything the own culling took returns to the game.
         var back = f.Engine.Apply(Doc(Mast("far-mast", position: Near1))).Outcomes["far-mast"];
         Assert(back.Applied && f.World.Native.Registered.Count == 0 && f.Culler.Lists.Contains(f.Outer1) && f.Culler.Lists.Count == 2, "Moved back, the mast's own sphere is released and the list is as before: " + back.Error);
+        // Through the session: Undo, Redo and Remove modification keep at most the mast's own sphere.
+        var g = new Fixture(); var (_, mapEditor, session) = Session(g);
+        bool OnlyTheMast() => g.World.Native.Registered.Count == 1 && g.World.Native.Registered.Single().Owner == g.Mast1 && g.World.Culling.Regions(g.Controller).Count == 1;
+        Assert(session.Edit(MastId(), new Placement(Far, Identity), null).Applied && OnlyTheMast(), "The session move holds exactly one sphere, the mast's");
+        mapEditor.Undo();
+        Assert(g.World.Native.Registered.Count == 0 && g.Culler.Lists.SequenceEqual(new[] { g.Outer1, g.Outer2 }), "Undo holds none, and the list is as before");
+        mapEditor.Redo();
+        Assert(OnlyTheMast() && !g.Culler.Lists.Contains(g.Outer1), "Redo holds exactly the mast's sphere again");
+        Assert(session.Remove(MastId()).Applied && g.World.Native.Registered.Count == 0 && g.Culler.Lists.SequenceEqual(new[] { g.Outer1, g.Outer2 }), "Remove modification holds none");
     }
 
     // A disabled mast shows nowhere: it gets no sphere of its own and the crossing's culler keeps its list. Enabled

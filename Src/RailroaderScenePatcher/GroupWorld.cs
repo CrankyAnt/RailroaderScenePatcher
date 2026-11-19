@@ -679,7 +679,8 @@ namespace RailroaderScenePatcher {
         }
         // The corners of the renderer, collider and light bounds at and below the part. The bounds come from the meshes
         // and collider shapes, which an object that is switched off still has. A visual effect gives no presence, and a
-        // light counts only for a part without renderers.
+        // light counts only for a part without renderers. A renderer or collider whose bounds cannot be read counts with
+        // its object's position. None for an object without presence (IGroupWorld.Presence).
         public IReadOnlyList<IReadOnlyList<double>> Presence(object target, IReadOnlyList<object> without) {
             var part = PartObject(target).transform;
             var skip = (without ?? new object[0]).OfType<GameObject>().Where(go => go != null).Select(go => go.transform).ToArray();
@@ -687,18 +688,26 @@ namespace RailroaderScenePatcher {
             // the presence does not change with the camera distance.
             bool Counts(Component c) => c != null && !skip.Any(c.transform.IsChildOf) && !Transient(c.transform, part);
             var points = new List<Vector3>();
+            // A renderer or collider whose bounds cannot be read now, such as a renderer without a mesh on an inactive
+            // object or a non-primitive collider that is off, counts with its object's position: the game can switch it on.
+            void Add(IEnumerable<Vector3> corners, Component c) { var found = corners.ToList(); if (found.Count == 0) found.Add(c.transform.position); points.AddRange(found); }
             foreach (var shape in part.GetComponentsInChildren<Renderer>(true))
-                if (Counts(shape) && BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false)) points.AddRange(Corners(shape));
+                if (Counts(shape) && BakedSceneryRules.GivesPresence(shape.GetType().FullName, true, false, false)) Add(Corners(shape), shape);
             var shapes = points.Count;
-            foreach (var collider in part.GetComponentsInChildren<Collider>(true)) if (Counts(collider)) points.AddRange(Corners(collider));
+            foreach (var collider in part.GetComponentsInChildren<Collider>(true)) if (Counts(collider)) Add(Corners(collider), collider);
             // A storage pile has no saved renderer or collider: it counts with the culling sphere it lays its logs out in.
             if (bulk != null && bulkRadius != null)
                 foreach (var pile in part.GetComponentsInChildren(bulk, true))
                     if (Counts(pile)) { var r = (float)bulkRadius.Invoke(pile, null); for (var i = 0; i < 8; i++) points.Add(pile.transform.position + Sign(i) * r); shapes++; }
             if (shapes == 0) foreach (var light in part.GetComponentsInChildren<Light>(true)) if (Counts(light)) points.Add(light.transform.position);
-            if (points.Count == 0) points.Add(part.position);
             var moves = NativeInventory.MovesWithOrigin(part);
             return points.Select(point => { var map = NativeInventory.MapPosition(point, moves); return (IReadOnlyList<double>)new double[] { map.x, map.y, map.z }; }).ToArray();
+        }
+        // The part's position in map coordinates.
+        public IReadOnlyList<double> Anchor(object target) {
+            var part = PartObject(target).transform;
+            var map = NativeInventory.MapPosition(part.position, NativeInventory.MovesWithOrigin(part));
+            return new double[] { map.x, map.y, map.z };
         }
         internal static IEnumerable<Vector3> Corners(Collider collider) {
             Bounds local;
