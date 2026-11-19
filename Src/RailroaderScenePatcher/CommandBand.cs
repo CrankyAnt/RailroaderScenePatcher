@@ -497,6 +497,30 @@ namespace RailroaderScenePatcher {
         }
         internal const string SegmentDetachReason = "A construction without segments has no meaning. Select the segments of the bridge's track instead.";
         internal static string ClearSegmentsReason(bool hasValue) => hasValue ? null : "This mod sets no construction segments for this object, so there is nothing to clear.";
+        // The Marker ID row of a track marker's Connections tab. Why the replacement ID is unavailable for the
+        // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
+        // shares takes one, and a marker that already has one keeps the row to change or clear it.
+        internal const string SetMarkerId = "Set ID", ClearMarkerId = "Clear ID", RepairDuplicateId = "Repair duplicate ID";
+        internal static string MarkerIdUnavailable(bool generic, string underlying, int sharers, bool hasValue) =>
+            !generic ? ReplacementMarkerIds.NotSupported + "."
+            : hasValue ? null
+            : underlying == null ? "The marker ID could not be read."
+            : sharers == 0 ? "Marker ID " + underlying + " is held by this marker alone, so it needs no replacement ID." : null;
+        // Why Set ID is unavailable: the general reason first, then an empty field, a reserved prefix, a space at either end
+        // or the marker's current ID.
+        internal static string MarkerIdSetReason(string block, string text, string current) {
+            if (block != null) return block;
+            var problem = ReplacementMarkerIds.Problem(text);
+            if (problem != null) return Sentence(problem);
+            return text == current ? "The field holds the marker's current ID." : null;
+        }
+        internal static string ClearMarkerIdReason(bool hasValue) => hasValue ? null : "This mod sets no replacement ID for this marker, so there is nothing to clear.";
+        // Why Clear ID is unavailable: the general reason first, then nothing to clear.
+        internal static string ClearMarkerIdReason(string block, bool hasValue) => block ?? ClearMarkerIdReason(hasValue);
+        // The caption above the other holders of the marker's underlying ID: while the marker still holds that ID it
+        // shares it with them; after a replacement it no longer does.
+        internal static string SharersCaption(string underlying, string current) =>
+            current == underlying ? "Also holding " + underlying : "Still holding " + underlying + ", the underlying ID";
         // A construction controller on an object of its own, Ela Bridge Scenery: its construction segments are its only edit.
         internal const string ConstructionSceneryFamily = "Bridge construction scenery";
         internal const string ConstructionSceneryOperations = "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.";

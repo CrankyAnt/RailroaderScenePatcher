@@ -350,7 +350,7 @@ namespace RailroaderScenePatcher {
                         if (ids != null) return ids;
                         if (idsError == null) {
                             try { return ids = TrackMarkerWorld.MarkerIds(); }
-                            catch (Exception e) { idsError = "the marker ids of the scene could not be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
+                            catch (Exception e) { idsError = "the marker IDs of the scene could not be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
                         }
                         throw new InvalidOperationException(idsError);
                     };
@@ -423,6 +423,8 @@ namespace RailroaderScenePatcher {
             if (scanErrors != 0) problems.Add("Direct-reference scan incomplete: " + scanErrors + " unreadable fields");
             void Read(Action action) { try { action(); } catch (Exception e) { problems.Add("Inspection unavailable: " + e.GetBaseException().Message); } }
             var marker = TypeName(c) == Marker ? c : Get(go, Marker);
+            // The holders of a duplicate marker ID; their lines and problem follow once the object's capability is known.
+            MarkerIdHolders markerHolders = null;
             if (marker != null) Read(() => {
                 var kind = Text(Field(marker, "type"));
                 bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + kind);
@@ -438,12 +440,12 @@ namespace RailroaderScenePatcher {
                 // Every setup and car placement that reads a starter placement marker, with its cars and wreck setting.
                 bindings.AddRange(reading.Readers);
                 Registrations(marker, bindings);
-                // A duplicate marker id: every holder with its activity, and the owner of each registration under the
-                // marker id, with the guard's holder set. Which components hold the marker id is the discovery's; the rest
+                // A duplicate marker ID: every holder with its activity, and the owner of each registration under the
+                // marker ID, with the guard's holder set. Which components hold the marker ID is the discovery's; the rest
                 // is read now. These lines lead the dependencies: the first one says why the holders are listed.
                 if (markerIds != null) {
                     markerIds().TryGetValue(Text(Field(marker, "id")), out var holders);
-                    duplicate.AddRange(TrackMarkerWorld.HolderSet(marker, (holders ?? new List<Component>()).Where(Loaded)).Dependencies(go));
+                    markerHolders = TrackMarkerWorld.HolderSet(marker, (holders ?? new List<Component>()).Where(Loaded));
                 }
             });
             if (TypeName(c) == Span) Read(() => {
@@ -710,6 +712,14 @@ namespace RailroaderScenePatcher {
             });
             // What the inspection could not read or check is a note, whatever the object's activity. Of the rest, a
             // disabled object keeps only what the game reads anyway.
+            // A holder that can receive a replacement ID, a supported generic track marker, has the duplicate marker ID
+            // as a problem while it is active, and its explanation offers the repair. Any other holder, such as a crossing
+            // pad, shows the explanation without a problem: the patcher cannot repair it there.
+            if (markerHolders != null) {
+                var repairable = structure == TrackMarkerScene.Structure;
+                duplicate.AddRange(markerHolders.Dependencies(go, repairable));
+                if (markerHolders.Problem(go, repairable) is string shared) problems.Add(shared);
+            }
             var notes = problems.Where(BindingRules.IsNote).ToArray();
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,

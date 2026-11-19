@@ -271,6 +271,8 @@ namespace RailroaderScenePatcher.Core {
                     if (item["relationships"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == "Track.TrackMarker")) minimum = Max(minimum, TrackMarkerScene.RequiredVersion);
                     // Crossing coverage, and any edit of a crossing-coverage target, needs its capability whether or not it is available on this build.
                     if ((item["relationships"] as JObject)?["crossingCoverage"] != null || (item["relationships"] as JObject)?["crossingEquipment"] != null || ((item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == CrossingCoverageScene.Structure) || ((item["target"] as JObject)?["component"]?.Type == JTokenType.String && (string)item["target"]["component"] == CrossingCoverageScene.ComponentType)) minimum = Max(minimum, CrossingCoverageScene.RequiredVersion);
+                    // A replacement ID needs its capability whether or not it is available on this build.
+                    if (item[ReplacementMarkerIds.Member] != null) minimum = Max(minimum, ReplacementMarkerIds.RequiredVersion);
                     // Construction segments need their capability whether or not it is available on this build.
                     if ((item["relationships"] as JObject)?["constructionSegments"] != null) minimum = Max(minimum, ConstructionSegmentRule.RequiredVersion);
                     // Bridge placement needs its capability whether or not it is available on this build.
@@ -369,6 +371,7 @@ namespace RailroaderScenePatcher.Core {
                 if (placement != null) PatchEngine.CheckPlacement(placement.Position, placement.Rotation);
                 if (existing != null) PatchEngine.Parse(existing);
                 var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
+                if (existing?[ReplacementMarkerIds.Member] != null) value[ReplacementMarkerIds.Member] = existing[ReplacementMarkerIds.Member].DeepClone();
                 // A placement edit of a track-following object keeps following the same track at the new relative placement.
                 var following = existing == null ? null : PatchEngine.Parse(existing).State.Placement?.Following;
                 if (placement != null && following != null) value["placement"] = PlacementJson(TrackFollowing.Relative(following.Anchor, TrackPose(following.Anchor), placement.Position, placement.Rotation));
@@ -426,6 +429,7 @@ namespace RailroaderScenePatcher.Core {
             }
             // An underlying state that was read without an activity is one whose track group switches the object.
             if (state.Active.HasValue) lines.Add("Enabled: from " + (before == null ? "unknown" : before.Active == null ? "controlled by its track group" : before.Active.Value ? "Yes" : "No") + " to " + (state.Active.Value ? "Yes" : "No"));
+            if (state.MarkerId != null) lines.Add("Marker ID: from " + (before?.MarkerId ?? "unknown") + " to " + state.MarkerId);
             if (state.Marker != null) lines.Add("Track binding: from " + Location(before?.Marker) + " to " + Location(state.Marker));
             if (state.Starter?.Track != null) lines.Add("Track location: from " + Location(before?.Starter?.Track) + " to " + Location(state.Starter.Track));
             if (state.Starter?.Wreck != null) lines.Add("Start derailed: from " + (before?.Starter?.Wreck == null ? "unknown" : before.Starter.Wreck.Value ? "Yes" : "No") + " to " + (state.Starter.Wreck.Value ? "Yes" : "No"));
@@ -456,6 +460,7 @@ namespace RailroaderScenePatcher.Core {
         }
         JObject WithPlacement(TargetIdentity target, JObject existing, JObject placement) {
             var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
+            if (existing?[ReplacementMarkerIds.Member] != null) value[ReplacementMarkerIds.Member] = existing[ReplacementMarkerIds.Member].DeepClone();
             value["placement"] = placement;
             if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
             if (existing?["relationships"] != null) value["relationships"] = existing["relationships"].DeepClone();
@@ -559,7 +564,7 @@ namespace RailroaderScenePatcher.Core {
                 var key = TargetKey(item);
                 if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return false;
                 var underlying = engine.Underlying(held.Target);
-                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)));
+                var desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)).WithMarkerId(parsed.State.MarkerId ?? underlying.MarkerId));
                 if (!Same(scene.Read(held.Target), desired)) return false;
                 return !(scene is IDerivedStateScene derived) || derived.DerivedProblem(held.Target, desired) == null;
             } catch (Exception) { return false; }
@@ -577,9 +582,9 @@ namespace RailroaderScenePatcher.Core {
                 var key = TargetKey(item);
                 if (items.Count(i => !ReferenceEquals(i, item) && TargetKey(i) == key) != 0) return null;
                 var underlying = engine.Underlying(target);
-                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)));
+                desired = engine.Evaluate(new ObjectState(parsed.State.Placement, parsed.State.Active ?? underlying.Active, parsed.State.Marker ?? underlying.Marker, CrossingCoverage.Overlay(underlying.Coverage, parsed.State.Coverage), StarterSetting.Overlay(underlying.Starter, parsed.State.Starter)).WithMarkerId(parsed.State.MarkerId ?? underlying.MarkerId));
                 prior = scene.Read(target);
-                if (prior.Active != desired.Active || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage) || !StarterSetting.Same(prior.Starter, desired.Starter)) return null;
+                if (prior.Active != desired.Active || prior.MarkerId != desired.MarkerId || !MarkerBinding.Same(prior.Marker, desired.Marker) || !CrossingCoverage.Same(prior.Coverage, desired.Coverage) || !StarterSetting.Same(prior.Starter, desired.Starter)) return null;
                 placement.PreflightPlacement(target);
             } catch (Exception) { return null; }
             var outcome = new Outcome { ResolvedTarget = target };
@@ -617,6 +622,7 @@ namespace RailroaderScenePatcher.Core {
                     return Empty(rest) ? null : rest;
                 }
                 var value = new JObject { ["target"] = existing?["target"] ?? TargetJson(target) };
+                if (existing?[ReplacementMarkerIds.Member] != null) value[ReplacementMarkerIds.Member] = existing[ReplacementMarkerIds.Member].DeepClone();
                 if (existing?["placement"] != null) value["placement"] = existing["placement"].DeepClone();
                 if (existing?["active"] != null) value["active"] = existing["active"].DeepClone();
                 if (existing?["starterPlacement"] != null) value["starterPlacement"] = existing["starterPlacement"].DeepClone();
@@ -625,6 +631,67 @@ namespace RailroaderScenePatcher.Core {
                 value["dependsOn"] = existing?["dependsOn"]?.DeepClone() ?? new JArray();
                 return value;
             }, null, "bind-");
+        }
+        // Sets or replaces this mod's replacement ID of a generic track marker. A null id clears the mod's value: the
+        // marker returns to its effective underlying id. The capability checks the id against every scene marker, graph
+        // registration and map object before anything changes. Clearing is refused while the modification still changes
+        // the marker's activity, binding or track-following placement and another scene marker holds the underlying id.
+        public Outcome SetMarkerId(TargetIdentity target, string id, InspectedTarget inspected) {
+            return Change(id == null ? "Clear marker ID" : "Set marker ID", target, inspected, existing => {
+                if (existing != null) PatchEngine.Parse(existing);
+                // An ID equal to the underlying one returns the marker to it, which is what clearing this mod's value does:
+                // it takes the same refusals, so it cannot leave a holder's settings or another holder's modification
+                // without the replacement ID they need.
+                var clearing = id == null || (existing?[ReplacementMarkerIds.Member] != null && id == engine.Underlying(engine.ResolveUnique(target))?.MarkerId);
+                if (clearing) {
+                    if (existing?[ReplacementMarkerIds.Member] == null) throw new InvalidOperationException("This mod sets no replacement ID for this marker, so there is nothing to clear");
+                    var rest = (JObject)existing.DeepClone();
+                    rest.Remove(ReplacementMarkerIds.Member);
+                    // Another holder's modification that needs this ID names this one in dependsOn. A modification that
+                    // leaves the file entirely is refused by the general dependsOn rule.
+                    var dependents = Empty(rest) ? new List<string>() : Dependents(ScenePatchFile.Key(existing));
+                    if (dependents.Count != 0) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.DependentRefusal(dependents));
+                    if (!Empty(rest)) {
+                        var state = PatchEngine.Parse(rest).State;
+                        if (state.Active.HasValue || state.Marker != null || state.Placement?.Following != null) {
+                            var resolved = engine.ResolveUnique(target);
+                            var underlying = engine.Underlying(resolved)?.MarkerId;
+                            var user = underlying == null || !(scene is IMarkerIdScene markers) ? null : markers.MarkerIdUsers(resolved, underlying).FirstOrDefault();
+                            if (user != null) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.ClearRefusal(underlying, user));
+                        }
+                    }
+                    return Empty(rest) ? null : rest;
+                }
+                var problem = ReplacementMarkerIds.Problem(id);
+                if (problem != null) throw new InvalidPatchDefinitionException(problem);
+                var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
+                value[ReplacementMarkerIds.Member] = id;
+                if (value["dependsOn"] == null) value["dependsOn"] = new JArray();
+                return value;
+            }, null, "marker-id-");
+        }
+        // The marker ID the generic track marker holds now, or null for any other object.
+        public string MarkerIdOf(TargetIdentity target) {
+            try { return scene.Read(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { return null; }
+        }
+        // Whether the active scene patch file sets a replacement ID for this object. Read from the scene patch file alone.
+        public bool HasMarkerId(TargetIdentity target) {
+            if (scenePatchFile == null || target == null) return false;
+            foreach (var item in scenePatchFile.Items) {
+                var other = item["target"] as JObject;
+                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (item[ReplacementMarkerIds.Member] != null) return true;
+            }
+            return false;
+        }
+        // The marker ID the object holds without this mod: its effective underlying id, or null for any other object.
+        public string UnderlyingMarkerId(TargetIdentity target) {
+            try { return engine.Underlying(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { return null; }
+        }
+        // The scene markers and registrations other than the object that use the id, by name; empty for an object that
+        // takes no replacement ID.
+        public IReadOnlyList<string> MarkerIdUsers(TargetIdentity target, string id) {
+            try { return scene is IMarkerIdScene markers && id != null ? markers.MarkerIdUsers(engine.ResolveUnique(target), id) : Array.Empty<string>(); } catch (Exception) { return Array.Empty<string>(); }
         }
         // Sets or replaces this mod's construction segments of a rail bridge construction with exactly the selected
         // segments. Null ids clear the mod's value: the construction returns to its effective underlying segments. detach
@@ -874,7 +941,7 @@ namespace RailroaderScenePatcher.Core {
             });
         }
         // A modification that sets nothing the patcher executes is no modification.
-        static bool Empty(JObject value) => value["placement"] == null && value["active"] == null && value["relationships"] == null && value["starterPlacement"] == null;
+        static bool Empty(JObject value) => value["placement"] == null && value["active"] == null && value["relationships"] == null && value["starterPlacement"] == null && value[ReplacementMarkerIds.Member] == null;
         // Places a starter placement marker on the track: the scene patch file records the setup whose car placement reads the
         // marker and the new track location. The capability checks the location and the whole car cut before anything changes.
         public Outcome PlaceStarter(TargetIdentity target, TrackLocation location, InspectedTarget inspected = null) {
@@ -989,7 +1056,7 @@ namespace RailroaderScenePatcher.Core {
                 // a value equal to the one it shows.
                 var normal = Normalised(existing, value, engine.Underlying(resolved));
                 outcome.Reverted = !ReferenceEquals(normal, value) || (value != null && normal != null && !PreservingJson.SameModification(normal, value));
-                value = normal;
+                value = WithIdDependencies(normal, resolved, existing);
                 // A modification that stays in the scene patch file but does not take effect would be reported as applied
                 // without changing the object, so the edit is refused with the reason. Removing it remains possible.
                 if (value != null && ineffective != null)
@@ -1020,6 +1087,45 @@ namespace RailroaderScenePatcher.Core {
                 outcome.Applied = true;
             } catch (Exception e) { Fail(outcome, e); }
             return outcome;
+        }
+        // A holder whose activity, binding or track-following settings apply only because other holders of its underlying
+        // marker ID took a replacement ID in this file depends on their modifications: dependsOn names them, so a load
+        // applies the replacement IDs first, whatever the order of the keys.
+        // A modification that no longer sets those settings drops these dependencies again, so the replacement IDs can
+        // leave; other dependsOn entries stay.
+        // A holder whose own modification gives it a replacement ID applies that ID first and needs no other holder's.
+        // A holder whose dependent cache, such as a map label's track group, disagreed with its location makes every
+        // setting rewrite its registration at a load; the first edit corrects the cache in this world only, so the
+        // session remembers that holder.
+        readonly HashSet<object> staleCaches = new HashSet<object>(new ReferenceComparer());
+        sealed class ReferenceComparer : IEqualityComparer<object> {
+            public new bool Equals(object a, object b) => ReferenceEquals(a, b);
+            public int GetHashCode(object value) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(value);
+        }
+        JObject WithIdDependencies(JObject value, object resolved, JObject existing) {
+            if (value == null || !(scene is IMarkerIdScene markers)) return value;
+            ObjectState state;
+            try { state = PatchEngine.Parse(value).State; } catch (InvalidOperationException) { return value; }
+            var settings = state.Active.HasValue || state.Marker != null || state.Placement?.Following != null;
+            if (!settings && markers.RewritesRegistration(resolved, state)) staleCaches.Add(resolved);
+            var needs = state.MarkerId == null && (settings || staleCaches.Contains(resolved));
+            var underlying = engine.Underlying(resolved)?.MarkerId;
+            if (underlying == null) return value;
+            var needed = new List<string>();
+            foreach (var item in scenePatchFile.Items) {
+                if (ReferenceEquals(item, existing) || item[ReplacementMarkerIds.Member] == null) continue;
+                try {
+                    var other = engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject));
+                    if (!ReferenceEquals(other, resolved) && engine.Underlying(other)?.MarkerId == underlying) needed.Add(ScenePatchFile.Key(item));
+                } catch (InvalidOperationException) { }
+            }
+            var dependencies = (value["dependsOn"] as JArray)?.Where(d => d.Type == JTokenType.String).Select(d => (string)d).ToList() ?? new List<string>();
+            var wanted = needs ? dependencies.Concat(needed) : dependencies.Where(d => !needed.Contains(d, StringComparer.Ordinal));
+            var next = wanted.Distinct(StringComparer.Ordinal).OrderBy(k => k, StringComparer.Ordinal).ToList();
+            if (next.SequenceEqual(dependencies.Distinct(StringComparer.Ordinal).OrderBy(k => k, StringComparer.Ordinal))) return value;
+            var result = (JObject)value.DeepClone();
+            result["dependsOn"] = new JArray(next.Cast<object>().ToArray());
+            return result;
         }
         // Records a failure with its kind: a failure that names no mutation was refused before one started.
         static void Fail(Outcome outcome, Exception e) {
@@ -1057,6 +1163,7 @@ namespace RailroaderScenePatcher.Core {
             var result = (JObject)value.DeepClone();
             bool Changed(JToken was, JToken now) => now != null && !PreservingJson.SameValue(was, now);
             if (Changed(existing?["active"], value["active"]) && state.Active.HasValue && under.Active == state.Active) result.Remove("active");
+            if (Changed(existing?[ReplacementMarkerIds.Member], value[ReplacementMarkerIds.Member]) && state.MarkerId != null && under.MarkerId == state.MarkerId) result.Remove(ReplacementMarkerIds.Member);
             if (Changed(existing?["placement"], value["placement"]) && state.Placement != null && state.Placement.Following == null && SamePlacement(state.Placement, under.Placement)) result.Remove("placement");
             var relationships = result["relationships"] as JObject;
             if (relationships != null && Changed(existing?["relationships"]?["trackMarker"], relationships["trackMarker"]) && state.Marker != null && under.Marker != null && MarkerBinding.Same(state.Marker, under.Marker)) {
@@ -1238,7 +1345,7 @@ namespace RailroaderScenePatcher.Core {
         // as current after its track turned by less than that angle, and the object would not follow.
         const double AngleToleranceDegrees = 0.01;
         static bool Same(ObjectState a, ObjectState b) {
-            if (a == null || b == null || a.Active != b.Active || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !CrossingEquipment.Same(a.Equipment, b.Equipment) || !StarterSetting.Same(a.Starter, b.Starter) || !ConstructionSegments.Same(a.Segments, b.Segments)) return false;
+            if (a == null || b == null || a.Active != b.Active || a.MarkerId != b.MarkerId || a.Placement == null || b.Placement == null || !MarkerBinding.Same(a.Marker, b.Marker) || !CrossingCoverage.Same(a.Coverage, b.Coverage) || !CrossingEquipment.Same(a.Equipment, b.Equipment) || !StarterSetting.Same(a.Starter, b.Starter) || !ConstructionSegments.Same(a.Segments, b.Segments)) return false;
             for (var i = 0; i < 3; i++) if (Math.Abs(a.Placement.Position[i] - b.Placement.Position[i]) > 0.01) return false;
             double dot = 0, la = 0, lb = 0;
             for (var i = 0; i < 4; i++) { dot += a.Placement.Rotation[i] * b.Placement.Rotation[i]; la += a.Placement.Rotation[i] * a.Placement.Rotation[i]; lb += b.Placement.Rotation[i] * b.Placement.Rotation[i]; }

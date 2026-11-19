@@ -75,7 +75,7 @@ class FakeSnapTracks : ISnapScene {
 }
 // Controlled track graph: segments by ID and named-location buckets by segment ID, as the native graph keeps them.
 // Activity follows the native marker lifecycle: enabling registers a valid location, disabling removes every entry.
-class FakeMarkerWorld : ITrackMarkerWorld {
+class FakeMarkerWorld : ITrackMarkerWorld, IMarkerIdWorld {
     // Why a disable cannot hold, as TrackMarkerWorld refuses it while a game switch that names the marker cannot be shared.
     public string DisableRefused;
     public string DisableRefusal(object target) => DisableRefused;
@@ -205,6 +205,29 @@ class FakeMarkerWorld : ITrackMarkerWorld {
     }
     // A group follower present at load, as its Awake observes the group.
     public void LoadFollower(FakeMarker m) { m.Follows = true; ObserveGroup(m); Load(m); Mutations = 0; m.Activations = 0; }
+    // The map-object ids of the map context, and an id whose write fails before it changes the marker.
+    public List<string> MapObjects = new List<string>();
+    public string FailMarkerId;
+    public IEnumerable<string> MapObjectIds => MapObjects;
+    public string MarkerId(object target) => ((FakeMarker)target).Id;
+    public void SetMarkerId(object target, string id) {
+        Mutations++;
+        if (id == FailMarkerId) throw new Exception("marker ID write injected");
+        ((FakeMarker)target).Id = id;
+    }
+    // Removes only the entries under the marker's id that this marker registered, as a targeted removal from its bucket.
+    public void UnregisterOwn(object target) {
+        Mutations++; var m = (FakeMarker)target;
+        foreach (var bucket in Buckets.Values) if (bucket.TryGetValue(m.Id, out var entry) && ReferenceEquals(entry.owner, m)) bucket.Remove(m.Id);
+    }
+    // The scene markers other than except that hold the id, by path, then the owners of graph entries under the id.
+    public IReadOnlyList<string> IdUsers(string id, object except) {
+        var users = Objects.SelectMany(o => o.Value.Cast<FakeMarker>().Where(m => m.Id == id && !ReferenceEquals(m, except)).Select(m => o.Key)).OrderBy(n => n, StringComparer.Ordinal).ToList();
+        foreach (var bucket in Buckets.Values)
+            if (bucket.TryGetValue(id, out var entry) && !ReferenceEquals(entry.owner, except) && !(entry.owner is FakeMarker owner && Objects.Values.Any(v => v.Contains(owner))))
+                users.Add(entry.owner is FakeMarker named && Unloaded.TryGetValue(named, out var name) ? name : ReplacementMarkerIds.ForeignOwner);
+        return users;
+    }
 }
 // A marker world with the native adapter's target confirmation and placement-only check: the structural rule and no consumer scan.
 class PlacementCheckedMarkerWorld : FakeMarkerWorld, ITargetConfirmation, IPlacementPattern {

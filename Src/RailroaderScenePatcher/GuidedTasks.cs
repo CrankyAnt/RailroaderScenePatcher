@@ -70,6 +70,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Activity: return "Enable or disable";
                 case GuidedTaskKind.Binding: return "Set track binding";
                 case GuidedTaskKind.DetachBinding: return "Detach track binding";
+                case GuidedTaskKind.MarkerId: return "Set replacement ID";
                 default: return "Place starter on track";
             }
         }
@@ -82,6 +83,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Snap: return PadBlock ?? (IsStarter ? StarterPlacements.ObjectSettings : snap == null ? "Snapping is unavailable." : null);
                 case GuidedTaskKind.Activity: return IsStarter ? StarterPlacements.ObjectSettings : null;
                 case GuidedTaskKind.StarterPlacement: return IsStarter ? null : "This object is not a starter placement marker.";
+                case GuidedTaskKind.MarkerId: return MarkerIdBlock();
                 case GuidedTaskKind.DetachBinding:
                     if (IsPad) return "A crossing pad cannot be detached. Disable it instead.";
                     if (IsStarter) return StarterPlacements.NoDetach;
@@ -101,7 +103,7 @@ namespace RailroaderScenePatcher {
                     guidedPlacement = PlacementValues();
                     if (guidedPlacement == null) throw new InvalidOperationException("This object has no placement.");
                     guidedBefore = kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap ? CurrentPlacement()
-                        : kind == GuidedTaskKind.Activity ? new[] { OwnActivity(selected) ? "Yes" : "No" } : CurrentBinding();
+                        : kind == GuidedTaskKind.Activity ? new[] { OwnActivity(selected) ? "Yes" : "No" } : kind == GuidedTaskKind.MarkerId ? new[] { CurrentMarkerId() } : CurrentBinding();
                     guided.Start(kind, selected, guidedBefore);
                     feedback.View(GuidedFeedbackView());
                     guidedFields = guided.Draft;
@@ -133,7 +135,7 @@ namespace RailroaderScenePatcher {
                 body.AddLabel("<style=Footnote>" + (guided.Kind == null ? "Choose one task for the inspected object." : Literal(GuidedName(guided.Kind.Value))) + "</style>")
                     .TextWrap(TMPro.TextOverflowModes.Ellipsis, TMPro.TextWrappingModes.Normal).Height(32);
                 if (guided.Step == GuidedTaskStep.Target) {
-                    foreach (GuidedTaskKind kind in Enum.GetValues(typeof(GuidedTaskKind))) {
+                    foreach (var kind in GuidedTaskState.Tasks) {
                         var task = kind; var reason = GuidedBlock(task);
                         Button(body, GuidedName(task), () => StartGuided(task)).Inactive(reason != null)
                             .Tooltip(GuidedName(task), CommandBand.Tooltip("Start this task for the inspected object.", reason));
@@ -167,6 +169,9 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.DetachBinding:
                     PlainLabel(builder, "Remove the logical track binding without changing the object's placement or activity.");
                     break;
+                case GuidedTaskKind.MarkerId:
+                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, "An ID that no other scene marker or map object uses and that does not begin with passengerStop: or flare:.", column => false);
+                    break;
                 default:
                     ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, guidedFields, 0, ChoiceBlock, "Enter the segment ID, end a or b, and distance in meters.", column => column == 2);
                     break;
@@ -195,6 +200,7 @@ namespace RailroaderScenePatcher {
             }
             if (guided.Kind == GuidedTaskKind.DetachBinding) return String.IsNullOrWhiteSpace(guidedBefore[0]) ? CommandBand.AlreadyDetached : null;
             if (guided.Kind == GuidedTaskKind.Activity) return CommandBand.FieldReason(null, guidedFields, guidedBefore, CommandBand.SameActivity);
+            if (guided.Kind == GuidedTaskKind.MarkerId) return CommandBand.MarkerIdSetReason(null, guidedFields[0], guidedBefore[0]);
             return null;
         }
         string GuidedUnchanged() {
@@ -205,6 +211,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Snap: return "Rotation, activity and logical bindings." + (follow ? track : "");
                 case GuidedTaskKind.Activity: return "Placement and logical bindings.";
                 case GuidedTaskKind.StarterPlacement: return "The marker's position and activity, the wreck setting and other car placements.";
+                case GuidedTaskKind.MarkerId: return "Placement, activity and track binding. Every other scene marker that holds the old ID keeps its registration.";
                 default: return IsPad ? "Activity. The pad follows its marker to the new location." : "Physical placement and activity.";
             }
         }
@@ -218,6 +225,7 @@ namespace RailroaderScenePatcher {
         }
         void GuidedSummary(UIPanelBuilder builder, string[] values, bool intended) {
             if (guided.Kind == GuidedTaskKind.Activity) { Field(builder, "Enabled", values[0]); return; }
+            if (guided.Kind == GuidedTaskKind.MarkerId) { Field(builder, "Marker ID", values[0]); return; }
             if (intended && guided.Kind == GuidedTaskKind.DetachBinding) { Field(builder, "Track binding", "Detached"); return; }
             if (guided.Kind == GuidedTaskKind.Placement || guided.Kind == GuidedTaskKind.Snap) {
                 Field(builder, "Position X, Y, Z (m)", intended && guided.Kind == GuidedTaskKind.Snap
@@ -285,6 +293,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Snap: return snap.Apply(guidedSnap);
                 case GuidedTaskKind.Activity: return session.Edit(identity, null, guidedFields[0] == "Yes", guidedInspection);
                 case GuidedTaskKind.DetachBinding: return session.Bind(identity, MarkerBinding.Detached, guidedInspection);
+                case GuidedTaskKind.MarkerId: return session.SetMarkerId(identity, guidedFields[0], guidedInspection);
                 case GuidedTaskKind.Binding:
                 case GuidedTaskKind.StarterPlacement:
                     var location = EnteredEditValues.TrackLocation(guidedFields);
@@ -303,6 +312,7 @@ namespace RailroaderScenePatcher {
                 case GuidedTaskKind.Snap: place = SnapPlace; action = "Physical snap"; consumes = true; break;
                 case GuidedTaskKind.Activity: place = ActivityPlace; action = guidedFields[0] == "Yes" ? "Enable" : "Disable"; consumes = false; break;
                 case GuidedTaskKind.DetachBinding: place = BindingPlace; action = "Track detachment"; consumes = false; break;
+                case GuidedTaskKind.MarkerId: place = MarkerIdPlace; action = "Set marker ID " + guidedFields[0]; consumes = false; break;
                 case GuidedTaskKind.Binding: place = BindingPlace; action = location == null ? "Track binding" : CommandBand.BindingAction(location.Segment, location.End, location.Distance); consumes = true; break;
                 case GuidedTaskKind.StarterPlacement: place = BindingPlace; action = location == null ? "Track location" : CommandBand.StarterAction(location.Segment, location.End, location.Distance); consumes = true; break;
                 default: place = PlacementPlace; action = "Placement"; consumes = false; break;

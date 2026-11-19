@@ -85,13 +85,18 @@ namespace RailroaderScenePatcher.Core {
         // reads. Null leaves it untouched, and an object without a construction controller reads null.
         public ConstructionSegments Segments { get; private set; }
         // The same state with this construction-segment setting.
-        public ObjectState WithSegments(ConstructionSegments segments) => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = LeavesActivity, Segments = segments };
+        public ObjectState WithSegments(ConstructionSegments segments) => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = LeavesActivity, Segments = segments, MarkerId = MarkerId };
+        // The id of a generic track marker. A modification's replacement ID, or null to leave the id untouched; a
+        // generic track marker reads its current id, and any other object reads null.
+        public string MarkerId { get; private set; }
+        // The same state with this marker ID.
+        public ObjectState WithMarkerId(string markerId) => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = LeavesActivity, Segments = Segments, MarkerId = markerId };
         // Tells the two meanings of a null Active apart for an object whose activity follows a track group. True: this is
         // one modification's own state, and the application leaves the activity as it is, including an explicit disable
         // that another modification installed. False: this is the complete desired state, and a null Active returns the
         // object to its group-driven activity, which releases an explicit disable.
         public bool LeavesActivity { get; private set; }
-        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true, Segments = Segments };
+        public ObjectState LeavingActivity() => new ObjectState(Placement, Active, Marker, Coverage, Equipment, Starter) { LeavesActivity = true, Segments = Segments, MarkerId = MarkerId };
     }
     // A map context that holds map patches, as the native map editor's does while it edits a map patch. In a save a map
     // patch is never in the map context.
@@ -302,8 +307,9 @@ namespace RailroaderScenePatcher.Core {
                 var parsed = Parse(entry, "", id); var identity = parsed.Identity;
                 if (identity.Scene != target.Scene || identity.Path != target.Path || identity.Component != target.Component ||
                     identity.Structure != null && identity.Structure != target.Structure || parsed.State.Marker?.Location == null) return false;
-                if (parsed.Dependencies.Length != 0 || parsed.State.Placement != null || parsed.State.Active != null) {
-                    unavailable = "Operation " + id + " requires world-load scheduling for dependencies, placement or activity";
+                // A replacement ID changes the id the native check registers under, so it waits for the world load.
+                if (parsed.Dependencies.Length != 0 || parsed.State.Placement != null || parsed.State.Active != null || parsed.State.MarkerId != null) {
+                    unavailable = "Operation " + id + " requires world-load scheduling for dependencies, placement, activity or a replacement ID";
                     return false;
                 }
                 // A prerequisite missing at OnEnable is not yet a failed runtime attempt. The definitive world-load
@@ -436,7 +442,7 @@ namespace RailroaderScenePatcher.Core {
             if (!underlying.TryGetValue(target, out state)) underlying.Add(target, state = scene.Read(target));
             if (state?.Placement?.Frame == null || !(scene is IFramedScene framed)) return state;
             var now = framed.FramePlacement(target);
-            return now == null ? state : new ObjectState(state.Placement.InFrame(now), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter).WithSegments(state.Segments);
+            return now == null ? state : new ObjectState(state.Placement.InFrame(now), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter).WithSegments(state.Segments).WithMarkerId(state.MarkerId);
         }
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;
@@ -462,6 +468,7 @@ namespace RailroaderScenePatcher.Core {
         // A relationship scene also checks the settings its relationships make unsupported.
         internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Segments != null && !(scene is IConstructionSegmentScene)) throw new InvalidPatchDefinitionException(ConstructionSegmentRule.NoRelationship);
+            if (state?.MarkerId != null && !(scene is IMarkerIdScene)) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
             if (scene is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
@@ -529,14 +536,18 @@ namespace RailroaderScenePatcher.Core {
             var relationships = item["relationships"] as JObject;
             var detection = ((relationships?["crossingCoverage"] as JObject)?["additions"] as JObject)?.Properties().Select(p => p.Name).Where(name => !String.IsNullOrWhiteSpace(name)) ?? Enumerable.Empty<string>();
             var equipment = (relationships?["crossingEquipment"] as JObject)?.Properties().Select(p => p.Name).Where(name => !String.IsNullOrWhiteSpace(name)).Select(name => "equipment " + name) ?? Enumerable.Empty<string>();
-            return detection.Concat(equipment);
+            // A replacement ID names one marker, so it follows the same rule as "marker ID <id>".
+            var markerId = item[ReplacementMarkerIds.Member]?.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)item[ReplacementMarkerIds.Member]) ? new[] { MarkerIdKey + (string)item[ReplacementMarkerIds.Member] } : new string[0];
+            return detection.Concat(equipment).Concat(markerId);
         }
         internal static HashSet<string> SharedAdditionIds(IEnumerable<JObject> items) {
             var seen = new HashSet<string>(StringComparer.Ordinal); var shared = new HashSet<string>(StringComparer.Ordinal);
             foreach (var item in items) foreach (var id in AdditionIds(item)) if (!seen.Add(id)) shared.Add(id);
             return shared;
         }
-        internal static string SharedAddition(string id) => "Addition ID " + id + " is used by more than one modification; an addition ID names one addition in its scene patch file";
+        const string MarkerIdKey = "marker ID ";
+        internal static string SharedAddition(string id) => id.StartsWith(MarkerIdKey, StringComparison.Ordinal) ? ReplacementMarkerIds.Shared(id.Substring(MarkerIdKey.Length))
+            : "Addition ID " + id + " is used by more than one modification; an addition ID names one addition in its scene patch file";
         // Underlying state overlaid with every effective modification of this scene patch file for the object. The owner is the key
         // of the scene patch file, which scopes the identities of its additions.
         internal ObjectState Desired(JObject modifications, object target, string owner = "") {
@@ -551,7 +562,7 @@ namespace RailroaderScenePatcher.Core {
             // left them, so an addition the scene patch file no longer lists is removed.
             if (state?.Equipment != null) {
                 var standing = scene.Read(target)?.Equipment ?? state.Equipment;
-                state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter).WithSegments(state.Segments);
+                state = new ObjectState(state.Placement, state.Active, state.Marker, state.Coverage, standing.Without(owner ?? ""), state.Starter).WithSegments(state.Segments).WithMarkerId(state.MarkerId);
             }
             foreach (var item in order) {
                 if (!ReferenceEquals(targets[item], target)) continue;
@@ -562,14 +573,14 @@ namespace RailroaderScenePatcher.Core {
         // One modification's state laid over a complete state: every value the modification sets replaces the one below.
         internal static ObjectState Overlay(ObjectState under, ObjectState mod) =>
             new ObjectState(mod.Placement ?? under.Placement, mod.Active ?? under.Active, mod.Marker ?? under.Marker, CrossingCoverage.Overlay(under.Coverage, mod.Coverage), CrossingEquipment.Overlay(under.Equipment, mod.Equipment), StarterSetting.Overlay(under.Starter, mod.Starter))
-                .WithSegments(ConstructionSegments.Overlay(under.Segments, mod.Segments));
+                .WithSegments(ConstructionSegments.Overlay(under.Segments, mod.Segments)).WithMarkerId(mod.MarkerId ?? under.MarkerId);
         // The state with a track-following placement evaluated at its anchor's current native pose. Throws before any
         // mutation when the anchor does not resolve.
         internal ObjectState Evaluate(ObjectState state) {
             var following = state?.Placement?.Following;
             if (following == null) return state;
             if (!(scene is ITrackPoseScene tracks)) throw new InvalidOperationException("Track-following placement is unavailable in this scene");
-            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter).WithSegments(state.Segments);
+            var evaluated = new ObjectState(following.Evaluate(tracks.TrackPose(following.Anchor)), state.Active, state.Marker, state.Coverage, state.Equipment, state.Starter).WithSegments(state.Segments).WithMarkerId(state.MarkerId);
             return state.LeavesActivity ? evaluated.LeavingActivity() : evaluated;
         }
         Modification Effective(string id, SortedDictionary<string, JObject> entries, Dictionary<string, Modification> effective, List<Modification> order, Dictionary<Modification, object> targets, HashSet<string> visiting, string owner, HashSet<string> shared) {
@@ -639,7 +650,7 @@ namespace RailroaderScenePatcher.Core {
             if (dependencies == null || dependencies.Any(x => x.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)x))) throw new InvalidOperationException("Invalid dependencies");
             return dependencies.Select(x => (string)x).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         }
-        internal static readonly string[] Known = { "target", "placement", "active", "relationships", "starterPlacement", "dependsOn" };
+        internal static readonly string[] Known = { "target", ReplacementMarkerIds.Member, "placement", "active", "relationships", "starterPlacement", "dependsOn" };
         // The modifications of a scene patch file by key, in ordinal key order.
         internal static SortedDictionary<string, JObject> Entries(JObject modifications) {
             var entries = new SortedDictionary<string, JObject>(StringComparer.Ordinal);
@@ -679,8 +690,18 @@ namespace RailroaderScenePatcher.Core {
                 if (relationships["constructionSegments"] != null) segments = ParseSegments(relationships["constructionSegments"]);
             }
             var starter = item["starterPlacement"] == null ? null : ParseStarter(item["starterPlacement"]);
-            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null) throw new InvalidOperationException("Unsupported placement");
-            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments), Dependencies = dependencies };
+            var markerId = item[ReplacementMarkerIds.Member] == null ? null : ParseMarkerId(item[ReplacementMarkerIds.Member]);
+            if (checkedPlacement == null && item["active"] == null && marker == null && coverage == null && equipment == null && starter == null && segments == null && markerId == null) throw new InvalidOperationException("Unsupported placement");
+            return new Modification { Id = id, Identity = identity, State = new ObjectState(checkedPlacement, (bool?)item["active"], marker, coverage, equipment, starter).WithSegments(segments).WithMarkerId(markerId), Dependencies = dependencies };
+        }
+        // A replacement ID: a non-empty string that does not begin with an id prefix the game reserves. Its
+        // uniqueness depends on the world and is checked when the modification applies.
+        static string ParseMarkerId(JToken token) {
+            if (token.Type != JTokenType.String) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotAString);
+            var id = (string)token;
+            var problem = ReplacementMarkerIds.Problem(id);
+            if (problem != null) throw new InvalidPatchDefinitionException(problem);
+            return id;
         }
         public const string TrackFollowingMode = "trackFollowing";
         // A placement relative to an explicitly selected segment location or endpoint node.

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Scene patch file v1
 
-This reference defines the v1 JSON fields accepted by the core engine for fixed and track-following placement, activity, track-marker relationships, crossing coverage and starter placements. Each supplying mod keeps one scene patch file at `Data/scene-patches.json`. The file uses strict UTF-8; a leading byte-order mark is accepted. The runtime reads the file but never writes it. The native map editor's Save writes it for the edited mod, as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md).
+This reference defines the v1 JSON fields accepted by the core engine for fixed and track-following placement, activity, track-marker relationships, replacement IDs, crossing coverage and starter placements. Each supplying mod keeps one scene patch file at `Data/scene-patches.json`. The file uses strict UTF-8; a leading byte-order mark is accepted. The runtime reads the file but never writes it. The native map editor's Save writes it for the edited mod, as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md).
 
 Current native target support covers:
 
@@ -10,7 +10,7 @@ Current native target support covers:
 - The Ela bridge and its colliders ([move or disable a bridge with its collision](placing-bridges.md)).
 - Baked scenery groups ([move or disable a baked scenery group](moving-baked-scenery-groups.md)).
 - Baked scenery parts ([move or disable a single part](moving-baked-scenery-groups.md#move-or-disable-a-single-part)).
-- Generic track markers ([repair, replace or detach a track-marker binding](repairing-track-bindings.md)).
+- Generic track markers ([repair, replace or detach a track-marker binding](repairing-track-bindings.md) and [give a marker a replacement ID](repairing-duplicate-marker-ids.md)).
 - Crossing pads ([rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md)).
 - Crossing coverage ([correct the detection coverage of an existing crossing](correcting-crossing-coverage.md) and [add detection for extra tracks at an existing crossing](adding-crossing-detection.md)).
 - Crossing lights and gates ([add lights and gates to an existing crossing](adding-crossing-equipment.md)).
@@ -46,6 +46,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. |
+| `markerId` | string | Optional. The replacement ID of a generic track marker. Requires patcher 0.5.0 or later; see Replacement ID below. |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position` and `rotation`; a track-following placement contains `mode`, `track`, `offset` and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
 | `relationships` | object | Optional. Explicit relationship settings; see Relationships below. Requires patcher 0.5.0 or later. |
@@ -58,11 +59,52 @@ The order of keys in `modifications`, members of any object and values of `depen
 
 In the native map editor, an edit cannot remove a modification while another modification names it in `dependsOn`. The refusal names those modifications. You also cannot edit a modification that does not take effect because a dependency is missing, fails or forms a cycle. The refusal gives the reason.
 
-A modification holds the desired state of one object and must contain `placement`, `active`, `relationships`, `starterPlacement`, or a combination. An omitted member leaves that part of the object untouched by this mod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a scene patch file that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
+A modification holds the desired state of one object and must contain `markerId`, `placement`, `active`, `relationships`, `starterPlacement`, or a combination. An omitted member leaves that part of the object untouched by this mod. An explicit `active` value is applied on every application, so a later activation by the game does not survive the next application of a scene patch file that disables the object. Patcher 0.1.0 rejects a modification that contains `active`; the dependency minimum below prevents that combination.
 
 The [scene object inventory](inspect-scene-objects.md) supplies observed identifiers and placement without changing this format. An inspection-only entry does not enable a new v1 operation. The engine rechecks the resolved object and map context immediately before changing anything. A missing, ambiguous or replaced target fails rather than redirecting the operation. Editing integrations can bind a complete scene patch file edit to its inspected observations through an in-memory token; that token is not serialized or distributed.
 
 [World selection](select-world-targets.md) confirms scene-object identities for the existing `target` fields. Segment and node choices record their native IDs and loaded map context in the editing session. Version 1 stores fixed and track-following placement, activity, track-marker relationships and crossing coverage. A pending choice or confirmed track or node identity stays in the editing session. Applying an edit and using the native map editor's Save writes the mod values.
+
+## Replacement ID
+
+`markerId` gives a generic track marker a replacement ID. The game registers a track marker's location under its marker ID. When more than one scene marker holds a marker ID, that ID is a duplicate marker ID: a change to one holder removes the registration of every holder. A replacement ID gives the target its own ID, so its registration no longer shares that ID with the other holders.
+
+The member is a string. Omitting it leaves the marker's ID as the loaded map gives it. The member has no detach form: `null` and every other value that is not a string fail the modification.
+
+The member applies to these targets only:
+
+- A generic track marker, with the target structure `track-marker-v1`.
+
+Any other target, such as a crossing pad, a milepost, a starter placement marker or an object that is not a marker, fails the modification before it changes anything, with `Only a generic track marker takes a replacement ID`. The object's other modifications still apply.
+
+The value must follow these rules, which the engine checks before it changes anything:
+
+- It is not empty or only whitespace, it does not begin or end with a space, and it does not begin with `passengerStop:` or `flare:`. The game uses these prefixes for its own track registrations.
+- It is not in use when the modification applies. A value that another scene marker holds, that a graph registration of an object that is not a scene marker holds, or that a map object of the map context uses fails the modification, and the refusal names that user. The check reads the world at the time of application. While the game has not loaded the map object manager, every value fails the modification, with a message that asks you to try again after the map has loaded. A value that an earlier scene patch file in load order has already given to a marker fails the later modification, and the earlier modification stays applied.
+- The same value in two modifications of one scene patch file fails both of them with `is used by more than one modification`. The value names one marker in the file.
+
+The replacement ID applies before the marker's `relationships.trackMarker`, its track-following placement and its `active` value, in the same modification. One modification can therefore give the marker an ID and then enable, rebind or track-follow it. Without the ID, the duplicate marker ID refuses those settings for every holder. Fixed `placement` is not affected by the duplicate marker ID.
+
+A holder that keeps the shared ID needs `dependsOn` for a modification that sets its activity, `relationships.trackMarker` or track-following placement, when other holders of the same ID take replacement IDs in the file. The modification names the keys of those other replacement-ID modifications, so that a load applies the replacement IDs first. Without them, the change can apply while the ID is still shared, and the duplicate ID refuses it. Scene patch editing writes these keys when it makes the edit; a hand-written file must name them. A modification that another modification names in `dependsOn` cannot be removed, and its replacement ID cannot be cleared, while the dependent modification stays. For example, when `repair-yard-limit` gives the yard limit its replacement ID, the modification of the speed sign that keeps `Mg6m` reads:
+
+```json
+"keep-speed-sign-on-track": {
+  "target": {
+    "scene": "<scene of the speed sign>",
+    "path": "<path of the speed sign>",
+    "component": "Track.TrackMarker",
+    "structure": "track-marker-v1"
+  },
+  "relationships": {
+    "trackMarker": { "segment": "pi3pzp", "end": "a", "distance": 3 }
+  },
+  "dependsOn": ["repair-yard-limit"]
+}
+```
+
+Applying the ID moves the marker's own registration to the new ID when the marker is active and its binding resolves. Every other holder of the old ID keeps its registration. A failed modification, a removal of the modification and the removal of the member restore the effective underlying ID, computed from the loaded map and the remaining values of the file, together with the registration that goes with it.
+
+The member requires patcher 0.5.0 or later; see [dependency minimum](#dependency-minimum). Format version 1 does not change. The engine does not check Lua scripts that look a marker up by ID, such as those that call `NativeTrack.GetMarkerLocation`, or third-party mods that look a marker up by ID. Game behavior is not yet observed in Railroader. For the editing steps, see [repair a duplicate marker ID](repairing-duplicate-marker-ids.md).
 
 ## Placement
 
@@ -395,7 +437,7 @@ The patcher recognizes an object holding one Generic `Track.TrackMarker`. The ta
 - No loaded component other than that relative position holds a direct reference to the marker. If a scan cannot read a field able to hold a marker, it refuses every marker.
 - No new-game car placement uses the marker.
 
-A modification may set `relationships.trackMarker`, `placement`, `active`, or any combination. For a marker that a progression controller or a map feature switches, such as `Sign Begin CTC Sylva`, `active: false` holds through that switch; see [objects the game switches](#objects-the-game-switches).
+A modification may set `markerId`, `relationships.trackMarker`, `placement`, `active`, or any combination. See [replacement ID](#replacement-id). For a marker that a progression controller or a map feature switches, such as `Sign Begin CTC Sylva`, `active: false` holds through that switch; see [objects the game switches](#objects-the-game-switches).
 
 A `trackMarker` setting writes the marker's serialized location and its named-location registration in the track graph: the patcher removes the registration under the marker ID, writes the location, and registers the marker at the new location when it is enabled and active. A detach leaves no listed track location. Map labels below the marker are registered with the map again, so their dimming follows the new location's track group. Placement moves the object root and refreshes its renderer cullers; it never changes the binding. Before changing anything the patcher requires one registration of this marker at its current location for an enabled, active marker with a resolvable location, and none otherwise. After a change it verifies the location, the placement, the activity, that registration rule and the map labels' track group. A difference fails the modification and restores the captured location, registration, placement and activity; an unverified restoration blocks further operations on the marker for the load. See [repair, replace or detach a track-marker binding](repairing-track-bindings.md) for editing instructions and limits.
 
@@ -411,9 +453,11 @@ A marker object whose `Track.TrackRelativePosition` has its activity follow the 
 
 After a change the patcher also verifies the subscription count, the observed group and the activity the group or the hold requires. A difference fails the modification and restores the captured location, registration, subscription, hold, placement and activity; an unverified restoration blocks further operations on the marker for the load.
 
-#### Markers with a duplicate marker id
+#### Markers with a duplicate marker ID
 
-When the game removes the track location listed for one marker, it removes every track location listed under that marker id, on every segment, so it removes the listed location of every scene marker that holds that marker id. When the target holds a duplicate marker id, a modification that would change the target's activity, its `trackMarker` binding or set a `trackFollowing` placement fails before changing anything. The holders are the loaded scene markers with the target's marker id and every scene marker that owns a registration under it, loaded or not. This applies to Generic markers and crossing pads. The failure is an invalid supplied definition; its diagnosis names the duplicate marker id and every holder, with each one's activity. The scene patch file's other modifications still apply, including a fixed `placement` of the same marker, unless a map label below the marker caches another track group than its location, which only registering the marker again would correct. A value equal to the marker's current one changes nothing and applies, such as `"active": false` on an inactive marker or the location the marker already has. A registration that another holder owns does not count as a registration of the target, so it does not fail the registration rule before changing anything.
+When the game removes the track location listed for one marker, it removes every track location listed under that marker ID, on every segment, so it removes the listed location of every scene marker that holds that marker ID. When the target holds a duplicate marker ID, a modification that would change the target's activity, its `trackMarker` binding or set a `trackFollowing` placement fails before changing anything. The holders are the loaded scene markers with the target's marker ID and every scene marker that owns a registration under it, loaded or not. This applies to Generic markers and crossing pads. The failure is an invalid supplied definition; its diagnosis names the duplicate marker ID and every holder, with each one's activity. The scene patch file's other modifications still apply, including a fixed `placement` of the same marker, unless a map label below the marker caches another track group than its location, which only registering the marker again would correct. A value equal to the marker's current one changes nothing and applies, such as `"active": false` on an inactive marker or the location the marker already has.
+
+A modification that also sets `markerId` on the target to a different ID that is not in use is not refused for this reason. A holder that keeps the shared ID needs `dependsOn` for its own activity, binding or track-following settings, as described in [replacement ID](#replacement-id). The replacement ID applies first, so the target's activity, binding and track-following settings act under its own ID, and the other holders keep their registrations. See [replacement ID](#replacement-id). A `markerId` equal to the marker's current ID does not lift the refusal. A crossing pad takes no replacement ID, so its settings stay refused while another holder keeps its ID. A registration that another holder owns does not count as a registration of the target, so it does not fail the registration rule before changing anything.
 
 ### Crossing pad
 
@@ -425,7 +469,7 @@ For a pad with `placement.mode` `trackFollowing`, the patcher also records the t
 
 After a change the patcher verifies the track-marker rules. It also checks that the current mesh was generated from the mod's location and the pad's current position, and that the culling sphere encloses that mesh. A pad generated by the game before the patcher observed it is generated once more on the first application, to the same mesh; later applications leave current geometry alone. A difference fails the modification and restores the captured location, registration, placement and activity, generates the pad again and requires the regenerated mesh to match the captured one; an unverified restoration blocks further operations on the pad for the load.
 
-One native journey on Railroader 0.6.2 with patcher commit `a282015` observed the pad Mg74 shift along the track after a rebinding, refusal of a missing segment and an out-of-range distance, native Undo and Redo, removal, and Save with a native map editor reload that reproduced one modification and one registration. A second journey with commit `ab2816f` measured that the rebinding changed the pad's vertex hash and moved its culling sphere 0.993 metres along the track while the sphere stayed aligned with the new bounds, and that native Undo and Remove modification restored the original vertex hash, bounds and culling sphere exactly. A pad that holds a duplicate marker id follows the rule under Markers with a duplicate marker id. See [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md) for editing instructions and limits.
+One native journey on Railroader 0.6.2 with patcher commit `a282015` observed the pad Mg74 shift along the track after a rebinding, refusal of a missing segment and an out-of-range distance, native Undo and Redo, removal, and Save with a native map editor reload that reproduced one modification and one registration. A second journey with commit `ab2816f` measured that the rebinding changed the pad's vertex hash and moved its culling sphere 0.993 metres along the track while the sphere stayed aligned with the new bounds, and that native Undo and Remove modification restored the original vertex hash, bounds and culling sphere exactly. A pad that holds a duplicate marker ID follows the rule under Markers with a duplicate marker ID. See [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md) for editing instructions and limits.
 
 ### Milepost
 
@@ -437,7 +481,7 @@ No setting changes the milepost's model, mile value (`mileage`), prefix, origin 
 
 After a change, the adapter verifies the track-marker rules and checks that the prefix, origin flag, mile value, displayed text, model and origin cache entry match their values before the change. It checks rendered texts only if the milepost was active before the change, because text that has never been awake fills in when the milepost first becomes active. A difference fails the modification and restores the captured location, registration, subscription, placement and activity. If the restored milepost state still differs from the captured state, the patcher reports incomplete cleanup and blocks further operations on that milepost for the load.
 
-The capability is incompatible with a game build whose milepost does more than call an empty `UpdateMileage` when its marker's location changes. The patcher does not repair a milepost binding before the game's marker check at world load. A broken binding therefore still raises the game's warning once in that load; the patcher repairs it during normal application. A milepost with a duplicate marker id follows the rule under Markers with a duplicate marker id. See [reposition or rebind a milepost](repositioning-mileposts.md) for the editing route and limits.
+The capability is incompatible with a game build whose milepost does more than call an empty `UpdateMileage` when its marker's location changes. The patcher does not repair a milepost binding before the game's marker check at world load. A broken binding therefore still raises the game's warning once in that load; the patcher repairs it during normal application. A milepost with a duplicate marker ID follows the rule under Markers with a duplicate marker ID. See [reposition or rebind a milepost](repositioning-mileposts.md) for the editing route and limits.
 
 ### Crossing
 
@@ -459,7 +503,7 @@ The patcher loads the definition's audio through the content library and keeps t
 
 The patcher recognizes an object holding one Generic `Track.TrackMarker` held by a car placement of an active new-game setup (`Game.Progression.SetupDescriptor`). The target `component` is `Track.TrackMarker`; set `structure` to `starter-placement-v1`. The marker must have an ID, and the object must not be a milepost or crossing pad. No other component may listen to the marker's location changes, and its activity must not follow a track group. No loaded component other than a colocated `Track.TrackRelativePosition` may hold a direct reference to it. Such a marker never resolves as `track-marker-v1`. A modification may set only `starterPlacement`.
 
-A `starterPlacement` track location writes the marker's serialized location and its registration in the track graph as for a Generic marker: the patcher removes the registration under the marker ID, writes the location, and registers the marker at the new location when the marker is enabled and active. A disabled marker keeps no registration; the game reads its location at a new company game all the same. The object's placement and activity stay as they are. A `wreck` writes the `wreck` field of the one `SetupDescriptor.CarPlacement` that reads the marker; an omitted `track` leaves the marker's location and registration untouched. Before changing anything the patcher requires the track-marker registration rule and refuses a marker whose marker id another scene marker holds, as it does for track markers. After a change it verifies the location and that rule. A difference fails the modification and restores the captured wreck setting, location and registration; an unverified restoration blocks further operations on the marker for the load.
+A `starterPlacement` track location writes the marker's serialized location and its registration in the track graph as for a Generic marker: the patcher removes the registration under the marker ID, writes the location, and registers the marker at the new location when the marker is enabled and active. A disabled marker keeps no registration; the game reads its location at a new company game all the same. The object's placement and activity stay as they are. A `wreck` writes the `wreck` field of the one `SetupDescriptor.CarPlacement` that reads the marker; an omitted `track` leaves the marker's location and registration untouched. Before changing anything the patcher requires the track-marker registration rule and refuses a marker whose marker ID another scene marker holds, as it does for track markers. After a change it verifies the location and that rule. A difference fails the modification and restores the captured wreck setting, location and registration; an unverified restoration blocks further operations on the marker for the load.
 
 The game reads the location and the wreck setting in `Game.State.CompanyModeSetup.Setup`, which runs when a new company game becomes active, after the world-load callback in which the patcher applies its scene patch files. The whole-cut check walks the track with the graph's own `LocationByMoving`, reads the segments' availability, and takes each cut's length from `StateManager.DescriptorsForIdentifiers` and `ConsistLength.OfDescriptors`, as the game's `TrainController.HandlePlaceTrain` does before `CanPlaceAt`. See [place a starter placement marker on the track](placing-starter-markers.md) for editing instructions and limits.
 
@@ -472,6 +516,7 @@ The native map editor's Save writes the scene patch file as indented UTF-8 JSON 
 - `equip-<object name>` for crossing equipment.
 - `starter-<object name>` for a starter placement.
 - `follow-<object name>` for track following.
+- `marker-id-<object name>` for a replacement ID.
 - `place-<object name>` otherwise.
 
 Save makes the key unique with a numeric suffix. A prefix that the object name already starts with is written once, so the marker `starter-ewh-int2` gets the key `starter-ewh-int2`. Whitespace and comments of the source are not kept.
@@ -525,7 +570,7 @@ A Save that writes the scene patch file writes its content in this order:
 - Scene patch file root: `formatVersion`, `sourceMap`, `modifications`, then unknown members.
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions` and `crossingEquipment` are in ordinal order.
-- A modification: `target`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
+- A modification: `target`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
 - `target`: `scene`, `path`, `component`, `structure`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
 - `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
@@ -555,6 +600,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | An independent-board target other than the legacy Sylva location sign | `0.5.0` |
 | Any modification whose target `structure` is `bridge-colliders-v1` | `0.5.0` |
 | Any modification with `relationships`, a `Track.TrackMarker` target component, or target `structure` `track-marker-v1` | `0.5.0` |
+| Any modification with `markerId` | `0.5.0` |
 | Any modification with `active` whose target `structure` is `track-marker-v1` | `0.5.0` |
 | Any modification whose `placement.mode` is `trackFollowing` | `0.5.0` |
 | Any modification whose target `structure` is `existing-crossing-mast-v1` or `existing-crossing-bell-v1` | `0.5.0` |

@@ -658,6 +658,8 @@ namespace RailroaderScenePatcher {
             if (selected.Problems.Count == 0) Line(builder, "None detected", null, null);
             foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, problem));
             if (selected.Problems.Count != 0) DrawProblemTasks(builder);
+            // An inactive holder of a duplicate marker ID has no problem, and its explanation still offers the repair here.
+            DrawDuplicateIdTasks(builder);
             // What the inspection could not read or check: nothing the modder can repair here, so no problem.
             if (selected.Notes.Count != 0) {
                 Section(builder, "Inspection notes");
@@ -1060,6 +1062,7 @@ namespace RailroaderScenePatcher {
             FieldLabel(builder, "Current binding");
             if (current.Length == 0) Line(builder, "None", null, null);
             foreach (var line in current) BindingFields(builder, line);
+            if (marker) DrawMarkerId(builder);
             Section(builder, "Observed bindings");
             var others = selected.Bindings.Where(line => !current.Contains(line) && !IsReader(line)).ToArray();
             if (others.Length == 0) Line(builder, "None observed", null, null);
@@ -1112,6 +1115,7 @@ namespace RailroaderScenePatcher {
             FieldLabel(builder, "Current track location");
             if (current.Length == 0) Line(builder, "None", null, null);
             foreach (var line in current) BindingFields(builder, line);
+            DrawMarkerId(builder);
             var readers = selected.Bindings.Where(IsReader).ToArray();
             // The native checkbox shows the effective wreck setting of the one car placement that reads the marker and
             // sets this mod's value; the result appears in the footer.
@@ -1758,8 +1762,9 @@ namespace RailroaderScenePatcher {
                     new[] { "Bells", "Adds a bell with sound from a bell definition in the content library. It rings when the crossing controller rings its own bell. Rejected definitions show why they cannot be used." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
+                    new[] { "Marker ID", "The ID the game registers a marker's track location under. When scene markers share an ID, the game removes the registration of all of them when one changes, so Enabled, the binding and Follow are refused. Give one of them a replacement ID with Set ID; the others keep their registrations. Clear ID returns the underlying ID." },
                     new[] { "Construction segments", "The track segments whose construction state decides which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They cannot be detached. Clear segments returns the native segments." } },
-                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
+                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Marker IDs", "repairing-duplicate-marker-ids.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {
                     new[] { "Remove modification", "Deletes this mod's modification and restores the object's underlying state, not an earlier patched position." },

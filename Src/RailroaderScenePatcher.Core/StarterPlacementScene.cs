@@ -114,8 +114,8 @@ namespace RailroaderScenePatcher.Core {
             if (unresolved != null) throw new InvalidPatchDefinitionException(unresolved);
             var problem = CutProblem(setups, reader, marker, track.Location);
             if (problem != null) throw new InvalidPatchDefinitionException(problem);
-            // The marker rules before any mutation, such as the refusal for a holder of a duplicate marker id, whose
-            // registration the game removes by marker id from every holder.
+            // The marker rules before any mutation, such as the refusal for a holder of a duplicate marker ID, whose
+            // registration the game removes by marker ID from every holder.
             relationship.CheckRelationships(target, new ObjectState(null, null, track));
         }
         // Why a track location cannot be the marker's, or null: its segment must exist exactly once and contain the distance.

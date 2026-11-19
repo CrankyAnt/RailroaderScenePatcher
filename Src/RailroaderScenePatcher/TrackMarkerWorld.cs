@@ -18,7 +18,7 @@ namespace RailroaderScenePatcher {
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
     // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
-    internal class TrackMarkerWorld : ITrackMarkerWorld, IDisableRefusal, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern {
+    internal class TrackMarkerWorld : ITrackMarkerWorld, IDisableRefusal, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern, IMarkerIdWorld {
         readonly NativeMarkerWarnings warningHistory = new NativeMarkerWarnings();
         readonly NativeCurrentWarnings currentWarnings = new NativeCurrentWarnings();
         internal const string MarkerType = "Track.TrackMarker";
@@ -239,7 +239,7 @@ namespace RailroaderScenePatcher {
         }
         public IReadOnlyList<MarkerRegistration> Registrations(object target) => RegistrationsOf(MarkerOf(target));
         // Every graph entry under the marker's ID. An entry that a scene marker holding the ID registered names that
-        // marker's object as its owner, in a loaded scene or not, so the entry of another holder of a duplicate marker id
+        // marker's object as its owner, in a loaded scene or not, so the entry of another holder of a duplicate marker ID
         // is told apart from this marker's.
         internal static IReadOnlyList<MarkerRegistration> RegistrationsOf(Component m) {
             var id = (string)Field(m, "id");
@@ -422,5 +422,44 @@ namespace RailroaderScenePatcher {
             return value;
         }
         static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("Coordinate exceeds native precision"); return f; }
+        // A replacement ID: the marker's id field, a removal of this marker's own graph entries only, the users of
+        // an id and the map-object ids of the map context. The native Graph.RemoveNamedLocation removes an id from every
+        // segment, so it would remove the registration of every other holder of the old id.
+        public string MarkerId(object target) => Field(MarkerOf(target), "id") as string;
+        public void SetMarkerId(object target, string id) => FieldOf(marker, "id").SetValue(MarkerOf(target), id);
+        public void UnregisterOwn(object target) {
+            var m = MarkerOf(target);
+            var id = (string)Field(m, "id");
+            foreach (DictionaryEntry bucket in (IDictionary)Field(Graph(), "_namedLocationsBySegmentId")) {
+                var entries = (IDictionary)bucket.Value;
+                if (entries.Contains(id) && ReferenceEquals(Field(entries[id], "ObjectValue"), m)) entries.Remove(id);
+            }
+        }
+        // The scene markers the current check may see that hold the id, then the owners of graph entries under the id
+        // that are not among them, such as a marker in a scene that is not loaded or a passenger stop.
+        public IReadOnlyList<string> IdUsers(string id, object except) {
+            var users = Resources.FindObjectsOfTypeAll(marker).OfType<Component>()
+                .Where(c => c != null && VisibleForCheck(c.gameObject) && !ReferenceEquals(c.gameObject, except) && Field(c, "id") as string == id)
+                .Select(c => c.gameObject).Distinct().Select(Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            foreach (DictionaryEntry bucket in (IDictionary)Field(Graph(), "_namedLocationsBySegmentId")) {
+                var entries = (IDictionary)bucket.Value;
+                if (!entries.Contains(id)) continue;
+                var holder = Field(entries[id], "ObjectValue") as Component;
+                if (holder != null && ReferenceEquals(holder.gameObject, except)) continue;
+                var name = holder != null && holder.GetType().FullName == MarkerType ? Name(holder.gameObject) : ReplacementMarkerIds.ForeignOwner;
+                if (!users.Contains(name)) users.Add(name);
+            }
+            return users;
+        }
+        // The ids of the map context's map objects, which the game gives the track markers it spawns for them. Null while
+        // the game has no map object manager, so a replacement ID is refused rather than taken unchecked.
+        public IEnumerable<string> MapObjectIds {
+            get {
+                var type = Native.Type("Game.MapObjectManager");
+                var manager = type == null ? null : Native.Read(type, "Shared");
+                if (manager == null || !(Native.Read(manager, "Objects") is IEnumerable objects)) return null;
+                return objects.Cast<object>().Select(entry => entry.GetType().GetProperty("Key")?.GetValue(entry) as string).Where(key => key != null).ToArray();
+            }
+        }
     }
 }

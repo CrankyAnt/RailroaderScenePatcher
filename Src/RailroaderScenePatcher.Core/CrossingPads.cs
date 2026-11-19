@@ -82,8 +82,8 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
         public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure ? RequiredVersion : null;
         public void Preflight(object target) => relationship.Preflight(target);
-        // The shared relationship checks first, so the refusal of an edit of a pad that holds a duplicate marker id
-        // names that marker id.
+        // The shared relationship checks first, so the refusal of an edit of a pad that holds a duplicate marker ID
+        // names that marker ID.
         public void CheckRelationships(object target, ObjectState state) {
             relationship.CheckRelationships(target, state);
             if (state?.Marker != null && state.Marker.IsDetached)

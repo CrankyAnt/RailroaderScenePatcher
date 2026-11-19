@@ -228,6 +228,7 @@ namespace RailroaderScenePatcher.Core {
                 case "active": return "the activity";
                 case "dependsOn": return "the dependencies";
                 case "starterPlacement": return "the starter placement";
+                case "markerId": return "the replacement ID";
                 case "trackMarker": return "the track binding";
                 case "crossingCoverage": return "the crossing coverage";
                 case "crossingEquipment": return "the added lights, gates and bells";

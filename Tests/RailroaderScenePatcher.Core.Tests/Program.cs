@@ -331,6 +331,7 @@ class Program {
         CrossingPadTests.Run();
         MilepostTests.Run();
         DuplicateMarkerIdTests.Run();
+        ReplacementMarkerIdTests.Run();
         DiagnosticTests.Run();
         MultipleModTests.Run();
         TrackFollowingTests.Run();

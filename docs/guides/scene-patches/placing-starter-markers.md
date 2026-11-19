@@ -15,7 +15,7 @@ At the start of a new company game, the setup places its car cuts in order. If o
 - The cut does not fit under the game's placement rule, taking the setup's other cuts into account. The check is described below. The message names the car placement, its cars and length, and the game's reason, such as `Not enough track.`, `Track not available.`, `Switch lined against.` or the earlier cut blocking it. The patcher also refuses a location that would block a later cut.
 - No car placement in an active setup uses the marker, or more than one does. The patcher needs exactly one car placement to change.
 - The edit would detach the marker's track location. The game needs that location to place the cut.
-- Another scene marker has the same marker id. Removing a registration by marker id removes it for every marker with that id. The message names the duplicate id and all its holders. See [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
+- Another scene marker has the same marker ID. Removing a registration by marker ID removes it for every marker with that ID. The message names the duplicate ID and all its holders. See [repair, replace or detach a track-marker binding](repairing-track-bindings.md).
 
 The game's placement rule checks the front of the cut, then points every 1.5 metres towards the back, and finally the back end. The cut's length includes the gaps between cars and a steam locomotive's tender. If the length is an exact multiple of 1.5 metres, the game checks the last step twice instead of checking the back end. The patcher follows the same rule.
 

@@ -1300,7 +1300,7 @@ namespace RailroaderScenePatcher {
             return new[] { selected.Position[0], selected.Position[1], selected.Position[2], angles.x, angles.y, angles.z };
         }
         // Fills the binding fields from the inspected marker location.
-        void ReadBinding() { var current = CurrentBinding(); for (var i = 0; i < 3; i++) binding[i] = current[i]; segmentFields[0] = CommandBand.SegmentText(CurrentSegments()); }
+        void ReadBinding() { var current = CurrentBinding(); for (var i = 0; i < 3; i++) binding[i] = current[i]; segmentFields[0] = CommandBand.SegmentText(CurrentSegments()); markerIdFields[0] = CurrentMarkerId(); }
         // Whether the inspected object holds the construction-segment relationship: a rail bridge construction root that
         // carries its construction controller, or a construction controller on an object of its own.
         bool HoldsConstructionSegments => selected != null && (selected.Identity.Structure == ConstructionSceneryScene.Structure

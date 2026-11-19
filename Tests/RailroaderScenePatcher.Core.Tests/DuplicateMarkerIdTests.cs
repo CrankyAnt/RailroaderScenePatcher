@@ -6,7 +6,7 @@ using System.Linq;
 using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher.Core;
 
-// Scene markers that hold a duplicate marker id. The game removes a marker's graph registration by marker id from every
+// Scene markers that hold a duplicate marker ID. The game removes a marker's graph registration by marker ID from every
 // holder, so an activity, binding or track-following edit of one holder is refused before it changes anything.
 static class DuplicateMarkerIdTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
@@ -15,8 +15,8 @@ static class DuplicateMarkerIdTests {
     static readonly string[] WhistlePaths = { "World/Roads/Grade Crossing - A/Whistle Sign W", "World/Roads/Grade Crossing - B/Whistle Sign W", "World/Roads/Grade Crossing - C/Whistle Sign W" };
     static TargetIdentity Marker(string path) => new TargetIdentity(Scene, path, "Track.TrackMarker", TrackMarkerScene.Structure);
 
-    // A pair: the active speed sign holds the registration of Mg6m; the inactive Yard Limit holds the same marker id. A
-    // group: three active whistle signs hold Mkft, each registered on its own segment. An unrelated marker has a marker id
+    // A pair: the active speed sign holds the registration of Mg6m; the inactive Yard Limit holds the same marker ID. A
+    // group: three active whistle signs hold Mkft, each registered on its own segment. An unrelated marker has a marker ID
     // of its own.
     sealed class World {
         public FakeMarkerWorld Markers = new FakeMarkerWorld();
@@ -64,17 +64,17 @@ static class DuplicateMarkerIdTests {
         OneObjectWithTwoMarkersIsOneHolder();
         StaleDependentCacheOfAHolderIsRefusedBeforeMutation();
         WriteRefusesARestoreThatWouldReRegisterAHolder();
-        Console.WriteLine("PASS: duplicate marker ids are named and their unsafe edits are refused before mutation");
+        Console.WriteLine("PASS: duplicate marker IDs are named and their unsafe edits are refused before mutation");
     }
     static void AssertRefused(World w, Outcome outcome, string before, string scenePatchFile, string scenario, params string[] holders) {
         Assert(!outcome.Applied, scenario + " is refused");
-        Assert(holders.All(outcome.Error.Contains), scenario + ": the refusal names the marker id and every holder: " + outcome.Error);
+        Assert(holders.All(outcome.Error.Contains), scenario + ": the refusal names the marker ID and every holder: " + outcome.Error);
         AssertNoReloadAdvice(outcome.Error, scenario);
         Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == scenePatchFile, scenario + ": the scene and the scene patch file are unchanged and every holder keeps its registration: " + w.Registrations());
     }
     // The refusal says that reloading does not help, and never advises it.
     static void AssertNoReloadAdvice(string error, string scenario) {
-        Assert(error.Contains("Reloading or choosing another track does not change the duplicate marker id.") && error.IndexOf("Reload before", StringComparison.OrdinalIgnoreCase) < 0
+        Assert(error.Contains("Reloading or choosing another track does not change the duplicate marker ID.") && error.IndexOf("Reload before", StringComparison.OrdinalIgnoreCase) < 0
             && error.IndexOf("reload the", StringComparison.OrdinalIgnoreCase) < 0, scenario + ": the refusal explains that reloading does not help and gives no Reload advice: " + error);
         Assert(!error.Contains(": "), scenario + ": the refusal is plain sentences without a label of its own: " + error);
     }
@@ -97,7 +97,7 @@ static class DuplicateMarkerIdTests {
         AssertRefused(w, w.Session.Bind(Marker(WhistlePaths[0]), MarkerBinding.At(new TrackLocation("Sb", "a", 30))), before, scenePatchFile, "A rebind of one whistle sign", all);
         AssertRefused(w, w.Session.Follow(Marker(WhistlePaths[2]), TrackAnchor.Endpoint("N1")), before, scenePatchFile, "Track following of one whistle sign", all);
         var refusal = w.Session.Edit(Marker(WhistlePaths[1]), null, false).Error;
-        Assert(!refusal.Contains(SpeedPath) && !refusal.Contains("Mg6m"), "The refusal names only the holders of its own marker id: " + refusal);
+        Assert(!refusal.Contains(SpeedPath) && !refusal.Contains("Mg6m"), "The refusal names only the holders of its own marker ID: " + refusal);
     }
     // The inactive Yard Limit holds no registration; the speed sign's registration under the same id is not one of the
     // Yard Limit's, so the Yard Limit's registration agrees with its activity and an edit that leaves it alone applies.
@@ -139,16 +139,16 @@ static class DuplicateMarkerIdTests {
     static void InspectorNamesTheIdEveryHolderAndEachRegistrationOwner() {
         var w = new World();
         var pair = Lines(w, w.Yard);
-        Assert(pair.Count == 3 && pair[0].StartsWith("Duplicate marker id Mg6m is held by 2 scene markers. ", StringComparison.Ordinal), "The dependency view names the duplicate marker id first: " + String.Join(" | ", pair));
+        Assert(pair.Count == 3 && pair[0].StartsWith("Duplicate marker ID Mg6m is held by 2 scene markers. ", StringComparison.Ordinal), "The dependency view names the duplicate marker ID first: " + String.Join(" | ", pair));
         Assert(pair[1] == "This marker is inactive and has no registration under Mg6m." && pair[2] == SpeedPath + " is active and has the registration under Mg6m at Sjdl / a / 10.",
             "The inspected Yard Limit comes first, inactive without a registration; the speed sign is active and owns the registration: " + String.Join(" | ", pair));
         var group = Lines(w, w.Whistles[2]);
-        Assert(group.Count == 4 && group[0].StartsWith("Duplicate marker id Mkft is held by 3 scene markers. ", StringComparison.Ordinal), "The group of three is named: " + String.Join(" | ", group));
+        Assert(group.Count == 4 && group[0].StartsWith("Duplicate marker ID Mkft is held by 3 scene markers. ", StringComparison.Ordinal), "The group of three is named: " + String.Join(" | ", group));
         Assert(group[1] == "This marker is active and has the registration under Mkft at Sc / a / 7." && group[2] == WhistlePaths[0] + " is active and has the registration under Mkft at Sa / a / 5."
             && group[3] == WhistlePaths[1] + " is active and has the registration under Mkft at Sb / a / 6.", "Each whistle sign owns its own registration: " + String.Join(" | ", group));
         Assert(group.All(line => !line.Contains(": ")), "Every line is a plain sentence without a label: " + String.Join(" | ", group));
-        Assert(Lines(w, w.Unrelated).Count == 0, "A marker id of its own adds no dependency lines");
-        // An entry that a non-marker object holds under the marker id is named as such.
+        Assert(Lines(w, w.Unrelated).Count == 0, "A marker ID of its own adds no dependency lines");
+        // An entry that a non-marker object holds under the marker ID is named as such.
         w.Markers.Buckets["Nnew"]["Mkft"] = ("b", 1, new object());
         var foreign = Lines(w, w.Whistles[0]);
         Assert(foreign.Last() == "An object that is not a scene marker has the registration under Mkft at Nnew / b / 1.", "A registration of another object is named: " + String.Join(" | ", foreign));
@@ -177,9 +177,9 @@ static class DuplicateMarkerIdTests {
         var outcomes = result.Outcomes;
         foreach (var key in new[] { "rebind-yard", "disable-whistle", "follow-whistle" }) {
             var holders = key.EndsWith("yard", StringComparison.Ordinal) ? new[] { "Mg6m", SpeedPath, YardPath } : new[] { "Mkft" }.Concat(WhistlePaths).ToArray();
-            Assert(!outcomes[key].Applied && holders.All(outcomes[key].Error.Contains) && outcomes[key].Cause == FailureCause.InvalidDefinition, key + " fails before mutation naming the marker id and every holder: " + outcomes[key].Error);
+            Assert(!outcomes[key].Applied && holders.All(outcomes[key].Error.Contains) && outcomes[key].Cause == FailureCause.InvalidDefinition, key + " fails before mutation naming the marker ID and every holder: " + outcomes[key].Error);
             var row = messages.Rows.SingleOrDefault(r => r.Operation == key);
-            Assert(row != null && holders.All(row.Message.Contains), key + " has a diagnostic naming the marker id and every holder");
+            Assert(row != null && holders.All(row.Message.Contains), key + " has a diagnostic naming the marker ID and every holder");
         }
         // Enabling the Yard Limit fails the same way, whichever of the Yard Limit's modifications comes first.
         Assert(!outcomes["enable-yard"].Applied && outcomes["enable-yard"].Error.Contains("Mg6m"), "Enabling the Yard Limit at load fails: " + outcomes["enable-yard"].Error);
@@ -204,7 +204,7 @@ static class DuplicateMarkerIdTests {
             PadItem("disable-pad", "\"active\":false"), PadItem("rebind-pad", "\"relationships\":{\"trackMarker\":{\"segment\":\"Sj7c\",\"end\":\"a\",\"distance\":186}}"),
             PadItem("detach-pad", "\"relationships\":{\"trackMarker\":{\"detach\":true}}"))));
         foreach (var key in new[] { "disable-pad", "rebind-pad", "detach-pad" })
-            Assert(!load.Outcomes[key].Applied && load.Outcomes[key].Error.Contains("Mpad") && load.Outcomes[key].Error.Contains(PadPath) && load.Outcomes[key].Error.Contains(OtherPath), key + " of a pad that holds a duplicate marker id fails naming it and both pads: " + load.Outcomes[key].Error);
+            Assert(!load.Outcomes[key].Applied && load.Outcomes[key].Error.Contains("Mpad") && load.Outcomes[key].Error.Contains(PadPath) && load.Outcomes[key].Error.Contains(OtherPath), key + " of a pad that holds a duplicate marker ID fails naming it and both pads: " + load.Outcomes[key].Error);
         Assert(world.Mutations == 0 && Registered() == before, "No pad changed and both keep their registration");
         var capabilities = new SceneCapabilities(() => world.MapIds);
         capabilities.Add(new CrossingPadScene(world, Capability.Unchecked));
@@ -222,7 +222,7 @@ static class DuplicateMarkerIdTests {
         var before = w.Registrations(); var scenePatchFile = w.Session.ScenePatchFileText;
         var enable = w.Session.Edit(Marker(YardPath), null, true);
         Assert(!enable.Applied, "Enabling the inactive Yard Limit that holds Mg6m is refused");
-        Assert(enable.Error.Contains("Mg6m") && enable.Error.Contains(SpeedPath) && enable.Error.Contains(YardPath), "The refusal names the marker id and every holder: " + enable.Error);
+        Assert(enable.Error.Contains("Mg6m") && enable.Error.Contains(SpeedPath) && enable.Error.Contains(YardPath), "The refusal names the marker ID and every holder: " + enable.Error);
         AssertNoReloadAdvice(enable.Error, "Enable");
         Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Session.ScenePatchFileText == scenePatchFile && !w.MapEditor.CanUndo, "Nothing changed: " + w.Registrations());
     }
@@ -231,13 +231,13 @@ static class DuplicateMarkerIdTests {
     static void RefusalNamesTheEditedAndActiveHoldersFirst() {
         var w = new World();
         var enable = w.Session.Edit(Marker(YardPath), null, true).Error;
-        Assert(enable.StartsWith("Duplicate marker id Mg6m is held by 2 scene markers, " + YardPath + " (inactive) and " + SpeedPath + " (active). ", StringComparison.Ordinal), "The edited Yard Limit comes first: " + enable);
+        Assert(enable.StartsWith("Duplicate marker ID Mg6m is held by 2 scene markers, " + YardPath + " (inactive) and " + SpeedPath + " (active). ", StringComparison.Ordinal), "The edited Yard Limit comes first: " + enable);
         var disable = w.Session.Edit(Marker(SpeedPath), null, false).Error;
-        Assert(disable.StartsWith("Duplicate marker id Mg6m is held by 2 scene markers, " + SpeedPath + " (active) and " + YardPath + " (inactive). ", StringComparison.Ordinal), "The edited speed sign comes first: " + disable);
+        Assert(disable.StartsWith("Duplicate marker ID Mg6m is held by 2 scene markers, " + SpeedPath + " (active) and " + YardPath + " (inactive). ", StringComparison.Ordinal), "The edited speed sign comes first: " + disable);
         var g = new World();
         g.Markers.SetActive(g.Whistles[0], false); g.Markers.Load(g.Whistles[1]); g.Markers.Load(g.Whistles[2]); g.Markers.Mutations = 0; // a load with the first sign inactive
         var group = g.Session.Bind(Marker(WhistlePaths[2]), MarkerBinding.At(new TrackLocation("Sc", "a", 9))).Error;
-        Assert(group.StartsWith("Duplicate marker id Mkft is held by 3 scene markers, " + WhistlePaths[2] + " (active), " + WhistlePaths[1] + " (active) and " + WhistlePaths[0] + " (inactive). ", StringComparison.Ordinal),
+        Assert(group.StartsWith("Duplicate marker ID Mkft is held by 3 scene markers, " + WhistlePaths[2] + " (active), " + WhistlePaths[1] + " (active) and " + WhistlePaths[0] + " (inactive). ", StringComparison.Ordinal),
             "The edited sign first, the active sign next and the inactive sign last: " + group);
     }
     // A holder whose activity follows its track group: its explicit disable would install the hold and deactivate it,
@@ -268,14 +268,14 @@ static class DuplicateMarkerIdTests {
         var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, new Store(), "map"); mapEditor.Session = session;
         var enable = session.Edit(new TargetIdentity(Scene, PadPath, "Track.TrackMarker", CrossingPadScene.Structure), null, true);
-        Assert(!enable.Applied && enable.Error.Contains("Mpad") && enable.Error.Contains(OtherPath) && !pad.Active, "Enabling an inactive pad that holds a duplicate marker id is refused: " + enable.Error);
+        Assert(!enable.Applied && enable.Error.Contains("Mpad") && enable.Error.Contains(OtherPath) && !pad.Active, "Enabling an inactive pad that holds a duplicate marker ID is refused: " + enable.Error);
         var load = new PatchEngine(capabilities).Apply(Doc("\"follow-pad\":{\"target\":{\"scene\":\"" + Scene + "\",\"path\":\"" + PadPath + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"crossing-pad-v1\"},"
             + "\"placement\":{\"mode\":\"trackFollowing\",\"track\":{\"node\":\"N1\"},\"offset\":[0,0,0],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}"));
         Assert(!load.Outcomes["follow-pad"].Applied && load.Outcomes["follow-pad"].Error.Contains("Mpad") && load.Outcomes["follow-pad"].Cause == FailureCause.InvalidDefinition, "Track following of a pad holder fails at load: " + load.Outcomes["follow-pad"].Error);
         Assert(world.Mutations == 0 && Registered() == before && !mapEditor.CanUndo, "No pad changed and both keep their registration");
     }
-    // A registration under the marker id owned by a scene marker the world does not list, such as one in a scene that
-    // is not loaded, makes the marker id a duplicate marker id: rewriting the registration would remove that one too.
+    // A registration under the marker ID owned by a scene marker the world does not list, such as one in a scene that
+    // is not loaded, makes the marker ID a duplicate marker ID: rewriting the registration would remove that one too.
     static void RegistrationOwnerOutsideTheLoadedMarkersIsAHolder() {
         var w = new World();
         var elsewhere = new FakeMarker { Id = "Mown", Segment = "Sjdl", End = "b", Distance = 30 };
@@ -288,13 +288,13 @@ static class DuplicateMarkerIdTests {
         var lines = Lines(w, w.Unrelated);
         Assert(lines.Contains("OtherScene/World/Signs/Elsewhere is active and has the registration under Mown at Sjdl / b / 30."), "The inspector lists it with the same holder set: " + String.Join(" | ", lines));
     }
-    // A holder is an object: an object with two markers that hold the marker id is one holder, as natively.
+    // A holder is an object: an object with two markers that hold the marker ID is one holder, as natively.
     static void OneObjectWithTwoMarkersIsOneHolder() {
         var handle = new object();
         var one = new MarkerIdHolders("Mtwo", new[] { new MarkerIdHolder(handle, "Scene/Sign", true), new MarkerIdHolder(handle, "Scene/Sign", true) });
-        Assert(!one.Duplicate && one.Holders.Count == 1 && one.Dependencies(handle).Count == 0, "One object is one holder, so its marker id is no duplicate");
+        Assert(!one.Duplicate && one.Holders.Count == 1 && one.Dependencies(handle).Count == 0, "One object is one holder, so its marker ID is no duplicate");
         var two = new MarkerIdHolders("Mtwo", new[] { new MarkerIdHolder(handle, "Scene/Sign", true), new MarkerIdHolder(handle, "Scene/Sign", false), new MarkerIdHolder(new object(), "Scene/Other", false) });
-        Assert(two.Duplicate && two.Holders.Count == 2 && two.Dependencies(handle).Count == 3, "Another object makes it a duplicate marker id, counted by object");
+        Assert(two.Duplicate && two.Holders.Count == 2 && two.Dependencies(handle).Count == 3, "Another object makes it a duplicate marker ID, counted by object");
     }
     // A map label cache that disagrees with a holder's location would be corrected by rewriting its registration, which
     // removes every holder's registration: the edit is refused before mutation, naming the cache and the holders.
@@ -309,10 +309,10 @@ static class DuplicateMarkerIdTests {
         var unrelated = new World();
         unrelated.Unrelated.CachedGroup = "stale";
         Assert(unrelated.Session.Edit(Marker("World/Large Scenery/Signs/Unrelated"), new Placement(new[] { 1061.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && unrelated.Unrelated.CachedGroup == "extension",
-            "A marker with a marker id of its own still has its cache corrected by its edit");
+            "A marker with a marker ID of its own still has its cache corrected by its edit");
     }
     // A placement that fails after it broke the holder's own registration or a dependent cache: restoring would rewrite
-    // the registration by marker id. The write refuses before it touches the graph, so cleanup is unverified and every
+    // the registration by marker ID. The write refuses before it touches the graph, so cleanup is unverified and every
     // other holder keeps its registration.
     sealed class BreakingPlacementWorld : FakeMarkerWorld, ITrackMarkerWorld {
         public bool DropRegistration, StaleCache;
@@ -332,14 +332,14 @@ static class DuplicateMarkerIdTests {
             if (registration) world.DropRegistration = true; else world.StaleCache = true;
             var edit = w.Session.Edit(Marker(WhistlePaths[0]), new Placement(new[] { 1090.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
             Assert(!edit.Applied && edit.Error.StartsWith("The edit failed. Cleanup could not be verified. Reason:", StringComparison.Ordinal) && Others() == others,
-                (registration ? "A lost registration" : "A stale cache") + " after a failed edit is not rewritten by marker id: " + edit.Error + " " + Others());
+                (registration ? "A lost registration" : "A stale cache") + " after a failed edit is not rewritten by marker ID: " + edit.Error + " " + Others());
             var load = new World(world = new BreakingPlacementWorld());
             others = String.Join(" ", load.Whistles.Skip(1).Select(m => String.Join(",", load.Markers.Registrations(m).Where(r => r.HoldsMarker).Select(r => r.Bucket))));
             if (registration) world.DropRegistration = true; else world.StaleCache = true;
             var result = new PatchEngine(load.Capabilities).Apply(Doc(Item("move", WhistlePaths[0], "\"placement\":{\"mode\":\"fixed\",\"position\":[1090,1,2],\"rotation\":[0,0,0,1]}")));
             var after = String.Join(" ", load.Whistles.Skip(1).Select(m => String.Join(",", load.Markers.Registrations(m).Where(r => r.HoldsMarker).Select(r => r.Bucket))));
             Assert(!result.Outcomes["move"].Applied && result.Outcomes["move"].Error.StartsWith("The change failed. Cleanup could not be verified. Reason:", StringComparison.Ordinal) && after == others,
-                (registration ? "A lost registration" : "A stale cache") + " after a failed modification is not rewritten by marker id: " + result.Outcomes["move"].Error + " " + after);
+                (registration ? "A lost registration" : "A stale cache") + " after a failed modification is not rewritten by marker ID: " + result.Outcomes["move"].Error + " " + after);
         }
     }
 }

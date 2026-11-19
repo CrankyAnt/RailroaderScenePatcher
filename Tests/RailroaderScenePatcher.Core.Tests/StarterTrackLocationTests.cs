@@ -282,16 +282,16 @@ static class StarterTrackLocationTests {
         var body = StarterCutRule.Body(world, new TrackLocation("S1", "a", 28), 10, out var error);
         Check(error != null && error.Contains("position injected") && body.Count > 0, "A body that cannot be followed says why: " + error);
     }
-    // A starter placement marker whose marker id another scene marker holds keeps its track location: the game removes
-    // a registration by marker id from every holder, so the move is refused before anything changes.
+    // A starter placement marker whose marker ID another scene marker holds keeps its track location: the game removes
+    // a registration by marker ID from every holder, so the move is refused before anything changes.
     static void ADuplicateMarkerIdIsRefusedBeforeMutation() {
         var (world, _, _, hopper, scene) = Setup();
         var twin = new FakeMarker { Id = "Mhop", Segment = "S1", End = "a", Distance = 5, Active = false };
         world.Objects["World/Twin"] = new List<object> { twin };
         world.Mutations = 0;
         var outcome = new PatchEngine(scene).Apply(Doc(Starter("dup-id", HopperPath, At("S2", "a", 80)))).Outcomes["dup-id"];
-        Check(!outcome.Applied && outcome.Error.StartsWith("Duplicate marker id Mhop", StringComparison.Ordinal) && world.Mutations == 0 && Entry(world, hopper) == "S2|a|90",
-            "A holder of a duplicate marker id is refused before mutation: " + outcome.Error);
+        Check(!outcome.Applied && outcome.Error.StartsWith("Duplicate marker ID Mhop", StringComparison.Ordinal) && world.Mutations == 0 && Entry(world, hopper) == "S2|a|90",
+            "A holder of a duplicate marker ID is refused before mutation: " + outcome.Error);
     }
     static void ObjectSettingsAndOtherRelationshipsAreRefused() {
         Refused(Starter("placed", HopperPath, At("S2", "a", 80), extra: ",\"active\":false"), "placed", "the object's placement and activity do not change where its cars start", "Activity on a starter placement marker is refused");

@@ -4,9 +4,11 @@ using System;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    internal enum GuidedTaskKind { Placement, Snap, Activity, Binding, DetachBinding, StarterPlacement }
+    internal enum GuidedTaskKind { Placement, Snap, Activity, Binding, DetachBinding, StarterPlacement, MarkerId }
     internal enum GuidedTaskStep { Target, Values, Review, Applied }
     internal sealed class GuidedTaskState {
+        // The tasks the task list offers, in its order; a task that does not fit the inspected object stays visible and disabled.
+        internal static readonly System.Collections.Generic.IReadOnlyList<GuidedTaskKind> Tasks = Array.AsReadOnly((GuidedTaskKind[])Enum.GetValues(typeof(GuidedTaskKind)));
         internal static string TargetBlock(GuidedTaskKind kind, TargetIdentity identity) =>
             identity != null && (identity.Structure == CrossingCoverageScene.Structure || (identity.Structure == null && identity.Component == CrossingCoverageScene.ComponentType))
                 && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap || kind == GuidedTaskKind.Activity)

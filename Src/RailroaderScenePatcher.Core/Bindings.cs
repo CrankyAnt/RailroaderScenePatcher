@@ -49,7 +49,7 @@ namespace RailroaderScenePatcher.Core {
         // The name of that scene marker, by scene and path; null when it is unknown.
         public string OwnerName { get; }
     }
-    // One scene marker that holds a marker id: the world's handle of the object, its name and whether the native marker
+    // One scene marker that holds a marker ID: the world's handle of the object, its name and whether the native marker
     // lifecycle keeps it registered.
     public sealed class MarkerIdHolder {
         public MarkerIdHolder(object handle, string name, bool registers) { Handle = handle ?? throw new ArgumentNullException(nameof(handle)); Name = name; Registers = registers; }
@@ -57,10 +57,10 @@ namespace RailroaderScenePatcher.Core {
         public string Name { get; }
         public bool Registers { get; }
     }
-    // The scene markers that hold one marker id. The game removes a marker's graph registration by marker id from every
-    // holder, so while the marker id is a duplicate marker id, an edit of one holder's activity, binding or
+    // The scene markers that hold one marker ID. The game removes a marker's graph registration by marker ID from every
+    // holder, so while the marker ID is a duplicate marker ID, an edit of one holder's activity, binding or
     // track-following placement would remove the registration of the others. Such an edit is refused until the
-    // duplicate marker id is repaired.
+    // duplicate marker ID is repaired.
     public sealed class MarkerIdHolders {
         readonly MarkerRegistration[] registrations;
         public MarkerIdHolders(string id, IEnumerable<MarkerIdHolder> holders) : this(id, holders, null) { }
@@ -71,7 +71,7 @@ namespace RailroaderScenePatcher.Core {
             this.registrations = registrations ?? new MarkerRegistration[0];
         }
         // The one holder set of the guard and the inspector: these holders, completed by the owner of every registration
-        // under the marker id that is not among them, such as a scene marker in a scene that is not loaded. Such an owner
+        // under the marker ID that is not among them, such as a scene marker in a scene that is not loaded. Such an owner
         // holds a registration, so it counts as registered.
         public MarkerIdHolders With(IEnumerable<MarkerRegistration> entries) {
             var all = (entries ?? Enumerable.Empty<MarkerRegistration>()).Where(e => e != null).ToArray();
@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher.Core {
             return new MarkerIdHolders(Id, Holders.Concat(owners), all);
         }
         public string Id { get; }
-        // Every scene marker that holds the marker id, by name.
+        // Every scene marker that holds the marker ID, by name.
         public IReadOnlyList<MarkerIdHolder> Holders { get; }
         public bool Duplicate => Holders.Count > 1;
         // The holders as a refusal or the inspector names them: the inspected marker first, then the active holders,
@@ -94,18 +94,28 @@ namespace RailroaderScenePatcher.Core {
         }
         // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
         // sentences that follow the label of the action they refuse.
-        public string Refusal(object self) => "Duplicate marker id " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
-        const string Reason = "The game removes a marker's graph registration by marker id from every scene marker that holds it, so an activity, binding or track-following edit of one of them is refused until the duplicate marker id is repaired. Reloading or choosing another track does not change the duplicate marker id.";
+        public string Refusal(object self) => "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
+        const string Reason = "The game removes a marker's graph registration by marker ID from every scene marker that holds it, so an activity, binding or track-following edit of one of them is refused until the duplicate marker ID is repaired. Reloading or choosing another track does not change the duplicate marker ID.";
+        // The problem of an active holder that can receive a replacement ID: a duplicate marker ID is then a defect the
+        // modder repairs with the patcher. An inactive holder, and a holder that cannot receive a replacement ID, such as a
+        // crossing pad, show the explanation without a problem. Null for a marker ID that one scene marker holds.
+        public string Problem(object self, bool repairable) {
+            var holder = Holders.FirstOrDefault(h => ReferenceEquals(h.Handle, self));
+            if (!repairable || !Duplicate || holder == null || !holder.Registers) return null;
+            var others = Holders.Count - 1;
+            return "Duplicate marker ID " + Id + " is shared with " + (others == 1 ? "1 other scene marker" : others + " other scene markers") + ". " + ReplacementMarkerIds.Offer;
+        }
         // The state of a holder that does not match its location and activity, such as its registration or a dependent
         // cache, which only a rewrite of its registration would correct. Loading the scene again registers the holders
-        // under the same marker id, so it gives no advice to reload.
+        // under the same marker ID, so it gives no advice to reload.
         public string Mismatch(object self, string difference) => "The marker's state does not match its location and activity (" + difference + "). " + Refusal(self);
-        // The dependency lines of the inspector for one holder, as plain sentences: the duplicate marker id first, then
-        // every holder with its activity and the registrations it owns under the marker id, and the registrations that
-        // no scene marker owns. Empty for a marker id that one scene marker holds.
-        public IReadOnlyList<string> Dependencies(object self) {
+        // The dependency lines of the inspector for one holder, as plain sentences: the duplicate marker ID first, then
+        // every holder with its activity and the registrations it owns under the marker ID, and the registrations that
+        // no scene marker owns. Empty for a marker ID that one scene marker holds. offer adds the repair to the first line
+        // for a holder that can receive a replacement ID.
+        public IReadOnlyList<string> Dependencies(object self, bool offer = false) {
             if (!Duplicate) return Array.Empty<string>();
-            var lines = new List<string> { "Duplicate marker id " + Id + " is held by " + Holders.Count + " scene markers. " + Reason };
+            var lines = new List<string> { "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers. " + Reason + (offer ? " " + ReplacementMarkerIds.Offer : "") };
             foreach (var holder in Ordered(self)) {
                 var own = registrations.Where(e => ReferenceEquals(e.Owner, holder.Handle)).Select(e => e.Location?.Display ?? e.Bucket).ToArray();
                 lines.Add((ReferenceEquals(holder.Handle, self) ? "This marker" : holder.Name) + " is " + Activity(holder) + " and "
@@ -319,17 +329,76 @@ namespace RailroaderScenePatcher.Core {
         // Must leave uncertain warning rows intact and must not throw or alter the verified scene state.
         void AfterVerifiedState(object marker);
     }
+    // The id of a generic track marker and the ids a replacement ID must not take.
+    public interface IMarkerIdWorld {
+        string MarkerId(object marker);
+        // Writes the marker's id field. The registration is the caller's: remove the marker's own entries first.
+        void SetMarkerId(object marker, string id);
+        // Removes only the graph entries under the marker's id that this marker registered. The native removal by id
+        // would remove the entries of every other holder of the id.
+        void UnregisterOwn(object marker);
+        // The scene markers other than except that hold the id, by name, followed by the owners of graph entries under
+        // the id that no listed scene marker owns, such as a passenger stop; ReplacementMarkerIds.ForeignOwner names one
+        // that is not a scene marker.
+        IReadOnlyList<string> IdUsers(string id, object except);
+        // The map-object ids of the map context: the game gives the track marker of a map object its map-object id. Null
+        // when the game has not loaded them, which refuses every replacement ID.
+        IEnumerable<string> MapObjectIds { get; }
+    }
+    // A capability whose objects take a replacement ID: the supported generic track markers.
+    public interface IMarkerIdScene {
+        // The scene markers and registrations other than the target that use the id, by name.
+        IReadOnlyList<string> MarkerIdUsers(object target, string id);
+        // Whether applying this state to the marker rewrites its registration, which a duplicate marker ID refuses:
+        // a setting of its activity, binding or track following, or any setting while a dependent cache such as a map
+        // label's track group disagrees with its location.
+        bool RewritesRegistration(object target, ObjectState state);
+    }
+    // The rules of a replacement ID, which repairs a duplicate marker ID: one holder takes an id that is not empty,
+    // does not begin with a prefix the game uses for its own registrations, and that no other scene marker, graph
+    // registration or map object of the map context uses. Lua scripts and third-party mods that look a marker up by id
+    // are not checked.
+    public static class ReplacementMarkerIds {
+        public const string Member = "markerId", RequiredVersion = "0.5.0";
+        public static readonly IReadOnlyList<string> ReservedPrefixes = Array.AsReadOnly(new[] { "passengerStop:", "flare:" });
+        public const string Empty = "The replacement ID is empty. Enter an ID that no other scene marker or map object uses";
+        public const string NotAString = "The replacement ID must be a string";
+        public const string NotSupported = "Only a generic track marker takes a replacement ID";
+        public const string Offer = "Give one of them a replacement ID to repair it.";
+        public const string ForeignOwner = "an object that is not a scene marker";
+        // Why the id cannot be a replacement ID whatever the world holds, or null. A space at either end would make an ID
+        // that looks like another one.
+        public static string Problem(string id) {
+            if (String.IsNullOrWhiteSpace(id)) return Empty;
+            if (id.Trim() != id) return "Replacement ID \"" + id + "\" begins or ends with a space. Remove the space";
+            var prefix = ReservedPrefixes.FirstOrDefault(p => id.StartsWith(p, StringComparison.Ordinal));
+            return prefix == null ? null : "Replacement ID " + id + " begins with " + prefix + ", which the game uses for its own track registrations. Choose an ID without that prefix";
+        }
+        public static string UsedBy(string id, string user) => "Replacement ID " + id + " is already used by " + (user == ForeignOwner ? user : "the scene marker " + user) + ". Choose an ID that no other scene marker uses";
+        public static string UsedByMapObject(string id) => "Replacement ID " + id + " is already used by the map object " + id + " of the map context. Choose another ID";
+        // The map objects of the map context could not be read, so the ID is not known to be free.
+        public static string MapObjectsUnknown(string id) => "Replacement ID " + id + " could not be checked against the map objects of the map context, because the game has not loaded them. Try again after the map has loaded";
+        // The modifications of other holders whose settings need this modification's replacement ID, by key.
+        public static string DependentRefusal(IReadOnlyList<string> dependents) => "This marker's replacement ID cannot be cleared because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name")
+            + " its modification in dependsOn: another holder's activity, binding or track-following settings need this ID. Change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first";
+        public static string Shared(string id) => "Replacement ID " + id + " is used by more than one modification; a replacement ID names one marker in its scene patch file";
+        // Clearing the replacement ID would return a duplicate marker ID while the modification still changes the
+        // marker's activity, binding or track-following placement.
+        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding and track-following settings need its replacement ID. Clear those settings first, or click Remove modification";
+    }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:
     // placement stays a separate, independently set value.
-    public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene {
+    public sealed class TrackMarkerScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IDependentOutputScene, IMarkerIdScene {
         public const string Structure = "track-marker-v1", RequiredVersion = "0.5.0";
         readonly MarkerRelationship relationship;
         // The scene ground masks at and below a marker object, such as the Hemingway station, whose track marker stands
         // on the root of its building: a move of the marker rebuilds them, and a mask that flattens the terrain height
         // refuses the move. Null in a world without them.
         readonly GroundMasks masks;
-        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null); Capability = capability; this.masks = masks; }
+        public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null, true); Capability = capability; this.masks = masks; }
+        public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
+        public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
         public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
         public void RetryOutput(object target) => masks?.RetryOutput(target);
         void Masked(object target, Action change) { var before = masks?.Observe(target); change(); masks?.Follow(target, target, before); }
@@ -370,12 +439,40 @@ namespace RailroaderScenePatcher.Core {
     // placement and activity, and an optional consumer of the location.
     internal sealed class MarkerRelationship {
         const double PositionTolerance = 0.01, AngleToleranceDegrees = 0.01;
-        sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; internal object Consumer; }
+        sealed class Snapshot { internal TrackLocation Location; internal double[] Position, Rotation; internal bool Active, Held; internal object Consumer; internal string Id; }
         readonly ITrackMarkerWorld world;
         readonly string structure;
         readonly IMarkerConsumer consumer;
-        internal MarkerRelationship(ITrackMarkerWorld world, string structure, IMarkerConsumer consumer) {
+        // The marker IDs of a capability whose markers take a replacement ID, or null.
+        readonly IMarkerIdWorld ids;
+        internal MarkerRelationship(ITrackMarkerWorld world, string structure, IMarkerConsumer consumer, bool replaceable = false) {
             this.world = world ?? throw new ArgumentNullException(nameof(world)); this.structure = structure; this.consumer = consumer;
+            ids = replaceable ? world as IMarkerIdWorld : null;
+        }
+        // The refusal for a holder of a duplicate marker ID; a marker that takes a replacement ID offers it.
+        string Refused(MarkerIdHolders holders, object target) => ids == null ? holders.Refusal(target) : holders.Refusal(target) + " " + ReplacementMarkerIds.Offer;
+        string Mismatched(MarkerIdHolders holders, object target, string difference) => ids == null ? holders.Mismatch(target, difference) : holders.Mismatch(target, difference) + " " + ReplacementMarkerIds.Offer;
+        internal IReadOnlyList<string> IdUsers(object target, string id) => ids?.IdUsers(id, target) ?? Array.Empty<string>();
+        // The settings CheckRelationships refuses for a holder of a duplicate marker ID, read as a setting rather than a
+        // change: a value equal to the current one counts too, so a later load in another order still finds it.
+        internal bool RewritesRegistration(object target, ObjectState state) =>
+            state != null && (state.Active.HasValue || state.Marker != null || state.Placement?.Following != null || world.DependentProblem(target) != null);
+        // Why the marker cannot take this replacement ID in the world as it is, or null.
+        string Unavailable(object target, string id) {
+            var problem = ReplacementMarkerIds.Problem(id);
+            if (problem != null) return problem;
+            var user = IdUsers(target, id).FirstOrDefault();
+            if (user != null) return ReplacementMarkerIds.UsedBy(id, user);
+            // Unread map objects fail closed: an ID the check could not cover is not taken.
+            var mapObjects = ids.MapObjectIds;
+            if (mapObjects == null) return ReplacementMarkerIds.MapObjectsUnknown(id);
+            return mapObjects.Contains(id, StringComparer.Ordinal) ? ReplacementMarkerIds.UsedByMapObject(id) : null;
+        }
+        // Gives the marker another id: its own registration moves to the new id, and no other holder of the old id loses its registration.
+        void Rename(object target, string id) {
+            ids.UnregisterOwn(target);
+            ids.SetMarkerId(target, id);
+            if (world.Registers(target) && Resolvable(world.Location(target))) world.Register(target);
         }
         internal IEnumerable<string> MapIds => world.MapIds;
         internal IReadOnlyList<object> Resolve(TargetIdentity identity) {
@@ -398,25 +495,36 @@ namespace RailroaderScenePatcher.Core {
             var difference = Coherence(target);
             if (difference != null) throw new InvalidOperationException(Incoherent(target, difference));
         }
-        // The refusal of a registration that does not match the location and activity. A holder of a duplicate marker id
-        // gets its explanation instead of advice to reload, which registers the holders under the same marker id again.
+        // The refusal of a registration that does not match the location and activity. A holder of a duplicate marker ID
+        // gets its explanation instead of advice to reload, which registers the holders under the same marker ID again.
         string Incoherent(object target, string difference) {
             var holders = Holders(target);
-            return holders != null && holders.Duplicate ? holders.Mismatch(target, difference)
+            return holders != null && holders.Duplicate ? Mismatched(holders, target, difference)
                 : "The game's track information for this marker is out of sync. " + difference.TrimEnd('.') + ". Reload the Map Editor before editing it.";
         }
         internal void CheckRelationships(object target, ObjectState state) {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
-            // Before mutation, what the write would refuse for a holder of a duplicate marker id: a change of its activity,
+            // A replacement ID applies first: a marker that leaves a duplicate marker ID holds an id of its own
+            // for the rest of the modification.
+            var renames = false;
+            if (state?.MarkerId != null) {
+                if (ids == null) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
+                if (state.MarkerId != ids.MarkerId(target)) {
+                    var unavailable = Unavailable(target, state.MarkerId);
+                    if (unavailable != null) throw new InvalidPatchDefinitionException(unavailable);
+                    renames = true;
+                }
+            }
+            // Before mutation, what the write would refuse for a holder of a duplicate marker ID: a change of its activity,
             // binding or track-following placement, and a dependent cache the write would correct by re-registering it.
-            var dependent = Changes(target, state) ? null : world.DependentProblem(target);
-            if (Changes(target, state) || dependent != null) {
+            var dependent = renames || Changes(target, state) ? null : world.DependentProblem(target);
+            if (!renames && (Changes(target, state) || dependent != null)) {
                 var holders = Holders(target);
                 if (holders != null && holders.Duplicate) {
-                    if (dependent != null) throw new InvalidOperationException(holders.Mismatch(target, dependent));
-                    throw new InvalidPatchDefinitionException(holders.Refusal(target));
+                    if (dependent != null) throw new InvalidOperationException(Mismatched(holders, target, dependent));
+                    throw new InvalidPatchDefinitionException(Refused(holders, target));
                 }
             }
             if (state?.Active == false && world.DisableRefusal(target) is string reason) throw new InvalidOperationException(reason);
@@ -454,9 +562,9 @@ namespace RailroaderScenePatcher.Core {
             if (group == null) return active.HasValue && active.Value != world.Active(target);
             return active == false ? !group.Held || world.Active(target) : group.Held;
         }
-        internal object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true, Consumer = consumer?.Capture(target) };
+        internal object Capture(object target) => new Snapshot { Location = world.Location(target), Position = world.Position(target), Rotation = world.Rotation(target), Active = world.Active(target), Held = world.GroupActivity(target)?.Held == true, Consumer = consumer?.Capture(target), Id = ids?.MarkerId(target) };
         // The activity of a group follower is group-driven (null) unless the explicit-disable hold is installed.
-        internal ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target)));
+        internal ObjectState Read(object target) => new ObjectState(new Placement(world.Position(target), world.Rotation(target)), ReadActive(target), MarkerBinding.Of(world.Location(target))).WithMarkerId(ids?.MarkerId(target));
         bool? ReadActive(object target) {
             var group = world.GroupActivity(target);
             return group == null || group.Held ? world.Active(target) : (bool?)null;
@@ -472,8 +580,8 @@ namespace RailroaderScenePatcher.Core {
             var active = follower ? (disabled ? false : (bool?)null) : state.Active ?? world.Active(target);
             var following = state.Placement?.Following != null;
             var activeBefore = world.Active(target);
-            var relationshipWritten = Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location), following, true);
-            var difference = Verify(target, location, state.Placement, active, following, true);
+            var relationshipWritten = Write(target, location, state.Placement?.Position, state.Placement?.Rotation, active, !TrackLocation.Same(before, location), following, true, state.MarkerId);
+            var difference = Verify(target, location, state.Placement, active, following, true, state.MarkerId);
             if (difference != null) throw new InvalidOperationException("Applied marker state did not verify: " + difference);
             // The native warning depends on the binding's validity and the marker's activity. A track-following update that
             // changes neither skips the reconciliation and its search of every marker; an explicit application always runs it.
@@ -486,8 +594,8 @@ namespace RailroaderScenePatcher.Core {
             var captured = (Snapshot)snapshot;
             try {
                 var active = world.GroupActivity(target) == null ? captured.Active : (captured.Held ? false : (bool?)null);
-                Write(target, captured.Location, captured.Position, captured.Rotation, active, !TrackLocation.Same(world.Location(target), captured.Location), false, false);
-                var verified = Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active, false, false) == null
+                Write(target, captured.Location, captured.Position, captured.Rotation, active, !TrackLocation.Same(world.Location(target), captured.Location), false, false, captured.Id);
+                var verified = Verify(target, captured.Location, new Placement(captured.Position, captured.Rotation), active, false, false, captured.Id) == null
                     && (consumer == null || consumer.Restored(target, captured.Consumer) == null);
                 if (verified) (world as ITrackMarkerDiagnostics)?.AfterVerifiedState(target);
                 return verified;
@@ -498,13 +606,19 @@ namespace RailroaderScenePatcher.Core {
         // relationship; its subscription is observed again for the current location; without the hold the group sets activity.
         // The consumer follows the final location and placement.
         // True when the relationship and its registration were written.
-        // A write that would touch the registration of a holder of a duplicate marker id stops before any mutation: removing it by id
+        // A write that would touch the registration of a holder of a duplicate marker ID stops before any mutation: removing it by id
         // would remove the registration of every holder.
-        bool Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind, bool following, bool explicitApply) {
+        // A marker ID changes first when the marker leaves a duplicate marker ID, so the rest of the write touches only its
+        // own registration under the new id; otherwise it changes last, after the activity and binding changed under the
+        // id the marker holds alone, which is how a restoration or removal returns a duplicate marker ID.
+        bool Write(object target, TrackLocation location, double[] position, double[] rotation, bool? active, bool rebind, bool following, bool explicitApply, string markerId = null) {
+            var renaming = ids != null && markerId != null && markerId != ids.MarkerId(target);
+            var renamed = false;
+            if (renaming && Holders(target)?.Duplicate == true) { Rename(target, markerId); renaming = false; renamed = true; }
             var group = world.GroupActivity(target);
             if (rebind || ActivityChanges(target, active, group) || Coherence(target) != null || world.DependentProblem(target) != null) {
                 var holders = Holders(target);
-                if (holders != null && holders.Duplicate) throw new InvalidOperationException(holders.Refusal(target));
+                if (holders != null && holders.Duplicate) throw new InvalidOperationException(Refused(holders, target));
             }
             if (group != null && active == false) {
                 if (!group.Held) world.HoldDisabled(target, true);
@@ -524,10 +638,12 @@ namespace RailroaderScenePatcher.Core {
             } else if (active == true && !world.Active(target)) world.SetActive(target, true);
             if (position != null) world.SetPlacement(target, position, rotation);
             if (group == null && active == false && world.Active(target)) world.SetActive(target, false);
+            if (renaming) { Rename(target, markerId); renamed = true; }
             consumer?.Refresh(target, Resolvable(world.Location(target)), following, explicitApply);
-            return written;
+            return written || renamed;
         }
-        string Verify(object target, TrackLocation location, Placement placement, bool? active, bool following, bool explicitApply) {
+        string Verify(object target, TrackLocation location, Placement placement, bool? active, bool following, bool explicitApply, string markerId = null) {
+            if (ids != null && markerId != null && ids.MarkerId(target) != markerId) return "the marker ID is " + ids.MarkerId(target) + ", expected " + markerId;
             if (!TrackLocation.Same(world.Location(target), location)) return "the serialized location is " + (world.Location(target)?.ToString() ?? "detached") + ", expected " + (location?.ToString() ?? "detached");
             var group = world.GroupActivity(target);
             if (group == null ? world.Active(target) != active : group.Held != (active == false)) return "activity differs";
@@ -552,7 +668,7 @@ namespace RailroaderScenePatcher.Core {
         // at a resolvable location of an active marker, none otherwise. Null when it agrees.
         string Coherence(object target) {
             var location = world.Location(target);
-            // Another holder's registration under the same marker id is never a registration of this marker.
+            // Another holder's registration under the same marker ID is never a registration of this marker.
             var entries = (world.Registrations(target) ?? Array.Empty<MarkerRegistration>()).Where(e => e.Owner == null || ReferenceEquals(e.Owner, target)).ToList();
             var expected = world.Registers(target) && Resolvable(location);
             if (!expected) return entries.Count == 0 ? null : entries.Count == 1 ? "The game still lists a track location for this marker." : "The game still lists " + entries.Count + " track locations for this marker.";

@@ -346,7 +346,7 @@ static class MilepostTests {
         foreach (var mode in new[] { RailroaderScenePatcher.CommandBand.NumericMode, RailroaderScenePatcher.CommandBand.GizmoMode, RailroaderScenePatcher.CommandBand.SnapMode })
             Assert(RailroaderScenePatcher.CommandBand.ModeBlock(mode, false, true, RailroaderScenePatcher.CommandBand.MilepostOperations, milepost: true) == null, "Mode " + mode + " stays open for a milepost");
     }
-    // Two mileposts share a marker id: a rebind of one would remove the other's registration and is refused before
+    // Two mileposts share a marker ID: a rebind of one would remove the other's registration and is refused before
     // mutation; a fixed placement touches no registration and applies.
     static void DuplicateMarkerIdRefusesRebindButNotPlacement() {
         var (world, t46, t47, scene) = Setup();
@@ -355,7 +355,7 @@ static class MilepostTests {
         world.Posts[twin] = new FakeMilepostWorld.Post { Mileage = 48, Text = "48", Rendered = "48" };
         world.Mutations = 0;
         var rebind = new PatchEngine(scene).Apply(Doc(Item("rebind", Bind(At("Stky0cg9c", "b", 5))))).Outcomes["rebind"];
-        Assert(!rebind.Applied && rebind.Error.Contains("Duplicate marker id Mdow") && world.Mutations == 0 && t46.Segment == "Stvw", "A rebind of a milepost with a duplicate marker id is refused before mutation: " + rebind.Error);
+        Assert(!rebind.Applied && rebind.Error.Contains("Duplicate marker ID Mdow") && world.Mutations == 0 && t46.Segment == "Stvw", "A rebind of a milepost with a duplicate marker ID is refused before mutation: " + rebind.Error);
         var placed = new PatchEngine(scene).Apply(Doc(Item("move", Place(1030)))).Outcomes["move"];
         Assert(placed.Applied && t46.Position[0] == 30 && t46.Segment == "Stvw", "A placement-only edit of that milepost applies: " + placed.Error);
         Assert(twin.Segment == "Stky0cg9c" && twin.Position[0] == 90, "The other holder is untouched");

@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IConstructionSegmentScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
+    public sealed class SceneCapabilities : IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
         // Supplied by the host: the map patches in the map context, which only the native map editor's context holds.
         public Func<IEnumerable<string>> MapPatches { get; set; }
         public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();
@@ -91,6 +91,8 @@ namespace RailroaderScenePatcher.Core {
         internal void CheckAvailable(object target) { if (target is Unavailable) Owner(target); }
         public object Capture(object target) => Owner(target).Capture(target);
         public ObjectState Read(object target) => Owner(target).Read(target);
+        public IReadOnlyList<string> MarkerIdUsers(object target, string id) => Owner(target) is IMarkerIdScene ids ? ids.MarkerIdUsers(target, id) : Array.Empty<string>();
+        public bool RewritesRegistration(object target, ObjectState state) => Owner(target) is IMarkerIdScene ids && ids.RewritesRegistration(target, state);
         public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
         public bool Restore(object target, object snapshot) => Owner(target).Restore(target, snapshot);
         // Relationships belong to the adapter that resolved the object; an adapter without them refuses any relationship.
@@ -98,6 +100,8 @@ namespace RailroaderScenePatcher.Core {
             var owner = Owner(target);
             // Only a capability that holds the relationship accepts construction segments.
             if (state?.Segments != null && !(owner is IConstructionSegmentScene)) throw new InvalidPatchDefinitionException(ConstructionSegmentRule.NoRelationship);
+            // Only the generic track markers take a replacement ID.
+            if (state?.MarkerId != null && !(owner is IMarkerIdScene)) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
             if (owner is IRelationshipScene relationships) { relationships.CheckRelationships(target, state); return; }
             if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");

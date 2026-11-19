@@ -55,6 +55,7 @@ namespace RailroaderScenePatcher.Core {
             if (was?.Rotation != null && !PatchEditingSession.SameRotation(was.Rotation, placement?.Rotation)) lines.Add("Rotation: does not match its value before the attempt");
             if (before.Active != now?.Active) lines.Add("Enabled: now " + Activity(now?.Active) + ", before " + Activity(before.Active));
             if (!MarkerBinding.Same(before.Marker, now?.Marker)) lines.Add("Track binding: now " + Binding(now?.Marker) + ", before " + Binding(before.Marker));
+            if (before.MarkerId != null && before.MarkerId != now?.MarkerId) lines.Add("Marker ID: now " + (now?.MarkerId ?? "unknown") + ", before " + before.MarkerId);
             if (!CrossingCoverage.Same(before.Coverage, now?.Coverage)) lines.Add("Crossing coverage: does not match its value before the attempt");
             if (before.Segments != null && !ConstructionSegments.Same(before.Segments, now?.Segments)) lines.Add("Construction segments: now " + (now?.Segments?.Display ?? "none") + ", before " + before.Segments.Display);
             if (now?.Coverage?.Residue?.Count > 0) lines.Add("Owned spans still registered: " + String.Join(", ", now.Coverage.Residue));
@@ -125,6 +126,7 @@ namespace RailroaderScenePatcher.Core {
                 case "Track binding": return structure == CrossingPadScene.Structure ? Pair("Crossing pads", "rebinding-crossing-pads.md") : Pair("Track bindings", "repairing-track-bindings.md");
                 case "Crossing coverage": return Pair("Crossing coverage", "correcting-crossing-coverage.md");
                 case "Construction segments": return Pair("Construction segments", "repairing-construction-segments.md");
+                case "Marker ID": return Pair("Marker IDs", "repairing-duplicate-marker-ids.md");
             }
             if (structure == ConstructionSceneryScene.Structure) return Pair("Construction segments", "repairing-construction-segments.md");
             if (structure == IndependentBoards.Structure) return Pair("Boards", "moving-boards.md");
