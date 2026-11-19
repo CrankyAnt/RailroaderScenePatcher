@@ -15,7 +15,18 @@ namespace RailroaderScenePatcher {
                 ? "You cannot move, rotate, enable or disable a crossing controller."
             // The Ela construction controller: its position has no effect and its activity runs the visibility control.
             : identity?.Structure == ConstructionSceneryScene.Structure && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap) ? CommandBand.ControllerNoPlacement
-            : identity?.Structure == ConstructionSceneryScene.Structure && kind == GuidedTaskKind.Activity ? CommandBand.ControllerNoActivity : null;
+            : identity?.Structure == ConstructionSceneryScene.Structure && kind == GuidedTaskKind.Activity ? CommandBand.ControllerNoActivity
+            // Its only edit is its construction segments: the tasks for track markers and starter placements do not fit it.
+            : identity?.Structure == ConstructionSceneryScene.Structure ? ControllerTaskBlock(kind) : null;
+        static string ControllerTaskBlock(GuidedTaskKind kind) {
+            switch (kind) {
+                case GuidedTaskKind.Binding:
+                case GuidedTaskKind.DetachBinding: return "The construction controller has no track binding. Set its construction segments on the Connections tab.";
+                case GuidedTaskKind.StarterPlacement: return "The construction controller is not a starter placement marker.";
+                case GuidedTaskKind.MarkerId: return "The construction controller is not a track marker, so it takes no replacement ID.";
+                default: return null;
+            }
+        }
         string[] draft = Array.Empty<string>();
         internal bool Enabled { get; private set; }
         internal GuidedTaskStep Step { get; private set; }

@@ -280,6 +280,7 @@ static class BindingTests {
         EditingRefusalAndFailureRestore();
         RefusedFileBindingKeepsHistoryComplete();
         UndoOfAnEditWhoseEarlierBindingIsGoneStaysIncomplete();
+        UndoOfAnEditThatFixedARefusedBindingStaysIncomplete();
         SaveAndReloadReproduceBindingOnce();
         GizmoGestureKeepsTheBinding();
         PhysicalSnapKeepsTheBinding();
@@ -672,6 +673,17 @@ static class BindingTests {
         mapEditor.Redo(); mapEditor.Undo();
         Assert(session.IncompleteOperation == null && Entry(world, sign) == "Sgone|a|1" && session.Refusal(Sign) == null && session.NotApplied(Sign) == null
             && !session.Changes(Sign).Any(line => line.StartsWith("Refused.", StringComparison.Ordinal)), "An applied binding is no longer refused: " + Entry(world, sign) + " " + String.Join(" | ", session.Changes(Sign)));
+    }
+    // Undo of a binding edit that replaced a binding the file version refused keeps the step incomplete: only crossing
+    // equipment returns to a refused state through Undo.
+    static void UndoOfAnEditThatFixedARefusedBindingStaysIncomplete() {
+        var (world, sign, other, session, mapEditor, store) = Session();
+        store.Patch = Doc(Binding("bad", At("Sgone", "a", 1))); session.CheckFileVersion();
+        Assert(session.UseFileVersion().Applied && session.Refusal(Sign) != null, "The file version's binding is refused");
+        Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Sjdl", "a", 3))).Applied && Entry(world, sign) == "Sjdl|a|3", "A binding edit replaces the refused binding");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation != null && Entry(world, sign) == "Sjdl|a|3" && (string)Only(session)["relationships"]["trackMarker"]["segment"] == "Sjdl",
+            "Undo to the refused binding keeps the step incomplete, with scene and file at the edit: " + session.IncompleteOperation + " " + Entry(world, sign));
     }
     static void UndoOfAnEditWhoseEarlierBindingIsGoneStaysIncomplete() {
         var (world, sign, other, session, mapEditor, store) = Session();

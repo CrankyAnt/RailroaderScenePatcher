@@ -291,6 +291,14 @@ static class ConstructionSegmentTests {
         Assert(CommandBand.SegmentIds(" S-a, S-b  S-c,,S-a ").SequenceEqual(new[] { "S-a", "S-b", "S-c", "S-a" }), "The field reads ids separated by commas or spaces: " + String.Join("|", CommandBand.SegmentIds(" S-a, S-b  S-c,,S-a ")));
         Assert(CommandBand.SegmentText(new[] { "S-b", "S-a" }) == "S-a, S-b", "The field shows a set in ordinal order: " + CommandBand.SegmentText(new[] { "S-b", "S-a" }));
         Assert(CommandBand.AddSegment("S-a", "S-b") == "S-a, S-b" && CommandBand.AddSegment("S-a, S-b", "S-a") == "S-a, S-b" && CommandBand.AddSegment("", "S-a") == "S-a", "Picked adds the confirmed segment once");
+        // A segment that no longer exists in the track graph is what the modder replaces: Picked drops it from the field and
+        // keeps the existing segments and the picked one.
+        var lines = new[] { CommandBand.SegmentBinding("cjwp8g", false), CommandBand.SegmentBinding("S-a", true) };
+        Assert(CommandBand.MissingSegments(lines).SequenceEqual(new[] { "cjwp8g" }), "The binding lines name the segment that no longer exists: " + String.Join(",", CommandBand.MissingSegments(lines)));
+        var picked = CommandBand.AddSegment("cjwp8g, S-a", "Sg6u0gppt", CommandBand.MissingSegments(lines));
+        Assert(picked == "S-a, Sg6u0gppt" && CommandBand.AddSegment(picked, "Sg6u04j9v", CommandBand.MissingSegments(lines)) == "S-a, Sg6u0gppt, Sg6u04j9v",
+            "Picked replaces a segment that no longer exists and keeps the others: " + picked);
+        Assert(CommandBand.AddSegment("S-a, typed", "S-b", CommandBand.MissingSegments(lines)) == "S-a, typed, S-b", "An ID the observed bindings do not name as missing stays");
         Assert(CommandBand.SegmentsReason(null, "", new[] { "S-a" }) == "Enter at least one segment ID.", "An empty field cannot be set");
         Assert(CommandBand.SegmentsReason(null, "S-b, S-a", new[] { "S-a", "S-b" }) == "The field holds the construction's current segments.", "The current set cannot be set again, in any order");
         Assert(CommandBand.SegmentsReason(null, "S-a, S-c", new[] { "S-a", "S-b" }) == null && CommandBand.SegmentsReason("Inspect an object first.", "S-c", new[] { "S-a" }) == "Inspect an object first.", "A different set can be set; the general reason comes first");
@@ -311,6 +319,14 @@ static class ConstructionSegmentTests {
         var ela = new TargetIdentity(SceneName, Ela, ConstructionSceneryScene.ComponentType, ConstructionSceneryScene.Structure);
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, ela) == CommandBand.ControllerNoPlacement && GuidedTaskState.TargetBlock(GuidedTaskKind.Snap, ela) == CommandBand.ControllerNoPlacement
             && GuidedTaskState.TargetBlock(GuidedTaskKind.Activity, ela) == CommandBand.ControllerNoActivity, "The guided tasks of the Ela controller give its placement and activity reasons");
+        // The other guided tasks do not fit the controller either: each stays in the list, inactive with the controller's reason.
+        foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement, GuidedTaskKind.MarkerId }) {
+            var reason = GuidedTaskState.TargetBlock(task, ela);
+            Assert(reason != null && reason.StartsWith("The construction controller ", StringComparison.Ordinal) && reason.EndsWith(".", StringComparison.Ordinal)
+                && CommandBand.Tooltip("Start this task for the inspected object.", reason).Contains("Unavailable: " + reason), "The guided task " + task + " of the Ela controller is unavailable with its reason: " + reason);
+        }
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("Connections tab"), "The binding tasks point to where the controller's segments are set");
+        Assert(GuidedTaskState.Tasks.Count == 7, "The task list keeps every task visible");
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, GroupId(Bryson)) == null, "A rail bridge group keeps its guided move");
         Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "This object cannot be edited here.", "The generic reason is what the Ela controller showed while it counted as not editable");
         Assert(CommandBand.ConstructionSceneryOperations == "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.",

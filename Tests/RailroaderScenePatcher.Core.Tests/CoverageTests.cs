@@ -97,7 +97,9 @@ class FakeCrossingWorld : ICrossingCoverageWorld {
         if (FailSetCircuits) { FailSetCircuits = false; ((FakeCrossing)controller).Circuits.Clear(); throw new Exception("circuit list injected"); }
         ((FakeCrossing)controller).Circuits = circuits.Cast<FakeCircuit>().ToList();
     }
-    public double[] Position(object controller) => (double[])((FakeCrossing)controller).Position.Clone();
+    // A read of the crossing's placement that fails, as a native read can.
+    public bool FailRead;
+    public double[] Position(object controller) { if (FailRead) throw new InvalidOperationException("read injected"); return (double[])((FakeCrossing)controller).Position.Clone(); }
     public double[] Rotation(object controller) => (double[])((FakeCrossing)controller).Rotation.Clone();
     public bool Active(object controller) => true;
     // Whether a car at the location occupies a registered span of an evaluated circuit, as the controller's loop finds it.

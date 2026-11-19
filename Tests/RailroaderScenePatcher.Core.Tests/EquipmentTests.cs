@@ -180,6 +180,11 @@ static class EquipmentTests {
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
         AValidAdditionNamesTheModificationsOtherRefusal();
+        ARefusedAdditionCanBeRemovedWhileAnotherStaysRefused();
+        RefusedAdditionsCanBeCorrectedOneAfterTheOther();
+        AnEarlierRefusalDoesNotShapeALaterFailure();
+        ACorrectionIsSavedOnlyWhileAnotherAdditionKeepsTheRefusal();
+        UndoToARefusedStateRespectsDependentsAndReportsItsOwnFailure();
         SmallMovesReachTheSceneAndUntouchedValuesStay();
         UnknownSourceOrPlacementContentIsUnsupported();
         Console.WriteLine("PASS: crossing light and gate eligibility, construction, refusal, restoration and scene patch editing");
@@ -646,6 +651,149 @@ static class EquipmentTests {
             Assert(entry.Built == null && entry.Problem != null && !entry.Problem.Contains("Recheck builds it"), c.Key + ": the valid addition names the refusal: " + entry.Problem);
             if (c.Key == "dependency") Assert(entry.Problem.Contains("absent"), "It names the missing dependency: " + entry.Problem);
         }
+    }
+    // Two refused additions beside two valid ones: removing one refused addition is previewed and applied while the other
+    // keeps the modification refused, so nothing is built; removing the second builds the valid ones. Undo puts the
+    // refused addition back, refused again, and the scene keeps what it holds.
+    static void ARefusedAdditionCanBeRemovedWhileAnotherStaysRefused() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("bell-as-light-a", "World/Rejected/bell", 5) + "," + Addition("bell-as-light-b", "World/Rejected/bell", 6)
+            + "," + Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20)));
+        var load = engine.Apply(scenePatchFile, "author/pack");
+        Assert(!load.Outcomes["equip-crossing"].Applied && f.Live.Count == 0, "The load refuses the modification");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        f.World.Mutations = 0;
+        var preview = session.PreviewEquipment(Crossing, null, "bell-as-light-a");
+        Assert(preview.Error == null && preview.Lines.Count == 1 && preview.Lines[0].Contains("bell-as-light-a") && preview.Lines[0].Contains("bell-as-light-b"),
+            "The removal preview names the removed addition and the one that keeps the modification refused: " + preview.Error + String.Join("|", preview.Lines));
+        var first = session.RemoveEquipment(Crossing, "bell-as-light-a");
+        Assert(first.Applied && f.World.Mutations == 0 && f.Live.Count == 0 && !session.ScenePatchFileText.Contains("bell-as-light-a") && session.ScenePatchFileText.Contains("bell-as-light-b"),
+            "Removing one refused addition changes the scene patch file only: " + first.Error);
+        Assert(session.Refusal(Crossing) != null && session.Refusal(Crossing).Contains("bell-as-light-b"), "The modification stays refused for the other addition: " + session.Refusal(Crossing));
+        var entries = session.EquipmentEntries(Crossing);
+        Assert(entries.Count == 3 && entries.Where(e => e.Addition.Id != "bell-as-light-b").All(e => e.Problem.Contains("bell-as-light-b")), "The valid additions name the remaining refused one");
+        mapEditor.Undo();
+        Assert(session.ScenePatchFileText.Contains("bell-as-light-a") && f.Live.Count == 0 && f.World.Mutations == 0, "Undo puts the removed addition back without building anything");
+        Assert(session.IncompleteOperation == null && session.Refusal(Crossing) != null && session.Refusal(Crossing).Contains("bell-as-light-a"),
+            "Undo leaves no incomplete operation, and the refusal names the restored addition: " + session.IncompleteOperation + " / " + session.Refusal(Crossing));
+        mapEditor.Redo();
+        Assert(!session.ScenePatchFileText.Contains("bell-as-light-a") && f.Live.Count == 0, "Redo removes it again");
+        var second = session.RemoveEquipment(Crossing, "bell-as-light-b");
+        Assert(second.Applied && f.Live.Select(a => a.Record.Id).OrderBy(i => i, StringComparer.Ordinal).SequenceEqual(new[] { "east", "west" }) && session.Refusal(Crossing) == null,
+            "Removing the last refused addition builds the valid ones: " + second.Error);
+        // Undo of the final removal returns the crossing to the refused modification: the built additions go again, as at load.
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation == null && f.Live.Count == 0 && session.ScenePatchFileText.Contains("bell-as-light-b") && session.Refusal(Crossing) != null && session.Refusal(Crossing).Contains("bell-as-light-b"),
+            "Undo of the final removal releases the built additions and keeps the modification refused: " + session.IncompleteOperation + " / " + session.Refusal(Crossing) + " / " + f.Live.Count);
+        mapEditor.Redo();
+        Assert(session.IncompleteOperation == null && f.Live.Count == 2 && session.Refusal(Crossing) == null, "Redo builds the valid additions again");
+    }
+    // Two refused additions corrected one after the other: the first correction is saved while the other keeps the
+    // modification refused, so nothing is built; after the second correction every addition is built. A correction that
+    // is itself refused is refused before any change.
+    static void RefusedAdditionsCanBeCorrectedOneAfterTheOther() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("bell-as-light-a", "World/Rejected/bell", 5) + "," + Addition("bell-as-light-b", "World/Rejected/bell", 6)
+            + "," + Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20)));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        f.World.Mutations = 0;
+        var stillBad = session.AddEquipment(Crossing, West(9, "World/Rejected/bell", "bell-as-light-a"));
+        Assert(!stillBad.Applied && stillBad.Failure == FailureKind.Refused && stillBad.Error.Contains("bell-as-light-a") && !stillBad.Error.Contains("bell-as-light-b") && f.World.Mutations == 0
+            && session.EquipmentEntries(Crossing).Single(e => e.Addition.Id == "bell-as-light-a").Addition.Placement.Position[0] == 5,
+            "A correction that is itself refused is refused with its own reason and the scene patch file keeps the entry: " + stillBad.Error);
+        var preview = session.PreviewEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"), null);
+        Assert(preview.Error == null && preview.Lines.Count == 1 && preview.Lines[0].Contains("bell-as-light-a") && preview.Lines[0].Contains("bell-as-light-b"),
+            "The preview of the first correction names the addition and the one that keeps the modification refused: " + preview.Error + String.Join("|", preview.Lines));
+        var first = session.AddEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"));
+        Assert(first.Applied && f.World.Mutations == 0 && f.Live.Count == 0 && session.Refusal(Crossing) != null && session.Refusal(Crossing).Contains("bell-as-light-b"),
+            "The first correction is saved and the modification stays refused for the other addition: " + first.Error + " / " + session.Refusal(Crossing));
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation == null && f.Live.Count == 0 && session.EquipmentEntries(Crossing).Single(e => e.Addition.Id == "bell-as-light-a").Addition.Source.Path == "World/Rejected/bell",
+            "Undo of the correction restores the refused source without building anything: " + session.IncompleteOperation);
+        mapEditor.Redo();
+        Assert(session.IncompleteOperation == null && f.Live.Count == 0 && session.EquipmentEntries(Crossing).Single(e => e.Addition.Id == "bell-as-light-a").Addition.Source.Path == SignalPath,
+            "Redo saves the correction again: " + session.IncompleteOperation);
+        var corrected = session.EquipmentEntries(Crossing).Single(e => e.Addition.Id == "bell-as-light-a");
+        Assert(corrected.Addition.Source.Path == SignalPath && corrected.Problem.Contains("bell-as-light-b"), "The corrected addition holds its new source and names the remaining refusal: " + corrected.Problem);
+        var second = session.AddEquipment(Crossing, West(6, CrossingPath + "/Signal 2", "bell-as-light-b"));
+        Assert(second.Applied && session.Refusal(Crossing) == null && f.Live.Select(a => a.Record.Id).OrderBy(i => i, StringComparer.Ordinal).SequenceEqual(new[] { "bell-as-light-a", "bell-as-light-b", "east", "west" }),
+            "After the second correction every addition is built: " + second.Error + " / " + String.Join(",", f.Live.Select(a => a.Record.Id)));
+    }
+    // A correction is saved without building only while another refused addition keeps the modification refused. When the
+    // modification stays refused for another reason, such as its detection, the correction is refused before any change
+    // with that reason. A source shared with a valid addition is no conflict: copies of one device may stand side by side.
+    static void ACorrectionIsSavedOnlyWhileAnotherAdditionKeepsTheRefusal() {
+        string Loc(double d) => "{\"segment\":\"Sgone\",\"end\":\"a\",\"distance\":" + N(d) + "}";
+        string Range(double a, double b) => "{\"from\":" + Loc(a) + ",\"to\":" + Loc(b) + "}";
+        var detection = "\"north\":{\"approachA\":" + Range(308, 550) + ",\"island\":" + Range(292, 308) + ",\"approachB\":" + Range(292, 50) + "}";
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc("\"equip-crossing\":{" + Target() + ",\"relationships\":{\"crossingCoverage\":{\"additions\":{" + detection + "}},\"crossingEquipment\":{"
+            + Addition("bell-as-light-a", "World/Rejected/bell", 5) + "," + Addition("west") + "}},\"dependsOn\":[]}");
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        f.World.Mutations = 0;
+        var preview = session.PreviewEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"), null);
+        Assert(preview.Error != null && preview.Error.Contains("Sgone"), "The preview refuses a correction that leaves the modification refused for its detection: " + preview.Error + String.Join("|", preview.Lines));
+        var corrected = session.AddEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"));
+        Assert(!corrected.Applied && corrected.Failure == FailureKind.Refused && corrected.Error.Contains("Sgone") && f.World.Mutations == 0 && session.ScenePatchFileText.Contains("World/Rejected/bell"),
+            "The correction is refused with the detection's reason and changes nothing: " + corrected.Error);
+        Assert(mapEditor.UndoGroups.Count == 0, "The refused correction adds no history step");
+    }
+    // Undo of the final removal withdraws the built additions only when nothing depends on the modification and the
+    // withdrawal itself succeeds; otherwise the step is incomplete and names why.
+    static void UndoToARefusedStateRespectsDependentsAndReportsItsOwnFailure() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("bell-as-light-b", "World/Rejected/bell", 6) + "," + Addition("west"))
+            + "," + Equip("follower", Addition("solo", x: 30), OtherPath, "[\"equip-crossing\"]"));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        Assert(session.RemoveEquipment(Crossing, "bell-as-light-b").Applied && f.Live.Single().Record.Id == "west", "The final removal builds the valid addition");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation != null && session.IncompleteOperation.Contains("follower") && f.Live.Single().Record.Id == "west",
+            "A modification another one names in dependsOn keeps its effect, and the step names the dependent: " + session.IncompleteOperation);
+        var g = new Fixture();
+        g.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine2 = new PatchEngine(g.Scene);
+        var lone = Doc(Equip("equip-crossing", Addition("bell-as-light-b", "World/Rejected/bell", 6) + "," + Addition("west")));
+        engine2.Apply(lone, "author/pack");
+        var store2 = new Store { Patch = lone }; var mapEditor2 = new NativeMapEditor();
+        var session2 = new PatchEditingSession(engine2, mapEditor2, store2, scenePatchFileKey: "author/pack"); mapEditor2.Session = session2;
+        Assert(session2.RemoveEquipment(Crossing, "bell-as-light-b").Applied && g.Live.Single().Record.Id == "west", "The final removal builds the valid addition");
+        g.World.StickyDestroy = true;
+        mapEditor2.Undo();
+        g.World.StickyDestroy = false;
+        Assert(session2.IncompleteOperation != null && session2.IncompleteOperation.Contains("did not verify"), "A withdrawal that fails reports its own failure: " + session2.IncompleteOperation);
+    }
+    // A content refusal reported by an earlier step does not turn a later, unrelated failure of a removal into a removal
+    // from the scene patch file: the removal fails and the scene patch file keeps the addition.
+    static void AnEarlierRefusalDoesNotShapeALaterFailure() {
+        var f = new Fixture();
+        f.World.Device("World/Rejected/bell", d => d.Facts.Bells = 1);
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("bell-as-light-a", "World/Rejected/bell", 5) + "," + Addition("bell-as-light-b", "World/Rejected/bell", 6) + "," + Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        Assert(session.RemoveEquipment(Crossing, "bell-as-light-a").Applied, "The first removal is saved");
+        mapEditor.Undo();
+        Assert(session.ScenePatchFileText.Contains("bell-as-light-a"), "Undo restores the refused addition, which records its refusal");
+        f.Coverage.FailRead = true;
+        var removed = session.RemoveEquipment(Crossing, "bell-as-light-a");
+        f.Coverage.FailRead = false;
+        Assert(!removed.Applied && session.ScenePatchFileText.Contains("bell-as-light-a"), "A removal that fails for another reason fails and keeps the scene patch file: " + removed.Applied + " " + removed.Error);
     }
     // A move as small as the native map editor stores reaches the scene, and a value the form did not change keeps the scene patch file's
     // literal, so an untouched apply is no change and a one-axis change rewrites only that axis.

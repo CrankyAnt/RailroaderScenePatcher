@@ -820,13 +820,34 @@ namespace RailroaderScenePatcher.Core {
         static JObject LocationJson(TrackLocation location) => new JObject { ["segment"] = location.Segment, ["end"] = location.End, ["distance"] = location.Distance };
         // Adds this mod's equipment to a crossing controller, or replaces its namesake: an addition with the same ID is moved,
         // or rebuilt when its source or pattern changes. Other additions keep their mod values or effective state.
+        // Correcting an addition of a modification that is not applied, while another addition keeps it refused, changes
+        // only the scene patch file, as a removal does. A correction that the modification would refuse without the other
+        // refused additions, for its own source or with the rest of the modification, is refused before any change.
         public Outcome AddEquipment(TargetIdentity target, EquipmentAddition addition, InspectedTarget inspected = null) {
             if (addition == null) throw new ArgumentNullException(nameof(addition));
-            return Change("Edit crossing equipment", target, inspected, existing => EquipmentValue(target, existing, addition, null), null, "equip-");
+            return Change("Edit crossing equipment", target, inspected, existing => EquipmentValue(target, existing, addition, null), null, "equip-", keepsRefusal: true, corrected: addition.Id);
+        }
+        // Why the modification value would be refused without its other refused additions, or null: the refusal the corrected
+        // addition brings or keeps. An addition counts as refused when its own source or pattern is refused.
+        string IntroducedRefusal(object resolved, JObject value, string corrected) {
+            var equipment = value["relationships"]?["crossingEquipment"] as JObject;
+            var rest = (JObject)value.DeepClone();
+            var restEquipment = rest["relationships"]?["crossingEquipment"] as JObject;
+            if (equipment != null && restEquipment != null) {
+                var additions = PatchEngine.Parse(value, scenePatchFileKey).State.Equipment?.Additions ?? Enumerable.Empty<EquipmentAddition>();
+                foreach (var other in additions.Where(a => a.Id != corrected)) {
+                    try { engine.CheckRelationships(resolved, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { other }, false))); }
+                    catch (InvalidOperationException) { restEquipment.Remove(other.Id); }
+                }
+            }
+            try { engine.CheckRelationships(resolved, engine.Evaluate(PatchEngine.Parse(rest, scenePatchFileKey).State.LeavingActivity())); return null; }
+            catch (InvalidOperationException e) { return e.Message; }
         }
         // Removes one of this mod's equipment additions: its copy is released from the controller and its culling.
+        // Removing an addition from a modification that is not applied, while another addition keeps it refused, changes
+        // only the scene patch file: the scene holds nothing of the modification, and the modification stays refused.
         public Outcome RemoveEquipment(TargetIdentity target, string id, InspectedTarget inspected = null) {
-            return Change("Remove crossing equipment", target, inspected, existing => EquipmentValue(target, existing, null, id), null, "equip-");
+            return Change("Remove crossing equipment", target, inspected, existing => EquipmentValue(target, existing, null, id), null, "equip-", keepsRefusal: true);
         }
         // The crossing's current equipment, read from the scene.
         public CrossingEquipment Equipment(TargetIdentity target) {
@@ -916,8 +937,20 @@ namespace RailroaderScenePatcher.Core {
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
                 var existing = own.FirstOrDefault();
                 var value = EquipmentValue(target, existing, addition, id);
-                if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State);
                 var key = existing == null ? NewId(target, "equip-") : ScenePatchFile.Key(existing);
+                if (value != null) {
+                    try { engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State); }
+                    catch (InvalidOperationException e) when (existing != null && NotAppliedOf(key) != null) {
+                        // A removal or correction in a modification that is not applied, which another addition keeps
+                        // refused: only the scene patch file changes, and the scene keeps what it holds.
+                        var stays = " Nothing is built, because the modification stays refused: " + ScenePatchFile.Sentence(e.Message) + ".";
+                        var introduced = addition == null ? null : IntroducedRefusal(resolved, value, addition.Id);
+                        if (introduced != null) throw new InvalidOperationException(introduced);
+                        if (addition != null) return new EquipmentPreview(new[] { "Save " + (displayName?.Invoke(addition) ?? addition.ToString()) + " in the scene patch file." + stays }, null);
+                        var removed = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment.Additions.First(a => a.Id == id);
+                        return new EquipmentPreview(new[] { "Remove " + (displayName?.Invoke(removed) ?? removed.ToString()) + " from the scene patch file." + stays }, null);
+                    }
+                }
                 var candidate = (JObject)scenePatchFile.Modifications.DeepClone();
                 if (value == null) candidate.Remove(key); else candidate[key] = value;
                 var current = scene.Read(resolved).Equipment;
@@ -1052,7 +1085,10 @@ namespace RailroaderScenePatcher.Core {
             });
         }
         // The prefix starts the key of a modification the edit adds; an existing modification keeps its key.
-        Outcome Change(string name, TargetIdentity target, InspectedTarget inspected, Func<JObject, JObject> next, Action validateBeforeMutation = null, string prefix = "place-") {
+        // keepsRefusal: an edit of a modification that is not applied, whose new value is still refused for its content
+        // before any mutation, changes the scene patch file only and keeps the modification refused with the new reason.
+        // corrected: the addition a correction changes; the file-only route needs another refused addition to keep the refusal.
+        Outcome Change(string name, TargetIdentity target, InspectedTarget inspected, Func<JObject, JObject> next, Action validateBeforeMutation = null, string prefix = "place-", bool keepsRefusal = false, string corrected = null) {
             var outcome = new Outcome();
             try {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
@@ -1100,10 +1136,27 @@ namespace RailroaderScenePatcher.Core {
                     // A number the edit leaves at its value keeps its source literal.
                     PreservingJson.KeepLiterals(existing, value);
                 }
-                Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation);
+                // The scene holds nothing of an entry that is not applied, so a value refused for its content can replace it
+                // without touching the scene.
+                // Whether the entry this step replaces is not applied: Undo may then return the object to that refused state.
+                var priorRefused = existing != null && NotAppliedOf(slot) != null;
+                var sceneHoldsNothing = keepsRefusal && value != null && priorRefused;
+                // Only this Commit's own refusal counts: an earlier step's reason must not shape a failure before the checks.
+                contentRefusal = null;
+                try { Commit(target, resolved, inspected, slot, existing, value, validateBeforeMutation); }
+                catch (InvalidOperationException) when (sceneHoldsNothing && contentRefusal != null) {
+                    var reason = contentRefusal;
+                    var introduced = corrected == null ? null : IntroducedRefusal(resolved, value, corrected);
+                    if (introduced != null) throw new InvalidOperationException(introduced);
+                    scenePatchFile.Replace(slot, value);
+                    Refuse(slot, value, reason);
+                }
                 var generation = versionGeneration; var keyGeneration = KeyGeneration(slot);
                 stepKeys.Add(slot);
-                RegisterPatchAction(() => Replay(name, slot, target, existing, generation, keyGeneration), name);
+                // Only an equipment step returns the object to a refused state through Undo; other steps keep the step
+                // incomplete when the restored entry is refused.
+                var withdrawable = keepsRefusal && priorRefused;
+                RegisterPatchAction(() => Replay(name, slot, target, existing, generation, keyGeneration, withdrawable, keepsRefusal), name);
                 outcome.Applied = true;
             } catch (Exception e) { Fail(outcome, e); }
             return outcome;
@@ -1227,17 +1280,19 @@ namespace RailroaderScenePatcher.Core {
         public Action<string> HistoryNotice;
         // Undo and Redo restore the modification under its key.
         // A step recorded before a file version replaced its entry, through Use file version or a file choice in Import, is a
-        // no-op that stays in the native history.
-        void Replay(string name, string slot, TargetIdentity target, JObject value, int generation, int keyGeneration) {
+        // no-op that stays in the native history. valueWasRefused: the restored entry was not applied when the step that
+        // replaced it ran.
+        void Replay(string name, string slot, TargetIdentity target, JObject value, int generation, int keyGeneration, bool valueWasRefused, bool equipmentStep) {
             if (generation != versionGeneration || keyGeneration != KeyGeneration(slot)) {
-                RegisterPatchAction(() => Replay(name, slot, target, value, generation, keyGeneration), name);
+                RegisterPatchAction(() => Replay(name, slot, target, value, generation, keyGeneration, valueWasRefused, equipmentStep), name);
                 try { HistoryNotice?.Invoke("This discarded scene patch step no longer changes the scene patch file."); } catch { }
                 return;
             }
             var current = scenePatchFile.Modifications[slot] as JObject;
             // The scene holds nothing of the entry being replaced: there is none, as in Undo of a Remove, or it is
             // itself not applied. Only then can a refused restoration leave the scene as it is.
-            var sceneHoldsNothing = current == null || NotAppliedOf(slot) != null;
+            var currentRefused = current != null && NotAppliedOf(slot) != null;
+            var sceneHoldsNothing = current == null || currentRefused;
             try {
                 contentRefusal = null;
                 var resolved = engine.ResolveUnique(target);
@@ -1254,12 +1309,43 @@ namespace RailroaderScenePatcher.Core {
                 Refuse(slot, value, contentRefusal);
                 try { Replayed?.Invoke(target); } catch { }
                 try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + e.Message + "."); } catch { }
+            } catch (Exception e) when (value != null && contentRefusal != null && valueWasRefused) {
+                // The restored modification was refused when the step replaced it, and is refused for its content again,
+                // while the scene holds the entry the step made effective, such as the additions that the final removal of
+                // a refused addition built. Its effect leaves the scene, as a refused modification has none at load, and
+                // the scene patch file holds it refused again. An entry that was applied when the step ran and is refused
+                // only now, such as a binding whose segment is gone, keeps the step incomplete.
+                var withdrawal = WithdrawForRefused(target, slot, current, value, contentRefusal);
+                if (withdrawal == null) {
+                    try { Replayed?.Invoke(target); } catch { }
+                    try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + e.Message + "."); } catch { }
+                } else {
+                    value = current;
+                    uncertain = true;
+                    IncompleteOperation = name + " could not be reversed or reapplied: " + ScenePatchFile.Sentence(withdrawal) + ". The scene patch file keeps the state shown; Save remains available.";
+                }
             } catch (Exception e) {
                 value = current;
                 uncertain = true;
                 IncompleteOperation = name + " could not be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown; Save remains available.";
             }
-            RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration), name);
+            RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration, equipmentStep && currentRefused, equipmentStep), name);
+        }
+        // Removes the effect of the entry under slot from the scene, as if the scene patch file did not hold it, then puts the
+        // refused value in its place. Returns why that is not possible or failed, or null: a modification that another one
+        // names in dependsOn keeps its effect, as it cannot leave the scene patch file either; a failed withdrawal reports its
+        // own failure, with what Commit restored or left.
+        string WithdrawForRefused(TargetIdentity target, string slot, JObject current, JObject value, string reason) {
+            var dependents = Dependents(slot);
+            if (dependents.Count != 0)
+                return "modification " + slot + " keeps its effect because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name") + " it in dependsOn, while the restored entry is refused: " + ScenePatchFile.Sentence(reason);
+            try {
+                var resolved = engine.ResolveUnique(target);
+                Commit(target, resolved, null, slot, current, null);
+            } catch (Exception e) { return e.Message; }
+            scenePatchFile.Replace(slot, value);
+            Refuse(slot, value, reason);
+            return null;
         }
         // Why the last Commit refused the scene patch file's content before any mutation, or null.
         string contentRefusal;

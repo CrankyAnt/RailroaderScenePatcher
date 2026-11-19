@@ -1547,8 +1547,8 @@ namespace RailroaderScenePatcher {
                             Slot("Detach", "Detach the construction from its segments.", block ?? CommandBand.SegmentDetachReason, () => { }, "Detach construction segments", 1, 72),
                             Slot(CommandBand.ClearSegments, "Clear this mod's value for the construction segments; the construction returns to its native segments.", block ?? CommandBand.ClearSegmentsReason(HasSegmentValue(identity)),
                                 () => Edit(SegmentsPlace, "Clearing the construction segments value", (edit, inspection) => edit.SetConstructionSegments(identity, null, inspection)), null, 1, 124),
-                            Slot("Picked", "Add the confirmed segment to the segments field.", block ?? (pickedSegment ? null : "Choose a segment with Segment and confirm it first."),
-                                () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier); FieldsChanged(); }, "Picked segment", 1, 70) };
+                            Slot("Picked", "Add the confirmed segment to the segments field, in place of segments that no longer exist.", block ?? (pickedSegment ? null : "Choose a segment with Segment and confirm it first."),
+                                () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier, CommandBand.MissingSegments(selected?.Bindings)); FieldsChanged(); }, "Picked segment", 1, 70) };
                     }
                     var pad = structure == CrossingPadScene.Structure;
                     // An object without a binding names that first; why it cannot be edited in general comes second.

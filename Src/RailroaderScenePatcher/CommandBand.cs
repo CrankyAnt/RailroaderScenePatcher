@@ -508,9 +508,16 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<string> SegmentIds(string text) => (text ?? "").Split(new[] { ',', ' ', '	' }, StringSplitOptions.RemoveEmptyEntries).Select(id => id.Trim()).Where(id => id.Length != 0).ToArray();
         // A set of segments as the field shows it, in ordinal order.
         internal static string SegmentText(IEnumerable<string> ids) => String.Join(", ", (ids ?? Enumerable.Empty<string>()).OrderBy(id => id, StringComparer.Ordinal));
-        // Picked adds the confirmed segment to the field once.
-        internal static string AddSegment(string text, string id) {
-            var ids = SegmentIds(text).ToList();
+        // The segments that the binding lines mark as no longer existing in the track graph, their remark left off.
+        internal static IReadOnlyList<string> MissingSegments(IEnumerable<string> bindings) =>
+            (bindings ?? Enumerable.Empty<string>()).Where(line => line != null && line.EndsWith(MissingSegment, StringComparison.Ordinal))
+                .Select(line => { var prefix = BoundPrefixes.FirstOrDefault(p => line.StartsWith(p, StringComparison.Ordinal)); return prefix == null ? null : line.Substring(prefix.Length, line.Length - prefix.Length - MissingSegment.Length).Trim(); })
+                .Where(id => !String.IsNullOrEmpty(id)).ToArray();
+        // Picked adds the confirmed segment to the field once. A segment that no longer exists is the one the pick replaces:
+        // it leaves the field, and the other segments stay.
+        internal static string AddSegment(string text, string id, IEnumerable<string> missing = null) {
+            var gone = new HashSet<string>(missing ?? Enumerable.Empty<string>(), StringComparer.Ordinal);
+            var ids = SegmentIds(text).Where(existing => !gone.Contains(existing)).ToList();
             if (!String.IsNullOrWhiteSpace(id) && !ids.Contains(id.Trim(), StringComparer.Ordinal)) ids.Add(id.Trim());
             return String.Join(", ", ids);
         }
