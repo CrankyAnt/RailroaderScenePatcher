@@ -524,7 +524,10 @@ namespace RailroaderScenePatcher {
         internal const string ControllerNoPlacement = ConstructionSceneryScene.NoPlacement + ".", ControllerNoActivity = ConstructionSceneryScene.NoActivity + ".";
         // The amber warning for an object that an explicit disable holds off against its construction controller, on the
         // Object tab and in the footer's message area.
-        internal const string ConstructionHoldWarning = "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.";
+        internal const string ConstructionHoldWarning = GameSwitchActivity.ConstructionHoldWarning;
+        // The Enabled readout of an object that no explicit disable holds off while progression or a map feature
+        // switches it off now.
+        internal const string SwitchedOffByGame = "Yes; the game switches it off now";
         // Names in running text: "a", "a and b", "a, b and c".
         static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
         // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise

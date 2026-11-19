@@ -145,6 +145,7 @@ static class StationMapIconTests {
         public IEnumerable<string> MapIds => new[] { "map" };
         public IReadOnlyList<object> Find(string scene, string path) => scene == SceneName && Objects.TryGetValue(path, out var found) ? found : new List<object>();
         public string Refusal(object icon) => Refused;
+        public string DisableRefusal(object icon) => null;
         public MapIconObservation Observe(object target) {
             var icon = (FakeIcon)target;
             return new MapIconObservation(new ObjectState(new Placement(new[] { icon.Position[0] + Origin, icon.Position[1], icon.Position[2] }, (double[])icon.Rotation.Clone()), icon.Active),
@@ -241,6 +242,7 @@ static class StationMapIconTests {
         public IEnumerable<string> MapIds => world.MapIds;
         public IReadOnlyList<object> Find(string scene, string path) => world.Find(scene, path);
         public string Refusal(object icon) => world.Refusal(icon);
+        public string DisableRefusal(object icon) => null;
         public MapIconObservation Observe(object icon) => world.Observe(icon);
         public void SetActive(object icon, bool active) => world.SetActive(icon, active);
         public void SetPlacement(object icon, Placement placement) {

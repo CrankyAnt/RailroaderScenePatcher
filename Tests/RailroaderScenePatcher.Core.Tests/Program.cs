@@ -335,6 +335,7 @@ class Program {
         MultipleModTests.Run();
         TrackFollowingTests.Run();
         GroupActivityTests.Run();
+        GameSwitchTests.Run();
         CoverageTests.Run();
         CoverageTests.RunAdditions();
         LocalWorldTests.Run();

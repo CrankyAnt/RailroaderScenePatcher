@@ -308,7 +308,10 @@ namespace RailroaderScenePatcher {
                     foreach (var item in switched) if (item is GameObject listed && listed != null) { culled[listed] = Label((Component)owner); if (!shows) hidden.Add(listed); }
                 }
                 try {
-                    foreach (var target in References(value)) {
+                    foreach (var reference in References(value)) {
+                        // A stand-in of the shared activity holds a switch's entries for an object while an explicit
+                        // disable holds it: the switch still names that object, so its dependencies stay as they were.
+                        var target = (UnityEngine.Object)GroupWorld.HeldThrough(reference) ?? reference;
                         var held = field.Authored ? incoming : working;
                         if (!held.TryGetValue(target, out var refs)) held.Add(target, refs = new List<string>());
                         refs.Add((field.Authored ? "Referenced by " : "Referenced at runtime by ") + Label((Component)owner) + "." + field.Name);

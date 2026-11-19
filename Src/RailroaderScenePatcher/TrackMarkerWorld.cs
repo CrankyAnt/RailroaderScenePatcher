@@ -18,7 +18,7 @@ namespace RailroaderScenePatcher {
     // A colocated TrackRelativePosition whose activity follows the track group subscribes to the graph's group event for
     // the bound segment's group. This adapter observes the group again after a rebinding and holds an explicitly disabled
     // object inactive by replacing the relative position's activation callback, so a group activation cannot reach it.
-    internal class TrackMarkerWorld : ITrackMarkerWorld, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern {
+    internal class TrackMarkerWorld : ITrackMarkerWorld, IDisableRefusal, ITrackMarkerDiagnostics, ITargetConfirmation, IPlacementPattern {
         readonly NativeMarkerWarnings warningHistory = new NativeMarkerWarnings();
         readonly NativeCurrentWarnings currentWarnings = new NativeCurrentWarnings();
         internal const string MarkerType = "Track.TrackMarker";
@@ -372,10 +372,14 @@ namespace RailroaderScenePatcher {
         }
         public void HoldDisabled(object target, bool hold) {
             var relative = Follower(target) ?? throw new InvalidOperationException("The object's activity does not follow a track group");
-            if (!hold) { setTargetActive.SetValue(relative, null); holds.Remove(relative); return; }
+            // A follower that a progression controller or a map feature also switches holds against them too.
+            if (!hold) { setTargetActive.SetValue(relative, null); holds.Remove(relative); GroupWorld.HoldFollower((GameObject)target, false); return; }
             if (!holds.TryGetValue(relative, out var callback)) { callback = new HoldTarget { Target = (GameObject)target }.Keep; holds.Add(relative, callback); }
             setTargetActive.SetValue(relative, callback);
+            GroupWorld.HoldFollower((GameObject)target, true);
         }
+        // A disable of a marker that progression or a map feature switches is refused while it cannot hold against them.
+        public string DisableRefusal(object target) => GroupWorld.DisableProblem(target as GameObject);
         // A marker the game does not shift with its origin, such as an unused starter marker under Setups, has its scene
         // position as its map position (MapOrigin); converting it would carry the origin's offset into the placement.
         public double[] Position(object target) {
@@ -384,7 +388,9 @@ namespace RailroaderScenePatcher {
             return new double[] { p.x, p.y, p.z };
         }
         public double[] Rotation(object target) { var r = ((GameObject)target).transform.rotation; return new double[] { r.x, r.y, r.z, r.w }; }
-        public bool Active(object target) => ((GameObject)target).activeSelf;
+        // A marker a progression controller or a map feature switches reads the patch's activity: whether no explicit
+        // disable holds it off. A track-group follower reads its own activity, which its group sets.
+        public bool Active(object target) => GroupWorld.ReadActivity((GameObject)target, Follower(target) != null);
         public void SetPlacement(object target, double[] position, double[] rotation) {
             var go = (GameObject)target;
             var p = new Vector3(Checked(position[0]), Checked(position[1]), Checked(position[2]));
@@ -398,8 +404,14 @@ namespace RailroaderScenePatcher {
                 Native.Call(c, "RequestUpdateCullingPosition");
             Physics.SyncTransforms();
         }
-        // The native marker lifecycle registers or removes the marker when the object's activity changes.
-        public void SetActive(object target, bool active) => ((GameObject)target).SetActive(active);
+        // The native marker lifecycle registers or removes the marker when the object's activity changes. A marker a
+        // progression controller or a map feature switches: a disable holds it off against them, and Enable returns it to
+        // their current choice. A track-group follower's hold is installed by HoldDisabled.
+        public void SetActive(object target, bool active) {
+            var go = (GameObject)target;
+            if (GroupWorld.SetActivity(go, active, Follower(target) != null)) return;
+            go.SetActive(active);
+        }
         bool MovesWithOrigin(Transform transform) {
             var moves = NativeInventory.MovesWithOrigin(transform);
             if (moves && Native.Read(transformer, "Shared") == null) throw new InvalidOperationException("Floating origin unavailable");

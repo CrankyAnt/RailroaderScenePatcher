@@ -612,9 +612,9 @@ namespace RailroaderScenePatcher {
             : selected.GroupPath == null ? selected.Subcategory : InventoryPresentationState.GroupOf(inventory, selected)?.Subcategory;
         bool IsRailBridge => BridgeSubgroup == BakedSceneryCategories.RailBridges;
         bool IsRoadBridge => BridgeSubgroup == BakedSceneryCategories.RoadBridges;
-        // An explicit disable holds the inspected object off against its track construction: the amber warning shows on
-        // the Object tab and in the footer.
-        bool HeldAgainstConstruction => selected?.Handle is GameObject held && GroupWorld.HeldAgainstConstruction(held);
+        // An explicit disable holds the inspected object off against a switch of the game: its track construction,
+        // progression or a map feature. The amber warning shows on the Object tab and in the footer; null otherwise.
+        string HoldWarning => selected?.Handle is GameObject held ? GroupWorld.HoldWarning(held, FollowsGroup) : null;
         // The Object tab: what the object is, whether it is enabled, and what was detected about it.
         void DrawObject(UIPanelBuilder builder) {
             // A part names its group first, with the button that inspects the group directly after the name.
@@ -683,10 +683,11 @@ namespace RailroaderScenePatcher {
                 foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), selected.Active, same)) PlainLabel(builder, use);
             }
             Section(builder, "State");
-            if (HeldAgainstConstruction) builder.AddLabel(Tint(Amber, CommandBand.ConstructionHoldWarning));
+            if (HoldWarning is string warning) builder.AddLabel(Tint(Amber, warning));
             // A group root's own flag can be off while only its simple culler hides it; the observation reads the authored flag.
             var own = OwnActivity(selected);
-            Field(builder, "Enabled", own ? (selected.Active ? "Yes" : "Yes; a parent is inactive") : "No")
+            var switchedOff = selected.Handle is GameObject shown && GroupWorld.OffThroughProgression(shown);
+            Field(builder, "Enabled", own ? (switchedOff ? CommandBand.SwitchedOffByGame : selected.Active ? "Yes" : "Yes; a parent is inactive") : "No")
                 .Tooltip("Enabled", "Whether this object is active in the scene.");
             if (FollowsGroup) Field(builder, "Track group", CommandBand.TrackGroup(Editable));
             FieldLabel(builder, "Supported edits");
@@ -1210,7 +1211,7 @@ namespace RailroaderScenePatcher {
                 source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmation.Identity.ToString()));
             } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
             else if (feedback.Recovery?.Kind != FailureKind.IncompleteCleanup && feedback.Recovery?.Kind != FailureKind.Blocked && CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
-            else if (!guided.Enabled && HeldAgainstConstruction) { source = ActivityPlace; state = Tint(Amber, CommandBand.ConstructionHoldWarning); }
+            else if (!guided.Enabled && HoldWarning is string warning) { source = ActivityPlace; state = Tint(Amber, warning); }
             // Entries in the area stack from the top without gaps:
             // the current state or newest result first, then the guided hint and the remaining results. Older results
             // are dimmed. Each names its action group. The area is a native scroll view: its content takes the height of its
@@ -1560,7 +1561,7 @@ namespace RailroaderScenePatcher {
                     // bridge's construction controller switches, cannot hold an Enabled setting.
                     var switched = block == null && target != null && (selected.GroupPath != null || selected.Family == BakedSceneryRules.Family) ? GroupWorld.ActivityProblem(target) : block == null && target != null && IsEquipment ? CrossingDeviceWorld.ActivityProblem(target) : null;
                     return new[] {
-                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? ControllerActivity ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
+                        Slot(enabled ? "Disable" : "Enable", enabled ? "Disable this object." : "Enable this object.", block ?? switched ?? ControllerActivity ?? (enabled && target != null ? GroupWorld.DisableProblem(target) : null) ?? CommandBand.ActivityReason(!enabled, FollowsGroup), () => { var enable = !enabled; Edit(ActivityPlace, enable ? "Enable" : "Disable", (current, inspection) => current.Edit(identity, null, enable, inspection)); }, null, 1, 0, enabled ? "Enable" : "Disable"),
                         // Named by what it takes back, over two cells; disabled while this mod sets no activity.
                         Slot(CommandBand.ClearActivity, "Clear this mod's value for the activity; the object returns to its underlying activity.", block ?? ControllerActivity ?? CommandBand.ClearActivityReason(HasActivityValue(identity)),
                             () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
@@ -1582,7 +1583,8 @@ namespace RailroaderScenePatcher {
         static bool OwnActivity(SceneObservation observation) {
             var target = observation?.Handle as GameObject;
             // Own culling switches a moved mast by camera distance, as it does a moved part: the observation reads what the scene or the modder set.
-            return target != null && (observation.Family == BakedSceneryRules.Family || observation.Family == ExistingEquipmentScene.MastFamily ? observation.Enabled : target.activeSelf);
+            // An object a progression controller or a map feature switches reads whether no explicit disable holds it off.
+            return target != null && (observation.Family == BakedSceneryRules.Family || observation.Family == ExistingEquipmentScene.MastFamily ? observation.Enabled : GroupWorld.ProgressionEnabled(target) ?? target.activeSelf);
         }
         static double[] EnteredRotation(double x, double y, double z) {
             var rotation = Quaternion.Euler((float)x, (float)y, (float)z);

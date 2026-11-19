@@ -76,6 +76,9 @@ class FakeSnapTracks : ISnapScene {
 // Controlled track graph: segments by ID and named-location buckets by segment ID, as the native graph keeps them.
 // Activity follows the native marker lifecycle: enabling registers a valid location, disabling removes every entry.
 class FakeMarkerWorld : ITrackMarkerWorld {
+    // Why a disable cannot hold, as TrackMarkerWorld refuses it while a game switch that names the marker cannot be shared.
+    public string DisableRefused;
+    public string DisableRefusal(object target) => DisableRefused;
     public string[] Maps = { "map" };
     public IEnumerable<string> MapIds => Maps;
     public Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();

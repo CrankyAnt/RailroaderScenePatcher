@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher {
     // World/Map Labels/Station Icons, and the map's icon registry (MapBuilder._mapIcons). An icon registers with the map
     // in its OnEnable and leaves it in its OnDisable; the map draws it where its object stands. The rules live in Core's
     // StationMapIconScene.
-    internal sealed class MapIconWorld : IMapIconWorld {
+    internal sealed class MapIconWorld : IMapIconWorld, IDisableRefusal {
         const string MapBuilderType = "UI.Map.MapBuilder";
         static readonly Type icon = Native.Type(StationMapIconRules.Component), builder = Native.Type(MapBuilderType);
         static readonly FieldInfo registry = builder?.GetField("_mapIcons", Native.Flags);
@@ -47,7 +47,8 @@ namespace RailroaderScenePatcher {
             var go = Icon(target);
             var t = go.transform;
             var position = NativeInventory.MapPosition(t); var rotation = t.rotation;
-            var state = new ObjectState(new Placement(new double[] { position.x, position.y, position.z }, new double[] { rotation.x, rotation.y, rotation.z, rotation.w }), go.activeSelf);
+            // An icon a progression controller switches reads the patch's activity: whether no explicit disable holds it off.
+            var state = new ObjectState(new Placement(new double[] { position.x, position.y, position.z }, new double[] { rotation.x, rotation.y, rotation.z, rotation.w }), GroupWorld.ReadActivity(go, false));
             return new MapIconObservation(state, go.activeInHierarchy, t.parent == null ? null : t.parent.gameObject, Registered(go));
         }
         // Whether the map has the icon registered, or null while the game has no map.
@@ -68,8 +69,16 @@ namespace RailroaderScenePatcher {
             // The icon's click collider is read by the map's raycasts; synchronise so they find it at its new place.
             Physics.SyncTransforms();
         }
-        // The icon's own OnEnable and OnDisable register it with the map and take it out again.
-        public void SetActive(object target, bool active) { Icon(target).SetActive(active); Physics.SyncTransforms(); }
+        // The icon's own OnEnable and OnDisable register it with the map and take it out again. An icon a progression
+        // controller or a map feature switches: a disable holds it off against them, and Enable returns it to their
+        // current choice.
+        public void SetActive(object target, bool active) {
+            var go = Icon(target);
+            if (!GroupWorld.SetActivity(go, active, false)) go.SetActive(active);
+            Physics.SyncTransforms();
+        }
+        // A disable of an icon that progression or a map feature switches is refused while it cannot hold against them.
+        public string DisableRefusal(object target) => GroupWorld.DisableProblem(target as GameObject);
         static float Checked(double value) {
             if (Double.IsNaN(value) || Double.IsInfinity(value) || Math.Abs(value) > Single.MaxValue) throw new InvalidOperationException("Coordinate exceeds native precision");
             return (float)value;

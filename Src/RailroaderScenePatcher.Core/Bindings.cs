@@ -271,7 +271,9 @@ namespace RailroaderScenePatcher.Core {
         public bool GroupEnabled { get; }
     }
     // The game-facing operations of the track-marker capability. Positions are map coordinates.
-    public interface ITrackMarkerWorld {
+    // IDisableRefusal: why `active: false` cannot hold against a switch of the game that names the marker, or null; the
+    // relationship refuses the disable with it before changing anything.
+    public interface ITrackMarkerWorld : IDisableRefusal {
         IEnumerable<string> MapIds { get; }
         IReadOnlyList<object> Resolve(TargetIdentity identity);
         // Why the object does not conform to the supported Generic-marker pattern, or null.
@@ -417,6 +419,7 @@ namespace RailroaderScenePatcher.Core {
                     throw new InvalidPatchDefinitionException(holders.Refusal(target));
                 }
             }
+            if (state?.Active == false && world.DisableRefusal(target) is string reason) throw new InvalidOperationException(reason);
             var group = world.GroupActivity(target);
             if (group != null && state?.Active == true)
                 throw new InvalidPatchDefinitionException("The object's activity follows track group " + (String.IsNullOrEmpty(group.LocationGroup) ? "of its bound segment" : group.LocationGroup) + "; only an explicit disable is supported. Omit active to keep group-driven activity");

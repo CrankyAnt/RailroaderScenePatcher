@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,7 +12,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the baked scenery group and part capabilities: the transform and activity of a group root
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // BakedSceneryRules, BakedSceneryGroups and BakedSceneryParts.
-    internal sealed class GroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
+    internal sealed class GroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisableRefusal, IDisposable {
         internal const string SimpleCullerType = "Helpers.SimpleCuller", GameObjectCullerType = "Helpers.Culling.GameObjectCuller";
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -92,22 +93,26 @@ namespace RailroaderScenePatcher {
             // adapter with its name, not a scene edit.
             var next = new PartCullingHost();
             // An earlier world's own culling goes back to the game before this one starts.
-            culling?.ReleaseAll(); constructions?.ReleaseAll(); host?.Dispose();
+            culling?.ReleaseAll(); switches?.ReleaseAll(); host?.Dispose();
             host = next; culling = new PartCullingController(host);
-            constructionHost = new ConstructionHost();
-            constructions = new ConstructionActivity(constructionHost, culling);
-            own = culling; ownHost = host; ownConstructions = constructions;
-            var current = culling; var shared = constructions; var stands = constructionHost;
+            switchHost = new SwitchHost();
+            switches = new GameSwitchActivity(switchHost, culling);
+            own = culling; ownHost = host; ownSwitches = switches;
+            var current = culling; var shared = switches; var stands = switchHost;
             host.Unloaded = () => { current.Unload(); shared.Unload(); stands.Unload(); trestles.Clear(); };
             culling.Fault = message => Debug.LogWarning("Scene Patcher: " + message);
+            // Without the members of a progression controller or a map feature, the patcher cannot see what they switch:
+            // their switches then set the objects as without the patcher, and an explicit disable holds only until then.
+            if (SwitchMembersProblem != null) Debug.LogWarning("Scene Patcher: " + SwitchMembersProblem);
         }
         readonly PartCullingController own;
         readonly PartCullingHost ownHost;
-        readonly ConstructionActivity ownConstructions;
-        // The activity of the objects a rail bridge's construction controller switches, shared with that controller for an
-        // explicit disable and for own culling. One for the loaded world, as own culling is.
-        static ConstructionActivity constructions;
-        static ConstructionHost constructionHost;
+        readonly GameSwitchActivity ownSwitches;
+        // The activity of the objects a switch of the game sets, shared with that switch for an explicit disable and for
+        // own culling: a rail bridge's construction controller, a progression controller and a map feature. One for the
+        // loaded world, as own culling is.
+        static GameSwitchActivity switches;
+        static SwitchHost switchHost;
         // The patcher's state for this world ends. While the scene stays loaded, every handler, renderer list, object
         // list and activity that own culling took over goes back to the game, and its spheres are released.
         bool disposed;
@@ -115,8 +120,8 @@ namespace RailroaderScenePatcher {
             if (disposed) return;
             disposed = true;
             try { own.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling release failed: " + e.GetBaseException().Message); }
-            try { ownConstructions.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: construction activity release failed: " + e.GetBaseException().Message); }
-            if (ReferenceEquals(constructions, ownConstructions)) { constructions = null; constructionHost = null; }
+            try { ownSwitches.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: switched activity release failed: " + e.GetBaseException().Message); }
+            if (ReferenceEquals(switches, ownSwitches)) { switches = null; switchHost = null; }
             ownHost.Dispose();
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
         }
@@ -134,14 +139,56 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<ObservedRegion> OwnSpheres(GameObject root) => culling == null || root == null ? new ObservedRegion[0] : culling.Regions(root);
         // The object's own activity as the scene or the modder set it: what own culling holds for an object it switches.
         internal static bool OwnActivity(GameObject go) => SharedEnabled(go) ?? CullingActivity.Desired(go.activeSelf, culling?.Desired(go));
-        // A group root's or part's Enabled setting as the inventory shows it: for an object of a rail bridge construction
-        // that a construction controller switches, whether no explicit disable holds it off; otherwise its authored activity.
+        // A group root's or part's Enabled setting as the inventory shows it: for an object that a switch of the game sets,
+        // whether no explicit disable holds it off; otherwise its authored activity.
         internal static bool Enabled(GameObject go) => SharedEnabled(go) ?? Authored(go);
-        // The patch's Enabled setting of a rail bridge construction's root or part that a controller switches, or null
-        // for any other object: the objects of other families that a controller names, such as Ela's, keep their readout.
-        static bool? SharedEnabled(GameObject go) => go != null && constructions != null && (RailBridgeRoot(go) || RailBridgeRoot(GroupRootOf(go))) ? constructions.Enabled(go) : null;
-        // Whether an explicit disable holds the object off against its construction controller, for the amber warning.
-        internal static bool HeldAgainstConstruction(GameObject go) => go != null && constructions?.Held(go) == true;
+        // The patch's Enabled setting of a rail bridge construction's root or part that a controller switches, or of any
+        // object that a progression controller or a map feature switches; null for any other object: the objects of other
+        // families that a construction controller names, such as Ela's, keep their readout.
+        static bool? SharedEnabled(GameObject go) =>
+            go != null && switches != null && (RailBridgeRoot(go) || RailBridgeRoot(GroupRootOf(go))) ? switches.Enabled(go) : ProgressionEnabled(go);
+        // The patch's Enabled setting of an object that a progression controller or a map feature switches, whatever its
+        // family, or null for any other object: a station group, a station map icon or a track marker reads it.
+        internal static bool? ProgressionEnabled(GameObject go) => go == null ? null : switches?.ProgressionEnabled(go);
+        // The activity a station map icon or track marker capability reads, and its write, routed through the shared
+        // activity as GameSwitchActivity.ReadActivity, SetActivity and HoldFollower decide. SetActivity is false when
+        // the caller switches the object itself.
+        internal static bool ReadActivity(GameObject go, bool follower) => switches?.ReadActivity(go, go.activeSelf, follower) ?? go.activeSelf;
+        internal static bool SetActivity(GameObject go, bool active, bool follower) => go != null && switches != null && switches.SetActivity(go, active, follower);
+        internal static void HoldFollower(GameObject go, bool hold) { if (go != null) switches?.HoldFollower(go, hold); }
+        // Whether the object is off now only because a progression controller or a map feature switches it off: no
+        // explicit disable holds it, and its activity as the scene and the switch set it is off. A group root that only
+        // its own culler or own culling hides counts as on (Authored), so it does not read as switched off by the game.
+        internal static bool OffThroughProgression(GameObject go) => ProgressionEnabled(go) == true && !Authored(go);
+        // The amber warning for an object that an explicit disable holds off against a switch of the game, or null.
+        // clearOnly: Enable is refused for the object, as for a track-group follower.
+        internal static string HoldWarning(GameObject go, bool clearOnly = false) => go == null || switches == null ? null : GameSwitchActivity.HoldWarning(switches.HeldAgainst(go), clearOnly);
+        public string DisableRefusal(object target) => DisableProblem(target as GameObject);
+        // Why an explicit disable of the object cannot hold against the game's progression or a map feature, or null:
+        // the shared activity of this load is unavailable for an object they switch, or the members of a progression
+        // controller or a map feature that names the object cannot be read. The capability refuses the disable before
+        // changing anything, as a rail bridge is refused while the construction members are unavailable.
+        internal static string DisableProblem(GameObject go) {
+            if (go == null) return null;
+            if ((SwitchKinds(go) & GameSwitchActivity.Progressions) != 0 && switches == null) return GameSwitchActivity.UnsharedRefusal;
+            if (progression != null && !ProgressionReadable && NamedBy(progression, go)) return GameSwitchActivity.ProgressionMembersRefusal;
+            if (mapFeature != null && !FeatureReadable && NamedBy(mapFeature, go)) return GameSwitchActivity.MapFeatureMembersRefusal;
+            return null;
+        }
+        // Whether a loaded component of the type names the object in any list field, read without knowing the field: the
+        // case when its known members are missing.
+        static bool NamedBy(Type type, GameObject go) {
+            foreach (var component in LoadedOf(type))
+                foreach (var field in component.GetType().GetFields(Native.Flags)) {
+                    if (field.FieldType == typeof(string) || !typeof(IEnumerable).IsAssignableFrom(field.FieldType)) continue;
+                    try { if (field.GetValue(component) is IEnumerable items && items.Cast<object>().Any(item => ReferenceEquals(item, go))) return true; }
+                    catch { }
+                }
+            return false;
+        }
+        // The object a stand-in of the shared activity holds the list entries for, or null: the reference scan names the
+        // switch that holds the stand-in as a referrer of that object, so its dependencies do not change by the hold.
+        internal static GameObject HeldThrough(UnityEngine.Object standIn) => standIn is GameObject go && go != null ? switchHost?.HeldBy(go) : null;
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
 
         // The rule's verdicts for every loaded World root. They are read again after Invalidate, which a whole discovery
@@ -350,58 +397,116 @@ namespace RailroaderScenePatcher {
             for (var t = root.transform.parent; t != null && !held; t = t.parent) held = t.GetComponent(construction) != null;
             return held ? "The game's track construction members are unavailable, so this rail bridge cannot be moved, enabled or disabled" : null;
         }
-        // The objects every loaded construction controller switches, read once per frame.
-        static HashSet<GameObject> constructionTargets;
-        static int targetsFrame = -1;
-        static HashSet<GameObject> ConstructionTargets() {
-            if (constructionTargets != null && targetsFrame == Time.frameCount) return constructionTargets;
-            var found = new HashSet<GameObject>();
+        // A progression controller (Game.Progression.ProgressionEntityObjectController) sets the objects of its two lists
+        // from its industry's or station's progression state, at Awake and on every IndustriesDidChange; a map feature
+        // (Game.Progression.MapFeature) sets the objects of gameObjectsEnableOnUnlock from whether it is unlocked
+        // (MapFeatureManager.UpdateFeatureForUnlocked). Railroader 0.6.3: the Cochran, Alarka, Alarka Jct and Hemingway
+        // station groups and 13 station map icons, and the track markers Sign Begin CTC Andrews and Sign Begin CTC Sylva.
+        internal const string ProgressionControllerType = "Game.Progression.ProgressionEntityObjectController", MapFeatureType = "Game.Progression.MapFeature";
+        static readonly Type progression = Native.Type(ProgressionControllerType), mapFeature = Native.Type(MapFeatureType);
+        static readonly FieldInfo progressionOn = progression?.GetField("activeOnProgressionEnabled", Native.Flags), progressionOff = progression?.GetField("inactiveOnProgressionEnabled", Native.Flags),
+            featureObjects = mapFeature?.GetField("gameObjectsEnableOnUnlock", Native.Flags);
+        static bool ObjectList(FieldInfo field) => field != null && typeof(IList).IsAssignableFrom(field.FieldType) && (field.FieldType == typeof(GameObject[]) || field.FieldType == typeof(List<GameObject>));
+        static bool ProgressionReadable => ObjectList(progressionOn) && ObjectList(progressionOff);
+        static bool FeatureReadable => ObjectList(featureObjects);
+        // Why the patcher cannot see what progression or a map feature switches, or null.
+        static string SwitchMembersProblem =>
+            progression != null && !ProgressionReadable ? "The game's progression controller members are unavailable, so an explicit disable does not hold against progression"
+            : mapFeature != null && !FeatureReadable ? "The game's map feature members are unavailable, so an explicit disable does not hold against a map feature" : null;
+        // The loaded components of the switch types, read again only when the loaded scenes change: a switch is a scene
+        // component, so the frames between scene changes find the same ones.
+        static readonly Dictionary<Type, Component[]> loadedSwitches = new Dictionary<Type, Component[]>();
+        static string switchScenes;
+        static int switchScenesFrame = -1;
+        static IEnumerable<Component> LoadedOf(Type type) {
+            if (type == null) return Enumerable.Empty<Component>();
+            if (switchScenesFrame != Time.frameCount) {
+                switchScenesFrame = Time.frameCount;
+                var key = new System.Text.StringBuilder();
+                for (var i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++) {
+                    var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+                    key.Append(scene.handle).Append(scene.isLoaded ? '+' : '-').Append(',');
+                }
+                var text = key.ToString();
+                if (text != switchScenes) { switchScenes = text; loadedSwitches.Clear(); }
+            }
+            if (!loadedSwitches.TryGetValue(type, out var found) || found.Any(c => c == null))
+                loadedSwitches[type] = found = Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)).ToArray();
+            return found;
+        }
+        // Every object list of every loaded switch of the game, with the switch it belongs to. A list is the game's own
+        // array or list, so a stand-in written into it receives the switch's writes.
+        static IEnumerable<KeyValuePair<IList, GameSwitch>> SwitchLists() {
             if (construction != null && ConstructionReadable)
-                foreach (var controller in Resources.FindObjectsOfTypeAll(construction).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)))
+                foreach (var controller in LoadedOf(construction))
                     if (constructionEntries.GetValue(controller) is Array entries)
                         foreach (var entry in entries)
-                            if (entry != null && entryTargets.GetValue(entry) is GameObject[] targets) foreach (var target in targets) if (target != null) found.Add(target);
-            targetsFrame = Time.frameCount;
-            return constructionTargets = found;
+                            if (entry != null && entryTargets.GetValue(entry) is GameObject[] targets) yield return new KeyValuePair<IList, GameSwitch>(targets, GameSwitch.Construction);
+            if (ProgressionReadable)
+                foreach (var controller in LoadedOf(progression))
+                    foreach (var field in new[] { progressionOn, progressionOff })
+                        if (field.GetValue(controller) is IList list) yield return new KeyValuePair<IList, GameSwitch>(list, GameSwitch.Progression);
+            if (FeatureReadable)
+                foreach (var feature in LoadedOf(mapFeature))
+                    if (featureObjects.GetValue(feature) is IList list) yield return new KeyValuePair<IList, GameSwitch>(list, GameSwitch.MapFeature);
         }
-        // An object whose controller writes go to a stand-in still counts: its controller still switches it.
-        internal static bool ConstructionSwitched(GameObject go) => go != null && construction != null && (ConstructionTargets().Contains(go) || constructionHost?.Holds(go) == true);
-        // The objects a construction controller switches at or below the root, diverted or not.
-        static IEnumerable<object> ConstructionNodes(GameObject root) =>
-            ConstructionTargets().Concat(constructionHost?.Held ?? Enumerable.Empty<GameObject>()).Where(go => go != null && go.transform.IsChildOf(root.transform)).Distinct().Cast<object>().ToArray();
-        // The construction controllers' entries, as the stand-ins of ConstructionActivity reach them: every entry that names
-        // an object is pointed at a hidden stand-in object, whose activity the controller then sets. Each change of the
-        // stand-in's activity reports the controller's choice; the object itself is set by the patcher.
-        sealed class ConstructionHost : IConstructionHost {
-            sealed class Diversion { internal GameObject StandIn; internal readonly List<KeyValuePair<GameObject[], int>> Slots = new List<KeyValuePair<GameObject[], int>>(); }
+        // The objects every loaded switch of the game sets, with the switches that set each, read once per frame.
+        static Dictionary<GameObject, GameSwitch> switchTargets;
+        static int targetsFrame = -1;
+        static Dictionary<GameObject, GameSwitch> SwitchTargets() {
+            if (switchTargets != null && targetsFrame == Time.frameCount) return switchTargets;
+            var found = new Dictionary<GameObject, GameSwitch>();
+            foreach (var list in SwitchLists())
+                foreach (var item in list.Key)
+                    if (item is GameObject target && target != null) found[target] = (found.TryGetValue(target, out var kinds) ? kinds : GameSwitch.None) | list.Value;
+            targetsFrame = Time.frameCount;
+            return switchTargets = found;
+        }
+        // The switches that set the object. An object whose switch writes go to a stand-in still counts: its switches
+        // still set it.
+        internal static GameSwitch SwitchKinds(GameObject go) =>
+            go == null ? GameSwitch.None : (SwitchTargets().TryGetValue(go, out var kinds) ? kinds : GameSwitch.None) | (switchHost?.Kinds(go) ?? GameSwitch.None);
+        internal static bool GameSwitched(GameObject go) => SwitchKinds(go) != GameSwitch.None;
+        // The objects a switch of the game sets at or below the root, diverted or not.
+        static IEnumerable<object> SwitchNodes(GameObject root) =>
+            SwitchTargets().Keys.Concat(switchHost?.Held ?? Enumerable.Empty<GameObject>()).Where(go => go != null && go.transform.IsChildOf(root.transform)).Distinct().Cast<object>().ToArray();
+        // The lists of the game's switches, as the stand-ins of GameSwitchActivity reach them: every list entry that names
+        // an object is pointed at a hidden stand-in object, whose activity the switch then sets. Each change of the
+        // stand-in's activity reports the switch's choice; the object itself is set by the patcher.
+        sealed class SwitchHost : IGameSwitchHost {
+            sealed class Diversion { internal GameObject StandIn; internal GameSwitch Kinds; internal IReadOnlyList<KeyValuePair<IList, int>> Slots; }
             readonly Dictionary<GameObject, Diversion> diversions = new Dictionary<GameObject, Diversion>();
-            internal bool Holds(GameObject go) => diversions.ContainsKey(go);
+            internal GameSwitch Kinds(GameObject go) => diversions.TryGetValue(go, out var diversion) ? diversion.Kinds : GameSwitch.None;
             internal IEnumerable<GameObject> Held => diversions.Keys.ToArray();
-            public bool Switched(object node) => node is GameObject go && go != null && ConstructionSwitched(go);
+            internal GameObject HeldBy(GameObject standIn) => diversions.FirstOrDefault(pair => pair.Value.StandIn == standIn).Key;
+            public GameSwitch Switches(object node) => node is GameObject go && go != null ? SwitchKinds(go) : GameSwitch.None;
             public bool Active(object node) => ((GameObject)node).activeSelf;
             public void Divert(object node, bool choice, Action<bool> changed) {
                 var go = (GameObject)node;
-                var diversion = new Diversion { StandIn = new GameObject("Scene Patcher construction stand-in") { hideFlags = HideFlags.HideAndDontSave } };
-                diversion.StandIn.SetActive(choice);
-                diversion.StandIn.AddComponent<ConstructionStandIn>().Changed = changed;
-                foreach (var controller in Resources.FindObjectsOfTypeAll(construction).OfType<Component>().Where(c => c != null && Loaded(c.gameObject)))
-                    if (constructionEntries.GetValue(controller) is Array entries)
-                        foreach (var entry in entries)
-                            if (entry != null && entryTargets.GetValue(entry) is GameObject[] targets)
-                                for (var i = 0; i < targets.Length; i++) if (targets[i] == go) { targets[i] = diversion.StandIn; diversion.Slots.Add(new KeyValuePair<GameObject[], int>(targets, i)); }
-                diversions[go] = diversion;
-                constructionTargets = null;
+                var standIn = new GameObject("Scene Patcher switch stand-in") { hideFlags = HideFlags.HideAndDontSave };
+                try {
+                    standIn.SetActive(choice);
+                    standIn.AddComponent<SwitchStandIn>().Changed = changed;
+                    // A failure part way puts the entries back (SwitchSlots.Divert); the diversion counts only once every
+                    // entry names the stand-in.
+                    var slots = SwitchSlots.Divert(SwitchLists(), go, standIn, out var kinds);
+                    diversions[go] = new Diversion { StandIn = standIn, Slots = slots, Kinds = kinds };
+                } catch {
+                    var behaviour = standIn.GetComponent<SwitchStandIn>(); if (behaviour != null) behaviour.Changed = null;
+                    UnityEngine.Object.Destroy(standIn);
+                    throw;
+                } finally { switchTargets = null; }
             }
             public void Restore(object node) {
                 if (!(node is GameObject go) || !diversions.TryGetValue(go, out var diversion)) return;
                 diversions.Remove(go);
-                foreach (var slot in diversion.Slots) if (slot.Key != null && slot.Value < slot.Key.Length && slot.Key[slot.Value] == diversion.StandIn) slot.Key[slot.Value] = go;
-                if (diversion.StandIn != null) { var standIn = diversion.StandIn.GetComponent<ConstructionStandIn>(); if (standIn != null) standIn.Changed = null; UnityEngine.Object.Destroy(diversion.StandIn); }
-                constructionTargets = null;
+                SwitchSlots.Restore(diversion.Slots, go, diversion.StandIn);
+                if (diversion.StandIn != null) { var standIn = diversion.StandIn.GetComponent<SwitchStandIn>(); if (standIn != null) standIn.Changed = null; UnityEngine.Object.Destroy(diversion.StandIn); }
+                switchTargets = null;
             }
             public void SetActive(object node, bool active) { ((GameObject)node).SetActive(active); Physics.SyncTransforms(); }
             public bool Alive(object node) => node is GameObject go && go != null;
-            // The map unloads: its controllers, objects and stand-ins go with it.
+            // The map unloads: its switches, objects and stand-ins go with it.
             internal void Unload() { foreach (var diversion in diversions.Values) if (diversion.StandIn != null) UnityEngine.Object.Destroy(diversion.StandIn); diversions.Clear(); }
         }
         // The track segment ids of the construction controller at or above the object, which decide the visibility of
@@ -450,9 +555,9 @@ namespace RailroaderScenePatcher {
         // listingRoot names the object whose game-object cullers can list the object, when that is not its baked
         // scenery group: a crossing controller for the objects below it.
         internal static bool Authored(GameObject go, GameObject listingRoot = null) {
-            // An object whose construction controller writes go to a stand-in takes the controller's choice, unless an
-            // explicit disable holds it off.
-            var shared = constructions?.Effective(go);
+            // An object whose switch writes go to a stand-in takes the switch's choice, unless an explicit disable holds it
+            // off.
+            var shared = switches?.Effective(go);
             if (shared != null) return shared.Value;
             // An object own culling switches reads what the scene or the modder set, whatever the camera made of it.
             var desired = culling?.Desired(go);
@@ -497,8 +602,8 @@ namespace RailroaderScenePatcher {
             foreach (var part in root.GetComponentsInChildren<Transform>(true)) {
                 if (part == t || Transient(part, t)) continue;
                 var local = t.InverseTransformPoint(part.position); var turn = Quaternion.Inverse(t.rotation) * part.rotation;
-                // A part that a culler or a rail bridge's construction controller switches keeps no activity of its own in the invariant.
-                var switched = Switched(part, listed) || ConstructionSwitched(part.gameObject);
+                // A part that a culler or a switch of the game sets keeps no activity of its own in the invariant.
+                var switched = Switched(part, listed) || GameSwitched(part.gameObject);
                 parts.Add(new GroupPart(Relative(t, part) + "#" + part.GetInstanceID(), Coordinates(local), Coordinates(turn), switched ? Authored(part.gameObject, listingRoot) : OwnActivity(part.gameObject), switched, part.gameObject, part.parent == t ? null : part.parent.gameObject, Animated(part, t) || (moves != null && moves(part))));
             }
             var cullers = new List<GroupCuller>();
@@ -669,9 +774,9 @@ namespace RailroaderScenePatcher {
         // culling group sends no events, and it resumes when the object is enabled.
         void Switch(GameObject go, bool active) {
             var group = GroupOf(OwnSimple(go));
-            // An object a construction controller switches: a disable holds it off against the controller, and Enable
-            // returns it to the controller's current choice.
-            if (!disposed && ownConstructions.Set(go, active)) { if (group != null) group.enabled = active; Physics.SyncTransforms(); return; }
+            // An object a switch of the game sets: a disable holds it off against the switch, and Enable returns it to the
+            // switch's current choice.
+            if (!disposed && ownSwitches.Set(go, active)) { if (group != null) group.enabled = active; Physics.SyncTransforms(); return; }
             // An object own culling switches takes the value as its desired activity and shows by its spheres.
             if (!disposed && own.SetDesired(go, active)) { if (group != null) group.enabled = active; Physics.SyncTransforms(); return; }
             // Enabled again, the object takes the visibility its culling group holds, so a far object does not show until
@@ -709,9 +814,9 @@ namespace RailroaderScenePatcher {
             // Every culler keeps the radius the scene gives it. A moved part outside a culler's sphere gets a sphere of
             // its own instead, as the plan names it.
             own.Apply(root, plan);
-            // An object a construction controller switches that own culling took over gets the controller's choice from
-            // now on; one it let go of goes back to the controller.
-            ownConstructions.Settle(ConstructionNodes(root));
+            // An object a switch of the game sets that own culling took over gets the switch's choice from now on; one it
+            // let go of goes back to the switch.
+            ownSwitches.Settle(SwitchNodes(root));
             Physics.SyncTransforms();
         }
         // Each enabled storage pile that stands elsewhere than where it last laid out its logs moves its culling sphere
@@ -747,11 +852,11 @@ namespace RailroaderScenePatcher {
         public bool Alive(object handle) => handle is GameObject go && go != null;
         static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("Coordinate exceeds native precision"); return f; }
     }
-    // The stand-in that receives a construction controller's writes for an object the patcher shares with it: Unity
-    // calls OnEnable and OnDisable when the controller sets its activity.
-    internal sealed class ConstructionStandIn : MonoBehaviour {
+    // The stand-in that receives a switch's writes for an object the patcher shares with it: Unity calls OnEnable and
+    // OnDisable when the switch sets its activity.
+    internal sealed class SwitchStandIn : MonoBehaviour {
         internal Action<bool> Changed;
-        void OnEnable() { try { Changed?.Invoke(true); } catch (Exception e) { Debug.LogWarning("Scene Patcher: construction activity update failed: " + e.GetBaseException().Message); } }
-        void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Debug.LogWarning("Scene Patcher: construction activity update failed: " + e.GetBaseException().Message); } }
+        void OnEnable() { try { Changed?.Invoke(true); } catch (Exception e) { Debug.LogWarning("Scene Patcher: switched activity update failed: " + e.GetBaseException().Message); } }
+        void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Debug.LogWarning("Scene Patcher: switched activity update failed: " + e.GetBaseException().Message); } }
     }
 }

@@ -39,8 +39,10 @@ class FakePart {
     public string Id; public double[] Offset; public double[] Rotation = { 0, 0, 0, 1 }; public bool Active = true; public bool Culled, Switched;
     // The game turns or moves this part while it runs, as a gauge needle turns a clock hand.
     public bool Animated;
-    // A rail bridge's construction controller switches this part on and off by the state of its track segments.
+    // A rail bridge's construction controller switches this part on and off by the state of its track segments, or the
+    // game switch Switch names does.
     public bool Constructed;
+    public GameSwitch Switch = GameSwitch.Construction;
     // For a switched part: whether its culler shows it now. Off while its culler hides it, it counts as on.
     public bool Shown = true;
     public FakePart Parent; public FakeGroup Group;
@@ -85,8 +87,9 @@ class FakeGroup {
     // Whether the simple culler on the root switches the root; null without one.
     public bool? RootCulling = true;
     public List<FakeGroupCollider> Colliders = new List<FakeGroupCollider>();
-    // A construction controller switches the root itself.
+    // A construction controller switches the root itself, or the game switch Switch names does.
     public bool Constructed;
+    public GameSwitch Switch = GameSwitch.Construction;
     // A rail bridge construction: it and its parts take no track-following placement, and its separate track-owned
     // scenery is described by Scenery.
     public bool RailBridge;
@@ -99,7 +102,10 @@ class FakeRegistration { public FakeCuller Culler; public CullerKind Kind; publi
 // Controlled world: map coordinates are scene coordinates plus Origin on X. A culling refresh moves every culler of an
 // active group to where it stands; a disabled group holds no culling registration. The world runs the real own-culling
 // controller over controlled cullers, culling managers, renderers and lists.
-class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
+class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable, IDisableRefusal {
+    // Why an explicit disable cannot hold, as GroupWorld refuses it while the game's switch members are unavailable.
+    public string DisableRefused;
+    public string DisableRefusal(object target) => DisableRefused;
     // The patcher's state for the world ends while the scene stays.
     public void Dispose() => Culling.ReleaseAll();
     // The construction controllers on group roots by root, with the segment ids each names; the loaded track segments by
@@ -137,7 +143,7 @@ class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
     public bool DetachCollider, KeepColliderDetached, ChangeColliderShape, ConstructionFlips, DisturbScenery;
     bool detached; string shapeBefore;
     // The activity of the objects a construction controller switches, shared with that controller.
-    public readonly ConstructionActivity Constructions;
+    public readonly GameSwitchActivity Constructions;
     // The controller's writes that the patcher diverted, by object: the stand-in's activity and what reports its
     // changes. Like a Unity object, the stand-in reports only a change of its activity.
     sealed class StandIn { internal bool Active; internal Action<bool> Changed; }
@@ -152,10 +158,10 @@ class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
         if (node is FakeGroup group) { group.Active = shows; Registrations(group); } else { var part = (FakePart)node; part.Active = shows; Registrations(part.Group); }
     }
     public bool Diverted(object node) => diverted.ContainsKey(node);
-    sealed class ConstructionHost : IConstructionHost {
+    sealed class ConstructionHost : IGameSwitchHost {
         readonly FakeGroupWorld world;
         internal ConstructionHost(FakeGroupWorld world) { this.world = world; }
-        public bool Switched(object node) => node is FakeGroup group ? group.Constructed : node is FakePart part && part.Constructed;
+        public GameSwitch Switches(object node) => node is FakeGroup group ? (group.Constructed ? group.Switch : GameSwitch.None) : node is FakePart part && part.Constructed ? part.Switch : GameSwitch.None;
         public bool Active(object node) => node is FakeGroup group ? group.Active : ((FakePart)node).Active;
         public void Divert(object node, bool choice, Action<bool> changed) => world.diverted[node] = new StandIn { Active = choice, Changed = changed };
         public void Restore(object node) => world.diverted.Remove(node);
@@ -166,7 +172,7 @@ class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable {
     public CullingPlan Plan;
     public readonly PartCullingController Culling;
     public readonly Host Native;
-    public FakeGroupWorld() { Native = new Host(this); Culling = new PartCullingController(Native); Constructions = new ConstructionActivity(new ConstructionHost(this), Culling); }
+    public FakeGroupWorld() { Native = new Host(this); Culling = new PartCullingController(Native); Constructions = new GameSwitchActivity(new ConstructionHost(this), Culling); }
     double[] behind, sibling;
     // The group rule's verdicts by path, when set: a group path resolves and is refused as GroupWorld resolves and
     // refuses it (BakedSceneryRules.ResolvesGroup, GroupRefusal), and so does a part path that names a group root.

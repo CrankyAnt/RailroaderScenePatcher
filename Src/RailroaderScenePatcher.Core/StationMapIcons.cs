@@ -32,7 +32,8 @@ namespace RailroaderScenePatcher.Core {
         public bool? Registered { get; }
     }
     // The native operations of the station map icon capability. Positions are map coordinates.
-    public interface IMapIconWorld {
+    // IDisableRefusal: why `active: false` cannot hold against a switch of the game that names the icon, or null.
+    public interface IMapIconWorld : IDisableRefusal {
         IEnumerable<string> MapIds { get; }
         // The loaded objects at the scene path that carry a map icon.
         IReadOnlyList<object> Find(string scene, string path);
@@ -68,6 +69,7 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
+            if (state?.Active == false && world.DisableRefusal(target) is string reason) throw new InvalidOperationException(reason);
         }
         public object Capture(object target) => world.Observe(target);
         public ObjectState Read(object target) => world.Observe(target).Root;

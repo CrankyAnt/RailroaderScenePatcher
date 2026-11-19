@@ -562,7 +562,9 @@ namespace RailroaderScenePatcher.Core {
         public object Parent { get; }
     }
     // The game-facing operations of the baked scenery group and part capabilities. Positions are map coordinates.
-    public interface IGroupWorld {
+    // IDisableRefusal: why `active: false` cannot hold against a switch of the game that names the group root or part, or
+    // null.
+    public interface IGroupWorld : IDisableRefusal {
         IEnumerable<string> MapIds { get; }
         // The loaded group roots of the Baked scenery group family at the scene and path.
         IReadOnlyList<object> Find(string scene, string path);
@@ -812,7 +814,8 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target);
+            var refusal = (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target))
+                ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal GroupObservation Observed; internal ConstructionSegments Segments; }
@@ -919,7 +922,8 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Equipment != null) throw new InvalidOperationException("Baked scenery parts do not support crossing-equipment relationships");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
-            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target));
+            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target))
+                ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal PartObservation Observed; internal Placement Held, Scene; }
