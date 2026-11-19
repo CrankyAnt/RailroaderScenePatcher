@@ -102,6 +102,12 @@ An operation can be unavailable even when other edits are supported. Its control
 - **Follow** is unavailable for every existing mast and bell. A modification that gives one a `trackFollowing` placement fails before changing anything.
 - Rotation is unavailable for a bell.
 
+## Multiplayer, later joins and reconnects
+
+Each player's game moves or disables the mast or bell in its own world when that world loads. A player who joins later or reconnects loads the map again, and the patcher applies each modification once to the equipment of the newly loaded world. A moved mast then gets its culling again. If a modification fails in one player's game, that game reports it, and the other players are not affected. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+
+These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+
 ## Limits
 
 - A crossing controller creates its bell each time the controller is enabled. If the game switches the controller off and on during a session, the new bell appears at the controller and stays enabled until the next world load reapplies the scene patch file.

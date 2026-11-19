@@ -73,6 +73,14 @@ The scene, path and segment in this example are placeholders. Use the scene and 
 
 To delete an addition, remove its member from `additions`; when it was the last one, remove `additions` too, because an empty `additions` object is invalid. An addition exists only while the scene patch file lists it. To make one modification wait for another, name it in `dependsOn`. The order of the keys in the file has no effect.
 
+## Multiplayer, later joins and reconnects
+
+Each player's game builds the addition in its own world when that world loads. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game, from the circuits that game holds. Whether the crossing's light, gate and bell keys also reach other players hasn't been determined.
+
+A player who joins later or reconnects loads the map again. The patcher builds the addition once in the newly loaded world, under the same addition ID, and nothing of the earlier session stays behind. If the addition fails in one player's game, that game reports it, and the other players keep their detection. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+
+These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+
 ## Limits
 
 - An addition ID may appear in one modification of the scene patch file. If two modifications use the same ID, both fail and the other modifications still apply.

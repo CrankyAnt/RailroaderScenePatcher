@@ -74,6 +74,14 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
 
 The scene, path and segment in this example are placeholders; use the scene, path and circuit IDs from the inspected crossing. The field rules are in the [scene patch file v1](scene-patch-file-v1.md#crossing-coverage).
 
+## Multiplayer, later joins and reconnects
+
+Each player's game applies the coverage to its own crossing when its world loads. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game, from the circuits that game holds. Whether the crossing's light, gate and bell keys also reach other players hasn't been determined.
+
+A player who joins later or reconnects loads the map again. The patcher applies each circuit once in the newly loaded world, and the circuits you did not name keep their native spans. If the coverage fails in one player's game, that game reports it, and the other players keep their coverage. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+
+These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+
 ## Limits
 
 - The patcher does not check whether trains occupy the affected spans, and it applies coverage while a train is parked on them. Coverage edits were validated with the affected spans clear of trains; make edits in scene patch editing with those spans clear.

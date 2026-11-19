@@ -82,6 +82,11 @@ class FakeCrossingWorld : ICrossingCoverageWorld {
         if (Graph.TryGetValue(s.Id, out var found) && ReferenceEquals(found, s)) Graph.Remove(s.Id);
         s.Destroyed = true;
     }
+    // The game unloads the map scenes: every span the patcher owns is destroyed with them and leaves the graph, without a
+    // call from the patcher.
+    public void SceneUnloaded() {
+        foreach (var span in Graph.Values.Where(s => s.Owned).ToList()) { Graph.Remove(span.Id); span.Destroyed = true; }
+    }
     public void SetSpans(object circuit, object approachA, object island, object approachB) {
         Mutations++;
         ((FakeCircuit)circuit).Spans = new[] { (FakeSpan)approachA, (FakeSpan)island, (FakeSpan)approachB };

@@ -33,13 +33,21 @@ static class ExistingEquipmentTests {
     // The crossing stands at map 1100, 10, 20. Its culler has a 30 m sphere and lists the object above each mast.
     internal sealed class Fixture : IRelatedInspectionScene {
         public readonly FakeGroupWorld World = new FakeGroupWorld();
-        public readonly FakeGroup Controller = new FakeGroup();
-        public readonly FakePart Outer1, Mast1, Gate1, Outer2, Mast2, Bell;
-        public readonly FakeCuller Culler;
+        public FakeGroup Controller;
+        public FakePart Outer1, Mast1, Gate1, Outer2, Mast2, Bell;
+        public FakeCuller Culler;
         public readonly PartHolds Holds = new PartHolds();
         public readonly SceneCapabilities Scene;
         public readonly PatchEngine Engine;
         public Fixture() {
+            Build();
+            Scene = new SceneCapabilities(() => World.Maps, this);
+            Scene.Add(ExistingEquipmentScene.Masts(World, Holds)); Scene.Add(ExistingEquipmentScene.Bells(World, Holds));
+            Engine = new PatchEngine(Scene);
+        }
+        // The crossing as the game builds it when its scene loads.
+        void Build() {
+            Controller = new FakeGroup();
             Controller.Parts.Clear(); Controller.Cullers.Clear(); Controller.RootCulling = null;
             Outer1 = Controller.Add(new FakePart { Id = "Signal 1#1", Offset = new[] { -6.0, 0, 4 } });
             Mast1 = Controller.Add(new FakePart { Id = "Signal 1/Signal 1#2", Offset = new[] { -6.0, 0, 4 }, Parent = Outer1 });
@@ -52,9 +60,14 @@ static class ExistingEquipmentTests {
             World.Objects[Crossing] = new List<object> { Controller };
             foreach (var (path, part) in new[] { (Mast1Path, Mast1), (Mast2Path, Mast2), (BellPath, Bell) }) World.PartsAt[path] = new List<object> { part };
             World.SetActive(Controller, true); World.Mutations = 0;
-            Scene = new SceneCapabilities(() => World.Maps, this);
-            Scene.Add(ExistingEquipmentScene.Masts(World, Holds)); Scene.Add(ExistingEquipmentScene.Bells(World, Holds));
-            Engine = new PatchEngine(Scene);
+        }
+        // The peer leaves and joins again: the map unloads, which destroys the crossing with its culling managers and the
+        // spheres in them, and the game builds the crossing anew.
+        public void Rejoin() {
+            World.Native.Unloading = true; World.Culling.Unload(); World.Native.Registered.Clear();
+            World.Objects.Clear(); World.PartsAt.Clear();
+            World.Native.Unloading = false;
+            Build();
         }
         public IEnumerable<string> MapIds => World.Maps;
         public IEnumerable<SceneObservation> Discover() => World.PartsAt.Select(pair => Of(pair.Value[0]));
@@ -91,6 +104,7 @@ static class ExistingEquipmentTests {
         IncompleteCleanupBlocksTheRetry();
         HistorySaveReloadAndRemoval();
         RepeatedApplicationAccumulatesNothing();
+        RejoinAppliesOnceToTheRebuiltCrossing();
         PatternsNameWhyEquipmentDoesNotConform();
         Assert(ExistingEquipmentScene.MastStructure == "existing-crossing-mast-v1" && ExistingEquipmentScene.BellStructure == "existing-crossing-bell-v1", "The structure names that scene patch files hold");
         OutlinerListsMastsAsOneEntryAndSpansUnderTheirController();
@@ -267,6 +281,29 @@ static class ExistingEquipmentTests {
             "Repeated application adds no offset and no second sphere or hand-over: " + first + " / " + Where(f));
         f.World.Origin = 1010;
         Assert(new PatchEngine(f.Scene).Apply(doc).Outcomes.Values.All(o => o.Applied) && Near(f.MapOf(f.Mast1).Position, Far), "A load at another origin reaches the same map placement: " + Where(f));
+    }
+
+    // A new load attempt over a kept world reconciles the moved mast, bell and disabled mast without another sphere or
+    // hand-over. After a leave and a join the game has rebuilt the crossing: the old equipment is released without a
+    // cleanup failure, and the rebuilt equipment gets each modification once.
+    static void RejoinAppliesOnceToTheRebuiltCrossing() {
+        var f = new Fixture();
+        var doc = Doc(Mast("far-mast", position: Far, rotation: Quarter), Bell("move-bell", new[] { 1103.0, 12, 21 }), Mast("off", Mast2Path, active: false));
+        Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied), "The equipment modifications apply");
+        var first = Where(f); var spheres = f.World.Native.Registered.Count; var listed = f.Culler.Lists.Count;
+        var kept = f.Engine.Reenter();
+        Assert(kept.Retained == 3 && kept.Released == 0 && kept.Failures.Count == 0, "A kept crossing keeps its equipment through a new load attempt: retained " + kept.Retained);
+        Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && Where(f) == first && f.World.Native.Registered.Count == spheres && f.Culler.Lists.Count == listed && f.World.Culling.HandedOver(f.Culler).Count == 1,
+            "Reconciling kept equipment adds no offset, sphere or hand-over: " + Where(f));
+        var old = f.Mast1;
+        f.Rejoin();
+        var rebuilt = f.Engine.Reenter();
+        Assert(rebuilt.Released == 3 && rebuilt.Retained == 0 && rebuilt.Failures.Count == 0, "The equipment the game destroyed is released without a cleanup failure: " + String.Join("; ", rebuilt.Failures));
+        Assert(!ReferenceEquals(f.Mast1, old) && f.World.Native.Registered.Count == 0 && Near(f.MapOf(f.Mast1).Position, new[] { 1094.0, 10, 24 }) && f.Mast2.Active, "The rebuilt crossing starts as the scene has it, with no hold or sphere left from the old one: " + Where(f));
+        var again = f.Engine.Apply(doc);
+        Assert(again.Outcomes.Values.All(o => o.Applied) && Where(f) == first && f.World.Native.Registered.Count == spheres && f.Culler.Lists.Count == listed && f.World.Culling.HandedOver(f.Culler).Count == 1 && !f.Mast2.Active,
+            "The rebuilt equipment gets each modification once: " + String.Join("; ", again.Outcomes.Values.Select(o => o.Error)) + " " + Where(f));
+        Assert(f.Engine.Apply(doc).Outcomes.Values.All(o => o.Applied) && Where(f) == first && f.World.Native.Registered.Count == spheres, "A repeated callback after the rejoin adds nothing");
     }
 
     // The mast pattern is judged from mechanisms: the lamps on the light object and the gates at and below it observe

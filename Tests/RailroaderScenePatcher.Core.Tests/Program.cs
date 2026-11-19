@@ -344,6 +344,7 @@ class Program {
         SubscriptionTests.Run();
         EquipmentTests.Run();
         BellTests.Run();
+        CrossingJoinTests.Run();
         FailureRecoveryTests.Run();
         FaultInjectionTests.Run();
         Console.WriteLine("PASS: complete scene patch file behavior"); return 0;

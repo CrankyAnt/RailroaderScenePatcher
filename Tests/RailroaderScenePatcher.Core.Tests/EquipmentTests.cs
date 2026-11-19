@@ -96,10 +96,18 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
         return added;
     }
     public void Destroy(object addition) {
-        Mutations++; if (StickyDestroy) return; var a = (Added)addition; a.Destroyed = true; a.InCuller = false; Devices.Remove(a.Copy);
+        Mutations++; if (StickyDestroy) return; Gone((Added)addition);
+    }
+    void Gone(Added a) {
+        // Destroying a destroyed object does nothing, as in the game.
+        if (a.Destroyed) return;
+        a.Destroyed = true; a.InCuller = false; Devices.Remove(a.Copy);
         // A bell releases its observer and its audio; a load still pending is cancelled.
         if (a.Bell != null) { a.Observers = 0; if (a.AudioLoaded) { a.AudioLoaded = false; AudioReferences--; } else if (a.LoadProblem == null) PendingLoads--; }
     }
+    // The game unloads the scene of a crossing: every addition beneath it is destroyed with it, without a call from the
+    // patcher. A bell gives up its observer and audio as it does when the patcher removes it.
+    public void SceneUnloaded(FakeCrossing crossing) { foreach (var a in Live(crossing).ToList()) Gone(a); }
     public bool Present(object addition) => !((Added)addition).Destroyed;
     public Placement Placement(object addition) { var a = (Added)addition; return new Placement((double[])a.Position.Clone(), (double[])a.Rotation.Clone()); }
     public void SetPlacement(object addition, Placement placement) {

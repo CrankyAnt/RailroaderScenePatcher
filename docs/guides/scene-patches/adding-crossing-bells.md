@@ -96,6 +96,14 @@ Target the crossing controller as for coverage, and key the bell by its ID under
 
 The scene, path and coordinates are placeholders. Use the values the editor shows for your crossing. `source.definition` is the bell definition's identifier in the content library. The bell observes the bell key of the controller targeted by its modification. See the [scene patch file v1 reference](scene-patch-file-v1.md#crossing-equipment) for the field rules.
 
+## Multiplayer, later joins and reconnects
+
+Each player's game builds the bell beneath its own crossing controller when its world loads, and loads the bell's audio there. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game and sets its bell key from it. The added bell follows the bell key of the controller in its own game. Whether that key also reaches other players hasn't been determined.
+
+A player who joins later or reconnects loads the map again. The patcher builds each bell once in the newly loaded world, under the same equipment ID. The bell of the earlier session released its audio when the map unloaded. If a bell fails in one player's game, for example because its bell definition is missing there, that game reports it, and the other players keep their bell. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+
+These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+
 ## Limits
 
 - Bells have a fixed map placement. Track-following placement, the transform gizmo and snapping are not available for bells.

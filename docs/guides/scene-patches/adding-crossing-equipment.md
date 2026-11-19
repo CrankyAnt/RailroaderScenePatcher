@@ -98,6 +98,14 @@ Target the crossing controller as you would for coverage, using `Track.Crossings
 
 The scene, paths and coordinates are placeholders. Use the values the editor shows for your crossing and source. Each addition belongs to the controller targeted by its modification. An entry's key is its ID, so it has no `id` member. See the [scene patch file v1 reference](scene-patch-file-v1.md#crossing-equipment) for the field rules.
 
+## Multiplayer, later joins and reconnects
+
+Each player's game builds the copy beneath its own crossing controller when its world loads. The copy's lamps and gates follow that controller, and the crossing's culler shows and hides the copy in that game.
+
+A player who joins later or reconnects loads the map again. The patcher builds each addition once in the newly loaded world, under the same equipment ID. The copies of the earlier session went with the map when it unloaded. If an addition fails in one player's game, for example because its source is missing there, that game reports it, and the other players keep their equipment. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+
+These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+
 ## Limits
 
 - Additions have a fixed map placement. Track-following placement, the transform gizmo and snapping are not available for additions.
