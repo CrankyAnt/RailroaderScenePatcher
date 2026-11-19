@@ -19,9 +19,11 @@ public sealed class FaultSwitch : MonoBehaviour {
     const string TypeName = "RailroaderScenePatcher.Core.FaultInjection";
     static readonly string[] Points = { "after-mutation", "during-restoration", "between-addition-steps" };
     Rect window = new Rect(20, 200, 360, 0);
-    // The group root for the unreadable-group point, as the Group skipped line names it: scene name/path.
+    // The group root for the unreadable-group and unreadable-parts points, as the Group skipped line names it:
+    // scene name/path.
     string groupRoot = "";
-    // Why the last Arm unreadable-group failed; the Last line shows it until an arm succeeds or Disarm is clicked.
+    // Why the last Arm unreadable-group or Arm unreadable-parts failed; the Last line shows it until an arm succeeds or
+    // Disarm is clicked.
     string armFailure;
     bool visible = true;
     string problem;
@@ -47,13 +49,13 @@ public sealed class FaultSwitch : MonoBehaviour {
         // The window takes the height of its content, so a long group root cannot push Disarm out of view.
         window = GUILayout.Window(0x52FA, window, Draw, "Scene Patcher fault switch (test only, F9 hides)", GUILayout.Width(window.width));
     }
-    void ArmGroup(Type type) {
+    void ArmGroup(Type type, string method, string point) {
         try {
-            Call(type, "ArmUnreadableGroup", groupRoot);
+            Call(type, method, groupRoot);
             armFailure = null;
-            Debug.Log("[SceneFaultSwitch] Armed unreadable-group " + groupRoot);
+            Debug.Log("[SceneFaultSwitch] Armed " + point + " " + groupRoot);
         } catch (Exception e) {
-            armFailure = "Arm unreadable-group failed: " + e.GetBaseException().Message;
+            armFailure = "Arm " + point + " failed: " + e.GetBaseException().Message;
             Debug.LogWarning("[SceneFaultSwitch] " + armFailure);
         }
     }
@@ -71,11 +73,13 @@ public sealed class FaultSwitch : MonoBehaviour {
             GUILayout.Label("Flattening mask moves: " + (flattening ? "allowed" : "refused"));
             if (GUILayout.Button(flattening ? "Refuse flattening mask moves" : "Allow flattening mask moves")) { Call(type, "AllowFlatteningMoves", !flattening); Debug.Log("[SceneFaultSwitch] Flattening mask moves " + (!flattening ? "allowed" : "refused")); }
             GUILayout.Label("Unreadable group: " + (Get(type, "UnreadableGroup") ?? "none"));
+            GUILayout.Label("Unreadable parts: " + (Get(type, "UnreadableParts") ?? "none"));
             groupRoot = GUILayout.TextField(groupRoot ?? "");
             var typed = !String.IsNullOrWhiteSpace(groupRoot);
             var enabled = GUI.enabled;
             GUI.enabled = enabled && typed;
-            if (GUILayout.Button(new GUIContent("Arm unreadable-group", typed ? "" : "Unavailable: type a group root"))) ArmGroup(type);
+            if (GUILayout.Button(new GUIContent("Arm unreadable-group", typed ? "" : "Unavailable: type a group root"))) ArmGroup(type, "ArmUnreadableGroup", "unreadable-group");
+            if (GUILayout.Button(new GUIContent("Arm unreadable-parts", typed ? "" : "Unavailable: type a group root"))) ArmGroup(type, "ArmUnreadableParts", "unreadable-parts");
             GUI.enabled = enabled;
             if (GUILayout.Button("Disarm")) { Call(type, "Disarm"); armFailure = null; Debug.Log("[SceneFaultSwitch] Disarmed"); }
             // The tooltip of the control under the pointer, such as the reason a button is unavailable.

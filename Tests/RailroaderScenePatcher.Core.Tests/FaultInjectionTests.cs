@@ -17,7 +17,8 @@ static class FaultInjectionTests {
         GroundMaskTests.RunFlatteningSwitch();
         RoadBridgeTests.RunFailureAfterRebuild();
         UnreadableGroupIsSkippedOnce();
-        Console.WriteLine("PASS: fault build arms each injected failure once and handles it as a real failure, and logs an unreadable group once");
+        UnreadablePartsAreSkippedOnce();
+        Console.WriteLine("PASS: fault build arms each injected failure once and handles it as a real failure, and logs an unreadable group and unreadable parts once");
 #else
         Assert(typeof(PatchEngine).Assembly.GetType("RailroaderScenePatcher.Core.FaultInjection") == null, "The normal build has no fault injection switch");
         Assert(new GroupSkips(_ => { }).Read(() => "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Coal Dealer", () => "read") == "read", "The normal build reads every group root");
@@ -49,6 +50,36 @@ static class FaultInjectionTests {
         Assert(FaultInjection.Armed == null, "The failure disarmed");
         var recheck = session.Recheck(new TargetIdentity("s", "p", "c"));
         Assert(recheck.Applied && p.X == 4 && !session.CleanupUnverified(new TargetIdentity("s", "p", "c")), "Recheck returns the object to the scene patch file and ends the guard: " + recheck.Error);
+    }
+    // The unreadable-parts point makes the family read the parts of one chosen group root as unreadable, each time it
+    // decides its groups, until it is disarmed; it is a point of its own beside the unreadable-group point, and the
+    // skipped family logs exactly one line for its root.
+    static void UnreadablePartsAreSkippedOnce() {
+        const string root = "s/World/Family root", other = "s/World/Other";
+        var lines = new List<string>();
+        var skips = new GroupSkips(lines.Add);
+        var computed = 0;
+        Assert(skips.ReadParts(() => { computed++; return root; }, () => { }) && computed == 0, "Before arming, the root of a group whose parts are read is not computed");
+        FaultInjection.ArmUnreadableParts(root);
+        Assert(FaultInjection.UnreadableParts == root && FaultInjection.UnreadableGroup == null && FaultInjection.Armed == null, "The point is armed for its root on its own");
+        Assert(skips.Read(() => root, () => "read") == "read", "World marking still reads the group's objects");
+        var reads = 0;
+        for (var pass = 0; pass < 3; pass++) {
+            Assert(!skips.ReadParts(() => root, () => reads++), "The armed root's parts read as unreadable on every pass");
+            Assert(skips.ReadParts(() => other, () => { }) && skips.ReadParts(() => root + "/Part", () => { }), "Another root reads its parts normally");
+        }
+        Assert(reads == 0, "The armed root's parts are not read");
+        Assert(lines.SequenceEqual(new[] { "Group skipped: " + root + ": its parts could not be read: Injected unreadable parts" }), "Exactly one line for the skipped family: " + String.Join(" | ", lines));
+        Assert(FaultInjection.LastTrip.StartsWith("Tripped unreadable-parts for " + root + " at ", StringComparison.Ordinal), "Last names the tripped root: " + FaultInjection.LastTrip);
+        FaultInjection.ArmUnreadableGroup(other);
+        Assert(FaultInjection.UnreadableParts == root, "Arming the unreadable-group point leaves the unreadable-parts point armed");
+        FaultInjection.Disarm();
+        Assert(FaultInjection.UnreadableParts == null && skips.ReadParts(() => root, () => { }) && lines.Count == 1, "Disarm ends the point");
+        foreach (var empty in new[] { null, "", " " }) {
+            var refused = false;
+            try { FaultInjection.ArmUnreadableParts(empty); } catch (ArgumentException) { refused = true; }
+            Assert(refused && FaultInjection.UnreadableParts == null, "The point needs a group root that is not only white space");
+        }
     }
     // The unreadable-group point makes world marking read one chosen group root as unreadable, each time it decides
     // its groups, until it is disarmed; the skipped group logs one line per root and reason.

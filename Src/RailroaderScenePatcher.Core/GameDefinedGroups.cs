@@ -185,6 +185,19 @@ namespace RailroaderScenePatcher.Core {
                 return read();
             } catch (Exception e) { Skip(RootOrNull(root), "its objects could not be read: " + e.GetBaseException().Message); return null; }
         }
+        // Reads the parts of one group of the family. A group whose parts cannot be read keeps its root entry without
+        // parts and is skipped: the result is false. root is computed as for Read.
+        public bool ReadParts(Func<string> root, Action read) {
+            if (root == null) throw new ArgumentNullException(nameof(root));
+            if (read == null) throw new ArgumentNullException(nameof(read));
+            try {
+#if SCENE_PATCHER_FAULTS
+                FaultInjection.TripUnreadableParts(root);
+#endif
+                read();
+                return true;
+            } catch (Exception e) { Skip(RootOrNull(root), "its parts could not be read: " + e.GetBaseException().Message); return false; }
+        }
         static string RootOrNull(Func<string> root) { try { return root(); } catch { return null; } }
     }
 }

@@ -270,7 +270,7 @@ A mask whose shape crosses a terrain tile border is tracked only on the tile of 
 
 Without the game's ground mask members, the groups that hold a mask are refused, but the Hemingway marker is not refused and would move without its mask. This is a limit of this version.
 
-Lake surfaces are not yet measured in Railroader. Automated tests check their listing, edits, refusal, restoration, Undo, Redo, Save and reload with controlled groups. Not yet observed in the game: whether the water and the logs appear at the new place, whether the log pond keeps following the sawmill's storage there, whether a moved lake appears and disappears by camera distance at its new place, and whether the game draws the lake surfaces of the base map from a static batch.
+A run on the base map in Railroader 0.6.3 build 26740326, with the patcher at commit `ec871d4`, observed the lake surfaces. The game draws none of the base map's lake surfaces from a static batch, so each can be moved. The water followed a moved `Whittier Log Pond` group and a moved `Fontana Lake (1)`, and nothing stayed at the old place. The logs of the moved log pond stood at its new place and followed the sawmill's log storage there. The moved Fontana lake appeared and disappeared by camera distance around its new place, as the unedited `Fontana Lake (2)` does around its own. Undo, Redo, **Disable**, **Enable**, Save and a world reload gave one water surface and one set of logs each. Automated tests check the listing, edits, refusal, restoration, Undo, Redo, Save and reload with controlled groups.
 
 Automated tests also check part edits and a moved part's separate culling sphere with a controlled group.
 

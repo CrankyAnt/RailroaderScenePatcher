@@ -28,6 +28,7 @@ static class HelperMarkerTests {
         AFarLargerColliderDoesNotOutlineTheObject();
         ALightOnlyObjectHasItsMarkerAtThePivot();
         AColliderFramesItsBoundsWithTheMarkerAtThePivot();
+        ACollidersOnlyObjectGetsItsColliderFrame();
         BeyondTheFrameDistanceOnlyTheMarkerShows();
         APivotBehindTheCameraShowsNothing();
         SelectInWorldPicksTheObjectByItsHelperMarker();
@@ -116,6 +117,33 @@ static class HelperMarkerTests {
         // Two colliders side by side are framed as one box: x -2..2 on the near face at z 49.
         var two = HelperMarkers.Mark(pivot, Eye, new[] { Box("a", -1, 1, 50, 1), Box("b", 1, 1, 50, 1) }, Camera, View);
         Check(two.Frame.HasValue && Near1(two.Frame.Value.X, 1280 - 2 * 1280 * .5625 / 49 - 4) && Near1(two.Frame.Value.Right, 1280 + 2 * 1280 * .5625 / 49 + 4), "both colliders side by side are inside the frame");
+    }
+
+    // The collection for a collider-only object, from the facts of its colliders to its frame: no renderer outlines
+    // it, so it shows a helper marker; the colliders that count give their bounds from their eight corners, and a
+    // collider whose corners cannot be read is left out alone. Here a terrain collider, the 2 m click spot cube with
+    // its pivot at its bottom face 50 m ahead, a collider that is switched off, and a solid collider whose corners throw.
+    static void ACollidersOnlyObjectGetsItsColliderFrame() {
+        var pivot = new WorldPoint(0, 0, 50);
+        var renderers = ObjectMarkingGeometry.Frame(pivot, Eye, Array.Empty<ObjectMarkingPart>(), Camera, View, null);
+        Check(HelperMarkers.Shows(renderers, false, 0), "a collider-only object shows a helper marker");
+        var facts = new[] { new HelperCollider(true, false, true, new[] { On }), Solid(On), new HelperCollider(false, false, false, new[] { On }), Solid(On) };
+        var cube = new List<WorldPoint>();
+        foreach (var x in new[] { -1.0, 1 }) foreach (var y in new[] { 0.0, 2 }) foreach (var z in new[] { 49.0, 51 }) cube.Add(new WorldPoint(x, y, z));
+        var read = new List<int>();
+        IReadOnlyList<WorldPoint> Corners(int i) { read.Add(i); if (i == 3) throw new InvalidOperationException("collider destroyed"); return cube; }
+        var parts = HelperMarkers.ColliderParts(HelperMarkers.Framing(facts), Corners);
+        Check(read.SequenceEqual(new[] { 1, 3 }), "only the colliders that count are read: " + String.Join(",", read));
+        Check(parts.Count == 1 && parts[0].Name == "collider #1" && Near1(parts[0].Center.Y, 1) && Near1(parts[0].Center.Z, 50) && Near1(parts[0].Extents.X, 1) && Near1(parts[0].Extents.Y, 1) && parts[0].Oriented.Count == 8,
+            "the click spot gives one part with its bounds and corners: " + String.Join(" | ", parts.Select(p => p.Name + " " + p.Center.X + "," + p.Center.Y + "," + p.Center.Z)));
+        var mark = HelperMarkers.Mark(pivot, Eye, parts, Camera, View);
+        Check(mark.ColliderFrame && mark.Frame.HasValue && Near1(mark.Frame.Value.Y, 720 * (1 - 2.0 / 49) - 4) && Near1(mark.Frame.Value.Bottom, 724) && Near1(mark.Frame.Value.Width, 2 * 1280 * .5625 / 49 + 8),
+            "the collider-only object gets its collider frame around the click spot's bounds");
+        Check(mark.Marker.HasValue && Near1(mark.Marker.Value.X, 1280) && Near1(mark.Marker.Value.Y, 720), "its marker stands on the pivot");
+        // A collider that gives fewer than eight corners is left out; without a collider that counts, the least frame shows.
+        Check(HelperMarkers.ColliderParts(new[] { 0 }, i => cube.Take(7).ToArray()).Count == 0 && HelperMarkers.ColliderParts(new[] { 0 }, i => null).Count == 0, "a collider without eight corners gives no part");
+        var terrainOnly = HelperMarkers.Mark(pivot, Eye, HelperMarkers.ColliderParts(HelperMarkers.Framing(new[] { facts[0] }), Corners), Camera, View);
+        Check(!terrainOnly.ColliderFrame && terrainOnly.Frame.HasValue && Near1(terrainOnly.Frame.Value.Width, 32), "an object with only a terrain collider keeps the least frame about its marker");
     }
 
     static void BeyondTheFrameDistanceOnlyTheMarkerShows() {

@@ -186,7 +186,7 @@ namespace RailroaderScenePatcher {
         // follows the object.
         // The terrain's collider type, read by name: its module is not referenced.
         const string TerrainColliderType = "UnityEngine.TerrainCollider";
-        sealed class Framed { internal Collider[] Colliders; internal int Until; }
+        sealed class Framed { internal Collider[] All; internal IReadOnlyList<int> Framing; internal int Until; }
         readonly Dictionary<GameObject, Framed> colliders = new Dictionary<GameObject, Framed>();
         IReadOnlyList<ObjectMarkingPart> Colliders(GameObject go) {
             if (!colliders.TryGetValue(go, out var kept) || Time.frameCount >= kept.Until) {
@@ -199,21 +199,9 @@ namespace RailroaderScenePatcher {
                         return new HelperCollider(collider.enabled, collider.isTrigger, collider.GetType().FullName == TerrainColliderType, chain);
                     } catch { return new HelperCollider(false, false, false, null); }
                 }).ToArray();
-                colliders[go] = kept = new Framed { Colliders = HelperMarkers.Framing(facts).Select(i => all[i]).ToArray(), Until = Time.frameCount + 90 + (go.GetInstanceID() & 63) };
+                colliders[go] = kept = new Framed { All = all, Framing = HelperMarkers.Framing(facts), Until = Time.frameCount + 90 + (go.GetInstanceID() & 63) };
             }
-            var parts = new List<ObjectMarkingPart>();
-            for (var index = 0; index < kept.Colliders.Length; index++) {
-                var collider = kept.Colliders[index];
-                if (collider == null) continue;
-                try {
-                    var corners = GroupWorld.Corners(collider).Select(Point).ToArray();
-                    if (corners.Length != 8) continue;
-                    double minX = corners.Min(c => c.X), maxX = corners.Max(c => c.X), minY = corners.Min(c => c.Y), maxY = corners.Max(c => c.Y), minZ = corners.Min(c => c.Z), maxZ = corners.Max(c => c.Z);
-                    parts.Add(new ObjectMarkingPart("collider #" + index, new WorldPoint((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2),
-                        new WorldPoint((maxX - minX) / 2, (maxY - minY) / 2, (maxZ - minZ) / 2), corners));
-                } catch { }
-            }
-            return parts;
+            return HelperMarkers.ColliderParts(kept.Framing, i => kept.All[i] == null ? null : GroupWorld.Corners(kept.All[i]).Select(Point).ToArray());
         }
         // Where a candidate stands in the world now: the transform of its scene object, which follows every placement
         // change, gizmo preview and Undo, or its observed position for anything else.
@@ -454,6 +442,8 @@ namespace RailroaderScenePatcher {
         static readonly GroupSkips skips = new GroupSkips(line => Debug.Log("Scene Patcher: " + line));
         static string RootPath(GameObject root) => root == null ? null : root.scene.name + "/" + BoardScene.PathOf(root.transform);
         internal static void Skipped(GameObject root, string reason) => skips.Skip(RootPath(root), reason);
+        // Reads the parts of one family group; a group whose parts cannot be read is skipped with one line.
+        internal static void ReadParts(GameObject root, Action read) => skips.ReadParts(() => RootPath(root), read);
         int[][] Mapped(SpatialCandidate[] candidates, InventoryGroup[] groups) {
             if (ReferenceEquals(candidates, mappedFor)) return mapped;
             var byHandle = new Dictionary<object, List<int>>();

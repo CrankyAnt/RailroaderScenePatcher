@@ -231,8 +231,7 @@ namespace RailroaderScenePatcher {
                 foreach (var group in classified.Where(v => v.Disposition == GroupDisposition.Group)) {
                     var groupRoot = ((HierarchyNode)group.Node).Transform;
                     if (pickableToggle != null && groupRoot.GetComponentsInChildren(pickableToggle, true).Length != 0) togglesNow.Add(groupRoot.gameObject);
-                    try { foreach (var part in BakedSceneryRules.Parts(new[] { group })) parts[((HierarchyNode)part.Node).Transform.gameObject] = part; }
-                    catch (Exception e) { WorldSelectionOverlay.Skipped(((HierarchyNode)group.Node).Transform.gameObject, "its parts could not be read: " + e.GetBaseException().Message); }
+                    WorldSelectionOverlay.ReadParts(groupRoot.gameObject, () => { foreach (var part in BakedSceneryRules.Parts(new[] { group })) parts[((HierarchyNode)part.Node).Transform.gameObject] = part; });
                 }
             }
             verdictKey = text; partVerdicts = parts; driven = drivenNow; toggleRoots = togglesNow;

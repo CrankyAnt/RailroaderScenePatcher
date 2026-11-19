@@ -7,7 +7,8 @@ namespace RailroaderScenePatcher.Core {
     // Test-only fault injection. It exists only in a build with -p:SceneFaults=true, which defines SCENE_PATCHER_FAULTS;
     // the normal build has no type, no hook and no way to arm a failure. One armed failure trips at the next mutation that
     // reaches its point, whether that mutation is an edit, an Undo or Redo step or a world-load application, and then
-    // disarms itself. The unreadable-group point is no mutation failure: it stays armed for one group root.
+    // disarms itself. The unreadable-group and unreadable-parts points are no mutation failures: each stays armed for one
+    // group root.
     public static class FaultInjection {
         // The points a failure can be armed at, by the names the test mod passes.
         public const string AfterMutation = "after-mutation", DuringRestoration = "during-restoration", BetweenAdditionSteps = "between-addition-steps";
@@ -30,7 +31,7 @@ namespace RailroaderScenePatcher.Core {
             if (point != AfterMutation && point != DuringRestoration && point != BetweenAdditionSteps) throw new ArgumentException("Unknown fault point: " + point);
             lock (gate) { armed = point; failRestoration = false; }
         }
-        public static void Disarm() { lock (gate) { armed = null; failRestoration = false; unreadableGroup = null; flatteningMoves = false; } }
+        public static void Disarm() { lock (gate) { armed = null; failRestoration = false; unreadableGroup = null; unreadableParts = null; flatteningMoves = false; } }
         // Lifts the refusal of a move of a ground mask that flattens the terrain height, until Disarm or a call with
         // false: the Railroader evidence that compares the height before, after and restoration needs such a move.
         static bool flatteningMoves;
@@ -47,17 +48,34 @@ namespace RailroaderScenePatcher.Core {
             if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A group root is required", nameof(root));
             lock (gate) unreadableGroup = root;
         }
+        // The group root whose parts the family reads as unreadable, named as for the unreadable-group point, or null.
+        static string unreadableParts;
+        public static string UnreadableParts { get { lock (gate) return unreadableParts; } }
+        // Arms the unreadable-parts point, beside any other point: every read of the parts of the group with this root
+        // throws until Disarm or another root is armed, so the family skips that group each time it decides its groups.
+        // The root is kept as typed.
+        public static void ArmUnreadableParts(string root) {
+            if (String.IsNullOrWhiteSpace(root)) throw new ArgumentException("A group root is required", nameof(root));
+            lock (gate) unreadableParts = root;
+        }
         // root is computed only while the point is armed.
         internal static void TripUnreadableGroup(Func<string> root) {
+            if (TripsFor(root, () => unreadableGroup, "unreadable-group")) throw new InjectedFault("Injected unreadable group", false);
+        }
+        internal static void TripUnreadableParts(Func<string> root) {
+            if (TripsFor(root, () => unreadableParts, "unreadable-parts")) throw new InjectedFault("Injected unreadable parts", false);
+        }
+        // Whether the root read now is the root armed at the point; records the trip.
+        static bool TripsFor(Func<string> root, Func<string> armedAt, string point) {
             string armedRoot;
-            lock (gate) armedRoot = unreadableGroup;
-            if (armedRoot == null) return;
+            lock (gate) armedRoot = armedAt();
+            if (armedRoot == null) return false;
             var read = root();
             lock (gate) {
-                if (read == null || !String.Equals(read, unreadableGroup, StringComparison.Ordinal)) return;
-                LastTrip = "Tripped unreadable-group for " + read + " at " + DateTime.UtcNow.ToString("O");
+                if (read == null || !String.Equals(read, armedAt(), StringComparison.Ordinal)) return false;
+                LastTrip = "Tripped " + point + " for " + read + " at " + DateTime.UtcNow.ToString("O");
             }
-            throw new InjectedFault("Injected unreadable group", false);
+            return true;
         }
         internal static void TripAfterMutation() {
             lock (gate) {

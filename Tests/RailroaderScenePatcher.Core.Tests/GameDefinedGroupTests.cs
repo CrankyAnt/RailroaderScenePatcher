@@ -22,6 +22,7 @@ static class GameDefinedGroupTests {
         RoadBridgeGroup();
         SkippedGroupLine();
         SkippedGroupOnce();
+        SkippedFamilyOnce();
         Distances();
         Marking();
         Picking();
@@ -219,6 +220,19 @@ static class GameDefinedGroupTests {
     static void SkippedGroupLine() =>
         Check(GameDefinedGroups.SkippedLine("BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer", "none of its objects has a usable position") ==
             "Group skipped: BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer: none of its objects has a usable position", "a skipped group gives one line Group skipped: <group root>: <reason>");
+    // The family decides its groups again after every scene change; a group whose parts cannot be read keeps its root
+    // entry without parts and logs exactly one line, once per root and reason, in the agreed format.
+    static void SkippedFamilyOnce() {
+        var lines = new List<string>();
+        var skips = new GroupSkips(lines.Add);
+        var computed = 0; var read = 0;
+        for (var pass = 0; pass < 3; pass++) {
+            Check(!skips.ReadParts(() => "s/World/A", () => throw new InvalidOperationException("broken")), "a group whose parts cannot be read is skipped");
+            Check(skips.ReadParts(() => { computed++; return "s/World/B"; }, () => read++), "a group whose parts are read is not skipped");
+        }
+        Check(computed == 0 && read == 3, "the root of a group whose parts are read is not computed (computed " + computed + " times), and its parts are read each pass");
+        Check(lines.SequenceEqual(new[] { "Group skipped: s/World/A: its parts could not be read: broken" }), "exactly one line for the skipped family: " + String.Join(" | ", lines));
+    }
     // World marking decides its groups again after every scene change; a skipped group logs its line once per root
     // and reason.
     static void SkippedGroupOnce() {

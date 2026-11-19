@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher {
             var current = CurrentMarkerId();
             Section(builder, "Marker ID");
             ValueRow(builder, "Replacement ID", null, new[] { "ID" }, markerIdFields, 0, block,
-                "The ID the game registers this marker's track location under. A replacement ID repairs a duplicate marker ID: it must not be empty, have a space at either end, begin with passengerStop: or flare:, or match another scene marker or map object. Lua scripts and other mods that look up a marker by ID are not checked.", column => false);
+                "The ID the game registers this marker's track location under. A replacement ID repairs a duplicate marker ID: it must not be empty, have a space at either end, begin with passengerStop: or flare:, or match another scene marker or map object. Lua scripts and other mods that look up a marker by ID are not checked.", column => false, freeText: true);
             builder.HStack(row => {
                 var set = Button(row, CommandBand.SetMarkerId, ApplyMarkerId);
                 Func<string> setReason = () => CommandBand.MarkerIdSetReason(block, markerIdFields[0], current);

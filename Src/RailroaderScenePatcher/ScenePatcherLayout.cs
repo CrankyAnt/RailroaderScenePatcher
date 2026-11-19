@@ -113,7 +113,7 @@ namespace RailroaderScenePatcher {
         // here. Returns the text of the running line, for a caller that keeps it current.
         // accessory builds a control at the right end of the caption's row, as the native Move button stands beside
         // the Position caption.
-        TMP_Text ValueRow(UIPanelBuilder builder, string caption, string unit, string[] labels, string[] values, int first, string block, string tip, Func<int, bool> numeric, Action<UIPanelBuilder> accessory = null) {
+        TMP_Text ValueRow(UIPanelBuilder builder, string caption, string unit, string[] labels, string[] values, int first, string block, string tip, Func<int, bool> numeric, Action<UIPanelBuilder> accessory = null, bool freeText = false) {
             if (accessory == null) FieldLabel(builder, CommandBand.GroupCaption(caption, unit, block == null));
             else builder.HStack(row => {
                 row.AddLabel("<style=FieldLabel>" + Literal(CommandBand.GroupCaption(caption, unit, block == null)) + "</style>", text => text.verticalAlignment = VerticalAlignmentOptions.Bottom);
@@ -132,6 +132,7 @@ namespace RailroaderScenePatcher {
                     var input = row.AddInputField(values[index], value => values[index] = value);
                     // Every keystroke stores the value and lets the buttons that depend on it follow.
                     var field = input.GetComponent<TMP_InputField>();
+                    if (freeText) FreeText(field);
                     field.onValueChanged.AddListener(value => { values[index] = value; FieldsChanged(); });
                     if (ReferenceEquals(values, placementFields)) field.onSelect.AddListener(_ => BeginNumericWorldEdit(field));
                     if (numeric(column)) AlignNumeric(input);
@@ -143,6 +144,14 @@ namespace RailroaderScenePatcher {
                 }
             });
             return null;
+        }
+        // A field that keeps every character the modder types. The game's shared input field prefab dropped ':' from
+        // a replacement ID, so a value that the mod's own rules check would otherwise never reach them as typed.
+        static void FreeText(TMP_InputField field) {
+            field.contentType = TMP_InputField.ContentType.Standard;
+            field.characterValidation = TMP_InputField.CharacterValidation.None;
+            field.inputValidator = null;
+            field.onValidateInput = null;
         }
         // The label of an input field and the alignment of a number in it, as the native inspectors build them.
         RectTransform FieldLabel(UIPanelBuilder builder, string label) => builder.AddLabel("<style=FieldLabel>" + Literal(label) + "</style>");

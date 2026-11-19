@@ -70,6 +70,7 @@ static class ReplacementMarkerIdTests {
         RepeatedApplicationAndReentryConverge();
         FailedAttemptRestoresTheIdAndEveryRegistration();
         IncompleteCleanupBlocksTheRetryUntilRecheck();
+        AWorldReloadReleasesTheBlockedRetry();
         RefusalOffersTheReplacementIdForGenericMarkers();
         ActiveHolderShowsTheProblemAndInactiveHolderTheExplanation();
         ScenePatchEditingAppliesUndoesRemovesAndSaves();
@@ -219,6 +220,36 @@ static class ReplacementMarkerIdTests {
         var recheck = e.Session.Recheck(yard);
         Assert(recheck.Applied && e.Yard.Id == "Mg6m-yard" && e.Yard.Segment == "Sjdl", "Recheck verifies the object against the scene patch file: " + recheck.Error + " " + e.Registrations());
         Assert(e.Session.Remove(yard).Applied && e.Yard.Id == "Mg6m" && e.Yard.Segment == "S9sc" && e.Own(e.Speed) == "Sjdl|a|10", "After Recheck the removal returns the id and the binding: " + e.Registrations());
+    }
+    // A world reload rebuilds every marker from the scene as the game loads it: the next load attempt releases the
+    // object whose cleanup stayed unverified and applies the replacement ID afresh. A new session starts with a new
+    // engine over the same scene patch file and applies it as well.
+    static void AWorldReloadReleasesTheBlockedRetry() {
+        var w = new World();
+        var json = Doc(Item("yard", YardPath, "\"markerId\":\"Mg6m-yard\",\"relationships\":{\"trackMarker\":{\"segment\":\"pi3pzp\",\"end\":\"a\",\"distance\":3}}"));
+        w.Markers.ThrowAfterLocation = true; w.Markers.FailMarkerId = "Mg6m";
+        Assert(w.Engine.Apply(json, "pack").Outcomes["yard"].Failure == FailureKind.IncompleteCleanup, "The attempt leaves an incomplete cleanup");
+        w.Markers.FailMarkerId = null;
+        w.Engine.Reenter();
+        Assert(w.Engine.Apply(json, "pack").Outcomes["yard"].Failure == FailureKind.Blocked, "Over the retained world the retry stays blocked");
+        // The reload: the game destroys the scene markers and their registrations and loads them from the scene again.
+        var reloaded = new World();
+        w.Markers.Objects.Clear(); w.Markers.Buckets.Clear(); w.Markers.Owners.Clear();
+        foreach (var path in reloaded.Markers.Objects.Keys) w.Markers.Objects[path] = reloaded.Markers.Objects[path];
+        foreach (var bucket in reloaded.Markers.Buckets) w.Markers.Buckets[bucket.Key] = bucket.Value;
+        w.Markers.Owners.AddRange(reloaded.Markers.Owners);
+        var release = w.Engine.Reenter();
+        Assert(release.Released > 0 && release.Failures.Count == 0, "The next load attempt releases the reloaded marker: " + String.Join(" | ", release.Failures));
+        var retry = w.Engine.Apply(json, "pack").Outcomes["yard"];
+        Assert(retry.Applied && reloaded.Yard.Id == "Mg6m-yard" && reloaded.Own(reloaded.Yard) == "none" && reloaded.Yard.Segment == "pi3pzp" && reloaded.Own(reloaded.Speed) == "Sjdl|a|10",
+            "After the reload the retry applies the replacement ID and the rebind: " + retry.Error + " " + reloaded.Registrations());
+        // A new session over the same scene patch file starts with a new engine.
+        var session = new World();
+        session.Markers.ThrowAfterLocation = true; session.Markers.FailMarkerId = "Mg6m";
+        Assert(session.Engine.Apply(json, "pack").Outcomes["yard"].Failure == FailureKind.IncompleteCleanup, "The first session leaves an incomplete cleanup");
+        var next = new World();
+        var applied = next.Engine.Apply(json, "pack").Outcomes["yard"];
+        Assert(applied.Applied && next.Yard.Id == "Mg6m-yard" && next.Yard.Segment == "pi3pzp", "A new session applies the replacement ID: " + applied.Error + " " + next.Registrations());
     }
     static void RefusalOffersTheReplacementIdForGenericMarkers() {
         var w = new World();

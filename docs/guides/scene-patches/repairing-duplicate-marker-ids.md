@@ -6,7 +6,7 @@ This guide shows how to give one scene marker a replacement ID when it shares it
 
 The replacement ID applies to the marker you select. The other holders keep their marker ID and their registrations. The marker does not move.
 
-The patcher's behavior is described from its code and its automated tests. The game's reaction to a replacement ID is expected from the game's code. It is not yet observed in Railroader; see [limits](#limits).
+The patcher's behavior is described from its code and its automated tests. A run on the base map in Railroader 0.6.3 build 26740326, with the patcher at commit `325ad5f`, observed the repairs of `Mg6m` and `Mkft`; see [limits](#limits).
 
 ## When to use it
 
@@ -137,7 +137,7 @@ The patcher checks these rules before it changes anything. A refused edit leaves
 
 ## Limits
 
-- Game behavior is not yet observed in Railroader. The automated tests check these rules against a controlled marker world with the `Mg6m` pair and a group of three holders of `Mkft`. They also cover a replacement ID that applies before track following, and the save and reload of dependent binding and track-following edits. They do not load Railroader.
+- A run on the base map in Railroader 0.6.3 build 26740326, with the patcher at commit `325ad5f`, observed the game's registrations. The Yard Limit took `Mg6m-yard`, **Enable** and a binding at `pi3pzp` in one modification: it registered under `Mg6m-yard` there, and the speed sign stayed registered under `Mg6m`. Undo and Redo, a dependent rebind of the speed sign, Save and a world reload reproduced both registrations, and removing the modifications returned `Mg6m` to its registration before the repair. A `Whistle Sign W` at Bryson Everett that took a replacement ID and **Disable** left the other four holders of `Mkft` registered. The run did not cover track following, Lua scripts or multiplayer. The automated tests check these rules against a controlled marker world with the `Mg6m` pair and a group of three holders of `Mkft`, including a replacement ID that applies before track following and the save and reload of dependent binding and track-following edits.
 - Lua scripts that look a marker up by ID, such as scripts that call `NativeTrack.GetMarkerLocation`, are not checked. Third-party mods that look a marker up by ID are not checked either.
 - Map object IDs come from the game's map object manager for the loaded map context. While the manager is not loaded, the patcher refuses every replacement ID.
 - A scene marker that is not loaded but still registers under the shared ID counts as a holder. A repair of another holder does not move its registration.
