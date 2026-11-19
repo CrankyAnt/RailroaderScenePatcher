@@ -29,6 +29,30 @@ namespace RailroaderScenePatcher.Core {
         // A world-load application that already failed in this load attempt; it is not retried until the next load attempt.
         AlreadyFailed
     }
+    // How the inspector names a modification that did not apply, by its failure kind: the label of its Changes tab line
+    // and of its group in a footer message. Whether a kind shows as not applied: an incomplete cleanup keeps its own
+    // presentation, since the object may hold part of the change.
+    public static class FailureLabels {
+        public static string Of(FailureKind kind) {
+            switch (kind) {
+                case FailureKind.Refused: return "Refused";
+                case FailureKind.DependencyFailed: return "Not applied because a dependency failed";
+                case FailureKind.Restored: return "Failed and restored";
+                case FailureKind.AwaitingOutput: return "Failed and waiting for terrain output";
+                case FailureKind.IncompleteCleanup: return "Failed with incomplete cleanup";
+                case FailureKind.Blocked: return "Blocked by an incomplete cleanup";
+                case FailureKind.AlreadyFailed: return "Already failed in this load";
+                default: return "Not applied";
+            }
+        }
+        public static bool ShowsAsNotApplied(FailureKind kind) => kind != FailureKind.None && kind != FailureKind.IncompleteCleanup;
+    }
+    // A modification of the edited scene patch file that is not applied, with its failure kind and reason.
+    public sealed class NotAppliedModification {
+        public NotAppliedModification(FailureKind kind, string reason) { Kind = kind; Reason = reason; }
+        public FailureKind Kind { get; }
+        public string Reason { get; }
+    }
     // A failure after a mutation started, with what it left behind.
     internal sealed class AttemptFailure : InvalidOperationException {
         internal AttemptFailure(FailureKind kind, string message, IReadOnlyList<string> remaining = null, bool wasGuarded = false) : base(message) {

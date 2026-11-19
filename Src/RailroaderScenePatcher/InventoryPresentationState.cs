@@ -82,12 +82,12 @@ namespace RailroaderScenePatcher {
         internal static string UnbuiltEquipmentName(EquipmentAddition item, IEnumerable<SourceCandidate> candidates) =>
             item.Id + ": " + EquipmentSourceName(item.Source, candidates);
 
-        internal static string OutlinerTooltip(SceneObservation item, bool changed) {
+        internal static string OutlinerTooltip(SceneObservation item, bool changed, FailureKind? failure = null) {
             var equipment = CommandBand.IsAddedFamily(item.Family);
             return (Name(item) + "\n" + (equipment ? "" : item.Identity.Path + "\n") + item.Family
                 + (item.Category == null ? "" : "\n" + item.Category + (item.Subcategory == null ? "" : " / " + item.Subcategory))
                 + (item.Active ? "" : "\nInactive") + (item.InspectionOnly == null ? "" : "\n" + CommandBand.InspectionOnlyLine(item.InspectionOnly))
-                + (changed ? "\nChanged by this mod" : "")
+                + (failure != null ? "\n" + CommandBand.FailureTooltipLine(failure.Value) : changed ? "\nChanged by this mod" : "")
                 + (item.Problems.Count == 0 ? "" : equipment ? "\nDetected problems: " + item.Problems.Count : "\n" + String.Join("\n", item.Problems)))
                 .Replace("<", "\\u003c").Replace(">", "\\u003e");
         }

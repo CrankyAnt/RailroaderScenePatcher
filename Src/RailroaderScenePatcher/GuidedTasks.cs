@@ -113,8 +113,12 @@ namespace RailroaderScenePatcher {
             });
         }
         // A problem offers only a matching supported task. The ordinary task list keeps unavailable operations visible.
+        // A construction segment problem has no guided task: its repair opens the Connections tab of the construction.
         void DrawProblemTasks(UIPanelBuilder builder) {
-            if (!selected.Problems.Any(problem => problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0)) return;
+            if (CommandBand.OffersConstructionRepair(selected.Problems))
+                Button(builder, CommandBand.RepairConstructionSegments, () => inspectorTab.Value = ConnectionsTab)
+                    .Tooltip(CommandBand.RepairConstructionSegments, CommandBand.RepairConstructionSegmentsTip);
+            if (!CommandBand.OffersBindingRepair(selected.Problems)) return;
             var kind = IsStarter ? GuidedTaskKind.StarterPlacement : GuidedTaskKind.Binding;
             var reason = GuidedBlock(kind);
             Button(builder, "Repair with guided task", () => StartGuided(kind)).Inactive(reason != null)

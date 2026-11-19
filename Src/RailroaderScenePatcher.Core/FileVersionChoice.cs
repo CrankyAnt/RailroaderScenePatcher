@@ -175,6 +175,8 @@ namespace RailroaderScenePatcher.Core {
                 ResetStartState(); stepKeys.Clear(); Import = null;
                 ClearVersionAcceptance(); VersionState = FileVersionState.None; VersionMessage = null;
                 LastVersionApplication = engine.ApplyFileVersion(text, scenePatchFileKey);
+                // The engine's failures of this application belong to the file version's entries; the Changes tab marks them.
+                ResetApplied(loaded.Modifications);
                 versionGeneration++;
                 outcome.Applied = true;
             } catch (Exception e) {

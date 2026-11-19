@@ -41,7 +41,7 @@ namespace RailroaderScenePatcher {
                 // The fields show the object as it now stands: a draft or a value from before the choice never stays
                 // behind to be applied.
                 ReadPlacement();
-                feedback.Report(RecoveryPlace, useFile ? "File version applied." : "Editor version kept.");
+                feedback.Report(RecoveryPlace, useFile ? FilePanelState.FileVersionApplied(session.LastVersionApplication) : "Editor version kept.");
             }
             // The choice may close the file panel: the window's controls and the title bar follow it.
             VersionChanged(); attachment.RefreshChrome();

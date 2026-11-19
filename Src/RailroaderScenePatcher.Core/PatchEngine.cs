@@ -477,6 +477,9 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Segments != null) throw new InvalidPatchDefinitionException(ConstructionSegmentRule.NoRelationship);
         }
         // A target is unsafe while its cleanup is unverified, including restored dependent output that has not completed.
+        // How the world load or a file version failed the modification id of a scene patch file in this load, or null.
+        internal Outcome Failure(string scenePatchFileKey, string id) =>
+            failed.TryGetValue((scenePatchFileKey ?? "").Length + ":" + (scenePatchFileKey ?? "") + id, out var outcome) ? outcome : null;
         internal bool IsUnsafe(object target) {
             if (unsafeTargets.Contains(target)) return true;
             if (!awaitingOutput.Contains(target)) return false;

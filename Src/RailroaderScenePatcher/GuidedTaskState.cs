@@ -12,7 +12,10 @@ namespace RailroaderScenePatcher {
         internal static string TargetBlock(GuidedTaskKind kind, TargetIdentity identity) =>
             identity != null && (identity.Structure == CrossingCoverageScene.Structure || (identity.Structure == null && identity.Component == CrossingCoverageScene.ComponentType))
                 && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap || kind == GuidedTaskKind.Activity)
-                ? "You cannot move, rotate, enable or disable a crossing controller." : null;
+                ? "You cannot move, rotate, enable or disable a crossing controller."
+            // The Ela construction controller: its position has no effect and its activity runs the visibility control.
+            : identity?.Structure == ConstructionSceneryScene.Structure && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap) ? CommandBand.ControllerNoPlacement
+            : identity?.Structure == ConstructionSceneryScene.Structure && kind == GuidedTaskKind.Activity ? CommandBand.ControllerNoActivity : null;
         string[] draft = Array.Empty<string>();
         internal bool Enabled { get; private set; }
         internal GuidedTaskStep Step { get; private set; }

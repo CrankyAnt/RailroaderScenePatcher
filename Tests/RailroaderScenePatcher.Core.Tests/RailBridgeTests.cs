@@ -38,13 +38,17 @@ static class RailBridgeTests {
         RailBridgesDoNotFollowTrack();
         SeparateTrackSceneryStays();
         FailuresRestoreColliderState();
+        LoadFailuresShowAsNotApplied();
+        ReadAgainShowsItsFailures();
+        ImportClearsOnlyWhatItApplied();
         ObjectTabNamesTheConstructionSegments();
+        MissingSegmentIsAProblemWithItsRepair();
         BridgeEditsInScenePatchEditing();
         Console.WriteLine("PASS: rail bridges");
     }
 
     // A construction's group root and parts carry one binding line per construction segment, which the Connections tab
-    // lists; a segment that no longer exists keeps its id with a remark and no problem. The Object tab's Use in the game
+    // lists; a segment that no longer exists keeps its id with a remark. The Object tab's Use in the game
     // text names the segments that decide the construction's visibility; a plate girder bridge without a controller is
     // decorative.
     static void ObjectTabNamesTheConstructionSegments() {
@@ -69,6 +73,53 @@ static class RailBridgeTests {
         Assert(CommandBand.ConstructionBindings(null, null).Count == 0, "No controller, no lines");
         Assert(CommandBand.ConstructionHoldWarning == "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.",
             "The hold warning names the game feature and that the disable holds: " + CommandBand.ConstructionHoldWarning);
+    }
+
+    // A construction segment that no longer exists is a defect the modder repairs on the Connections tab (#96): the
+    // group root of Bryson Bridge 1, the Almond Bridge or any other construction, and the Ela controller, report it as a
+    // problem with the same wording, naming the segment and the repair. The problem leaves once the construction names
+    // existing segments, and without the track graph there is one inspection note instead. The Object tab offers the
+    // construction segment repair, not the track binding task, for such a problem.
+    static void MissingSegmentIsAProblemWithItsRepair() {
+        var known = new HashSet<string> { "seg-a", "seg-new-1", "seg-new-2" };
+        var problems = CommandBand.ConstructionSegmentProblems(new[] { "seg-a", "cjwp8g" }, known, "no graph");
+        Assert(problems.SequenceEqual(new[] { "Construction segment cjwp8g no longer exists. On the Connections tab, select the segments of the bridge's track and click Set." }),
+            "A missing segment is one problem naming it and the repair: " + String.Join(" | ", problems));
+        var empty = CommandBand.ConstructionSegmentProblems(new[] { " " }, known, "no graph");
+        Assert(empty.SequenceEqual(new[] { "A construction segment has no ID. On the Connections tab, select the segments of the bridge's track and click Set." }),
+            "An empty segment ID is a problem too: " + String.Join(" | ", empty));
+        Assert(CommandBand.ConstructionSegmentProblems(new[] { "seg-new-1", "seg-new-2" }, known, "no graph").Count == 0, "After the repair the construction names existing segments and has no problem");
+        var unknown = CommandBand.ConstructionSegmentProblems(new[] { "cjwp8g" }, null, "no graph");
+        Assert(unknown.SequenceEqual(new[] { "Construction segment validity unknown: no graph" }) && unknown.All(BindingRules.IsNote), "Without the track graph there is one inspection note: " + String.Join(" | ", unknown));
+        var unknownEmpty = CommandBand.ConstructionSegmentProblems(new[] { "cjwp8g", "" }, null, "no graph");
+        Assert(unknownEmpty.SequenceEqual(new[] { empty[0], "Construction segment validity unknown: no graph" }), "Without the track graph an empty segment ID stays a problem: " + String.Join(" | ", unknownEmpty));
+        Assert(CommandBand.ConstructionSegmentProblems(null, known, "no graph").Count == 0 && CommandBand.ConstructionSegmentProblems(null, null, "no graph").Count == 0, "No controller, no problem and no note");
+        // A problem, not an inspection note: it gives the object the problem marker while the object is enabled, and a
+        // disabled object keeps none.
+        Assert(problems.All(line => !BindingRules.IsNote(line)) && !BindingRules.IsNote(empty[0]), "A missing construction segment is no inspection note");
+        Assert(CommandBand.RowMarkers(BindingRules.Problems(true, problems, null).Count != 0, false, false) == "!", "An enabled construction is listed with the problem marker");
+        Assert(CommandBand.RowMarkers(BindingRules.Problems(false, problems, null).Count != 0, false, false) == "", "A disabled construction has no problem marker: its controller does not run");
+        // The same missing ID listed twice by one controller is one problem.
+        var twice = CommandBand.ConstructionSegmentProblems(new[] { "cjwp8g", "cjwp8g", "", " " }, known, "no graph");
+        Assert(twice.Count == 2 && twice.Distinct().Count() == 2, "Each problem line is distinct: " + String.Join(" | ", twice));
+        // Where the patcher can repair the construction segments: the group root of an editable rail bridge group and the
+        // editable Ela controller. A part, a refused group root or controller (no structure) and any other object show
+        // the remark without a problem; this is the inventory's gate (NativeInventory passes the observation's structure).
+        var ids = new[] { "cjwp8g" };
+        Assert(CommandBand.RepairableConstructionProblems(BakedSceneryGroups.Structure, ids, known, "no graph").SequenceEqual(problems), "An editable group root reports the problem");
+        Assert(CommandBand.RepairableConstructionProblems(ConstructionSceneryScene.Structure, ids, known, "no graph").SequenceEqual(problems), "The editable Ela controller reports the problem with the same wording");
+        Assert(CommandBand.RepairableConstructionProblems(BakedSceneryParts.Structure, ids, known, "no graph").Count == 0, "A part shows the remark without a problem");
+        Assert(CommandBand.RepairableConstructionProblems(null, ids, known, "no graph").Count == 0, "A refused group root or controller, or one that shares its path, has no problem");
+        Assert(CommandBand.RepairableConstructionProblems(BakedSceneryGroups.Structure, null, known, "no graph").Count == 0, "A group without a controller has no problem");
+        Assert(BindingRules.Problems(false, problems, null).Count == 0, "A disabled construction keeps no problem");
+        // The repair offered with the problem: the construction segment repair, and not the track binding task.
+        Assert(CommandBand.RepairConstructionSegments == "Repair construction segments", "The repair button: " + CommandBand.RepairConstructionSegments);
+        Assert(CommandBand.OffersConstructionRepair(problems) && !CommandBand.OffersBindingRepair(problems), "A construction problem offers the construction segment repair only");
+        Assert(CommandBand.OffersConstructionRepair(empty) && !CommandBand.OffersBindingRepair(empty), "An empty construction segment offers the construction segment repair only");
+        Assert(!CommandBand.OffersConstructionRepair(new[] { "Marker broken binding: missing segment S9" }) && CommandBand.OffersBindingRepair(new[] { "Marker broken binding: missing segment S9" }),
+            "A track binding problem keeps the guided task");
+        Assert(!CommandBand.OffersConstructionRepair(new[] { "Missing construction-scenery target" }) && !CommandBand.OffersBindingRepair(new string[0]), "Other problems offer neither");
+        Assert(CommandBand.RepairConstructionSegmentsTip == "Open the Connections tab to select the segments of the bridge's track.", "The repair button's tooltip: " + CommandBand.RepairConstructionSegmentsTip);
     }
 
     // In scene patch editing: Undo and Redo of bridge edits with matching dirty state and Save availability, Remove
@@ -333,6 +384,68 @@ static class RailBridgeTests {
 
     // A preflight refusal leaves the bridge untouched; a collider that does not follow fails the move, which restores the
     // captured placement, activity, culling and collider state; incomplete cleanup is reported and blocks the retry.
+    // A world load whose move of Bryson Bridge 1 fails after mutation and is restored, with a move of the plate girder
+    // bridge that depends on it: in scene patch editing the first shows as failed and restored, the second as not applied
+    // because its dependency failed. A second application in the same load reports AlreadyFailed and keeps the first
+    // failure, so the object keeps showing the kind of that first failure.
+    const string Key = "author/pack";
+    static string Depending(string item, string on) => item.Replace("\"dependsOn\":[]", "\"dependsOn\":[\"" + on + "\"]");
+    static void LoadFailuresShowAsNotApplied() {
+        var f = new Bridges(); f.World.DetachCollider = true;
+        var text = Doc(GroupMod("move-bryson", Bryson, BridgeTarget), Depending(GroupMod("move-plate", Girder, PlateTarget), "move-bryson"));
+        var load = f.Engine.Apply(text, Key);
+        Assert(load.Outcomes["move-bryson"].Failure == FailureKind.Restored && load.Outcomes["move-plate"].Failure == FailureKind.DependencyFailed,
+            "The load fails the move after mutation and the dependent move by its dependency: " + load.Outcomes["move-bryson"].Failure + " " + load.Outcomes["move-plate"].Failure);
+        var again = f.Engine.Apply(text, Key);
+        Assert(again.Outcomes["move-bryson"].Failure == FailureKind.AlreadyFailed, "A second application in the same load reports AlreadyFailed: " + again.Outcomes["move-bryson"].Failure);
+        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store { Patch = text }, scenePatchFileKey: Key);
+        var bryson = session.NotApplied(GroupId(Bryson)); var plate = session.NotApplied(GroupId(Girder));
+        Assert(bryson?.Kind == FailureKind.Restored && session.Refusal(GroupId(Bryson)) == null, "The failed and restored move shows as not applied, not as refused: " + bryson?.Kind);
+        Assert(plate?.Kind == FailureKind.DependencyFailed, "The dependent move shows as not applied because its dependency failed: " + plate?.Kind);
+        Assert(session.Changes(GroupId(Bryson)).Single().StartsWith("Failed and restored. The change failed. The object is back as it was.", StringComparison.Ordinal)
+            && session.Changes(GroupId(Girder)).Single().StartsWith("Not applied because a dependency failed. ", StringComparison.Ordinal),
+            "The Changes tab names each failure: " + String.Join(" | ", session.Changes(GroupId(Bryson)).Concat(session.Changes(GroupId(Girder)))));
+        Assert(ReferenceEquals(CommandBand.Badges(true, false, CommandBand.ShownFailure(true, bryson.Kind)).Single(), CommandBand.NotApplied)
+            && CommandBand.RowMarkers(false, true, false, CommandBand.ShownFailure(true, plate.Kind)) == "\u00d7", "Both show the not applied badge and marker");
+    }
+
+    // Read again of a corrected scene patch file in a session that started protected: the failures of its application show.
+    static void ReadAgainShowsItsFailures() {
+        var f = new Bridges(); f.World.DetachCollider = true;
+        var store = new Store { Patch = "{ not a scene patch file" };
+        var session = new PatchEditingSession(f.Engine, new NativeMapEditor(), store, scenePatchFileKey: Key);
+        Assert(session.Blocked != null, "The session starts protected");
+        store.Patch = Doc(GroupMod("move-bryson", Bryson, BridgeTarget));
+        var reread = session.Reread(true);
+        Assert(reread.Applied && session.LastReread.Outcomes["move-bryson"].Failure == FailureKind.Restored, "Read again applies the file and the move fails: " + reread.Error);
+        Assert(session.NotApplied(GroupId(Bryson))?.Kind == FailureKind.Restored, "The failure of Read again's application shows: " + session.NotApplied(GroupId(Bryson))?.Kind);
+    }
+
+    // Import applies a changed entry: its earlier failure no longer shows. A changed entry whose target does not resolve
+    // is not applied, so it keeps its load refusal: here it changes away and back, and shows refused again.
+    static void ImportClearsOnlyWhatItApplied() {
+        const string Gone = Large + "Gone Bridge";
+        var f = new Bridges(); f.World.DetachCollider = true;
+        var text = Doc(GroupMod("move-bryson", Bryson, BridgeTarget), GroupMod("move-gone", Gone, BridgeTarget));
+        f.Engine.Apply(text, Key);
+        var store = new Store { Patch = text }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(f.Engine, mapEditor, store, scenePatchFileKey: Key); mapEditor.Session = session;
+        Assert(session.NotApplied(GroupId(Bryson))?.Kind == FailureKind.Restored && session.NotApplied(GroupId(Gone))?.Kind == FailureKind.Refused, "Both load failures show");
+        f.World.DetachCollider = false;
+        void Import(string patch, string step) {
+            store.Patch = patch; session.CheckFileVersion();
+            Assert(session.OpenImport().Applied, step + ": Import opens");
+            var applied = session.ApplyImport();
+            Assert(applied.Applied, step + ": Import applies: " + applied.Error);
+        }
+        var other = new[] { 3510.0, 540, 4400 };
+        Import(Doc(GroupMod("move-bryson", Bryson, other), GroupMod("move-gone", Gone, other)), "First import");
+        Assert(session.NotApplied(GroupId(Bryson)) == null && Near(f.At(f.Bridge1), other), "The applied entry no longer shows its failure: " + f.Where());
+        Assert(session.LastImport.NotApplied.Any(line => line.StartsWith("move-gone", StringComparison.Ordinal)), "The unresolved entry is kept but not applied");
+        Import(Doc(GroupMod("move-bryson", Bryson, other), GroupMod("move-gone", Gone, BridgeTarget)), "Second import");
+        Assert(session.NotApplied(GroupId(Gone))?.Kind == FailureKind.Refused, "Back at its loaded entry, the unresolved modification shows its load refusal again");
+    }
+
     static void FailuresRestoreColliderState() {
         var refused = new Bridges(); refused.World.Refused = "The group's scene is not loaded";
         var outcome = refused.Engine.Apply(Doc(GroupMod("move-bryson", Bryson, BridgeTarget))).Outcomes["move-bryson"];

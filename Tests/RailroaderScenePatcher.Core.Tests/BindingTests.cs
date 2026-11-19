@@ -278,6 +278,8 @@ static class BindingTests {
         EditingSetReplaceDetachUndoRedo();
         EditingRemovalRecomputesUnderlyingRelationship();
         EditingRefusalAndFailureRestore();
+        RefusedFileBindingKeepsHistoryComplete();
+        UndoOfAnEditWhoseEarlierBindingIsGoneStaysIncomplete();
         SaveAndReloadReproduceBindingOnce();
         GizmoGestureKeepsTheBinding();
         PhysicalSnapKeepsTheBinding();
@@ -650,6 +652,34 @@ static class BindingTests {
         mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo(); mapEditor.Redo();
         Assert(sign.Segment == null && world.Registrations(sign).Count == 0 && sign.Position[0] == 40 && sign.CachedGroup == null, "Redo reapplies every relationship and placement edit");
         Assert(Entry(world, other) == "Sjdl|b|38.6" && other.CachedGroup == "alarka", "No scene patch editing operation touched the unrelated marker or its dependent cache");
+    }
+    // A file version whose binding names a missing segment is refused before mutation; the Changes tab marks it. Once the
+    // segment exists and Undo of a Remove applies the binding, it is no longer refused. Undo of an edit whose earlier
+    // binding is now refused, while the scene holds the later one, keeps the step incomplete: scene and file stay together.
+    static void RefusedFileBindingKeepsHistoryComplete() {
+        var (world, sign, other, session, mapEditor, store) = Session();
+        store.Patch = Doc(Binding("bad", At("Sgone", "a", 1))); session.CheckFileVersion();
+        Assert(session.UseFileVersion().Applied, "The file version is used");
+        var outcome = session.LastVersionApplication.Outcomes["bad"];
+        Assert(!outcome.Applied && outcome.Error.Contains("Relationship target segment Sgone is missing") && Entry(world, sign) == "S9sc|a|225.6681", "The binding is refused before mutation: " + outcome.Error);
+        var changes = session.Changes(Sign);
+        Assert(changes.SequenceEqual(new[] { "Refused. Relationship target segment Sgone is missing." }), "The Changes tab marks the modification as refused: " + String.Join(" | ", changes));
+        Assert(session.Remove(Sign).Applied, "Remove modification of the refused binding applies");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation == null && Entry(world, sign) == "S9sc|a|225.6681" && session.Changes(Sign).SequenceEqual(changes), "Undo puts the refused binding back without an incomplete step: " + session.IncompleteOperation);
+        // The track appears; Redo removes, Undo now applies the binding: it is no longer refused.
+        world.Segments["Sgone"] = new List<double> { 10 };
+        mapEditor.Redo(); mapEditor.Undo();
+        Assert(session.IncompleteOperation == null && Entry(world, sign) == "Sgone|a|1" && session.Refusal(Sign) == null && session.NotApplied(Sign) == null
+            && !session.Changes(Sign).Any(line => line.StartsWith("Refused.", StringComparison.Ordinal)), "An applied binding is no longer refused: " + Entry(world, sign) + " " + String.Join(" | ", session.Changes(Sign)));
+    }
+    static void UndoOfAnEditWhoseEarlierBindingIsGoneStaysIncomplete() {
+        var (world, sign, other, session, mapEditor, store) = Session();
+        Assert(session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12))).Applied && session.Bind(Sign, MarkerBinding.At(new TrackLocation("Sjdl", "a", 3))).Applied, "Bind A, then B");
+        world.Segments.Remove("Nnew");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation != null && Entry(world, sign) == "Sjdl|a|3" && (string)Only(session)["relationships"]["trackMarker"]["segment"] == "Sjdl" && session.Refusal(Sign) == null,
+            "Undo to a binding whose segment is gone keeps the step incomplete, with scene and file at B: " + session.IncompleteOperation + " " + Entry(world, sign));
     }
     static void EditingRemovalRecomputesUnderlyingRelationship() {
         var (world, sign, other, session, mapEditor, store) = Session();

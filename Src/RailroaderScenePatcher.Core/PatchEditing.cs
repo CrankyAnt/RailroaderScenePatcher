@@ -246,7 +246,7 @@ namespace RailroaderScenePatcher.Core {
                 if (diskText == null) { scenePatchFile = ScenePatchFile.Create(SceneTargetMapFor(scene.MapIds)); ResetStartState(); return; }
                 var loaded = ScenePatchFile.Load(diskText);
                 Blocked = Refusal(loaded, diskText);
-                if (Blocked == null) { scenePatchFile = loaded; saved = PreservingJson.Parse(diskText).Root; ResetStartState(); }
+                if (Blocked == null) { scenePatchFile = loaded; saved = PreservingJson.Parse(diskText).Root; ResetStartState(); ResetApplied(loaded.Modifications); }
             } catch (Exception e) { Blocked = "The edited mod's scene patch file cannot be read. " + ScenePatchFile.Sentence(e.Message); }
             if (Blocked != null) { scenePatchFileProblem = true; Blocked = ScenePatchFile.Sentence(Blocked) + ProtectedSuffix; }
         }
@@ -325,12 +325,7 @@ namespace RailroaderScenePatcher.Core {
         // searching the scene, so a list can ask for every row. A target without a structure matches any structure.
         public bool IsChanged(TargetIdentity target) {
             if (scenePatchFile == null || target == null) return false;
-            foreach (var item in scenePatchFile.Items) {
-                var other = item["target"] as JObject;
-                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
-                var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
-                if (structure == null || target.Structure == null || structure == target.Structure) return true;
-            }
+            foreach (var item in scenePatchFile.Items) if (Targets(item, target)) return true;
             return false;
         }
         // The object a target resolves to uniquely, or null. This searches the scene; a caller that reads output every
@@ -404,7 +399,11 @@ namespace RailroaderScenePatcher.Core {
             try {
                 var resolved = engine.ResolveUnique(target);
                 var own = Own(resolved);
-                return own.Count == 1 ? ChangeLines(PatchEngine.Parse(own[0]).State, engine.Underlying(resolved)) : new string[0];
+                if (own.Count != 1) return new string[0];
+                // A modification the patcher refused changes nothing: the tab says so with the reason instead.
+                var failure = NotAppliedOf(ScenePatchFile.Key(own[0]));
+                if (failure != null) return new[] { FailureLabels.Of(failure.Kind) + ". " + ScenePatchFile.Sentence(failure.Reason) + "." };
+                return ChangeLines(PatchEngine.Parse(own[0]).State, engine.Underlying(resolved));
             } catch (InvalidOperationException) { return new string[0]; }
         }
         // The lines for one modification's state against the underlying state.
@@ -1215,12 +1214,25 @@ namespace RailroaderScenePatcher.Core {
                 return;
             }
             var current = scenePatchFile.Modifications[slot] as JObject;
+            // The scene holds nothing of the entry being replaced: there is none, as in Undo of a Remove, or it is
+            // itself not applied. Only then can a refused restoration leave the scene as it is.
+            var sceneHoldsNothing = current == null || NotAppliedOf(slot) != null;
             try {
+                contentRefusal = null;
                 var resolved = engine.ResolveUnique(target);
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified");
                 Commit(target, resolved, null, slot, current, value);
                 // Undo and Redo of this patcher's own step changed this object; the owner observes it again.
                 try { Replayed?.Invoke(target); } catch { }
+            } catch (Exception e) when (value != null && contentRefusal != null && sceneHoldsNothing) {
+                // The restored modification is one the patcher refuses for its content before any mutation, such as a
+                // hand-written detach of construction segments or a coverage of a missing track that Use file version
+                // or a world load refused, and the scene holds nothing of the entry it replaces. The step puts it back
+                // in the scene patch file as it stood, refused again, and leaves the scene as it is, as at load.
+                scenePatchFile.Replace(slot, value);
+                Refuse(slot, value, contentRefusal);
+                try { Replayed?.Invoke(target); } catch { }
+                try { HistoryNotice?.Invoke("Modification " + slot + " is back in the scene patch file but is not applied: " + e.Message + "."); } catch { }
             } catch (Exception e) {
                 value = current;
                 uncertain = true;
@@ -1228,12 +1240,58 @@ namespace RailroaderScenePatcher.Core {
             }
             RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration), name);
         }
+        // Why the last Commit refused the scene patch file's content before any mutation, or null.
+        string contentRefusal;
+        // Modifications of the scene patch file that a history step put back refused, by key, with the entry as it was
+        // refused. The Changes tab marks such an entry as refused while the scene patch file holds it unchanged.
+        readonly Dictionary<string, KeyValuePair<JObject, string>> refusedEntries = new Dictionary<string, KeyValuePair<JObject, string>>(StringComparer.Ordinal);
+        void Refuse(string key, JObject entry, string reason) { if (entry != null) refusedEntries[key] = new KeyValuePair<JObject, string>((JObject)entry.DeepClone(), reason); }
+        // The modifications as the world load, the last file version or Read again applied them: the engine's failures of
+        // this load belong to these entries, until an edit, a history step or Import applies the entry again.
+        JObject applied;
+        readonly HashSet<string> superseded = new HashSet<string>(StringComparer.Ordinal);
+        void ResetApplied(JObject modifications) {
+            applied = modifications == null ? null : (JObject)modifications.DeepClone();
+            refusedEntries.Clear(); superseded.Clear();
+        }
+        // An entry that was applied again: its earlier refusal or failure no longer holds.
+        void Reapplied(string key) { if (key == null) return; refusedEntries.Remove(key); superseded.Add(key); }
+        // How the scene patch file's current entry under key is not applied, or null: refused by a history step, or failed
+        // by the world load or a file version while the entry is still the one it applied. An incomplete cleanup keeps
+        // its own presentation.
+        NotAppliedModification NotAppliedOf(string key) {
+            if (key == null || !(scenePatchFile?.Modifications[key] is JObject now)) return null;
+            if (refusedEntries.TryGetValue(key, out var refused) && PreservingJson.SameModification(now, refused.Key)) return new NotAppliedModification(FailureKind.Refused, refused.Value);
+            if (superseded.Contains(key) || !(applied?[key] is JObject loaded) || !PreservingJson.SameModification(now, loaded)) return null;
+            var failure = engine.Failure(scenePatchFileKey, key);
+            return failure == null || failure.Applied || !FailureLabels.ShowsAsNotApplied(failure.Failure) ? null : new NotAppliedModification(failure.Failure, failure.Error);
+        }
+        // How this mod's modification of the object is not applied, or null: the object then shows that, not a change.
+        // It matches the target as IsChanged does, without searching the scene, so the outliner can ask for every row.
+        public NotAppliedModification NotApplied(TargetIdentity target) {
+            if (scenePatchFile == null || target == null) return null;
+            NotAppliedModification found = null; var count = 0;
+            foreach (var item in scenePatchFile.Items) {
+                if (!Targets(item, target)) continue;
+                count++; found = NotAppliedOf(ScenePatchFile.Key(item));
+            }
+            return count == 1 ? found : null;
+        }
+        // Why this mod's modification of the object is refused, or null.
+        public string Refusal(TargetIdentity target) { var failure = NotApplied(target); return failure?.Kind == FailureKind.Refused ? failure.Reason : null; }
+        static bool Targets(JObject item, TargetIdentity target) {
+            var other = item["target"] as JObject;
+            if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) return false;
+            var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
+            return structure == null || target.Structure == null || structure == target.Structure;
+        }
         void Commit(TargetIdentity identity, object target, InspectedTarget inspected, string key, JObject current, JObject value, Action validateBeforeMutation = null) {
             var mapContext = scene.MapIds.ToArray();
             var prior = scene.Read(target);
             engine.Underlying(target);
             scenePatchFile.Replace(key, value);
-            var mutating = false;
+            var mutating = false; var contentChecked = false;
+            contentRefusal = null;
             try {
                 var desired = engine.Desired(scenePatchFile.Modifications, target, scenePatchFileKey);
                 // Only the mod's relationship needs a resolvable target; the underlying one may be the broken binding being repaired.
@@ -1244,6 +1302,7 @@ namespace RailroaderScenePatcher.Core {
                     finally { engine.Unplan(); }
                 }
                 CheckEffectiveCoverage(target, desired.Coverage);
+                contentChecked = true;
                 // Reading state and resolving the scene patch file may invoke native callbacks. Never redirect to a new match.
                 engine.GuardMutation(identity, target, mapContext, inspected);
                 validateBeforeMutation?.Invoke();
@@ -1258,6 +1317,9 @@ namespace RailroaderScenePatcher.Core {
                 if (!Same(scene.Read(target), desired)) throw new InvalidOperationException("Applied state did not verify");
             } catch (Exception e) {
                 scenePatchFile.Replace(key, current);
+                // What the scene patch file holds was refused before any mutation: its desired state, relationships or
+                // effective coverage. A guard that the object changed during the checks is no such refusal.
+                if (!mutating && !contentChecked) contentRefusal = e.Message;
                 // A rejection before the mutation started changed nothing in the scene and needs no restoration.
                 if (!mutating) throw;
                 var restored = false; string restoreError = null;
@@ -1275,6 +1337,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.AwaitOutput(target)) throw new AttemptFailure(FailureKind.AwaitingOutput, "The edit failed and the object is back as it was. The game is still regenerating its dependent output. Editing can resume once that output is verified. Reason: " + e.Message);
                 throw new AttemptFailure(FailureKind.Restored, "The edit failed. The object is back as it was. Reason: " + e.Message);
             }
+            Reapplied(key);
         }
         // Explicit retry after unverified cleanup: rechecks the actual state against the scene patch file before unblocking. The
         // target is resolved, inspected and preflighted afresh. The desired state comes from the scene patch file, so the persistent

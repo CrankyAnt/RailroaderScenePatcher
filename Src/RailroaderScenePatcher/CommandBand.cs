@@ -10,7 +10,7 @@ namespace RailroaderScenePatcher {
     // and colour a status lamp shows, when a command is disabled, which markers stand before a name, and where the
     // window opens. UI-independent, shared with controlled replay.
     internal static class CommandBand {
-        internal const string Green = "#7FB86B", Amber = "#E8A33D";
+        internal const string Green = "#7FB86B", Amber = "#E8A33D", Red = "#FF8080";
         // A status lamp: a coloured dot and a word. It is information and has no action.
         internal sealed class Lamp {
             internal Lamp(string word, string reserve, bool good) { Word = word; Reserve = reserve; Good = good; }
@@ -448,10 +448,9 @@ namespace RailroaderScenePatcher {
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery) shows or hides parts of the bridge by
         // the construction state of the track segments it names by id, wherever the bridge stands. Each segment is one
         // binding line of the group root and of every part below the controller, for the Connections tab. A segment that
-        // no longer exists in the track graph keeps its id with a remark and is no problem marker, as #95 decided for a
-        // rail bridge construction; the Connections tab of the root offers the repair. The Ela controller's own
-        // inventory line still reports a missing segment as a problem (an open point). exists is null when the track
-        // graph could not be read.
+        // no longer exists in the track graph keeps its id with a remark. Since #96 the Connections tab of the group root
+        // repairs it, so the group root also reports it as a problem (ConstructionSegmentProblems), as the Ela controller
+        // does. exists is null when the track graph could not be read.
         const string SegmentPrefix = "Construction segment=", MissingSegment = "; no longer exists";
         internal static string SegmentBinding(string id, bool? exists) => SegmentPrefix + (id ?? "") + (exists == false ? MissingSegment : "");
         internal static IReadOnlyList<string> ConstructionSegments(IEnumerable<string> bindings) =>
@@ -472,6 +471,33 @@ namespace RailroaderScenePatcher {
             }
             return found;
         }
+        // A construction segment that no longer exists, or an empty segment ID, is a defect the modder repairs on the
+        // Connections tab of the construction (#96): one problem per such segment, worded alike for a rail bridge group
+        // root and the Ela controller; a segment the controller lists twice is one problem. known is null when the track
+        // graph could not be read: then the segments that could not be checked give one inspection note
+        // (BindingRules.IsNote), and an empty segment ID stays a problem. ids is null without a controller.
+        const string ConstructionRecovery = " On the Connections tab, select the segments of the bridge's track and click Set.";
+        internal static IReadOnlyList<string> ConstructionSegmentProblems(IEnumerable<string> ids, ICollection<string> known, string graphError) {
+            var all = (ids ?? Enumerable.Empty<string>()).ToArray();
+            if (all.Length == 0) return Array.Empty<string>();
+            var problems = all.Where(id => String.IsNullOrWhiteSpace(id) || (known != null && !known.Contains(id)))
+                .Select(id => (String.IsNullOrWhiteSpace(id) ? "A construction segment has no ID." : "Construction segment " + id + " no longer exists.") + ConstructionRecovery);
+            return (known == null ? problems.Concat(new[] { "Construction segment validity unknown: " + graphError }) : problems).Distinct(StringComparer.Ordinal).ToArray();
+        }
+        // The construction segment problems of an inventory entry, only where the patcher can repair them: the group root
+        // of an editable rail bridge group and the editable Ela controller, by the structure the entry is observed with. A
+        // part, a refused object or one that shares its path (no structure) shows the remark without a problem.
+        internal static IReadOnlyList<string> RepairableConstructionProblems(string structure, IEnumerable<string> ids, ICollection<string> known, string graphError) =>
+            structure == BakedSceneryGroups.Structure || structure == ConstructionSceneryScene.Structure ? ConstructionSegmentProblems(ids, known, graphError) : Array.Empty<string>();
+        // The repair a problem offers on the Object tab: a construction segment problem opens the Connections tab of the
+        // construction, where its segments are set; no guided task sets construction segments. Another problem that
+        // concerns a segment, a binding or a track location offers the guided track binding task.
+        internal const string RepairConstructionSegments = "Repair construction segments";
+        internal const string RepairConstructionSegmentsTip = "Open the Connections tab to select the segments of the bridge's track.";
+        static bool ConstructionProblem(string problem) => problem != null && problem.EndsWith(ConstructionRecovery, StringComparison.Ordinal);
+        internal static bool OffersConstructionRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(ConstructionProblem);
+        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(problem => problem != null && !ConstructionProblem(problem)
+            && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0));
         internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments";
         // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
         // holds; known is null when the track graph could not be read. An empty id is a segment that does not exist.
@@ -551,8 +577,30 @@ namespace RailroaderScenePatcher {
         }
         // Whether the Placement tab shows Numeric whatever mode was open: a pad, an object that cannot be edited, a
         // construction controller, and an object whose every move is refused have no use for the other modes.
+        // The tooltip of a placement mode: its own block, or for Numeric, which stays open to show the placement, the block
+        // of its fields; otherwise its description.
+        internal static string ModeTip(int mode, string description, string modeBlock, string fieldBlock) => Tooltip(description, modeBlock ?? (mode == NumericMode ? fieldBlock : null));
+        // The tooltip of a value row that stands as a running line because it cannot be edited.
+        internal static string BlockedValueTip(string block) => Tooltip(null, block);
+        // Why Apply and Read of Numeric are inactive: the block of the placement for both, then, for Apply, the fields.
+        internal static (string Apply, string Read) NumericActionReasons(string block, string fieldReason) => (block ?? fieldReason, block);
+        // Supported edits of an object whose move a ground mask blocks: only what still applies.
+        internal const string MarkerOperations = "Set, replace or detach the marker's track binding. Edit placement and activity separately.";
+        internal static string OperationsWithoutMove(string operations) =>
+            operations == GroupOperations ? "Enable or disable the whole group."
+            : operations == PartOperations ? "Enable or disable this part. The group and its other parts stay unchanged."
+            : operations == MarkerOperations ? "Set, replace or detach the marker's track binding. Edit activity separately."
+            : operations;
         internal static bool ForcesNumeric(bool pad, bool editable, bool controller, string moveBlock) => pad || !editable || controller || moveBlock != null;
         // Why the placement actions of the tab, Read and Apply included, are unavailable, or null: the first block that holds.
+        // Whether an object observed with this structure is edited in the inspector: every capability's structure but a
+        // starter placement marker's, which has its own workflow. The Ela construction controller counts: its construction
+        // segments are its edit, and its placement and activity give their own reasons.
+        static readonly HashSet<string> EditableStructures = new HashSet<string>(StringComparer.Ordinal) {
+            IndependentBoards.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
+            BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure,
+            ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure, ConstructionSceneryScene.Structure };
+        internal static bool EditableStructure(string structure) => structure != null && EditableStructures.Contains(structure);
         internal static string PlacementBlock(string edit, string pad, string controller, string moveBlock) => edit ?? pad ?? controller ?? moveBlock;
         // Why every move of the object is refused, or null: its dependency line names a mask that flattens the terrain
         // height. The placement modes and fields are then unavailable with this reason.
@@ -800,8 +848,17 @@ namespace RailroaderScenePatcher {
         }
         static string Tail(string[] segments, int count) => String.Join("/", segments, Math.Max(0, segments.Length - count), Math.Min(count, segments.Length));
         // The markers of an outliner row, in their order before the name: "!" for a detected problem, "*" for a changed
-        // object and "+" for an added object. "*" never means unsaved.
-        internal static string RowMarkers(bool problem, bool changed, bool added) => (problem ? "!" : "") + (changed ? "*" : "") + (added ? "+" : "");
+        // object, "×" instead of "*" for an object whose modification in this mod is not applied (failure is the
+        // shown failure, ShownFailure), and "+" for an added object. "*" never means unsaved. If a game font lacks the
+        // multiplication sign, an "x" is the documented fallback.
+        internal static string RowMarkers(bool problem, bool changed, bool added, FailureKind? failure = null) => (problem ? "!" : "") + (failure != null ? "×" : changed ? "*" : "") + (added ? "+" : "");
+        // The failure an object shows: only an object that this mod changes can show that its modification is not applied.
+        internal static FailureKind? ShownFailure(bool changed, FailureKind? failure) => changed ? failure : null;
+        // The row tooltip's line for an object whose modification in this mod is refused or otherwise not applied.
+        internal static string FailureTooltipLine(FailureKind failure) => "This mod's modification of this object is " + (failure == FailureKind.Refused ? "refused" : "not applied") + ". The Changes tab gives the reason.";
+        // The label of the Changes tab line, and whether a failure kind shows as not applied.
+        internal static string FailureLabel(FailureKind failure) => FailureLabels.Of(failure);
+        internal static bool ShowsAsNotApplied(FailureKind failure) => FailureLabels.ShowsAsNotApplied(failure);
         // The row's text without colours: the markers, one space, the name. A row without a marker starts with its name.
         internal static string RowText(string markers, string name) => String.IsNullOrEmpty(markers) ? name : markers + " " + name;
         // A state-line badge as the native Map Editor's inspector writes it.
@@ -812,7 +869,7 @@ namespace RailroaderScenePatcher {
             // Bold, capitals, 90 percent of the line's size, in the badge's colour.
             internal string Markup => "<color=" + Color + "><b><size=90%>" + Text + "</size></b></color>";
         }
-        internal static readonly Badge Changed = new Badge("* CHANGED", Amber), Added = new Badge("+ ADDED", Green);
+        internal static readonly Badge Changed = new Badge("* CHANGED", Amber), Added = new Badge("+ ADDED", Green), Refused = new Badge("× REFUSED", Red), NotApplied = new Badge("× NOT APPLIED", Red);
         // The order of the state line under the heading: the badges and the problem count first, then the family, its
         // inactivity and inspection only. The line ends in an ellipsis beside the Inspector and Guided switch, so what is
         // cut off is the family, which the tooltip and the outliner also give, never a badge. Absent parts are left out.
@@ -823,9 +880,12 @@ namespace RailroaderScenePatcher {
         }
         // The search field's tooltip: a fixed title and what the field does, like every other control.
         internal const string SearchTitle = "Search objects", SearchTip = "Show only the objects whose name, path, family, binding identifiers, dependencies or problems contain the text you type.";
-        internal static IReadOnlyList<Badge> Badges(bool changed, bool added) {
+        // A modification that is not applied changes nothing: its object shows the refused or the not applied badge
+        // instead of the changed one.
+        internal static IReadOnlyList<Badge> Badges(bool changed, bool added, FailureKind? failure = null) {
             var badges = new List<Badge>();
-            if (changed) badges.Add(Changed);
+            if (failure != null) badges.Add(failure == FailureKind.Refused ? Refused : NotApplied);
+            else if (changed) badges.Add(Changed);
             if (added) badges.Add(Added);
             return badges;
         }

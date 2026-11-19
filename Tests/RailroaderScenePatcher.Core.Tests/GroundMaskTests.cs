@@ -161,6 +161,8 @@ static class GroundMaskTests {
         FailedSecondRebuildRestoresAndWaitsForTerrain();
         PlacementModesAreUnavailableForAFlatteningMask();
         FlatteningMaskRefusesAMove();
+        RefusedLoadMoveShowsAsRefused();
+        BlockedMoveControlsShowTheirReason();
         ActivityReleasesAndRegistersTheMask();
         FailureAfterMutationRestoresTheMask();
         TerrainWriteFailureIsIdentifiableAndRetryable();
@@ -272,6 +274,59 @@ static class GroundMaskTests {
         // The tab's actions, Read and Apply included, take the same reason.
         Assert(CommandBand.PlacementBlock(null, null, null, reason) == reason && CommandBand.PlacementBlock("edit", "pad", "controller", reason) == "edit" && CommandBand.PlacementBlock(null, "pad", null, reason) == "pad"
             && CommandBand.PlacementBlock(null, null, "controller", reason) == "controller" && CommandBand.PlacementBlock(null, null, null, null) == null, "The move block is the reason of the placement actions when no earlier block holds");
+    }
+
+    // A move that the world load refused, such as a hand-written fixed move of a station whose ground mask flattens the
+    // terrain height, shows as refused in scene patch editing: not as a change, with the reason on the Changes tab, in
+    // the outliner marker, the state badge and the row tooltip. The Problems filter stays for repairable defects of the
+    // object. An edit that replaces the refused modification ends the mark.
+    static void RefusedLoadMoveShowsAsRefused() {
+        var f = new Stop(flattens: true);
+        var text = Doc(GroupMod("move-station", Far));
+        var load = f.Engine.Apply(text, "author/pack").Outcomes["move-station"];
+        Assert(!load.Applied && load.Failure == FailureKind.Refused, "The world load refuses the move: " + load.Error);
+        var store = new Store { Patch = text }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(f.Engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var refusal = session.Refusal(StationId);
+        Assert(refusal != null && refusal.Contains("flattens the terrain height") && session.IsChanged(StationId), "The session knows the refused modification and its reason: " + refusal);
+        Assert(session.Changes(StationId).SequenceEqual(new[] { "Refused. " + refusal.TrimEnd('.') + "." }), "The Changes tab marks it as refused: " + String.Join(" | ", session.Changes(StationId)));
+        // What the outliner, state line and tooltip show: only an object this mod changes can show a failure.
+        Assert(CommandBand.ShownFailure(true, FailureKind.Refused) == FailureKind.Refused && CommandBand.ShownFailure(false, FailureKind.Refused) == null && CommandBand.ShownFailure(true, null) == null, "Only a changed object shows a failure");
+        Assert(CommandBand.RowMarkers(false, true, false, FailureKind.Refused) == "×" && CommandBand.RowMarkers(true, true, false, FailureKind.Restored) == "!×" && CommandBand.RowMarkers(false, true, false) == "*", "The outliner marks a modification that is not applied with its own marker, not *");
+        var badges = CommandBand.Badges(true, false, FailureKind.Refused);
+        Assert(badges.Count == 1 && ReferenceEquals(badges[0], CommandBand.Refused) && badges[0].Text == "× REFUSED" && badges[0].Color == "#FF8080", "The state line shows the refused badge instead of the changed one");
+        Assert(ReferenceEquals(CommandBand.Badges(true, false, FailureKind.Restored).Single(), CommandBand.NotApplied) && CommandBand.NotApplied.Text == "× NOT APPLIED", "A failed and restored modification shows as not applied");
+        Assert(ReferenceEquals(CommandBand.Badges(true, false).Single(), CommandBand.Changed), "A modification that applied stays changed");
+        Assert(CommandBand.FailureTooltipLine(FailureKind.Refused) == "This mod's modification of this object is refused. The Changes tab gives the reason."
+            && CommandBand.FailureTooltipLine(FailureKind.Restored) == "This mod's modification of this object is not applied. The Changes tab gives the reason.", "The row tooltip lines");
+        Assert(CommandBand.FailureLabel(FailureKind.Refused) == "Refused" && CommandBand.FailureLabel(FailureKind.Restored) == "Failed and restored" && CommandBand.FailureLabel(FailureKind.DependencyFailed) == "Not applied because a dependency failed",
+            "The Changes tab labels by failure kind");
+        Assert(!CommandBand.ShowsAsNotApplied(FailureKind.IncompleteCleanup) && CommandBand.ShowsAsNotApplied(FailureKind.Restored) && CommandBand.ShowsAsNotApplied(FailureKind.Refused), "An incomplete cleanup keeps its own presentation");
+        // A session whose own key differs, another mod's file, does not take that refusal.
+        var other = new PatchEditingSession(f.Engine, new NativeMapEditor(), new Store { Patch = text }, scenePatchFileKey: "other/pack");
+        Assert(other.Refusal(StationId) == null, "Another scene patch file key has no refusal");
+        // Remove modification ends the mark; Undo brings the refused modification back, refused, without an incomplete step.
+        Assert(session.Remove(StationId).Applied && session.Refusal(StationId) == null && !session.IsChanged(StationId), "After Remove modification nothing is refused or changed");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation == null && session.Refusal(StationId) != null && Close(f.At(f.Group), Authored), "Undo brings the refused move back as refused: " + session.IncompleteOperation);
+    }
+
+    // An object whose move a flattening ground mask blocks shows Read and Apply inactive with the reason, the Numeric mode
+    // and the position fields with "Unavailable: <reason>", and Supported edits names only what still applies.
+    static void BlockedMoveControlsShowTheirReason() {
+        var reason = CommandBand.FlatteningMoveBlock;
+        var acts = CommandBand.NumericActionReasons(reason, null);
+        Assert(acts.Apply == reason && acts.Read == reason, "Read and Apply are inactive with the reason");
+        var open = CommandBand.NumericActionReasons(null, "Enter a number");
+        Assert(open.Apply == "Enter a number" && open.Read == null, "Without a block Apply follows the fields and Read is available");
+        Assert(CommandBand.ModeTip(CommandBand.NumericMode, "Enter a position.", null, reason) == "Unavailable: " + reason.TrimEnd('.') + ".", "The Numeric mode gives the reason of its fields: " + CommandBand.ModeTip(CommandBand.NumericMode, "Enter a position.", null, reason));
+        Assert(CommandBand.ModeTip(CommandBand.NumericMode, "Enter a position.", null, null) == "Enter a position." && CommandBand.ModeTip(CommandBand.GizmoMode, "Drag.", reason, reason).StartsWith("Unavailable: ", StringComparison.Ordinal),
+            "An open Numeric mode keeps its description; another mode gives its own block");
+        Assert(CommandBand.BlockedValueTip(reason) == "Unavailable: " + reason.TrimEnd('.') + ".", "A blocked value row's tooltip starts with Unavailable: " + CommandBand.BlockedValueTip(reason));
+        Assert(CommandBand.OperationsWithoutMove(CommandBand.GroupOperations) == "Enable or disable the whole group.", "A blocked group: " + CommandBand.OperationsWithoutMove(CommandBand.GroupOperations));
+        Assert(CommandBand.OperationsWithoutMove(CommandBand.PartOperations) == "Enable or disable this part. The group and its other parts stay unchanged.", "A blocked part: " + CommandBand.OperationsWithoutMove(CommandBand.PartOperations));
+        Assert(CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations) == "Set, replace or detach the marker's track binding. Edit activity separately.", "A blocked marker: " + CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations));
+        Assert(CommandBand.OperationsWithoutMove("Something else.") == "Something else." && CommandBand.OperationsWithoutMove(null) == null, "Other texts stay");
     }
 
     // A part with a fixed placement keeps it when its group moves, and so does the mask it holds: nothing is rebuilt.

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 
@@ -46,6 +47,26 @@ namespace RailroaderScenePatcher {
         internal const string ImportIntro = "Import applies all changes below and your choices for all conflicts together. It adds no Undo step. Nothing is written until you click Save in the Map Editor.";
         internal static string KindLabel(ImportChangeKind kind) => kind == ImportChangeKind.New ? "New" : kind == ImportChangeKind.Removed ? "Removed" : "Changed";
         internal static string ChoiceLabel(bool useFile) => useFile ? "File version" : "Editor version";
+        // The message of Use file version, for the footer message area: in the form of a completed Import, it counts the
+        // applied modifications and those that did not apply by failure kind, and names each with its reason. A refused
+        // modification stays in the scene patch file but is not applied; the other kinds keep their own label, so an
+        // incomplete cleanup never reads as kept but not applied.
+        internal static string FileVersionApplied(ScenePatchFileResult result) =>
+            result == null ? FileVersionApplied(null, 0, Array.Empty<KeyValuePair<string, (FailureKind, string)>>())
+            : FileVersionApplied(result.Error, result.Outcomes?.Count(o => o.Value.Applied) ?? 0,
+                (result.Outcomes ?? new Dictionary<string, Outcome>()).Where(o => !o.Value.Applied).Select(o => new KeyValuePair<string, (FailureKind, string)>(o.Key, (o.Value.Failure, o.Value.Error))).ToArray());
+        internal static string FileVersionApplied(string fileError, int applied, IReadOnlyList<KeyValuePair<string, (FailureKind Kind, string Reason)>> failed) {
+            string Plain(string text) => (text ?? "").Trim().TrimEnd('.').TrimEnd();
+            if (fileError != null) return "File version applied. Its modifications are not applied: " + Plain(fileError) + ".";
+            if (failed == null || failed.Count == 0) return "File version applied.";
+            string Count(int n) => n == 0 ? "No modifications" : n == 1 ? "1 modification" : n + " modifications";
+            string Lower(string label) => Char.ToLowerInvariant(label[0]) + label.Substring(1);
+            var groups = failed.GroupBy(f => f.Value.Kind).OrderBy(g => (int)g.Key).ToArray();
+            var counts = new[] { Count(applied) + " applied" }.Concat(groups.Select(g => Count(g.Count()) + " " + Lower(FailureLabels.Of(g.Key))));
+            var lists = groups.Select(g => (g.Key == FailureKind.Refused ? "Kept in the scene patch file but not applied" : FailureLabels.Of(g.Key)) + ": "
+                + String.Join("; ", g.Select(f => f.Key + " (" + Plain(f.Value.Reason) + ")")) + ".");
+            return "File version applied. " + String.Join(", ", counts) + ". " + String.Join(" ", lists);
+        }
         // The message of a completed Import, for the footer message area.
         // unsaved says whether the patch work now differs from the file on disk.
         // A conflict resolved with the file version changed the entry, so it counts as an applied change; the conflicts kept

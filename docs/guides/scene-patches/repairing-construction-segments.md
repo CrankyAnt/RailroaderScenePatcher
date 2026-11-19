@@ -14,9 +14,9 @@ A plate girder bridge has no construction controller and no construction segment
 
 ## Why a repair is needed
 
-The game code shows that splitting a segment in the native map editor removes the segment and adds two segments with new IDs, and that replacing a segment also removes its ID. The controller keeps naming the old ID. The game code also suggests that the construction then no longer shows by the state of its segments, or that the game reports an error. None of this has been observed in Railroader yet.
+The game code shows that splitting a segment in the native map editor removes the segment and adds two segments with new IDs, and that replacing a segment also removes its ID. The controller keeps naming the old ID. In Railroader, after a construction segment of `Bridge 1` at Bryson was deleted, the bridge's parts stayed visible and the game reported an error when the world loaded. What the game does after a split has not yet been observed.
 
-The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. A segment that no longer exists shows its ID followed by `no longer exists`.
+The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. A segment that no longer exists shows its ID followed by `no longer exists`. The construction then shows a problem on its **Object** tab under **Detected problems**, such as `Construction segment <segment ID> no longer exists`, and is marked **!** in the outliner. A construction segment without an ID is a problem too. Click **Repair construction segments** below the problem to open the **Connections** tab. The problem disappears after the repair. A part of `Bridge 1` or the `Almond Bridge` shows the remark on its **Connections** tab without a problem; repair the construction on its group root.
 
 ## Set the construction segments in the native map editor
 
@@ -36,7 +36,7 @@ After the check, the patcher writes the segment IDs to the controller and lets t
 
 ## Detach and clear
 
-You cannot detach the construction segments: a construction without segments has no meaning. **Detach** stays unavailable, and a hand-written `{ "detach": true }` fails before anything changes.
+You cannot detach the construction segments: a construction without segments has no meaning. **Detach** stays unavailable, and a hand-written `{ "detach": true }` fails before anything changes: at world load, with **Use file version** and with **Import**. The construction keeps its segments. After **Use file version**, the footer names the refused modification with the reason, and the **Changes** tab reads `Refused.` with the reason. If you remove such a modification on the **Changes** tab, native **Undo** puts it back in the scene patch file without applying it, as it stood before.
 
 **Clear segments** removes this mod's value: the construction returns to the segments it has without this mod. **Remove modification** on the **Changes** tab does the same and also removes this mod's placement and activity of the object. Native **Undo** returns the segments from before the edit, and **Redo** sets them again.
 

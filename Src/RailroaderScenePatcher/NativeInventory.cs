@@ -383,6 +383,8 @@ namespace RailroaderScenePatcher {
         static SceneObservation Observe(Component c, string family, Dictionary<UnityEngine.Object, List<string>> incoming, Dictionary<UnityEngine.Object, List<string>> working, int scanErrors, HashSet<string> segmentIds, string graphError, Func<GameObject, string> boardRefusal,
             ReferenceScan markerReferrers, string referrerError, HolderIndex setups, Dictionary<GameObject, string> culled, HashSet<GameObject> hidden, Func<Dictionary<string, List<Component>>> markerIds) {
             var go = c.gameObject; var problems = new List<string>(); var bindings = new List<string>(); var dependencies = new List<string>(); var duplicate = new List<string>();
+            // The segment ids of the construction controller this entry names, for its construction segment problems.
+            string[] constructionIds = null;
             // A transform stands for a group root or a part of a listed group.
             var part = c is Transform && GroupWorld.IsPart(go);
             var groupRoot = c is Transform && !part;
@@ -471,11 +473,8 @@ namespace RailroaderScenePatcher {
             if (TypeName(c) == ConstructionScenery) Read(() => {
                 var ids = Field(c, "segmentIds") as string[];
                 if (ids == null) throw new InvalidOperationException("Construction scenery segment IDs unavailable");
-                foreach (var id in ids) {
-                    bindings.Add("Construction scenery segment=" + id);
-                    if (String.IsNullOrWhiteSpace(id) || (segmentIds != null && !segmentIds.Contains(id))) problems.Add("Construction scenery has a missing segment binding: " + id);
-                }
-                if (segmentIds == null) problems.Add("Construction segment validity unknown: " + graphError);
+                foreach (var id in ids) bindings.Add("Construction scenery segment=" + id);
+                constructionIds = ids;
                 var entries = Field(c, "entries") as IEnumerable;
                 if (entries == null) throw new InvalidOperationException("Construction scenery entries unavailable");
                 foreach (var entry in entries) {
@@ -553,12 +552,14 @@ namespace RailroaderScenePatcher {
             });
             // A rail bridge construction shows or hides its parts by the construction state of the track segments its
             // controller names, wherever it stands: each segment is a binding of the group root and of every part below the
-            // controller. A segment that no longer exists keeps its id with a remark and is no problem.
+            // controller. A segment that no longer exists keeps its id with a remark. On the group root, whose Connections
+            // tab repairs the construction segments, it is also a problem, once the group is known to be editable below.
             if (groupRoot || part) Read(() => {
                 var ids = GroupWorld.ConstructionSegmentsOf(go);
                 if (ids == null) return;
                 bindings.AddRange(CommandBand.ConstructionBindings(ids, segmentIds));
                 dependencies.Add(CommandBand.ConstructionDependency);
+                constructionIds = ids;
             });
             // A scene ground mask shapes the terrain where its object stands: the part that holds it says so, and the
             // group root, a part above it and a marker object above it name that part.
@@ -680,7 +681,7 @@ namespace RailroaderScenePatcher {
             var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
             var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Move, rotate, enable or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
-                : markerEditable ? "Set, replace or detach the marker's track binding. Edit placement and activity separately."
+                : markerEditable ? CommandBand.MarkerOperations
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
                 : pad ? CommandBand.NotEditable(padRefusal)
@@ -720,6 +721,14 @@ namespace RailroaderScenePatcher {
                 duplicate.AddRange(markerHolders.Dependencies(go, repairable));
                 if (markerHolders.Problem(go, repairable) is string shared) problems.Add(shared);
             }
+            // A missing construction segment is a problem where the patcher can repair it: on the group root of an
+            // editable rail bridge group and on the editable Ela controller. Elsewhere its remark on the Connections tab
+            // stays, without a problem. Like any problem it is hidden while the object is switched off itself: the game's
+            // controller (a GameBehaviour) runs only while its object is active, so a disabled construction does not fail.
+            problems.AddRange(CommandBand.RepairableConstructionProblems(structure, constructionIds, segmentIds, graphError));
+            // A ground mask that flattens the terrain height blocks every move of the object: Supported edits then names
+            // only what still applies, and the Placement tab gives the reason.
+            if (structure != null && CommandBand.GroundMaskMoveBlock(dependencies) != null) operations = CommandBand.OperationsWithoutMove(operations);
             var notes = problems.Where(BindingRules.IsNote).ToArray();
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,

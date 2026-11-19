@@ -22,6 +22,81 @@ static class ConstructionSegmentTests {
     static string Segments(string id, string path, string relationship, string extra = "") => "\"" + id + "\":{" + Target(path) + ",\"relationships\":{\"constructionSegments\":" + relationship + "}" + extra + ",\"dependsOn\":[]}";
     static string Ids(IEnumerable<string> ids) => ids == null ? "none" : String.Join(",", ids);
 
+    // A hand-written detach, or a reference with a missing segment, in the scene patch file is refused before mutation on
+    // every route that applies the file: Use file version and Import, as at world load. The refused modification shows
+    // as a failed modification, and Remove modification of it, with its Undo and Redo, keeps the history consistent.
+    static void FileRoutesRefuseADetach() {
+        // The footer of a file version without refusals stays as it was. It counts refused modifications as refused and
+        // names the other failure kinds apart: an incomplete cleanup never reads as kept but not applied.
+        KeyValuePair<string, (FailureKind, string)> Failed(string key, FailureKind kind, string reason) => new KeyValuePair<string, (FailureKind, string)>(key, (kind, reason));
+        Assert(FilePanelState.FileVersionApplied(null, 1, new KeyValuePair<string, (FailureKind, string)>[0]) == "File version applied.", "A file version without refusals");
+        var mixed = FilePanelState.FileVersionApplied(null, 1, new[] { Failed("b", FailureKind.Refused, "Reason one"), Failed("c", FailureKind.Refused, "Reason two."), Failed("d", FailureKind.IncompleteCleanup, "Reason three"), Failed("e", FailureKind.Restored, "Reason four") });
+        Assert(mixed == "File version applied. 1 modification applied, 2 modifications refused, 1 modification failed and restored, 1 modification failed with incomplete cleanup. Kept in the scene patch file but not applied: b (Reason one); c (Reason two). Failed and restored: e (Reason four). Failed with incomplete cleanup: d (Reason three).", "Several failure kinds: " + mixed);
+        Assert(FilePanelState.FileVersionApplied("Map mismatch", 0, new KeyValuePair<string, (FailureKind, string)>[0]) == "File version applied. Its modifications are not applied: Map mismatch.", "A file version that does not apply at all");
+        Assert(FilePanelState.FileVersionApplied(null) == "File version applied.", "No application result");
+        foreach (var relationship in new[] { "{\"detach\":true}", "{\"segments\":[\"S-gone\"]}" }) {
+            var expected = relationship.Contains("detach") ? ConstructionSegmentRule.NoDetach : "S-gone";
+            // Use file version.
+            var f = Split(); var store = new Store(); var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
+            string Now() => String.Join(",", f.World.SegmentsOf[f.Bridge1].OrderBy(x => x, StringComparer.Ordinal));
+            store.Patch = Doc(Segments("bad", Bryson, relationship)); session.CheckFileVersion();
+            var used = session.UseFileVersion();
+            var outcome = session.LastVersionApplication?.Outcomes?["bad"];
+            Assert(used.Applied && outcome != null && !outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains(expected) && f.World.SegmentWrites == 0 && Now() == "S-bryson",
+                "Use file version refuses " + relationship + " before mutation with the reason: " + outcome?.Error + " writes " + f.World.SegmentWrites + " now " + Now());
+            // The footer names the refused modification with its reason, and the Changes tab marks it as refused.
+            var footer = FilePanelState.FileVersionApplied(session.LastVersionApplication);
+            Assert(footer == "File version applied. No modifications applied, 1 modification refused. Kept in the scene patch file but not applied: bad (" + outcome.Error + ").",
+                "The footer states the refusal: " + footer);
+            Assert(session.Changes(GroupId(Bryson)).SequenceEqual(new[] { "Refused. " + outcome.Error.TrimEnd('.') + "." }), "The Changes tab marks the modification as refused: " + String.Join(" | ", session.Changes(GroupId(Bryson))));
+            // Remove modification of the refused modification, then Undo and Redo: nothing incomplete, the object unchanged.
+            var afterUse = session.Outstanding(mapEditor.NativeDirty).ToArray(); var dirtyAfterUse = mapEditor.IsDirty;
+            var removed = session.Remove(GroupId(Bryson));
+            Assert(removed.Applied && Now() == "S-bryson", "Remove modification of the refused modification applies: " + removed.Error);
+            Assert(!session.HasConstructionSegments(GroupId(Bryson)) && mapEditor.IsDirty, "After the removal the file no longer holds the refused modification and the title shows unsaved work");
+            mapEditor.Undo();
+            Assert(session.IncompleteOperation == null && Now() == "S-bryson" && f.World.SegmentWrites == 0, "Undo of the removal is consistent: " + session.IncompleteOperation + " now " + Now());
+            Assert(session.HasConstructionSegments(GroupId(Bryson)) && mapEditor.IsDirty == dirtyAfterUse && session.Outstanding(mapEditor.NativeDirty).SequenceEqual(afterUse),
+                "Undo puts the refused modification back as the file holds it, with the persistence of the file version: " + String.Join(", ", session.Outstanding(mapEditor.NativeDirty)));
+            mapEditor.Redo();
+            Assert(session.IncompleteOperation == null && Now() == "S-bryson" && !session.HasConstructionSegments(GroupId(Bryson)) && mapEditor.IsDirty, "Redo of the removal is consistent: " + session.IncompleteOperation);
+            // No step is left that fails later: repeated Undo and Redo, also around a later edit of another object, stay complete.
+            var moved = session.Edit(GroupId(Almond), new Placement(new[] { 3500.0, 540, 4400 }, new[] { 0.0, 0, 0, 1 }), null);
+            Assert(moved.Applied, "A later edit of another object applies: " + moved.Error);
+            for (var round = 0; round < 3; round++) {
+                mapEditor.Undo(); mapEditor.Undo(); mapEditor.Redo(); mapEditor.Redo();
+                Assert(session.IncompleteOperation == null && Now() == "S-bryson" && f.World.SegmentWrites == 0, "Round " + round + " of Undo and Redo stays complete: " + session.IncompleteOperation);
+            }
+            mapEditor.Undo(); mapEditor.Undo();
+            Assert(session.IncompleteOperation == null && mapEditor.IsDirty == dirtyAfterUse && session.Outstanding(mapEditor.NativeDirty).SequenceEqual(afterUse),
+                "Back at the file version the title and Save availability match it: " + String.Join(", ", session.Outstanding(mapEditor.NativeDirty)));
+            // Import.
+            var g = Split(); var importStore = new Store(); var importEditor = new NativeMapEditor();
+            var importing = new PatchEditingSession(g.Engine, importEditor, importStore); importEditor.Session = importing;
+            importStore.Patch = Doc(Segments("bad", Bryson, relationship)); importing.CheckFileVersion();
+            Assert(importing.OpenImport().Applied, "Import opens");
+            var imported = importing.ApplyImport();
+            Assert(!imported.Applied && imported.Error.Contains(expected) && g.World.SegmentWrites == 0, "Import refuses " + relationship + " before mutation with the reason: " + imported.Error);
+        }
+    }
+
+    // A refused edit leaves no refusal behind: Undo of a step whose target is gone afterwards stays incomplete.
+    static void StaleRefusalLeavesAMissingTargetIncomplete() {
+        var f = Split(); var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
+        var girder = new TargetIdentity(SceneName, "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)", BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
+        // A move of the plate girder bridge and its removal: Undo of the removal restores an entry where the file holds none.
+        Assert(session.Edit(girder, new Placement(new[] { 4100.0, 529, 5667 }, new[] { 0.0, 0, 0, 1 }), null).Applied && session.Remove(girder).Applied, "A move of the plate girder bridge and its removal apply");
+        // A move the world refuses inside the edit's relationship check, before any mutation.
+        f.World.PlacementRefused[f.Bridge1] = "S-gone placement refused";
+        var refused = session.Edit(GroupId(Bryson), new Placement(new[] { 3500.0, 540, 4400 }, new[] { 0.0, 0, 0, 1 }), null);
+        Assert(!refused.Applied && refused.Error.Contains("S-gone placement refused"), "A move of Bryson Bridge 1 is refused: " + refused.Error);
+        f.World.Objects.Remove("World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation != null && !session.IncompleteOperation.Contains("S-gone"), "Undo of the removal for a target that is gone stays incomplete with its own reason: " + session.IncompleteOperation);
+    }
+
     // Bryson Bridge 1 after a native split of its construction segment: the controller still names the old id.
     internal static RailBridgeTests.Bridges Split() {
         var f = new RailBridgeTests.Bridges();
@@ -35,6 +110,8 @@ static class ConstructionSegmentTests {
         RefusalsComeBeforeMutation();
         FailuresRestoreThePriorSet();
         RepairInScenePatchEditing();
+        FileRoutesRefuseADetach();
+        StaleRefusalLeavesAMissingTargetIncomplete();
         ElaControllerHoldsOnlyItsSegments();
         ConnectionsTabTexts();
         Console.WriteLine("PASS: construction segments");
@@ -221,6 +298,21 @@ static class ConstructionSegmentTests {
         Assert(CommandBand.ClearSegmentsReason(false) == "This mod sets no construction segments for this object, so there is nothing to clear." && CommandBand.ClearSegmentsReason(true) == null, "Clear segments needs this mod's value");
         Assert(CommandBand.ActionRows.Any(row => row.Length == 4 && row[0][0] == "Set" && row[1][0] == "Detach" && row[2][0] == CommandBand.ClearSegments && row[3][0] == "Picked") && CommandBand.LabelWidths.ContainsKey(CommandBand.ClearSegments),
             "The construction segment row is one of the panel's action rows with a known label width");
+        // The Ela controller is an editable object (its construction segments), so the edit block does not fall back to
+        // the generic reason: placement and activity then give the controller's own reasons.
+        Assert(CommandBand.EditableStructure(ConstructionSceneryScene.Structure), "The Ela controller is editable");
+        foreach (var structure in new[] { IndependentBoards.Structure, BridgeScene.Structure, TrackMarkerScene.Structure, MilepostScene.Structure, CrossingCoverageScene.Structure, CrossingPadScene.Structure,
+            BakedSceneryGroups.Structure, BakedSceneryParts.Structure, StationMapIconRules.Structure, SpawnPoints.Structure, ExistingEquipmentScene.MastStructure, ExistingEquipmentScene.BellStructure })
+            Assert(CommandBand.EditableStructure(structure), "Still editable: " + structure);
+        Assert(!CommandBand.EditableStructure(null) && !CommandBand.EditableStructure(StarterPlacementScene.Structure), "No structure, or a starter placement marker with its own workflow, is not editable here");
+        Assert(CommandBand.PlacementBlock(null, null, CommandBand.ControllerNoPlacement, null) == CommandBand.ControllerNoPlacement
+            && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.ConstructionSceneryOperations, controller: true) == null,
+            "Numeric stays open for the Ela controller and its fields give the placement reason");
+        var ela = new TargetIdentity(SceneName, Ela, ConstructionSceneryScene.ComponentType, ConstructionSceneryScene.Structure);
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, ela) == CommandBand.ControllerNoPlacement && GuidedTaskState.TargetBlock(GuidedTaskKind.Snap, ela) == CommandBand.ControllerNoPlacement
+            && GuidedTaskState.TargetBlock(GuidedTaskKind.Activity, ela) == CommandBand.ControllerNoActivity, "The guided tasks of the Ela controller give its placement and activity reasons");
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, GroupId(Bryson)) == null, "A rail bridge group keeps its guided move");
+        Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "This object cannot be edited here.", "The generic reason is what the Ela controller showed while it counted as not editable");
         Assert(CommandBand.ConstructionSceneryOperations == "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.",
             "The Ela controller's Supported edits: " + CommandBand.ConstructionSceneryOperations);
         Assert(CommandBand.InspectionOnly(CommandBand.ConstructionSceneryFamily, false) == null, "No bridge construction controller is inspection only");

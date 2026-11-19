@@ -294,6 +294,9 @@ namespace RailroaderScenePatcher.Core {
                 var context = scene.MapIds.ToArray();
                 var targets = new List<Tuple<TargetIdentity, object>>();
                 var notApplied = new List<string>();
+                // Changed entries of the file that Import does not apply: unresolved or not executable. Their earlier
+                // refusal or failure still holds afterwards.
+                var unapplied = new HashSet<string>(StringComparer.Ordinal);
                 // An entry that names a changed entry in dependsOn may change its effect with it, so its object is applied again.
                 var affected = new HashSet<string>(changed, StringComparer.Ordinal);
                 for (var grown = true; grown;) {
@@ -309,12 +312,14 @@ namespace RailroaderScenePatcher.Core {
                         if (item == null) continue;
                         var executable = true;
                         try { PatchEngine.Parse(item, scenePatchFileKey); } catch (InvalidOperationException) { executable = false; }
+                        if (pair.Item2 && !executable) unapplied.Add(key);
                         TargetIdentity identity; object resolved;
                         try { identity = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(identity); }
                         catch (InvalidOperationException e) {
                             // An entry the patcher does not execute is kept without execution, and an entry whose target is
                             // unavailable is an isolated application failure, as at load.
                             if (pair.Item2 && executable && changed.Contains(key)) notApplied.Add(key + ": " + ScenePatchFile.Sentence(e.Message));
+                            if (pair.Item2) unapplied.Add(key);
                             continue;
                         }
                         if (targets.Any(t => ReferenceEquals(t.Item2, resolved))) continue;
@@ -357,6 +362,8 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var conflict in fileChoices) stepKeys.ExceptWith(conflict.Keys);
                 ClearVersionAcceptance(); VersionState = FileVersionState.None; VersionMessage = null; Import = null;
                 LastImport = new ImportResult(overview.Changes.Count, fileChoices.Count, overview.Conflicts.Count - fileChoices.Count, notApplied);
+                // Import applied the changed entries it could: an earlier refusal or failure of them no longer holds.
+                foreach (var key in changed) if (!unapplied.Contains(key)) Reapplied(key);
                 outcome.Applied = true;
             } catch (Exception e) {
                 scenePatchFile = original;

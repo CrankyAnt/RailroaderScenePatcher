@@ -1126,7 +1126,7 @@ static class InspectionTests {
         // Which lines are notes: what the inspection could not read or check.
         foreach (var line in new[] { "Direct-reference scan incomplete: 3 unreadable fields", "Inspection unavailable: no graph", "Marker binding validity unknown: no graph", "Lower binding validity unknown: no graph", "Construction segment validity unknown: no graph", "Missing script in inspected hierarchy" })
             Check(BindingRules.IsNote(line), "An inspection failure is a note: " + line);
-        foreach (var line in new[] { "Marker broken binding: missing segment Sgone", "Marker has an empty segment binding", "Lower broken binding: missing segment S9", "Missing circuit 0 island", "Construction scenery has a missing segment binding: S4", "Missing construction-scenery target" })
+        foreach (var line in new[] { "Marker broken binding: missing segment Sgone", "Marker has an empty segment binding", "Lower broken binding: missing segment S9", "Missing circuit 0 island", "Construction segment S4 no longer exists. On the Connections tab, select the segments of the bridge's track and click Set.", "Missing construction-scenery target" })
             Check(!BindingRules.IsNote(line), "A defect of the object is a problem: " + line);
         Check(!BindingRules.IsNote(null), "No line is no note");
         // A refused object of a supported family stays in its family, with its reason and without a problem.

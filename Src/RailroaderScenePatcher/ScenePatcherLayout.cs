@@ -121,7 +121,7 @@ namespace RailroaderScenePatcher {
                 accessory(row);
             }).Height(RowHeight);
             if (block != null) {
-                var line = Line(builder, Literal(CommandBand.RunningLine(labels, values.Skip(first).Take(labels.Length).ToArray(), unit)), caption, CommandBand.Sentence(block), 30);
+                var line = Line(builder, Literal(CommandBand.RunningLine(labels, values.Skip(first).Take(labels.Length).ToArray(), unit)), caption, CommandBand.BlockedValueTip(block), 30);
                 return line.GetComponentInChildren<TMP_Text>(true);
             }
             builder.HStack(row => {
@@ -344,6 +344,10 @@ namespace RailroaderScenePatcher {
         bool IsChanged(SceneObservation entry) {
             try { return attachment != null && attachment.Session.IsChanged(entry.Identity); } catch { return false; }
         }
+        // How this mod's modification of the object is not applied, or null: the object then shows that, not a change.
+        FailureKind? FailureOf(SceneObservation entry) {
+            try { return attachment == null || entry == null ? null : CommandBand.ShownFailure(attachment.Session.IsChanged(entry.Identity), attachment.Session.NotApplied(entry.Identity)?.Kind); } catch { return null; }
+        }
         void DrawOutliner(UIPanelBuilder builder) {
             builder.ConfigureLayout(4f);
             DrawLeftBand(builder);
@@ -415,19 +419,19 @@ namespace RailroaderScenePatcher {
                             if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; foreach (var open in above) state.SetExpanded(open, true); }
                         }
                         var name = InventoryPresentationState.Name(item);
-                        var changed = IsChanged(item); var added = IsAdded(item);
+                        var changed = IsChanged(item); var added = IsAdded(item); var failure = CommandBand.ShownFailure(changed, changed ? FailureOf(item) : null);
                         // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so
                         // that they stay visible when the end of a long name is cut off; they take room only on a row
                         // that has them. "*" marks a changed object and never unsaved work. A name that repeats in its
                         // folder carries its parent, dimmed; an inactive object is italic and says so.
-                        var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added);
+                        var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added, failure);
                         var segments = item.Identity.Path.Split('/');
                         var context = label == null && repeated.Contains(name) && segments.Length > 1 ? "  <alpha=#99>" + Literal(segments[segments.Length - 2]) + "<alpha=#FF>" : "";
                         // A row of the Inspection only group names its family, which its folder does not. A group
                         // that stays under its category without a supported edit is marked as inspection only.
                         if (item.InspectionOnly != null) context += "  <alpha=#99>" + (item.Category == null ? Literal(item.Family) : "inspection only") + "<alpha=#FF>";
                         if (where != null) context = "  <alpha=#99>" + Literal(where) + "<alpha=#FF>" + context;
-                        var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>") + (markers.Length == 0 ? "" : " ");
+                        var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
                         string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
                         // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
                         var shown = label ?? InventoryPresentationState.NarrowName(item.Family, name, OutlinerMinimumWidth - RowDecoration,
@@ -435,7 +439,7 @@ namespace RailroaderScenePatcher {
                         var text = NameMarkup(shown);
                         if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
                         return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = InventoryPresentationState.OutlinerTooltip(item, changed)
+                            Tooltip = InventoryPresentationState.OutlinerTooltip(item, changed, failure)
                         };
                     }
                     // The Baked scenery group family lists its groups under their categories and each group's parts
@@ -567,8 +571,8 @@ namespace RailroaderScenePatcher {
             var text = new List<string> { selected.Family };
             if (!selected.Active) text.Add("Inactive");
             // The native Map Editor's badges, as its inspector shows them beside the row marker.
-            var badges = CommandBand.Badges(IsChanged(selected), IsAdded(selected));
-            foreach (var badge in badges) text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this mod" : "Added by this mod");
+            var badges = CommandBand.Badges(IsChanged(selected), IsAdded(selected), FailureOf(selected));
+            foreach (var badge in badges) text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this mod" : ReferenceEquals(badge, CommandBand.Refused) ? "Modification refused" : ReferenceEquals(badge, CommandBand.NotApplied) ? "Modification not applied" : "Added by this mod");
             if (selected.InspectionOnly != null) text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly));
             var count = selected.Problems.Count == 0 ? null : selected.Problems.Count == 1 ? "1 problem" : selected.Problems.Count + " problems";
             if (count != null) text.Add(count);
@@ -755,7 +759,7 @@ namespace RailroaderScenePatcher {
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
                     var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController, MoveBlock, IsRoadBridge);
-                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.Tooltip(tips[i], padMode));
+                    segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.ModeTip(i, tips[i], padMode, EditBlock() ?? PadBlock ?? ControllerBlock ?? MoveBlock));
                 }
             }, true);
             var block = EditBlock() ?? PadBlock ?? ControllerBlock ?? MoveBlock;
@@ -1137,7 +1141,8 @@ namespace RailroaderScenePatcher {
         void DrawChanges(UIPanelBuilder builder) {
             Section(builder, "This mod");
             var changed = IsChanged(selected);
-            FieldMarkup(builder, "Object", changed ? ChangedBadge : "Unchanged")
+            var shownFailure = FailureOf(selected);
+            FieldMarkup(builder, "Object", shownFailure != null ? CommandBand.Badges(changed, false, shownFailure)[0].Markup : changed ? ChangedBadge : "Unchanged")
                 .Tooltip("Changed", "Whether Data/scene-patches.json of the edited mod holds a modification of this object.");
             // One short line per changed setting, with the value the object has without this modification.
             if (changed && attachment != null) {
@@ -1409,12 +1414,14 @@ namespace RailroaderScenePatcher {
             switch (id) {
                 case PlacementTab:
                     block = CommandBand.PlacementBlock(block, PadBlock, ControllerBlock, MoveBlock);
-                    // Without fields there is nothing to apply or to read: an object whose placement stands as running
-                    // lines has no value controls.
-                    if ((placementMode == 0 || IsPad) && block != null) return new Act[0];
-                    if (placementMode == 0 || IsPad) return new[] {
-                        Typed(Slot("Apply", "Apply the entered position and rotation. Placement does not change a track binding.", null, ApplyPlacement), () => CommandBand.FieldReason(block, placementFields, CurrentPlacement(), CommandBand.SamePlacement)),
-                        Slot("Read", "Fill the fields with the inspected values.", block, ReadNumericPlacement), Empty, Empty };
+                    // An object whose placement stands as running lines keeps Apply and Read, inactive with the reason.
+                    if (placementMode == 0 || IsPad) {
+                        var placementBlock = block;
+                        return new[] {
+                            Typed(Slot("Apply", "Apply the entered position and rotation. Placement does not change a track binding.", null, ApplyPlacement),
+                                () => CommandBand.NumericActionReasons(placementBlock, placementBlock == null ? CommandBand.FieldReason(null, placementFields, CurrentPlacement(), CommandBand.SamePlacement) : null).Apply),
+                            Slot("Read", "Fill the fields with the inspected values.", CommandBand.NumericActionReasons(placementBlock, null).Read, ReadNumericPlacement), Empty, Empty };
+                    }
                     // The Gizmo mode has no action: the gizmo stands on the object while the mode is open.
                     if (placementMode == 1) return new Act[0];
                     if (placementMode == 2) {
@@ -1719,7 +1726,7 @@ namespace RailroaderScenePatcher {
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
-                    new[] { "Changed", "Objects this mod changes, marked *." },
+                    new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead; its Changes tab gives the reason." },
                     new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },

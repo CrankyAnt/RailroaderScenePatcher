@@ -184,6 +184,7 @@ static partial class CoverageTests {
         IncompleteCleanupGuardsRetry();
         EditingPreviewSelectUndoRedoAndRemoval();
         EditingRefusalAndFailureRestore();
+        RefusedFileCoverageKeepsHistoryComplete();
         SaveAndReloadReproduceCoverageOnce();
         DependedCoverageKeepsItsLastEntry();
         UnresolvedDetectionSpanIsAControllerProblem();
@@ -422,6 +423,21 @@ static partial class CoverageTests {
         var store = new Store { Patch = patch }; var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(f.Scene), mapEditor, store); mapEditor.Session = session;
         return (f, session, mapEditor, store);
+    }
+    // A file version whose coverage selects a missing track is refused before mutation with a plain refusal, not an
+    // invalid definition. Remove modification with native Undo and Redo still leaves no incomplete step.
+    static void RefusedFileCoverageKeepsHistoryComplete() {
+        var (f, session, mapEditor, store) = Session();
+        store.Patch = Doc(Cover("bad", Tracks("Pipr", "Sgone"))); session.CheckFileVersion();
+        Assert(session.UseFileVersion().Applied, "The file version is used");
+        var outcome = session.LastVersionApplication.Outcomes["bad"];
+        Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains("track segment Sgone is missing") && f.World.Mutations == 0 && f.Native, "The coverage is refused before mutation: " + outcome.Error);
+        Assert(session.Changes(Crossing).Count == 1 && session.Changes(Crossing)[0].StartsWith("Refused. ", StringComparison.Ordinal), "The Changes tab marks it as refused: " + String.Join(" | ", session.Changes(Crossing)));
+        Assert(session.Remove(Crossing).Applied, "Remove modification of the refused coverage applies");
+        mapEditor.Undo();
+        Assert(session.IncompleteOperation == null && f.World.Mutations == 0 && f.Native, "Undo puts the refused coverage back without an incomplete step: " + session.IncompleteOperation);
+        mapEditor.Redo(); mapEditor.Undo();
+        Assert(session.IncompleteOperation == null, "Redo and Undo stay complete: " + session.IncompleteOperation);
     }
     static JObject Only(PatchEditingSession session) => (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
     static void EditingPreviewSelectUndoRedoAndRemoval() {
