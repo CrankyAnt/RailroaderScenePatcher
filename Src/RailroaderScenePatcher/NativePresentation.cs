@@ -50,7 +50,7 @@ namespace RailroaderScenePatcher {
         internal const int Width = 340, DefaultHeight = 300, MinimumHeight = 120;
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(Width, DefaultHeight), new Vector2Int(260, MinimumHeight), Window.Position.UpperLeft);
-        protected override string Title { get; set; } = "Scene patches help";
+        protected override string Title { get; set; } = "Scene Patcher help";
         internal Window NativeWindow => Window;
         protected override void BuildContent(UIPanelBuilder builder) { Build?.Invoke(builder); }
         internal void Refresh() { RebuildPanel(); }

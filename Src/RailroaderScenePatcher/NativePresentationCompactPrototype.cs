@@ -9,8 +9,13 @@ namespace RailroaderScenePatcher {
     // mode should look like and what the game's window allows. Mode and variant live in memory only; the native
     // window's saved bounds are kept at the full window's while compact.
     internal sealed partial class NativePresentation {
-        internal enum PrototypeCompactVariant { OwnerLayout, SlimStrip, SideRail }
-        internal static readonly string[] PrototypeVariantNames = { "A: Owner's layout", "B: Slim bottom strip", "C: Side rail" };
+        internal enum PrototypeCompactVariant { OwnerLayout, SlimStrip, SideRail, OwnerWithChoice }
+        internal static readonly string[] PrototypeVariantNames = { "A: Owner's layout", "B: Slim bottom strip", "C: Side rail", "D: Owner's layout with world choice line" };
+        internal const int PrototypeVariantCount = 4;
+        // Where the user left each variant's compact window, in screen pixels, for this session only. A variant the user
+        // has not moved or resized opens at its own place.
+        readonly Rect[] prototypeVariantRects = new Rect[PrototypeVariantCount];
+        Rect prototypePlacedRect;
         internal bool PrototypeCompact { get; private set; }
         internal PrototypeCompactVariant PrototypeVariant { get; private set; }
         // Called after each mode or variant switch with the presentation's part of the log line.
@@ -60,7 +65,8 @@ namespace RailroaderScenePatcher {
 
         internal void PrototypeCycleVariant(int step) {
             if (disposed || !PrototypeCompact) return;
-            PrototypeVariant = (PrototypeCompactVariant)(((int)PrototypeVariant + step + 3) % 3);
+            PrototypeRememberRect();
+            PrototypeVariant = (PrototypeCompactVariant)(((int)PrototypeVariant + step + PrototypeVariantCount) % PrototypeVariantCount);
             PrototypePlace();
             dirty = true;
             PrototypeSwitched?.Invoke(PrototypeState());
@@ -82,7 +88,17 @@ namespace RailroaderScenePatcher {
             dirty = true;
         }
 
+        // A compact window the user dragged or resized keeps that rectangle for its variant; it never snaps back.
+        void PrototypeRememberRect() {
+            var current = PanelBounds;
+            if (current.width <= 0) return;
+            if (Mathf.Abs(current.x - prototypePlacedRect.x) > 1 || Mathf.Abs(current.y - prototypePlacedRect.y) > 1 ||
+                Mathf.Abs(current.width - prototypePlacedRect.width) > 1 || Mathf.Abs(current.height - prototypePlacedRect.height) > 1)
+                prototypeVariantRects[(int)PrototypeVariant] = current;
+        }
+
         void PrototypeExitCompact() {
+            PrototypeRememberRect();
             PrototypeCompact = false;
             if (prototypeResizer != null) { try { prototypeResizer.minSize = prototypeResizerMinimum; } catch { } prototypeResizer = null; }
             if (prototypeFullRect.width > 0 && prototypeFullRect.height > 0) Place((RectTransform)window.transform, prototypeFullRect);
@@ -111,6 +127,12 @@ namespace RailroaderScenePatcher {
         // The compact window's rectangle in screen pixels for the current variant. The frame is what the native window
         // adds around its content: the title bar and the padding.
         void PrototypePlace() {
+            var remembered = prototypeVariantRects[(int)PrototypeVariant];
+            if (remembered.width > 0 && remembered.height > 0) {
+                Place((RectTransform)window.transform, remembered);
+                prototypePlacedRect = remembered; boundsFrame = -1;
+                return;
+            }
             var native = window.NativeWindow;
             var frame = ((RectTransform)native.transform).rect.size - native.GetContentSize();
             float width, height, x, y;
@@ -127,17 +149,18 @@ namespace RailroaderScenePatcher {
                     break;
                 default:
                     width = prototypeFullRect.width;
-                    height = (PrototypeOwnerContent + frame.y) * scale;
+                    height = ((PrototypeVariant == PrototypeCompactVariant.OwnerWithChoice ? PrototypeOwnerContent + PrototypeChoiceLine : PrototypeOwnerContent) + frame.y) * scale;
                     x = (Screen.width - width) * 0.5f; y = Screen.height - height;
                     break;
             }
             width = Mathf.Min(width, Screen.width); height = Mathf.Min(height, Screen.height);
-            Place((RectTransform)window.transform, new Rect(Mathf.Max(0, x), Mathf.Max(0, y), width, height));
+            prototypePlacedRect = new Rect(Mathf.Max(0, x), Mathf.Max(0, y), width, height);
+            Place((RectTransform)window.transform, prototypePlacedRect);
             boundsFrame = -1;
         }
 
         // Content heights and the rail's content width, in canvas units.
-        internal const float PrototypeOwnerContent = 236, PrototypeSlimContent = 92, PrototypeRailContent = 300;
+        internal const float PrototypeOwnerContent = 236, PrototypeChoiceLine = 24, PrototypeSlimContent = 92, PrototypeRailContent = 300;
 
         string PrototypeState() {
             var bounds = PanelBounds;

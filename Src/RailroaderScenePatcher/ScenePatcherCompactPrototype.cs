@@ -1,5 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
+using System.Linq;
+using RailroaderScenePatcher.Core;
 using UI.Builder;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,7 +20,8 @@ namespace RailroaderScenePatcher {
             switch (presentation.PrototypeVariant) {
                 case NativePresentation.PrototypeCompactVariant.SlimStrip: PrototypeSlimStrip(builder); break;
                 case NativePresentation.PrototypeCompactVariant.SideRail: PrototypeSideRail(builder); break;
-                default: PrototypeOwnerLayout(builder); break;
+                case NativePresentation.PrototypeCompactVariant.OwnerWithChoice: PrototypeOwnerLayout(builder, true); break;
+                default: PrototypeOwnerLayout(builder, false); break;
             }
         }
 
@@ -27,7 +30,7 @@ namespace RailroaderScenePatcher {
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
                 Button(row, "<", () => presentation.PrototypeCycleVariant(-1)).Tooltip("Previous variant", "Prototype: show the previous compact variant.");
-                row.AddLabel("<color=" + PrototypePill + "><b>PROTOTYPE</b> " + Literal(NativePresentation.PrototypeVariantNames[(int)presentation.PrototypeVariant]) + " (" + ((int)presentation.PrototypeVariant + 1) + "/3)</color>")
+                row.AddLabel("<color=" + PrototypePill + "><b>PROTOTYPE</b> " + Literal(NativePresentation.PrototypeVariantNames[(int)presentation.PrototypeVariant]) + " (" + ((int)presentation.PrototypeVariant + 1) + "/" + NativePresentation.PrototypeVariantCount + ")</color>")
                     .TextWrap(TMPro.TextOverflowModes.Ellipsis, TMPro.TextWrappingModes.NoWrap).Height(RowHeight).FlexibleWidth();
                 Button(row, ">", () => presentation.PrototypeCycleVariant(1)).Tooltip("Next variant", "Prototype: show the next compact variant.");
             }).Height(RowHeight);
@@ -36,7 +39,8 @@ namespace RailroaderScenePatcher {
         // A: the owner's description. The full window's two columns without the outliner's search, filters and
         // reminders, without tabs, tab bodies and footers: the left band over a short scrollable outliner, the right
         // band over the heading, the state line and the Inspector and Guided switch.
-        void PrototypeOwnerLayout(UIPanelBuilder builder) {
+        // D is A with one line of a pending world choice under the state line.
+        void PrototypeOwnerLayout(UIPanelBuilder builder, bool choiceLine) {
             var columns = builder.HStack(row => {
                 var width = Mathf.Clamp(outlinerWidth, OutlinerMinimumWidth, OutlinerMaximum());
                 leftBandWidth = width;
@@ -48,6 +52,7 @@ namespace RailroaderScenePatcher {
                     column.ConfigureLayout(4f);
                     DrawRightBand(column);
                     PrototypeHeading(column);
+                    if (choiceLine) PrototypeChoiceLine(column);
                     column.AddExpandingVerticalSpacer();
                 });
                 var inspector = inspectorRect.gameObject.AddComponent<LayoutElement>();
@@ -103,6 +108,18 @@ namespace RailroaderScenePatcher {
                 Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
                 DrawModeSwitch(row);
             }).ChildrenKeepHeight().Height(RowHeight);
+        }
+
+        // One line of a pending world choice: what to click, then the clicked candidate. The full text, as the footer
+        // words it, is in the tooltip. Without a pending choice the line stays empty and keeps its height.
+        void PrototypeChoiceLine(UIPanelBuilder builder) {
+            var pending = selection?.Pending;
+            if (pending == null) { builder.Spacer(RowHeight); return; }
+            var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
+            var candidate = selection.Find(pending.Candidate);
+            var what = candidate == null ? purpose + " in the world." : CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation);
+            var full = purpose + " in the world." + (candidate == null ? " Nothing is clicked yet." : " Clicked: " + what + " Open the full window to confirm.");
+            Line(builder, "<b>World choice</b> " + Tint(Blue, what), "World choice", full, RowHeight);
         }
 
         void PrototypeLog(string state) {
