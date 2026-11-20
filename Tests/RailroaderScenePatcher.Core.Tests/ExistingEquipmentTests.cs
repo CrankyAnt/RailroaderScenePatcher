@@ -100,6 +100,7 @@ static class ExistingEquipmentTests {
         DisabledFarMastNeedsNoCulling();
         TrackFollowingPlacementIsRefused();
         ActivityThatACullerSwitchesIsRefused();
+        GroupDrivenActivityAndTheExplicitDisable();
         RefusalsLeaveSceneAndFileUnchanged();
         FailureAfterMutationRestoresEquipmentAndCulling();
         IncompleteCleanupBlocksTheRetry();
@@ -207,6 +208,58 @@ static class ExistingEquipmentTests {
         var outcome = f.Engine.Apply(Doc(Mast("off", Mast2Path, active: false))).Outcomes["off"];
         Assert(!outcome.Applied && outcome.Error.Contains("culler") && f.World.Mutations == 0 && f.Mast2.Active, "Enabled is refused before mutation for equipment a culler switches itself: " + outcome.Error);
         Assert(f.Engine.Apply(Doc(Mast("move", Mast2Path, position: new[] { 1108.0, 10, 16 }))).Outcomes["move"].Applied, "Its placement can still be edited");
+    }
+
+    // Equipment whose activity the game's switches drive. The mast pattern accepts a light object or bell that a
+    // progression or a map feature names in its switch list, and one below an object that such a switch names: an explicit
+    // disable holds through the switch's later writes, and without one the switch keeps switching the equipment. A light
+    // object that a track-relative component switches with its track group does not conform: its disable is refused
+    // before any change, and its group keeps switching it.
+    static void GroupDrivenActivityAndTheExplicitDisable() {
+        foreach (var kind in new[] { GameSwitch.Progression, GameSwitch.MapFeature }) {
+            // The switch names the light object, or the bell, itself.
+            var f = new Fixture(); f.Mast1.Constructed = f.Bell.Constructed = true; f.Mast1.Switch = f.Bell.Switch = kind;
+            var off = f.Engine.Apply(Doc(Mast("mast-off", active: false), Bell("bell-off", active: false)));
+            Assert(off.Outcomes.Values.All(o => o.Applied) && !f.Mast1.Active && !f.Bell.Active, kind + ": the explicit disable of a switched mast and bell applies: " + String.Join("; ", off.Outcomes.Values.Select(o => o.Error)));
+            f.World.Controller(f.Mast1, true); f.World.Controller(f.Bell, true);
+            Assert(!f.Mast1.Active && !f.Bell.Active && f.World.ObservePart(f.Mast1).Part.Active == false && f.World.Constructions.Held(f.Mast1), kind + ": the switch turning them on does not reach the disabled mast and bell");
+            Assert(f.Engine.Apply(Doc(Mast("mast-off", active: false), Bell("bell-off", active: false))).Outcomes.Values.All(o => o.Applied) && !f.Mast1.Active && !f.Bell.Active, kind + ": a repeated application keeps the hold");
+            var on = f.Engine.Apply(Doc(Mast("mast-on", active: true))).Outcomes["mast-on"];
+            Assert(on.Applied && f.Mast1.Active && !f.World.Diverted(f.Mast1), kind + ": Enable returns the mast to the switch's current choice and back to the switch: " + on.Error);
+            f.World.Controller(f.Mast1, false);
+            Assert(!f.Mast1.Active, kind + ": the switch switches the enabled mast again");
+            var g = new Fixture(); g.Mast1.Constructed = true; g.Mast1.Switch = kind;
+            Assert(g.Engine.Apply(Doc(Mast("move", position: Near1))).Outcomes["move"].Applied, kind + ": a move without Enabled applies");
+            g.World.Controller(g.Mast1, false);
+            Assert(!g.Mast1.Active && !g.World.Diverted(g.Mast1), kind + ": without an explicit disable the switch turns the mast off");
+            g.World.Controller(g.Mast1, true);
+            Assert(g.Mast1.Active && Near(g.MapOf(g.Mast1).Position, Near1), kind + ": and on again, at its placement");
+        }
+        // The switch names the object above the mast: the mast's own activity holds the disable while the switch turns that
+        // object off and on, and a load while the switch holds it off applies the disable as well.
+        var above = new Fixture();
+        Assert(above.Engine.Apply(Doc(Mast("mast-off", active: false))).Outcomes["mast-off"].Applied && !above.Mast1.Active, "The disable of a mast below a switched object applies");
+        above.World.Controller(above.Outer1, false);
+        Assert(above.Engine.Apply(Doc(Mast("mast-off", active: false))).Outcomes["mast-off"].Applied, "An application while the switch holds the object above off applies");
+        above.World.Controller(above.Outer1, true);
+        Assert(above.Outer1.Active && !above.Mast1.Active, "The switch turning the object above on does not turn the disabled mast on");
+        var follows = new Fixture();
+        follows.World.Controller(follows.Outer1, false);
+        Assert(follows.Mast1.Active && !follows.Outer1.Active, "Without an explicit disable the mast keeps its own activity, so it shows with the object above as the switch sets it");
+        follows.World.Controller(follows.Outer1, true);
+        Assert(follows.Outer1.Active && follows.Mast1.Active, "The switch shows it again");
+        // A track-group follower: the pattern refuses the mast before any change.
+        var group = new Fixture(); var (_, editor, session) = Session(group);
+        var problem = ExistingEquipmentPattern.MastProblem(new MastFacts { Lamps = { new LampFacts { Name = "Signal 1", Key = "lights" } }, FollowsTrackGroup = true }, new[] { "lights", "gates" });
+        group.World.PartRefused = "This mast cannot be edited: " + problem;
+        var refused = group.Engine.Apply(Doc(Mast("mast-off", active: false))).Outcomes["mast-off"];
+        Assert(!refused.Applied && refused.Failure == FailureKind.Refused && refused.Error.Contains("track group") && group.World.Mutations == 0 && group.Mast1.Active, "The disable of a track-group follower is refused before any change: " + refused.Failure + " " + refused.Error);
+        var before = session.ScenePatchFileText;
+        Assert(!session.Edit(MastId(), null, false).Applied && session.ScenePatchFileText == before && !editor.CanUndo && group.World.Mutations == 0, "Scene patch editing refuses it too and leaves the file and history unchanged");
+        group.World.Controller(group.Mast1, false);
+        Assert(!group.Mast1.Active, "Its track group keeps switching it off");
+        group.World.Controller(group.Mast1, true);
+        Assert(group.Mast1.Active, "and on");
     }
 
     static void RefusalsLeaveSceneAndFileUnchanged() {
