@@ -395,8 +395,11 @@ namespace RailroaderScenePatcher.Core {
         // The scene ground masks at and below a marker object, such as the Hemingway station, whose track marker stands
         // on the root of its building: a move of the marker rebuilds them, and a mask that flattens the terrain height
         // refuses the move. Null in a world without them.
-        readonly GroundMasks masks;
+        GroundMasks masks;
         public TrackMarkerScene(ITrackMarkerWorld world, Capability capability, GroundMasks masks = null) { relationship = new MarkerRelationship(world, Structure, null, true); Capability = capability; this.masks = masks; }
+        // Gives a capability built before the world's ground masks existed, as for a new game's start, those masks. A
+        // capability that already has masks keeps them.
+        public void UseMasks(GroundMasks value) { if (masks == null) masks = value; }
         public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
         public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
         public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;

@@ -21,6 +21,8 @@ The **Use in the game** section of the **Object** tab names each use for the ins
 
 The game reads a spawn point where it stands each time it uses it, so a moved spawn point is expected to be used at its new place. A disabled spawn point is expected to be passed by for rescue, teleport, quick search and the default start, and the tab says so for a disabled spawn point. An inactive spawn point is not a problem.
 
+A new game reads its start spawn point while the map loads, before the patcher applies the rest of the scene patch file. So when a new game starts, the patcher applies the spawn point modifications first, just before the game reads them. A spawn point modification that depends on another modification, or uses a track-following placement, waits for the normal world-load application. A new game then starts at the spawn point's place on the loaded map.
+
 ## Move a spawn point
 
 1. Open **Scene patches**, click **Refresh** in the command band, open the **Spawn point** family and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.

@@ -19,10 +19,11 @@ namespace RailroaderScenePatcher {
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
-            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install();
+            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install(); NewGameStartHook.Install(this);
             if (NativeSaveClick.Problem != null) context.Log.Info(NativeSaveClick.Problem);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
             if (DeferredRestores.Error != null) context.Log.Info(DeferredRestores.Error + ". The game runs its restore-time callbacks before scene patch files apply.");
+            if (NewGameStartHook.Error != null) context.Log.Info(NewGameStartHook.Error + ". A new game starts at the spawn point's scene placement.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
         // Every exit path hands the restore-time callbacks the patcher deferred back to the game, after the apply.
@@ -89,6 +90,18 @@ namespace RailroaderScenePatcher {
             }
             catch (Exception e) { return "Early capability prerequisites unavailable: " + e.GetBaseException().Message; }
         }
+        // A new game reads its start spawn point before the world-load callback. This opens the load attempt for the
+        // current map context, which the callback then joins, as the marker check does.
+        internal void BeforeNewGameStart() {
+            try {
+                var binding = Binding();
+                var state = binding.Prepare(MapContext());
+                if (state == null) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": spawn points keep their scene placement for the new game start: " + binding.Error); return; }
+                var applied = state.BeforeNewGameStart(context);
+                if (applied > 0) context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": " + applied + " spawn point modification" + (applied == 1 ? "" : "s") + " applied before the new game start");
+            }
+            catch (Exception e) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": spawn points keep their scene placement for the new game start: " + e.GetBaseException().Message); }
+        }
         // The world's patcher state stays for a later load attempt over the same map context; the next attempt releases the
         // state of every object that did not survive. Parts bound to the native map editor end with the world.
         public void OnWorldUnload() {
@@ -102,7 +115,7 @@ namespace RailroaderScenePatcher {
             NativeRepairHooks.Reset();
             world?.Release();
             ReleaseReporter();
-            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove(); DeferredRestores.Remove();
+            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove(); DeferredRestores.Remove(); NewGameStartHook.Remove();
         }
         void ReleaseReporter() {
             if (reporter == null) return;
@@ -126,6 +139,7 @@ namespace RailroaderScenePatcher {
         readonly Dictionary<string, KeyValuePair<string, string>> pendingNotices = new Dictionary<string, KeyValuePair<string, string>>();
         bool presentationErrorLogged;
         TrackMarkerWorld markerWorld;
+        TrackMarkerScene markerScene;
         internal bool Initialized { get; private set; }
         SceneInventory inventory;
         InspectionInputBlocker inputBlocker;
@@ -246,6 +260,8 @@ namespace RailroaderScenePatcher {
                     context.Log.Info("Scene Patcher " + Version + ": ground mask handling incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 PrepareRuntime(value);
+                // A runtime prepared before the world load, for a new game's start or a marker check, built the marker capability without them.
+                markerScene?.UseMasks(groundMasks);
                 if (inMapEditor) {
                     inventory = new SceneInventory(native);
                     selection = new SpatialSelection(native, () => inventory?.Entries);
@@ -298,11 +314,6 @@ namespace RailroaderScenePatcher {
                     capabilities.AddUnavailable(MilepostScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": milepost capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
-                try { capabilities.Add(new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked)); }
-                catch (Exception e) {
-                    capabilities.AddUnavailable(SpawnPoints.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": spawn point capability incompatible or unavailable: " + e.GetBaseException().Message);
-                }
                 try { capabilities.Add(new StationMapIconScene(new MapIconWorld())); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(StationMapIconRules.Structure, e.GetBaseException().Message);
@@ -348,8 +359,14 @@ namespace RailroaderScenePatcher {
             native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
             ModScenePatchFiles.Log = message => context?.Log.Info(message);
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
-            try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
+            try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
+            // A new game reads its start spawn point before the world load, so the spawn point capability is ready with the runtime.
+            try { capabilities.Add(new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked)); }
+            catch (Exception e) {
+                capabilities.AddUnavailable(SpawnPoints.Structure, e.GetBaseException().Message);
+                context?.Log.Info("Scene Patcher " + Version + ": spawn point capability incompatible or unavailable: " + e.GetBaseException().Message);
+            }
             engine = new PatchEngine(capabilities);
             nativeDiagnostics = new NativePatchDiagnostics(Report);
             runtime = new PatchRuntime(engine, nativeDiagnostics, Version, Application.version);
@@ -369,6 +386,18 @@ namespace RailroaderScenePatcher {
                 }
                 return attempted ? null : unavailable ?? "No applicable dependency-free relationship-only repair before TrackMarker.OnEnable";
             });
+        }
+        // Applies the spawn point modifications that can take effect now, before the game reads a new game's start spawn
+        // point. The world-load apply runs every modification again. Returns how many applied.
+        internal int BeforeNewGameStart(IModContext value) {
+            PrepareRuntime(value);
+            var applied = 0;
+            foreach (var mod in ModScenePatchFiles.Discover()) {
+                if (mod == null || mod.Error != null || !mod.Applicable) continue;
+                try { applied += runtime.BeforeNewGameStart(mod.Json, mod.Source).Outcomes.Values.Count(o => o.Applied); }
+                catch (Exception e) { context?.Log.Info(Describe(mod, "Spawn point placement before the new game start failed: " + e.GetBaseException().Message)); }
+            }
+            return applied;
         }
         internal void ApplyScenePatchFiles() {
             if (engine == null) return;
@@ -1000,7 +1029,7 @@ namespace RailroaderScenePatcher {
             // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
             capabilities?.Dispose();
             groundMasks?.Dispose(); groundMasks = null; GroundMaskWorld.Unavailable(); scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
-            runtime = null; markerWorld = null; nativeDiagnostics = null; pendingWarnings.Clear(); pendingNotices.Clear(); overlapNotices = null;
+            runtime = null; markerWorld = null; markerScene = null; nativeDiagnostics = null; pendingWarnings.Clear(); pendingNotices.Clear(); overlapNotices = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }

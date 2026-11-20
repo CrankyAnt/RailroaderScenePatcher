@@ -131,6 +131,12 @@ namespace RailroaderScenePatcher.Core {
             ReportResult(result, source);
             return result;
         }
+        public ScenePatchFileResult BeforeNewGameStart(string json, PatchSource source) {
+            var result = engine.BeforeNewGameStart(json, source.Identifier);
+            if (result.Error != null) ClearSource(source);
+            ReportResult(result, source);
+            return result;
+        }
         void ClearSource(PatchSource source) {
             foreach (var key in latest.Keys.Where(k => k.StartsWith(Key(source, ""), StringComparison.Ordinal)).ToArray()) latest.Remove(key);
         }

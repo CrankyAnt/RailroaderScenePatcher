@@ -170,6 +170,7 @@ static class GroundMaskTests {
         InventoryListsTheStationsAndDepotsWithTheirParts();
         ObjectTabNamesTheMaskHolder();
         MarkerRootGainsTheMaskHandling();
+        MarkerSceneBuiltBeforeTheMasksGainsThem();
         Console.WriteLine("PASS: ground masks");
     }
 
@@ -562,6 +563,20 @@ static class GroundMaskTests {
         terrain.Flattens = true;
         var refused = engine.Apply(Doc(Move("again", 1220))).Outcomes["again"];
         Assert(!refused.Applied && refused.Error.Contains("flattens the terrain height") && Close(world.Position(marker), new[] { 1160.0, 1, 2 }) && terrain.Rebuilds == 1, "A flattening mask refuses the marker's move before mutation: " + refused.Error);
+    }
+    // A new game prepares the runtime before the world load builds the ground masks; the marker capability built then
+    // gains them once they exist, and handles the mask below Hemingway as one built with them.
+    static void MarkerSceneBuiltBeforeTheMasksGainsThem() {
+        const string path = "World/Large Scenery/Hemingway/Hemingway flagstopstation";
+        var world = new FakeMarkerWorld(); var marker = new FakeMarker { Id = "Mo0j", Segment = "S9sc", End = "a", Distance = 46.52 };
+        world.Objects[path] = new List<object> { marker }; world.Load(marker); world.Relative(marker);
+        var terrain = new MarkerTerrain(world, marker) { Flattens = true }; var masks = new GroundMasks(terrain);
+        var scene = new TrackMarkerScene(world, Capability.Unchecked);
+        scene.UseMasks(masks);
+        scene.UseMasks(new GroundMasks(new MarkerTerrain(world, marker)));
+        string Move(string id, double x) => "\"" + id + "\":{\"target\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + path + "\",\"component\":\"Track.TrackMarker\",\"structure\":\"track-marker-v1\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + x.ToString(CultureInfo.InvariantCulture) + ",1,2],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+        var refused = new PatchEngine(scene).Apply(Doc(Move("move", 1160))).Outcomes["move"];
+        Assert(!refused.Applied && refused.Error.Contains("flattens the terrain height") && terrain.Rebuilds == 0, "The masks given later refuse the move under a flattening mask; a second set does not replace them: " + refused.Error);
     }
     // The one mask below a controlled marker: registered where the marker stood at the last rebuild.
     sealed class MarkerTerrain : IGroundMaskWorld {

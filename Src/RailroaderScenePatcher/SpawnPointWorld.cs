@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using HarmonyLib;
 using RailroaderScenePatcher.Core;
 using UnityEngine;
 
@@ -84,6 +85,32 @@ namespace RailroaderScenePatcher {
                 var count = shared.GetType().GetProperty("Count", BindingFlags.Instance | BindingFlags.Public)?.GetValue(shared);
                 return count is int value ? value : (int?)null;
             } catch { return null; }
+        }
+    }
+    // Places the spawn points a new game reads before the mods' OnWorldLoad. GlobalGameManager.LoadMap calls
+    // StateManager.ApplyNewGameSetup once the map scenes are loaded; it reads the start setup's spawn point transform for
+    // a company with no cars and no balance, and right after it InitializeDefaultSpawnIfNeeded reads the first active
+    // spawn point when neither that nor native spawns set the start. The prefix applies the spawn point modifications of
+    // the applicable scene patch files first, through the engine's own execution; the world load applies every
+    // modification again. It never skips the original, and any internal failure leaves the game's own start.
+    internal static class NewGameStartHook {
+        const string Id = "crankyant.scene-patcher.new-game-start";
+        static Harmony harmony;
+        static EntryPoint owner;
+        // Why the hook is not installed, or null.
+        internal static string Error { get; private set; }
+        internal static void Install(EntryPoint value) {
+            owner = value;
+            try {
+                var method = typeof(Game.State.StateManager).GetMethod("ApplyNewGameSetup", BindingFlags.Instance | BindingFlags.Public, null, new[] { typeof(Game.State.NewGameSetup) }, null);
+                if (method == null || method.ReturnType != typeof(void)) throw new MissingMethodException("StateManager.ApplyNewGameSetup");
+                harmony = new Harmony(Id);
+                harmony.Patch(method, prefix: new HarmonyMethod(typeof(NewGameStartHook), nameof(Before)));
+            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "New game start hook unavailable: " + e.GetBaseException().Message; }
+        }
+        internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; owner = null; }
+        static void Before() {
+            try { owner?.BeforeNewGameStart(); } catch { /* The game's own start stays. */ }
         }
     }
 }

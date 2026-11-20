@@ -15,8 +15,9 @@ namespace RailroaderScenePatcher.Core {
     // of SpawnPoint.All (GlobalGameManager.InitializeDefaultSpawnIfNeeded). An active company setup names a spawn point;
     // when the game applies the setup to a company with no cars and no balance, it reads that spawn point's transform
     // for the start, whatever its activity (StateManager.ApplyNewGameSetup). Whether that start or the native spawns
-    // win when both exist is not settled by the source. None of this is observed in Railroader yet, so the Object tab
-    // states it as expected behaviour.
+    // win when both exist is not settled by the source. Both new-game reads run before the mods' OnWorldLoad, so the
+    // patcher applies the spawn point modifications first (PatchEngine.BeforeNewGameStart). None of this is observed in
+    // Railroader yet, so the Object tab states it as expected behaviour.
     // A stuck player is moved to the closest active spawn point, and to a native spawn only when there is none
     // (PlayerController, SpawnPoint.TryClosestTo). The /tp console command and quick search list the active spawn
     // points by name and jump to where each stands (TeleportCommand, QuickSearchController). Each reads the

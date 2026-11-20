@@ -283,9 +283,18 @@ namespace RailroaderScenePatcher.Core {
         // The complete envelope is checked before selecting a dependency-free relationship repair for this native check.
         public ScenePatchFileResult BeforeNativeCheck(string json, string scenePatchFileKey, TargetIdentity target) {
             if (target == null) throw new ArgumentNullException(nameof(target));
-            return ApplyScenePatchFile(json, scenePatchFileKey, null, target, false);
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, (string id, JObject entry, out string unavailable) => EarlyRepair(id, entry, target, out unavailable), false);
         }
-        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, TargetIdentity nativeTarget, bool retryFailures) {
+        // A new game reads the start setup's spawn point, or the first active spawn point, before the world-load apply
+        // (StateManager.ApplyNewGameSetup, GlobalGameManager.InitializeDefaultSpawnIfNeeded). The complete envelope is
+        // checked; then only the spawn point modifications that can take effect now apply, through the same execution as
+        // the world load, which later applies every modification again.
+        public ScenePatchFileResult BeforeNewGameStart(string json, string scenePatchFileKey) {
+            return ApplyScenePatchFile(json, scenePatchFileKey, null, EarlySpawn, false);
+        }
+        // Whether a modification runs in an early route; unavailable names why one that the route is for has to wait.
+        delegate bool EarlyRoute(string id, JObject entry, out string unavailable);
+        ScenePatchFileResult ApplyScenePatchFile(string json, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, EarlyRoute early, bool retryFailures) {
             if (scenePatchFileKey == null) throw new ArgumentNullException(nameof(scenePatchFileKey));
             Observe("document-dispatch", scenePatchFileKey);
             var result = new ScenePatchFileResult();
@@ -302,7 +311,7 @@ namespace RailroaderScenePatcher.Core {
                 var visiting = new HashSet<string>();
                 // Modifications that dependsOn does not order run in ordinal key order, whatever the order of the text.
                 foreach (var id in entries.Keys) {
-                    if (nativeTarget != null && !EarlyRepair(id, entries[id], nativeTarget, out var unavailable)) {
+                    if (early != null && !early(id, entries[id], out var unavailable)) {
                         if (unavailable != null) result.EarlyRouteUnavailable = unavailable;
                         continue;
                     }
@@ -348,6 +357,29 @@ namespace RailroaderScenePatcher.Core {
                     CheckRelationships(matches[0], parsed.State);
                     return true;
                 } catch (Exception e) { unavailable = "Early repair prerequisites unavailable: " + e.Message; return false; }
+            } catch (InvalidOperationException) { return false; }
+        }
+        // A spawn point modification runs early when it sets only a fixed placement or activity, has no dependencies, and its
+        // target is unique and passes preflight now. Anything else waits for the world load, untouched and without a
+        // recorded failure: a prerequisite missing now is not yet a failed attempt.
+        bool EarlySpawn(string id, JObject entry, out string unavailable) {
+            unavailable = null;
+            try {
+                var parsed = Parse(entry, "", id); var identity = parsed.Identity;
+                if (identity.Component != SpawnPoints.Component || identity.Structure != null && identity.Structure != SpawnPoints.Structure) return false;
+                var state = parsed.State;
+                if (parsed.Dependencies.Length != 0 || state.Placement?.Following != null || state.Marker != null || state.Coverage != null || state.Equipment != null ||
+                    state.Starter != null || state.Segments != null || state.MarkerId != null) {
+                    unavailable = "Operation " + id + " requires world-load scheduling for dependencies, track-following placement or relationships";
+                    return false;
+                }
+                try {
+                    var matches = Matches(identity);
+                    if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target is not yet unique and available");
+                    if (IsUnsafe(matches[0])) throw new InvalidOperationException("Cleanup for this object could not be verified");
+                    scene.Preflight(matches[0]);
+                    return true;
+                } catch (Exception e) { unavailable = "Early spawn point placement prerequisites unavailable: " + e.Message; return false; }
             } catch (InvalidOperationException) { return false; }
         }
         Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, bool retryFailures) {

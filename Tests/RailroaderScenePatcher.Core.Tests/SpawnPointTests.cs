@@ -70,6 +70,44 @@ static class SpawnPointTests {
         RelationshipsAreRefusedBeforeMutation();
         MinimumHoldsWithoutTheCapability();
         SpawnPointRootIsNoGroupRow();
+        NewGameStartPlacesSpawnPointsFirst();
+        NewGameStartLeavesOtherWorkForTheWorldLoad();
+    }
+    // A new game reads the start setup's spawn point before the world-load apply; the spawn point modifications apply
+    // first, through the same engine, and the world load then finds them in place.
+    static void NewGameStartPlacesSpawnPointsFirst() {
+        var (world, spawn, scene) = Setup();
+        var engine = new PatchEngine(scene);
+        var doc = Doc(Spawn("move-alarka", extra: ",\"active\":false"));
+        var early = engine.BeforeNewGameStart(doc, "");
+        Assert(early.Error == null && early.Outcomes["move-alarka"].Applied && Moved(spawn) && !spawn.Active, "The spawn point is moved and disabled before the new game reads it: " + early.Error);
+        var load = engine.Apply(doc, "");
+        Assert(load.Outcomes["move-alarka"].Applied && Moved(spawn) && !spawn.Active, "The world-load apply keeps the move: " + load.Outcomes["move-alarka"].Error);
+        var store = new Store { Patch = doc }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
+        Assert(session.Remove(AlarkaId).Applied && Unedited(spawn), "Remove modification still returns the authored placement and activity, captured before the early apply");
+    }
+    // Only a spawn point modification without dependencies, with a fixed placement and a target ready now applies early;
+    // anything else is left to the world-load apply, untouched and without a failure.
+    static void NewGameStartLeavesOtherWorkForTheWorldLoad() {
+        var (world, spawn, scene) = Setup();
+        world.Objects["World/POIs/Bryson"] = new List<object> { new FakeSpawn() };
+        world.Objects["World/POIs/Dillsboro"] = new List<object> { new FakeSpawn() };
+        var dependent = Spawn("a-dependent", path: "World/POIs/Bryson").Replace("\"dependsOn\":[]", "\"dependsOn\":[\"move-alarka\"]");
+        var following = "\"following\":{\"target\":{\"scene\":\"level4\",\"path\":\"World/POIs/Dillsboro\",\"component\":\"Character.SpawnPoint\",\"structure\":\"spawn-point-v1\"}," +
+            "\"placement\":{\"mode\":\"trackFollowing\",\"track\":{\"segment\":\"S1\",\"end\":\"a\",\"distance\":10},\"offset\":[0,0,0],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+        var doc = Doc(Spawn("move-alarka") + "," + dependent + "," + following);
+        var engine = new PatchEngine(scene);
+        var early = engine.BeforeNewGameStart(doc, "");
+        Assert(early.Outcomes["move-alarka"].Applied && !early.Outcomes.ContainsKey("a-dependent") && !early.Outcomes.ContainsKey("following") && world.Mutations == 1,
+            "Only the fixed, dependency-free spawn point modification applies early: " + String.Join(", ", early.Outcomes.Keys));
+        Assert(early.EarlyRouteUnavailable != null, "The skipped modifications are named as waiting for the world load");
+        world.Refused = "The spawn point's scene is not loaded";
+        var refused = new PatchEngine(scene).BeforeNewGameStart(Doc(Spawn("move-alarka", 5220)), "");
+        Assert(!refused.Outcomes.Any() && world.Mutations == 1 && refused.EarlyRouteUnavailable.Contains("not loaded"), "A target that is not ready is left untouched without a failure: " + refused.EarlyRouteUnavailable);
+        world.Refused = null;
+        var later = engine.Apply(Doc(Spawn("move-alarka", 5220)), "");
+        Assert(later.Outcomes["move-alarka"].Applied && Math.Abs(spawn.Position[0] - 4220) < 1e-9, "The world-load apply still runs every modification: " + later.Outcomes["move-alarka"].Error);
     }
     static void FixedPlacementThroughTheOrigin() {
         var (world, spawn, scene) = Setup();
