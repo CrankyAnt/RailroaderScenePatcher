@@ -152,7 +152,7 @@ public sealed class Observation : MonoBehaviour {
     // The culling readout serves any map in the isolated home: it needs the home and the observer's mod folder, not the
     // fixed-placement fixture. It writes Evidence/culling/readout.jsonl under the mod folder.
     string cullingPath = "World/Large Scenery/Whittier/Whittier Saw Mill", cullingPadMarkerId = "", cullingLabel = "", cullingStatus = "No readout yet"; long cullingSequence;
-    Rect cullingWindow = new Rect(740, 330, 380, 210);
+    Rect cullingWindow = new Rect(740, 330, 380, 240); long colliderSequence;
     bool HomeValid() {
         try {
             var args = Environment.GetCommandLineArgs(); var ix = Enumerable.Range(0, args.Length).Where(i => String.Equals(args[i], "-homedir", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -218,6 +218,32 @@ public sealed class Observation : MonoBehaviour {
             cullingStatus = "Readout " + cullingSequence + " written: " + ((JArray)data["cullers"]).Count + " cullers, " + own.Count + " own spheres";
         } catch (Exception e) { cullingStatus = "Readout failed: " + e.GetBaseException().Message; }
     }
+    // Every Collider below the culling target, enabled or not, with its type, trigger flag, attached Rigidbody and world
+    // bounds. It uses the same target identity as the culling readout (group path, optional pad marker ID) and writes one
+    // row per collider to Evidence/culling/colliders.jsonl, or one no-colliders row when the target has none.
+    void ColliderReadout() {
+        try {
+            if (!HomeValid()) throw new InvalidOperationException("Unexpected home or observer mod");
+            var padMarkerId = cullingPadMarkerId.Trim();
+            var root = padMarkerId.Length == 0 ? One(cullingPath) : OneCrossbuck(cullingPath, padMarkerId);
+            var colliders = root.GetComponentsInChildren<Collider>(true).Where(c => c != null).ToArray();
+            var common = new JObject { ["evidenceKind"] = "collider-readout", ["schemaVersion"] = 1, ["label"] = cullingLabel, ["padMarkerId"] = padMarkerId.Length == 0 ? null : padMarkerId, ["sequence"] = ++colliderSequence, ["utc"] = DateTime.UtcNow.ToString("O"), ["frame"] = Time.frameCount, ["gameVersion"] = Application.version, ["group"] = Placement(root), ["count"] = colliders.Length };
+            common["patcherAssemblySha256"] = HashFile(TypeNamed("RailroaderScenePatcher.PatcherBehaviour").Assembly.Location);
+            var path = Path.Combine(directory, "Evidence", "culling", "colliders.jsonl"); Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var lines = new List<string>();
+            if (colliders.Length == 0) { var row = new JObject(common); row["event"] = "no-colliders"; lines.Add(row.ToString(Formatting.None)); }
+            for (var i = 0; i < colliders.Length; i++) {
+                var c = colliders[i]; var body = c.attachedRigidbody; var row = new JObject(common);
+                row["event"] = "collider"; row["index"] = i; row["path"] = PathOf(c.transform); row["type"] = c.GetType().FullName; row["enabled"] = c.enabled; row["isTrigger"] = c.isTrigger;
+                row["activeSelf"] = c.gameObject.activeSelf; row["activeInHierarchy"] = c.gameObject.activeInHierarchy;
+                row["rigidbody"] = body == null ? null : new JObject { ["path"] = PathOf(body.transform), ["instanceId"] = body.GetInstanceID(), ["isKinematic"] = body.isKinematic };
+                row["bounds"] = new JObject { ["center"] = V(c.bounds.center), ["size"] = V(c.bounds.size) };
+                lines.Add(row.ToString(Formatting.None));
+            }
+            File.AppendAllLines(path, lines);
+            cullingStatus = "Collider readout " + colliderSequence + " written: " + colliders.Length + " colliders";
+        } catch (Exception e) { cullingStatus = "Collider readout failed: " + e.GetBaseException().Message; }
+    }
     // Every UI object under the mouse pointer, top hit first, as the event system raycasts a click there: for each, its
     // selectables with their enabled and interactable state and the parent canvas groups that can block them. Bound to
     // F8 so the pointer can stay on the control. It writes Evidence/culling/pointer.jsonl under the mod folder.
@@ -252,6 +278,7 @@ public sealed class Observation : MonoBehaviour {
                 GUILayout.Label("Pad marker ID (crossbucks that share a path)"); cullingPadMarkerId = GUILayout.TextField(cullingPadMarkerId);
                 GUILayout.Label("Label"); cullingLabel = GUILayout.TextField(cullingLabel);
                 if (GUILayout.Button("Culling readout")) CullingReadout();
+                if (GUILayout.Button("Collider readout")) ColliderReadout();
                 GUI.DragWindow(new Rect(0, 0, 10000, 20));
             }, "Culling readout");
         if (!ready) return;
