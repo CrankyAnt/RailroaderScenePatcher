@@ -979,6 +979,17 @@ namespace RailroaderScenePatcher {
             var y = Math.Max(0, Math.Min(anchorTop, screenHeight - height));
             return new Area { X = x, Y = y, Width = width, Height = height };
         }
+        // Where a placed window goes once it no longer lies within the screen, such as after its corner was dragged past
+        // the screen's bottom edge: moved back inside with its own size, as the native window keeps itself within its
+        // parent (Window.ClampToParentBounds), and never larger than the screen. A window within the screen, up to half a
+        // pixel of rounding past an edge, stays as it is. Null for a window without a size.
+        internal static Area? Within(Area current, float screenWidth, float screenHeight) {
+            if (current.Width <= 0 || current.Height <= 0) return null;
+            const float slack = 0.5f;
+            if (current.X >= -slack && current.Y >= -slack && current.X + current.Width <= screenWidth + slack && current.Y + current.Height <= screenHeight + slack) return current;
+            float width = Math.Min(current.Width, screenWidth), height = Math.Min(current.Height, screenHeight);
+            return new Area { X = Math.Max(0, Math.Min(current.X, screenWidth - width)), Y = Math.Max(0, Math.Min(current.Y, screenHeight - height)), Width = width, Height = height };
+        }
         internal static Area Default(float screenWidth, float screenHeight, float scale, float mapEditorLeft, float mapEditorWidth, float mapEditorBottom, float topRightBottom,
             float defaultWidth, float defaultHeight, float minimumHeight) {
             float width = defaultWidth * scale, x = 0, top = screenHeight - defaultHeight * scale;

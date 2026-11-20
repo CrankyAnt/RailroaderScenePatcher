@@ -916,11 +916,19 @@ namespace RailroaderScenePatcher {
             }
             if (!IsOpen) return;
             var current = PanelBounds;
-            bool onScreen = current.width > 0 && current.height > 0 && current.xMin >= 0 && current.yMin >= 0 && current.xMax <= Screen.width && current.yMax <= Screen.height;
+            var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
             // A placed window stays where it is, as native windows do: native UI that opens over it, chrome rebuilds and
             // camera moves do not move or resize it. Bounds the native window restored from an earlier session win over
-            // the default. Place it again only when it no longer lies within the screen.
-            if (onScreen && (panelPlaced || hadSavedBounds)) { panelPlaced = true; return; }
+            // the default. A placed window that no longer lies within the screen, such as one whose corner was dragged
+            // past the screen's bottom edge, moves back inside with its size, and does not return to the default layout.
+            if (within != null && (panelPlaced || hadSavedBounds)) {
+                var inside = within.Value;
+                panelPlaced = true;
+                if (inside.X == current.x && inside.Y == current.y && inside.Width == current.width && inside.Height == current.height) return;
+                Place((RectTransform)window.transform, new Rect(inside.X, inside.Y, inside.Width, inside.Height));
+                SaveBounds(window.NativeWindow);
+                return;
+            }
             Place((RectTransform)window.transform, DefaultBounds());
             panelPlaced = true;
             SaveBounds(window.NativeWindow);

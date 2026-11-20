@@ -452,6 +452,18 @@ static class CommandBandTests {
         // A component the game adds while it runs is no dependency.
         Check(HierarchyDependencies.IsRuntimeComponent("Helpers.Animation.PlayableGraphAnimatorAdapter") && !HierarchyDependencies.IsRuntimeComponent("RollingStock.Controls.KeyValueBoolAnimator")
             && !HierarchyDependencies.IsRuntimeComponent("UnityEngine.Animator") && !HierarchyDependencies.IsRuntimeComponent(null), "The playable-graph adapter an animator adds while running is runtime state; the animator itself is authored");
+        // A placed window that no longer lies within the screen, such as one whose corner was dragged past the screen's
+        // bottom edge, is moved back inside with its size, as the native window keeps itself within its parent; it never
+        // jumps back to the default layout. A window larger than the screen takes the screen's size.
+        PanelPlacement.Area A(float x, float y, float w, float h) => new PanelPlacement.Area { X = x, Y = y, Width = w, Height = h };
+        string S(PanelPlacement.Area? a) => a == null ? "none" : a.Value.X + "," + a.Value.Y + " " + a.Value.Width + "x" + a.Value.Height;
+        Check(S(PanelPlacement.Within(A(100, 300, 734, 700), 1920, 1080)) == "100,300 734x700", "A window within the screen stays as it is");
+        var rounded = PanelPlacement.Within(A(100, 300, 734, 780.4f), 1920, 1080);
+        Check(rounded != null && rounded.Value.Y == 300 && rounded.Value.Height == 780.4f, "A window that ends a fraction of a pixel past the edge stays as it is");
+        Check(S(PanelPlacement.Within(A(100, 300, 734, 812), 1920, 1080)) == "100,268 734x812", "A corner dragged past the bottom edge keeps the size and moves the window up: " + S(PanelPlacement.Within(A(100, 300, 734, 812), 1920, 1080)));
+        Check(S(PanelPlacement.Within(A(1500, -20, 734, 700), 1920, 1080)) == "1186,0 734x700", "A window past the right and top edges moves inside");
+        Check(S(PanelPlacement.Within(A(0, 100, 734, 1300), 1920, 1080)) == "0,0 734x1080", "A window taller than the screen takes the screen's height");
+        Check(PanelPlacement.Within(A(0, 0, 0, 700), 1920, 1080) == null && PanelPlacement.Within(A(0, 0, 734, 0), 1920, 1080) == null, "A window without a size has no place within the screen");
         // The help window stands beside the panel and never over it.
         var right = PanelPlacement.Beside(0, 734, 300, 364, 800, 2560, 1440, 8);
         Check(right.X == 742 && right.Y == 300 && right.Width == 364 && right.Height == 800, "With room at the right the help stands right of the panel, at the height of its ?: " + right.X);
