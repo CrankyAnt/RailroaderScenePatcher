@@ -35,32 +35,40 @@ namespace RailroaderScenePatcher {
         // The short form of dependency or runtime lines, which the Object tab shows by default: every line that names a
         // component of the inspected hierarchy by its label (scene/path [type]) joins one line per object, which names
         // the object by its path relative to the inspected one, or "This object", followed by its component types
-        // without their namespace. Objects follow in the order they first appear. A reference line keeps its place
-        // with the relative path; any other line, also one that names an object outside the hierarchy, stays as it is.
-        // The lines that stay come first.
+        // without their namespace. Objects follow in the order they first appear, the inspected object first. A
+        // reference line keeps its place with the relative path; any other line, also one that names an object outside
+        // the hierarchy, stays as it is. The lines that stay come first.
         internal static IReadOnlyList<string> ShortForm(string scene, string path, IEnumerable<string> lines) {
             var all = (lines ?? Enumerable.Empty<string>()).ToArray();
             if (String.IsNullOrEmpty(scene) || String.IsNullOrEmpty(path)) return all;
             var root = scene + "/" + path;
             var kept = new List<string>();
             var objects = new List<string>();
-            var items = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            var components = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             foreach (var line in all) {
-                var label = Label(line, root);
+                var label = FindComponentLabel(line, root);
                 if (label == null) { kept.Add(line); continue; }
-                var (start, end, relative, type) = label.Value;
-                var before = line.Substring(0, start); var after = line.Substring(end);
-                var item = Item(before, after, ShortType(type));
-                if (item == null) { kept.Add(before + (relative.Length == 0 ? "this object" : relative) + " [" + type + "]" + after); continue; }
-                if (!items.TryGetValue(relative, out var list)) { items[relative] = list = new List<string>(); objects.Add(relative); }
-                list.Add(item);
+                var found = label.Value;
+                var before = line.Substring(0, found.Start); var after = line.Substring(found.End);
+                var entry = ComponentEntry(before, after, ShortType(found.Type));
+                if (entry == null) { kept.Add(before + (found.RelativePath.Length == 0 ? "this object" : found.RelativePath) + " [" + found.Type + "]" + after); continue; }
+                if (!components.TryGetValue(found.RelativePath, out var list)) { components[found.RelativePath] = list = new List<string>(); objects.Add(found.RelativePath); }
+                list.Add(entry);
             }
             var ordered = objects.Where(o => o.Length == 0).Concat(objects.Where(o => o.Length != 0));
-            return kept.Concat(ordered.Select(o => (o.Length == 0 ? "This object" : o) + ": " + String.Join(", ", items[o]))).ToArray();
+            return kept.Concat(ordered.Select(o => (o.Length == 0 ? "This object" : o) + ": " + String.Join(", ", components[o]))).ToArray();
         }
-        // Where a line names a component of the hierarchy below root: the label's start and end, the object's path
-        // relative to root, and the component type. Null when the line names none.
-        static (int, int, string, string)? Label(string line, string root) {
+        // A component label (scene/path [type]) of an object at or below the inspected one, found in a line: where the
+        // label starts and ends in the line, the object's path relative to the inspected object ("" for that object
+        // itself), and the component's full type name.
+        struct ComponentLabel {
+            internal int Start, End;
+            internal string RelativePath, Type;
+        }
+        // The first label in the line that names a component of the hierarchy below root, or null when it names none.
+        // A sibling whose name only begins with the inspected object's name, such as "Crossing (1)" beside "Crossing",
+        // is outside the hierarchy.
+        static ComponentLabel? FindComponentLabel(string line, string root) {
             if (line == null) return null;
             for (var at = line.IndexOf(root, StringComparison.Ordinal); at >= 0; at = line.IndexOf(root, at + 1, StringComparison.Ordinal)) {
                 var rest = at + root.Length;
@@ -70,21 +78,23 @@ namespace RailroaderScenePatcher {
                 if (close < 0) continue;
                 var relative = line.Substring(rest, open - rest);
                 if (relative.Length != 0 && relative[0] != '/') continue;
-                return (at, close + 1, relative.TrimStart('/'), line.Substring(open + 2, close - open - 2));
+                return new ComponentLabel { Start = at, End = close + 1, RelativePath = relative.TrimStart('/'), Type = line.Substring(open + 2, close - open - 2) };
             }
             return null;
         }
         static string ShortType(string type) { var dot = type.LastIndexOf('.'); return dot < 0 ? type : type.Substring(dot + 1); }
-        // A component as its object's line names it, or null for a line of another kind.
-        static string Item(string before, string after, string type) {
-            if (before == "Component " && after.Length == 0) return type;
-            if (before == "Component " && after == "; enabled=True") return type + " (enabled)";
-            if (before == "Component " && after == "; enabled=False") return type + " (disabled)";
-            if (before.Length == 0 && after == " enabled=True") return type + " enabled";
-            if (before.Length == 0 && after == " enabled=False") return type + " disabled";
-            if (after.Length == 0 && before == "Runtime object ") return type + " (runtime object)";
-            if (after.Length == 0 && before == "Runtime component ") return type + " (runtime component)";
-            if (after.Length == 0 && before == "Generated pad object ") return type + " (generated pad object)";
+        // The component as its object's short line lists it, from the text before and after its label: a component
+        // line (HierarchyDependencies.Describe), an enabled line of the runtime state, or a runtime or generated object.
+        // An enabled state reads "Type enabled" or "Type disabled" in every kind of line. Null for a line of another
+        // kind, such as a reference, which keeps a line of its own.
+        static string ComponentEntry(string before, string after, string type) {
+            var state = after == "; enabled=True" || after == " enabled=True" ? " enabled" : after == "; enabled=False" || after == " enabled=False" ? " disabled" : null;
+            if (before == "Component " && (after.Length == 0 || (state != null && after[0] == ';'))) return type + (state ?? "");
+            if (before.Length == 0 && state != null && after[0] == ' ') return type + state;
+            if (after.Length != 0) return null;
+            if (before == "Runtime object ") return type + " (runtime object)";
+            if (before == "Runtime component ") return type + " (runtime component)";
+            if (before == "Generated pad object ") return type + " (generated pad object)";
             return null;
         }
         internal static IEnumerable<string> Describe(bool crossingPad, IEnumerable<HierarchyPart> parts) {
