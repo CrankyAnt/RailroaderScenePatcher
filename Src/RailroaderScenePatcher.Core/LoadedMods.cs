@@ -56,7 +56,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // What happened to this scene patch file in one load attempt, as one line for the log: the mod, the map the scene patch file
         // is for, and the outcome. mapIds is the loaded map followed by its layers. A scene patch file for another map is
-        // skipped without a failure, so this line is the only trace of it.
+        // skipped; outside the native map editor that skip also gives a native warning.
         public string LogLine(string patcherVersion, int attempt, IReadOnlyList<string> mapIds) {
             var maps = mapIds ?? Array.Empty<string>();
             var source = Mod.Source;

@@ -5,7 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
-    public enum FailureCause { Unknown, InvalidDefinition, PatcherFault }
+    // NotApplicable: a scene patch file that does not apply in the loaded map context. It is no fault, so its warning names no one to report to.
+    public enum FailureCause { Unknown, InvalidDefinition, PatcherFault, NotApplicable }
     public sealed class PatchSource {
         public PatchSource(string identifier, string name, string version, string author = null, string website = null) {
             Identifier = identifier ?? throw new ArgumentNullException(nameof(identifier)); Name = name; Version = version; Author = author; Website = website;
@@ -19,10 +20,10 @@ namespace RailroaderScenePatcher.Core {
     public sealed class PatchFailure {
         internal PatchFailure(PatchSource mod, string operation, TargetIdentity target, string error, FailureCause cause, string patcherVersion, string gameVersion, string diagnosticKey) {
             DiagnosticKey = diagnosticKey; ModIdentifier = mod.Identifier; Operation = operation; ObjectPath = target?.Path; Cause = cause;
-            ReportTo = cause == FailureCause.InvalidDefinition ? "mod author" : "patcher maintainer";
+            ReportTo = cause == FailureCause.NotApplicable ? null : cause == FailureCause.InvalidDefinition ? "mod author" : "patcher maintainer";
             Message = (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + "; version " + (mod.Version ?? "not supplied") + "]. Definition Data/scene-patches.json; operation " + operation +
                 "; object " + (target == null ? "not resolved" : target.Label) + ". " + error +
-                ". Patcher " + patcherVersion + "; game " + gameVersion + ". Report to the " + ReportTo + ".";
+                ". Patcher " + patcherVersion + "; game " + gameVersion + "." + (ReportTo == null ? "" : " Report to the " + ReportTo + ".");
             if (!String.IsNullOrWhiteSpace(mod.Author)) Message += " Mod author: " + mod.Author + ".";
             if (Uri.TryCreate(mod.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + mod.Website + ".";
         }
@@ -85,7 +86,11 @@ namespace RailroaderScenePatcher.Core {
                 // The engine isolates scene patch file and operation failures itself; presentation faults stay with this scene patch file.
                 ClearSource(mod.Source);
                 scenePatchFile.Result = engine.Apply(mod.Json, mod.Source.Identifier);
-                try { ReportResult(scenePatchFile.Result, mod.Source); }
+                // In the native map editor only the edited mod loads, and its mismatch stays with scene patch editing's own diagnostic.
+                try {
+                    ReportResult(scenePatchFile.Result, mod.Source);
+                    if (scenePatchFile.Result.NotApplicable != null && !mod.EditTarget) Report(mod.Source, "document", null, scenePatchFile.Result.NotApplicable, FailureCause.NotApplicable, true);
+                }
                 catch (Exception e) { scenePatchFile.PresentationError = "Failure report delivery failed: " + e.Message; }
                 try { ObserveOverlap(mod, scenePatchFile.Result, notices); }
                 catch (Exception e) { scenePatchFile.PresentationError = (scenePatchFile.PresentationError == null ? "" : scenePatchFile.PresentationError + "; ") + "Overlap notice delivery failed: " + e.Message; }

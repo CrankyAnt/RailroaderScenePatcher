@@ -46,9 +46,16 @@ static class MultipleModTests {
         Check(undeclared.X == 0, "A loaded mod without the required patcher dependency is not considered");
         Check(otherMap.X == 0, "A mod whose scene patch file names a scene target map outside the map context is not applied");
         Check(scenePatchFiles.Single(d => d.Mod.Source.Identifier == "b/undeclared").Result == null, "An undeclared mod is never handed to the engine");
-        Check(messages.Rows.Count == 0, "Neither a missing dependency nor a map mismatch is a player-facing application failure");
-        // One log line per scene patch file per load attempt names the mod, the scene patch file's map and the outcome.
+        // A missing dependency means the mod is no candidate. A scene patch file for another map is a candidate that the
+        // patcher does not apply, so it warns with the supplying mod and the reason; it is no fault, so it names no one to report to.
         var maps = scene.MapIds.ToArray();
+        Check(messages.Rows.Count == 1 && messages.Rows[0].ModIdentifier == "c/other-map", "Only the scene patch file for another map gives a warning: " + String.Join(" | ", messages.Rows.Select(r => r.Message)));
+        var skip = messages.Rows[0];
+        Check(skip.Message.StartsWith("Other map [c/other-map; version 1.0]. ", StringComparison.Ordinal) && skip.Message.Contains("for map elsewhere, which is neither the loaded map " + maps[0] + " nor one of its layers (" + String.Join(", ", maps.Skip(1)) + ")")
+            && skip.Message.Contains("not applied") && !skip.Message.Contains("Report to") && skip.ReportTo == null && skip.Cause == FailureCause.NotApplicable, "The warning names the supplying mod and the reason, without a report direction: " + skip.Message);
+        runtime.ApplyLoaded(mods, null);
+        Check(messages.Rows.Count == 1, "A repeated application in the same load gives no second warning");
+        // One log line per scene patch file per load attempt names the mod, the scene patch file's map and the outcome.
         var start = "Scene Patcher 0.6.0: load attempt 2, map " + maps[0] + " (layers " + String.Join(", ", maps.Skip(1)) + "): ";
         var lines = scenePatchFiles.ToDictionary(d => d.Mod.Source.Identifier, d => d.LogLine("0.6.0", 2, maps));
         Check(lines["a/declared"] == start + "Declared [a/declared] scene patch file for " + maps[0] + ": 1 of 1 modifications applied, 0 failed, 0 unchanged", "An applied scene patch file is logged with its counts: " + lines["a/declared"]);
@@ -60,6 +67,9 @@ static class MultipleModTests {
         var editTarget = LoadedMod.Read("e/edited", Info("Edited"), Doc(Move("m", "undeclared", 7)), editTarget: true);
         runtime.ApplyLoaded(new[] { editTarget }, null);
         Check(undeclared.X == 7, "The native map editor's active scene patch file applies before Save has declared the dependency");
+        var editedElsewhere = new Messages();
+        new PatchRuntime(new PatchEngine(scene), editedElsewhere, "0.6.0", "game").ApplyLoaded(new[] { LoadedMod.Read("e/edited", Info("Edited"), Doc(Move("m", "undeclared", 8), "elsewhere"), editTarget: true) }, null);
+        Check(editedElsewhere.Rows.Count == 0 && undeclared.X == 7, "In the native map editor a scene target map mismatch of the edited mod stays with scene patch editing's own diagnostic");
         var unreadable = LoadedMod.Read("f/broken", "{broken", Doc(Move("m", "declared", 9)));
         Check(unreadable.Error != null && !unreadable.Applicable, "Unreadable supplying metadata protects the mod as a whole");
     }

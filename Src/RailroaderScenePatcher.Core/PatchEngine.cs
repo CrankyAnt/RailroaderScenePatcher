@@ -204,9 +204,18 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyDictionary<string, Outcome> Outcomes { get; internal set; }
         public bool MapEditorOnly { get; internal set; }
         public string EarlyRouteUnavailable { get; internal set; }
+        // Why the scene patch file does not apply in this map context, with the map it names and the loaded maps, or null.
+        // The file is skipped as a whole; this is no failure of the file or of the patcher.
+        public string NotApplicable { get; internal set; }
     }
     public sealed class PatchEngine {
         readonly IScene scene;
+        string NotApplicable(string problem, string mapId) {
+            if (problem != SceneTargetMapCheck.Mismatch) return problem;
+            var maps = scene.MapIds.ToArray();
+            return "The scene patch file is for map " + mapId + ", which is neither the loaded map " + (maps.Length == 0 ? "unknown" : maps[0]) +
+                " nor one of its layers (" + (maps.Length < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "). Its modifications were not applied";
+        }
         readonly Dictionary<string, Outcome> failed = new Dictionary<string, Outcome>();
         readonly HashSet<object> unsafeTargets = new HashSet<object>(new ByReference());
         // The remaining or uncertain state each unsafe target was left with, for the recovery guidance.
@@ -303,7 +312,7 @@ namespace RailroaderScenePatcher.Core {
             if (!scenePatchFile.CanWrite) { result.Error = scenePatchFile.Error; result.MapEditorOnly = true; return result; }
             try {
                 var mapProblem = SceneTargetMapCheck.Problem(scene, (string)scenePatchFile.Root["sourceMap"]["mapId"]);
-                if (mapProblem != null) { result.Error = mapProblem; result.MapEditorOnly = true; return result; }
+                if (mapProblem != null) { result.Error = mapProblem; result.MapEditorOnly = true; result.NotApplicable = NotApplicable(mapProblem, (string)scenePatchFile.Root["sourceMap"]["mapId"]); return result; }
                 if (scene.Capability == Capability.Incompatible) { result.Error = "Placement capability is incompatible"; return result; }
                 var entries = Entries(scenePatchFile.Modifications);
                 sharedAdditions = SharedAdditionIds(entries.Values);

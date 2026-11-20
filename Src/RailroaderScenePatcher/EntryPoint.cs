@@ -408,8 +408,8 @@ namespace RailroaderScenePatcher {
             IReadOnlyList<LoadedScenePatchFile> scenePatchFiles;
             try { scenePatchFiles = runtime.ApplyLoaded(ModScenePatchFiles.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
             catch (Exception e) { Report("discovery", "Loaded mod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
-            // One line per scene patch file per load attempt says what happened to it, also when nothing else is reported: a
-            // scene patch file for another map is skipped without a failure.
+            // One line per scene patch file per load attempt says what happened to it, also when nothing else is reported, such
+            // as for a mod without the patcher dependency.
             loadAttempts++;
             string[] maps = null;
             try { maps = ModScenePatchFiles.MapIds(); } catch { }
