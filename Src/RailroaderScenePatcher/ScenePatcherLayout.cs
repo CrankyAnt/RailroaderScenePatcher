@@ -30,13 +30,13 @@ namespace RailroaderScenePatcher {
             RowHeight = 24, LineHeight = 20, TabStripHeight = 30, InspectorMessageHeight = 104, FilePanelMessageHeight = 64,
             // What a row adds to its name: the folder and child indent, the two markers and the scroll bar.
             RowDecoration = 80;
-        // The changed state reads the same in the state line and on the Changes tab: the native Map Editor's badge.
+        // The changed state reads the same in the state line and on the Changes tab: the native map editor's badge.
         static readonly string ChangedBadge = CommandBand.Changed.Markup;
         // The left band's widths are CommandBand's, and the outliner's minimum holds them: 296 against the 251 they
         // need.
         // How far a lamp's dot stands above the middle of its row, half of this, so that it sits on its word's line.
         const float LampRaise = 4;
-        // The native Map Editor's status colors (MapCompositionStyle and its inspectors), and the proposed-target blue of
+        // The native map editor's status colors (MapCompositionStyle and its inspectors), and the proposed-target blue of
         // the world markings.
         const string Red = "#FF8080", Amber = "#E8A33D", Green = "#7FB86B", Blue = "#4DCCFF";
         // The outliner width is stored where the native window stores this window's bounds: the game's preferences
@@ -309,7 +309,7 @@ namespace RailroaderScenePatcher {
                 var starter = selected != null && selected.Family == StarterPlacements.Family;
                 Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Inactive(focus != null)
                     .Tooltip("Focus", CommandBand.Tooltip(starter ? "Move the camera to the marker's track point, where the start setup places its cars." : "Move the camera to the inspected object.", focus));
-                // Beside Focus, as the native Map Editor has Focus and Clear on its selection row.
+                // Beside Focus, as the native map editor has Focus and Clear on its selection row.
                 var keepDraft = guided.Enabled && (guided.Step == GuidedTaskStep.Values || guided.Step == GuidedTaskStep.Review);
                 var clear = keepDraft && !pending ? "No world choice is pending." : CommandBand.Clear(selected != null, pending);
                 Button(row, "Clear", ClearInspection).Inactive(clear != null)
@@ -585,7 +585,7 @@ namespace RailroaderScenePatcher {
             if (selected == null) { plain = "Select a row or click Select in world."; return plain; }
             var text = new List<string> { selected.Family };
             if (!selected.Active) text.Add("Inactive");
-            // The native Map Editor's badges, as its inspector shows them beside the row marker.
+            // The native map editor's badges, as its inspector shows them beside the row marker.
             var badges = CommandBand.Badges(IsChanged(selected), IsAdded(selected), FailureOf(selected));
             foreach (var badge in badges) text.Add(ReferenceEquals(badge, CommandBand.Changed) ? "Changed by this mod" : ReferenceEquals(badge, CommandBand.Refused) ? "Modification refused" : ReferenceEquals(badge, CommandBand.NotApplied) ? "Modification not applied" : "Added by this mod");
             if (selected.InspectionOnly != null) text.Add(CommandBand.InspectionOnlyLine(selected.InspectionOnly));

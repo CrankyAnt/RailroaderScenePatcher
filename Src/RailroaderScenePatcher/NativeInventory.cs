@@ -197,7 +197,7 @@ namespace RailroaderScenePatcher {
             if (value is UnityEngine.Object obj) { if (obj != null) yield return obj; }
             else if (value is IList list) foreach (var item in list) if (item is UnityEngine.Object element && element != null) yield return element;
         }
-        // A map object the game spawns carries this component; its track anchor is edited in the native Map Editor.
+        // A map object the game spawns carries this component; its track anchor is edited in the native map editor.
         const string MapObject = "Game.MapObjectActivation", PhotoController = "RollingStock.BuilderPhotoController";
         static string MarkerKind(Component marker) { try { return Text(Field(marker, "type")); } catch { return null; } }
         // The markers a builder photo rig holds, read once per discovery.

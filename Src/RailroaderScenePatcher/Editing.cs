@@ -12,7 +12,7 @@ using RailroaderScenePatcher.Core;
 using UI.Builder;
 
 namespace RailroaderScenePatcher {
-    // The native Map Editor's Save button stays enabled with its own unsaved tint and tooltip. Its click callback writes the
+    // The native map editor's Save button stays enabled with its own unsaved tint and tooltip. Its click callback writes the
     // edited terrain before MapEditor.Save, so a Save refusal runs before that callback: it reports the patcher's reason in the
     // scene patch editing feedback, or in a native alert while the Scene patches window is closed, and skips the callback,
     // which leaves no native Save Failed alert. Without this hook the edited terrain tiles are already written when the

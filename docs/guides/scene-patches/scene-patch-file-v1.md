@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Scene patch file v1
 
-This reference defines the v1 JSON fields and their meaning. Each supplying mod keeps one scene patch file at `Data/scene-patches.json`. The file uses strict UTF-8 and accepts a leading byte-order mark. The runtime only reads the file. The native Map Editor's **Save** writes it for the edited mod. See [Write a scene patch file](writing-scene-patch-files.md) for manual editing and [the modder manual](modder-manual.md) for editing in Railroader.
+This reference defines the v1 JSON fields and their meaning. Each supplying mod keeps one scene patch file at `Data/scene-patches.json`. The file uses strict UTF-8 and accepts a leading byte-order mark. The runtime only reads the file. The native map editor's **Save** writes it for the edited mod. See [Write a scene patch file](writing-scene-patch-files.md) for manual editing and [the modder manual](modder-manual.md) for editing in Railroader.
 
 Current native target support covers:
 

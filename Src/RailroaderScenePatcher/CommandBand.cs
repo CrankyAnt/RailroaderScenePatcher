@@ -921,7 +921,7 @@ namespace RailroaderScenePatcher {
         internal static bool ShowsAsNotApplied(FailureKind failure) => FailureLabels.ShowsAsNotApplied(failure);
         // The row's text without colours: the markers, one space, the name. A row without a marker starts with its name.
         internal static string RowText(string markers, string name) => String.IsNullOrEmpty(markers) ? name : markers + " " + name;
-        // A state-line badge as the native Map Editor's inspector writes it.
+        // A state-line badge as the native map editor's inspector writes it.
         internal sealed class Badge {
             internal Badge(string text, string color) { Text = text; Color = color; }
             internal string Text { get; }

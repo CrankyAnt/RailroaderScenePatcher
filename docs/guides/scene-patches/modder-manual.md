@@ -6,8 +6,8 @@ Use this manual to find an existing scene object, choose an edit the object supp
 
 ## Choose where to edit
 
-- Use the native Map Editor for map data such as track, industry spans, native spawns, and station click spots in Railroader 0.6.3. Change the native data first when it supplies a track or other reference your scene edit needs.
-- Open your mod's map definition in the native Map Editor and use **Scene patches** for supported Unity scene objects. The patcher writes to the edited mod, even when an object comes from an inherited map layer. Your mod's native changes reach a save on the base-game map through a map-changing script or a map patch.
+- Use the native map editor for map data such as track, industry spans, native spawns, and station click spots in Railroader 0.6.3. Change the native data first when it supplies a track or other reference your scene edit needs.
+- Open your mod's map definition in the native map editor and use **Scene patches** for supported Unity scene objects. The patcher writes to the edited mod, even when an object comes from an inherited map layer. Your mod's native changes reach a save on the base-game map through a map-changing script or a map patch.
 - To edit the same scene patch file outside the game, follow [Write a scene patch file](writing-scene-patch-files.md). Use the [v1 reference](scene-patch-file-v1.md) for field definitions and version requirements.
 
 A scene patch file applies to its scene target map and to maps that inherit that map as a map layer. The editor uses the bottom map layer for a new file and keeps the scene target map of an existing file. Tests cover the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and maps that inherit it as a map layer. Maps with a different terrain tile set are untested.

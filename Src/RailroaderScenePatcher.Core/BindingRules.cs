@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher.Core {
             : markerType == "Flare" ? BindingNeed.Never
             : BindingNeed.Optional;
 
-        // Whether a kind is listed in the inventory at all. A signal marker is out of scope, the native Map Editor owns
+        // Whether a kind is listed in the inventory at all. A signal marker is out of scope, the native map editor owns
         // the track anchor of a map object, and the builder photo marker has no role in play.
         public static bool Listed(string markerType, bool nativeMapObject, bool builderPhoto) => markerType != "Signal" && !nativeMapObject && !builderPhoto;
 
