@@ -534,6 +534,7 @@ namespace RailroaderScenePatcher {
                         CancelRequest("the panel was closed before the request ran");
                     });
                     presentation.ResetRequested = ResetLayout;
+                    presentation.PrototypeSwitched = PrototypeLog;
                     presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
                     presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
                     if (presentation.TitleIconProblem != null) context?.Log.Info("A title-bar icon could not join the title bar (" + presentation.TitleIconProblem + "); the window help holds a button for it.");

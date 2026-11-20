@@ -20,7 +20,7 @@ namespace RailroaderScenePatcher {
         internal const string WindowIdentifier = "crankyant/scene-patcher/inspector";
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(NativePresentation.DefaultWidth, NativePresentation.DefaultHeight), new Vector2Int(NativePresentation.MinimumWidth, NativePresentation.MinimumHeight), Window.Position.UpperLeft);
-        protected override string Title { get; set; } = "Scene patches";
+        protected override string Title { get; set; } = "Scene Patcher";
         internal Window NativeWindow => Window;
         protected override void BuildContent(UIPanelBuilder builder) { Build?.Invoke(builder); }
         internal void Refresh() { RebuildPanel(); }
@@ -56,7 +56,7 @@ namespace RailroaderScenePatcher {
         internal void Refresh() { RebuildPanel(); }
     }
 
-    internal sealed class NativePresentation : IDisposable {
+    internal sealed partial class NativePresentation : IDisposable {
         // Canvas units. The default width holds the outliner filters beside the four tab titles, which is wider
         // than the native Map Editor window. The minimum keeps the outliner, the inspector's minimum and the footer in
         // view, and the band's buttons and states at their own widths: at 620 they needed about 24 more and overlapped; its height fits below the Map Editor window on a 1080-high screen.
@@ -223,6 +223,7 @@ namespace RailroaderScenePatcher {
                 titleDetails = null; detailsGlyph = null;
                 TitleIconProblem = (TitleIconProblem == null ? "" : TitleIconProblem + "; ") + "Session details: " + e.GetBaseException().Message;
             }
+            AddPrototypeCompactIcon(manager, close.transform.parent);
             PlaceTitleHelp();
             SetTitleRepairControls();
         }
@@ -291,7 +292,7 @@ namespace RailroaderScenePatcher {
             if (height <= 0 || width <= 0) return;
             var middle = (lowerLeft.y + upperLeft.y) * 0.5f;
             var right = lowerLeft.x - 2;
-            foreach (var icon in new[] { titleHelp, titleReset, titleDetails }) {
+            foreach (var icon in new[] { titleHelp, titleReset, titleDetails, titleCompactPrototype }) {
                 if (icon == null) continue;
                 icon.sizeDelta = new Vector2(width, height);
                 icon.localPosition = new Vector3(right, middle, 0);
@@ -623,6 +624,7 @@ namespace RailroaderScenePatcher {
         }
         // Forgets the saved bounds and places the window at its default position again.
         internal void ResetLayout() {
+            if (PrototypeCompact) PrototypeExitCompact();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
             // The request comes from a button press, and layout moves nothing while a button is down: the next layout
             // after the release places the window.
@@ -723,6 +725,7 @@ namespace RailroaderScenePatcher {
         }
         void Close() {
             if (disposed) return;
+            if (PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=close"); }
             ClearFocus();
             window.NativeWindow.CloseWindow();
             // Native close completes after the end-of-frame yield. Notify only from its transition event.
@@ -741,6 +744,7 @@ namespace RailroaderScenePatcher {
             if (disposed) return;
             if (openOnTick) { openOnTick = false; if (!IsOpen) Toggle(); }
             Layout(false);
+            PrototypeTick();
             if (IsOpen) PlaceTitleHelp();
             RemoveClosedHelp();
             if (helpSizing > 0 && --helpSizing == 0) SizeHelp();
@@ -1007,6 +1011,7 @@ namespace RailroaderScenePatcher {
             if (resetTexture != null) UnityEngine.Object.Destroy(resetTexture);
             if (detailsSprite != null) UnityEngine.Object.Destroy(detailsSprite);
             if (detailsTexture != null) UnityEngine.Object.Destroy(detailsTexture);
+            PrototypeDispose();
             if (window != null) {
                 window.Build = null;
                 window.NativeWindow.DelegateRequestClose = null;

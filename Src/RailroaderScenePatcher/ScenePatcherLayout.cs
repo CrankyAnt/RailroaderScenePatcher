@@ -188,6 +188,8 @@ namespace RailroaderScenePatcher {
         const string GuideRoot = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/";
 
         void DrawWindow(UIPanelBuilder builder) {
+            // PROTOTYPE hook: the compact window draws its own content.
+            if (presentation.PrototypeCompact) { DrawCompactPrototype(builder); return; }
             typed.Clear();
             builder.ConfigureLayout(4f);
             // The command band is split at the column divider: each column starts with its own band, so the left band is
@@ -198,7 +200,7 @@ namespace RailroaderScenePatcher {
                 // The stored width is the user's; a window too narrow for it shows less without overwriting it.
                 var width = Mathf.Clamp(outlinerWidth, OutlinerMinimumWidth, OutlinerMaximum());
                 leftBandWidth = width;
-                var outlinerRect = row.VStack(DrawOutliner);
+                var outlinerRect = row.VStack(column => DrawOutliner(column));
                 // While the file panel is open, the outliner waits for it; Refresh alone stays available.
                 if (FileLocked) { DisableDuringRepair(outlinerRect); LockControls(outlinerRect, refreshButton); }
                 var outliner = outlinerRect.gameObject.AddComponent<LayoutElement>();
@@ -361,11 +363,12 @@ namespace RailroaderScenePatcher {
         FailureKind? FailureOf(SceneObservation entry) {
             try { return attachment == null || entry == null ? null : CommandBand.ShownFailure(attachment.Session.IsChanged(entry.Identity), attachment.Session.NotApplied(entry.Identity)?.Kind); } catch { return null; }
         }
-        void DrawOutliner(UIPanelBuilder builder) {
+        // PROTOTYPE hook: compactPrototype leaves out the search row, the filters and the reminders.
+        void DrawOutliner(UIPanelBuilder builder, bool compactPrototype = false) {
             builder.ConfigureLayout(4f);
             DrawLeftBand(builder);
             UIPanel results = null;
-            builder.HStack(row => {
+            if (!compactPrototype) builder.HStack(row => {
                 // The search field takes the width the two buttons leave, whatever it holds: its own least and
                 // preferred widths follow its content, the clear button that comes with text included, and they
                 // moved "?" and Fit and pushed Fit past the column's edge. This element decides instead.
@@ -384,7 +387,7 @@ namespace RailroaderScenePatcher {
                 fit = Button(row, "Fit", () => FitOutliner(fit.RectTransform.GetComponentInChildren<TMP_Text>(true)));
                 fit.Tooltip("Fit names", "Size this column to most names shown. Drag the divider for another width.");
             }).Height(30);
-            builder.AddSegmentedControlCompact(segments => {
+            if (!compactPrototype) builder.AddSegmentedControlCompact(segments => {
                 // All first, then the rest by name.
                 segments.AddSegment(CommandBand.AllFilter, outlinerFilter == OutlinerFilter.All, presentation.Action(() => outlinerFilter = OutlinerFilter.All)).Tooltip(CommandBand.AllFilter, "Show all objects.");
                 segments.AddSegment(CommandBand.ChangedFilter, outlinerFilter == OutlinerFilter.Changed, presentation.Action(() => outlinerFilter = OutlinerFilter.Changed)).Tooltip(CommandBand.ChangedFilter, "Show the objects this mod changes.");
@@ -492,8 +495,9 @@ namespace RailroaderScenePatcher {
                     })();
                 });
                 var listLayout = outline.GetComponent<LayoutElement>();
-                listLayout.minHeight = 120; listLayout.flexibleHeight = 10000;
+                listLayout.minHeight = compactPrototype ? 60 : 120; listLayout.flexibleHeight = 10000;
             });
+            if (compactPrototype) return;
             // The window help expands on these three reminders.
             builder.AddHRule();
             builder.Spacer(4f);
