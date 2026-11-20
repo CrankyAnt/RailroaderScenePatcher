@@ -28,8 +28,8 @@ namespace RailroaderScenePatcher {
         // The inspector's minimum holds the four footer slots, their spacing and the resize grip.
         const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 100,
             RowHeight = 24, LineHeight = 20, TabStripHeight = 30,
-            // The message areas take the height that a gap above the footer and a spacer below its row held before: the tab's
-            // own row stands just above the footer's divider, and the footer's row at the window's lower edge.
+            // The message areas' heights. The tab's own row stands just above the footer's divider and the footer's row at
+            // the window's lower edge, so the message area takes the rest of the footer's height.
             InspectorMessageHeight = 124, FilePanelMessageHeight = 84,
             // What a row adds to its name: the folder and child indent, the two markers and the scroll bar.
             RowDecoration = 80;
