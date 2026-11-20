@@ -528,8 +528,10 @@ namespace RailroaderScenePatcher {
         internal const string RepairConstructionSegmentsTip = "Open the Connections tab to select the segments of the bridge's track.";
         static bool ConstructionProblem(string problem) => problem != null && problem.EndsWith(ConstructionRecovery, StringComparison.Ordinal);
         internal static bool OffersConstructionRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(ConstructionProblem);
-        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(problem => problem != null && !ConstructionProblem(problem)
-            && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0));
+        // Whether a problem is of the kind Repair with guided task repairs: a track binding or track location problem.
+        internal static bool IsBindingProblem(string problem) => problem != null && !ConstructionProblem(problem)
+            && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0);
+        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(IsBindingProblem);
         internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments.";
         // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
         // holds; known is null when the track graph could not be read. An empty id is a segment that does not exist.
@@ -585,13 +587,14 @@ namespace RailroaderScenePatcher {
         // The Detected problems section of a stale object list: its problems are those of the last refresh.
         internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
         // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID, a
-        // track binding problem that remains says that the duplicate is repaired and that this problem is another one,
-        // with the two routes that repair it. repairedId is the duplicate marker ID the replacement ID repaired, or null.
+        // problem of the kind Repair with guided task repairs (IsBindingProblem) says that the duplicate is repaired and
+        // that this problem is another one, with the two routes that repair it. repairedId is the duplicate marker ID the
+        // replacement ID repaired, or null.
         internal static string ProblemText(string problem, string repairedId) =>
-            repairedId != null && problem != null && problem.StartsWith("Marker ", StringComparison.Ordinal) && (problem.IndexOf("missing segment", StringComparison.Ordinal) >= 0 || problem.IndexOf("empty segment binding", StringComparison.Ordinal) >= 0)
-                ? problem + ". Duplicate marker ID " + repairedId + " is repaired. This is a different problem: the track binding " + (problem.IndexOf("missing segment", StringComparison.Ordinal) >= 0 ? "names a segment that doesn't exist" : "is empty")
-                    + ". Click Repair with guided task, or set an existing track on the Connections tab."
+            repairedId != null && IsBindingProblem(problem)
+                ? (problem.EndsWith(".", StringComparison.Ordinal) ? problem : problem + ".") + " Duplicate marker ID " + repairedId + " is repaired. " + RepairedBindingProblem
                 : problem;
+        const string RepairedBindingProblem = "This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab.";
         // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
         // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
         internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";

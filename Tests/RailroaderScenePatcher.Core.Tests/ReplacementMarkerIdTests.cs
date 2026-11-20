@@ -154,13 +154,17 @@ static class ReplacementMarkerIdTests {
         Assert(w.Session.RepairedMarkerId(yard) == "Mg6m", "B repaired duplicate marker ID Mg6m");
         var enable = w.Session.Edit(yard, null, true);
         Assert(enable.Applied && w.Yard.Active, "B is enabled: " + enable.Error);
-        Assert(Problems(w.Yard, YardPath).SequenceEqual(new[] { "Marker broken binding: missing segment z5w8si. Duplicate marker ID Mg6m is repaired. This is a different problem: the track binding names a segment that doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab." }),
+        Assert(Problems(w.Yard, YardPath).SequenceEqual(new[] { "Marker broken binding: missing segment z5w8si. Duplicate marker ID Mg6m is repaired. This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab." }),
             "Enabled B shows the missing segment as another problem: " + String.Join(" | ", Problems(w.Yard, YardPath)));
         var rebind = w.Session.Bind(yard, MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3)));
         Assert(rebind.Applied && Problems(w.Yard, YardPath).Length == 0, "Binding B to an existing segment clears it: " + rebind.Error + " " + String.Join(" | ", Problems(w.Yard, YardPath)));
         // Without a repaired duplicate, a problem reads as before.
         Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", null) == "Marker broken binding: missing segment z5w8si", "A problem without a repaired duplicate is unchanged");
         Assert(CommandBand.ProblemText("Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Mg6m") == "Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Only a binding problem names the repaired duplicate");
+        // The note follows the problem's kind, a binding problem that Repair with guided task repairs, whatever its wording.
+        Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m") == "Marker has an empty segment binding. Duplicate marker ID Mg6m is repaired. This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab.",
+            "An empty binding gets the same note: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m"));
+        Assert(CommandBand.IsBindingProblem("Marker broken binding: missing segment z5w8si") && !CommandBand.IsBindingProblem("Duplicate marker ID Mg6m is shared with 1 other scene marker."), "The kind that offers Repair with guided task decides the note");
     }
     static void WhistleRepairLetsOneHolderBeDisabled() {
         var w = new World();
