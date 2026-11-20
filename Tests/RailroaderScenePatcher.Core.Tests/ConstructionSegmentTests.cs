@@ -326,6 +326,11 @@ static class ConstructionSegmentTests {
                 && CommandBand.Tooltip("Start this task for the inspected object.", reason).Contains("Unavailable: " + reason), "The guided task " + task + " of the Ela controller is unavailable with its reason: " + reason);
         }
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("Connections tab"), "The binding tasks point to where the controller's segments are set");
+        // The controller is bound to track by its construction segments, which the Connections tab shows: the reason
+        // says it holds no marker's track location, not that it has no track binding at all.
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela) == "The construction controller follows its construction segments, not a marker's track location. Set its construction segments on the Connections tab."
+            && GuidedTaskState.TargetBlock(GuidedTaskKind.DetachBinding, ela) == GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela),
+            "The binding tasks do not deny the construction segments: " + GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela));
         Assert(GuidedTaskState.Tasks.Count == 8, "The task list keeps every task visible");
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, GroupId(Bryson)) == null, "A rail bridge group keeps its guided move");
         Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "This object cannot be edited here.", "The generic reason is what the Ela controller showed while it counted as not editable");

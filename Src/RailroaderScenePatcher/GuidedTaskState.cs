@@ -21,7 +21,7 @@ namespace RailroaderScenePatcher {
         static string ControllerTaskBlock(GuidedTaskKind kind) {
             switch (kind) {
                 case GuidedTaskKind.Binding:
-                case GuidedTaskKind.DetachBinding: return "The construction controller has no track binding. Set its construction segments on the Connections tab.";
+                case GuidedTaskKind.DetachBinding: return "The construction controller follows its construction segments, not a marker's track location. Set its construction segments on the Connections tab.";
                 case GuidedTaskKind.StarterPlacement:
                 case GuidedTaskKind.Wreck: return "The construction controller is not a starter placement marker.";
                 case GuidedTaskKind.MarkerId: return "The construction controller is not a track marker, so it takes no replacement ID.";
