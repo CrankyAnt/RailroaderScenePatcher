@@ -155,10 +155,12 @@ namespace RailroaderScenePatcher {
         // in a clear square as large as a native compact button, 24 units, that takes the click. label, the heading the
         // triangle follows, takes the same click and tooltip, so the heading and the triangle form one target. A click
         // runs click and rebuilds the panel. The game's tooltip raycast reads only objects on the UI layer, so every
-        // object made here takes the layer of the row it stands in.
+        // object made here takes the UI layer: that of the heading, a native prefab, or the named layer without one. The
+        // row itself does not have it, because the builder makes its containers on the default layer.
         internal const float DisclosureHitSize = 24;
         internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click, RectTransform label, string title, string tip) {
-            var layer = parent.gameObject.layer;
+            var layer = label != null ? label.gameObject.layer : LayerMask.NameToLayer("UI");
+            if (layer < 0) layer = parent.gameObject.layer;
             var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave, layer = layer };
             var rect = (RectTransform)hit.transform;
             rect.SetParent(parent, false);
