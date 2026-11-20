@@ -116,8 +116,8 @@ namespace RailroaderScenePatcher {
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location", ClearSegments = "Clear segments";
-        // Why Clear binding has nothing to clear: this mod sets no track binding for the marker or crossing pad.
-        internal static string ClearBindingReason(bool hasValue) => hasValue ? null : "This mod sets no track binding for this marker, so there is nothing to clear.";
+        // Why Clear binding has nothing to clear: this mod sets no track binding for the marker, milepost or crossing pad.
+        internal static string ClearBindingReason(bool hasValue) => hasValue ? null : "This mod sets no track binding for this object, so there is nothing to clear.";
         // Why Clear location has nothing to clear: this mod sets no track location for the starter placement marker.
         internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This mod sets no track location for this marker, so there is nothing to clear.";
         // The name of a wreck edit, after the checkbox's new state.
@@ -711,12 +711,13 @@ namespace RailroaderScenePatcher {
         // can be edited, at the end of the running line while it cannot.
         internal static readonly string[] PlacementGroups = { "Position", "Rotation" }, PlacementUnits = { "m", "deg" }, Axes = { "X", "Y", "Z" };
         internal static string GroupCaption(string caption, string unit, bool editable) => editable && unit != null ? caption + " (" + unit + ")" : caption;
-        // The short label in front of a value's box, or null for the one value of a group, which its caption names.
-        internal static string BoxLabel(IReadOnlyList<string> labels) => labels.Count < 2 ? null : labels[0];
+        // Whether each value of a group has a short label in front of its box: the one value of a group has only the
+        // group's caption.
+        internal static bool HasBoxLabels(IReadOnlyList<string> labels) => labels.Count > 1;
         // The values of a group that cannot be edited now, as one running line: "X 4361.091  Y 528.405  Z 5380.431 (m)".
         // A value that is not set reads as a dash.
         internal static string RunningLine(IReadOnlyList<string> labels, IReadOnlyList<string> values, string unit) =>
-            String.Join("  ", labels.Select((label, i) => (labels.Count < 2 ? "" : label + " ") + (i < values.Count && !String.IsNullOrWhiteSpace(values[i]) ? values[i].Trim() : "-"))) + (unit == null ? "" : " (" + unit + ")");
+            String.Join("  ", labels.Select((label, i) => (HasBoxLabels(labels) ? label + " " : "") + (i < values.Count && !String.IsNullOrWhiteSpace(values[i]) ? values[i].Trim() : "-"))) + (unit == null ? "" : " (" + unit + ")");
         // Why the inspected object cannot be edited, as the yellow message and every "Unavailable:" tooltip give it:
         // the object's own reason, which the Object tab shows under Supported edits, and not a pointer to that tab. It is
         // one plain sentence: the message's source and the tooltip's Unavailable: are its only label.

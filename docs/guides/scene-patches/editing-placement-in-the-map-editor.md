@@ -94,7 +94,7 @@ After a board edit, the **Terrain** section on the **Changes** tab shows the sta
 
 ## Undo and redo
 
-Each completed edit adds one entry to the native map editor's history, alongside your native edits. Use the native map editor's **Undo** and **Redo** to reverse and reapply the object's state and the scene patch file together. Reloading ends this history. The patcher does not preserve Undo or Redo across a reload.
+Each completed edit adds one entry to the native map editor's history, alongside your other edits in the native map editor. Use the native map editor's **Undo** and **Redo** to reverse and reapply the object's state and the scene patch file together. Reloading ends this history. The patcher does not preserve Undo or Redo across a reload.
 
 If the native map editor's Undo or Redo stops on an error, the session details show **Incomplete operation**. The history can no longer be trusted to record edits. Save still writes the current state. Until you reload the native map editor, however, the title star, Save button tint and tooltip, and exit confirmation continue to report unsaved native map data.
 

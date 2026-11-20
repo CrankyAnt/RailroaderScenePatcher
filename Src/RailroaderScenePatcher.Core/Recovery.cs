@@ -198,8 +198,9 @@ namespace RailroaderScenePatcher.Core {
             if (Mentions(problem, "resolve uniquely")) return "Nothing changed. The object is missing from the loaded scene, or more than one object matches. Refresh the object list and inspect it again.";
             if (Mentions(problem, "protected from overwrite")) return "Nothing changed. This scene patch file cannot be overwritten.";
             if (Mentions(problem, "Reload before", "Reload the Map Editor before")) return "";
-            // A reason that already says what to choose needs no second instruction.
-            if (Mentions(problem, "Choose an ID", "Choose another ID")) return "Nothing changed.";
+            // A replacement ID refusal (ReplacementMarkerIds) already says what to enter instead, so it needs no second
+            // instruction. ReplacementMarkerIdTests pins every one of them.
+            if (Mentions(problem, "Choose an ID", "Choose another ID", "Remove the space", "Enter an ID")) return "Nothing changed.";
             return "Nothing changed. Correct the problem and try again.";
         }
         static bool Mentions(string text, params string[] words) => words.Any(w => text.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);

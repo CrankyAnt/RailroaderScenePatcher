@@ -126,7 +126,7 @@ Without `markerId`, the marker keeps its ID. A modification with `markerId` requ
 
 The patcher checks these rules before changing anything. If it refuses the edit, the marker and its registrations stay as they were.
 
-- **Target.** Only a generic track marker takes a replacement ID: a target with the structure `track-marker-v1`. A modification with `markerId` on any other target fails with `Only objects in the Track marker family can have a replacement ID.` Such targets include crossing pads, mileposts, starter placement markers, and objects that are not markers. The other modifications of the file still apply.
+- **Target.** Only an object in the **Track marker** family takes a replacement ID: a target with the structure `track-marker-v1`. A modification with `markerId` on any other target fails with `Only objects in the Track marker family can have a replacement ID.` Such targets include crossing pads, mileposts, starter placement markers, and objects that are not markers. The other modifications of the file still apply.
 - **Empty and invalid values.** The patcher refuses an empty or whitespace-only ID and any value that isn't a string, including `null`. It also refuses an ID that begins or ends with a space because it would look like another ID.
 - **Reserved prefixes.** An ID that begins with `passengerStop:` or `flare:` is refused. The game uses these prefixes for its own track registrations.
 - **Uniqueness.** The ID must not be used by another scene marker, by a graph registration of an object that is not a scene marker, or by a map object of the loaded map context. The refusal names the user, for example `Replacement ID <id> is already used by the scene marker <scene/path>. Choose an ID that no other scene marker uses.`

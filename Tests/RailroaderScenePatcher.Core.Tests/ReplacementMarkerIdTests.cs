@@ -301,13 +301,38 @@ static class ReplacementMarkerIdTests {
         Assert(w.Session.MarkerIdRefusal(yard, "Mg6m-yard") == null, "A free ID passes Review");
         Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Yard.Id == "Mg6m", "The check changes nothing: " + w.Registrations());
         Assert(w.Session.MarkerIdRefusal(yard, "Mg6m") == null, "The marker's own ID is left to Apply, which treats it as no change or a clear");
+        // The guided task's Review step asks the session with its draft, stays in Review with the recovery, and keeps
+        // Apply unavailable with the refusal until Back.
+        var guided = new RailroaderScenePatcher.GuidedTaskState();
+        var target = new SceneObservation(new object(), yard, "Track marker", false, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
+        guided.Start(RailroaderScenePatcher.GuidedTaskKind.MarkerId, target, new[] { "Mg6m" });
+        guided.SetValues(new[] { "Mown" }); guided.Review();
+        var refused = guided.CheckReview(w.Session.MarkerIdRefusal, "Click Back to correct the values.");
+        Assert(refused != null && refused.Contains(UnrelatedPath) && guided.Step == RailroaderScenePatcher.GuidedTaskStep.Review && guided.Recovery == "Click Back to correct the values." && guided.ApplyBlock == refused,
+            "Review refuses the used ID with its recovery and keeps Apply unavailable: " + refused + " / " + guided.ApplyBlock);
+        guided.Back();
+        Assert(guided.ApplyBlock == null && guided.Step == RailroaderScenePatcher.GuidedTaskStep.Values, "Back clears the refusal");
+        guided.SetValues(new[] { "Mg6m-yard" }); guided.Review();
+        Assert(guided.CheckReview(w.Session.MarkerIdRefusal, "Click Back to correct the values.") == null && guided.ApplyBlock == null, "A free ID passes Review and Apply stays available");
+        var placement = new RailroaderScenePatcher.GuidedTaskState();
+        placement.Start(RailroaderScenePatcher.GuidedTaskKind.Placement, target, new[] { "1", "2", "3", "0", "0", "0" }); placement.Review();
+        Assert(placement.CheckReview((t, id) => "asked", "r") == null, "Review asks about a replacement ID only for that task");
+        Assert(w.Registrations() == before && w.Markers.Mutations == 0, "Review changes nothing");
+        // Every replacement ID refusal already says what to enter instead, so its correction adds no second instruction.
+        foreach (var id in new[] { "Mown", "water-tower-1", "flare:1", " Mx", "" }) {
+            var outcome = w.Session.SetMarkerId(yard, id, null);
+            var recovery = RecoveryGuidance.For(outcome, "Marker ID", "Set marker ID " + id, TrackMarkerScene.Structure);
+            Assert(!outcome.Applied && recovery.Correction == "Nothing changed.", "\"" + id + "\": the correction adds no second instruction: " + outcome.Error + " / " + recovery.Correction);
+        }
+        var other = RecoveryGuidance.For(w.Session.SetMarkerId(new TargetIdentity(Scene, "World/Missing", "Track.TrackMarker", TrackMarkerScene.Structure), "Mfree", null), "Marker ID", "Set marker ID", TrackMarkerScene.Structure);
+        Assert(other != null && other.Correction.StartsWith("Nothing changed.", StringComparison.Ordinal) && other.Correction != "Nothing changed.", "Another refusal keeps its correction: " + other?.Correction);
     }
     // Clear binding of a marker or crossing pad is available only while this mod sets its track binding; otherwise it
     // states that there is nothing to clear, as Clear ID and Clear location do.
     static void ClearBindingStatesWhenThereIsNothingToClear() {
         var w = new World(); var unrelated = Marker(UnrelatedPath);
         Assert(!w.Session.HasTrackBinding(unrelated), "An unchanged marker has no track binding value");
-        Assert(RailroaderScenePatcher.CommandBand.ClearBindingReason(false) == "This mod sets no track binding for this marker, so there is nothing to clear." && RailroaderScenePatcher.CommandBand.ClearBindingReason(true) == null,
+        Assert(RailroaderScenePatcher.CommandBand.ClearBindingReason(false) == "This mod sets no track binding for this object, so there is nothing to clear." && RailroaderScenePatcher.CommandBand.ClearBindingReason(true) == null,
             "Clear binding states when there is nothing to clear");
         Assert(w.Session.Bind(unrelated, MarkerBinding.At(new TrackLocation("Sa", "a", 10))).Applied && w.Session.HasTrackBinding(unrelated), "A rebind sets the track binding value");
         Assert(w.Session.Edit(Marker(WhistlePaths[0]), new Placement(new[] { 1080.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && !w.Session.HasTrackBinding(Marker(WhistlePaths[0])), "A placement alone sets no track binding value");

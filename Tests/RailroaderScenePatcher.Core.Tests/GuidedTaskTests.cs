@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
@@ -50,20 +51,48 @@ static class GuidedTaskTests {
         Check(CommandBand.FieldReason(null, new[] { "No" }, new[] { "No" }, CommandBand.SameWreck) == "The car placement already has the selected Start derailed setting." &&
             CommandBand.FieldReason(null, new[] { "Yes" }, new[] { "No" }, CommandBand.SameWreck) == null, "An unchanged wreck setting cannot be reviewed");
     }
-    // The Apply step says the edit is complete only while its Undo step is in the native undo history: native Undo
-    // reverses it and the step says so, and Redo makes it complete again. Without a known step it keeps the plain result.
+    // The Apply step follows the session's history identity, as the native undo manager makes it: every Undo and Redo
+    // builds a new group object, a new edit clears the redo stack, and the oldest groups are pruned.
     static void AppliedStepFollowsNativeHistory() {
-        var state = new GuidedTaskState(); var step = new object();
-        state.Start(GuidedTaskKind.Placement, Target("sign"), new[] { "1", "2", "3", "0", "0", "0" }); state.Review();
-        state.Complete(true, null, null, step);
-        Check(state.AppliedText(new[] { new object(), step }) == "The edit is complete. Save when you're done.", "The applied edit is complete while its step is in the undo history");
-        Check(state.AppliedText(new[] { new object() }) == "Undo reversed this edit. Redo in the Map Editor applies it again.", "After native Undo the Apply step no longer says the edit is complete: " + state.AppliedText(new object[0]));
-        Check(state.AppliedText(new[] { step }) == "The edit is complete. Save when you're done.", "After Redo the edit is complete again");
-        var unknown = new GuidedTaskState();
-        unknown.Start(GuidedTaskKind.Placement, Target("sign"), new[] { "1", "2", "3", "0", "0", "0" }); unknown.Review(); unknown.Complete(true, null, null);
-        Check(unknown.AppliedText(new object[0]) == "The edit is complete. Save when you're done.", "Without a known step the Apply step keeps the plain result");
-        state.AnotherTask();
-        Check(state.AppliedText(new[] { step }) == null, "Another guided task forgets the applied step");
+        var scene = new Scene(); var box = new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } };
+        scene.Objects["p"] = new List<object> { box };
+        var editor = new NativeMapEditor(); var session = new PatchEditingSession(new PatchEngine(scene), editor, new Store()); editor.Session = session;
+        var p = new TargetIdentity("s", "p", "c"); var x = 150.0;
+        GuidedTaskState Applied(bool known = true) {
+            var guided = new GuidedTaskState();
+            guided.Start(GuidedTaskKind.Placement, Target("p"), new[] { "1", "2", "3", "0", "0", "0" }); guided.Review();
+            Check(session.Edit(p, new Placement(new[] { x++, 2, 3 }, new[] { 0.0, 0, 0, 1 }), null).Applied, "The guided edit applies");
+            if (known) guided.Complete(true, null, null, session.HistoryState); else guided.Complete(true, null, null);
+            return guided;
+        }
+        const string complete = "The edit is complete. Save when you're done.", undone = "Undo reversed this edit. Redo in the Map Editor applies it again.",
+            discarded = "Undo reversed this edit, and a later edit removed it from Redo.";
+        var state = Applied();
+        string Text() => state.AppliedText(session.StepOf);
+        Check(Text() == complete, "The applied edit is complete: " + Text());
+        editor.NativeEdit(5);
+        Check(Text() == complete, "A later edit leaves it complete: " + Text());
+        editor.Undo(); editor.Undo();
+        Check(Text() == undone, "After native Undo of the edit the step says so and offers Redo: " + Text());
+        editor.Redo();
+        Check(Text() == complete, "After Redo, which builds a new group, the edit is complete again: " + Text());
+        editor.Undo(); editor.NativeEdit(7);
+        Check(Text() == discarded, "After Undo and a new edit, Redo no longer holds it: " + Text());
+        // Pruning the oldest groups keeps the edit; it claims no Undo.
+        editor.MaxLevels = 2;
+        var pruned = Applied();
+        for (var i = 0; i < 4; i++) editor.NativeEdit(10 + i);
+        Check(pruned.AppliedText(session.StepOf) == complete, "A pruned step still stands: " + pruned.AppliedText(session.StepOf));
+        // Another guided task forgets the earlier step: an Undo of the earlier edit no longer changes its text.
+        editor.MaxLevels = 50;
+        var next = Applied();
+        next.AnotherTask();
+        Check(next.Step == GuidedTaskStep.Target && next.AppliedText(session.StepOf) == null, "Another guided task leaves the Apply step");
+        next.Start(GuidedTaskKind.Activity, Target("p"), new[] { "Yes" }); next.Review(); next.Complete(true, null, null);
+        editor.Undo();
+        Check(next.AppliedText(session.StepOf) == complete, "The new task does not keep the earlier step: " + next.AppliedText(session.StepOf));
+        var unknown = Applied(known: false); editor.Undo();
+        Check(unknown.AppliedText(session.StepOf) == complete, "Without a known step the Apply step keeps the plain result");
     }
     static void CrossingControllerCannotMoveOrChangeActivity() {
         foreach (var crossing in new[] {

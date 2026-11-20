@@ -103,8 +103,6 @@ namespace RailroaderScenePatcher {
         internal readonly object MapEditor, Manager;
         internal readonly PatchEditingSession Session;
         internal readonly string PatchPath;
-        // The native undo history, read by the guided Apply step to tell whether its edit still stands.
-        internal readonly NativeHistory History;
         internal string Fault;
         internal Action<string> Log = _ => { };
         internal Action VersionChanged = () => { };
@@ -119,7 +117,7 @@ namespace RailroaderScenePatcher {
             if (Manager == null) throw new MissingMemberException("Native undo manager unavailable");
             Native.Read(mapEditor, "_cleanChangeCount"); Native.Read(mapEditor, "_upgradedOnLoad"); Native.Read(Manager, "ChangeCount");
             var storage = ModScenePatchFiles.ActiveStorage(); PatchPath = storage.PatchPath;
-            var history = History = new NativeHistory(Manager);
+            var history = new NativeHistory(Manager);
             Session = new PatchEditingSession(engine, history, storage, ModScenePatchFiles.PatcherId, ModScenePatchFiles.EditedModId());
             var cleanCount = Convert.ToInt32(Native.Read(MapEditor, "_cleanChangeCount"));
             nativeDirty = new NativeDirtyTracker(history, ChangeCount, ChangeCount != cleanCount, cleanCount);

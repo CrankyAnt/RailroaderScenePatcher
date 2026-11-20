@@ -44,13 +44,18 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<string> Outstanding { get; }
         public string Error { get; }
     }
+    // Where the history holds the state an edit reached: in the undo stack, so the edit stands; in the redo stack after
+    // Undo reversed it; or discarded from Redo by a later edit. A state pruned from the oldest end still stands.
+    public enum HistoryStep { Stands, Undone, Discarded }
     // Identifies the state the undo history has reached, where the native change count cannot:
     // a state keeps its identity through Undo and Redo, a new edit or a pruned past gets a new one.
     internal sealed class HistoryIdentity {
         sealed class Token { internal long Value; }
         readonly ConditionalWeakTable<object, Token> tokens = new ConditionalWeakTable<object, Token>();
         readonly INativeHistory history;
-        List<long> last = new List<long>();
+        List<long> last = new List<long>(), lastRedo = new List<long>();
+        // States that left the redo stack without returning to the undo stack: a new edit cleared them.
+        readonly HashSet<long> discarded = new HashSet<long>();
         long next, floor, pendingUndo, pendingRedo;
         int undoCount, redoCount;
         bool executing;
@@ -72,6 +77,15 @@ namespace RailroaderScenePatcher.Core {
                 }
             }
             last = now;
+            var redo = history.RedoGroups.Select(TokenFor).ToList();
+            foreach (var gone in lastRedo) if (!redo.Contains(gone) && !now.Contains(gone)) discarded.Add(gone);
+            lastRedo = redo;
+        }
+        internal HistoryStep StepOf(long state) {
+            Observe();
+            if (last.Contains(state)) return HistoryStep.Stands;
+            if (lastRedo.Contains(state)) return HistoryStep.Undone;
+            return discarded.Contains(state) ? HistoryStep.Discarded : HistoryStep.Stands;
         }
         internal void Begin() {
             Observe();
@@ -695,9 +709,7 @@ namespace RailroaderScenePatcher.Core {
         // without changing anything: guided Review refuses what Apply would. The underlying ID passes: setting it clears
         // the mod's value, which Apply checks with its own refusals.
         public string MarkerIdRefusal(TargetIdentity target, string id) {
-            var problem = ReplacementMarkerIds.Problem(id);
-            if (problem != null) return problem;
-            if (!(scene is IMarkerIdScene markers)) return ReplacementMarkerIds.NotSupported;
+            if (!(scene is IMarkerIdScene markers)) return ReplacementMarkerIds.Problem(id) ?? ReplacementMarkerIds.NotSupported;
             try {
                 var resolved = engine.ResolveUnique(target);
                 return id == engine.Underlying(resolved)?.MarkerId ? null : markers.MarkerIdRefusal(resolved, id);
@@ -1547,6 +1559,9 @@ namespace RailroaderScenePatcher.Core {
         }
 
         // History notifications from the native map editor: around each native Undo or Redo, and after any history change.
+        // The state the history has reached now, such as right after an edit: StepOf tells later where that state is.
+        public long HistoryState => identity.Current;
+        public HistoryStep StepOf(long state) => identity.StepOf(state);
         public void BeginHistoryExecution() { historyExecuting = true; identity.Begin(); nativeIdentity?.Begin(); }
         public void EndHistoryExecution(Exception error) {
             identity.End(error != null);

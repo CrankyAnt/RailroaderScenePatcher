@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
@@ -8,7 +9,7 @@ namespace RailroaderScenePatcher {
     internal enum GuidedTaskStep { Target, Values, Review, Applied }
     internal sealed class GuidedTaskState {
         // The tasks the task list offers, in its order; a task that does not fit the inspected object stays visible and disabled.
-        internal static readonly System.Collections.Generic.IReadOnlyList<GuidedTaskKind> Tasks = Array.AsReadOnly((GuidedTaskKind[])Enum.GetValues(typeof(GuidedTaskKind)));
+        internal static readonly IReadOnlyList<GuidedTaskKind> Tasks = Array.AsReadOnly((GuidedTaskKind[])Enum.GetValues(typeof(GuidedTaskKind)));
         internal static string TargetBlock(GuidedTaskKind kind, TargetIdentity identity) =>
             identity != null && (identity.Structure == CrossingCoverageScene.Structure || (identity.Structure == null && identity.Component == CrossingCoverageScene.ComponentType))
                 && (kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap || kind == GuidedTaskKind.Activity)
@@ -45,34 +46,50 @@ namespace RailroaderScenePatcher {
             if (Step == GuidedTaskStep.Target) Target = target;
             Message = null; return true;
         }
-        internal void Review(string refusal = null, string recovery = null) { if (Step == GuidedTaskStep.Values || Step == GuidedTaskStep.Review) { Step = GuidedTaskStep.Review; Message = refusal; Recovery = recovery; } }
+        internal void Review(string refusal = null, string recovery = null) { if (Step == GuidedTaskStep.Values || Step == GuidedTaskStep.Review) { Step = GuidedTaskStep.Review; Message = refusal; Recovery = recovery; reviewRefusal = null; } }
+        // Why Review refuses the draft, which keeps Apply unavailable until Back or another Review.
+        string reviewRefusal;
+        internal string ApplyBlock => Step == GuidedTaskStep.Review ? reviewRefusal : null;
+        // Checks the draft in Review as Apply would check it, without changing anything: a replacement ID that the
+        // session refuses, such as one another scene marker uses. A refusal stays in Review with its recovery. Returns it.
+        internal string CheckReview(Func<TargetIdentity, string, string> markerIdRefusal, string recovery) {
+            if (Step != GuidedTaskStep.Review || Kind != GuidedTaskKind.MarkerId || Target == null || markerIdRefusal == null) return null;
+            var refusal = markerIdRefusal(Target.Identity, draft.Length == 0 ? null : draft[0]);
+            if (refusal != null) { Recovery = recovery; reviewRefusal = refusal; }
+            return refusal;
+        }
         internal void Back() {
-            if (Step == GuidedTaskStep.Review) { Step = GuidedTaskStep.Values; Message = null; Recovery = null; Success = false; }
+            if (Step == GuidedTaskStep.Review) { Step = GuidedTaskStep.Values; Message = null; Recovery = null; Success = false; reviewRefusal = null; }
             else if (Step == GuidedTaskStep.Values) { Step = GuidedTaskStep.Target; Target = null; Kind = null; draft = Array.Empty<string>(); Message = null; Recovery = null; Success = false; }
         }
         internal void Open() { Cancel(); Enabled = true; }
-        internal void Cancel() { appliedStep = null; Enabled = false; Step = GuidedTaskStep.Target; Kind = null; Target = null; draft = Array.Empty<string>(); Message = null; Recovery = null; Success = false; }
+        internal void Cancel() { appliedStep = null; reviewRefusal = null; Enabled = false; Step = GuidedTaskStep.Target; Kind = null; Target = null; draft = Array.Empty<string>(); Message = null; Recovery = null; Success = false; }
         internal void AnotherTask() { if (Step == GuidedTaskStep.Applied) Open(); }
         internal SceneObservation BackToInspector() { if (Step != GuidedTaskStep.Applied) return null; var target = Target; Cancel(); return target; }
-        // The native Undo step of the applied edit, or null when it is not known.
-        object appliedStep;
-        internal void Complete(bool applied, string message, string recovery, object step = null) {
+        // The history state the applied edit reached, or null when it is not known.
+        long? appliedStep;
+        internal void Complete(bool applied, string message, string recovery, long? step = null) {
             if (Step != GuidedTaskStep.Review) return;
             Success = applied; Message = message; Recovery = recovery;
             if (applied) { Step = GuidedTaskStep.Applied; appliedStep = step; }
         }
-        internal const string AppliedComplete = "The edit is complete. Save when you're done.", AppliedUndone = "Undo reversed this edit. Redo in the Map Editor applies it again.";
-        // What the Apply step says, given the native undo history: the edit is complete while its Undo step is in it,
-        // and reversed after Undo took it out. Null outside the Apply step.
-        internal string AppliedText(System.Collections.Generic.IEnumerable<object> undoGroups) {
+        internal const string AppliedComplete = "The edit is complete. Save when you're done.", AppliedUndone = "Undo reversed this edit. Redo in the Map Editor applies it again.",
+            AppliedDiscarded = "Undo reversed this edit, and a later edit removed it from Redo.";
+        // What the Apply step says, given where the history holds the state the edit reached (PatchEditingSession.StepOf):
+        // complete while it stands, reversed with Redo offered while Redo holds it, and reversed without Redo once a later
+        // edit cleared it. Null outside the Apply step.
+        internal string AppliedText(Func<long, HistoryStep> stepOf) {
             if (Step != GuidedTaskStep.Applied) return null;
-            if (appliedStep == null || undoGroups == null) return AppliedComplete;
-            foreach (var group in undoGroups) if (ReferenceEquals(group, appliedStep)) return AppliedComplete;
-            return AppliedUndone;
+            if (appliedStep == null || stepOf == null) return AppliedComplete;
+            switch (stepOf(appliedStep.Value)) {
+                case HistoryStep.Undone: return AppliedUndone;
+                case HistoryStep.Discarded: return AppliedDiscarded;
+                default: return AppliedComplete;
+            }
         }
         internal void Start(GuidedTaskKind kind, SceneObservation target, string[] values) {
             var copiedValues = (string[])values.Clone();
-            Enabled = true; Step = GuidedTaskStep.Values; Kind = kind; Target = target; Message = null; Recovery = null; Success = false;
+            Enabled = true; Step = GuidedTaskStep.Values; Kind = kind; Target = target; Message = null; Recovery = null; Success = false; reviewRefusal = null;
             draft = copiedValues;
         }
     }

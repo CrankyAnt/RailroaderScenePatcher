@@ -129,7 +129,7 @@ namespace RailroaderScenePatcher {
                 for (var column = 0; column < labels.Length; column++) {
                     var index = first + column; var label = labels[column];
                     // The one value of a group has only the group's caption.
-                    if (CommandBand.BoxLabel(labels) != null) row.AddLabel("<style=FieldLabel>" + Literal(label) + "</style>", text => text.verticalAlignment = VerticalAlignmentOptions.Middle).MinWidth(0f);
+                    if (CommandBand.HasBoxLabels(labels)) row.AddLabel("<style=FieldLabel>" + Literal(label) + "</style>", text => text.verticalAlignment = VerticalAlignmentOptions.Middle).MinWidth(0f);
                     var input = row.AddInputField(values[index], value => values[index] = value);
                     // Every keystroke stores the value and lets the buttons that depend on it follow.
                     var field = input.GetComponent<TMP_InputField>();
@@ -137,7 +137,7 @@ namespace RailroaderScenePatcher {
                     field.onValueChanged.AddListener(value => { values[index] = value; FieldsChanged(); });
                     if (ReferenceEquals(values, placementFields)) field.onSelect.AddListener(_ => BeginNumericWorldEdit(field));
                     if (numeric(column)) AlignNumeric(input);
-                    input.Tooltip(labels.Length < 2 ? caption : caption + " " + label, tip);
+                    input.Tooltip(CommandBand.HasBoxLabels(labels) ? caption + " " + label : caption, tip);
                     var layout = input.gameObject.GetComponent<LayoutElement>() ?? input.gameObject.AddComponent<LayoutElement>();
                     // The boxes share the row's width equally, whatever their content: the box's own preferred
                     // width, which follows its text, gives way to this element.
@@ -498,7 +498,7 @@ namespace RailroaderScenePatcher {
             builder.AddHRule();
             builder.Spacer(4f);
             Line(builder, "<style=Footnote>Save, Undo, Redo: Map Editor</style>", null, null);
-            Line(builder, "<style=Footnote>Refresh after Map Editor edits</style>", null, null);
+            Line(builder, "<style=Footnote>Refresh after native edits</style>", null, null);
             Line(builder, "<style=Footnote>Reload clears Undo history</style>", null, null);
             builder.Spacer(4f);
         }
@@ -774,7 +774,7 @@ namespace RailroaderScenePatcher {
                 Field(builder, "Track point", point == null ? "None: " + (FocusUnavailable() ?? StarterPlacements.NoTrackPoint) : String.Join(", ", point.Select(CommandBand.Number)))
                     .Tooltip("Track point", "Where the start setup places the front of this marker's car cut, in map coordinates. Focus goes here.");
             }
-            var tips = new[] { "Enter a position in map coordinates and a rotation in degrees.", "Drag the Map Editor's Move or Rotate gizmo in the world.",
+            var tips = new[] { "Enter a position in map coordinates and a rotation in degrees.", "Drag the native map editor's Move or Rotate gizmo in the world.",
                 "Move the object once onto a chosen track or endpoint.", "Keep the object's placement relative to a chosen track or endpoint." };
             builder.AddSegmentedControlCompact(segments => {
                 for (var i = 0; i < PlacementModes.Length; i++) {
@@ -808,7 +808,7 @@ namespace RailroaderScenePatcher {
                             if (selection?.Pending != null || toolBlock != null) return;
                             gizmoTool = chosen;
                             gizmo?.SetMode(chosen);
-                        })).Inactive(toolBlock != null).Tooltip(name, CommandBand.Tooltip(tool == UI.Gizmos.TransformGizmoMode.Move ? "Drag the Map Editor's Move gizmo in the world." : "Drag the Map Editor's Rotate gizmo in the world.", toolBlock));
+                        })).Inactive(toolBlock != null).Tooltip(name, CommandBand.Tooltip(tool == UI.Gizmos.TransformGizmoMode.Move ? "Drag the native map editor's Move gizmo in the world." : "Drag the native map editor's Rotate gizmo in the world.", toolBlock));
                     }
                 }, true);
                 // The object's placement as the running lines of Numeric: it follows the gizmo while it is dragged
@@ -886,10 +886,12 @@ namespace RailroaderScenePatcher {
             if (current != null) {
                 foreach (var circuit in current.Circuits) {
                     var key = circuit.Key; var value = circuit.Value;
-                    // A native circuit is named by its island span, a detection addition by its ID.
-                    var name = DetectionAddition.Id(key) == null ? "Circuit " + key : "Detection addition " + DetectionAddition.Id(key);
+                    // A native circuit is named by its island span, a detection addition by its ID; the button names it in
+                    // running text, after Edit.
+                    var addition = DetectionAddition.Id(key);
+                    var name = addition == null ? "Circuit " + key : "Detection addition " + addition;
                     Field(builder, name, value.ToString());
-                    var buttonName = "Edit " + Char.ToLowerInvariant(name[0]) + name.Substring(1);
+                    var buttonName = addition == null ? "Edit circuit " + key : "Edit detection addition " + addition;
                     Button(builder, buttonName, () => { OpenedForm(null); CloseEquipmentForm(); coverageCircuit = key; coverageAddition = DetectionAddition.Id(key); preparedCoverage = null; ReadCoverage(value); }).Inactive(wait != null)
                         .Tooltip(buttonName, CommandBand.Tooltip(DetectionAddition.Id(key) == null ? "Select the tracks this circuit covers, or detach it. Circuits you do not edit keep their coverage." : "Change the tracks of this detection addition, or delete it.", wait));
                 }
@@ -1013,7 +1015,7 @@ namespace RailroaderScenePatcher {
             }
             var deviceGuide = CommandBand.RejectionGuide(candidates);
             if (deviceGuide != null)
-                Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open the guide's reasons why a source isn't eligible in your browser.");
+                Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open in your browser the guide's reasons why a source isn't eligible.");
             // Bells: every bell definition of the content library, with the bell pattern's reason for an ineligible one.
             Section(builder, "Add a bell");
             Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " ineligible bell definitions in the content library", null, null);
@@ -1026,7 +1028,7 @@ namespace RailroaderScenePatcher {
             }
             var bellGuide = CommandBand.RejectionGuide(bells);
             if (bellGuide != null)
-                Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open the guide's reasons why a source isn't eligible in your browser.");
+                Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open in your browser the guide's reasons why a source isn't eligible.");
         }
         void EquipmentNameField(UIPanelBuilder builder, EquipmentAddition item, string name, bool built) {
             var label = FieldLabel(builder, name);
@@ -1748,7 +1750,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Title bar", "Reset layout restores the window position and outliner width. Session details shows information about this editing session." },
                     new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo, or snap. Clicking the inspected row does the same. Applied changes stay. During guided Values or Review, either action cancels a pending world choice and keeps the target and draft. Without a pending choice, neither action is allowed. Return to Inspector to cancel the task. With the pointer over this window, Escape closes an open choice list first. Further presses cancel a drag or a pending world choice, gizmo, or snap, one action per press. Escape keeps the inspection and guided task." },
                     new[] { "Undo and Redo", "Every completed edit here is one Undo step. Use Undo and Redo in the Map Editor." },
-                    new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after an edit in the Map Editor, Undo, or Redo; a stale object list refuses edits." },
+                    new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after an edit in the native map editor, Undo, or Redo; a stale object list refuses edits." },
                     new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
                     new[] { "Current, Stale, Paused, Saved, Unsaved, Blocked", "The lamps above the outliner show whether its contents are current and whether changes need saving. When a lamp shows Paused, follow the instructions in Version choice, Repair, or Import before inspecting objects. Blocked means Save is unavailable. Hover over a lamp for details." },
                     new[] { "* and +", "* marks an object this mod changes. + marks an object this mod adds. The Unsaved lamp tells you when to save." },
@@ -1783,7 +1785,7 @@ namespace RailroaderScenePatcher {
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {
                     new[] { "Numeric", "Position in map coordinates, rotation in degrees." },
-                    new[] { "Gizmo", "The Map Editor's gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
+                    new[] { "Gizmo", "The native map editor's gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves as a whole, and the scenery of its track stays in place. The terrain output of a board or a ground mask regenerates after the move. An object whose ground mask flattens the terrain height can't be moved." },
@@ -1804,7 +1806,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it rebuilds the pad along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
                     new[] { "Marker ID", "The game registers a marker's track location under this ID. When scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding, and Follow. Click Set ID to give one marker a replacement ID. The others keep their registrations. Click Clear ID to restore the underlying ID." },
-                    new[] { "Construction segments", "The construction state of these track segments determines which parts of a rail bridge the game shows. After you split or replace the bridge's track in the Map Editor, select the new segments and click Set. They can't be detached. Click Clear segments to restore the underlying segments." } },
+                    new[] { "Construction segments", "The construction state of these track segments determines which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They can't be detached. Click Clear segments to restore the underlying segments." } },
                 Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Marker IDs", "repairing-duplicate-marker-ids.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Adding detection", "adding-crossing-detection.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Starter placement", "placing-starter-markers.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {

@@ -495,7 +495,7 @@ static class CommandBandTests {
         Check(CommandBand.RunningLine(new[] { "Segment", "End", "Distance" }, new[] { "S377", " a ", "" }, "m") == "Segment S377  End a  Distance - (m)", "A binding reads the same way; a value that is not set is a dash");
         Check(CommandBand.RunningLine(new[] { "A", "B" }, new[] { "1" }, null) == "A 1  B -", "A line without a unit ends with its last value");
         // A group of one value, such as Replacement ID, has only its caption: the value stands without a second label.
-        Check(CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null) == "Myyi" && CommandBand.BoxLabel(new[] { "ID" }) == null && CommandBand.BoxLabel(CommandBand.Axes) == "X",
+        Check(CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null) == "Myyi" && !CommandBand.HasBoxLabels(new[] { "ID" }) && CommandBand.HasBoxLabels(CommandBand.Axes),
             "A single value repeats no label: " + CommandBand.RunningLine(new[] { "ID" }, new[] { "Myyi" }, null));
         // The reason an object cannot be edited is its own, wherever it is given, as one plain sentence.
         foreach (var row in new[] {

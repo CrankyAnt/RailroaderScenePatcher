@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
 using UI.Builder;
@@ -150,16 +151,19 @@ namespace RailroaderScenePatcher {
                     }
                 } else if (guided.Step == GuidedTaskStep.Values) DrawGuidedValues(body);
                 else if (guided.Step == GuidedTaskStep.Review) DrawGuidedReview(body);
-                else PlainLabel(body, guided.AppliedText(UndoGroups()));
+                else PlainLabel(body, guided.AppliedText(StepOf));
             });
             var fill = view.GetComponent<LayoutElement>();
             if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
             // Reserve the inspector tab action row, even though guided actions live in the footer.
             ActionRow(builder, Array.Empty<Act>(), null); builder.Spacer(TabGap);
         }
-        // The native undo history, newest last, or null when it cannot be read.
-        System.Collections.Generic.IReadOnlyList<object> UndoGroups() {
-            try { return attachment?.History?.UndoGroups; } catch { return null; }
+        // Where the history holds a state; a state it cannot read stands.
+        HistoryStep StepOf(long state) {
+            try { return attachment?.Session.StepOf(state) ?? HistoryStep.Stands; } catch { return HistoryStep.Stands; }
+        }
+        long? HistoryState() {
+            try { return attachment?.Session.HistoryState; } catch { return null; }
         }
         void DrawGuidedValues(UIPanelBuilder builder) {
             Field(builder, "Target", guided.Target.Identity.Path);
@@ -274,9 +278,9 @@ namespace RailroaderScenePatcher {
                     pin(selected).Validate(capabilities, guided.Target.Identity, guided.Target.Handle);
                     guidedInspection.Validate(capabilities, guided.Target.Identity, guided.Target.Handle);
                     // Review refuses a replacement ID that Apply would refuse, such as one another scene marker uses.
-                    var refusal = guided.Kind == GuidedTaskKind.MarkerId ? attachment?.Session.MarkerIdRefusal(guided.Target.Identity, guidedFields[0]) : null;
-                    if (refusal != null) { feedback.Refuse(GuidedPlace, "Review", refusal); guided.Review(null, GuidedValuesRecovery); }
-                    else guided.Review();
+                    guided.Review();
+                    var refusal = guided.CheckReview(attachment == null ? null : (Func<TargetIdentity, string, string>)attachment.Session.MarkerIdRefusal, GuidedValuesRecovery);
+                    if (refusal != null) feedback.Refuse(GuidedPlace, "Review", refusal);
                 } catch (Exception e) {
                     feedback.Refuse(GuidedPlace, "Review", e.GetBaseException().Message);
                     guided.Review(null, GuidedRecovery);
@@ -311,7 +315,7 @@ namespace RailroaderScenePatcher {
             }
             return new[] {
                 Slot("Back", "Return to Values and keep the draft.", wait, () => { guided.Back(); feedback.View(GuidedFeedbackView()); guidedFields = guided.Draft; if (guided.Kind == GuidedTaskKind.Snap) preparedSnap = guidedSnap; }),
-                Typed(Slot("Apply", "Apply the reviewed changes.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock()),
+                Typed(Slot("Apply", "Apply the reviewed changes.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? guided.ApplyBlock ?? GuidedValuesBlock()),
                 Slot("Target", "Discard the entered values and return to Target.", wait, GuidedTarget) };
         }
         Outcome GuidedOperation(PatchEditingSession session) {
@@ -357,7 +361,7 @@ namespace RailroaderScenePatcher {
                 return GuidedOperation(session);
             }, consumes, applied => {
                 var cleanup = !applied && guided.Target != null && attachment?.Session.CleanupUnverified(guided.Target.Identity) == true;
-                var step = applied ? UndoGroups()?.LastOrDefault() : null;
+                var step = applied ? HistoryState() : null;
                 guided.Complete(applied, null, applied ? null : cleanup ? "Return to Inspector and click Recheck before trying again." : checkedTarget ? GuidedValuesRecovery : GuidedRecovery, step);
                 feedback.View(GuidedFeedbackView(), preserve: true);
                 presentation?.RequestRefresh();

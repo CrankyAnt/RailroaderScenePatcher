@@ -466,10 +466,10 @@ namespace RailroaderScenePatcher.Core {
         // change: a value equal to the current one counts too, so a later load in another order still finds it.
         internal bool RewritesRegistration(object target, ObjectState state) =>
             state != null && (state.Active.HasValue || state.Marker != null || state.Placement?.Following != null || world.DependentProblem(target) != null);
-        // Why the marker cannot take this replacement ID, or null; its own ID is no change.
+        // Why the marker cannot take this replacement ID, or null; its own ID is no change, as CheckRelationships treats it.
         internal string MarkerIdRefusal(object target, string id) {
-            if (ids == null) return ReplacementMarkerIds.NotSupported;
-            return id != null && id == ids.MarkerId(target) ? null : Unavailable(target, id);
+            if (ids == null) return ReplacementMarkerIds.Problem(id) ?? ReplacementMarkerIds.NotSupported;
+            return id == ids.MarkerId(target) ? null : Unavailable(target, id);
         }
         // Why the marker cannot take this replacement ID in the world as it is, or null.
         string Unavailable(object target, string id) {
@@ -525,11 +525,9 @@ namespace RailroaderScenePatcher.Core {
             var renames = false;
             if (state?.MarkerId != null) {
                 if (ids == null) throw new InvalidPatchDefinitionException(ReplacementMarkerIds.NotSupported);
-                if (state.MarkerId != ids.MarkerId(target)) {
-                    var unavailable = Unavailable(target, state.MarkerId);
-                    if (unavailable != null) throw new InvalidPatchDefinitionException(unavailable);
-                    renames = true;
-                }
+                var unavailable = MarkerIdRefusal(target, state.MarkerId);
+                if (unavailable != null) throw new InvalidPatchDefinitionException(unavailable);
+                renames = state.MarkerId != ids.MarkerId(target);
             }
             // Before mutation, what the write would refuse for a holder of a duplicate marker ID: a change of its activity,
             // binding or track-following placement, and a dependent cache the write would correct by re-registering it.

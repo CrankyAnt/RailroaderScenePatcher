@@ -32,9 +32,9 @@ The patcher doesn't infer tracks or an area from nearby track. An addition detec
 4. Click **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed tracks. Preview again after you change a field.
 
-To change an addition's tracks, click **Edit Detection addition** with its ID, change the fields, preview, and apply. The patcher replaces the addition's spans and keeps its circuit.
+To change an addition's tracks, click **Edit detection addition** with its ID, change the fields, preview, and apply. The patcher replaces the addition's spans and keeps its circuit.
 
-To delete an addition, click **Edit Detection addition** with its ID, then **Delete** at the bottom of the tab and apply. Its circuit leaves the crossing, and the patcher unregisters and removes its spans. Other additions and the native circuits keep their coverage. **Remove modification** in the footer deletes every addition of the crossing and returns its native circuits to their coverage without your mod.
+To delete an addition, click **Edit detection addition** with its ID, then **Delete** at the bottom of the tab and apply. Its circuit leaves the crossing, and the patcher unregisters and removes its spans. Other additions and the native circuits keep their coverage. **Remove modification** in the footer deletes every addition of the crossing and returns its native circuits to their coverage without your mod.
 
 Native Undo and Redo reverse and repeat each applied change. Undo of an addition removes its circuit and spans. Undo of a deletion builds them again.
 
