@@ -268,7 +268,7 @@ static class CommandBandTests {
             ("Blocked", "The scene patch file needs repair. Resolve the issue before saving."), "The Blocked tooltip body gives repair guidance.");
         Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Changed, false)) ==
             ("Blocked", "The scene patch file changed outside scene patch editing. Choose a file version before saving."), "The Blocked tooltip body retains the reason and action for a file version choice.");
-        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene patches to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
+        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene Patcher to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
         Check(CommandBand.InventoryWord >= 60 && CommandBand.SaveWord >= CommandBand.InventoryWord, "The reserved widths hold the longer word of each lamp");
     }
     static void CommandsAreDisabledOnlyForTheirOwnReason() {

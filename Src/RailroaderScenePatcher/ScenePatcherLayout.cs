@@ -12,7 +12,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
-    // Inspector mode of the Scene patches window: a command band, the outliner beside the inspector, four tabs and a
+    // Inspector mode of the Scene Patcher window: a command band, the outliner beside the inspector, four tabs and a
     // fixed footer. A control sits where its scope is: a tab's own actions in a pinned row at the bottom of its tab
     // body, the actions on the inspected object that are the same on every tab in the footer below the messages.
     // The tab body takes the height left by the fixed message area and the action rows.

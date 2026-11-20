@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Complete an edit with a guided task
 
-Open **Scene patches** in the native map editor, inspect the object you want to change and click **Guided** beside its name. A guided task lets you move or rotate the object, snap it to a track or endpoint, enable or disable it, set or detach its track binding, set a replacement ID, place a starter on track, or choose whether a starter placement starts derailed (**Start derailed**). Unavailable tasks stay visible, with tooltips that explain why.
+Open **Scene Patcher** in the native map editor, inspect the object you want to change and click **Guided** beside its name. A guided task lets you move or rotate the object, snap it to a track or endpoint, enable or disable it, set or detach its track binding, set a replacement ID, place a starter on track, or choose whether a starter placement starts derailed (**Start derailed**). Unavailable tasks stay visible, with tooltips that explain why.
 
 You can also start from a detected problem on the **Object** tab. For a track binding problem, click **Repair with guided task**. For a duplicate marker ID on a generic track marker, click **Repair duplicate ID**, or click **Set ID on Connections tab** beside it to make the same repair in the inspector. For a construction segment that no longer exists on a rail bridge, **Repair construction segments** opens the **Connections** tab. Set the segments there. No guided task sets them.
 

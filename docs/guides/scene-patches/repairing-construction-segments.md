@@ -23,7 +23,7 @@ The **Connections** tab lists each construction segment under **Observed binding
 ## Set the construction segments in the native map editor
 
 1. Split or replace the bridge's track in the native map editor.
-1. Open **Scene patches**, click **Refresh** in the command band, and select the construction in the outliner: **Baked scenery group** > **Bridge** > **Rail bridges** > `Bridge 1`, `Almond Bridge`, or `Ela Bridge Scenery`.
+1. Open **Scene Patcher**, click **Refresh** in the command band, and select the construction in the outliner: **Baked scenery group** > **Bridge** > **Rail bridges** > `Bridge 1`, `Almond Bridge`, or `Ela Bridge Scenery`.
 1. On the **Connections** tab, click **Segment** under **Replacement targets**, click the new track in the world, and click **Confirm** in the footer.
 1. Click **Picked** at the bottom of the tab. The segment ID is added to the **Segments** field. A segment that no longer exists leaves the field, and the other IDs stay.
 1. Repeat the previous two steps for every segment the bridge stands on, such as both halves of a split segment. You can also type the IDs in the **Segments** field, separated by commas.

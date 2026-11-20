@@ -106,12 +106,12 @@ namespace RailroaderScenePatcher {
         // the form of an addition that is built or that the scene patch file no longer holds.
         internal static string CorrectedAddition(string editedId, IEnumerable<EquipmentEntry> entries) =>
             editedId == null ? null : (entries ?? Enumerable.Empty<EquipmentEntry>()).Any(e => e?.Addition?.Id == editedId && e.Problem != null) ? editedId : null;
-        // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
+        // The native alert for a refused Save while the Scene Patcher window is closed, or null while it is open, where the
         // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
         // ignored click.
         internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason, bool versionChoice = false) =>
             windowOpen ? ((string Title, string Message)?)null : ("Save refused", versionChoice
-                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene patches to choose which version to keep."
+                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene Patcher to choose which version to keep."
                 : "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
