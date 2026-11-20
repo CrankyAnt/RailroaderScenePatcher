@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher.Core {
         public GroundMasks(IGroundMaskWorld world) { this.world = world ?? throw new ArgumentNullException(nameof(world)); output = new TerrainOutput(world); }
         // Why the move of an object whose ground mask flattens the terrain height is refused.
         public static string FlatteningRefusal(string holder) =>
-            "The ground mask on " + holder + " flattens the terrain height. It's not confirmed that the game restores the height after a move, so this object can't be moved.";
+            "The ground mask on " + holder + " flattens the terrain height. The game might not restore that height after a move, so this object can't be moved.";
         internal IReadOnlyList<GroundMaskState> Observe(object scope) => world.Masks(scope) ?? Array.Empty<GroundMaskState>();
         // Why the placement of the group root or part cannot be set, or null: a ground mask at or below it flattens the
         // terrain height. Activity stays editable.

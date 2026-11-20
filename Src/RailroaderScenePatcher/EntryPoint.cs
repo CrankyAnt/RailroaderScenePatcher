@@ -827,7 +827,7 @@ namespace RailroaderScenePatcher {
                 nextReloadCheck = Time.unscaledTime + 1f;
             }
             presentation?.SetEntryStatus(reloadRequirement == null ? "Scene patches" : "Scene patches: reload",
-                reloadRequirement ?? "Open scene-patch inspection and editing.");
+                reloadRequirement ?? "Open the Scene patches window.");
             bool open = presentation != null && presentation.IsOpen;
             if (!open) CancelGizmo();
             SyncInputRegions();
@@ -1646,7 +1646,7 @@ namespace RailroaderScenePatcher {
                     if (mod.Error != null) { lines.Add(mod.Source.Identifier + ": " + mod.Error); continue; }
                     foreach (var item in inventory.InspectScenePatchFile(mod.Json))
                                                 // A field without a value is left out.
-                        lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "scene patch file") + ", " + item.MatchCount + " inspection matches",
+                        lines.Add(String.Join("; ", new[] { mod.Source.Identifier + "/" + (item.Id ?? "scene patch file") + ": matches " + item.MatchCount + (item.MatchCount == 1 ? " object" : " objects"),
                             item.Dependencies.Count == 0 ? null : "dependsOn=" + String.Join(", ", item.Dependencies) }.Concat(item.Problems).Where(f => !String.IsNullOrEmpty(f))));
                 }
                 scenePatchFileInspection = String.Join("\n", lines);
@@ -1654,7 +1654,7 @@ namespace RailroaderScenePatcher {
                 // Setups that could not be read leave every marker in its own family; each marker notes it, and the
                 // diagnostics say it once for the inventory.
                 if (NativeInventory.StartersError != null) MapEditorDiagnostic(StarterPlacements.Unreadable(NativeInventory.StartersError));
-                status = "Refreshed scene observations and supplied definitions without applying patches." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
+                status = "Refreshed the object list and the supplied definitions. Nothing was applied." + (inspectedBefore && selected == null ? " The inspected object is no longer present." : "");
             } catch (Exception e) { MapEditorDiagnostic(e.GetBaseException().Message); }
         }
         // Copy ID names the scene target map of the edited mod's scene patch file, or the one scene patch editing would write for it.

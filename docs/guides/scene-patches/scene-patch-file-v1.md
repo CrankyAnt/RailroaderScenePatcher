@@ -219,7 +219,7 @@ The modification fails as an invalid definition in any of these cases:
 
 A repeated key is a repeated property name, so the patcher rejects the whole scene patch file. An unknown pattern or an unknown member in an entry, its `source`, or its `placement` makes the modification unsupported. This includes an `id` member. The patcher preserves unsupported modifications without executing them.
 
-Before changing anything, the engine checks every addition in the modification. Its pattern must be supported. Its source must resolve to exactly one loaded object or one bell definition in the content library, and meet the pattern's requirements for the target controller. See [rejected sources](adding-crossing-equipment.md#rejected-sources) and [rejected bell definitions](adding-crossing-bells.md#rejected-bell-definitions). A missing or ambiguous source fails the modification. This includes an object in an unloaded scene or a definition absent from the content library. The engine never loads a scene or substitutes another source or sound.
+Before changing anything, the engine checks every addition in the modification. Its pattern must be supported. Its source must resolve to exactly one loaded object or one bell definition in the content library, and meet the pattern's requirements for the target controller. See [ineligible sources](adding-crossing-equipment.md#ineligible-sources) and [ineligible bell definitions](adding-crossing-bells.md#ineligible-bell-definitions). A missing or ambiguous source fails the modification. This includes an object in an unloaded scene or a definition absent from the content library. The engine never loads a scene or substitutes another source or sound.
 
 `crossing-light-gate-v1` has these requirements:
 

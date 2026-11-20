@@ -91,7 +91,7 @@ Click **Copy ID** in the command band to copy the identity. Add a modification u
 }
 ```
 
-For `setup`, use the setup identifier shown under **Read by** on the **Object** tab. Its car placement uses this marker. Omit `track` to keep the map's track location. Omit `wreck` to keep the map's wreck setting, use `true` to make the cut a wreck, or use `false` to place it on the track.
+For `setup`, use the setup identifier shown under **Used by** on the **Object** tab. Its car placement uses this marker. Omit `track` to keep the map's track location. Omit `wreck` to keep the map's wreck setting, use `true` to make the cut a wreck, or use `false` to place it on the track.
 
 ## Limits
 

@@ -255,7 +255,7 @@ namespace RailroaderScenePatcher {
                 Field(builder, "Position X, Y, Z (m)", intended && guided.Kind == GuidedTaskKind.Snap
                     ? guidedSnap == null ? "No snap target" : String.Join(", ", guidedSnap.Placement.Position.Select(CommandBand.Number))
                     : String.Join(", ", values.Take(3)));
-                Field(builder, "Rotation X, Y, Z (degrees)", String.Join(", ", values.Skip(3)));
+                Field(builder, "Rotation X, Y, Z (deg)", String.Join(", ", values.Skip(3)));
                 if (intended && guided.Kind == GuidedTaskKind.Snap) Field(builder, "Snap target", guidedSnap?.Identity.ToString() ?? "None");
                 return;
             }
@@ -299,7 +299,7 @@ namespace RailroaderScenePatcher {
                 }), Slot("Another guided task", "Return to the task list.", null, GuidedTarget) };
             if (guided.Step == GuidedTaskStep.Target) return new[] { Slot("Inspector", "Leave Guided mode and return to Inspector.", wait, LeaveGuided, "Return to Inspector") };
             if (guided.Step == GuidedTaskStep.Values) {
-                var back = Slot("Back", "Discard the draft and return to the task list.", wait, GuidedTarget);
+                var back = Slot("Back", "Discard the entered values and return to Target.", wait, GuidedTarget);
                 var next = Typed(Slot("Next", "Review your changes without applying them.", wait, ReviewGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock());
                 if (guided.Kind == GuidedTaskKind.Snap) return new[] { back,
                     Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
@@ -312,7 +312,7 @@ namespace RailroaderScenePatcher {
             return new[] {
                 Slot("Back", "Return to Values and keep the draft.", wait, () => { guided.Back(); feedback.View(GuidedFeedbackView()); guidedFields = guided.Draft; if (guided.Kind == GuidedTaskKind.Snap) preparedSnap = guidedSnap; }),
                 Typed(Slot("Apply", "Apply the reviewed changes.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock()),
-                Slot("Target", "Discard the draft and return to the task list.", wait, GuidedTarget) };
+                Slot("Target", "Discard the entered values and return to Target.", wait, GuidedTarget) };
         }
         Outcome GuidedOperation(PatchEditingSession session) {
             var identity = guided.Target.Identity;

@@ -612,7 +612,7 @@ namespace RailroaderScenePatcher {
         // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height keeps
         // the object in place.
         const string GroupRootHolds = "the root of this group holds the scene ground mask";
-        const string GroundMaskPrefix = "Ground mask: ", HeightUnconfirmed = "can't be moved because it's not confirmed that the game restores the height after a move.";
+        const string GroundMaskPrefix = "Ground mask: ", HeightUnconfirmed = "can't be moved because the game might not restore the terrain height after a move.";
         // parts: the holders are parts of the object's family; below a marker object they are plain objects.
         // group: the object that holds the mask itself is a group root, as a road bridge is, not a part.
         internal static string GroundMaskDependency(bool self, IEnumerable<string> holders, bool flattens, bool parts = true, bool group = false) {
@@ -653,7 +653,7 @@ namespace RailroaderScenePatcher {
         internal static string PlacementBlock(string edit, string pad, string controller, string moveBlock) => edit ?? pad ?? controller ?? moveBlock;
         // Why every move of the object is refused, or null: its dependency line names a mask that flattens the terrain
         // height. The placement modes and fields are then unavailable with this reason.
-        internal const string FlatteningMoveBlock = "This object has a ground mask that flattens the terrain height. It's not confirmed that the game restores the height after a move.";
+        internal const string FlatteningMoveBlock = "This object has a ground mask that flattens the terrain height. The game might not restore that height after a move.";
         internal static string GroundMaskMoveBlock(IEnumerable<string> dependencies) =>
             dependencies?.Any(line => line != null && line.StartsWith(GroundMaskPrefix, StringComparison.Ordinal) && line.EndsWith(HeightUnconfirmed, StringComparison.Ordinal)) == true ? FlatteningMoveBlock : null;
         // Whether the object has terrain output of a scene ground mask, by its dependency line.
@@ -683,14 +683,14 @@ namespace RailroaderScenePatcher {
         // crossing's Connections tab, not on the object itself.
         internal const string AddedEquipmentFamily = "Added light or gate", AddedBellFamily = "Added bell";
         // The guide link offered below a list of equipment sources: its label and the guide page with the anchor of its
-        // rejection reasons, or null while no source of the list is rejected. A list of bell definitions links to the bell
+        // eligibility reasons, or null while every source of the list is eligible. A list of bell definitions links to the bell
         // guide, a list of devices to the light and gate guide.
         internal static string[] RejectionGuide(IEnumerable<SourceCandidate> sources) {
             var rejected = (sources ?? Enumerable.Empty<SourceCandidate>()).Where(s => s != null && !s.Eligible).ToList();
             if (rejected.Count == 0) return null;
             return rejected.Any(s => s.Source.IsDefinition)
-                ? new[] { "Why a bell definition is rejected", "adding-crossing-bells.md#rejected-bell-definitions" }
-                : new[] { "Why a device is rejected", "adding-crossing-equipment.md#rejected-sources" };
+                ? new[] { "Why a bell definition isn't eligible", "adding-crossing-bells.md#ineligible-bell-definitions" }
+                : new[] { "Why a device isn't eligible", "adding-crossing-equipment.md#ineligible-sources" };
         }
         internal static bool IsAddedFamily(string family) => family == AddedEquipmentFamily || family == AddedBellFamily;
         // Where added equipment is edited, one sentence for its supported edits and for why it cannot be edited as an
@@ -711,10 +711,12 @@ namespace RailroaderScenePatcher {
         // can be edited, at the end of the running line while it cannot.
         internal static readonly string[] PlacementGroups = { "Position", "Rotation" }, PlacementUnits = { "m", "deg" }, Axes = { "X", "Y", "Z" };
         internal static string GroupCaption(string caption, string unit, bool editable) => editable && unit != null ? caption + " (" + unit + ")" : caption;
+        // The short label in front of a value's box, or null for the one value of a group, which its caption names.
+        internal static string BoxLabel(IReadOnlyList<string> labels) => labels.Count < 2 ? null : labels[0];
         // The values of a group that cannot be edited now, as one running line: "X 4361.091  Y 528.405  Z 5380.431 (m)".
         // A value that is not set reads as a dash.
         internal static string RunningLine(IReadOnlyList<string> labels, IReadOnlyList<string> values, string unit) =>
-            String.Join("  ", labels.Select((label, i) => label + " " + (i < values.Count && !String.IsNullOrWhiteSpace(values[i]) ? values[i].Trim() : "-"))) + (unit == null ? "" : " (" + unit + ")");
+            String.Join("  ", labels.Select((label, i) => (labels.Count < 2 ? "" : label + " ") + (i < values.Count && !String.IsNullOrWhiteSpace(values[i]) ? values[i].Trim() : "-"))) + (unit == null ? "" : " (" + unit + ")");
         // Why the inspected object cannot be edited, as the yellow message and every "Unavailable:" tooltip give it:
         // the object's own reason, which the Object tab shows under Supported edits, and not a pointer to that tab. It is
         // one plain sentence: the message's source and the tooltip's Unavailable: are its only label.
@@ -939,7 +941,7 @@ namespace RailroaderScenePatcher {
             return parts;
         }
         // The search field's tooltip: a fixed title and what the field does, like every other control.
-        internal const string SearchTitle = "Search objects", SearchTip = "Show only the objects whose name, path, family, binding identifiers, dependencies, or problems contain the text you type.";
+        internal const string SearchTitle = "Search objects", SearchTip = "Show only the objects whose name, path, family, binding IDs, dependencies, or problems contain the text you type.";
         // A modification that is not applied changes nothing: its object shows the refused or the not applied badge
         // instead of the changed one.
         internal static IReadOnlyList<Badge> Badges(bool changed, bool added, FailureKind? failure = null) {

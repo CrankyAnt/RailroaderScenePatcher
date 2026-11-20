@@ -121,7 +121,7 @@ static class RoadBridgeTests {
         Assert(line == "Ground mask: the root of this group holds the scene ground mask. Moving the group moves the terrain shaping. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
             "The line of a group whose root holds the mask: " + line);
         var flat = CommandBand.GroundMaskDependency(true, new[] { "Old Home Town Road Bridge" }, true, group: true);
-        Assert(flat == "Ground mask: the root of this group holds the scene ground mask, which also flattens the terrain height. The group can't be moved because it's not confirmed that the game restores the height after a move.",
+        Assert(flat == "Ground mask: the root of this group holds the scene ground mask, which also flattens the terrain height. The group can't be moved because the game might not restore the terrain height after a move.",
             "The line of a group whose root holds a flattening mask: " + flat);
         Assert(CommandBand.HoldsGroundMask(new[] { line }) && CommandBand.GroundMaskMoveBlock(new[] { line }) == null && CommandBand.GroundMaskMoveBlock(new[] { flat }) == CommandBand.FlatteningMoveBlock,
             "Both lines carry terrain output, and only the flattening one blocks a move");

@@ -10,7 +10,7 @@ The supported bridge is the Ela bridge of the Bushnell-Whittier map layer, at `W
 
 1. Open **Scene patches**, click **Refresh** in the command band, search for `Ela Bridge`, and select its row in the outliner. You can also click **Select in world** and select the bridge by its marking, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `bridge-colliders-v1`. If **Supported edits** on the **Object** tab starts with **Not editable:**, the bridge doesn't match the supported pattern. The text explains why.
 2. Click **Focus** in the command band to see the bridge and the track beside it.
-3. On the **Placement** tab, choose **Numeric** mode and change the six fields for position in map coordinates and rotation in degrees. Click **Apply** at the bottom of the tab.
+3. On the **Placement** tab, click **Numeric** and change the six fields for position in map coordinates and rotation in degrees. Click **Apply** at the bottom of the tab.
 
 The bridge root moves at once, with every collider below it. Save, Undo, Redo, and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal returns the bridge to the placement the loaded map gives it.
 

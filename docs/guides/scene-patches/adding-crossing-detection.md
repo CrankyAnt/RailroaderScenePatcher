@@ -6,7 +6,7 @@ Use this guide when you add a track through an existing grade crossing and need 
 
 ## What an addition is
 
-A crossing controller evaluates circuits. Each circuit has an approach A span, an island span and an approach B span. A detection addition adds another circuit with three spans of its own. The patcher builds the circuit, registers its spans in the track graph, and adds it to the controller after the native circuits.
+A crossing controller evaluates circuits. Each circuit has an approach A span, an island span, and an approach B span. A detection addition adds another circuit with three spans of its own. The patcher builds the circuit, registers its spans in the track graph, and adds it to the controller after the native circuits.
 
 Define an addition with an ID, tracks, and an area:
 
@@ -27,7 +27,7 @@ The patcher doesn't infer tracks or an area from nearby track. An addition detec
 ## Add detection in the native map editor
 
 1. Open the Scene Patcher panel and inspect the crossing controller, either from the outliner (folder **Crossing controller**) or with **Select in world**.
-2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Addition ID** and click **Add detection** beside it.
+2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Detection addition ID** and click **Add detection** beside it.
 3. For each of **Approach A**, **Island**, and **Approach B**, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the **From** and **To** distances in meters. To fill a role's segment from the world, click **Segment** next to the role, click the track, then click **Confirm**. When editing an existing addition, the role's current starting segment is excluded from its choice list. You can pick segments used by other roles. **From** is the end next to the island for each approach, and the island's lower end for the island.
 4. Click **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed tracks. Preview again after you change a field.

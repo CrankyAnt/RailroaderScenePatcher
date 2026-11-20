@@ -21,7 +21,7 @@ In the native map editor, open **Scene patches** and click **Refresh** in the co
 1. Select the mast or bell in the outliner, or click **Select in world** and select it in the world.
 2. On the **Placement** tab, choose a mode:
    - **Numeric**: enter the position in map coordinates. For a mast, you can also enter the rotation in degrees. Click **Apply**.
-   - **Gizmo**: drag the native Move gizmo in the world or, for a mast, the Rotate gizmo.
+   - **Gizmo**: drag the Map Editor's Move gizmo in the world or, for a mast, the Rotate gizmo.
    - **Snap**: move the mast or bell onto a selected track or endpoint in a single edit, as described in [snap an object to a track](snapping-to-track.md).
 3. Check the result in the world. The tab's fields show the physical placement set by the scene patch.
 

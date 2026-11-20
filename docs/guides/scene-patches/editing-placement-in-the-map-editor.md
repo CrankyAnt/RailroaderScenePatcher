@@ -171,7 +171,7 @@ Click **Reload Map Editor...** in **Scene patches**. The confirmation warns that
 
 If Save fails, the native map editor stays open and reports the completed and outstanding writes.
 
-While a file version choice is pending or the file needs repair, reload and exit offer only discard or cancel. Save becomes available after you click **Use file version** or **Keep editor version**. In repair state, the backup must also succeed. After an unrecovered native history error, the native map editor may be unable to prove that native map data is clean. The confirmation identifies the outstanding work so you can cancel or discard it.
+While a file version choice is pending or the file needs repair, reload and exit offer only discard or cancel. Save becomes available after you click **Use file version** or **Keep editor version**. In repair state, the backup must also succeed. After an unrecovered native history error, the native map editor might be unable to prove that native map data is clean. The confirmation identifies the outstanding work so you can cancel or discard it.
 
 Reload reopens the requested map definition. For the same map, the patcher records the camera's ground location in map coordinates and requests a return when the native map editor and camera are ready. This request survives mod replacement in the same process. It expires after five minutes and is discarded if another map opens. Before reporting arrival, the patcher checks the settled horizontal ground position. Reload does not preserve selection, camera angle, or native history.
 

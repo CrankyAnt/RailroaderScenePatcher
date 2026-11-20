@@ -599,7 +599,7 @@ namespace RailroaderScenePatcher {
                 // with its origin that difference changes with every origin move although nothing moved the object: its
                 // position is the scene position, which is its map position at the first origin.
                 position = MapPosition(go.transform);
-                if (!MovesWithOrigin(go.transform)) runtime.Add("Position does not move with the world origin; it is the position in the scene");
+                if (!MovesWithOrigin(go.transform)) runtime.Add("Position does not move with the world origin; it is the position in the scene.");
                 coordinatesAvailable = !Single.IsNaN(position.x) && !Single.IsNaN(position.y) && !Single.IsNaN(position.z) && !Single.IsInfinity(position.x) && !Single.IsInfinity(position.y) && !Single.IsInfinity(position.z);
                 if (!coordinatesAvailable) throw new InvalidOperationException("Map coordinates unavailable");
             });

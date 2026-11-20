@@ -243,7 +243,7 @@ namespace RailroaderScenePatcher.Core {
         public const string NoTrackPoint = "the marker's track location does not resolve to a track point";
         // What Supported edits says for a used marker. The track location is the starter placement workflow's own edit;
         // the object's placement and activity do not reach the car placement.
-        public const string Operations = "Track location: place the marker on the track under Connections. Once the whole car cut passes the game's placement rule, the new-game setup places its front there. Start derailed: choose under Connections whether the cut starts derailed as a wreck. The object's placement and activity do not change where its cars start";
+        public const string Operations = "Track location: place the marker on the track under Connections. Once the whole car cut passes the game's placement rule, the new-game setup places its front there. Start derailed: choose under Connections whether the cut starts derailed as a wreck. The object's placement and activity do not change where its cars start.";
         // Why the object's placement and activity cannot be edited: what the Placement tab's modes and the activity
         // buttons say, and what a starter placement modification with placement or active fails with.
         public const string ObjectSettings = "A new-game car placement reads only this marker's track location, so the object's placement and activity do not change where its cars start; place the marker on the track under Connections";

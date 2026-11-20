@@ -94,7 +94,7 @@ namespace RailroaderScenePatcher.Core {
         // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
         // sentences that follow the label of the action they refuse.
         public string Refusal(object self) => "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
-        const string Reason = "When the game removes a marker's graph registration by marker ID, it removes the registration of every scene marker with that ID. You can't edit their activity, binding, or track-following placement until the duplicate marker ID is repaired. Reloading or choosing another track doesn't change the duplicate marker ID.";
+        const string Reason = "When the game removes a marker's registration by marker ID, it removes the registration of every scene marker with that ID. You can't edit their activity, binding, or track-following placement until the duplicate marker ID is repaired. Reloading or choosing another track doesn't change the duplicate marker ID.";
         // The problem of an active holder that can receive a replacement ID: a duplicate marker ID is then a defect the
         // modder repairs with the patcher. An inactive holder, and a holder that cannot receive a replacement ID, such as a
         // crossing pad, show the explanation without a problem. Null for a marker ID that one scene marker holds.
