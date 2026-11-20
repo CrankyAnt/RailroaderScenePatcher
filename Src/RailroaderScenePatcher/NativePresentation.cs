@@ -158,7 +158,7 @@ namespace RailroaderScenePatcher {
         // object made here takes the UI layer: that of the heading, a native prefab, or the named layer without one. The
         // row itself does not have it, because the builder makes its containers on the default layer.
         internal const float DisclosureHitSize = 24;
-        internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click, RectTransform label, string title, string tip) {
+        internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click, RectTransform label, TooltipInfo tooltip) {
             var layer = label != null ? label.gameObject.layer : LayerMask.NameToLayer("UI");
             if (layer < 0) layer = parent.gameObject.layer;
             var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave, layer = layer };
@@ -179,14 +179,14 @@ namespace RailroaderScenePatcher {
             button.targetGraphic = area; button.transition = Selectable.Transition.None;
             var run = Action(click);
             button.onClick.AddListener(() => run());
-            rect.Tooltip(title, tip);
+            rect.Tooltip(tooltip.Title, tooltip.Text);
             if (label != null) {
                 var text = label.GetComponentInChildren<TMP_Text>(true);
                 if (text != null) text.raycastTarget = true;
                 var labelButton = label.GetComponent<Button>() ?? label.gameObject.AddComponent<Button>();
                 labelButton.targetGraphic = text; labelButton.transition = Selectable.Transition.None;
                 labelButton.onClick.AddListener(() => run());
-                label.Tooltip(title, tip);
+                label.Tooltip(tooltip.Title, tooltip.Text);
             }
             return rect;
         }

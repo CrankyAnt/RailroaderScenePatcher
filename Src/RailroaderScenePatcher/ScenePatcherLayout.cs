@@ -100,7 +100,7 @@ namespace RailroaderScenePatcher {
                 headingLayout.flexibleWidth = 0;
                 foreach (var text in heading.GetComponentsInChildren<TMP_Text>(true)) text.textWrappingMode = TextWrappingModes.NoWrap;
                 var headingText = heading.GetComponentInChildren<TMP_Text>(true);
-                presentation.DisclosureTriangle(heading.parent, longForm, headingText != null ? headingText.color : Color.white, toggle, heading, title, CommandBand.DisclosureTip(longForm));
+                presentation.DisclosureTriangle(heading.parent, longForm, headingText != null ? headingText.color : Color.white, toggle, heading, new TooltipInfo(title, CommandBand.DisclosureTip(longForm)));
                 row.Spacer();
             }).Height(NativePresentation.DisclosureHitSize);
         }
