@@ -666,7 +666,6 @@ namespace RailroaderScenePatcher {
             if (comparedKey != null && comparedKey == idleKey) comparedKey = now;
             idleKey = now;
         }
-        // The entry of the inspected object after related observations were replaced.
         // A marker ID edit, its Undo or its Redo changes the duplicate marker ID of every other holder of the old and the
         // new ID: those entries are observed again at once, so their problems agree with the edit and with the
         // availability of the replacement ID, which reads the scene.
@@ -678,6 +677,7 @@ namespace RailroaderScenePatcher {
                 if (updated != null) KeepSelection(holder, updated);
             }
         }
+        // The entry of the inspected object after related observations were replaced.
         void KeepSelection(SceneObservation before, SceneObservation updated) {
             if (ReferenceEquals(selected, before)) selected = updated;
             else if (selected != null && !inventory.Entries.Any(e => ReferenceEquals(e, selected))) selected = inventoryPresentation.CurrentSelection(inventory, selected);
