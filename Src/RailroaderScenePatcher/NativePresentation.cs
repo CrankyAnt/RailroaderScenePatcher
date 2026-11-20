@@ -624,7 +624,7 @@ namespace RailroaderScenePatcher {
         }
         // Forgets the saved bounds and places the window at its default position again.
         internal void ResetLayout() {
-            if (PrototypeCompact) PrototypeExitCompact();
+            if (PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=reset layout"); }
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
             // The request comes from a button press, and layout moves nothing while a button is down: the next layout
             // after the release places the window.
@@ -1001,6 +1001,8 @@ namespace RailroaderScenePatcher {
         }
         public void Dispose() {
             if (disposed) return;
+            // PROTOTYPE hook: the window goes while compact, such as when the Map Editor is left.
+            if (PrototypeCompact) { try { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=window removed (Map Editor left or reloaded)"); } catch { } }
             HideTooltip();
             ClearFocus(); disposed = true;
             entryPanel?.Dispose();

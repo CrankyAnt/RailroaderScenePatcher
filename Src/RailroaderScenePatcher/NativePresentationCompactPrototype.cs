@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher {
         void AddPrototypeCompactIcon(WindowManager manager, Transform parent) {
             try {
                 titleCompactPrototype = TitleIcon(manager, parent, "CrankyAnt Scene Patcher compact prototype", PrototypeArrow(true), PrototypeToggleCompact,
-                    () => new TooltipInfo(PrototypeCompact ? "Full window" : "Compact window", PrototypeCompact ? "Show the full window again." : "Shrink the window to the bottom of the screen."), out prototypeCompactGlyph);
+                    () => new TooltipInfo(PrototypeCompact ? "Full window" : "Compact window", PrototypeCompact ? "Show the full window again." : "Switch to a smaller window that leaves more of the world in view."), out prototypeCompactGlyph);
             } catch (Exception e) {
                 if (titleCompactPrototype != null) UnityEngine.Object.Destroy(titleCompactPrototype.gameObject);
                 titleCompactPrototype = null; prototypeCompactGlyph = null;

@@ -79,13 +79,41 @@ namespace RailroaderScenePatcher {
         // rows of their own, then the left band over the outliner, which takes the rest of the height.
         void PrototypeSideRail(UIPanelBuilder builder) {
             leftBandWidth = NativePresentation.PrototypeRailContent;
-            DrawRightBand(builder);
+            PrototypeRailBand(builder);
             var name = selected == null ? "No Selection" : selected.DisplayName;
             Heading(builder, Literal(name), "Object", selected?.Identity.Path).Height(RowHeight);
             Line(builder, StateLine(out var states), "State", states, RowHeight);
             builder.HStack(row => { DrawModeSwitch(row); row.Spacer(); }).ChildrenKeepHeight().Height(RowHeight);
             var outliner = builder.VStack(column => DrawOutliner(column, true)).gameObject.AddComponent<LayoutElement>();
             outliner.flexibleHeight = 10000; outliner.flexibleWidth = 10000;
+        }
+
+        // The band's four commands on two rows, so the rail's width holds them: Select in world and Focus, then Clear
+        // and Copy ID. The states and tooltips are the full band's (DrawRightBand).
+        void PrototypeRailBand(UIPanelBuilder builder) {
+            var pending = selection?.Pending != null;
+            builder.HStack(row => {
+                row.ConfigureLayout(4f);
+                var select = CommandBand.SelectInWorld(selection != null, pending);
+                Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
+                    .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
+                var focus = CommandBand.Focus(selected != null, FocusUnavailable());
+                var starter = selected != null && selected.Family == StarterPlacements.Family;
+                Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Inactive(focus != null)
+                    .Tooltip("Focus", CommandBand.Tooltip(starter ? "Move the camera to the marker's track point, where the start setup places its cars." : "Move the camera to the inspected object.", focus));
+                row.Spacer();
+            }).Height(RowHeight);
+            builder.HStack(row => {
+                row.ConfigureLayout(4f);
+                var keepDraft = guided.Enabled && (guided.Step == GuidedTaskStep.Values || guided.Step == GuidedTaskStep.Review);
+                var clear = keepDraft && !pending ? "No world choice is pending." : CommandBand.Clear(selected != null, pending);
+                Button(row, "Clear", ClearInspection).Inactive(clear != null)
+                    .Tooltip("Clear", CommandBand.Tooltip(keepDraft ? "Cancel the world choice and keep the object and draft." : "End the inspection and cancel a pending world choice, gizmo, or snap. Applied changes stay.", clear));
+                var copy = CommandBand.CopyId(selected != null, attachment?.Session.CopyIdRefusal);
+                Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
+                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the object's ID, placement, and the map ID needed by the scene patch file.", copy));
+                row.Spacer();
+            }).Height(RowHeight);
         }
 
         // The heading row and the state row as the full window draws them.
@@ -118,13 +146,13 @@ namespace RailroaderScenePatcher {
             var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
             var candidate = selection.Find(pending.Candidate);
             var what = candidate == null ? purpose + " in the world." : CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation);
-            var full = purpose + " in the world." + (candidate == null ? " Nothing is clicked yet." : " Clicked: " + what + " Open the full window to confirm.");
+            var full = purpose + " in the world." + (candidate == null ? " Nothing is clicked yet." : " " + what + " Open the full window to confirm.");
             Line(builder, "<b>World choice</b> " + Tint(Blue, what), "World choice", full, RowHeight);
         }
 
         void PrototypeLog(string state) {
             var pending = selection?.Pending;
-            context?.Log.Info("Compact prototype: " + state + "; inspected=" + (selected == null ? "none" : selected.Identity.ToString()) +
+            context?.Log.Info("Compact prototype: " + state + "; inspected=" + (selected == null ? "none" : selected.DisplayName + " (" + selected.Identity.Path + ")") +
                 "; pending world choice=" + (pending == null ? "no" : "yes (" + pending.Kind + ", candidate " + (selection.Find(pending.Candidate) == null ? "none" : "clicked") + ")"));
         }
     }
