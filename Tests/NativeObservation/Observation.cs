@@ -49,6 +49,7 @@ public sealed class Observation : MonoBehaviour {
     bool GuardStillValid() { try { Guard(); return true; } catch { return false; } }
     static bool Same(string a, string b) => String.Equals(Path.GetFullPath(a).TrimEnd('\\', '/'), Path.GetFullPath(b).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
     void Update() {
+        if (loaded && Input.GetKeyDown(KeyCode.F8) && HomeValid()) PointerReadout();
         if (!loaded || ready) return;
         try {
             Guard(); terrain = Read(TypeNamed("Map.Runtime.MapManager"), "Instance"); if (terrain == null) return;
@@ -216,6 +217,32 @@ public sealed class Observation : MonoBehaviour {
             File.AppendAllText(path, data.ToString(Formatting.None) + "\n");
             cullingStatus = "Readout " + cullingSequence + " written: " + ((JArray)data["cullers"]).Count + " cullers, " + own.Count + " own spheres";
         } catch (Exception e) { cullingStatus = "Readout failed: " + e.GetBaseException().Message; }
+    }
+    // Every UI object under the mouse pointer, top hit first, as the event system raycasts a click there: for each, its
+    // selectables with their enabled and interactable state and the parent canvas groups that can block them. Bound to
+    // F8 so the pointer can stay on the control. It writes Evidence/culling/pointer.jsonl under the mod folder.
+    void PointerReadout() {
+        try {
+            var system = UnityEngine.EventSystems.EventSystem.current;
+            if (system == null) throw new InvalidOperationException("No event system");
+            var pointer = new UnityEngine.EventSystems.PointerEventData(system) { position = Input.mousePosition };
+            var hits = new List<UnityEngine.EventSystems.RaycastResult>(); system.RaycastAll(pointer, hits);
+            var data = new JObject { ["evidenceKind"] = "pointer-readout", ["schemaVersion"] = 1, ["label"] = cullingLabel, ["utc"] = DateTime.UtcNow.ToString("O"), ["frame"] = Time.frameCount,
+                ["mouse"] = new JArray(Input.mousePosition.x, Input.mousePosition.y), ["screen"] = new JArray(Screen.width, Screen.height),
+                ["hovered"] = system.currentSelectedGameObject == null ? null : PathOf(system.currentSelectedGameObject.transform) };
+            data["hits"] = new JArray(hits.Where(h => h.gameObject != null).Select(h => {
+                var rect = h.gameObject.transform as RectTransform;
+                var clickHandler = UnityEngine.EventSystems.ExecuteEvents.GetEventHandler<UnityEngine.EventSystems.IPointerClickHandler>(h.gameObject);
+                return new JObject { ["path"] = PathOf(h.gameObject.transform), ["layer"] = LayerMask.LayerToName(h.gameObject.layer), ["module"] = h.module == null ? null : h.module.GetType().FullName, ["depth"] = h.depth, ["sortingOrder"] = h.sortingOrder,
+                    ["rect"] = rect == null ? null : new JArray(rect.rect.x, rect.rect.y, rect.rect.width, rect.rect.height),
+                    ["clickHandler"] = clickHandler == null ? null : PathOf(clickHandler.transform) + " [" + String.Join(",", clickHandler.GetComponents<UnityEngine.EventSystems.IPointerClickHandler>().Select(c => c.GetType().FullName)) + "]",
+                    ["selectables"] = new JArray(h.gameObject.GetComponentsInParent<UnityEngine.UI.Selectable>(true).Select(c => new JObject { ["path"] = PathOf(c.transform), ["type"] = c.GetType().FullName, ["enabled"] = c.enabled, ["activeAndEnabled"] = c.isActiveAndEnabled, ["interactable"] = c.interactable, ["interactableInHierarchy"] = c.IsInteractable() })),
+                    ["canvasGroups"] = new JArray(h.gameObject.GetComponentsInParent<CanvasGroup>(true).Where(g => !g.interactable || !g.blocksRaycasts || g.ignoreParentGroups).Select(g => new JObject { ["path"] = PathOf(g.transform), ["interactable"] = g.interactable, ["blocksRaycasts"] = g.blocksRaycasts, ["ignoreParentGroups"] = g.ignoreParentGroups })) };
+            }));
+            var path = Path.Combine(directory, "Evidence", "culling", "pointer.jsonl"); Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.AppendAllText(path, data.ToString(Formatting.None) + "\n");
+            cullingStatus = "Pointer readout written: " + hits.Count + " hits" + (hits.Count == 0 ? "" : ", top " + hits[0].gameObject.name);
+        } catch (Exception e) { cullingStatus = "Pointer readout failed: " + e.GetBaseException().Message; }
     }
     void OnGUI() {
         if (loaded && HomeValid())
