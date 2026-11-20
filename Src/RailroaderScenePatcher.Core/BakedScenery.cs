@@ -21,6 +21,9 @@ namespace RailroaderScenePatcher.Core {
         bool LodLevel { get; }
         // The game turns or moves this object's transform while it runs, such as the clock hand a gauge needle turns.
         bool Animated { get; }
+        // The id of the track marker on this object itself, or null without one. Read only for the crossing pads of an
+        // unprotected crossing.
+        string MarkerId { get; }
         IReadOnlyList<IHierarchyNode> Children { get; }
     }
     public enum PartDisposition { Part, ExistingFamily, NotListed }
@@ -58,6 +61,10 @@ namespace RailroaderScenePatcher.Core {
         // table does not name, which stays in the Inspection only group, and for an object that is no group.
         public string Category { get; internal set; }
         public string Subcategory { get; internal set; }
+        // A crossbuck of an unprotected crossing: a group of its own under Grade crossing, whose models are no parts.
+        public bool Crossbuck { get; internal set; }
+        // For a crossbuck, the marker id of its crossing's pad, or null when the crossing has no pad with one id.
+        public string PadMarkerId { get; internal set; }
     }
     // The categories of the Baked scenery group family and the category table of the Railroader 0.6.3 Large Scenery
     // catalogue: which scene object in a group-root position is a group, under which category, and which is a folder.
@@ -281,7 +288,25 @@ namespace RailroaderScenePatcher.Core {
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
             RendererCuller = "Helpers.Culling.RendererCuller", FolderRule = "Folders above group roots";
-        public const string CrossbuckTicket = "#107";
+        // Crossbucks at unprotected crossings: each crossbuck is a group of its own under Grade crossing, wherever it
+        // stands below World. Its models, the LOD levels below it, belong to its entry and are no parts.
+        public const string CrossbuckModels = "The models of a crossbuck belong to its entry";
+        // The name of a crossbuck's entry: the crossbuck's own name at its crossing, as a crossing mast is named, so the
+        // crossbucks of the base map read apart and a search finds them by crossing name. A crossbuck that the pad marker
+        // id identifies names that id. The full path stays in the tooltip.
+        public static string CrossbuckName(string path, string padMarkerId = null) {
+            if (path == null) return null;
+            var last = path.LastIndexOf('/');
+            if (last <= 0) return path;
+            var crossing = path.LastIndexOf('/', last - 1);
+            return path.Substring(last + 1) + " at " + path.Substring(crossing + 1, last - crossing - 1) + (padMarkerId == null ? "" : " (pad marker " + padMarkerId + ")");
+        }
+        // Why a target with a pad marker id cannot name a crossbuck, from the crossbucks listed at its path, or null. The
+        // id identifies a crossbuck only where several crossbucks share the path: a crossbuck with a path of its own is
+        // named by its path alone, so the identity holds one identifier, never two.
+        public const string PadMarkerUnshared = "This crossbuck's path names it alone, so its target takes no padMarkerId. Remove padMarkerId from this target";
+        public static string PadMarkerRefusal(int crossbucksAtPath) =>
+            crossbucksAtPath == 0 ? TargetIdentity.PadMarkerNotAccepted : crossbucksAtPath == 1 ? PadMarkerUnshared : null;
         static bool Protected(IHierarchyNode node) => node.Components.Contains(CrossingController);
         static bool Pad(IHierarchyNode node) => node.Components.Contains(PadBuilder);
         static bool MarkerObject(IHierarchyNode node) => node.Components.Contains(Marker);
@@ -291,6 +316,11 @@ namespace RailroaderScenePatcher.Core {
         static bool Unprotected(IHierarchyNode node) =>
             node.Children.Any(Pad) && node.Children.All(child => Pad(child) || MarkerObject(child) || Crossbuck(child));
         static bool Crossing(IHierarchyNode node) => Protected(node) || Unprotected(node);
+        // The marker id of the crossing's pad: the one id its pads hold, or null.
+        static string PadMarkerId(IHierarchyNode crossing) {
+            var ids = crossing.Children.Where(Pad).Select(pad => pad.MarkerId).Where(id => !String.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal).ToArray();
+            return ids.Length == 1 ? ids[0] : null;
+        }
         static bool RoadBridge(IHierarchyNode node) => RoadBridge(node.Name);
         // One or more crossings, or crossings and road bridges.
         static bool CrossingFolder(IHierarchyNode node) =>
@@ -303,12 +333,14 @@ namespace RailroaderScenePatcher.Core {
             // A scene object the category table marks as a folder, such as Bryson Yard, is no group: its children are.
             if (BakedSceneryCategories.IsFolder(path) || CrossingFolder(node)) { foreach (var child in node.Children) Candidate(town, child, path + "/" + child.Name, verdicts); return; }
             if (Unprotected(node)) {
+                var pad = PadMarkerId(node);
                 foreach (var child in node.Children) {
                     var at = path + "/" + child.Name;
                     if (!child.Serialized) verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.NotListed, RuntimeObject));
                     else if (child.HasFamily) verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.ExistingFamily, null));
                     else if (MarkerObject(child)) verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.NotListed, FolderRule));
-                    else verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.InspectionOnly, "crossbucks at unprotected crossings", CrossbuckTicket));
+                    // Every other child is a crossbuck: a group of its own under Grade crossing, wherever the crossing stands.
+                    else verdicts.Add(new GroupRootVerdict(child, at, GroupDisposition.Group, null) { Category = BakedSceneryCategories.GradeCrossing, Crossbuck = true, PadMarkerId = pad });
                 }
                 return;
             }
@@ -402,7 +434,8 @@ namespace RailroaderScenePatcher.Core {
         public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {
             if (verdicts == null) throw new ArgumentNullException(nameof(verdicts));
             var found = new List<PartVerdict>();
-            foreach (var group in verdicts.Where(v => v.Disposition == GroupDisposition.Group)) Walk(group.Node, group.Path, group.Path, null, found);
+            // A crossbuck is one entry: its models are no parts.
+            foreach (var group in verdicts.Where(v => v.Disposition == GroupDisposition.Group)) Walk(group.Node, group.Path, group.Path, group.Crossbuck ? CrossbuckModels : null, found);
             return found;
         }
         // rule is set below an object that a sibling shares its path with: every object below it shares a path prefix
@@ -786,7 +819,12 @@ namespace RailroaderScenePatcher.Core {
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
     // The root of a rail bridge construction that carries its construction controller, such as Bryson Bridge 1 and the
     // Almond Bridge, also holds the construction-segment relationship.
-    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IDisposable {
+    // The crossbucks a world lists at a hierarchy path, with the marker id of each one's crossing pad, for the identity
+    // of crossbucks whose crossings share one path.
+    public interface ICrossbuckWorld {
+        IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path);
+    }
+    public sealed class BakedSceneryGroups : IScene, IVersionedScene, IRelationshipScene, IConstructionSegmentScene, IDependentOutputScene, IPadMarkerIdentityScene, IDisposable {
         public const string Structure = "baked-scenery-group-v1", ComponentType = "UnityEngine.Transform", RequiredVersion = "0.5.0";
         readonly IGroupWorld world;
         readonly PartHolds holds;
@@ -806,7 +844,17 @@ namespace RailroaderScenePatcher.Core {
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != ComponentType || (identity.Structure != null && identity.Structure != Structure)) return Array.Empty<object>();
-            return world.Find(identity.Scene, identity.Path) ?? Array.Empty<object>();
+            if (identity.PadMarkerId == null) return world.Find(identity.Scene, identity.Path) ?? Array.Empty<object>();
+            // A pad marker id names the crossbucks at the shared path whose crossing's pad holds it.
+            var crossbucks = Crossbucks(identity);
+            return crossbucks.Count < 2 ? Array.Empty<object>() : crossbucks.Where(pair => pair.Value == identity.PadMarkerId).Select(pair => pair.Key).ToArray();
+        }
+        IReadOnlyList<KeyValuePair<object, string>> Crossbucks(TargetIdentity identity) =>
+            (world as ICrossbuckWorld)?.CrossbucksAt(identity.Scene, identity.Path) ?? Array.Empty<KeyValuePair<object, string>>();
+        public string PadMarkerRefusal(TargetIdentity identity) {
+            if (identity.PadMarkerId == null) return null;
+            if (identity.Component != ComponentType || (identity.Structure != null && identity.Structure != Structure)) return TargetIdentity.PadMarkerNotAccepted;
+            return BakedSceneryRules.PadMarkerRefusal(Crossbucks(identity).Count);
         }
         public void Preflight(object target) {
             var refusal = world.Refusal(target);

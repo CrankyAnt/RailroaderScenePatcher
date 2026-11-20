@@ -12,7 +12,7 @@ namespace RailroaderScenePatcher {
     // The native operations of the baked scenery group and part capabilities: the transform and activity of a group root
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // BakedSceneryRules, BakedSceneryGroups and BakedSceneryParts.
-    internal sealed class GroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisableRefusal, IDisposable {
+    internal sealed class GroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IDisposable {
         internal const string SimpleCullerType = "Helpers.SimpleCuller", GameObjectCullerType = "Helpers.Culling.GameObjectCuller";
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
@@ -281,9 +281,19 @@ namespace RailroaderScenePatcher {
             var verdict = VerdictOf(go);
             if (verdict == null) return IsPart(go) ? BakedSceneryRules.Family : null;
             if (verdict.Disposition == GroupDisposition.Group) return BakedSceneryRules.Family;
-            if (verdict.Disposition != GroupDisposition.InspectionOnly) return null;
-            // A group the category table names stands in the family under its category, a crossbuck included.
-            return verdict.Category == null && verdict.Ticket == BakedSceneryRules.CrossbuckTicket ? "Crossbuck" : BakedSceneryRules.Family;
+            return verdict.Disposition == GroupDisposition.InspectionOnly ? BakedSceneryRules.Family : null;
+        }
+        // The listed crossbucks at a hierarchy path, each with the marker id of its crossing's pad. Several stand at one
+        // path where crossings share it, as the three crossings below World/Roads Bryson/Old River Rd do.
+        internal static IReadOnlyList<KeyValuePair<object, string>> Crossbucks(string scene, string path) =>
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && VerdictOf(g) is GroupRootVerdict v && v.Disposition == GroupDisposition.Group && v.Crossbuck)
+                .Select(g => new KeyValuePair<object, string>(g, VerdictOf(g).PadMarkerId)).ToArray();
+        public IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path) => Crossbucks(scene, path);
+        // The pad marker id a crossbuck's target carries: only where other crossbucks share its path, so its path alone
+        // does not name it. Null for every other object.
+        internal static string TargetPadMarkerId(GameObject go) {
+            var verdict = VerdictOf(go);
+            return verdict == null || !verdict.Crossbuck || Crossbucks(go.scene.name, BoardScene.PathOf(go.transform)).Count < 2 ? null : verdict.PadMarkerId;
         }
         // The rule's view of one loaded object; components and children are read once.
         sealed class HierarchyNode : IHierarchyNode {
@@ -317,6 +327,12 @@ namespace RailroaderScenePatcher {
             public bool HasFamily => family ?? (family = Transform.GetComponents<Component>().Any(c => c != null && !(c is Transform) && NativeInventory.FamilyOf(c) != null)).Value;
             public bool Serialized => (Transform.gameObject.hideFlags & HideFlags.DontSave) == 0;
             public bool Animated => driven.Contains(Transform);
+            public string MarkerId {
+                get {
+                    var marker = Transform.GetComponents<Component>().FirstOrDefault(c => c != null && c.GetType().FullName == BakedSceneryRules.Marker);
+                    try { return marker == null ? null : TrackMarkerWorld.Field(marker, "id") as string; } catch { return null; }
+                }
+            }
             public IReadOnlyList<IHierarchyNode> Children {
                 get {
                     if (children == null) { children = new IHierarchyNode[Transform.childCount]; for (var i = 0; i < children.Length; i++) children[i] = new HierarchyNode(Transform.GetChild(i), driven); }

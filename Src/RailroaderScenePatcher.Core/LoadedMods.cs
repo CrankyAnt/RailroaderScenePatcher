@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher.Core {
                     if (!ReferenceEquals(dependent, prerequisite) && dependent.Dependencies.Contains(prerequisite.Source.Identifier, StringComparer.Ordinal))
                         dependencies.Add(Name(dependent.Source) + " declares a dependency on " + Name(prerequisite.Source));
             Dependencies = dependencies;
-            Message = "Supplying mods " + String.Join(", ", Mods.Select(Name)) + " each modify the existing target " + target.Scene + "/" + target.Path + " [" + target.Component + "]. " +
+            Message = "Supplying mods " + String.Join(", ", Mods.Select(Name)) + " each modify the existing target " + target.Label + ". " +
                 "This indicates a possible incompatibility, not a confirmed conflict. " + (dependencies.Count == 0 ? "" : String.Join("; ", dependencies) + "; a dependency does not establish that the changes are compatible. ") +
                 "Application continued in load order; no change was undone and no winner was chosen. Check the mods' descriptions if the result looks wrong.";
         }

@@ -13,7 +13,7 @@ namespace RailroaderScenePatcher.Core {
     public interface ITargetLiveness {
         bool IsLive(object target, TargetIdentity identity);
     }
-    public sealed class SceneCapabilities : IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
+    public sealed class SceneCapabilities : IPadMarkerIdentityScene, IConstructionSegmentScene, IMarkerIdScene, IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IRelationshipScene, ITrackPoseScene, IDerivedStateScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene, IRetainedScene, ITargetLiveness, ITargetedInspectionScene, IPlannedStateScene, ICrossingEquipmentScene, IFramedScene, IMapPatchContext, IDisposable {
         // Supplied by the host: the map patches in the map context, which only the native map editor's context holds.
         public Func<IEnumerable<string>> MapPatches { get; set; }
         public IEnumerable<string> MapPatchIds => MapPatches?.Invoke() ?? Enumerable.Empty<string>();
@@ -56,9 +56,11 @@ namespace RailroaderScenePatcher.Core {
             }
         }
         public IEnumerable<SceneObservation> Discover() => inspection == null ? Enumerable.Empty<SceneObservation>() : inspection.Discover();
+        // A pad marker id is resolved only by a capability that accepts it, so no other capability matches the path alone.
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             var found = new List<object>();
             foreach (var capability in capabilities) {
+                if (identity.PadMarkerId != null && !(capability is IPadMarkerIdentityScene)) continue;
                 foreach (var item in capability.Resolve(identity) ?? Array.Empty<object>()) {
                     // An object claimed by two capabilities appears twice and stays ambiguous.
                     if (item != null) owners[item] = capability;
@@ -67,6 +69,14 @@ namespace RailroaderScenePatcher.Core {
             }
             if (identity.Structure != null && unavailable.TryGetValue(identity.Structure, out var missing)) found.Add(missing);
             return found;
+        }
+        // The structure picks the capability that judges a pad marker id; without one, the first that accepts the identity.
+        public string PadMarkerRefusal(TargetIdentity identity) {
+            if (identity?.PadMarkerId == null) return null;
+            var accepting = capabilities.OfType<IPadMarkerIdentityScene>().ToArray();
+            if (accepting.Length == 0) return TargetIdentity.PadMarkerNotAccepted;
+            var refusals = accepting.Select(c => c.PadMarkerRefusal(identity)).ToArray();
+            return refusals.Any(r => r == null) ? null : refusals.FirstOrDefault(r => r != TargetIdentity.PadMarkerNotAccepted) ?? TargetIdentity.PadMarkerNotAccepted;
         }
         IScene Owner(object target) {
             if (target is Unavailable missing) throw new InvalidOperationException("The patcher cannot edit this object on this game build. Report this to the patcher maintainer. Details: " + missing.Reason);

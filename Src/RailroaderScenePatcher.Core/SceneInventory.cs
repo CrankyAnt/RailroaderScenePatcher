@@ -293,8 +293,7 @@ namespace RailroaderScenePatcher.Core {
                 if (target == null || new[] { "scene", "path", "component" }.Any(k => target[k]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)target[k])) ||
                     (target["structure"] != null && target["structure"].Type != JTokenType.String)) problems.Add("Invalid target identity");
                 else {
-                    matches = Entries.Count(e => e.Identity.Scene == (string)target["scene"] && e.Identity.Path == (string)target["path"] &&
-                        e.Identity.Component == (string)target["component"] && (target["structure"] == null || e.Identity.Structure == (string)target["structure"]));
+                    matches = Entries.Count(e => TargetIdentity.SameObject(target, e.Identity) && (target["structure"] == null || e.Identity.Structure == (string)target["structure"]));
                     if (matches != 1) problems.Add(matches == 0 ? "Target is missing or has no inspection adapter" : "Target is ambiguous");
                 }
                 results.Add(new DefinitionInspection(id, matches, dependencies, problems));
@@ -427,8 +426,7 @@ namespace RailroaderScenePatcher.Core {
             // A capability that failed its game checks resolves to a placeholder; name that cause instead of a changed context.
             (scene as SceneCapabilities)?.CheckAvailable(resolved);
             if (!maps.SequenceEqual(scene.MapIds) || !ReferenceEquals(resolved, observed.Handle) ||
-                identity.Scene != observed.Identity.Scene || identity.Path != observed.Identity.Path ||
-                identity.Component != observed.Identity.Component || (identity.Structure != null && identity.Structure != observed.Identity.Structure) || !(scene is IInspectionScene inspection))
+                !TargetIdentity.SameObject(identity, observed.Identity) || (identity.Structure != null && identity.Structure != observed.Identity.Structure) || !(scene is IInspectionScene inspection))
                 throw new InvalidOperationException("Inspected target context changed; refresh and inspect again");
             if (ComparedNow) { ComparedNow = false; return; }
             // A scene that can observe one object reads the target now and compares it with the inspection. The engine's
@@ -438,7 +436,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!observed.Matches(current)) throw new InvalidOperationException(Changed(observed, current));
                 return;
             }
-            var matches = inspection.Discover().Where(e => e.Identity.Scene == identity.Scene && e.Identity.Path == identity.Path && e.Identity.Component == identity.Component).ToArray();
+            var matches = inspection.Discover().Where(e => TargetIdentity.SameObject(e.Identity, identity)).ToArray();
             if (matches.Length != 1) throw new InvalidOperationException(Changed(matches.Length == 0 ? "missing" : matches.Length + " objects hold its identity"));
             if (!observed.Matches(matches[0])) throw new InvalidOperationException(Changed(observed, matches[0]));
         }

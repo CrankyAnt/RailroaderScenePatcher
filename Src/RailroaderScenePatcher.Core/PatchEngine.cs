@@ -21,13 +21,40 @@ namespace RailroaderScenePatcher.Core {
     public enum Capability { Checked, Unchecked, Incompatible }
     public sealed class TargetIdentity {
         internal TargetIdentity() { }
-        public TargetIdentity(string scene, string path, string component, string structure = null) {
-            Scene = scene; Path = path; Component = component; Structure = structure;
+        public TargetIdentity(string scene, string path, string component, string structure = null, string padMarkerId = null) {
+            Scene = scene; Path = path; Component = component; Structure = structure; PadMarkerId = padMarkerId;
         }
         public string Scene { get; internal set; }
         public string Path { get; internal set; }
         public string Component { get; internal set; }
         public string Structure { get; internal set; }
+        // The marker id of the crossing pad beside a crossbuck whose hierarchy path several crossbucks share, as the
+        // crossbucks of the three crossings below World/Roads Bryson/Old River Rd do; null for every other target. It
+        // stands beside the path, which stays the raw hierarchy path.
+        public string PadMarkerId { get; internal set; }
+        public const string PadMarkerMember = "padMarkerId";
+        // Why a scene refuses a target with a pad marker id, when it names no crossbuck at a shared path.
+        public const string PadMarkerNotAccepted = "padMarkerId identifies only a crossbuck at an unprotected crossing whose path other crossbucks share. Remove padMarkerId from this target";
+        // Whether a target object of a scene patch file names this identity's object: the same scene, path, component
+        // and pad marker id. The structure is compared by the caller.
+        internal static bool SameObject(JObject target, TargetIdentity identity) =>
+            target != null && identity != null && (string)target["scene"] == identity.Scene && (string)target["path"] == identity.Path && (string)target["component"] == identity.Component
+            && (target[PadMarkerMember]?.Type == JTokenType.String ? (string)target[PadMarkerMember] : null) == identity.PadMarkerId;
+        // The identity for a message: scene and path, the pad marker id where it has one, and the component.
+        public string Label => Scene + "/" + Path + (PadMarkerId == null ? "" : " (pad marker " + PadMarkerId + ")") + " [" + Component + "]";
+        public static bool SameObject(TargetIdentity a, TargetIdentity b) =>
+            a != null && b != null && a.Scene == b.Scene && a.Path == b.Path && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId;
+        // The target object of a scene patch file for this identity.
+        internal JObject ToJson() {
+            var value = new JObject { ["scene"] = Scene, ["path"] = Path, ["component"] = Component };
+            if (Structure != null) value["structure"] = Structure;
+            if (PadMarkerId != null) value[PadMarkerMember] = PadMarkerId;
+            return value;
+        }
+    }
+    // A scene that accepts a pad marker id beside a target's path: it says why it refuses the identity, or null.
+    public interface IPadMarkerIdentityScene {
+        string PadMarkerRefusal(TargetIdentity identity);
     }
     public sealed class Placement {
         internal Placement() { }
@@ -230,7 +257,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var target in resolutionOrder.ToArray()) {
                 var identity = identities[target];
                 bool present;
-                try { present = (scene.Resolve(identity) ?? Array.Empty<object>()).Any(m => ReferenceEquals(m, target)) || (scene as IRetainedScene)?.Unsettled(target) == true; }
+                try { present = (Matches(identity) ?? Array.Empty<object>()).Any(m => ReferenceEquals(m, target)) || (scene as IRetainedScene)?.Unsettled(target) == true; }
                 catch (Exception e) { failures.Add(Describe(identity) + ": the retained object could not be checked, so its state is kept: " + e.Message); retained++; continue; }
                 if (present) { retained++; continue; }
                 try { (scene as IRetainedScene)?.Release(target); }
@@ -241,7 +268,7 @@ namespace RailroaderScenePatcher.Core {
             }
             return new ReentryResult(retained, released, failures);
         }
-        static string Describe(TargetIdentity identity) => identity.Scene + "/" + identity.Path + " [" + identity.Component + "]";
+        static string Describe(TargetIdentity identity) => identity.Label;
         public ScenePatchFileResult Apply(string json) { return Apply(json, ""); }
         public ScenePatchFileResult Apply(string json, string scenePatchFileKey) {
             return Apply(json, scenePatchFileKey, null);
@@ -315,7 +342,7 @@ namespace RailroaderScenePatcher.Core {
                 // A prerequisite missing at OnEnable is not yet a failed runtime attempt. The definitive world-load
                 // application still owns invalid-definition reporting and the existing guarded-failure policy.
                 try {
-                    var matches = scene.Resolve(identity);
+                    var matches = Matches(identity);
                     if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target is not yet unique and available");
                     scene.Preflight(matches[0]);
                     CheckRelationships(matches[0], parsed.State);
@@ -368,7 +395,8 @@ namespace RailroaderScenePatcher.Core {
                 var identity = parsed.Identity;
                 outcome.Target = identity;
                 Observe("resolve", scenePatchFileKey, id, identity.Path);
-                var matches = scene.Resolve(identity);
+                IReadOnlyList<object> matches;
+                try { matches = Matches(identity); } catch (InvalidOperationException) { outcome.Cause = FailureCause.InvalidDefinition; throw; }
                 if (matches == null || matches.Count != 1 || matches[0] == null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException("Target must resolve uniquely"); }
                 var resolved = matches[0];
                 Track(identity, resolved);
@@ -447,8 +475,17 @@ namespace RailroaderScenePatcher.Core {
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;
         internal object ResolveUnique(TargetIdentity identity) { return ResolveOverride != null ? ResolveOverride(identity) : ResolveFresh(identity); }
+        // The objects the identity names. A pad marker id names a crossbuck at a shared path; every other target refuses
+        // it with the reason, before anything is resolved.
+        IReadOnlyList<object> Matches(TargetIdentity identity) {
+            if (identity.PadMarkerId != null) {
+                var refusal = scene is IPadMarkerIdentityScene accepting ? accepting.PadMarkerRefusal(identity) : TargetIdentity.PadMarkerNotAccepted;
+                if (refusal != null) throw new InvalidOperationException(refusal);
+            }
+            return scene.Resolve(identity);
+        }
         internal object ResolveFresh(TargetIdentity identity) {
-            var matches = scene.Resolve(identity);
+            var matches = Matches(identity);
             if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target must resolve uniquely");
             Track(identity, matches[0]);
             return matches[0];
@@ -457,7 +494,7 @@ namespace RailroaderScenePatcher.Core {
         // and for an edit in scene patch editing the same inspected observation.
         internal void GuardMutation(TargetIdentity identity, object resolved, string[] mapContext, InspectedTarget expected) {
             scene.Preflight(resolved);
-            var current = scene.Resolve(identity);
+            var current = Matches(identity);
             if (current == null || current.Count != 1 || !ReferenceEquals(current[0], resolved))
                 throw new InvalidOperationException("Target changed before mutation; refresh and inspect again");
             if (!mapContext.SequenceEqual(scene.MapIds))
@@ -514,7 +551,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // Whether the object was resolved under this identity. An identity without a structure matches any structure.
         bool ResolvedUnder(object target, TargetIdentity identity) =>
-            identities.TryGetValue(target, out var known) && known.Scene == identity.Scene && known.Path == identity.Path && known.Component == identity.Component
+            identities.TryGetValue(target, out var known) && TargetIdentity.SameObject(known, identity)
             && (known.Structure == null || identity.Structure == null || known.Structure == identity.Structure);
         // The refusal of an operation on a guarded target: a restored target that waits for its dependent output is
         // not an incomplete cleanup and needs no Recheck; any other guard is.
@@ -642,8 +679,9 @@ namespace RailroaderScenePatcher.Core {
             } catch (InvalidOperationException e) { return e.Message; }
         }
         internal static TargetIdentity ParseTarget(JObject target) {
-            if (target == null || !Only(target, "scene", "path", "component", "structure") || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)) throw new InvalidOperationException("Invalid or unsupported target");
-            return new TargetIdentity { Scene=(string)target["scene"], Path=(string)target["path"], Component=(string)target["component"], Structure=(string)target["structure"] };
+            if (target == null || !Only(target, "scene", "path", "component", "structure", TargetIdentity.PadMarkerMember) || !RequiredString(target,"scene") || !RequiredString(target,"path") || !RequiredString(target,"component") || (target["structure"] != null && target["structure"].Type != JTokenType.String)
+                || (target[TargetIdentity.PadMarkerMember] != null && !RequiredString(target, TargetIdentity.PadMarkerMember))) throw new InvalidOperationException("Invalid or unsupported target");
+            return new TargetIdentity { Scene=(string)target["scene"], Path=(string)target["path"], Component=(string)target["component"], Structure=(string)target["structure"], PadMarkerId=(string)target[TargetIdentity.PadMarkerMember] };
         }
         internal static Placement CheckPlacement(double[] position, double[] rotation) {
             if (position == null || rotation == null || position.Length != 3 || rotation.Length != 4) throw new InvalidOperationException("Invalid placement coordinates");

@@ -162,11 +162,12 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<OutlineNode> Categories(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory, string search) {
             rows = rows ?? Array.Empty<SceneObservation>();
             var all = (inventory ?? rows).Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family).ToArray();
-            string GroupKey(string scene, string path) => scene + "\n" + path;
+            // The crossbucks of crossings that share one path differ by their crossing's pad marker id.
+            string GroupKey(string scene, string path, string padMarkerId = null) => scene + "\n" + path + (padMarkerId == null ? "" : "\n" + padMarkerId);
             var groups = new Dictionary<string, OutlineNode>(StringComparer.Ordinal);
             var order = new List<OutlineNode>();
             OutlineNode Group(SceneObservation row, string scene, string path, bool context) {
-                var key = GroupKey(scene, path);
+                var key = GroupKey(scene, path, row?.Identity.PadMarkerId);
                 if (!groups.TryGetValue(key, out var node)) {
                     groups[key] = node = new OutlineNode { Key = key, Label = row?.DisplayName ?? path.Substring(path.LastIndexOf('/') + 1), Row = row, Context = context, Where = GroupWhere(path) };
                     order.Add(node);
@@ -305,8 +306,7 @@ namespace RailroaderScenePatcher {
         internal SceneObservation CurrentSelection(SceneInventory inventory, SceneObservation previous) {
             if (previous == null) return null;
             var matches = inventory.Entries.Where(item => ReferenceEquals(item.Handle, previous.Handle) &&
-                item.Identity.Scene == previous.Identity.Scene && item.Identity.Path == previous.Identity.Path &&
-                item.Identity.Component == previous.Identity.Component && item.Identity.Structure == previous.Identity.Structure).Take(2).ToArray();
+                TargetIdentity.SameObject(item.Identity, previous.Identity) && item.Identity.Structure == previous.Identity.Structure).Take(2).ToArray();
             // Two observations can share handle and identity: one object with two components of a type, as some CTC
             // objects have. The inspected one is then the entry itself, or the entry that reads the same.
             if (matches.Length <= 1) return matches.Length == 1 ? matches[0] : null;

@@ -77,7 +77,7 @@ namespace RailroaderScenePatcher.Core {
                 return new InspectedTarget(maps, observed);
             }
             var inventory = new SceneInventory((IInspectionScene)scene); inventory.Refresh();
-            var observation = inventory.Entries.Single(o => ReferenceEquals(o.Handle, target) && o.Identity.Scene == identity.Scene && o.Identity.Path == identity.Path && o.Identity.Component == identity.Component);
+            var observation = inventory.Entries.Single(o => ReferenceEquals(o.Handle, target) && TargetIdentity.SameObject(o.Identity, identity));
             return inventory.Pin(observation);
         }
         public Outcome Complete() {

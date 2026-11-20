@@ -679,7 +679,7 @@ namespace RailroaderScenePatcher {
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell || icon || spawnPoint);
             if (only != null) markerEditable = false;
             var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
-            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? CommandBand.GroupOperations : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
+            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
                 : bridge ? (bridgeRefusal == null ? "Move, rotate, enable or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? CommandBand.MarkerOperations
                 : marked ? CommandBand.NotEditable(markerRefusal)
@@ -703,11 +703,16 @@ namespace RailroaderScenePatcher {
                 operations = CommandBand.AddedEquipmentOperations(displayName);
             }
             // A mast and a bell are named with their crossing, which tells the masts of several crossings apart.
+            // A crossbuck is named with its crossing, which tells the 52 crossbucks of the base map apart.
+            string padMarkerId = null;
+            if (groupRoot && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = BakedSceneryRules.CrossbuckName(verdict.Path, padMarkerId); });
             if ((mast || ownBell) && controller != null) Read(() => displayName = go.name + " at " + CrossingEquipment.Place(controller.gameObject.name, Ancestors(controller.transform)));
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
-                var holders = BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
+                // A crossbuck that a pad marker id identifies counts the crossbucks at its path that hold that id.
+                var holders = padMarkerId != null ? GroupWorld.Crossbucks(go.scene.name, BoardScene.PathOf(go.transform)).Count(pair => pair.Value == padMarkerId)
+                    : BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
                 var shared = CommandBand.SharedPath(holders);
                 if (shared != null) { structure = null; operations = CommandBand.NotEditable(shared); }
             });
@@ -731,7 +736,7 @@ namespace RailroaderScenePatcher {
             if (structure != null && CommandBand.GroundMaskMoveBlock(dependencies) != null) operations = CommandBand.OperationsWithoutMove(operations);
             var notes = problems.Where(BindingRules.IsNote).ToArray();
             var defects = BindingRules.Problems(enabled, problems.Where(line => !BindingRules.IsNote(line)), anyway.Where(line => !BindingRules.IsNote(line)));
-            return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure), family,
+            return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
                 category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1],

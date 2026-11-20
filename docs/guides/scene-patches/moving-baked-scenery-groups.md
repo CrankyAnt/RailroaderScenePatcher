@@ -21,7 +21,7 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to crossbucks at unprotected crossings and to groups containing a station click spot, map icon or car loader. The `Coal Loader` group at Robinson Gap Mine holds a car loader and stays `inspection only`: the game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
+Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot, map icon or car loader. The `Coal Loader` group at Robinson Gap Mine holds a car loader and stays `inspection only`: the game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
 Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
@@ -190,6 +190,32 @@ The 60-metre bridge at US19 Gov Island stands beside the grade-crossing setup of
 
 Two smoke decals at Dillsboro, `World/Roads Dillsboro/Bridge Smoke Decal Projector` and `Bridge Smoke Decal Projector (1)`, stand 9 m from the root of `Dillsboro Road Bridge 1` and 4 m from the root of `Old Home Town Road Bridge`, and are expected to darken those bridges above the track. They are scene objects of their own beside the bridges, not parts of them, and the patcher does not list them because a decal projector has no renderer, collider or light. A moved bridge is expected to leave its soot decal at the old place. Not yet observed in Railroader.
 
+## Crossbucks at unprotected crossings
+
+You can move, rotate or disable a crossbuck at an unprotected crossing so that it stands beside the road where you moved the road or track in the native map editor. Each crossbuck is its own group under **Baked scenery group** > **Grade crossing**, wherever its crossing stands below `World`, such as `World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)`. Its row names the crossbuck at its crossing, for example `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville`, followed by its location, `Roads Andrews / Crossing Unprotected - Robbinsville`. To find a crossing's crossbucks, search the outliner for the crossing's name. The row's tooltip shows the full path. A crossbuck is one entry: its model and LOD levels have no rows of their own.
+
+A crossbuck uses fixed placement and **Enabled**. Move it as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor), and disable it as described in [disable or enable a group](#disable-or-enable-a-group). Only the crossbuck changes. The crossing pad, the whistle signs and the other crossbuck of the crossing keep their own families and stay where they are. To rebind the pad, see [rebind crossing pads](rebinding-crossing-pads.md); to move a whistle sign, see [repair track bindings](repairing-track-bindings.md).
+
+Each crossbuck carries a renderer culler on its root. The patcher moves the culler's sphere to the crossbuck and keeps its radius. Disabling the crossbuck releases its sphere, and enabling it registers the sphere again.
+
+On the **Object** tab, **Use in the game** says that the crossbuck is decorative: the game reads nothing from it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place, so moving or disabling a crossbuck changes no game function.
+
+### Crossings that share one path
+
+The three unprotected crossings below `World/Roads Bryson/Old River Rd` have the same name, `Crossing Unprotected`, so their crossbucks share one hierarchy path. The patcher tells them apart by the marker ID of each crossing's pad, `Mbkd`, `M0sh` or `Mgdu`. The target keeps the hierarchy path and names the ID in its own member, `padMarkerId`:
+
+```json
+"target": {
+  "scene": "<scene from the inspected identity>",
+  "path": "World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (1)",
+  "component": "UnityEngine.Transform",
+  "structure": "baked-scenery-group-v1",
+  "padMarkerId": "Mbkd"
+}
+```
+
+The outliner shows the ID in the row's name, for example `Sign-Crossing0 (1) at Crossing Unprotected (pad marker Mbkd)`. On the **Object** tab, **Identity** shows it as **Pad marker ID** below the path, and **Copy ID** copies it as `padMarkerId` beside the path. Without `padMarkerId`, the path names all three crossbucks, so the modification fails before anything changes. A `padMarkerId` that matches no pad of a crossing at that path names no crossbuck and fails too. A crossbuck whose crossing's name is its own is named by its path alone: its target refuses `padMarkerId`, and so does every target that is no crossbuck.
+
 ## Write the modification by hand
 
 Click **Copy ID** in the command band to copy the identity. Add a modification under a key of your choice in the `modifications` object of `Data/scene-patches.json`, as described in [scene patch file v1](scene-patch-file-v1.md):
@@ -262,7 +288,7 @@ Grass and other terrain detail under a group come from the terrain and its masks
 
 Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. In those runs Bryson Yard was still listed as one group: it moved with all its posts and lamps, and no part remained at its old position. Bryson Yard is now a folder, and each of its lamp posts is its own group. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
 
-The runs did not cover other groups, groups with game logic or terrain shaping, or multiplayer.
+The runs did not cover other groups, groups with game logic or terrain shaping, or multiplayer. Crossbuck edits have not yet been observed in Railroader; automated tests check them with controlled crossbucks, cullers, pads and whistle signs, including the crossings below Old River Rd.
 
 The ground mask behavior of the station and depot groups has not been run in Railroader. Automated tests use a controlled mask and terrain system. They check the rebuild, the terrain output of the old and the new place, the flattening refusal, the Hemingway track marker, restoration, Undo, Redo, Save and reload. Not yet observed in the game: whether the rebuilt mask regenerates terrain and vegetation at the new place, whether the old place returns to its former state, and whether the terrain height returns after Undo and removal.
 

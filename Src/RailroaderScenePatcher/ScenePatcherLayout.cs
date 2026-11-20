@@ -723,6 +723,10 @@ namespace RailroaderScenePatcher {
             Field(builder, "Structure", selected.Identity.Structure ?? "none");
             FieldLabel(builder, "Path");
             PlainLabel(builder, Breakable(selected.Identity.Path));
+            // A crossbuck whose path other crossbucks share is named by its crossing's pad marker id beside the path.
+            if (selected.Identity.PadMarkerId != null)
+                Field(builder, "Pad marker ID", selected.Identity.PadMarkerId)
+                    .Tooltip("Pad marker ID", "The marker ID of this crossing's pad. Other crossbucks share this path, so the scene patch file names this crossbuck by its path and this ID.");
             Section(builder, "Dependencies");
             if (selected.Dependencies.Count == 0) Line(builder, "None observed", null, null);
             foreach (var line in selected.Dependencies) PlainLabel(builder, Breakable(line));

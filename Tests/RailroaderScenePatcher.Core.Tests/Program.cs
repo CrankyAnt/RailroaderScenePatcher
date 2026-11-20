@@ -311,6 +311,7 @@ class Program {
         BakedSceneryTests.Run();
         BakedCategoryTests.Run();
         BakedPartTests.Run();
+        CrossbuckTests.Run();
         IndustryObjectTests.Run();
         LakeSurfaceTests.Run();
         StationMapIconTests.Run();

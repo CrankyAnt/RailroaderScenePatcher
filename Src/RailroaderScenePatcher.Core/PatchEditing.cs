@@ -217,8 +217,7 @@ namespace RailroaderScenePatcher.Core {
         public static string CopyId(IEnumerable<string> mapIds, SceneObservation entry) => CopyId(SceneTargetMapFor(mapIds), entry);
         static string CopyId(string sceneTargetMap, SceneObservation entry) {
             if (entry == null) throw new ArgumentNullException(nameof(entry));
-            var target = new JObject { ["scene"] = entry.Identity.Scene, ["path"] = entry.Identity.Path, ["component"] = entry.Identity.Component };
-            if (entry.Identity.Structure != null) target["structure"] = entry.Identity.Structure;
+            var target = entry.Identity.ToJson();
             return new JObject {
                 ["sourceMap"] = new JObject { ["mapId"] = sceneTargetMap },
                 ["target"] = target,
@@ -263,6 +262,8 @@ namespace RailroaderScenePatcher.Core {
                 if (scenePatchFile == null) return minimum;
                 foreach (var item in scenePatchFile.Items) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
+                    // A crossbuck that its crossing's pad marker id names needs the crossbuck identity.
+                    if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
                     // Track-following placement needs its capability whether or not it is available on this build.
@@ -315,7 +316,7 @@ namespace RailroaderScenePatcher.Core {
             if (scenePatchFile == null || target == null) return false;
             foreach (var item in scenePatchFile.Items) {
                 var other = item["target"] as JObject;
-                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (other == null || !TargetIdentity.SameObject(other, target)) continue;
                 var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
                 if ((structure == null || target.Structure == null || structure == target.Structure) && item["active"] != null && item["active"].Type != JTokenType.Null) return true;
             }
@@ -491,7 +492,7 @@ namespace RailroaderScenePatcher.Core {
         const int ReconcileResolveInterval = 40;
         int reconciliations;
         object ReconcileTarget(TargetIdentity identity) {
-            var key = identity.Scene + "|" + identity.Path + "|" + identity.Component + "|" + identity.Structure;
+            var key = identity.Scene + "|" + identity.Path + "|" + identity.Component + "|" + identity.Structure + "|" + identity.PadMarkerId;
             if (scene is ITargetLiveness liveness && reconciled.TryGetValue(key, out var known) && reconciliations - known.Value < ReconcileResolveInterval && liveness.IsLive(known.Key, identity)) return known.Key;
             reconciled.Remove(key);
             var resolved = engine.ResolveFresh(identity);
@@ -606,7 +607,7 @@ namespace RailroaderScenePatcher.Core {
         void FollowUpdate(object target, ObjectState state) { if (scene is IFollowUpdateScene follow) follow.ApplyFollowUpdate(target, state); else scene.Apply(target, state); }
         static string TargetKey(JObject item) {
             var target = item["target"] as JObject;
-            return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"];
+            return target == null ? null : (string)target["scene"] + "\n" + (string)target["path"] + "\n" + (string)target["component"] + "\n" + (string)target[TargetIdentity.PadMarkerMember];
         }
         // Sets, replaces or detaches this mod's track-marker relationship of the object. Placement and activity keep their mod values.
         // A null binding clears the mod's relationship: the object returns to its effective underlying relationship.
@@ -678,7 +679,7 @@ namespace RailroaderScenePatcher.Core {
             if (scenePatchFile == null || target == null) return false;
             foreach (var item in scenePatchFile.Items) {
                 var other = item["target"] as JObject;
-                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (other == null || !TargetIdentity.SameObject(other, target)) continue;
                 if (item[ReplacementMarkerIds.Member] != null) return true;
             }
             return false;
@@ -748,7 +749,7 @@ namespace RailroaderScenePatcher.Core {
             if (scenePatchFile == null || target == null) return false;
             foreach (var item in scenePatchFile.Items) {
                 var other = item["target"] as JObject;
-                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (other == null || !TargetIdentity.SameObject(other, target)) continue;
                 if (item["relationships"]?["constructionSegments"] != null) return true;
             }
             return false;
@@ -1060,7 +1061,7 @@ namespace RailroaderScenePatcher.Core {
             if (scenePatchFile == null || target == null) return false;
             foreach (var item in scenePatchFile.Items) {
                 var other = item["target"] as JObject;
-                if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) continue;
+                if (other == null || !TargetIdentity.SameObject(other, target)) continue;
                 if (item["starterPlacement"]?[member] != null) return true;
             }
             return false;
@@ -1388,7 +1389,7 @@ namespace RailroaderScenePatcher.Core {
         public string Refusal(TargetIdentity target) { var failure = NotApplied(target); return failure?.Kind == FailureKind.Refused ? failure.Reason : null; }
         static bool Targets(JObject item, TargetIdentity target) {
             var other = item["target"] as JObject;
-            if (other == null || (string)other["scene"] != target.Scene || (string)other["path"] != target.Path || (string)other["component"] != target.Component) return false;
+            if (other == null || !TargetIdentity.SameObject(other, target)) return false;
             var structure = other["structure"]?.Type == JTokenType.String ? (string)other["structure"] : null;
             return structure == null || target.Structure == null || structure == target.Structure;
         }
@@ -1512,11 +1513,7 @@ namespace RailroaderScenePatcher.Core {
             for (var n = 2; used.Contains(id); n++) id = stem + "-" + n;
             return id;
         }
-        static JObject TargetJson(TargetIdentity target) {
-            var value = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
-            if (target.Structure != null) value["structure"] = target.Structure;
-            return value;
-        }
+        static JObject TargetJson(TargetIdentity target) => target.ToJson();
         // The placement tolerances of the scene adapters' own verification. A wider angle here would count a following object
         // as current after its track turned by less than that angle, and the object would not follow.
         const double AngleToleranceDegrees = 0.01;

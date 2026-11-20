@@ -33,15 +33,14 @@ namespace RailroaderScenePatcher.Core {
         public bool Equals(SelectionIdentity other) {
             if (other == null || Kind != other.Kind) return false;
             if (Target == null) return Identifier == other.Identifier;
-            return Target.Scene == other.Target.Scene && Target.Path == other.Target.Path &&
-                Target.Component == other.Target.Component && Target.Structure == other.Target.Structure;
+            return TargetIdentity.SameObject(Target, other.Target) && Target.Structure == other.Target.Structure;
         }
 
         public override bool Equals(object other) => Equals(other as SelectionIdentity);
         public override int GetHashCode() => Kind.GetHashCode() ^ (Identifier ?? Target.Path).GetHashCode();
         public override string ToString() => Target == null
             ? (Kind == SelectionKind.TrackSegment ? "Track segment " : "Track node ") + Identifier
-            : Target.Scene + "/" + Target.Path + " [" + Target.Component + "]";
+            : Target.Label;
     }
 
     public sealed class SelectionCandidate {

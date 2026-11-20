@@ -21,7 +21,7 @@ namespace RailroaderScenePatcher.Core {
             DiagnosticKey = diagnosticKey; ModIdentifier = mod.Identifier; Operation = operation; ObjectPath = target?.Path; Cause = cause;
             ReportTo = cause == FailureCause.InvalidDefinition ? "mod author" : "patcher maintainer";
             Message = (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + "; version " + (mod.Version ?? "not supplied") + "]. Definition Data/scene-patches.json; operation " + operation +
-                "; object " + (target == null ? "not resolved" : target.Scene + "/" + target.Path + " [" + target.Component + "]") + ". " + error +
+                "; object " + (target == null ? "not resolved" : target.Label) + ". " + error +
                 ". Patcher " + patcherVersion + "; game " + gameVersion + ". Report to the " + ReportTo + ".";
             if (!String.IsNullOrWhiteSpace(mod.Author)) Message += " Mod author: " + mod.Author + ".";
             if (Uri.TryCreate(mod.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + mod.Website + ".";

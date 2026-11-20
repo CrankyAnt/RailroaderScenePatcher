@@ -15,6 +15,7 @@ class Node : IHierarchyNode {
     public bool HasFamily { get; set; }
     public bool LodLevel { get; set; }
     public bool Animated { get; set; }
+    public string MarkerId { get; set; }
     public IReadOnlyList<string> Components => Own;
     public IReadOnlyList<IHierarchyNode> Children => Kids;
     public Node(string name, params Node[] children) { Name = name; Kids.AddRange(children); }
@@ -23,6 +24,7 @@ class Node : IHierarchyNode {
     public Node Family() { HasFamily = true; return this; }
     public Node Lod() { LodLevel = true; return this; }
     public Node Driven() { Animated = true; return this; }
+    public Node Id(string id) { MarkerId = id; return this; }
 }
 // Quaternions in x, y, z, w order for the controlled worlds.
 static class Turn {
@@ -110,7 +112,7 @@ class FakeRegistration { public FakeCuller Culler; public CullerKind Kind; publi
 // Controlled world: map coordinates are scene coordinates plus Origin on X. A culling refresh moves every culler of an
 // active group to where it stands; a disabled group holds no culling registration. The world runs the real own-culling
 // controller over controlled cullers, culling managers, renderers and lists.
-class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable, IDisableRefusal {
+class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisposable, IDisableRefusal {
     // Why an explicit disable cannot hold, as GroupWorld refuses it while the game's switch members are unavailable.
     public string DisableRefused;
     public string DisableRefusal(object target) => DisableRefused;
@@ -187,6 +189,11 @@ class FakeGroupWorld : IGroupWorld, IConstructionSegmentWorld, IDisposable, IDis
     public Dictionary<string, GroupRootVerdict> GroupVerdicts;
     GroupRootVerdict GroupVerdict(string path) => GroupVerdicts != null && path != null && GroupVerdicts.TryGetValue(path, out var verdict) ? verdict : null;
     string PathOf(object handle) => Objects.FirstOrDefault(pair => pair.Value.Contains(handle)).Key;
+    // The listed crossbucks at a hierarchy path, each with the marker id of its crossing's pad, as GroupWorld.CrossbucksAt
+    // reads them.
+    public Dictionary<string, List<KeyValuePair<object, string>>> CrossbuckIds = new Dictionary<string, List<KeyValuePair<object, string>>>();
+    public IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path) =>
+        CrossbuckIds.TryGetValue(path, out var found) ? found : new List<KeyValuePair<object, string>>();
     public IReadOnlyList<object> Find(string scene, string path) {
         if (GroupVerdicts != null && !BakedSceneryRules.ResolvesGroup(GroupVerdict(path), path)) return new List<object>();
         return Objects.TryGetValue(path, out var found) ? found : new List<object>();
@@ -646,11 +653,11 @@ static class BakedSceneryTests {
         Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Grade Crossing Setup")?.Disposition == GroupDisposition.ExistingFamily, "The crossing in the folder keeps its family");
         Assert(At(verdicts, "World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m") is GroupRootVerdict island && island.Disposition == GroupDisposition.Group && island.Subcategory == BakedSceneryCategories.RoadBridges, "The road bridge in the folder is a group root under Road bridges");
         var crossbucks = verdicts.Where(v => v.Path.StartsWith("World/Roads Bryson/Old River Rd/", StringComparison.Ordinal) && v.Path.EndsWith(")", StringComparison.Ordinal)).ToArray();
-        Assert(At(verdicts, "World/Roads Bryson/Old River Rd") == null && crossbucks.Length == 6 && crossbucks.All(v => v.Disposition == GroupDisposition.InspectionOnly && v.Ticket == "#107"),
-            "Old River Rd is a folder of three unprotected crossings, whose six crossbucks are inspection only for #107");
+        Assert(At(verdicts, "World/Roads Bryson/Old River Rd") == null && crossbucks.Length == 6 && crossbucks.All(v => v.Disposition == GroupDisposition.Group && v.Crossbuck && v.Category == BakedSceneryCategories.GradeCrossing),
+            "Old River Rd is a folder of three unprotected crossings, whose six crossbucks are groups under Grade crossing");
         var single = verdicts.Where(v => v.Path.StartsWith("World/Roads Bryson/Crossing Unprotected (1)/", StringComparison.Ordinal)).ToArray();
-        Assert(single.Count(v => v.Disposition == GroupDisposition.ExistingFamily) == 3 && single.Count(v => v.Ticket == "#107") == 2 && At(verdicts, "World/Roads Bryson/Crossing Unprotected (1)") == null,
-            "The pad and whistle signs of an unprotected crossing keep their families and its crossbucks wait for #107");
+        Assert(single.Count(v => v.Disposition == GroupDisposition.ExistingFamily) == 3 && single.Count(v => v.Crossbuck && v.Disposition == GroupDisposition.Group) == 2 && At(verdicts, "World/Roads Bryson/Crossing Unprotected (1)") == null,
+            "The pad and whistle signs of an unprotected crossing keep their families and its crossbucks are groups of their own");
         Assert(At(verdicts, "World/Large Scenery/Bryson/Station Yard")?.Disposition == GroupDisposition.InspectionOnly, "A group that holds a pad among other parts is no crossing folder");
     }
     // Every candidate that is no group comes back with the coverage rule that keeps it out, so evidence can explain it.

@@ -61,12 +61,11 @@ static class CommandBandTests {
             "A group with a map icon reads Not editable as a group: " + CommandBand.GroupInspectionOnly(icon, family));
         Check(CommandBand.GroupInspectionOnly(Verdict("Platform", new Node("Deck").Solid()), family) == null, "A listed group is not inspection only");
         Check(CommandBand.GroupInspectionOnly(null, family) == "Not yet supported: this baked scenery group cannot be edited", "A group without a verdict waits for support");
-        // A reason that names a kind, as a crossbuck's does, waits for support under its ticket.
+        // A crossbuck is a listed group of its own, not inspection only.
         var crossbuck = BakedSceneryRules.Classify(new Node("World", new Node("Roads Bryson", new Node("Crossing Unprotected",
             new Node("Crossing Pad").With("Track.TrackMarker", "Track.TrackCurveMeshBuilder").Solid().Family(), new Node("Sign-Crossing0 (1)", new Node("LOD0").Solid()).With("Helpers.Culling.RendererCuller")))))
             .Single(v => v.Path.EndsWith("Sign-Crossing0 (1)", StringComparison.Ordinal));
-        Check(crossbuck.Ticket == BakedSceneryRules.CrossbuckTicket && !crossbuck.ReasonIsSentence && CommandBand.GroupInspectionOnly(crossbuck, family) == "Not yet supported: crossbucks at unprotected crossings cannot be edited",
-            "A kind a ticket covers keeps Not yet supported: " + CommandBand.GroupInspectionOnly(crossbuck, family));
+        Check(crossbuck.Ticket == null && crossbuck.Crossbuck && CommandBand.GroupInspectionOnly(crossbuck, family) == null, "A crossbuck is a listed group: " + CommandBand.GroupInspectionOnly(crossbuck, family));
     }
     static void QueuingGizmoSetupKeepsTheConnectionsPreview() {
         Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");

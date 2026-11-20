@@ -737,7 +737,7 @@ namespace RailroaderScenePatcher {
             if (replayFrame != 0 && Time.frameCount >= replayFrame) {
                 replayFrame = 0;
                 if (inventory != null) foreach (var identity in replayed.ToArray()) {
-                    var entry = inventory.Entries.FirstOrDefault(e => e.Identity.Scene == identity.Scene && e.Identity.Path == identity.Path && e.Identity.Component == identity.Component);
+                    var entry = inventory.Entries.FirstOrDefault(e => TargetIdentity.SameObject(e.Identity, identity));
                     var updated = entry == null ? null : inventory.ReobserveRelated(entry);
                     // An Undo or Redo of this patcher's step: the fields show the object, and an open equipment form its addition, as they are now.
                     if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) { ReadPlacement(); ReadOpenEquipment(); } }

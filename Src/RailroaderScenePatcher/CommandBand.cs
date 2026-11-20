@@ -298,6 +298,11 @@ namespace RailroaderScenePatcher {
         // The supported edits of a group root of the Baked scenery group family.
         internal const string GroupOperations = "Move, rotate, enable or disable the whole group. Its parts move with it.";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
+        // The supported edits of a crossbuck of an unprotected crossing, a group of its own under Grade crossing, and
+        // what the game uses it for: nothing reads it. The auto engineer's crossing horn reads the crossing's
+        // Crossing-type pad marker, which keeps its own family.
+        internal const string CrossbuckOperations = "Move, rotate, enable or disable this crossbuck. The crossing pad, the whistle signs and the other crossbuck stay in place.";
+        internal const string CrossbuckUse = "Decorative. The crossbuck marks the crossing for road users, and the game reads nothing from it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place, so moving or disabling the crossbuck changes no game function.";
         // The supported edits of a part of a listed baked scenery group.
         internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
         internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
@@ -309,6 +314,8 @@ namespace RailroaderScenePatcher {
         // holdsPiles: the group root or part holds storage piles below it.
         internal static string UseInGame(bool part, string category, string storage, bool holdsPiles) {
             if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile does not change the storage, and the industry keeps working on its native track spans.";
+            // Only crossbucks stand under Grade crossing in the family.
+            if (!part && category == BakedSceneryCategories.GradeCrossing) return CrossbuckUse;
             if (category != BakedSceneryCategories.IndustryBuilding && category != BakedSceneryCategories.StorageDisplay) return part ? PartDecorative : Decorative;
             return "Decorative. The industry works on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " does not change loading or unloading." +
                 (holdsPiles ? " Its piles keep showing the industry's storage." : "");

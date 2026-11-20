@@ -45,7 +45,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 
 | Field | Type | Requirement |
 | --- | --- | --- |
-| `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. |
+| `target` | object | Required. Must contain `scene`, `path`, and `component`. Optional `structure` is a string. Optional `padMarkerId` is a non-empty string that names a crossbuck whose path other crossbucks share; see [Baked scenery group](#baked-scenery-group). |
 | `markerId` | string | Optional. The replacement ID of a generic track marker. Requires patcher 0.5.0 or later; see Replacement ID below. |
 | `placement` | object | Optional. A fixed placement contains `mode`, `position` and `rotation`; a track-following placement contains `mode`, `track`, `offset` and `rotation`. See Placement below. |
 | `active` | boolean | Optional. `false` disables the object, `true` enables it. Generic activity requires patcher 0.2.0 or later; track-marker activity requires 0.5.0 or later. |
@@ -53,7 +53,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | `starterPlacement` | object | Optional. Sets a starter placement marker's track location, whether its starting cars are a wreck, or both. See Starter placement below. Requires patcher 0.5.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same scene patch file. |
 
-The target object accepts only `scene`, `path`, `component`, and optional `structure`. All required target strings must be non-empty. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
+The target object accepts only `scene`, `path`, `component`, and optional `structure` and `padMarkerId`. All required target strings must be non-empty, and so must `padMarkerId` when present. `path` is always the object's hierarchy path. `padMarkerId` stands beside it and is accepted only for a crossbuck whose path other crossbucks share; every other target refuses it with the reason, before anything changes. The scene adapter must resolve the identity to exactly one object. Zero or multiple matches fail the modification.
 
 The order of keys in `modifications`, members of any object and values of `dependsOn` has no meaning. The engine applies each modification after every modification its `dependsOn` names. It applies modifications that `dependsOn` does not order in the ordinal order of their keys, defined under Canonical order below. The scene patch file therefore applies the same way regardless of its text order. A repeated `dependsOn` value counts once. If a dependency fails, its dependent modification is not applied; modifications that do not depend on it still apply.
 
@@ -324,11 +324,23 @@ The patcher recognizes the group roots of the Baked scenery group family. The ta
 
 A group root is a scene object one level below a folder of `World`, or, below `World/Large Scenery`, one level below a town folder. The folder `World/Large Scenery/Almond Bridge` is itself a group root: it holds the construction of one rail bridge, and its `Abutments` and `Steel` are parts. A folder whose children are crossings, or crossings and road bridges, is not a group root; its children are. To be listed in this family, a root must be serialized by the scene, must not be a `Map.json` object or listed by another family, and must hold a renderer, collider, light, storage pile (`Scenery.Pile`) or log pond (`Scenery.LogPond`) at or below it on an object the scene saves. A candidate without one is not listed at all. A collider the game builds while the camera is near, as a storage pile does, does not count; the pile itself does.
 
-The family leaves out a group holding any of the following at any depth: a track marker, station click spot, spawn point, map icon or car loader (`RollingStock.CarContentSwapper`). The game loads Robinson Gap coal by teleport between the industry's track spans, not at `World/Large Scenery/Robinson Gap Mine/Coal Loader`, so moving that loader would not move loading. It also leaves out a group that holds a track construction controller (`Game.Mow.TrackConstructionScenery`) but is no rail bridge construction. Those objects and the crossbucks of unprotected crossings are inspection only. A group with a spawn point is not moved as a whole, because its spawn points are edited one by one in the [Spawn point](#spawn-point) family.
+The family leaves out a group holding any of the following at any depth: a track marker, station click spot, spawn point, map icon or car loader (`RollingStock.CarContentSwapper`). The game loads Robinson Gap coal by teleport between the industry's track spans, not at `World/Large Scenery/Robinson Gap Mine/Coal Loader`, so moving that loader would not move loading. It also leaves out a group that holds a track construction controller (`Game.Mow.TrackConstructionScenery`) but is no rail bridge construction. Those objects are inspection only. A group with a spawn point is not moved as a whole, because its spawn points are edited one by one in the [Spawn point](#spawn-point) family.
 
 Rail bridge constructions outside Ela are groups of this family under Bridge / Rail bridges: `World/Large Scenery/Bryson/Bridge 1`, `World/Large Scenery/Almond Bridge` and each plate girder bridge below `World/Large Scenery/Plate Girder Bridge`. The track they carry is native map data and keeps its own trestle or steel flags; a modification moves only the construction. The station groups `Cochran flagstopstation`, `Alarka Depot` and `Alarka Jct Station` are switched by their progression controllers; `"active": false` holds through that switch, as [objects the game switches](#objects-the-game-switches) describes. Bryson Bridge 1 and the Almond Bridge carry a construction controller (`Game.Mow.TrackConstructionScenery`). It switches their parts on and off by the construction state of the track segments it names by ID, its construction segments. `"active": false` holds a group root or part off even when the controller would switch it on; without it, or with `"active": true`, the controller switches the object. A construction's `placement` must use `"mode": "fixed"`: a track-following placement of a rail bridge or of one of its parts fails before changing anything. The patcher reads construction segment IDs without resolving them, so a segment that no longer exists in the track graph causes no patcher failure. What the game does with such a segment has not yet been observed in Railroader.
 
 Road bridge constructions are groups of this family under Bridge / Road bridges: every group root whose name contains `Road Bridge`, below `World/Large Scenery` and below the `World/Roads` folders, including `World/Roads Bryson/US19 Gov Island/Concrete Road Bridge - 60m`, which stands in a folder beside a grade-crossing setup. The road they carry is native map data; a modification moves only the bridge. A road bridge's `placement` must use `"mode": "fixed"`: a track-following placement of a road bridge or of one of its parts fails before changing anything, with `Road bridges use fixed placement. Track-following placement does not apply to them`. Each road bridge holds a renderer culler and a scene ground mask on its root; see [scene ground masks](#scene-ground-masks).
+
+Each crossbuck of an unprotected crossing is a group of this family under Grade crossing, wherever its crossing stands below `World`. Its root is the crossbuck, such as `World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)`; its model and LOD levels are no parts. A crossbuck takes a fixed `placement` and `active`. The crossing pad and whistle signs beside it keep their own families and do not move with it. Where unprotected crossings share one path, as the three crossings below `World/Roads Bryson/Old River Rd` do, their crossbucks share their hierarchy path, such as `World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (1)`. The target then names a crossbuck by that path and the target member `padMarkerId`, the marker ID of its crossing's pad (`Mbkd`, `M0sh` or `Mgdu` there). Without `padMarkerId`, the shared path names every crossbuck at it, and the modification fails as ambiguous. A `padMarkerId` that matches no pad at that path names none and fails too. A crossbuck whose path names it alone refuses `padMarkerId` with `This crossbuck's path names it alone, so its target takes no padMarkerId. Remove padMarkerId from this target`, and every other target refuses it with `padMarkerId identifies only a crossbuck at an unprotected crossing whose path other crossbucks share. Remove padMarkerId from this target`. A refusal changes nothing, and the other modifications still apply.
+
+```json
+"target": {
+  "scene": "<scene from the inspected identity>",
+  "path": "World/Roads Bryson/Old River Rd/Crossing Unprotected/Sign-Crossing0 (1)",
+  "component": "UnityEngine.Transform",
+  "structure": "baked-scenery-group-v1",
+  "padMarkerId": "Mbkd"
+}
+```
 
 A path that names no listed group root, or more than one, fails the modification before changing anything. A modification may set `placement`, `active`, or both, and for Bryson Bridge 1 and the Almond Bridge also `relationships.constructionSegments`; see [construction segments](#construction-segments).
 
@@ -571,7 +583,7 @@ A Save that writes the scene patch file writes its content in this order:
 - `sourceMap`: `mapId`, then unknown members.
 - The keys of `modifications`, `circuits`, `additions` and `crossingEquipment` are in ordinal order.
 - A modification: `target`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`, then unknown members.
-- `target`: `scene`, `path`, `component`, `structure`.
+- `target`: `scene`, `path`, `component`, `structure`, `padMarkerId`.
 - `relationships`: `trackMarker`, `crossingCoverage`, `crossingEquipment`, `constructionSegments`.
 - `constructionSegments`: `segments`, `detach`. The values of `segments` are in ordinal order when it is an array of strings.
 - `crossingCoverage`: `circuits`, `additions`.
@@ -611,6 +623,7 @@ The supplying mod's `Info.json` must list `crankyant/scene-patcher` under `depen
 | A modification with `Helpers.MilePost` as its target component or `milepost-v1` as its target `structure` | `0.5.0` |
 | Any modification with `starterPlacement`, or whose target `structure` is `starter-placement-v1` | `0.5.0` |
 | Any modification whose target `structure` is `baked-scenery-group-v1` | `0.5.0` |
+| Any modification whose target has `padMarkerId` | `0.5.0` |
 | A modification whose target `structure` is `baked-scenery-part-v1` | `0.5.0` |
 | A modification whose target `structure` is `spawn-point-v1`, or whose target has `Character.SpawnPoint` as its component and no `structure` | `0.5.0` |
 | A modification with `UI.Map.MapIcon` as its target component or `station-map-icon-v1` as its target `structure` | `0.5.0` |
