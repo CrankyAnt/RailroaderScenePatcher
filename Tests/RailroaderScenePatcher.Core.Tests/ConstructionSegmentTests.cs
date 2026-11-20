@@ -109,6 +109,8 @@ static class ConstructionSegmentTests {
         ReferenceReplacesTheSet();
         RefusalsComeBeforeMutation();
         FailuresRestoreThePriorSet();
+        IncompleteCleanupBlocksTheRetryUntilRecheck();
+        AWorldReloadReleasesTheBlockedRetry();
         RepairInScenePatchEditing();
         FileRoutesRefuseADetach();
         StaleRefusalLeavesAMissingTargetIncomplete();
@@ -254,6 +256,61 @@ static class ConstructionSegmentTests {
         sticky.World.ThrowAfterPlacement = false;
         var blocked = sticky.Engine.Apply(doc).Outcomes["repair"];
         Assert(!blocked.Applied && blocked.Failure == FailureKind.AlreadyFailed && sticky.World.SegmentWrites == 2, "The retry is blocked within the load: " + blocked.Failure + " " + blocked.Error);
+    }
+
+    // The repair with a move of Bryson Bridge 1, whose move fails after the segments were written.
+    static string RepairWithMove(string id = "repair") => Doc(Segments(id, Bryson, "{\"segments\":[\"S-bryson-a\",\"S-bryson-b\"]}", ",\"placement\":{\"mode\":\"fixed\",\"position\":[3500,540,4400],\"rotation\":[0,0,0,1]}"));
+
+    // In scene patch editing, an incomplete cleanup of the construction segments blocks the next edit of the bridge until
+    // Recheck verifies the bridge against the scene patch file; after that, the retry applies.
+    static void IncompleteCleanupBlocksTheRetryUntilRecheck() {
+        var f = Split(); var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
+        string Now() => String.Join(",", f.World.SegmentsOf[f.Bridge1].OrderBy(s => s, StringComparer.Ordinal));
+        store.Patch = RepairWithMove(); session.CheckFileVersion();
+        f.World.ThrowAfterPlacement = true; f.World.StickySegments = true;
+        Assert(session.UseFileVersion().Applied, "Use file version runs");
+        var outcome = session.LastVersionApplication?.Outcomes?["repair"];
+        Assert(outcome != null && !outcome.Applied && outcome.Failure == FailureKind.IncompleteCleanup && outcome.Remaining.Contains("Construction segments: now S-bryson-a, S-bryson-b, before S-bryson"),
+            "The incomplete cleanup is reported with the remaining construction segments: " + outcome?.Failure + " " + outcome?.Error + " | " + String.Join(" | ", outcome?.Remaining ?? new string[0]));
+        var blocked = session.SetConstructionSegments(GroupId(Bryson), new[] { "S-bryson-a" }, null);
+        Assert(!blocked.Applied && blocked.Failure == FailureKind.Blocked && Now() == "S-bryson-a,S-bryson-b", "The retry on the bridge is blocked until cleanup is verified: " + blocked.Failure + " " + blocked.Error + " now " + Now());
+        // The controller accepts writes again; Recheck verifies the bridge against the scene patch file.
+        f.World.StickySegments = false;
+        var recheck = session.Recheck(GroupId(Bryson));
+        Assert(recheck.Applied && Now() == "S-bryson-a,S-bryson-b" && f.At(f.Bridge1).Zip(new[] { 3500.0, 540, 4400 }, (a, b) => Math.Abs(a - b)).All(d => d <= 0.001),
+            "Recheck verifies the bridge against the scene patch file: " + recheck.Error + " now " + Now());
+        var retry = session.SetConstructionSegments(GroupId(Bryson), new[] { "S-bryson-a" }, null);
+        Assert(retry.Applied && Now() == "S-bryson-a", "After Recheck the retry applies: " + retry.Failure + " " + retry.Error + " now " + Now());
+    }
+
+    // A world reload loads the bridge from the scene again: the next load attempt releases the bridge whose cleanup stayed
+    // unverified, and the retry applies the repair afresh. A new session with a new engine applies it as well.
+    static void AWorldReloadReleasesTheBlockedRetry() {
+        var f = Split(); f.World.ThrowAfterPlacement = true; f.World.StickySegments = true;
+        Assert(f.Engine.Apply(RepairWithMove(), "pack").Outcomes["repair"].Failure == FailureKind.IncompleteCleanup, "The attempt leaves an incomplete cleanup");
+        f.Engine.Reenter();
+        var held = f.Engine.Apply(RepairWithMove(), "pack").Outcomes["repair"];
+        Assert(!held.Applied && held.Failure == FailureKind.Blocked, "Over the retained world the retry stays blocked: " + held.Failure + " " + held.Error);
+        // The reload: the game destroys the bridge and loads it from the scene again, with its native segment.
+        var reloaded = Split();
+        foreach (var path in new[] { Bryson, Bryson + "/Abutments", Bryson + "/Steel", Bryson + "/Steel/Plate Girder E (4)" }) {
+            if (reloaded.World.Objects.ContainsKey(path)) f.World.Objects[path] = reloaded.World.Objects[path];
+            if (reloaded.World.PartsAt.ContainsKey(path)) f.World.PartsAt[path] = reloaded.World.PartsAt[path];
+        }
+        f.World.SegmentsOf[reloaded.Bridge1] = new[] { "S-bryson" }; f.World.SetActive(reloaded.Bridge1, true);
+        f.World.StickySegments = false; f.World.SegmentWrites = 0;
+        var release = f.Engine.Reenter();
+        Assert(release.Released > 0 && release.Failures.Count == 0, "The next load attempt releases the reloaded bridge: " + String.Join(" | ", release.Failures));
+        var retry = f.Engine.Apply(RepairWithMove(), "pack").Outcomes["repair"];
+        Assert(retry.Applied && Ids(f.World.SegmentsOf[reloaded.Bridge1].OrderBy(s => s, StringComparer.Ordinal)) == "S-bryson-a,S-bryson-b",
+            "After the reload the retry applies the repair: " + retry.Failure + " " + retry.Error + " " + Ids(f.World.SegmentsOf[reloaded.Bridge1]));
+        // A new session over the same scene patch file starts with a new engine.
+        var first = Split(); first.World.ThrowAfterPlacement = true; first.World.StickySegments = true;
+        Assert(first.Engine.Apply(RepairWithMove(), "pack").Outcomes["repair"].Failure == FailureKind.IncompleteCleanup, "The first session leaves an incomplete cleanup");
+        var next = Split();
+        var applied = next.Engine.Apply(RepairWithMove(), "pack").Outcomes["repair"];
+        Assert(applied.Applied && Ids(next.World.SegmentsOf[next.Bridge1].OrderBy(s => s, StringComparer.Ordinal)) == "S-bryson-a,S-bryson-b", "A new session applies the repair: " + applied.Error);
     }
 
     // An omitted relationship keeps the native segments; a reference replaces the set with exactly the selected segments,
