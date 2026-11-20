@@ -4,7 +4,7 @@ using System;
 using RailroaderScenePatcher.Core;
 
 namespace RailroaderScenePatcher {
-    internal enum GuidedTaskKind { Placement, Snap, Activity, Binding, DetachBinding, StarterPlacement, MarkerId }
+    internal enum GuidedTaskKind { Placement, Snap, Activity, Binding, DetachBinding, StarterPlacement, Wreck, MarkerId }
     internal enum GuidedTaskStep { Target, Values, Review, Applied }
     internal sealed class GuidedTaskState {
         // The tasks the task list offers, in its order; a task that does not fit the inspected object stays visible and disabled.
@@ -22,7 +22,8 @@ namespace RailroaderScenePatcher {
             switch (kind) {
                 case GuidedTaskKind.Binding:
                 case GuidedTaskKind.DetachBinding: return "The construction controller has no track binding. Set its construction segments on the Connections tab.";
-                case GuidedTaskKind.StarterPlacement: return "The construction controller is not a starter placement marker.";
+                case GuidedTaskKind.StarterPlacement:
+                case GuidedTaskKind.Wreck: return "The construction controller is not a starter placement marker.";
                 case GuidedTaskKind.MarkerId: return "The construction controller is not a track marker, so it takes no replacement ID.";
                 default: return null;
             }

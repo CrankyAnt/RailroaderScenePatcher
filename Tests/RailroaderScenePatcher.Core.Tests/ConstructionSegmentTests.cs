@@ -320,13 +320,13 @@ static class ConstructionSegmentTests {
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, ela) == CommandBand.ControllerNoPlacement && GuidedTaskState.TargetBlock(GuidedTaskKind.Snap, ela) == CommandBand.ControllerNoPlacement
             && GuidedTaskState.TargetBlock(GuidedTaskKind.Activity, ela) == CommandBand.ControllerNoActivity, "The guided tasks of the Ela controller give its placement and activity reasons");
         // The other guided tasks do not fit the controller either: each stays in the list, inactive with the controller's reason.
-        foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement, GuidedTaskKind.MarkerId }) {
+        foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement, GuidedTaskKind.Wreck, GuidedTaskKind.MarkerId }) {
             var reason = GuidedTaskState.TargetBlock(task, ela);
             Assert(reason != null && reason.StartsWith("The construction controller ", StringComparison.Ordinal) && reason.EndsWith(".", StringComparison.Ordinal)
                 && CommandBand.Tooltip("Start this task for the inspected object.", reason).Contains("Unavailable: " + reason), "The guided task " + task + " of the Ela controller is unavailable with its reason: " + reason);
         }
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("Connections tab"), "The binding tasks point to where the controller's segments are set");
-        Assert(GuidedTaskState.Tasks.Count == 7, "The task list keeps every task visible");
+        Assert(GuidedTaskState.Tasks.Count == 8, "The task list keeps every task visible");
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, GroupId(Bryson)) == null, "A rail bridge group keeps its guided move");
         Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "This object cannot be edited here.", "The generic reason is what the Ela controller showed while it counted as not editable");
         Assert(CommandBand.ConstructionSceneryOperations == "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.",

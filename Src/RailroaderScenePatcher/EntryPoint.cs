@@ -1650,6 +1650,12 @@ namespace RailroaderScenePatcher {
             try { wreck = attachment.Session.StarterWreck(selected.Identity); } catch { wreck = null; }
             return wreck;
         }
+        // The effective wreck setting of the inspected starter placement marker as the guided task's value, read now.
+        string CurrentWreck() {
+            var effective = attachment?.Session.StarterWreck(selected.Identity);
+            if (effective == null) throw new InvalidOperationException(CommandBand.WreckReason(NativeInventory.StartersError, selected.Bindings.Where(IsReader).ToArray()) ?? "The wreck setting could not be read.");
+            return effective.Value ? "Yes" : "No";
+        }
         internal double[] InspectedTrackPoint() {
             if (selected == null || selected.Family != StarterPlacements.Family) return null;
             if (trackPointFrame != Time.frameCount || !ReferenceEquals(trackPointOf, selected.Handle)) {

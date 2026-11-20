@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
 using System;
+using System.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
@@ -23,6 +24,28 @@ static class GuidedTaskTests {
         GuidedResultSurvivesInspectorRestoration();
         RefreshClearsMessagesButKeepsContext();
         GuidedStepChangesClearEarlierRefusals();
+        StarterPlacementMarkerOffersTheWreckSetting();
+    }
+    // The task list of a starter placement marker offers the inspector's Start derailed setting as a guided task, next to
+    // placing the starter on track. It is available where the inspector's checkbox is, for the one car placement that
+    // reads the marker, and refused with the checkbox's reason otherwise.
+    static void StarterPlacementMarkerOffersTheWreckSetting() {
+        var tasks = GuidedTaskState.Tasks.ToList();
+        Check(tasks.IndexOf(GuidedTaskKind.Wreck) == tasks.IndexOf(GuidedTaskKind.StarterPlacement) + 1, "The wreck task follows Place starter on track in the task list");
+        const string reader = StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no";
+        Check(CommandBand.WreckTaskReason(true, null, new[] { reader }) == null, "A starter placement marker read by one car placement offers the wreck task");
+        Check(CommandBand.WreckTaskReason(true, null, new string[0]) == CommandBand.WreckReason(null, new string[0]) &&
+            CommandBand.WreckTaskReason(true, "placements unavailable", new[] { reader }) == CommandBand.WreckReason("placements unavailable", new[] { reader }),
+            "The wreck task is refused with the reason of the inspector's checkbox");
+        Check(CommandBand.WreckTaskReason(false, null, new[] { reader }) == "This object is not a starter placement marker.", "Another object does not offer the wreck task");
+        var controller = new TargetIdentity("scene", "Ela Bridge Scenery", "Game.Mow.TrackConstructionScenery", ConstructionSceneryScene.Structure);
+        Check(GuidedTaskState.TargetBlock(GuidedTaskKind.Wreck, controller) == "The construction controller is not a starter placement marker.", "The construction controller does not offer the wreck task");
+        // Values starts from the effective setting; an unchanged value cannot be reviewed.
+        var state = new GuidedTaskState(); var target = Target("starter");
+        state.Start(GuidedTaskKind.Wreck, target, new[] { "No" }); state.SetValues(new[] { "Yes" }); state.Review(); state.Back();
+        Check(state.Kind == GuidedTaskKind.Wreck && state.Step == GuidedTaskStep.Values && state.Draft[0] == "Yes", "Back from Review keeps the wreck draft");
+        Check(CommandBand.FieldReason(null, new[] { "No" }, new[] { "No" }, CommandBand.SameWreck) == "The car placement already has the selected Start derailed setting." &&
+            CommandBand.FieldReason(null, new[] { "Yes" }, new[] { "No" }, CommandBand.SameWreck) == null, "An unchanged wreck setting cannot be reviewed");
     }
     static void CrossingControllerCannotMoveOrChangeActivity() {
         foreach (var crossing in new[] {

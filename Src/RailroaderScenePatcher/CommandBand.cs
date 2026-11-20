@@ -118,6 +118,12 @@ namespace RailroaderScenePatcher {
             return count == 1 ? null : count == 0 ? Sentence(StarterPlacements.NoReader)
                 : Sentence(StarterPlacements.SeveralReaders(readers.Select(StarterPlacements.PlaceOf).ToArray()));
         }
+        // Why the guided task that sets Start derailed cannot start, or null: it fits only a starter placement marker, and
+        // there only where the inspector's checkbox can be used (WreckReason).
+        internal static string WreckTaskReason(bool starter, string setupsError, IReadOnlyList<string> readers) =>
+            starter ? WreckReason(setupsError, readers) : "This object is not a starter placement marker.";
+        // Why the Start derailed value of the guided task cannot be reviewed: it is the car placement's current setting.
+        internal const string SameWreck = "The car placement already has the selected Start derailed setting.";
         // Why Clear activity cannot run for an object this mod sets no activity for, or null.
         internal static string ClearActivityReason(bool hasValue) => hasValue ? null : "This mod sets no activity for this object, so there is nothing to clear.";
         // Why the footer's Details of a world choice cannot show anything, or null: it shows the clicked candidate.

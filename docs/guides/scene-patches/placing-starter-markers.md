@@ -48,6 +48,8 @@ The wreck setting determines whether the cars start derailed or on the track. De
 
 The footer reports the result. The **Changes** tab shows the old and new settings, such as `Start derailed: from No to Yes`, and the **Used by** lines show the updated setting. The edit takes one native Undo step.
 
+You can also make this edit with the **Start derailed** [guided task](completing-guided-tasks.md). It uses the same operation as the checkbox and is unavailable for the same reasons.
+
 The checkbox is unavailable if the patcher cannot read the new-game setups or identify exactly one new-game car placement in an active setup that uses this marker. The tooltip explains why, prefixed with `Unavailable:`. The patcher also checks this before changing anything and refuses an edit for the same reason.
 
 Changing the wreck setting keeps the marker's track location. Moving the marker to another track location keeps the wreck setting.
