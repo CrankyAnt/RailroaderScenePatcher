@@ -386,12 +386,43 @@ static class ExistingEquipmentTests {
             Assert(CommandBand.ModeBlock(mode, false, true, CommandBand.MastOperations, equipment: true) == null, "Mode " + mode + " applies to a mast");
         Assert(CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.MastOperations, equipment: true) == CommandBand.EquipmentNoFollow && CommandBand.EquipmentNoFollow.Contains("fixed placement"), "Follow says why it does not apply");
         Assert(CommandBand.Tooltip("Keep the object's placement relative to a chosen track or endpoint.", CommandBand.EquipmentNoFollow).StartsWith("Unavailable: ", StringComparison.Ordinal), "A disabled mode's tooltip gives the reason");
-        // A mast that does not conform keeps every placement mode but Numeric disabled with its concrete reason.
-        var refused = CommandBand.NotEditable("lamp Signal 1 observes key 'power', which the crossing controller does not publish");
-        Assert(CommandBand.ModeBlock(CommandBand.GizmoMode, false, false, refused, equipment: true).Contains("'power'") && CommandBand.ModeBlock(CommandBand.NumericMode, false, false, refused, equipment: true) == null, "A nonconforming mast gives its reason on every mode it cannot use");
+        NonconformingEquipmentStaysListedWithItsOperationsDisabled();
         // A bell's sound has no direction: its rotation stays visible and disabled with that reason; a mast's applies.
         Assert(CommandBand.RotationBlock(ExistingEquipmentScene.BellStructure) == CommandBand.BellNoRotation && CommandBand.BellNoRotation.Contains("no direction") && CommandBand.RotationBlock(ExistingEquipmentScene.MastStructure) == null && CommandBand.RotationBlock(null) == null,
             "Rotation does not apply to a bell and applies to a mast");
         Assert(CommandBand.EquipmentGuide[1] == "moving-crossing-equipment.md#refusal-reasons" && CommandBand.EquipmentGuide[0].Length != 0, "The refusal links to the operation guidance");
+    }
+
+    // A mast or bell that does not conform to its pattern is listed in its family, not left out and not inspection only.
+    // The inventory gives it no structure and its refusal under Supported edits, so the inspector cannot edit it: every
+    // placement mode, Numeric included, the rotation fields and Enabled are disabled with the concrete reason, and the
+    // reason links to the operation guidance.
+    static void NonconformingEquipmentStaysListedWithItsOperationsDisabled() {
+        var problem = ExistingEquipmentPattern.MastProblem(new MastFacts { Lamps = { new LampFacts { Name = "Signal 1", Key = "power", Targets = 1, Materials = 1, RendererUsesMaterial = true } } }, new[] { "lights", "gates" });
+        var bellProblem = ExistingEquipmentPattern.BellProblem(new ExistingBellFacts { ControllerActive = false });
+        var mast = Entry(Mast1Path, ExistingEquipmentScene.MastComponent, ExistingEquipmentScene.MastFamily, CommandBand.NotEditable(problem), displayName: "Signal 1 at Bryson Everett");
+        var bell = Entry(BellPath, ExistingEquipmentScene.BellComponent, ExistingEquipmentScene.BellFamily, CommandBand.NotEditable(bellProblem));
+        var conforming = Entry(Mast2Path, ExistingEquipmentScene.MastComponent, ExistingEquipmentScene.MastFamily, CommandBand.MastOperations, structure: ExistingEquipmentScene.MastStructure);
+        var inventory = new SceneInventory(new Scene { Maps = new[] { "map" }, Observations = () => new[] { mast, bell, conforming } }); inventory.Refresh();
+        var groups = InventoryPresentationState.Groups(inventory.Entries);
+        Assert(groups.Single(g => g.Key == ExistingEquipmentScene.MastFamily).Value.Contains(mast) && groups.Single(g => g.Key == ExistingEquipmentScene.BellFamily).Value.Contains(bell)
+            && !groups.Any(g => g.Key == InventoryPresentationState.InspectionOnlyGroup), "The nonconforming mast and bell are listed in their families: " + String.Join(", ", groups.Select(g => g.Key + "=" + g.Value.Count)));
+        foreach (var (row, reason) in new[] { (mast, problem), (bell, bellProblem) }) {
+            var operations = row.Operations;
+            Assert(!CommandBand.EditableStructure(row.Identity.Structure) && CommandBand.Refusal(operations) == reason, "The entry cannot be edited and states its refusal under Supported edits: " + operations);
+            var shown = CommandBand.EditReason(operations);
+            Assert(shown == CommandBand.Sentence(reason) && shown.Contains(row == mast ? "'power'" : "controller is disabled"), "The reason the disabled controls give is the concrete refusal: " + shown);
+            var equipment = CommandBand.RefusedEquipment(row.Family, operations);
+            Assert(equipment, "The entry is a refused mast or bell, which links to the guide's refusal reasons");
+            foreach (var mode in new[] { CommandBand.NumericMode, CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
+                Assert(CommandBand.ModeBlock(mode, false, false, operations, equipment: equipment) == shown, "Placement mode " + mode + " is disabled with the reason: " + CommandBand.ModeBlock(mode, false, false, operations, equipment: equipment));
+            Assert(CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown) == "Unavailable: " + shown, "Numeric's tooltip gives the reason: " + CommandBand.Tooltip("Enter a position in map coordinates and a rotation in degrees.", shown));
+            // The rotation fields and Enabled take the inspector's edit block, which for an object that cannot be edited is this reason.
+            Assert(CommandBand.ForcesNumeric(false, false, false, null) && CommandBand.InspectorEditBlock(false, operations) == shown, "Rotation and Enabled are disabled with the same reason: " + CommandBand.InspectorEditBlock(false, operations));
+        }
+        Assert(!CommandBand.RefusedEquipment(conforming.Family, conforming.Operations) && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, conforming.Operations, equipment: true) == null && CommandBand.InspectorEditBlock(true, conforming.Operations) == null,
+            "A conforming mast keeps Numeric, rotation and Enabled");
+        var added = CommandBand.AddedEquipmentOperations("Added light at Bryson Everett");
+        Assert(!CommandBand.RefusedEquipment(ExistingEquipmentScene.MastFamily, added), "Added equipment is no refused mast: its crossing's Connections tab edits it");
     }
 }

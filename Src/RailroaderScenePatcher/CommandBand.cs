@@ -765,11 +765,12 @@ namespace RailroaderScenePatcher {
         // Why a placement mode is inactive for the inspected object, or null. A crossing pad has its own reason for
         // every mode; a milepost has one for Follow. An object that cannot be edited keeps Numeric, which shows its
         // placement, and has every other mode inactive with the object's own reason.
-        // An existing crossing mast or bell has one for Follow as well.
+        // An existing crossing mast or bell has one for Follow as well. One that does not conform to its pattern has
+        // every mode inactive with its refusal, Numeric included: its placement fields stay visible under it.
         // moveBlock: why every move of the object is refused, such as a ground mask that flattens the terrain height;
         // Numeric then stays open to show the placement, with its fields unavailable for the same reason.
         internal static string ModeBlock(int mode, bool pad, bool editable, string operations, bool milepost = false, bool equipment = false, bool railBridge = false, bool controller = false, string moveBlock = null, bool roadBridge = false) =>
-            controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && mode != NumericMode ? EditReason(operations) : moveBlock != null && mode != NumericMode ? moveBlock
+            controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && (mode != NumericMode || equipment) ? EditReason(operations) : moveBlock != null && mode != NumericMode ? moveBlock
             : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
             : railBridge && mode == FollowMode ? RailBridgeNoFollow : roadBridge && mode == FollowMode ? RoadBridgeNoFollow : null;
         // A road bridge construction does not follow track: move the road natively, then the bridge onto it.
@@ -795,6 +796,13 @@ namespace RailroaderScenePatcher {
         // The guide link offered for a mast or bell that does not conform to its pattern: its label and the guide page
         // with the anchor of the refusal reasons.
         internal static readonly string[] EquipmentGuide = { "Why this equipment cannot be edited", "moving-crossing-equipment.md#refusal-reasons" };
+        // Whether an inventory entry is an existing crossing mast or bell that does not conform to its pattern: it is
+        // listed in its family with its refusal under Supported edits. Added equipment, which its crossing edits, is not.
+        internal static bool RefusedEquipment(string family, string operations) =>
+            (family == ExistingEquipmentScene.MastFamily || family == ExistingEquipmentScene.BellFamily) && Refusal(operations) != null;
+        // Why the inspector cannot edit the inspected object at all, or null: the object's own reason when no capability
+        // edits it. The placement fields, the rotation fields and Enabled are then disabled with that reason.
+        internal static string InspectorEditBlock(bool editable, string operations) => editable ? null : EditReason(operations);
         // Why Enabled cannot be set for equipment that a culler of the game switches itself.
         internal const string EquipmentSwitched = "The game's culler enables and disables this object based on camera distance. It would override a saved Enabled setting, so the patcher cannot keep that setting applied";
         // Why Follow is inactive for a milepost: the milepost capability covers fixed placement, activity and the binding.

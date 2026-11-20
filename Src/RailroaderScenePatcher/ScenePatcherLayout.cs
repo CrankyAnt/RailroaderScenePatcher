@@ -715,7 +715,7 @@ namespace RailroaderScenePatcher {
             FieldLabel(builder, "Supported edits");
             PlainLabel(builder, selected.Operations);
             // A mast or bell that does not conform to its pattern links to the guide's refusal reasons.
-            if ((selected.Family == ExistingEquipmentScene.MastFamily || selected.Family == ExistingEquipmentScene.BellFamily) && CommandBand.Refusal(selected.Operations) != null)
+            if (IsRefusedEquipment)
                 Button(builder, CommandBand.EquipmentGuide[0], () => Application.OpenURL(GuideRoot + CommandBand.EquipmentGuide[1])).Tooltip(CommandBand.EquipmentGuide[0], "Open the guide's refusal reasons in your browser.");
             // A starter placement marker names every setup and car placement that reads it, with the cars and the wreck
             // setting of each.
@@ -779,7 +779,7 @@ namespace RailroaderScenePatcher {
                     // A mode that cannot be used on the inspected object is inactive and says why.
                     // A starter placement marker's object does not change where its cars start: every mode but Numeric,
                     // which shows the object's placement, says so.
-                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment, IsRailBridge, IsController, MoveBlock, IsRoadBridge);
+                    var padMode = CommandBand.ModeBlock(i, IsPad, Editable, IsStarter ? CommandBand.NotEditable(StarterPlacements.ObjectSettings) : selected?.Operations, selected?.Identity.Structure == MilepostScene.Structure, IsEquipment || IsRefusedEquipment, IsRailBridge, IsController, MoveBlock, IsRoadBridge);
                     segments.AddSegment(PlacementModes[i], placementMode == i, presentation.Action(() => { if (padMode == null) ChangePlacementMode(mode); })).Inactive(padMode != null).Tooltip(PlacementModes[i], CommandBand.ModeTip(i, tips[i], padMode, EditBlock() ?? PadBlock ?? ControllerBlock ?? MoveBlock));
                 }
             }, true);

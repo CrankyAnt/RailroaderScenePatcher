@@ -1267,6 +1267,8 @@ namespace RailroaderScenePatcher {
         }
         // Editing needs a mutation adapter; the inventory marks each supported pattern with its structure.
         bool Editable => selected != null && CommandBand.EditableStructure(selected.Identity.Structure) && selected.Handle is GameObject;
+        // The inspected object is an existing crossing mast or bell that does not conform to its pattern.
+        bool IsRefusedEquipment => selected != null && CommandBand.RefusedEquipment(selected.Family, selected.Operations);
         // The inspected object is an existing crossing mast or bell that conforms to its pattern.
         bool IsEquipment => selected != null && (selected.Identity.Structure == ExistingEquipmentScene.MastStructure || selected.Identity.Structure == ExistingEquipmentScene.BellStructure);
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
@@ -1278,9 +1280,9 @@ namespace RailroaderScenePatcher {
             : attachment.Session.Blocked != null ? attachment.Session.Blocked + " The recovery choices are in the session details."
             : selection?.Pending != null ? "Confirm or cancel the world selection to edit."
             : IsStarter ? StarterBlock() ?? (inspectorTab.Value == ConnectionsTab ? null : CommandBand.EditReason(CommandBand.NotEditable(StarterPlacements.ObjectSettings)))
-            : !Editable ? CommandBand.EditReason(selected?.Operations)
-            : gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
-            : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the object list." : null;
+            : CommandBand.InspectorEditBlock(Editable, selected?.Operations)
+            ?? (gizmo?.Active == true ? "Complete or cancel the gizmo to edit."
+            : (GameObject)selected.Handle == null ? "The inspected object no longer exists. Refresh the object list." : null);
         // Why the inspected starter placement marker's modification cannot be changed now, whatever the tab, or null: what
         // Remove modification and Recheck in the footer, and the track location on the Connections tab, wait for.
         string StarterBlock() =>
