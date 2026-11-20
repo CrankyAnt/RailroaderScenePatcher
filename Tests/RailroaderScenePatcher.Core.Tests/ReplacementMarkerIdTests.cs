@@ -165,6 +165,14 @@ static class ReplacementMarkerIdTests {
         // The note follows the problem's kind, a binding problem that Repair with guided task repairs, whatever its wording.
         Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "") == "Duplicate marker ID Mg6m is repaired, but this is a different problem: the marker has no track binding. Click Repair with guided task, or set an existing track on the Connections tab.",
             "An empty binding says so in plain words: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", ""));
+        // The two repairs on the Object tab stay visible on every generic track marker. Without a duplicate marker ID they
+        // are disabled: the speed sign, which now holds Mg6m alone, by the replacement ID's own reason, and the yard limit,
+        // which holds its replacement ID alone, by the same sentence with that ID.
+        Assert(CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure) && !CommandBand.ShowsDuplicateRepairs(CrossingPadScene.Structure) && !CommandBand.ShowsDuplicateRepairs(null), "Only a generic track marker shows the repairs");
+        var speedReason = CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 0, false);
+        Assert(CommandBand.DuplicateRepairReason(false, speedReason, "Mg6m") == "Only this marker holds marker ID Mg6m, so it doesn't need a replacement ID.", "The speed sign's repairs are disabled with the replacement ID's reason: " + CommandBand.DuplicateRepairReason(false, speedReason, "Mg6m"));
+        Assert(CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard") == "Only this marker holds marker ID Mg6m-yard, so it doesn't need a replacement ID.", "The repaired yard limit's repairs are disabled with its own ID: " + CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard"));
+        Assert(CommandBand.DuplicateRepairReason(true, null, "Mg6m") == null && CommandBand.DuplicateRepairReason(true, "Confirm or cancel the pending world choice first.", "Mg6m") == "Confirm or cancel the pending world choice first.", "With a duplicate the repairs keep their own availability");
         Assert(CommandBand.IsBindingProblem("Marker broken binding: missing segment z5w8si") && !CommandBand.IsBindingProblem("Duplicate marker ID Mg6m is shared with 1 other scene marker."), "The kind that offers Repair with guided task decides the note");
     }
     // After a marker ID edit, its Undo or its Redo, the inventory observes again every other entry that holds the

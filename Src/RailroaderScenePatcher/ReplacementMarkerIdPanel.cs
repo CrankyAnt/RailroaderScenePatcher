@@ -121,9 +121,12 @@ namespace RailroaderScenePatcher {
         // The duplicate explanation of a holder that can receive a replacement ID offers the repair, active or not: for
         // the inspected marker through its guided task and, beside it, through the Marker ID section of its Connections
         // tab, both available for the same reasons, and for each other scene marker that shares the ID through Select.
+        // A generic track marker without a duplicate marker ID, such as one whose duplicate is repaired, keeps both
+        // buttons visible and disabled with the reason.
         void DrawDuplicateIdTasks(UIPanelBuilder builder) {
-            if (!CommandBand.OffersDuplicateRepair(selected?.Identity.Structure, selected?.Dependencies)) return;
-            var reason = GuidedBlock(GuidedTaskKind.MarkerId);
+            if (!CommandBand.ShowsDuplicateRepairs(selected?.Identity.Structure)) return;
+            var offers = CommandBand.OffersDuplicateRepair(selected.Identity.Structure, selected.Dependencies);
+            var reason = CommandBand.DuplicateRepairReason(offers, GuidedBlock(GuidedTaskKind.MarkerId), CurrentMarkerId());
             builder.HStack(row => {
                 Button(row, CommandBand.RepairDuplicateId, () => StartGuided(GuidedTaskKind.MarkerId)).Inactive(reason != null)
                     .Tooltip("Repair duplicate marker ID", CommandBand.Tooltip("Start a guided task that gives this marker a replacement ID.", reason));
@@ -132,7 +135,7 @@ namespace RailroaderScenePatcher {
                 row.Spacer();
             }).ChildrenKeepHeight().Height(RowHeight);
             var sharers = ReadSharers().Sharers;
-            if (sharers.Count == 0) return;
+            if (!offers || sharers.Count == 0) return;
             FieldLabel(builder, "Or give the replacement ID to");
             DrawMarkerIdSharers(builder, sharers);
         }
