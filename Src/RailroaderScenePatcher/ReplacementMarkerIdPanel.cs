@@ -120,18 +120,19 @@ namespace RailroaderScenePatcher {
         }
         // The duplicate explanation of a holder that can receive a replacement ID offers the repair, active or not: for
         // the inspected marker through its guided task and, beside it, through the Marker ID section of its Connections
-        // tab, both available for the same reasons, and for each other scene marker that shares the ID through Select.
-        // A generic track marker without a duplicate marker ID, such as one whose duplicate is repaired, keeps both
-        // buttons visible and disabled with the reason.
+        // tab, and for each other scene marker that shares the ID through Select. A marker that has its replacement ID
+        // keeps both buttons: the repair says it already has one, and the Connections tab changes or clears the ID. Set
+        // ID on the Connections tab is available whenever that tab's Marker ID section is, with its reason otherwise.
         void DrawDuplicateIdTasks(UIPanelBuilder builder) {
-            if (!CommandBand.ShowsDuplicateRepairs(selected?.Identity.Structure)) return;
-            var offers = CommandBand.OffersDuplicateRepair(selected.Identity.Structure, selected.Dependencies);
+            var offers = CommandBand.OffersDuplicateRepair(selected?.Identity.Structure, selected?.Dependencies);
+            if (!CommandBand.ShowsDuplicateRepairs(selected?.Identity.Structure, offers, HasMarkerIdValue(selected?.Identity))) return;
             var reason = CommandBand.DuplicateRepairReason(offers, GuidedBlock(GuidedTaskKind.MarkerId), CurrentMarkerId());
+            var section = MarkerIdBlock();
             builder.HStack(row => {
                 Button(row, CommandBand.RepairDuplicateId, () => StartGuided(GuidedTaskKind.MarkerId)).Inactive(reason != null)
                     .Tooltip("Repair duplicate marker ID", CommandBand.Tooltip("Start a guided task that gives this marker a replacement ID.", reason));
-                Button(row, CommandBand.SetIdOnConnections, () => inspectorTab.Value = ConnectionsTab).Inactive(reason != null)
-                    .Tooltip(CommandBand.SetIdOnConnections, CommandBand.Tooltip(CommandBand.SetIdOnConnectionsTip, reason));
+                Button(row, CommandBand.SetIdOnConnections, () => inspectorTab.Value = ConnectionsTab).Inactive(section != null)
+                    .Tooltip(CommandBand.SetIdOnConnections, CommandBand.Tooltip(CommandBand.SetIdOnConnectionsTip, section));
                 row.Spacer();
             }).ChildrenKeepHeight().Height(RowHeight);
             var sharers = ReadSharers().Sharers;

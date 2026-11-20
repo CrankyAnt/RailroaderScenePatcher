@@ -571,16 +571,19 @@ namespace RailroaderScenePatcher {
         // The Inspector route of the same repair, beside Repair duplicate ID: the Marker ID section of the Connections tab.
         internal const string SetIdOnConnections = "Set ID on the Connections tab";
         internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Marker ID section, enter a replacement ID and click Set ID.";
+        // Whether the Object tab shows Repair duplicate ID and Set ID on the Connections tab: on a generic track marker
+        // that holds a duplicate marker ID (offersRepair), or that has this mod's replacement ID, the repaired state, where
+        // they stay visible with their reasons. A marker that never shared its ID shows neither.
+        internal static bool ShowsDuplicateRepairs(string structure, bool offersRepair, bool hasReplacementId) =>
+            structure == TrackMarkerScene.Structure && (offersRepair || hasReplacementId);
+        // Why Repair duplicate ID is unavailable, or null. With a duplicate marker ID it follows replacementIdReason, the
+        // reason the replacement ID can't be set now. Without one the marker already has its replacement ID, named when
+        // it could be read. Set ID on the Connections tab follows the Marker ID section's own reason instead.
+        internal static string DuplicateRepairReason(bool offersRepair, string replacementIdReason, string currentId) =>
+            offersRepair ? replacementIdReason
+            : String.IsNullOrWhiteSpace(currentId) ? "This marker already has a replacement ID." : "This marker already has replacement ID " + currentId + ".";
         // Whether the Object tab offers Repair duplicate ID: for a generic track marker whose explanation names a
         // duplicate marker ID, active or not.
-        // Whether the Object tab shows Repair duplicate ID and Set ID on the Connections tab at all: on every generic
-        // track marker, the one kind that takes a replacement ID. Without a duplicate marker ID they stay visible,
-        // disabled with their reason (DuplicateRepairReason), as every unsupported operation does.
-        internal static bool ShowsDuplicateRepairs(string structure) => structure == TrackMarkerScene.Structure;
-        // Why the two repairs are unavailable, or null. With a duplicate marker ID, block, the replacement ID's own reason.
-        // Without one, that reason, or for a marker that holds its replacement ID alone the same sentence with that ID.
-        internal static string DuplicateRepairReason(bool offersRepair, string block, string currentId) =>
-            offersRepair ? block : block ?? MarkerIdUnavailable(null, true, currentId, 0, false) ?? "This marker has no duplicate marker ID to repair.";
         internal static bool OffersDuplicateRepair(string structure, IEnumerable<string> dependencies) =>
             structure == TrackMarkerScene.Structure && dependencies?.Any(line => line != null && line.StartsWith("Duplicate marker ID ", StringComparison.Ordinal)) == true;
         // What the Detected problems section says when the object has no problem. Beside Repair duplicate ID the holder
