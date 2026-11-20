@@ -146,6 +146,9 @@ namespace RailroaderScenePatcher.Core {
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
                     if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before using the file version");
+                    // A current modification that is not applied changed nothing, so there is nothing to capture or
+                    // restore: its refusal refuses only itself, never the choice of another file version.
+                    if (NotAppliedOf(ScenePatchFile.Key(item)) != null) continue;
                     scene.Preflight(resolved);
                     engine.GuardMutation(target, resolved, context, null);
                     if (!snapshots.Any(pair => ReferenceEquals(pair.Item1, resolved))) snapshots.Add(Tuple.Create(resolved, scene.Capture(resolved)));
@@ -170,6 +173,7 @@ namespace RailroaderScenePatcher.Core {
                     try { target = PatchEngine.ParseTarget(item["target"] as JObject); resolved = engine.ResolveUnique(target); }
                     catch (InvalidOperationException) { continue; }
                     if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before using the file version");
+                    if (NotAppliedOf(property.Name) != null) continue;
                     scene.Preflight(resolved);
                     mutationStarted = true;
                     Commit(target, resolved, null, property.Name, item, null);
