@@ -134,6 +134,9 @@ namespace RailroaderScenePatcher.Core {
     // editing.
     public static class SceneTargetMapCheck {
         public const string Mismatch = "The scene target map is neither the loaded map nor one of its layers";
+        // The map the game loads when Editor is clicked in the main menu, before a map is chosen (MapIdentifiers.EditorDefault,
+        // MenuManager.EditorGameSetup). New Game never offers it.
+        public const string EditorDefaultMap = "rr/editor-default-map";
         // The maps a scene patch file can name in the scene's map context: its map IDs without the map patches.
         public static string[] Valid(IScene scene) {
             var patches = scene is IMapPatchContext context ? (context.MapPatchIds ?? Enumerable.Empty<string>()).ToArray() : new string[0];
@@ -213,6 +216,8 @@ namespace RailroaderScenePatcher.Core {
         string NotApplicable(string problem, string mapId) {
             if (problem != SceneTargetMapCheck.Mismatch) return problem;
             var maps = scene.MapIds.ToArray();
+            // The editor's transient default map, loaded before a map is chosen, is no map a player plays: nothing warns for it.
+            if (maps.Length != 0 && maps[0] == SceneTargetMapCheck.EditorDefaultMap) return null;
             return "The scene patch file is for map " + mapId + ", which is neither the loaded map " + (maps.Length == 0 ? "unknown" : maps[0]) +
                 " nor one of its layers (" + (maps.Length < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "). Its modifications were not applied";
         }

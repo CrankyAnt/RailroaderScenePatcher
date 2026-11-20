@@ -51,10 +51,17 @@ static class MultipleModTests {
         var maps = scene.MapIds.ToArray();
         Check(messages.Rows.Count == 1 && messages.Rows[0].ModIdentifier == "c/other-map", "Only the scene patch file for another map gives a warning: " + String.Join(" | ", messages.Rows.Select(r => r.Message)));
         var skip = messages.Rows[0];
-        Check(skip.Message.StartsWith("Other map [c/other-map; version 1.0]. ", StringComparison.Ordinal) && skip.Message.Contains("for map elsewhere, which is neither the loaded map " + maps[0] + " nor one of its layers (" + String.Join(", ", maps.Skip(1)) + ")")
-            && skip.Message.Contains("not applied") && !skip.Message.Contains("Report to") && skip.ReportTo == null && skip.Cause == FailureCause.NotApplicable, "The warning names the supplying mod and the reason, without a report direction: " + skip.Message);
+        // A map mismatch concerns the whole file, so its row has its own wording without an operation or object.
+        Check(skip.Message == "Other map [c/other-map; version 1.0]. The scene patch file is for map elsewhere, which is neither the loaded map " + maps[0] + " nor one of its layers (" + String.Join(", ", maps.Skip(1)) + "). Its modifications were not applied. Patcher 0.6.0; game game."
+            && skip.ReportTo == null && skip.Cause == FailureCause.NotApplicable, "The warning names the supplying mod, its version and the reason, without operation, object or report direction: " + skip.Message);
         runtime.ApplyLoaded(mods, null);
         Check(messages.Rows.Count == 1, "A repeated application in the same load gives no second warning");
+        // Clicking Editor in the main menu loads the game's editor default map before a map is chosen. No mod supplies a
+        // file for that transient map, so its load warns for none of them, applicable elsewhere or not.
+        var editorStart = new Scene(); editorStart.Origin = 0; editorStart.Maps = new[] { SceneTargetMapCheck.EditorDefaultMap };
+        var editorMessages = new Messages();
+        new PatchRuntime(new PatchEngine(editorStart), editorMessages, "0.6.0", "game").ApplyLoaded(mods, null);
+        Check(SceneTargetMapCheck.EditorDefaultMap == "rr/editor-default-map" && editorMessages.Rows.Count == 0, "The editor default map's load gives no map-applicability warning: " + String.Join(" | ", editorMessages.Rows.Select(r => r.Message)));
         // One log line per scene patch file per load attempt names the mod, the scene patch file's map and the outcome.
         var start = "Scene Patcher 0.6.0: load attempt 2, map " + maps[0] + " (layers " + String.Join(", ", maps.Skip(1)) + "): ";
         var lines = scenePatchFiles.ToDictionary(d => d.Mod.Source.Identifier, d => d.LogLine("0.6.0", 2, maps));
