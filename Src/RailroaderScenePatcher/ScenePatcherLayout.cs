@@ -89,9 +89,9 @@ namespace RailroaderScenePatcher {
             if (divider) builder.AddHRule();
             return builder.AddLabel("<b>" + Literal(title) + "</b>");
         }
-        // A section heading with the native disclosure triangle (UIBuilderAssets.disclosureCollapsed and
-        // disclosureExpanded, as AddExpandable draws it) right after its title. The triangle switches the section between
-        // its short form, collapsed, and its long form, expanded; the section's lines stay in view either way.
+        // A section heading with the native disclosure triangle (NativePresentation.DisclosureTriangle) right after its
+        // title. The triangle switches the section between its short form, collapsed, and its long form, expanded; the
+        // section's lines stay in view either way.
         void DisclosureSection(UIPanelBuilder builder, string title, bool longForm, Action toggle) {
             builder.AddHRule();
             builder.HStack(row => {
@@ -99,27 +99,9 @@ namespace RailroaderScenePatcher {
                 var headingLayout = heading.GetComponent<LayoutElement>() ?? heading.gameObject.AddComponent<LayoutElement>();
                 headingLayout.flexibleWidth = 0;
                 foreach (var text in heading.GetComponentsInChildren<TMP_Text>(true)) text.textWrappingMode = TextWrappingModes.NoWrap;
-                // The hit area is a clear square around the small triangle, so the triangle is easy to click.
-                var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
-                var hitRect = (RectTransform)hit.transform;
-                hitRect.SetParent(heading.parent, false);
-                var hitLayout = hit.AddComponent<LayoutElement>();
-                hitLayout.minWidth = hitLayout.preferredWidth = 20; hitLayout.minHeight = hitLayout.preferredHeight = 20; hitLayout.flexibleWidth = 0;
-                var area = hit.AddComponent<Image>(); area.color = Color.clear;
-                var icon = new GameObject("Triangle", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
-                var iconRect = (RectTransform)icon.transform;
-                iconRect.SetParent(hitRect, false);
-                iconRect.anchorMin = iconRect.anchorMax = new Vector2(.5f, .5f); iconRect.sizeDelta = new Vector2(10, 10); iconRect.anchoredPosition = Vector2.zero;
-                var image = icon.AddComponent<Image>();
-                var assets = UIBuilderAssets.Shared;
-                image.sprite = assets == null ? null : longForm ? assets.disclosureExpanded : assets.disclosureCollapsed;
-                image.preserveAspect = true; image.raycastTarget = false;
                 var headingText = heading.GetComponentInChildren<TMP_Text>(true);
-                if (headingText != null) image.color = headingText.color;
-                var button = hit.AddComponent<Button>();
-                button.targetGraphic = area; button.transition = Selectable.Transition.None;
-                button.onClick.AddListener(() => presentation.Action(toggle)());
-                hitRect.Tooltip(title, CommandBand.DisclosureTip(longForm));
+                presentation.DisclosureTriangle(heading.parent, longForm, headingText != null ? headingText.color : Color.white, toggle)
+                    .Tooltip(title, CommandBand.DisclosureTip(longForm));
                 row.Spacer();
             }).Height(LineHeight);
         }

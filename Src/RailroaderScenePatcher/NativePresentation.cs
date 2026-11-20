@@ -150,6 +150,30 @@ namespace RailroaderScenePatcher {
             if (button != null) { button.transition = Selectable.Transition.None; button.targetGraphic = hit; }
             return rect;
         }
+        // The native disclosure triangle, with the sprites AddExpandable draws (UIBuilderAssets.disclosureCollapsed and
+        // disclosureExpanded), as a button of its own in a builder row: the 10-unit triangle in the given colour stands
+        // in a clear 20-unit square that takes the click, so it is easy to hit. A click runs click and rebuilds the panel.
+        internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click) {
+            var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
+            var rect = (RectTransform)hit.transform;
+            rect.SetParent(parent, false);
+            var layout = hit.AddComponent<LayoutElement>();
+            layout.minWidth = layout.preferredWidth = 20; layout.minHeight = layout.preferredHeight = 20; layout.flexibleWidth = 0;
+            var area = hit.AddComponent<Image>(); area.color = Color.clear;
+            var icon = new GameObject("Triangle", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
+            var iconRect = (RectTransform)icon.transform;
+            iconRect.SetParent(rect, false);
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(.5f, .5f); iconRect.sizeDelta = new Vector2(10, 10); iconRect.anchoredPosition = Vector2.zero;
+            var image = icon.AddComponent<Image>();
+            var assets = UIBuilderAssets.Shared;
+            image.sprite = assets == null ? null : expanded ? assets.disclosureExpanded : assets.disclosureCollapsed;
+            image.preserveAspect = true; image.raycastTarget = false; image.color = color;
+            var button = hit.AddComponent<Button>();
+            button.targetGraphic = area; button.transition = Selectable.Transition.None;
+            var run = Action(click);
+            button.onClick.AddListener(() => run());
+            return rect;
+        }
         // Every title-bar glyph is one size and one stroke weight, those of the native close cross beside them, which
         // measures 12 to 13 pixels across with strokes of about 2 at UI scale 1: 13 canvas units across with strokes
         // of about 2 units. A glyph texture is 56 pixels: a drawing reaches the texture's edge within a unit and its
