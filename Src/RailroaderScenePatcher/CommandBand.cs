@@ -587,14 +587,16 @@ namespace RailroaderScenePatcher {
         // The Detected problems section of a stale object list: its problems are those of the last refresh.
         internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
         // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID, a
-        // problem of the kind Repair with guided task repairs (IsBindingProblem) says that the duplicate is repaired and
-        // that this problem is another one, with the two routes that repair it. repairedId is the duplicate marker ID the
-        // replacement ID repaired, or null.
-        internal static string ProblemText(string problem, string repairedId) =>
+        // problem of the kind Repair with guided task repairs (IsBindingProblem) is told in plain words instead of the
+        // inventory's rule text: first that the duplicate is repaired, then what is wrong with the binding, named by the
+        // marker's bound segment, then the two routes that repair it. repairedId is the duplicate marker ID the
+        // replacement ID repaired, or null; segment is the marker's bound segment, empty when it has none.
+        internal static string ProblemText(string problem, string repairedId, string segment) =>
             repairedId != null && IsBindingProblem(problem)
-                ? (problem.EndsWith(".", StringComparison.Ordinal) ? problem : problem + ".") + " Duplicate marker ID " + repairedId + " is repaired. " + RepairedBindingProblem
+                ? "Duplicate marker ID " + repairedId + " is repaired, but this is a different problem: "
+                    + (String.IsNullOrWhiteSpace(segment) ? "the marker has no track binding." : "the track binding names segment " + segment + ", which doesn't exist.")
+                    + " Click Repair with guided task, or set an existing track on the Connections tab."
                 : problem;
-        const string RepairedBindingProblem = "This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab.";
         // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
         // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
         internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
