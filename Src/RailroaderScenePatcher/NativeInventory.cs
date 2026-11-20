@@ -349,6 +349,8 @@ namespace RailroaderScenePatcher {
                     // it again, so the other holders of an edited marker's old and new ID are named by their IDs now.
                     Dictionary<string, List<Component>> ids = null; string idsError = null; var idsAt = -1;
                     markerIds = () => {
+                        // TrackMarkerWorld.IdWrites counts every SetMarkerId, by an edit, Undo, Redo or restoration, so
+                        // the cached index lives only until the next marker ID write.
                         if (ids != null && idsAt == TrackMarkerWorld.IdWrites) return ids;
                         if (idsError == null) {
                             try { idsAt = TrackMarkerWorld.IdWrites; return ids = TrackMarkerWorld.MarkerIds(); }
