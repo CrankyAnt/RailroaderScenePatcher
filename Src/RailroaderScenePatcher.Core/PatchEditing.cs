@@ -947,9 +947,9 @@ namespace RailroaderScenePatcher.Core {
                         var stays = " Nothing is built, because the modification stays refused: " + ScenePatchFile.Sentence(e.Message) + ".";
                         var introduced = addition == null ? null : IntroducedRefusal(resolved, value, addition.Id);
                         if (introduced != null) throw new InvalidOperationException(introduced);
-                        if (addition != null) return new EquipmentPreview(new[] { "Save " + (displayName?.Invoke(addition) ?? addition.ToString()) + " in the scene patch file." + stays }, null);
+                        if (addition != null) return new EquipmentPreview(new[] { "Save " + CrossingEquipment.Named(addition, displayName) + " in the scene patch file." + stays }, null);
                         var removed = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment.Additions.First(a => a.Id == id);
-                        return new EquipmentPreview(new[] { "Remove " + (displayName?.Invoke(removed) ?? removed.ToString()) + " from the scene patch file." + stays }, null);
+                        return new EquipmentPreview(new[] { "Remove " + CrossingEquipment.Named(removed, displayName) + " from the scene patch file." + stays }, null);
                     }
                 }
                 var candidate = (JObject)scenePatchFile.Modifications.DeepClone();

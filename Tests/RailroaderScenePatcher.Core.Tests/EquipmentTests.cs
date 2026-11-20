@@ -417,12 +417,14 @@ static class EquipmentTests {
                 "Expected [" + String.Join(" | ", expected) + "]. Got [" + (preview.Error ?? String.Join(" | ", preview.Lines)) + "].");
         }
 
+        // Each line names the addition by its equipment ID, with the display name beside it: additions that share a
+        // source read apart.
         CheckLines(Preview(West(path: replacementPath, id: "east")),
-            "Add Signal 2; the crossing controller drives it.", "Keep Signal 1 (added).");
+            "Add east (Signal 2); the crossing controller drives it.", "Keep west (Signal 1 (added)).");
         CheckLines(Preview(West(path: replacementPath)),
-            "Rebuild Signal 2; the copy of Signal 1 (added) is removed.");
-        CheckLines(Preview(West(12)), "Move Signal 1 (added).");
-        CheckLines(Preview(null, "west"), "Remove Signal 1 (added).");
+            "Rebuild west (Signal 2); the copy of Signal 1 (added) is removed.");
+        CheckLines(Preview(West(12)), "Move west (Signal 1 (added)).");
+        CheckLines(Preview(null, "west"), "Remove west (Signal 1 (added)).");
     }
     static void EditingRefusalAndFailureRestore() {
         var (f, session, mapEditor, store) = Session();
@@ -669,6 +671,10 @@ static class EquipmentTests {
         var preview = session.PreviewEquipment(Crossing, null, "bell-as-light-a");
         Assert(preview.Error == null && preview.Lines.Count == 1 && preview.Lines[0].Contains("bell-as-light-a") && preview.Lines[0].Contains("bell-as-light-b"),
             "The removal preview names the removed addition and the one that keeps the modification refused: " + preview.Error + String.Join("|", preview.Lines));
+        // Both refused additions copy one source: the removal preview names the removed one by its equipment ID.
+        var named = session.PreviewEquipment(Crossing, null, "bell-as-light-a", null, addition => "Crossing Bell at Rejected");
+        Assert(named.Error == null && named.Lines.Single().StartsWith("Remove bell-as-light-a (Crossing Bell at Rejected) from the scene patch file.", StringComparison.Ordinal),
+            "The removal preview names the addition by its equipment ID beside its display name: " + named.Error + String.Join("|", named.Lines));
         var first = session.RemoveEquipment(Crossing, "bell-as-light-a");
         Assert(first.Applied && f.World.Mutations == 0 && f.Live.Count == 0 && !session.ScenePatchFileText.Contains("bell-as-light-a") && session.ScenePatchFileText.Contains("bell-as-light-b"),
             "Removing one refused addition changes the scene patch file only: " + first.Error);
@@ -711,6 +717,9 @@ static class EquipmentTests {
         var preview = session.PreviewEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"), null);
         Assert(preview.Error == null && preview.Lines.Count == 1 && preview.Lines[0].Contains("bell-as-light-a") && preview.Lines[0].Contains("bell-as-light-b"),
             "The preview of the first correction names the addition and the one that keeps the modification refused: " + preview.Error + String.Join("|", preview.Lines));
+        var named = session.PreviewEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"), null, null, addition => "Signal 1");
+        Assert(named.Error == null && named.Lines.Single().StartsWith("Save bell-as-light-a (Signal 1) in the scene patch file.", StringComparison.Ordinal),
+            "The correction preview names the addition by its equipment ID beside its display name: " + named.Error + String.Join("|", named.Lines));
         var first = session.AddEquipment(Crossing, West(5, SignalPath, "bell-as-light-a"));
         Assert(first.Applied && f.World.Mutations == 0 && f.Live.Count == 0 && session.Refusal(Crossing) != null && session.Refusal(Crossing).Contains("bell-as-light-b"),
             "The first correction is saved and the modification stays refused for the other addition: " + first.Error + " / " + session.Refusal(Crossing));

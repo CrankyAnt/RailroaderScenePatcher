@@ -115,16 +115,22 @@ namespace RailroaderScenePatcher.Core {
             if (a == null || b == null) return a == b;
             return a.additions.Count == b.additions.Count && a.additions.All(x => b.Find(x.Key) is EquipmentAddition y && EquipmentAddition.Same(x, y));
         }
+        // An addition in a preview line: its equipment ID with its display name beside it, so that additions which copy one
+        // source read apart, or its full description without a display name.
+        internal static string Named(EquipmentAddition addition, Func<EquipmentAddition, string> displayName) {
+            var name = displayName?.Invoke(addition);
+            return name == null ? addition.ToString() : addition.Id + " (" + name + ")";
+        }
         // One line per addition: what changes first, as it is built, rebuilt, moved or removed, then what is kept.
         internal static IReadOnlyList<string> Describe(CrossingEquipment current, CrossingEquipment desired) => Describe(current, desired, null);
         internal static IReadOnlyList<string> Describe(CrossingEquipment current, CrossingEquipment desired, Func<EquipmentAddition, string> displayName) {
             if (current == null || desired == null) throw new InvalidOperationException("This object has no crossing equipment");
             var changes = new List<string>(); var kept = new List<string>();
-            string Name(EquipmentAddition addition) => displayName?.Invoke(addition) ?? addition.ToString();
+            string Name(EquipmentAddition addition) => Named(addition, displayName);
             foreach (var want in desired.additions) {
                 var now = current.Find(want.Key);
                 if (now == null) changes.Add("Add " + Name(want) + "; the crossing controller drives it.");
-                else if (!EquipmentAddition.SameBuild(now, want)) changes.Add("Rebuild " + Name(want) + "; the copy of " + (displayName == null ? now.Source.ToString() : Name(now)) + " is removed.");
+                else if (!EquipmentAddition.SameBuild(now, want)) changes.Add("Rebuild " + Name(want) + "; the copy of " + (displayName == null ? now.Source.ToString() : displayName(now)) + " is removed.");
                 else if (!EquipmentAddition.SamePlacement(now.Placement, want.Placement)) changes.Add("Move " + Name(want) + ".");
                 else kept.Add("Keep " + Name(want) + ".");
             }

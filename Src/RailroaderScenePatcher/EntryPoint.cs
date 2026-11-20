@@ -1508,6 +1508,16 @@ namespace RailroaderScenePatcher {
                 if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement);
             } catch (Exception) { }
         }
+        // After Use file version the open equipment form shows its addition as the scene patch file now holds it. A form
+        // for an addition the file no longer holds, and a new addition's draft, close: nothing from before the choice
+        // stays behind to be applied.
+        void ReplaceOpenEquipment() {
+            if (equipmentSource == null) return;
+            var held = false;
+            if (equipmentEdited != null && attachment != null && selected?.Identity.Structure == CrossingCoverageScene.Structure)
+                try { held = attachment.Session.EquipmentEntries(selected.Identity).Any(e => e.Addition.Id == equipmentEdited); } catch (Exception) { }
+            if (held) ReadOpenEquipment(); else CloseEquipmentForm();
+        }
         void CloseEquipmentForm() { equipmentEdited = null; equipmentSource = null; equipmentLabel = null; preparedEquipment = null; equipmentOwn = null; equipmentAngles = null; for (var i = 0; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0"; }
         EquipmentAddition ParseEquipment(out string problem) {
             var id = (equipmentFields[0] ?? "").Trim();
