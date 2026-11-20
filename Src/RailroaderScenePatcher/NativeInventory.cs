@@ -465,7 +465,7 @@ namespace RailroaderScenePatcher {
                 foreach (var name in new[] { "prefix", "origin", "mileage" }) bindings.Add("Milepost " + name + "=" + Describe(Field(c, name)));
                 dependencies.Add("Milepost origin cache and rendered display");
             });
-            // A spawn point names what teleport and quick search offer, its priority and the start setups that name it.
+            // A spawn point names what teleport offers, its priority and the start setups that name it.
             if (TypeName(c) == SpawnPoints.Component) Read(() => {
                 bindings.AddRange(SpawnPointWorld.Bindings(c));
                 dependencies.Add(SpawnPoints.Dependency);

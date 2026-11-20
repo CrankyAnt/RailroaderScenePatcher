@@ -19,18 +19,19 @@ namespace RailroaderScenePatcher.Core {
     // patcher applies the spawn point modifications first (PatchEngine.BeforeNewGameStart). None of this is observed in
     // Railroader yet, so the Object tab states it as expected behaviour.
     // A stuck player is moved to the closest active spawn point, and to a native spawn only when there is none
-    // (PlayerController, SpawnPoint.TryClosestTo). The /tp console command and quick search list the active spawn
-    // points by name and jump to where each stands (TeleportCommand, QuickSearchController). Each reads the
-    // transform when it runs, so a moved spawn point is used at its new place.
+    // (PlayerController, SpawnPoint.TryClosestTo). The /tp console command lists the active spawn points by name and
+    // jumps to where each stands (TeleportCommand). Quick search lists them too (QuickSearchController.AllItems), but
+    // its Show() is empty in Railroader 0.6.3, so it never opens there. Each reads the transform when it runs, so a
+    // moved spawn point is used at its new place.
     public static class SpawnPoints {
         public const string Family = "Spawn point", Component = "Character.SpawnPoint", Structure = "spawn-point-v1", RequiredVersion = "0.5.0";
         public const string Operations = "Move, rotate, enable or disable this spawn point. Native spawns in the map data stay with the Map Editor's Spawns category.";
-        public const string Dependency = "Player start, rescue, teleport and quick search read this spawn point's placement when they run; only an active spawn point is offered, and a start setup reads it whatever its activity";
+        public const string Dependency = "Player start, rescue and teleport read this spawn point's placement when they run; only an active spawn point is offered, and a start setup reads it whatever its activity";
         // The family of a component below a scene root of this name, or null: every scene spawn point that the inventory
         // can list at all, wherever it stands.
         public static string FamilyOf(string componentType, string sceneRoot) =>
             componentType == Component && BakedSceneryRules.ListedBelow(sceneRoot, false) ? Family : null;
-        // The binding lines of a spawn point: the name teleport and quick search offer, its priority for the default
+        // The binding lines of a spawn point: the name teleport offers, its priority for the default
         // start, and each start setup that names it, by that setup's identifier. A setup without an identifier has no
         // line here: the adapter names it by its object, as the starter placement markers do. When the setups cannot
         // be read, one line says so instead, so the Object tab never reads that no setup names the spawn point.
@@ -64,8 +65,8 @@ namespace RailroaderScenePatcher.Core {
                 : "New game: the map declares " + Count(nativeSpawns.Value, "native spawn") + ", so a new game without a start setup is expected to start there. The Map Editor edits them under Spawns.");
             uses.Add(active ? "Rescue: a stuck player is expected to be moved to the closest active spawn point."
                 : "Rescue: a stuck player is expected to be moved to the closest active spawn point; this spawn point is disabled, so it is passed by.");
-            uses.Add(active ? "Teleport and quick search: the /tp console command and quick search are expected to offer this spawn point as " + name + " and jump to where it stands."
-                : "Teleport and quick search: the /tp console command and quick search offer only active spawn points; this spawn point is disabled, so they are expected not to offer it.");
+            uses.Add(active ? "Teleport: the /tp console command is expected to offer this spawn point as " + name + " and jump to where it stands. Quick search lists active spawn points too, in a game version that opens it; Railroader 0.6.3 doesn't open quick search."
+                : "Teleport: the /tp console command offers only active spawn points; this spawn point is disabled, so it's expected not to offer it.");
             var unread = After(lines, SetupsUnreadPrefix).FirstOrDefault();
             var setups = After(lines, SetupPrefix).ToArray();
             uses.Add(unread != null ? "Start setup: the start setups could not be read: " + unread + "."

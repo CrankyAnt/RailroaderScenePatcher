@@ -16,7 +16,7 @@ The **Use in the game** section of the **Object** tab lists the uses of the insp
 
 - **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. If several active spawn points share that priority, the game does not fix which of them it takes, and the tab says so. With native spawns, the new game is expected to start at those instead.
 - **Rescue:** a stuck player is expected to be moved to the closest active spawn point.
-- **Teleport and quick search:** the `/tp` console command and quick search are expected to offer each active spawn point by its object name and jump to where it stands.
+- **Teleport:** the `/tp` console command is expected to offer each active spawn point by its object name and jump to where it stands. Quick search also lists active spawn points, but only in a game version that opens it. Railroader 0.6.3 doesn't open quick search.
 - **Start setup:** when the game applies an active start setup that names the spawn point to a company with no cars and no balance yet, the new company game is expected to start there, also while the spawn point is disabled. The tab names each such setup by its identifier, or by its object name when it has none. Whether a start setup or the map's native spawns win when both exist has not been established.
 
 The game reads a spawn point's transform each time it uses it. In Railroader 0.6.3, `/tp alarka` took the player to the moved Alarka point. A new East Whittier company game without native spawns used the moved spawn point named by its start setup. Removing the modification returned the new company's start to its authored position.
@@ -33,7 +33,7 @@ The spawn point moves at once, and its helper marker moves with it. Save, Undo, 
 
 ## Disable or enable a spawn point
 
-Click **Disable** at the bottom of the **Object** tab to take the spawn point out of rescue, teleport, quick search and the default start. Click **Enable**, Undo, or **Remove modification** to bring it back.
+Click **Disable** at the bottom of the **Object** tab to take the spawn point out of rescue, teleport and the default start. Click **Enable**, Undo, or **Remove modification** to bring it back.
 
 ## Write the modification by hand
 
@@ -64,4 +64,4 @@ Before a change, the patcher requires that the spawn point's scene is loaded and
 
 ## Limits
 
-Automated tests check placement and activity with a controlled spawn point. The Railroader 0.6.3 runs did not establish rescue, quick search, the default start without a start setup, the behavior of an inactive point named by a start setup, or precedence when a map also supplies native spawns. A baked scenery group that holds a spawn point cannot be moved as a whole. Edit each spawn point in its own family.
+Automated tests check placement and activity with a controlled spawn point. The Railroader 0.6.3 runs did not establish rescue, the default start without a start setup, the behavior of an inactive point named by a start setup, or precedence when a map also supplies native spawns. A baked scenery group that holds a spawn point cannot be moved as a whole. Edit each spawn point in its own family.
