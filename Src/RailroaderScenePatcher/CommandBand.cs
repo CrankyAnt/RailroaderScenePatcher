@@ -465,7 +465,7 @@ namespace RailroaderScenePatcher {
             var shown = storage ?? "industry's storage";
             var segments = ConstructionSegments(lines);
             if (segments.Count != 0)
-                return "The construction state of track segment" + (segments.Count == 1 ? " " : "s ") + Listing(segments) + " decides which parts of this bridge the game shows.";
+                return "The construction state of track segment" + (segments.Count == 1 ? " " : "s ") + Prose.Join(segments) + " decides which parts of this bridge the game shows.";
             var interactive = Interactive(part, lines);
             if (interactive != null) return interactive;
             if (lines.Contains(LogPondSelf))
@@ -608,8 +608,6 @@ namespace RailroaderScenePatcher {
         // The Enabled readout of an object that no explicit disable holds off while progression or a map feature
         // switches it off now.
         internal const string SwitchedOffByGame = "Yes, but currently switched off by the game";
-        // Names in running text: "a", "a and b", "a, b and c".
-        static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + (names.Count == 2 ? " and " : ", and ") + names[names.Count - 1];
         // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise
         // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height keeps
         // the object in place.
@@ -621,7 +619,7 @@ namespace RailroaderScenePatcher {
             var names = (holders ?? Enumerable.Empty<string>()).ToArray();
             var several = !self && names.Length > 1;
             var kind = parts ? "part" : "object";
-            var who = self ? (group ? GroupRootHolds : "this part holds the scene ground mask") : several ? "the " + kind + "s " + Listing(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
+            var who = self ? (group ? GroupRootHolds : "this part holds the scene ground mask") : several ? "the " + kind + "s " + Prose.Join(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
             if (flattens) return GroundMaskPrefix + who + (several ? ", and one or more also flatten the terrain height. " : ", which also flattens the terrain height. ") + (!self ? "This object " : group ? "The group " : "It ") + HeightUnconfirmed;
             return GroundMaskPrefix + who + ". Moving " + (!self ? "this object moves " + (several ? "those " + kind + "s" : "that " + kind) + " and the terrain shaping with " + (several ? "them" : "it") : group ? "the group moves the terrain shaping" : "it moves the terrain shaping") +
                 ". The patcher asks the game to regenerate terrain and vegetation at the old and new positions.";

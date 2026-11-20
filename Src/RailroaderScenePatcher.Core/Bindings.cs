@@ -89,8 +89,7 @@ namespace RailroaderScenePatcher.Core {
             Holders.OrderBy(h => ReferenceEquals(h.Handle, self) ? 0 : h.Registers ? 1 : 2).ToArray();
         static string Activity(MarkerIdHolder holder) => holder.Registers ? "active" : "inactive";
         string Names(object self) {
-            var names = Ordered(self).Select(h => h.Name + " (" + Activity(h) + ")").ToArray();
-            return names.Length < 2 ? String.Join("", names) : String.Join(", ", names.Take(names.Length - 1)) + (names.Length == 2 ? " and " : ", and ") + names[names.Length - 1];
+            return Prose.Join(Ordered(self).Select(h => h.Name + " (" + Activity(h) + ")"));
         }
         // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
         // sentences that follow the label of the action they refuse.

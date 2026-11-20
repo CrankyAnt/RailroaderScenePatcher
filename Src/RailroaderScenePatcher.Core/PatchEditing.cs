@@ -158,9 +158,7 @@ namespace RailroaderScenePatcher.Core {
 
         public static string DisplayItem(string item) => item == NativeData ? "map data" : item == Metadata ? "patcher dependency" : item;
         public static string OutstandingWriteList(IReadOnlyList<string> outstanding) {
-            if (outstanding.Count < 2) return String.Join("", outstanding.Select(DisplayItem));
-            var conjunction = outstanding.Count == 2 ? " and " : ", and ";
-            return String.Join(", ", outstanding.Take(outstanding.Count - 1).Select(DisplayItem)) + conjunction + DisplayItem(outstanding[outstanding.Count - 1]);
+            return Prose.Join(outstanding.Select(DisplayItem));
         }
         readonly PatchEngine engine;
         readonly IScene scene;
@@ -911,7 +909,7 @@ namespace RailroaderScenePatcher.Core {
             string whole = null;
             if (refused.Count == 0) whole = ModificationRefusal(existing, resolved);
             var stopped = refused.Count == 0 ? whole
-                : (refused.Count == 1 ? "addition " + refused[0] + " is" : "additions " + String.Join(", ", refused.Take(refused.Count - 1)) + (refused.Count == 2 ? " and " : ", and ") + refused[refused.Count - 1] + " are")
+                : (refused.Count == 1 ? "addition " + refused[0] + " is" : "additions " + Prose.Join(refused) + " are")
                     + " refused, so none of this crossing's additions are built";
             var entries = new List<EquipmentEntry>();
             foreach (var addition in modEquipment.Additions) {

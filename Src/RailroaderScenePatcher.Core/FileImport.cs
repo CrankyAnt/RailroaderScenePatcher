@@ -238,8 +238,7 @@ namespace RailroaderScenePatcher.Core {
         }
         static string List(IReadOnlyList<string> items) {
             if (items.Count == 0) return "nothing";
-            if (items.Count == 1) return items[0];
-            return String.Join(", ", items.Take(items.Count - 1)) + (items.Count == 2 ? " and " : ", and ") + items[items.Count - 1];
+            return Prose.Join(items);
         }
         ImportConflict Conflict(int number, ImportConflictCase kind, List<string> keys, JObject file, JObject read, JObject start, JObject editor) {
             var name = keys.Select(k => TargetName(Entry(file, k), Entry(editor, k), Entry(read, k), Entry(start, k))).FirstOrDefault(n => n != null);

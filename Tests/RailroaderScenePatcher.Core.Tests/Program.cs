@@ -305,6 +305,7 @@ class Program {
         StarterTrackLocationTests.Run();
         StarterWreckTests.Run();
         GuidedTaskTests.Run();
+        ProseTests.Run();
         CommandBandTests.Run();
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
