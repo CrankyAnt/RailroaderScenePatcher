@@ -573,6 +573,14 @@ namespace RailroaderScenePatcher {
         internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Marker ID section, enter a replacement ID and click Set ID.";
         // Whether the Object tab offers Repair duplicate ID: for a generic track marker whose explanation names a
         // duplicate marker ID, active or not.
+        // Whether the Object tab shows Repair duplicate ID and Set ID on the Connections tab at all: on every generic
+        // track marker, the one kind that takes a replacement ID. Without a duplicate marker ID they stay visible,
+        // disabled with their reason (DuplicateRepairReason), as every unsupported operation does.
+        internal static bool ShowsDuplicateRepairs(string structure) => structure == TrackMarkerScene.Structure;
+        // Why the two repairs are unavailable, or null. With a duplicate marker ID, block, the replacement ID's own reason.
+        // Without one, that reason, or for a marker that holds its replacement ID alone the same sentence with that ID.
+        internal static string DuplicateRepairReason(bool offersRepair, string block, string currentId) =>
+            offersRepair ? block : block ?? MarkerIdUnavailable(null, true, currentId, 0, false) ?? "This marker has no duplicate marker ID to repair.";
         internal static bool OffersDuplicateRepair(string structure, IEnumerable<string> dependencies) =>
             structure == TrackMarkerScene.Structure && dependencies?.Any(line => line != null && line.StartsWith("Duplicate marker ID ", StringComparison.Ordinal)) == true;
         // What the Detected problems section says when the object has no problem. Beside Repair duplicate ID the holder

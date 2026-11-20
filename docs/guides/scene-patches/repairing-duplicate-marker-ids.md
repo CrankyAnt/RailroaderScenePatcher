@@ -44,7 +44,7 @@ The replacement ID doesn't change the marker's track binding. If that binding na
 
 Use this route to have every step of the change checked in a single guided task.
 
-1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section for a generic track marker whose explanation names a duplicate marker ID, active or inactive.
+1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section of every generic track marker, beside **Set ID on the Connections tab**. Both are available when the marker's explanation names a duplicate marker ID, active or inactive. Without a duplicate marker ID, for example after the repair, both stay visible but are unavailable, and their tooltips read `Unavailable: Only this marker holds marker ID <id>, so it doesn't need a replacement ID.`
 1. In **Target**, select **Set replacement ID** in the task list.
 1. In **Values**, enter a new ID that you make up in the **Replacement ID** field. The same text as on the **Connections** tab stands below the field, and the same checks as **Set ID** apply.
 1. Click **Next**. **Review** checks the ID against the scene markers and map objects, as **Apply** does. An ID that's already in use is refused in **Review**, with the marker or map object that uses it. **Review** shows the proposed **Marker ID**. It lists the settings that stay unchanged: placement, activity, and track binding. Every other holder keeps its registration.
