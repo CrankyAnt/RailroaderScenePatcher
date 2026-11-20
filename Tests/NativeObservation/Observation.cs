@@ -71,6 +71,15 @@ public sealed class Observation : MonoBehaviour {
     static JObject BoundsValue(Bounds b) => new JObject { ["center"] = V(b.center), ["size"] = V(b.size), ["min"] = V(b.min), ["max"] = V(b.max) };
     static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
     static Transform One(string path, string scene = null) { var a = Resources.FindObjectsOfTypeAll<Transform>().Where(t => t != null && t.gameObject.scene.IsValid() && t.gameObject.scene.isLoaded && (scene == null || t.gameObject.scene.name == scene) && PathOf(t) == path).ToArray(); if (a.Length != 1) throw new InvalidOperationException(path + " match count=" + a.Length); return a[0]; }
+    // The one loaded object at a path whose crossbuck target carries this pad marker id, as the patcher gives it to a
+    // crossbuck that shares its path with other crossbucks, such as the three below World/Roads Bryson/Old River Rd.
+    static Transform OneCrossbuck(string path, string padMarkerId) {
+        var world = TypeNamed("RailroaderScenePatcher.GroupWorld");
+        var a = Resources.FindObjectsOfTypeAll<Transform>().Where(t => t != null && t.gameObject.scene.IsValid() && t.gameObject.scene.isLoaded && PathOf(t) == path).ToArray();
+        var b = a.Where(t => Convert.ToString(Call(world, "TargetPadMarkerId", t.gameObject)) == padMarkerId).ToArray();
+        if (b.Length != 1) throw new InvalidOperationException(path + " with pad marker " + padMarkerId + " match count=" + b.Length + " of " + a.Length + " at the path");
+        return b[0];
+    }
     static JObject Placement(Transform t) => new JObject { ["instanceId"] = t.gameObject.GetInstanceID(), ["scene"] = t.gameObject.scene.name, ["sceneHandle"] = t.gameObject.scene.handle.ToString(), ["path"] = PathOf(t), ["parent"] = t.parent == null ? null : PathOf(t.parent), ["parentId"] = t.parent == null ? (int?)null : t.parent.gameObject.GetInstanceID(), ["worldPosition"] = V(t.position), ["worldRotation"] = Q(t.rotation), ["localPosition"] = V(t.localPosition), ["localRotation"] = Q(t.localRotation), ["localScale"] = V(t.localScale), ["lossyScale"] = V(t.lossyScale), ["mapPosition"] = V(ConvertPosition("WorldToGame", t.position)), ["activeSelf"] = t.gameObject.activeSelf, ["activeInHierarchy"] = t.gameObject.activeInHierarchy };
     static Component ComponentAt(Transform t, string type) => t.GetComponents<Component>().Single(c => c != null && c.GetType().FullName == type);
     JObject Marker() {
@@ -141,8 +150,8 @@ public sealed class Observation : MonoBehaviour {
     void Replay() { try { Guard(); if (!ready) throw new InvalidOperationException("Not ready"); var type = TypeNamed("RailroaderScenePatcher.PatcherBehaviour"); var matches = Resources.FindObjectsOfTypeAll(type).OfType<Component>().Where(c => c != null).ToArray(); if (matches.Length != 1) throw new InvalidOperationException("Patcher count=" + matches.Length); var p = matches[0]; var engine = Read(p, "engine"); if (engine == null) throw new InvalidOperationException("No engine"); Emit("replay-start", new JObject { ["patcherInstanceId"] = p.GetInstanceID(), ["engineIdentity"] = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(engine) }); Call(p, "ApplyScenePatchFiles"); Emit("replay-end", new JObject { ["engineSame"] = ReferenceEquals(engine, Read(p, "engine")) }); status = "Replay callback completed"; } catch (Exception e) { if (ready && GuardStillValid()) Emit("replay-error", new JObject { ["error"] = e.GetBaseException().ToString() }); status = "Replay failed: " + e.GetBaseException().Message; } }
     // The culling readout serves any map in the isolated home: it needs the home and the observer's mod folder, not the
     // fixed-placement fixture. It writes Evidence/culling/readout.jsonl under the mod folder.
-    string cullingPath = "World/Large Scenery/Whittier/Whittier Saw Mill", cullingLabel = "", cullingStatus = "No readout yet"; long cullingSequence;
-    Rect cullingWindow = new Rect(740, 330, 380, 170);
+    string cullingPath = "World/Large Scenery/Whittier/Whittier Saw Mill", cullingPadMarkerId = "", cullingLabel = "", cullingStatus = "No readout yet"; long cullingSequence;
+    Rect cullingWindow = new Rect(740, 330, 380, 210);
     bool HomeValid() {
         try {
             var args = Environment.GetCommandLineArgs(); var ix = Enumerable.Range(0, args.Length).Where(i => String.Equals(args[i], "-homedir", StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -171,8 +180,9 @@ public sealed class Observation : MonoBehaviour {
     void CullingReadout() {
         try {
             if (!HomeValid()) throw new InvalidOperationException("Unexpected home or observer mod");
-            var root = One(cullingPath);
-            var data = new JObject { ["evidenceKind"] = "culling-readout", ["schemaVersion"] = 1, ["label"] = cullingLabel, ["sequence"] = ++cullingSequence, ["utc"] = DateTime.UtcNow.ToString("O"), ["frame"] = Time.frameCount, ["gameVersion"] = Application.version, ["group"] = Placement(root) };
+            var padMarkerId = cullingPadMarkerId.Trim();
+            var root = padMarkerId.Length == 0 ? One(cullingPath) : OneCrossbuck(cullingPath, padMarkerId);
+            var data = new JObject { ["evidenceKind"] = "culling-readout", ["schemaVersion"] = 1, ["label"] = cullingLabel, ["padMarkerId"] = padMarkerId.Length == 0 ? null : padMarkerId, ["sequence"] = ++cullingSequence, ["utc"] = DateTime.UtcNow.ToString("O"), ["frame"] = Time.frameCount, ["gameVersion"] = Application.version, ["group"] = Placement(root) };
             data["patcherAssemblySha256"] = HashFile(TypeNamed("RailroaderScenePatcher.PatcherBehaviour").Assembly.Location);
             var camera = Camera.main; if (camera != null) data["camera"] = new JObject { ["mapPosition"] = V(ConvertPosition("WorldToGame", camera.transform.position)), ["rotation"] = Q(camera.transform.rotation), ["distanceToGroup"] = (camera.transform.position - root.position).magnitude };
             data["cullers"] = new JArray(root.GetComponentsInChildren<Component>(true).Where(c => c != null && (c.GetType().FullName == "Helpers.SimpleCuller" || c.GetType().FullName == "Helpers.Culling.RendererCuller" || c.GetType().FullName == "Helpers.Culling.GameObjectCuller")).Select(GameCuller));
@@ -212,6 +222,7 @@ public sealed class Observation : MonoBehaviour {
             cullingWindow = GUI.Window(0x4933394E, cullingWindow, id => {
                 GUILayout.Label(cullingStatus);
                 GUILayout.Label("Group path"); cullingPath = GUILayout.TextField(cullingPath);
+                GUILayout.Label("Pad marker ID (crossbucks that share a path)"); cullingPadMarkerId = GUILayout.TextField(cullingPadMarkerId);
                 GUILayout.Label("Label"); cullingLabel = GUILayout.TextField(cullingLabel);
                 if (GUILayout.Button("Culling readout")) CullingReadout();
                 GUI.DragWindow(new Rect(0, 0, 10000, 20));
