@@ -32,7 +32,23 @@ static class CommandBandTests {
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
         GroupVerdictsSayNotYetOnlyWithATicket();
+        ARefusedAdditionTakesItsCorrectionFromUse();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
+    }
+    // A refused addition is corrected in its own Edit form: Use then gives that addition the device as its source and
+    // keeps its ID and placement, instead of starting a new addition. A valid addition's form and no form start a new one.
+    // The preview the form shows also stands in the footer, so a removal or correction that builds nothing says so there.
+    static void ARefusedAdditionTakesItsCorrectionFromUse() {
+        var source = new EquipmentSource("BushnellWhittier", "World/Roads/Grade Crossing - Bryson Everett/Signal 1");
+        EquipmentAddition Item(string id) => new EquipmentAddition(id, EquipmentAddition.LightGatePattern, source, new Placement(new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }));
+        var entries = new[] { new EquipmentEntry(Item("bell-as-light-a"), null, "Equipment bell-as-light-a: the source does not conform"), new EquipmentEntry(Item("west"), Item("west"), null) };
+        Check(CommandBand.CorrectedAddition("bell-as-light-a", entries) == "bell-as-light-a", "Use in the form of a refused addition corrects that addition");
+        Check(CommandBand.CorrectedAddition("west", entries) == null && CommandBand.CorrectedAddition(null, entries) == null && CommandBand.CorrectedAddition("gone", entries) == null,
+            "Use in a valid addition's form, without a form, or for an addition the file no longer holds starts a new addition");
+        var lines = new[] { "Remove bell-as-light-a from the scene patch file. Nothing is built, because the modification stays refused: Equipment bell-as-light-b: no." };
+        Check(CommandBand.PreviewReport("Equipment", lines) == "Equipment preview completed. " + lines[0] + " Click Apply to apply it.",
+            "The footer carries the preview line and asks for a click: " + CommandBand.PreviewReport("Equipment", lines));
+        Check(CommandBand.PreviewReport("Coverage", new string[0]) == "Coverage preview completed. Click Apply to apply it.", "A preview without lines asks for the click only");
     }
     // A group left out under a settled rule that needs no ticket, such as a group that holds track markers, is not
     // waiting for support and never reads "Not yet supported:"; a group a ticket covers does.

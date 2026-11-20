@@ -95,6 +95,17 @@ namespace RailroaderScenePatcher {
             text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
             return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
         }
+        // The footer report of a completed preview: the preview's own lines, as the form shows them, then the click that
+        // applies it. A removal or correction that builds nothing says so here too, wherever the form stands in the tab.
+        internal static string PreviewReport(string kind, IEnumerable<string> lines) {
+            var shown = (lines ?? Enumerable.Empty<string>()).Where(line => !String.IsNullOrWhiteSpace(line)).Select(Sentence).ToArray();
+            return kind + " preview completed. " + (shown.Length == 0 ? "" : String.Join(" ", shown) + " ") + "Click Apply to apply it.";
+        }
+        // The addition a Use corrects: the refused addition whose Edit form is open (editedId) takes the device as its
+        // source and keeps its ID and placement. Null when Use starts a new addition: no form, a new addition's form, or
+        // the form of an addition that is built or that the scene patch file no longer holds.
+        internal static string CorrectedAddition(string editedId, IEnumerable<EquipmentEntry> entries) =>
+            editedId == null ? null : (entries ?? Enumerable.Empty<EquipmentEntry>()).Any(e => e?.Addition?.Id == editedId && e.Problem != null) ? editedId : null;
         // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
         // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
         // ignored click.

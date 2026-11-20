@@ -988,12 +988,15 @@ namespace RailroaderScenePatcher {
             if (candidates == null) return;
             var bells = candidates.Where(c => c.Source.IsDefinition).ToList();
             candidates = candidates.Where(c => !c.Source.IsDefinition).ToList();
+            // With the Edit form of a refused addition open, Use corrects that addition rather than adding a new one.
+            var corrected = attachment == null ? null : CorrectedUse(attachment.Session);
+            string UseTip(string added) => corrected == null ? added : "Correct " + corrected + " with this source. Its equipment ID and placement stay. Click Preview, then Apply.";
             Line(builder, candidates.Count(c => c.Eligible) + " eligible and " + candidates.Count(c => !c.Eligible) + " rejected devices in the loaded map", null, null);
             foreach (var candidate in candidates) {
                 var source = candidate;
                 var name = InventoryPresentationState.EquipmentSourceName(source);
                 if (source.Eligible) Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
-                    .Tooltip("Use " + name, CommandBand.Tooltip("Copy this device to this crossing. The crossing controller drives its lamps and gates.", wait));
+                    .Tooltip("Use " + name, CommandBand.Tooltip(UseTip("Copy this device to this crossing. The crossing controller drives its lamps and gates."), wait));
                 else Field(builder, "Rejected " + name, CommandBand.Sentence(source.Problem));
             }
             var deviceGuide = CommandBand.RejectionGuide(candidates);
@@ -1006,7 +1009,7 @@ namespace RailroaderScenePatcher {
                 var source = candidate;
                 var name = InventoryPresentationState.EquipmentSourceName(source);
                 if (source.Eligible) Button(builder, "Use " + name, () => UseSource(attachment.Session, source)).Inactive(wait != null)
-                    .Tooltip("Use " + name, CommandBand.Tooltip("Add a bell to this crossing using this definition's sound. It rings when the crossing controller rings its own bell.", wait));
+                    .Tooltip("Use " + name, CommandBand.Tooltip(UseTip("Add a bell to this crossing using this definition's sound. It rings when the crossing controller rings its own bell."), wait));
                 else Field(builder, "Rejected " + name, CommandBand.Sentence(source.Problem));
             }
             var bellGuide = CommandBand.RejectionGuide(bells);

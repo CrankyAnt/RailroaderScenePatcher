@@ -1421,7 +1421,7 @@ namespace RailroaderScenePatcher {
                 preparedCoverage = new PreparedCoverage { Circuit = circuit, Addition = addition, Value = value, Preview = preview };
                 // A preview that the session itself refuses carries its reason; either way the newest result leads.
                 if (preview.Error != null) feedback.Refuse(CoveragePlace, "Coverage preview", preview.Error);
-                else feedback.Report(CoveragePlace, "Coverage preview completed. Select Apply to apply it.");
+                else feedback.Report(CoveragePlace, CommandBand.PreviewReport("Coverage", null));
                 presentation?.RequestRefresh();
             });
         }
@@ -1439,7 +1439,7 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) { feedback.Refuse(place, "Equipment preview", e.GetBaseException().Message); preparedEquipment = null; return; }
                 preparedEquipment = new PreparedEquipment { Addition = addition, RemoveId = removeId, Preview = preview };
                 if (preview.Error != null) feedback.Refuse(place, "Equipment preview", preview.Error);
-                else feedback.Report(place, "Equipment preview completed. Select Apply to apply it.");
+                else feedback.Report(place, CommandBand.PreviewReport("Equipment", preview.Lines));
                 presentation?.RequestRefresh();
             });
         }
@@ -1447,8 +1447,15 @@ namespace RailroaderScenePatcher {
         // the device's placement relative to its own crossing carried over to the inspected crossing, five metres aside.
         // A bell has no placement of its own to carry over: it starts at the inspected crossing, five metres aside, and its ID
         // comes from the definition's name or identifier.
+        // In the open Edit form of a refused addition, Use corrects that addition instead: it takes the device as its
+        // source and keeps its ID and the form's placement, so Preview and Apply save the correction (CorrectedAddition).
         void UseSource(PatchEditingSession session, SourceCandidate candidate) {
             CloseCoverageForm(); feedback.ClearPlace(LightGatePlace); feedback.ClearPlace(BellPlace);
+            if (CorrectedUse(session) != null) {
+                equipmentSource = candidate.Source; preparedEquipment = null;
+                equipmentLabel = InventoryPresentationState.EquipmentSourceName(candidate);
+                return;
+            }
             equipmentSource = candidate.Source; preparedEquipment = null; equipmentOwn = null; equipmentEdited = null;
             equipmentLabel = InventoryPresentationState.EquipmentSourceName(candidate);
             var path = candidate.Source.Path ?? candidate.Source.Definition;
@@ -1457,6 +1464,11 @@ namespace RailroaderScenePatcher {
             for (var i = 1; i < 7; i++) equipmentFields[i] = i < 4 ? "" : "0";
             if (selected == null || selected.Position.Count != 3 || selected.Rotation.Count != 4) return;
             FillEquipment(EquipmentPlacement.Propose(candidate.Position, candidate.Rotation, candidate.CrossingPosition, candidate.CrossingRotation, selected.Position.ToArray(), selected.Rotation.ToArray()));
+        }
+        // The refused addition a Use would correct now, or null when Use starts a new addition.
+        string CorrectedUse(PatchEditingSession session) {
+            if (equipmentEdited == null || session == null || selected?.Identity.Structure != CrossingCoverageScene.Structure) return null;
+            try { return CommandBand.CorrectedAddition(equipmentEdited, session.EquipmentEntries(selected.Identity)); } catch { return null; }
         }
         // Opens the form for an addition of this mod as the scene patch file holds it.
         void ReadEquipment(EquipmentAddition addition, string name) {
