@@ -181,7 +181,7 @@ namespace RailroaderScenePatcher {
                         values.AddSegment("Yes", guidedFields[0] == "Yes", presentation.Action(() => guidedFields[0] = "Yes"));
                         values.AddSegment("No", guidedFields[0] == "No", presentation.Action(() => guidedFields[0] = "No"));
                     }, true);
-                    PlainLabel(builder, "Choose the setting the car cut has without this mod to remove the mod's value.");
+                    PlainLabel(builder, CommandBand.WreckValuesHelp);
                     break;
                 case GuidedTaskKind.DetachBinding:
                     PlainLabel(builder, "Remove the logical track binding without changing the object's placement or activity.");

@@ -40,6 +40,8 @@ static class GuidedTaskTests {
         Check(CommandBand.WreckTaskReason(false, null, new[] { reader }) == "This object is not a starter placement marker.", "Another object does not offer the wreck task");
         var controller = new TargetIdentity("scene", "Ela Bridge Scenery", "Game.Mow.TrackConstructionScenery", ConstructionSceneryScene.Structure);
         Check(GuidedTaskState.TargetBlock(GuidedTaskKind.Wreck, controller) == "The construction controller is not a starter placement marker.", "The construction controller does not offer the wreck task");
+        // The Values help line uses the term of the inspector's section, Starting cars.
+        Check(CommandBand.WreckValuesHelp == "Choose the setting the starting cars have without this mod to remove the mod's value.", "The Values help line names the starting cars: " + CommandBand.WreckValuesHelp);
         // Values starts from the effective setting; an unchanged value cannot be reviewed.
         var state = new GuidedTaskState(); var target = Target("starter");
         state.Start(GuidedTaskKind.Wreck, target, new[] { "No" }); state.SetValues(new[] { "Yes" }); state.Review(); state.Back();

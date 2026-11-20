@@ -133,6 +133,9 @@ namespace RailroaderScenePatcher {
         // there only where the inspector's checkbox can be used (WreckReason).
         internal static string WreckTaskReason(bool starter, string setupsError, IReadOnlyList<string> readers) =>
             starter ? WreckReason(setupsError, readers) : "This object is not a starter placement marker.";
+        // The help line under the Start derailed choice in the guided task's Values, in the term of the inspector's
+        // Starting cars section.
+        internal const string WreckValuesHelp = "Choose the setting the starting cars have without this mod to remove the mod's value.";
         // Why the Start derailed value of the guided task cannot be reviewed: it is the car placement's current setting.
         internal const string SameWreck = "The car placement already has the selected Start derailed setting.";
         // Why Clear activity cannot run for an object this mod sets no activity for, or null.
