@@ -29,7 +29,7 @@ If multiple mods try to change the same existing scene object, an informational 
 
 ## Tested maps
 
-The patcher has been tested on the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and on maps that inherit it as a map layer. Maps with a different terrain tile set, such as a whole new map, are untested. The patcher stays enabled on these maps unless the end-of-project check finds that it corrupts the map or its save.
+The patcher has been tested on the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and on maps that inherit it as a map layer. Maps with a different terrain tile set, such as a whole new map, are untested. The patcher doesn't disable itself on these maps.
 
 ## For map modders
 
