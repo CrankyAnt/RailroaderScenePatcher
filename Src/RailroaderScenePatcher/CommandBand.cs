@@ -588,6 +588,9 @@ namespace RailroaderScenePatcher {
                 ? problem + ". Duplicate marker ID " + repairedId + " is repaired. This is a different problem: the track binding " + (problem.IndexOf("missing segment", StringComparison.Ordinal) >= 0 ? "names a segment that doesn't exist" : "is empty")
                     + ". Click Repair with guided task, or set an existing track on the Connections tab."
                 : problem;
+        // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
+        // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
+        internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
             !generic ? ReplacementMarkerIds.NotSupportedFor(family)
             : hasValue ? null
