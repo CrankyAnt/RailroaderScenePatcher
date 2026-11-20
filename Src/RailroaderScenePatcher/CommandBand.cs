@@ -567,7 +567,7 @@ namespace RailroaderScenePatcher {
         // shares takes one, and a marker that already has one keeps the row to change or clear it.
         internal const string SetMarkerId = "Set ID", ClearMarkerId = "Clear ID", RepairDuplicateId = "Repair duplicate ID";
         // The Inspector route of the same repair, beside Repair duplicate ID: the Marker ID section of the Connections tab.
-        internal const string SetIdOnConnections = "Set ID on Connections tab";
+        internal const string SetIdOnConnections = "Set ID on the Connections tab";
         internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Marker ID section, enter a replacement ID and click Set ID.";
         // Whether the Object tab offers Repair duplicate ID: for a generic track marker whose explanation names a
         // duplicate marker ID, active or not.
