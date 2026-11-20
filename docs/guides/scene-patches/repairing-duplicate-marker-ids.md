@@ -38,7 +38,7 @@ After **Set ID**, the caption above the other holders changes from **Also holdin
 
 The patcher checks the other holders of the old and the new ID again right after **Set ID**, and after native **Undo** or **Redo** of it. A holder that no longer shares its ID loses its duplicate problem at once, without **Refresh**.
 
-The replacement ID doesn't change the marker's track binding. If that binding names a segment that doesn't exist, the marker shows that problem once it's enabled, as a different problem from the duplicate, for example `Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab.` A marker without a track binding reads `the marker has no track binding` in that place. See [repairing track bindings](repairing-track-bindings.md).
+The replacement ID doesn't change the marker's track binding. If that binding names a segment that doesn't exist, the marker shows that problem once it's enabled, as a different problem from the duplicate, for example `Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab.` For a marker without a track binding, the message says `the marker has no track binding` instead. See [repairing track bindings](repairing-track-bindings.md).
 
 ## Give a replacement ID with a guided task
 

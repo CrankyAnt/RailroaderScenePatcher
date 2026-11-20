@@ -528,10 +528,8 @@ namespace RailroaderScenePatcher {
         internal const string RepairConstructionSegmentsTip = "Open the Connections tab to select the segments of the bridge's track.";
         static bool ConstructionProblem(string problem) => problem != null && problem.EndsWith(ConstructionRecovery, StringComparison.Ordinal);
         internal static bool OffersConstructionRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(ConstructionProblem);
-        // Whether a problem is of the kind Repair with guided task repairs: a track binding or track location problem.
-        internal static bool IsBindingProblem(string problem) => problem != null && !ConstructionProblem(problem)
-            && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0);
-        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(IsBindingProblem);
+        internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(problem => problem != null && !ConstructionProblem(problem)
+            && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0));
         internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments.";
         // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
         // holds; known is null when the track graph could not be read. An empty id is a segment that does not exist.
@@ -597,17 +595,19 @@ namespace RailroaderScenePatcher {
             : "Show the full lines, with each component's scene and full path.";
         // The Detected problems section of a stale object list: its problems are those of the last refresh.
         internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
-        // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID, a
-        // problem of the kind Repair with guided task repairs (IsBindingProblem) is told in plain words instead of the
-        // inventory's rule text: first that the duplicate is repaired, then what is wrong with the binding, named by the
-        // marker's bound segment, then the two routes that repair it. repairedId is the duplicate marker ID the
-        // replacement ID repaired, or null; segment is the marker's bound segment, empty when it has none.
-        internal static string ProblemText(string problem, string repairedId, string segment) =>
-            repairedId != null && IsBindingProblem(problem)
-                ? "Duplicate marker ID " + repairedId + " is repaired, but this is a different problem: "
-                    + (String.IsNullOrWhiteSpace(segment) ? "the marker has no track binding." : "the track binding names segment " + segment + ", which doesn't exist.")
-                    + " Click Repair with guided task, or set an existing track on the Connections tab."
-                : problem;
+        // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID,
+        // the binding rule's own problem for a bound segment that doesn't resolve, a missing segment or an empty binding
+        // (BindingRules.Problem with resolves false for the marker's need, activity and bound segment), is told in plain
+        // words instead of the rule text: first that the duplicate is repaired, then what is wrong with the binding,
+        // named by the bound segment, then the two routes that repair it. Every other problem keeps its text, also a
+        // track location problem whose segment exists. repairedId is the duplicate marker ID the replacement ID
+        // repaired, or null; segment is the marker's bound segment, empty when it has none.
+        internal static string ProblemText(string problem, string repairedId, string segment, bool enabled, BindingNeed need) {
+            if (repairedId == null || problem == null || problem != BindingRules.Problem(need, enabled, "Marker", segment, false)) return problem;
+            return "Duplicate marker ID " + repairedId + " is repaired, but this is a different problem: "
+                + (String.IsNullOrWhiteSpace(segment) ? "the marker has no track binding." : "the track binding names segment " + segment + ", which doesn't exist.")
+                + " Click Repair with guided task, or set an existing track on the Connections tab.";
+        }
         // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
         // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
         internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";

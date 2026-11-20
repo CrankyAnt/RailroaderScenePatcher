@@ -145,7 +145,7 @@ static class ReplacementMarkerIdTests {
             if (holders.Problem(m, true) is string duplicate) all.Add(duplicate);
             if (BindingRules.Problem(BindingNeed.Optional, m.Active, "Marker", m.Segment, w.Markers.Segments.ContainsKey(m.Segment)) is string binding) all.Add(binding);
             var repaired = w.Session.RepairedMarkerId(Marker(path));
-            return BindingRules.Problems(m.Active, all, null).Select(problem => CommandBand.ProblemText(problem, repaired, m.Segment)).ToArray();
+            return BindingRules.Problems(m.Active, all, null).Select(problem => CommandBand.ProblemText(problem, repaired, m.Segment, m.Active, BindingNeed.Optional)).ToArray();
         }
         Assert(Problems(w.Speed, SpeedPath).SequenceEqual(new[] { "Duplicate marker ID Mg6m is shared with 1 other scene marker. Give one of them a replacement ID to repair it." }), "A shows the duplicate problem: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
         Assert(Problems(w.Yard, YardPath).Length == 0, "The inactive B shows none: " + String.Join(" | ", Problems(w.Yard, YardPath)));
@@ -160,11 +160,14 @@ static class ReplacementMarkerIdTests {
         var rebind = w.Session.Bind(yard, MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3)));
         Assert(rebind.Applied && Problems(w.Yard, YardPath).Length == 0, "Binding B to an existing segment clears it: " + rebind.Error + " " + String.Join(" | ", Problems(w.Yard, YardPath)));
         // Without a repaired duplicate, a problem reads as before.
-        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", null, "z5w8si") == "Marker broken binding: missing segment z5w8si", "A problem without a repaired duplicate is unchanged");
-        Assert(CommandBand.ProblemText("Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Mg6m", "Sjdl") == "Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Only a binding problem names the repaired duplicate");
-        // The note follows the problem's kind, a binding problem that Repair with guided task repairs, whatever its wording.
-        Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "") == "Duplicate marker ID Mg6m is repaired, but this is a different problem: the marker has no track binding. Click Repair with guided task, or set an existing track on the Connections tab.",
-            "An empty binding says so in plain words: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", ""));
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", null, "z5w8si", true, BindingNeed.Optional) == "Marker broken binding: missing segment z5w8si", "A problem without a repaired duplicate is unchanged");
+        // The rewrite follows the binding rule's own missing-segment and empty-binding problems for the marker's bound
+        // segment, not the wording of a problem.
+        Assert(CommandBand.ProblemText("Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Mg6m", "Sjdl", true, BindingNeed.Optional) == "Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Another kind of problem keeps its text");
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", "Mg6m", "pi3pzp", true, BindingNeed.Optional) == "Marker broken binding: missing segment z5w8si", "A problem that isn't the rule's missing-segment problem for the bound segment keeps its text");
+        Assert(CommandBand.ProblemText("Marker binding validity unknown: graph unavailable", "Mg6m", "z5w8si", true, BindingNeed.Optional) == "Marker binding validity unknown: graph unavailable", "A line about a segment that couldn't be checked keeps its text");
+        Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "", true, BindingNeed.Required) == "Duplicate marker ID Mg6m is repaired, but this is a different problem: the marker has no track binding. Click Repair with guided task, or set an existing track on the Connections tab.",
+            "The rule's empty-binding problem says so in plain words: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "", true, BindingNeed.Required));
         // The two repairs on the Object tab stand where they mean something: on a generic track marker that holds a
         // duplicate marker ID, or that has a replacement ID. With a duplicate both follow the replacement ID's reason. A
         // marker that already has its replacement ID can't start the repair again, and says so with its ID; Set ID on
@@ -174,7 +177,6 @@ static class ReplacementMarkerIdTests {
         Assert(CommandBand.DuplicateRepairReason(true, null, "Mg6m") == null && CommandBand.DuplicateRepairReason(true, "Confirm or cancel the pending world choice first.", "Mg6m") == "Confirm or cancel the pending world choice first.", "With a duplicate the repair follows the replacement ID's reason");
         Assert(CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard") == "This marker already has replacement ID Mg6m-yard.", "The repaired marker says that it has its replacement ID: " + CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard"));
         Assert(CommandBand.DuplicateRepairReason(false, null, "") == "This marker already has a replacement ID." && CommandBand.DuplicateRepairReason(false, null, null) == "This marker already has a replacement ID.", "An ID that could not be read is never printed empty");
-        Assert(CommandBand.IsBindingProblem("Marker broken binding: missing segment z5w8si") && !CommandBand.IsBindingProblem("Duplicate marker ID Mg6m is shared with 1 other scene marker."), "The kind that offers Repair with guided task decides the note");
     }
     // After a marker ID edit, its Undo or its Redo, the inventory observes again every other entry that holds the
     // edited marker's old or new ID, so their problems agree with the edit at once. Entries of other IDs, the edited
