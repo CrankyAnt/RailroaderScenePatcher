@@ -42,17 +42,35 @@ namespace RailroaderScenePatcher {
         internal static string Summary(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             Rows(inventory, search, filter, changed).Count + " of " + (inventory?.Entries.Count ?? 0) + " objects";
 
-        // Baked scenery parts include their group; other objects use their observed visible name.
-        // The marker ID an entry was observed with, from its "Marker id=<id>; type=..." binding line, or null for an
-        // entry without one.
-        const string MarkerIdLine = "Marker id=";
+        // The named values of a binding line of the form "Marker id=Mlm1; type=Generic": the words before the first key
+        // name the group ("Marker", "Track-relative", "Circuit 0"), and each "key=value" part follows in order. A part
+        // without a key continues the value before it. Null for a line without a key, such as "Graph registration: none".
+        internal static (string Group, IReadOnlyList<KeyValuePair<string, string>> Values)? BindingValues(string line) {
+            var first = line?.IndexOf('=') ?? -1;
+            if (first < 0) return null;
+            var space = line.LastIndexOf(' ', first);
+            var group = space < 0 ? "" : line.Substring(0, space);
+            var values = new List<KeyValuePair<string, string>>();
+            string key = null, value = null;
+            foreach (var part in line.Substring(space + 1).Split(new[] { "; " }, StringSplitOptions.None)) {
+                var equals = part.IndexOf('=');
+                if (equals <= 0) { if (key != null) value += "; " + part; continue; }
+                if (key != null) values.Add(new KeyValuePair<string, string>(key, value));
+                key = part.Substring(0, equals); value = part.Substring(equals + 1);
+            }
+            if (key != null) values.Add(new KeyValuePair<string, string>(key, value));
+            return (group, values);
+        }
+        // The marker ID an entry was observed with: the id value of its Marker binding line (BindingValues), or null for
+        // an entry without one.
         internal static string MarkerIdOf(SceneObservation entry) {
-            var line = entry?.Bindings.FirstOrDefault(b => b != null && b.StartsWith(MarkerIdLine, StringComparison.Ordinal));
-            if (line == null) return null;
-            var value = line.Substring(MarkerIdLine.Length);
-            var end = value.IndexOf(';');
-            value = (end < 0 ? value : value.Substring(0, end)).Trim();
-            return value.Length == 0 ? null : value;
+            foreach (var line in entry?.Bindings ?? Enumerable.Empty<string>()) {
+                var values = BindingValues(line);
+                if (values?.Group != "Marker") continue;
+                var id = values.Value.Values.FirstOrDefault(pair => pair.Key == "id").Value?.Trim();
+                if (!String.IsNullOrEmpty(id)) return id;
+            }
+            return null;
         }
         // The other entries that hold the marker ID an object had before an edit, its Undo or its Redo, or the one it has
         // after it: their duplicate marker ID problem and explanation change with the edit, so they are observed again.
@@ -62,6 +80,7 @@ namespace RailroaderScenePatcher {
             if (ids.Count == 0) return Array.Empty<SceneObservation>();
             return (entries ?? Enumerable.Empty<SceneObservation>()).Where(e => e != null && !ReferenceEquals(e.Handle, self) && MarkerIdOf(e) is string id && ids.Contains(id)).ToArray();
         }
+        // Baked scenery parts include their group; other objects use their observed visible name.
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
         static readonly Regex AddedSuffix = new Regex(@" \(added(?:, [0-9]+ of [0-9]+)?\)\z");

@@ -189,6 +189,9 @@ static class ReplacementMarkerIdTests {
         var after = Entry(yard, YardPath, "Marker id=Mg6m-yard; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
         var entries = new[] { after, Entry(speed, SpeedPath, "Marker id=Mg6m; type=Generic"), Entry(other, UnrelatedPath, "Marker id=Mown; type=Generic"), Entry(sign, "World/Sign", "Board") };
         Assert(InventoryPresentationState.MarkerIdOf(before) == "Mg6m" && InventoryPresentationState.MarkerIdOf(entries[3]) == null, "The observed marker ID is read from the entry's marker line");
+        var parsed = InventoryPresentationState.BindingValues("Circuit 0 lower=Sa; upper=Sb; note=a; b");
+        Assert(parsed?.Group == "Circuit 0" && String.Join("|", parsed.Value.Values.Select(v => v.Key + "=" + v.Value)) == "lower=Sa|upper=Sb|note=a; b" && InventoryPresentationState.BindingValues("Graph registration: none") == null,
+            "One parser reads a binding line's group and named values, the Object tab's fields and the marker ID alike");
         var holders = InventoryPresentationState.OtherMarkerIdHolders(entries, before, after);
         Assert(holders.Count == 1 && ReferenceEquals(holders[0].Handle, speed), "Only the speed sign, which holds the old ID, is observed again: " + String.Join(", ", holders.Select(h => h.Identity.Path)));
         // Undo: the yard limit returns from Mg6m-yard to Mg6m; the speed sign is again the other holder.
