@@ -1009,7 +1009,7 @@ namespace RailroaderScenePatcher {
             }
             var deviceGuide = CommandBand.RejectionGuide(candidates);
             if (deviceGuide != null)
-                Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open the rejection reasons in the guide in the browser.");
+                Button(builder, deviceGuide[0], () => Application.OpenURL(GuideRoot + deviceGuide[1])).Tooltip(deviceGuide[0], "Open the guide's reasons for refusing a source in your browser.");
             // Bells: every bell definition of the content library, with the bell pattern's reason for a rejected one.
             Section(builder, "Add a bell");
             Line(builder, bells.Count(c => c.Eligible) + " eligible and " + bells.Count(c => !c.Eligible) + " rejected bell definitions in the content library", null, null);
@@ -1022,7 +1022,7 @@ namespace RailroaderScenePatcher {
             }
             var bellGuide = CommandBand.RejectionGuide(bells);
             if (bellGuide != null)
-                Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open the guide's rejection reasons in your browser.");
+                Button(builder, bellGuide[0], () => Application.OpenURL(GuideRoot + bellGuide[1])).Tooltip(bellGuide[0], "Open the guide's reasons for refusing a source in your browser.");
         }
         void EquipmentNameField(UIPanelBuilder builder, EquipmentAddition item, string name, bool built) {
             var label = FieldLabel(builder, name);
