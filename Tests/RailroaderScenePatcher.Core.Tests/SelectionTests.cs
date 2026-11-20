@@ -76,8 +76,11 @@ static class SelectionTests {
         Check(result.Outcomes["move"].Applied && ReferenceEquals(result.Outcomes["move"].ResolvedTarget, replacement) && original.X == 7 && replacement.X == 12,
             "Complete scene patch file application uses the confirmed replacement identity and preserves the previous target");
         Console.WriteLine("PASS: confirmed spatial scene-target identity and complete scene patch file application");
-        UnresolvedSceneTargets(scene, scenePatchFile.ToString(), candidates, candidate, original, replacement);
-        ReplacementChoices(scene, scenePatchFile.ToString(), candidates, candidate, result, original, replacement);
+        // Each sub-test starts from its own applied replacement, so no candidate or scene object carries over.
+        var unresolved = AppliedReplacement();
+        UnresolvedSceneTargets(unresolved.Scene, unresolved.Json, unresolved.Candidates, unresolved.Candidate, unresolved.Original, unresolved.Replacement);
+        var replacing = AppliedReplacement();
+        ReplacementChoices(replacing.Scene, replacing.Json, replacing.Candidates, replacing.Candidate, replacing.Result, replacing.Original, replacing.Replacement);
         PatchEditingHistory();
         ConfirmationFindsOneIdentity();
         CurrentBindingIsNoCandidate();
@@ -350,8 +353,29 @@ static class SelectionTests {
         Check(session.Pending.Candidate == candidate && session.Pending.Source == candidate && session.Confirmed == null,
             "An explicit choice can make the source the candidate without confirming it");
         session.Cancel();
+        candidates.Items.Remove(other);
         Check(saved.Write() == json && scene.MutationCalls == mutations && original.X == 7 && replacement.X == 12,
             "Cancelling source-in-overlap choices preserves the whole scene patch file and both scene objects");
+    }
+
+    sealed class ReplacementFixture {
+        public Scene Scene; public Candidates Candidates; public SelectionCandidate Candidate; public Box Original, Replacement;
+        public string Json; public ScenePatchFileResult Result;
+    }
+    // A scene whose move modification targets the replacement board, applied, with the replacement as the one candidate.
+    static ReplacementFixture AppliedReplacement() {
+        var fixture = new ReplacementFixture { Scene = new Scene(), Candidates = new Candidates(), Original = new Box { X = 7 }, Replacement = new Box { X = 9 } };
+        fixture.Scene.Objects["original"] = new List<object> { fixture.Original };
+        fixture.Scene.Objects["replacement"] = new List<object> { fixture.Replacement };
+        var target = new TargetIdentity("scene", "replacement", "Culler");
+        fixture.Candidate = new SelectionCandidate(fixture.Replacement, SelectionIdentity.SceneObject(target), "Replacement board");
+        fixture.Candidates.Items.Add(fixture.Candidate);
+        var scenePatchFile = JObject.Parse("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"original\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}");
+        scenePatchFile["modifications"].First.First["target"] = new JObject { ["scene"] = target.Scene, ["path"] = target.Path, ["component"] = target.Component };
+        fixture.Json = scenePatchFile.ToString();
+        fixture.Result = new PatchEngine(fixture.Scene).Apply(fixture.Json);
+        Check(fixture.Result.Outcomes["move"].Applied && fixture.Original.X == 7 && fixture.Replacement.X == 12, "The replacement fixture applies its move to the replacement board only");
+        return fixture;
     }
 
     static void ReplacementChoices(Scene scene, string json, Candidates candidates, SelectionCandidate source, ScenePatchFileResult completed,

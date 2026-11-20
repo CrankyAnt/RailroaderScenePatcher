@@ -434,7 +434,12 @@ static class PatchEditingTests {
         w.MapEditor.Redo(); Assert(!w.Box.Active, "Native Redo reapplies the activity change");
         Assert(w.Session.Edit(P, PlacementAt(112), null).Applied && !w.Box.Active && w.Box.X == 12 && w.ScenePatchFile["modifications"].Count() == 1, "Placement and activity group in one desired state per object");
         Assert(w.MapEditor.Save() == null && !w.MapEditor.IsDirty && !(bool)w.Saved["modifications"].First.First["active"], "The activity change persists through the same Save");
-        Assert(!new PatchEngine(new Scene()).Apply(Doc(Mod("a", "p", "\"active\":\"no\""))).Outcomes["a"].Applied, "A non-boolean activity value is rejected");
+        // The target exists and is off, so only the activity check can keep a value that reads as true from applying.
+        foreach (var value in new[] { "\"no\"", "1" }) {
+            var target = new Scene(); var off = new Box { Active = false }; target.Objects["p"] = new List<object> { off };
+            var rejected = new PatchEngine(target).Apply(Doc(Mod("a", "p", "\"active\":" + value))).Outcomes["a"];
+            Assert(!rejected.Applied && rejected.Error == "Invalid activity" && rejected.Cause == FailureCause.InvalidDefinition && !off.Active && target.MutationCalls == 0, "A non-boolean activity value " + value + " is rejected before the object changes");
+        }
     }
     static void UndoAndRedoAreOneCoherentChange() {
         var w = new World();

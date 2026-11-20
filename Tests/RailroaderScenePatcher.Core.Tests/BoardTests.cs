@@ -308,7 +308,7 @@ static class BoardTests {
         world.UnloadedTiles.Add("52,0");
         engine.Apply(Doc(Mod("move", Place(Far))), "author/pack");
         Assert(boards.Output(board).Outstanding.Count == 1 && boards.Output(board).Completed.Count == 1, "A position whose tile is not built needs no rebuild; the tile builds from the current mask");
-        Assert(Near(original, new FakeBoard().Position), "Fixture position unchanged");
+        Assert(!Near(board.Position, original) && Near(board.Position, Far) && Consistent(world, board), "The board moves although the tile of its new position is not built");
     }
     static void TerrainWriteFailureIsReportedAndRetryable() {
         var (world, board, boards, engine) = Setup();

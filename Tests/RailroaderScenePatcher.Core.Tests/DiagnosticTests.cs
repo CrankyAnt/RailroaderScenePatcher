@@ -185,12 +185,14 @@ static class DiagnosticTests {
         Check(!runtime.Reconcile(source, "move", attribution, warnings, () => true), "A later rejected complete scene patch file must invalidate its previous repair permission");
     }
     static void InvalidDefinitionsAndEditingRecovery() {
-        var scene = new Scene();
+        // The target exists and is off, so only the activity check keeps 42, which reads as true, from applying.
+        var scene = new Scene(); var sign = new Box { Active = false }; scene.Objects["sign"] = new List<object> { sign };
         var messages = new Messages();
         var runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         var source = new PatchSource("example/mod", "Example Mod", "2.1");
         runtime.Apply(ScenePatchFile.Replace("\"active\":false", "\"active\":42"), source);
         Check(messages.Rows.Count == 1 && messages.Rows[0].Cause == FailureCause.InvalidDefinition && messages.Rows[0].ReportTo == "mod author", "A demonstrably invalid supplied value directs reports to its mod author");
+        Check(messages.Rows[0].Message.Contains("Invalid activity") && !sign.Active && scene.MutationCalls == 0, "The invalid activity value is the reported cause, and the object does not change");
         Check(!messages.Rows[0].Message.Contains("Mod author:") && !messages.Rows[0].Message.Contains("Published website"), "Absent optional metadata must not be invented");
         runtime = new PatchRuntime(new PatchEngine(scene), messages, "0.5.0", "game-build");
         runtime.Apply(ScenePatchFile.Replace("\"active\":false", "\"futureOperation\":true"), source);
