@@ -949,7 +949,7 @@ namespace RailroaderScenePatcher {
                 pending?.Purpose, pending?.Source?.Label, pending?.Problem, pending?.Candidate?.Label,
                 pending == null ? "" : String.Join("\n", pending.Offers.Select(o => o.Label)),
                 selection?.Confirmed?.Identity, preparedSnap?.Identity, choosingSnap, gizmo?.State, outstanding, reloadRequirement, MapEditorReload.Error, TerrainSnapshot(),
-                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage, ImportSnapshot(),
+                coverageCircuit, preparedCoverage == null ? "" : String.Join("\n", preparedCoverage.Preview.Lines) + preparedCoverage.Preview.Error, RecoverySnapshot(), attachment?.Session.VersionState, attachment?.Session.VersionMessage, attachment?.Session.ObservedVersion, ImportSnapshot(),
                 equipmentSource, preparedEquipment == null ? "" : String.Join("\n", preparedEquipment.Preview.Lines) + preparedEquipment.Preview.Error);
         }
         // Computing the outstanding work serializes the scene patch file and reads the dependency metadata. Its inputs change

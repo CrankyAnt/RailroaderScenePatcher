@@ -48,6 +48,7 @@ static class FileVersionTests {
         RepairBackupPreservesBytes();
         ChangedBackupIsNotRemoved();
         ChangedBackupSurvivesWriteFailure();
+        LateClickDoesNothing();
         var store = new Store { Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}" };
         var session = new PatchEditingSession(new PatchEngine(new Scene()), new NativeMapEditor(), store);
         store.Patch = "{\"modifications\":{},\"sourceMap\":{\"mapId\":\"map\"},\"formatVersion\":1}";
@@ -246,6 +247,25 @@ static class FileVersionTests {
         session.BeginSave();
         if (store.Patch == null) throw new Exception("Save restores the deleted scene patch file");
     }
+    // Use file version runs in one frame, which can take seconds. A second click during that frame reaches the button of
+    // the panel as it was drawn, after the choice already closed it: the click is late and does nothing, so it cannot
+    // report that there is no readable file version. A click on a panel drawn for an older file version is late too.
+    static void LateClickDoesNothing() {
+        const string Empty = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}";
+        var store = new Store { Patch = Empty };
+        var session = new PatchEditingSession(new PatchEngine(new Scene()), new NativeMapEditor(), store);
+        store.Patch = Empty.Replace("{}}", "{},\"extra\":1}"); session.CheckFileVersion();
+        var drawn = FilePanelState.Of(session); var version = session.ObservedVersion;
+        if (drawn != FilePanelState.Kind.VersionChoice || FilePanelState.Late(drawn, version, session)) throw new Exception("A click on the panel as drawn is not late");
+        if (!session.UseFileVersion().Applied) throw new Exception("The first click uses the file version");
+        if (!FilePanelState.Late(drawn, version, session)) throw new Exception("A second click after the choice closed the panel is late");
+        // The file changes again: the panel opens for the new version, and a click drawn for the old one stays late.
+        store.Patch = Empty.Replace("{}}", "{},\"extra\":2}"); session.CheckFileVersion();
+        if (FilePanelState.Of(session) != FilePanelState.Kind.VersionChoice || !FilePanelState.Late(drawn, version, session)) throw new Exception("A click drawn for an older file version is late");
+        if (FilePanelState.Late(FilePanelState.Of(session), session.ObservedVersion, session)) throw new Exception("A click on the newly drawn panel is not late");
+        if (!FilePanelState.Late(FilePanelState.Kind.VersionChoice, session.ObservedVersion, null)) throw new Exception("Without a session every click is late");
+    }
+
     static void CorrectedFailedEntryRetries() {
         string Doc(string path) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"same-id\":{\"target\":{\"scene\":\"s\",\"path\":\"" + path + "\",\"component\":\"c\"},\"active\":false,\"dependsOn\":[]}}}";
         var scene = new Scene();

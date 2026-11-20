@@ -27,6 +27,12 @@ namespace RailroaderScenePatcher {
             var first = (tooltip ?? "").Split('\n')[0].Trim();
             return first.Length != 0 ? first : (label ?? "").Trim();
         }
+        // Whether a click on a file panel button drawn for this panel and file version comes late: a choice already
+        // closed or replaced the panel, or the panel now stands for another file version. Use file version runs in one
+        // frame, which can take seconds, and a second click during it reaches the button as it was drawn. A late click
+        // does nothing; the result of the first one stays in the footer.
+        internal static bool Late(Kind drawnFor, string drawnVersion, PatchEditingSession session) =>
+            session == null || Of(session) != drawnFor || !String.Equals(session.ObservedVersion, drawnVersion, StringComparison.Ordinal);
         internal static string Heading(Kind kind) => kind == Kind.VersionChoice ? "Version choice" : kind == Kind.Repair ? "Repair" : kind == Kind.Import ? "Import" : null;
         // Why a control outside the panel cannot be used, as its "Unavailable:" tooltip gives it, or null.
         internal static string Reason(Kind kind) =>

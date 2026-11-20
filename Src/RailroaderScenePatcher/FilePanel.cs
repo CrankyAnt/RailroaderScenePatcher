@@ -76,18 +76,21 @@ namespace RailroaderScenePatcher {
             }
         }
         Act[] FilePanelActs(FilePanelState.Kind kind, PatchEditingSession session) {
+            // A choice reaches the session only while the panel it was drawn for still stands (FilePanelState.Late).
+            var version = session.ObservedVersion;
+            Action Current(Action run) => () => { if (!FilePanelState.Late(kind, version, attachment?.Session)) run(); };
             switch (kind) {
                 case FilePanelState.Kind.VersionChoice: return new[] {
-                    Slot(FilePanelState.UseFile, "Use the changes from the file on disk.", null, () => ChooseFileVersion(true)),
-                    Slot(FilePanelState.KeepEditor, "Continue editing with your current version.", null, () => ChooseFileVersion(false)),
-                    Slot(FilePanelState.Import, "Review which changes to bring into the editor.", null, OpenImport) };
+                    Slot(FilePanelState.UseFile, "Use the changes from the file on disk.", null, Current(() => ChooseFileVersion(true))),
+                    Slot(FilePanelState.KeepEditor, "Continue editing with your current version.", null, Current(() => ChooseFileVersion(false))),
+                    Slot(FilePanelState.Import, "Review which changes to bring into the editor.", null, Current(OpenImport)) };
                 case FilePanelState.Kind.Repair: return new[] {
-                    Slot(FilePanelState.KeepEditor, "Continue editing with your current version.", !session.VersionFileMissing && session.BackupPreview == null ? "The backup path is unavailable." : null, () => ChooseFileVersion(false)),
+                    Slot(FilePanelState.KeepEditor, "Continue editing with your current version.", !session.VersionFileMissing && session.BackupPreview == null ? "The backup path is unavailable." : null, Current(() => ChooseFileVersion(false))),
                     Slot(FilePanelState.Details, "Open Details to read the full diagnosis for this session.", null, () => presentation.ToggleDetails()),
                     Slot(FilePanelState.Copy, "Copy the full diagnosis.", null, () => { GUIUtility.systemCopyBuffer = FullDiagnosis(session); feedback.Report(RecoveryPlace, "Diagnosis copied to the clipboard."); }) };
                 case FilePanelState.Kind.Import: return new[] {
-                    Slot(FilePanelState.Import, "Apply all changes and your choices for all conflicts in this overview together.", session.Import?.ApplyRefusal, ApplyImport),
-                    Slot(FilePanelState.Cancel, "Close the overview and discard your conflict choices. Nothing changes. You still need to choose a version.", null, CancelImport) };
+                    Slot(FilePanelState.Import, "Apply all changes and your choices for all conflicts in this overview together.", session.Import?.ApplyRefusal, Current(ApplyImport)),
+                    Slot(FilePanelState.Cancel, "Close the overview and discard your conflict choices. Nothing changes. You still need to choose a version.", null, Current(CancelImport)) };
                 default: return new Act[0];
             }
         }

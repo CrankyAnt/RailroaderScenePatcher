@@ -27,6 +27,8 @@ namespace RailroaderScenePatcher.Core {
         string observedVersion;
         bool observedMissing;
         public FileVersionState VersionState { get; private set; }
+        // The file version the last check observed, by which a choice tells which version it was offered for.
+        public string ObservedVersion => observedVersion;
         public string VersionMessage { get; private set; }
         public bool VersionFileMissing => VersionState == FileVersionState.Repair && observedMissing;
         public ScenePatchFileResult LastVersionApplication { get; private set; }
