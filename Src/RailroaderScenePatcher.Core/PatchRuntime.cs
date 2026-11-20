@@ -21,9 +21,9 @@ namespace RailroaderScenePatcher.Core {
         internal PatchFailure(PatchSource mod, string operation, TargetIdentity target, string error, FailureCause cause, string patcherVersion, string gameVersion, string diagnosticKey) {
             DiagnosticKey = diagnosticKey; ModIdentifier = mod.Identifier; Operation = operation; ObjectPath = target?.Path; Cause = cause;
             ReportTo = cause == FailureCause.NotApplicable ? null : cause == FailureCause.InvalidDefinition ? "mod author" : "patcher maintainer";
-            // A file that does not apply concerns the whole file, so its row names no operation or object.
+            // A file that does not apply concerns the whole file, so its row names the file as the affected definition and no operation or object.
             Message = (mod.Name ?? mod.Identifier) + " [" + mod.Identifier + "; version " + (mod.Version ?? "not supplied") + "]. " +
-                (cause == FailureCause.NotApplicable ? "" : "Definition Data/scene-patches.json; operation " + operation + "; object " + (target == null ? "not resolved" : target.Label) + ". ") + error +
+                (cause == FailureCause.NotApplicable ? "Definition Data/scene-patches.json. " : "Definition Data/scene-patches.json; operation " + operation + "; object " + (target == null ? "not resolved" : target.Label) + ". ") + error +
                 ". Patcher " + patcherVersion + "; game " + gameVersion + "." + (ReportTo == null ? "" : " Report to the " + ReportTo + ".");
             if (!String.IsNullOrWhiteSpace(mod.Author)) Message += " Mod author: " + mod.Author + ".";
             if (Uri.TryCreate(mod.Website, UriKind.Absolute, out var site) && (site.Scheme == "https" || site.Scheme == "http")) Message += " Published website: " + mod.Website + ".";

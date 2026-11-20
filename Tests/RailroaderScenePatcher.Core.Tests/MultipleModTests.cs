@@ -51,9 +51,9 @@ static class MultipleModTests {
         var maps = scene.MapIds.ToArray();
         Check(messages.Rows.Count == 1 && messages.Rows[0].ModIdentifier == "c/other-map", "Only the scene patch file for another map gives a warning: " + String.Join(" | ", messages.Rows.Select(r => r.Message)));
         var skip = messages.Rows[0];
-        // A map mismatch concerns the whole file, so its row has its own wording without an operation or object.
-        Check(skip.Message == "Other map [c/other-map; version 1.0]. The scene patch file is for map elsewhere, which is neither the loaded map " + maps[0] + " nor one of its layers (" + String.Join(", ", maps.Skip(1)) + "). Its modifications weren't applied. Patcher 0.6.0; game game."
-            && skip.ReportTo == null && skip.Cause == FailureCause.NotApplicable, "The warning names the supplying mod, its version and the reason, without operation, object or report direction: " + skip.Message);
+        // A map mismatch concerns the whole file, so its row names the file as the affected definition, without an operation or object.
+        Check(skip.Message == "Other map [c/other-map; version 1.0]. Definition Data/scene-patches.json. The scene patch file is for map elsewhere, which is neither the loaded map " + maps[0] + " nor one of its layers (" + String.Join(", ", maps.Skip(1)) + "). Its modifications weren't applied. Patcher 0.6.0; game game."
+            && skip.ReportTo == null && skip.Cause == FailureCause.NotApplicable, "The warning names the supplying mod, its version, the affected definition and the reason, without operation, object or report direction: " + skip.Message);
         runtime.ApplyLoaded(mods, null);
         Check(messages.Rows.Count == 1, "A repeated application in the same load gives no second warning");
         // Clicking Editor in the main menu loads the game's editor default map before a map is chosen. No mod supplies a
