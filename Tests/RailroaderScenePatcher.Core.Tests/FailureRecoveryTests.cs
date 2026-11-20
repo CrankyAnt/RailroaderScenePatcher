@@ -173,7 +173,7 @@ static class FailureRecoveryTests {
         Assert(RecoveryGuidance.For(w.Session.Edit(Q, At(40), null), "Placement", "Placement", null) == null, "An applied outcome needs no guidance");
         w.Scene.FailNextApplies = 1;
         var restored = RecoveryGuidance.For(w.Session.Edit(P, At(70), null), "Placement", "Placement", IndependentBoards.Structure);
-        Assert(restored.Kind == FailureKind.Restored && restored.Guide == "writing-fixed-placement.md" && restored.Line("Placement").Contains("was undone") && restored.Correction.Contains("Correct the cause and try again."), "A restored placement failure links the placement guide");
+        Assert(restored.Kind == FailureKind.Restored && restored.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && restored.Line("Placement").Contains("was undone") && restored.Correction.Contains("Correct the cause and try again."), "A restored placement failure links the placement guide");
         var pin = w.Pin(P); w.P.X = 5;
         var stale = RecoveryGuidance.For(w.Session.Edit(P, At(71), null, pin), "Modification", "Removal", BridgeScene.Structure);
         w.Scene.FailNextApplies = 1; w.Scene.RefuseState = s => s.Placement?.Position[0] != 80;
@@ -185,21 +185,28 @@ static class FailureRecoveryTests {
             Assert(!guidance.Correction.Contains("JSON") && !guidance.Correction.Contains("scene-patches.json"), "Scene patch editing guidance corrects through the editor, not the file: " + guidance.Correction);
         // Each panel action opens the guide of the operation it ran: the place, the action and the target's capability decide.
         var routes = new[] {
-            new[] { "Placement", "Placement", IndependentBoards.Structure, "writing-fixed-placement.md" },
+            new[] { "Placement", "Placement", IndependentBoards.Structure, "editing-placement-in-the-map-editor.md#set-a-numeric-placement" },
             new[] { "Gizmo", "Gizmo drag", IndependentBoards.Structure, "using-transform-gizmos.md" },
             new[] { "Snap", "Physical snap", IndependentBoards.Structure, "snapping-to-track.md" },
             new[] { "Follow", "Track following", TrackMarkerScene.Structure, "following-track.md" },
             new[] { "Track binding", "Set binding", TrackMarkerScene.Structure, "repairing-track-bindings.md" },
             new[] { "Track binding", "Set binding", CrossingPadScene.Structure, "rebinding-crossing-pads.md" },
+            new[] { "Track binding", "Place starter", StarterPlacementScene.Structure, "placing-starter-markers.md" },
+            new[] { "Track binding", "Set binding", MilepostScene.Structure, "repositioning-mileposts.md" },
+            new[] { "Start derailed", "Start derailed: Yes", StarterPlacementScene.Structure, "placing-starter-markers.md" },
             new[] { "Crossing coverage", "Crossing coverage", CrossingCoverageScene.Structure, "correcting-crossing-coverage.md" },
             new[] { "Crossing coverage", RecoveryGuidance.DetectionAddition, CrossingCoverageScene.Structure, "adding-crossing-detection.md" },
+            new[] { "Lights and gates", "Adding a gate", CrossingCoverageScene.Structure, "adding-crossing-equipment.md" },
+            new[] { "Bells", "Adding a bell", CrossingCoverageScene.Structure, "adding-crossing-bells.md" },
+            new[] { "Modification", "Removal", ExistingEquipmentScene.MastStructure, "moving-crossing-equipment.md" },
+            new[] { "Modification", "Removal", BakedSceneryParts.Structure, "moving-baked-scenery-groups.md" },
             new[] { "Modification", "Recheck", BridgeScene.Structure, "placing-bridges.md" },
             new[] { "Modification", "Removal", IndependentBoards.Structure, "moving-boards.md" },
             new[] { "Modification", "Recheck", null, RecoveryGuidance.EditingGuide } };
         foreach (var route in routes) {
             var guide = RecoveryGuidance.Guide(route[0], route[1], route[2]).Value;
             Assert(guide == route[3], route[0] + " / " + route[1] + " opens " + route[3] + ", not " + guide);
-            Assert(System.IO.File.Exists(System.IO.Path.Combine(RepositoryRoot(), "docs", "guides", "scene-patches", guide)), "The guide " + guide + " exists");
+            Assert(System.IO.File.Exists(System.IO.Path.Combine(RepositoryRoot(), "docs", "guides", "scene-patches", guide.Split('#')[0])), "The guide " + guide + " exists");
         }
     }
     // The message area's result for each outcome, through the panel's own feedback route.
@@ -213,7 +220,7 @@ static class FailureRecoveryTests {
         w.Scene.FailNextApplies = 1; w.Scene.RefuseState = s => s.Placement?.Position[0] != 80;
         Assert(!Run(inspection => w.Session.Edit(P, At(80), null, inspection)) && feedback.Result.StartsWith("Placement failed; cleanup is incomplete. ", StringComparison.Ordinal) && feedback.Result.Contains("What remains: Position: now 80") && feedback.Result.Contains("Recheck"), "An incomplete cleanup names what remains and Recheck: " + feedback.Result);
         w.Scene.RefuseState = null;
-        Assert(feedback.Recovery.Guide == "writing-fixed-placement.md" && feedback.Recovery.GuideTitle == "Fixed placement", "The result keeps the operation's guide for the footer");
+        Assert(feedback.Recovery.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && feedback.Recovery.GuideTitle == "Fixed placement", "The result keeps the operation's guide for the footer");
         Assert(!Run(inspection => w.Session.Edit(P, At(81), null, inspection)) && feedback.Result.StartsWith("Placement is blocked by incomplete cleanup. ", StringComparison.Ordinal), "A blocked retry says why: " + feedback.Result);
         Assert(Run(inspection => w.Session.Recheck(P, inspection)) && feedback.Recovery == null, "A completed action replaces the guidance with its result");
     }
@@ -265,7 +272,7 @@ static class FailureRecoveryTests {
         var calls = w.Scene.MutationCalls;
         Assert(!feedback.Run("Placement", "Placement", null, w.Inventory, entry, inspection => w.Session.Edit(P, At(81), null, inspection), guard: () => w.Session.GuardOutcome(P)), "The retry does not run");
         Assert(feedback.Result.StartsWith("Placement is blocked by incomplete cleanup. ", StringComparison.Ordinal) && feedback.Result.Contains("What remains: Position: now 80") && !feedback.Result.Contains("stale"), "The retry is refused for the incomplete cleanup, not as stale: " + feedback.Result);
-        Assert(feedback.Recovery.Kind == FailureKind.Blocked && feedback.Recovery.Guide == "writing-fixed-placement.md" && w.Scene.MutationCalls == calls && w.P.X == 80, "Guide stays available and nothing changed");
+        Assert(feedback.Recovery.Kind == FailureKind.Blocked && feedback.Recovery.Guide == "editing-placement-in-the-map-editor.md#set-a-numeric-placement" && w.Scene.MutationCalls == calls && w.P.X == 80, "Guide stays available and nothing changed");
         Assert(w.Session.GuardOutcome(Q) == null, "Another object has no guard");
     }
     static void FailureColourFollowsTheFailureKind() {

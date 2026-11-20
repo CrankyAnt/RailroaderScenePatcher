@@ -12,14 +12,14 @@ A native spawn is an entry in the `spawns` section of a map's `Map.json`. The na
 
 ## What the game uses a spawn point for
 
-The **Use in the game** section of the **Object** tab names each use for the inspected spawn point. These uses come from the game's code and have not yet been observed in Railroader, so the tab and this guide describe them as expected behavior:
+The **Use in the game** section of the **Object** tab lists the uses of the inspected spawn point. Use the list below to choose what to check in a test save.
 
 - **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. If several active spawn points share that priority, the game does not fix which of them it takes, and the tab says so. With native spawns, the new game is expected to start at those instead.
 - **Rescue:** a stuck player is expected to be moved to the closest active spawn point.
 - **Teleport and quick search:** the `/tp` console command and quick search are expected to offer each active spawn point by its object name and jump to where it stands.
 - **Start setup:** when the game applies an active start setup that names the spawn point to a company with no cars and no balance yet, the new company game is expected to start there, also while the spawn point is disabled. The tab names each such setup by its identifier, or by its object name when it has none. Whether a start setup or the map's native spawns win when both exist has not been established.
 
-The game reads a spawn point where it stands each time it uses it, so a moved spawn point is expected to be used at its new place. A disabled spawn point is expected to be passed by for rescue, teleport, quick search and the default start, and the tab says so for a disabled spawn point. An inactive spawn point is not a problem.
+The game reads a spawn point's transform each time it uses it. In Railroader 0.6.3, `/tp alarka` took the player to the moved Alarka point. A new East Whittier company game without native spawns used the moved spawn point named by its start setup. Removing the modification returned the new company's start to its authored position.
 
 A new game reads its start spawn point while the map loads, before the patcher applies the rest of the scene patch file. So when a new game starts, the patcher applies the spawn point modifications first, just before the game reads them. A spawn point modification that depends on another modification, or uses a track-following placement, waits for the normal world-load application. A new game then starts at the spawn point's place on the loaded map.
 
@@ -64,4 +64,4 @@ Before a change, the patcher requires that the spawn point's scene is loaded and
 
 ## Limits
 
-The automated tests check this behavior with a controlled spawn point. Start, rescue, teleport and quick search at a moved spawn point have not yet been observed in Railroader. If you disable every active spawn point on a map without native spawns, a new game without a start setup has no spawn point to start at; the patcher does not warn about this. A baked scenery group that holds a spawn point is not moved as a whole; edit each spawn point in its own family.
+Automated tests check placement and activity with a controlled spawn point. The Railroader 0.6.3 runs did not establish rescue, quick search, the default start without a start setup, the behavior of an inactive point named by a start setup, or precedence when a map also supplies native spawns. A baked scenery group that holds a spawn point cannot be moved as a whole. Edit each spawn point in its own family.

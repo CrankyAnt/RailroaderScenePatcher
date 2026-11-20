@@ -138,17 +138,25 @@ namespace RailroaderScenePatcher.Core {
     }
     public static class RecoveryGuidance {
         public const string EditingGuide = "editing-placement-in-the-map-editor.md";
+        public const string NumericPlacementGuide = EditingGuide + "#set-a-numeric-placement";
         // The guide of an operation: the action that ran, then the action group it ran in, and otherwise the capability of
         // the inspected object. A detection addition runs in the Crossing coverage group but has its own guide.
         public static KeyValuePair<string, string> Guide(string place, string action, string structure) {
             if (action == DetectionAddition) return Pair("Crossing detection", "adding-crossing-detection.md");
             switch (place) {
-                case "Placement": return Pair("Fixed placement", "writing-fixed-placement.md");
+                case "Placement": return Pair("Fixed placement", NumericPlacementGuide);
                 case "Gizmo": return Pair("Transform gizmos", "using-transform-gizmos.md");
                 case "Snap": return Pair("Snapping", "snapping-to-track.md");
                 case "Follow": return Pair("Following a track", "following-track.md");
-                case "Track binding": return structure == CrossingPadScene.Structure ? Pair("Crossing pads", "rebinding-crossing-pads.md") : Pair("Track bindings", "repairing-track-bindings.md");
+                case "Track binding":
+                    if (structure == CrossingPadScene.Structure) return Pair("Crossing pads", "rebinding-crossing-pads.md");
+                    if (structure == StarterPlacementScene.Structure) return Pair("Starter placement", "placing-starter-markers.md");
+                    if (structure == MilepostScene.Structure) return Pair("Mileposts", "repositioning-mileposts.md");
+                    return Pair("Track bindings", "repairing-track-bindings.md");
+                case "Start derailed": return Pair("Starter placement", "placing-starter-markers.md");
                 case "Crossing coverage": return Pair("Crossing coverage", "correcting-crossing-coverage.md");
+                case "Lights and gates": return Pair("Lights and gates", "adding-crossing-equipment.md");
+                case "Bells": return Pair("Bells", "adding-crossing-bells.md");
                 case "Construction segments": return Pair("Construction segments", "repairing-construction-segments.md");
                 case "Marker ID": return Pair("Marker IDs", "repairing-duplicate-marker-ids.md");
             }
@@ -160,6 +168,12 @@ namespace RailroaderScenePatcher.Core {
             if (structure == CrossingPadScene.Structure) return Pair("Crossing pads", "rebinding-crossing-pads.md");
             if (structure == CrossingCoverageScene.Structure) return Pair("Crossing coverage", "correcting-crossing-coverage.md");
             if (structure == SpawnPoints.Structure) return Pair("Spawn points", "moving-spawn-points.md");
+            if (structure == StarterPlacementScene.Structure) return Pair("Starter placement", "placing-starter-markers.md");
+            if (structure == MilepostScene.Structure) return Pair("Mileposts", "repositioning-mileposts.md");
+            if (structure == ExistingEquipmentScene.MastStructure || structure == ExistingEquipmentScene.BellStructure)
+                return Pair("Existing crossing equipment", "moving-crossing-equipment.md");
+            if (structure == BakedSceneryGroups.Structure || structure == BakedSceneryParts.Structure)
+                return Pair("Baked scenery groups", "moving-baked-scenery-groups.md");
             return Pair("Editing in the Map Editor", EditingGuide);
         }
         static KeyValuePair<string, string> Pair(string title, string file) => new KeyValuePair<string, string>(title, file);

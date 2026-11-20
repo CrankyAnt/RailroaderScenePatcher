@@ -26,13 +26,13 @@ If the station's building group is a scene object, move it in the **Baked scener
 
 The icon's object moves at once. Save, Undo, Redo and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal returns the icon to the placement that the loaded map gives it.
 
-Which refresh the map window needs before it shows a moved icon has not been observed in Railroader yet.
+In Railroader 0.6.3, a moved Bryson station icon appeared at its new map position in play. The test did not establish when an already open map refreshes.
 
 ## Disable or enable the icon
 
-Click **Disable** at the bottom of the **Object** tab. The icon is expected to leave the map: a disabled map icon takes itself out of the map's icon list. **Enable**, **Clear activity**, Undo or removal brings it back. Neither has been observed in Railroader yet.
+Click **Disable** at the bottom of the **Object** tab to remove the icon from the map's icon list. **Enable**, **Clear activity**, Undo or removal can return it to that list when the game enables it.
 
-The game's progression switches 13 station map icons on and off with their station: at load and whenever the industries change. Without a disable, the patcher leaves that switching to the game. A disable holds against it: the icon stays off the map when progression would switch it on. The **Object** tab and the footer's message area then show an amber warning that the icon stays off in the game although the game's progression switches it on, because your disable holds against it. **Enable**, **Clear activity**, Undo or removal returns the icon to the state that progression gives it now. While progression keeps an icon off that you did not disable, **Enabled** reads `Yes; the game switches it off now`. If the disable could not hold, because the patcher cannot share the icon's activity with progression in this load or the game's progression members are unavailable, **Disable** is unavailable and its tooltip gives the reason. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches). Not yet observed in Railroader. The **Dependencies** section of the **Object** tab is expected to list the progression controller that references the icon, as it lists every object that names the icon in a saved field, also while your disable holds the icon out of the controller's list.
+The game's progression switches 13 station map icons on and off with their station at load and when industries change. An explicit disable keeps the icon off the map when progression would switch it on. The **Object** tab and footer show an amber warning. **Enable**, **Clear activity**, Undo or removal returns control to progression. While progression keeps an icon off without your disable, **Enabled** reads `Yes; the game switches it off now`. If the patcher cannot keep the icon disabled through progression on this load, **Disable** is unavailable and its tooltip explains why. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches).
 
 ## Write the modification by hand
 
@@ -69,4 +69,4 @@ After each change, it checks that the icon has the mod's placement and activity,
 
 ## Limits
 
-The automated tests check this behavior with controlled icons. Moving, disabling and restoring a station map icon has not been observed in Railroader yet. What this guide says about the map follows from the game's code: `UI.Map.MapIcon.OnEnable` and `OnDisable` add the icon to the map's icon list and take it out, `UI.Map.MapBuilder` scales every listed icon with the map's zoom, and `Game.Progression.ProgressionEntityObjectController` switches its listed objects in `Awake` and on `IndustriesDidChange`.
+Automated tests check moves, activity and restoration with controlled icons. In Railroader 0.6.3, the Bryson icon moved 300 m east and was absent at its old spot. The explicitly disabled Cochran icon stayed off the map after the Alarka Branch progression milestone and after Save & Quit and reload. Restoration of the moved icon in play and updates while the map is open remain unverified.

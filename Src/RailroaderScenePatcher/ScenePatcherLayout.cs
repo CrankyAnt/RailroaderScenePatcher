@@ -1746,7 +1746,7 @@ namespace RailroaderScenePatcher {
                     new[] { "* and +", "* marks an object this mod changes. + marks an object this mod adds. The Unsaved lamp tells you when to save." },
                     new[] { "Footer", "Remove modification, Recheck and Guide appear below the messages on every tab. Actions specific to a tab appear at the bottom of that tab." },
                     new[] { "Failed edit", "A refused edit changes nothing. If an edit fails after it starts, the patcher restores the object to how it was. If it cannot verify that restoration, the message lists what remains and further edits are blocked until Recheck succeeds or you reload the Map Editor. Guide opens the guide for the failed action." } },
-                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
+                Guides = new[] { new[] { "Modder manual", "modder-manual.md" }, new[] { "Guided tasks", "completing-guided-tasks.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
@@ -1781,8 +1781,9 @@ namespace RailroaderScenePatcher {
                     new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. The terrain output of a board or a ground mask regenerates after the move." },
                     new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
                     new[] { "Spawn points", "The game reads a spawn point where it stands each time it starts, rescues or teleports a player. A disabled spawn point is not offered, except by a start setup that names it." } },
-                Guides = new[] { new[] { "Fixed placement", "writing-fixed-placement.md" }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
-                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" } } },
+                Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
+                    new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
+                    new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
                 Terms = new[] {
                     new[] { "Track binding", "The track location a marker is registered at. Changing it does not move the object." },
@@ -1796,13 +1797,13 @@ namespace RailroaderScenePatcher {
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
                     new[] { "Marker ID", "The ID the game registers a marker's track location under. When scene markers share an ID, the game removes the registration of all of them when one changes, so Enabled, the binding and Follow are refused. Give one of them a replacement ID with Set ID; the others keep their registrations. Clear ID returns the underlying ID." },
                     new[] { "Construction segments", "The track segments whose construction state decides which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They cannot be detached. Clear segments returns the native segments." } },
-                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Marker IDs", "repairing-duplicate-marker-ids.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
+                Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Marker IDs", "repairing-duplicate-marker-ids.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Adding detection", "adding-crossing-detection.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Starter placement", "placing-starter-markers.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {
                     new[] { "Remove modification", "Deletes this mod's modification and restores the object's underlying state, not an earlier patched position." },
                     new[] { "Recheck", "After a failed edit, compares the object with the scene patch file and unblocks it once they agree." },
                     new[] { "Terrain output", "The game regenerates terrain after a move of a board or a ground mask. Save does not write that output. Retry asks for it again." } },
-                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" } } },
+                Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "File recovery", "recover-scene-patch-files.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {
             if (!Help.TryGetValue(region, out var help)) return;

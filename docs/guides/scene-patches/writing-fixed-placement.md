@@ -4,7 +4,7 @@
 
 This guide explains how to write a v1 scene patch file for fixed placement of an independent board. This capability supports scene objects identified by the `independent-board-v1` structure, with a `Helpers.Culling.RendererCuller`, one circle map mask and no track relationship. The example uses the Sylva location board, `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene.
 
-An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed placement, visible rendering, culler membership and mask position after a measured origin shift. The test does not establish support for other builds or the complete culling range. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects and failure limits.
+An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed placement, visible rendering, culler membership and mask position after a measured origin shift. The test covered one build and sampled camera distances. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects and failure limits. For the general workflow, see [Write a scene patch file](writing-scene-patch-files.md).
 
 ## Add the scene patch file
 
@@ -53,7 +53,7 @@ Every player in a multiplayer session needs your mod and Railroader Scene Patche
 
 The host and each client apply your scene patch file to their own scene when their world loads. Each checks the map context, target identity and capability prerequisites locally. A failure in one player's game is reported there and does not undo changes for the others or disconnect anyone. Fixed placement uses map coordinates, so each player's board ends up at the same map position even though their local world origins differ.
 
-When a player's game loads the world again, for example on reconnect or when the same map is entered again, the patcher sets the board to the stored map position without accumulating an offset. If the game rebuilt an object, the patcher applies your modification to it as new and removes anything it built for the old object. Nothing else in the scene changes. In single-player, loading the same save again rebuilds the objects, and each modification is applied once. If the game keeps an object, the patcher keeps what it knows about it. The patcher does not retry a failed modification within the same load; it tries again on the next load. An object whose cleanup could not be verified stays protected until the map is loaded fresh. Live multiplayer behavior with this release, including reconnect, has not yet been tested.
+When a player's game loads the world again, the patcher uses the stored map position. If the game rebuilt an object, the patcher applies your modification to it as new and removes anything it built for the old object. In single-player, loading the same save again rebuilt the objects and applied each modification once. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer) for repeat application, failure handling and multiplayer evidence limits.
 
 ## Check the support boundary
 
