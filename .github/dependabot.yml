@@ -1,52 +1,17 @@
 version: 2
 updates:
   - package-ecosystem: nuget
-    directory: /Src/RailroaderScenePatcher.Core
+    directories:
+      - /Src/RailroaderScenePatcher.Core
+      - /Src/RailroaderScenePatcher
+      - /Tests/RailroaderScenePatcher.Core.Tests
+      - /Tests/NativeObservation
+      - /Tests/FaultInjection
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
     groups:
-      minor-and-patch:
+      per-dependency:
+        group-by: dependency-name
         patterns: ["*"]
-        update-types: [minor, patch]
-  - package-ecosystem: nuget
-    directory: /Src/RailroaderScenePatcher
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
-  - package-ecosystem: nuget
-    directory: /Tests/RailroaderScenePatcher.Core.Tests
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
-  - package-ecosystem: nuget
-    directory: /Tests/NativeObservation
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
-  - package-ecosystem: nuget
-    directory: /Tests/FaultInjection
-    schedule:
-      interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      minor-and-patch:
-        patterns: ["*"]
-        update-types: [minor, patch]
