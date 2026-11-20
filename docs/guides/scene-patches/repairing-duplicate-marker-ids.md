@@ -36,7 +36,7 @@ Each repair changes one holder, and each replacement ID belongs to one marker. A
 
 After **Set ID**, the caption above the other holders changes from **Also holding** to **Still holding** and includes the underlying ID, for example `Still holding Mg6m, the underlying ID`. The list names the holders that keep that ID. The selected marker now has a unique replacement ID, so its detected problem disappears. The other holders keep sharing the underlying ID until each has its own.
 
-The other holders' duplicate problem goes away when you click **Refresh**. Until then the object list is stale, and the **Detected problems** section starts with `The object list is stale, so these problems might be out of date. Click Refresh to check them again.`
+The patcher checks the other holders of the old and the new ID again right after **Set ID**, and after native **Undo** or **Redo** of it. A holder that no longer shares its ID loses its duplicate problem at once, without **Refresh**.
 
 The replacement ID doesn't change the marker's track binding. If that binding names a segment that doesn't exist, the marker shows that problem once it's enabled, as a different problem from the duplicate, for example `Marker broken binding: missing segment z5w8si. Duplicate marker ID Mg6m is repaired. This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab.` See [repairing track bindings](repairing-track-bindings.md).
 

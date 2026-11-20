@@ -65,6 +65,7 @@ static class ReplacementMarkerIdTests {
         UniquenessNamesTheMarkerOrMapObjectThatUsesTheId();
         YardLimitRepairAppliesBeforeEnableAndRebind();
         ARepairedHolderShowsItsMissingSegmentAsAnotherProblem();
+        AnIdEditReobservesTheHoldersOfBothIds();
         WhistleRepairLetsOneHolderBeDisabled();
         LoadOrderCollisionFailsTheLaterModification();
         TheSameIdInTwoModificationsFailsBoth();
@@ -165,6 +166,24 @@ static class ReplacementMarkerIdTests {
         Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m") == "Marker has an empty segment binding. Duplicate marker ID Mg6m is repaired. This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab.",
             "An empty binding gets the same note: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m"));
         Assert(CommandBand.IsBindingProblem("Marker broken binding: missing segment z5w8si") && !CommandBand.IsBindingProblem("Duplicate marker ID Mg6m is shared with 1 other scene marker."), "The kind that offers Repair with guided task decides the note");
+    }
+    // After a marker ID edit, its Undo or its Redo, the inventory observes again every other entry that holds the
+    // edited marker's old or new ID, so their problems agree with the edit at once. Entries of other IDs, the edited
+    // object itself and objects without a marker ID stay as they were.
+    static void AnIdEditReobservesTheHoldersOfBothIds() {
+        SceneObservation Entry(object handle, string path, params string[] bindings) =>
+            new SceneObservation(handle, Marker(path), "Track marker", true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "");
+        object yard = new object(), speed = new object(), other = new object(), sign = new object();
+        var before = Entry(yard, YardPath, "Marker id=Mg6m; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
+        var after = Entry(yard, YardPath, "Marker id=Mg6m-yard; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
+        var entries = new[] { after, Entry(speed, SpeedPath, "Marker id=Mg6m; type=Generic"), Entry(other, UnrelatedPath, "Marker id=Mown; type=Generic"), Entry(sign, "World/Sign", "Board") };
+        Assert(InventoryPresentationState.MarkerIdOf(before) == "Mg6m" && InventoryPresentationState.MarkerIdOf(entries[3]) == null, "The observed marker ID is read from the entry's marker line");
+        var holders = InventoryPresentationState.OtherMarkerIdHolders(entries, before, after);
+        Assert(holders.Count == 1 && ReferenceEquals(holders[0].Handle, speed), "Only the speed sign, which holds the old ID, is observed again: " + String.Join(", ", holders.Select(h => h.Identity.Path)));
+        // Undo: the yard limit returns from Mg6m-yard to Mg6m; the speed sign is again the other holder.
+        var undone = InventoryPresentationState.OtherMarkerIdHolders(new[] { before, entries[1], entries[2] }, after, before);
+        Assert(undone.Count == 1 && ReferenceEquals(undone[0].Handle, speed), "Undo observes the speed sign again too");
+        Assert(InventoryPresentationState.OtherMarkerIdHolders(entries, entries[3], entries[3]).Count == 0 && InventoryPresentationState.OtherMarkerIdHolders(entries, null, null).Count == 0, "An object without a marker ID observes nothing else");
     }
     static void WhistleRepairLetsOneHolderBeDisabled() {
         var w = new World();

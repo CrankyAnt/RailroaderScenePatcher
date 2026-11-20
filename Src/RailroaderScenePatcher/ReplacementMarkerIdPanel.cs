@@ -19,15 +19,10 @@ namespace RailroaderScenePatcher {
         // The ID the inspected marker holds now: read from the scene for a generic track marker, otherwise from the
         // inventory's binding line of the marker, so a marker that takes no replacement ID still shows its ID. Empty for
         // any other object.
-        const string MarkerIdLine = "Marker id=";
         string CurrentMarkerId() {
             if (selected == null) return "";
             try { var read = attachment?.Session.MarkerIdOf(selected.Identity); if (read != null) return read; } catch { }
-            var line = selected.Bindings.FirstOrDefault(b => b.StartsWith(MarkerIdLine, StringComparison.Ordinal));
-            if (line == null) return "";
-            var value = line.Substring(MarkerIdLine.Length);
-            var end = value.IndexOf(';');
-            return (end < 0 ? value : value.Substring(0, end)).Trim();
+            return InventoryPresentationState.MarkerIdOf(selected) ?? "";
         }
         // The underlying ID of the inspected generic marker and the other scene markers that use it, read once per frame:
         // the users are a scan of every loaded marker and of the track graph, and one panel build asks several times.

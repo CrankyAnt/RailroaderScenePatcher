@@ -43,6 +43,25 @@ namespace RailroaderScenePatcher {
             Rows(inventory, search, filter, changed).Count + " of " + (inventory?.Entries.Count ?? 0) + " objects";
 
         // Baked scenery parts include their group; other objects use their observed visible name.
+        // The marker ID an entry was observed with, from its "Marker id=<id>; type=..." binding line, or null for an
+        // entry without one.
+        const string MarkerIdLine = "Marker id=";
+        internal static string MarkerIdOf(SceneObservation entry) {
+            var line = entry?.Bindings.FirstOrDefault(b => b != null && b.StartsWith(MarkerIdLine, StringComparison.Ordinal));
+            if (line == null) return null;
+            var value = line.Substring(MarkerIdLine.Length);
+            var end = value.IndexOf(';');
+            value = (end < 0 ? value : value.Substring(0, end)).Trim();
+            return value.Length == 0 ? null : value;
+        }
+        // The other entries that hold the marker ID an object had before an edit, its Undo or its Redo, or the one it has
+        // after it: their duplicate marker ID problem and explanation change with the edit, so they are observed again.
+        internal static IReadOnlyList<SceneObservation> OtherMarkerIdHolders(IEnumerable<SceneObservation> entries, SceneObservation before, SceneObservation after) {
+            var ids = new HashSet<string>(new[] { MarkerIdOf(before), MarkerIdOf(after) }.Where(id => id != null), StringComparer.Ordinal);
+            var self = after?.Handle ?? before?.Handle;
+            if (ids.Count == 0) return Array.Empty<SceneObservation>();
+            return (entries ?? Enumerable.Empty<SceneObservation>()).Where(e => e != null && !ReferenceEquals(e.Handle, self) && MarkerIdOf(e) is string id && ids.Contains(id)).ToArray();
+        }
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
         static readonly Regex AddedSuffix = new Regex(@" \(added(?:, [0-9]+ of [0-9]+)?\)\z");

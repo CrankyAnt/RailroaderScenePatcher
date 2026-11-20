@@ -426,7 +426,10 @@ namespace RailroaderScenePatcher {
         // an id and the map-object ids of the map context. The native Graph.RemoveNamedLocation removes an id from every
         // segment, so it would remove the registration of every other holder of the old id.
         public string MarkerId(object target) => Field(MarkerOf(target), "id") as string;
-        public void SetMarkerId(object target, string id) => FieldOf(marker, "id").SetValue(MarkerOf(target), id);
+        // Every write of a marker ID, by an edit, its Undo, Redo or a restoration, counts here, so that the inventory's
+        // marker ID index of a discovery (NativeInventory) is read again instead of naming holders by their old IDs.
+        internal static int IdWrites { get; private set; }
+        public void SetMarkerId(object target, string id) { FieldOf(marker, "id").SetValue(MarkerOf(target), id); IdWrites++; }
         public void UnregisterOwn(object target) {
             var m = MarkerOf(target);
             var id = (string)Field(m, "id");
