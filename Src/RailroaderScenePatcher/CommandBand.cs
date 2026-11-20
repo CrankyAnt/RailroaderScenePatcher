@@ -581,6 +581,10 @@ namespace RailroaderScenePatcher {
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
             ? "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
+        // The tooltip of the disclosure triangle after the Dependencies and Runtime state headings.
+        internal static string DisclosureTip(bool longForm) => longForm
+            ? "Show the short form, with paths relative to this object and grouped per object."
+            : "Show the full lines, with each component's scene and full path.";
         // The Detected problems section of a stale object list: its problems are those of the last refresh.
         internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
         // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID, a

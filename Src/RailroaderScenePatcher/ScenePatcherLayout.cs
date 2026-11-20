@@ -58,6 +58,8 @@ namespace RailroaderScenePatcher {
         bool candidateDetails;
         static readonly string[] PlacementModes = { "Numeric", "Gizmo", "Snap", "Follow" };
         OutlinerFilter outlinerFilter;
+        // Whether the Object tab's Dependencies and Runtime state show their long form instead of the short form.
+        bool dependenciesLong, runtimeLong;
         float outlinerWidth = OutlinerDefaultWidth;
         int placementMode;
         object revealed;
@@ -83,6 +85,40 @@ namespace RailroaderScenePatcher {
         RectTransform Section(UIPanelBuilder builder, string title, bool divider = true) {
             if (divider) builder.AddHRule();
             return builder.AddLabel("<b>" + Literal(title) + "</b>");
+        }
+        // A section heading with the native disclosure triangle (UIBuilderAssets.disclosureCollapsed and
+        // disclosureExpanded, as AddExpandable draws it) right after its title. The triangle switches the section between
+        // its short form, collapsed, and its long form, expanded; the section's lines stay in view either way.
+        void DisclosureSection(UIPanelBuilder builder, string title, bool longForm, Action toggle) {
+            builder.AddHRule();
+            builder.HStack(row => {
+                var heading = row.AddLabel("<b>" + Literal(title) + "</b>");
+                var headingLayout = heading.GetComponent<LayoutElement>() ?? heading.gameObject.AddComponent<LayoutElement>();
+                headingLayout.flexibleWidth = 0;
+                foreach (var text in heading.GetComponentsInChildren<TMP_Text>(true)) text.textWrappingMode = TextWrappingModes.NoWrap;
+                // The hit area is a clear square around the small triangle, so the triangle is easy to click.
+                var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
+                var hitRect = (RectTransform)hit.transform;
+                hitRect.SetParent(heading.parent, false);
+                var hitLayout = hit.AddComponent<LayoutElement>();
+                hitLayout.minWidth = hitLayout.preferredWidth = 20; hitLayout.minHeight = hitLayout.preferredHeight = 20; hitLayout.flexibleWidth = 0;
+                var area = hit.AddComponent<Image>(); area.color = Color.clear;
+                var icon = new GameObject("Triangle", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
+                var iconRect = (RectTransform)icon.transform;
+                iconRect.SetParent(hitRect, false);
+                iconRect.anchorMin = iconRect.anchorMax = new Vector2(.5f, .5f); iconRect.sizeDelta = new Vector2(10, 10); iconRect.anchoredPosition = Vector2.zero;
+                var image = icon.AddComponent<Image>();
+                var assets = UIBuilderAssets.Shared;
+                image.sprite = assets == null ? null : longForm ? assets.disclosureExpanded : assets.disclosureCollapsed;
+                image.preserveAspect = true; image.raycastTarget = false;
+                var headingText = heading.GetComponentInChildren<TMP_Text>(true);
+                if (headingText != null) image.color = headingText.color;
+                var button = hit.AddComponent<Button>();
+                button.targetGraphic = area; button.transition = Selectable.Transition.None;
+                button.onClick.AddListener(() => presentation.Action(toggle)());
+                hitRect.Tooltip(title, CommandBand.DisclosureTip(longForm));
+                row.Spacer();
+            }).Height(LineHeight);
         }
         // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.
@@ -742,12 +778,14 @@ namespace RailroaderScenePatcher {
             if (selected.Identity.PadMarkerId != null)
                 Field(builder, "Pad marker ID", selected.Identity.PadMarkerId)
                     .Tooltip("Pad marker ID", "The marker ID of this crossing's pad. Other crossbucks share this path, so the scene patch file names this crossbuck by its path and this ID.");
-            Section(builder, "Dependencies");
+            // Each section shows its short form, paths relative to this object and grouped per object, until its
+            // triangle switches it to the long form.
+            DisclosureSection(builder, "Dependencies", dependenciesLong, () => dependenciesLong = !dependenciesLong);
             if (selected.Dependencies.Count == 0) Line(builder, "None observed", null, null);
-            foreach (var line in selected.Dependencies) PlainLabel(builder, Breakable(line));
-            Section(builder, "Runtime state");
+            foreach (var line in dependenciesLong ? selected.Dependencies : HierarchyDependencies.ShortForm(selected.Identity.Scene, selected.Identity.Path, selected.Dependencies)) PlainLabel(builder, Breakable(line));
+            DisclosureSection(builder, "Runtime state", runtimeLong, () => runtimeLong = !runtimeLong);
             if (selected.RuntimeState.Count == 0) Line(builder, "None observed", null, null);
-            foreach (var line in selected.RuntimeState) PlainLabel(builder, Breakable(line));
+            foreach (var line in runtimeLong ? selected.RuntimeState : HierarchyDependencies.ShortForm(selected.Identity.Scene, selected.Identity.Path, selected.RuntimeState)) PlainLabel(builder, Breakable(line));
         }
         static bool IsReader(string line) => line.StartsWith(StarterPlacements.ReaderPrefix, StringComparison.Ordinal);
         // A path wraps after a separator instead of in the middle of a name.
@@ -1785,8 +1823,8 @@ namespace RailroaderScenePatcher {
                     new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },
                     new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear activity returns it to its underlying activity." },
                     new[] { "Track group", "Some markers switch with their track group. Disable holds the marker inactive. Click Clear activity to let the group control it again." },
-                    new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links." },
-                    new[] { "Runtime state", "Whether the game switches parts of the object on or off while it runs. These values don't make the object list stale." },
+                    new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links. The short form lists each object of this hierarchy by its relative path with its components; click the triangle after the heading for the full lines." },
+                    new[] { "Runtime state", "Whether the game switches parts of the object on or off while it runs. These values don't make the object list stale. Its triangle switches between the short form and the full lines, as for Dependencies." },
                     new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",

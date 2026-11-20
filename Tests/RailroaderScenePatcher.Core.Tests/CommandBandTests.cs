@@ -18,6 +18,7 @@ static class CommandBandTests {
         TheWindowOpensBelowTheMapEditorOrAtTheTopRight();
         OwnSaveKeepsTheDefinitionsCurrent();
         ADisabledControlKeepsItsDescription();
+        HierarchyLinesHaveAShortForm();
         ChoiceLabelsLeadWithWhatTellsThemApart();
         AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
         AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
@@ -405,6 +406,47 @@ static class CommandBandTests {
         Check(InventoryPresentationState.Notice(null, true).Contains("inspection is unavailable"), "Without an inventory the notice names that first");
     }
     // An enabled control says what it does; a disabled one only why it cannot be used now.
+    // The Object tab's Dependencies and Runtime state show a short form by default: paths relative to the inspected
+    // object, one line per object of its hierarchy with its components after it, the inspected object first. Lines that
+    // name no object of the hierarchy stay as they are, before the objects. The long form is the lines themselves.
+    static void HierarchyLinesHaveAShortForm() {
+        const string Scene = "BushnellWhittier", Path = "World/Roads/Crossing";
+        var dependencies = new[] {
+            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing [Track.CrossingController]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [UnityEngine.MeshRenderer]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate/Arm [UnityEngine.MeshFilter]; enabled=False",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription."
+        };
+        var shortForm = HierarchyDependencies.ShortForm(Scene, Path, dependencies);
+        var expected = new[] {
+            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription.",
+            "This object: CrossingController",
+            "Gate: CrossingGate, MeshRenderer",
+            "Gate/Arm: MeshFilter (disabled)"
+        };
+        Check(shortForm.SequenceEqual(expected), "The short form groups the hierarchy's components per object: " + String.Join(" | ", shortForm));
+        var runtime = new[] {
+            "BushnellWhittier/World/Roads/Crossing/Bell [UnityEngine.AudioSource] enabled=True",
+            "BushnellWhittier/World/Roads/Crossing/Bell [CrossingBell] enabled=False",
+            "Runtime object BushnellWhittier/World/Roads/Crossing/Bell/Pool [UnityEngine.AudioSource]",
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True"
+        };
+        var shortRuntime = HierarchyDependencies.ShortForm(Scene, Path, runtime);
+        var expectedRuntime = new[] {
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True",
+            "Bell: AudioSource enabled, CrossingBell disabled",
+            "Bell/Pool: AudioSource (runtime object)"
+        };
+        Check(shortRuntime.SequenceEqual(expectedRuntime), "The short form of the runtime state: " + String.Join(" | ", shortRuntime));
+        Check(HierarchyDependencies.ShortForm(Scene, Path, new string[0]).Count == 0 && HierarchyDependencies.ShortForm(null, null, new[] { "x" }).SequenceEqual(new[] { "x" }), "No lines stay none, and without a path the lines stay as they are");
+    }
     static void ADisabledControlKeepsItsDescription() {
         Check(CommandBand.Tooltip("Move the object with the native gizmo.", null) == "Move the object with the native gizmo.", "An enabled control shows its description");
         Check(CommandBand.Tooltip("Move the object with the native gizmo.", "Inspect an object first.") == "Unavailable: Inspect an object first.",
