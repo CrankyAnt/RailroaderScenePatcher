@@ -131,7 +131,8 @@ namespace RailroaderScenePatcher.Core {
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             // The capability covers fixed placement: nothing here re-evaluates a placement when its track changes.
             if (state?.Placement?.Following != null) throw new InvalidOperationException(NoFollowing);
-            var refusal = state?.Active == null ? null : world.ActivityRefusal(target);
+            // A disable that could not hold against the game's progression or map feature is refused before any change.
+            var refusal = (state?.Active == null ? null : world.ActivityRefusal(target)) ?? (state?.Active == false ? world.DisableRefusal(target) : null);
             if (refusal != null) throw new InvalidOperationException(refusal);
         }
         sealed class Snapshot { internal PartObservation Observed; internal Placement Held, Scene; }

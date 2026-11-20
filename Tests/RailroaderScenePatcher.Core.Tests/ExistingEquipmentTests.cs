@@ -235,6 +235,21 @@ static class ExistingEquipmentTests {
             g.World.Controller(g.Mast1, true);
             Assert(g.Mast1.Active && Near(g.MapOf(g.Mast1).Position, Near1), kind + ": and on again, at its placement");
         }
+        // A disable that could not hold, because the game's switch members are unavailable, is refused with the reason
+        // before any change, for a mast and a bell, in a load and in scene patch editing. Its placement and Enable still apply.
+        foreach (var bell in new[] { false, true }) {
+            var u = new Fixture(); u.Mast1.Constructed = u.Bell.Constructed = true; u.Mast1.Switch = u.Bell.Switch = GameSwitch.Progression;
+            u.World.DisableRefused = GameSwitchActivity.ProgressionMembersRefusal;
+            var part = bell ? u.Bell : u.Mast1;
+            var refusedOff = u.Engine.Apply(Doc(bell ? Bell("off", active: false) : Mast("off", active: false))).Outcomes["off"];
+            Assert(!refusedOff.Applied && refusedOff.Failure == FailureKind.Refused && refusedOff.Error.Contains(GameSwitchActivity.ProgressionMembersRefusal) && u.World.Mutations == 0 && part.Active,
+                (bell ? "Bell" : "Mast") + ": a disable that could not hold is refused with the reason before any change: " + refusedOff.Failure + " " + refusedOff.Error);
+            var (_, uEditor, uSession) = Session(u);
+            var uBefore = uSession.ScenePatchFileText;
+            Assert(!uSession.Edit(bell ? BellId : MastId(), null, false).Applied && uSession.ScenePatchFileText == uBefore && !uEditor.CanUndo && u.World.Mutations == 0, (bell ? "Bell" : "Mast") + ": scene patch editing refuses it too and leaves the file and history unchanged");
+            Assert(u.Engine.Apply(Doc(bell ? Bell("move", position: new[] { 1101.0, 10, 21 }) : Mast("move", position: Near1))).Outcomes["move"].Applied, (bell ? "Bell" : "Mast") + ": its placement still applies");
+            Assert(u.Engine.Apply(Doc(bell ? Bell("on", active: true) : Mast("on", active: true))).Outcomes["on"].Applied, (bell ? "Bell" : "Mast") + ": Enable is no disable and still applies");
+        }
         // The switch names the object above the mast: the mast's own activity holds the disable while the switch turns that
         // object off and on, and a load while the switch holds it off applies the disable as well.
         var above = new Fixture();

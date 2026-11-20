@@ -99,6 +99,7 @@ An operation can be unavailable even when other edits are supported. Its control
 
 - **Enable** and **Disable** are unavailable when a culler of the game itself enables and disables the equipment by camera distance. That culler would override a saved Enabled value. This was checked at one base-game map crossing in Railroader 0.6.3, Bryson Everett. Its culler lists each mast's parent, so Enabled is supported for those masts. **Runtime state** on the **Object** tab shows which object the culler lists for the inspected mast.
 - **Enable** and **Disable** are unavailable for a bell if the game build lacks what the patcher needs to configure the bell again after enabling it, such as unavailable crossing-equipment prerequisites. The tooltip names what the build lacks.
+- **Disable** is unavailable for a mast or bell that a progression controller or map feature switches when the disable could not hold, because the patcher cannot share its activity in this load or the game's members of that switch are unavailable. The tooltip gives that reason. A scene patch file that disables such a mast or bell fails that modification before changing anything, and the file's other modifications still apply. No base-game crossing has such a mast or bell in Railroader 0.6.3.
 - **Follow** is unavailable for every existing mast and bell. A modification that gives one a `trackFollowing` placement fails before changing anything.
 - Rotation is unavailable for a bell.
 

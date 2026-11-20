@@ -217,8 +217,9 @@ namespace RailroaderScenePatcher {
             return problem == null ? null : "This " + (bells ? "bell" : "mast") + " cannot be edited: " + problem;
         }
         public string ActivityRefusal(object part) => ActivityProblem(part as GameObject);
-        // No switch of the game names a crossing device in Railroader 0.6.3, so its disable is never refused for one.
-        public string DisableRefusal(object target) => null;
+        // No switch of the game names a crossing device in Railroader 0.6.3. A mast or bell that a progression or a map
+        // feature switches is refused a disable that could not hold, with the reason, as a baked scenery group is.
+        public string DisableRefusal(object target) => GroupWorld.DisableProblem(target as GameObject);
         // Existing equipment refuses track-following placement itself (ExistingEquipmentScene).
         public string FollowingRefusal(object target) => null;
         // Crossing masts and bells hold no lake surface.
