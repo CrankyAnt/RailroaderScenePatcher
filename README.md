@@ -1,6 +1,6 @@
 # Railroader Scene Patcher
 
-A Railroader mod that lets map modders repair or move supported scene objects, such as misplaced signs or bridges and track markers with broken bindings. If a mod you use requires Railroader Scene Patcher, you need the patcher installed so Railroader can apply that mod's changes when you load a map.
+Railroader Scene Patcher is a Railroader mod that lets map modders repair or move supported scene objects, such as misplaced signs or bridges and track markers with broken bindings. If a mod you use requires the patcher, install it so Railroader can apply that mod's changes when you load a map.
 
 > **Status.** Under development. There is no official release or mod package yet.
 
@@ -13,7 +13,7 @@ Author: CrankyAnt
 3. Quit and reopen Railroader after installing the files, changing DLL permission, or replacing the patcher's DLL. A full restart lets Railroader pick up the files and the permission setting.
 4. On the main menu, click **Mods** to open **Manage Mods**. Enable the mod that requires the patcher and click **Apply**. Railroader enables its installed dependency automatically. If the dependency is missing, incompatible, or blocked by DLL permission, check the reason shown in **Manage Mods**.
 
-You install and update the mods and manage DLL permission on your own computer. In multiplayer, the host and each client need the required mod versions installed and DLL permission enabled locally. The patcher applies scene changes on each computer when the map loads.
+Install and update mods and manage DLL permission on your own computer. In multiplayer, the host and each client need the required mod versions installed and DLL permission enabled locally. The patcher applies scene changes on each computer when the map loads.
 
 See Railroader's [mod installation guide](https://docs.railroadergame.com/modding/installing-mods/) and [DLL mod settings](https://docs.railroadergame.com/modding/dll-mods/).
 
@@ -37,9 +37,9 @@ See the [modder manual](docs/guides/scene-patches/modder-manual.md) for editing 
 
 ## License
 
-This repository uses per-file license assignment according to the REUSE
-specification. See [REUSE.toml](REUSE.toml) for the authoritative
-machine-readable record.
+This repository assigns licenses per file according to the REUSE
+specification. [REUSE.toml](REUSE.toml) is the authoritative machine-readable
+record.
 
 Every file is licensed under the [MIT License](LICENSE.md), free to use,
 modify, and redistribute. If you copy or build on this project, retain the

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Select targets in the world
 
-Use world markings to select a supported inventory object for inspection or choose a target for an edit. You can select inactive objects too.
+Use world markings to inspect a supported inventory object or choose a target for an edit. Inactive objects are selectable too.
 
 ## Select an object for inspection
 
@@ -11,7 +11,7 @@ Use world markings to select a supported inventory object for inspection or choo
 3. Click an object's square marker, object frame or identity label to make it the candidate.
 4. Check the candidate, then click **Confirm** in the footer to inspect it.
 
-Each square marker is at its object's position. You can click the marker's `+`. If you click inside object frames without hitting a `+`, the patcher chooses the object whose `+` is nearest on screen. The candidate is blue, with a more saturated blue under the pointer. After you click, it stays plain blue. Confirmation turns its object frame and square marker gold. For an editable object, **Numeric** mode on the **Placement** tab shows its inspected placement.
+Each square marker is at its object's position, and you can click its `+`. If you click inside object frames without hitting a `+`, the patcher chooses the object whose `+` is nearest on screen. The candidate appears blue, with a more saturated blue under the pointer. After you click, it stays plain blue. Confirming it turns its object frame and square marker gold. If the object is editable, **Numeric** mode on the **Placement** tab shows its inspected placement.
 
 The footer's first message slot, **World choice**, tells you what to choose, for example `Choose an object in the world.` The native map editor can still respond to world clicks while **Select in world** is open.
 
@@ -19,7 +19,7 @@ After you click a candidate, the footer shows it on a blue `Object <n>: …` lin
 
 ## Choose between overlapping markings
 
-A numbered choice list opens beside the pointer when two or more `+` markers are closer than half a marker and a click cannot distinguish them. The footer says `N objects. Select a row from the list next to the pointer.` Each row starts with the name that distinguishes its candidate. Select a row to make that object the candidate.
+A numbered choice list opens beside the pointer when two or more `+` markers are closer than half a marker and a click can't distinguish them. The footer says `N objects. Select a row from the list next to the pointer.` Each row starts with a name that distinguishes its candidate. Select a row to make that object the candidate.
 
 The row under the pointer has a blue background. Hover over a row or the candidate's `+` to see its blue world marking. A track shows a ribbon; an object shows a box. Press **Escape** to close the choice list and leave the world choice open so you can click elsewhere. You can navigate the world while the list is open.
 
@@ -29,23 +29,23 @@ Markings use the same colors as the panel:
 
 - Blue marks the candidate. Its label starts with `Candidate: …` when the choice list is closed.
 - Gold marks the inspected object. It has an object frame and a square marker at the center, with no label to obstruct its gizmo. The panel shows any detected problem.
-- Green marks a confirmed target until you use or withdraw it. Its world label starts with `Confirmed choice: …` and appears while you inspect the object it was chosen for. While this target is green, the marking for the track the object is currently bound to or follows is hidden. That marking returns when you use or withdraw the target.
+- Green marks a confirmed target until you use or withdraw it. Its world label starts with `Confirmed choice: …` and appears while you inspect the object it was chosen for. While the target is green, the track the object is currently bound to or follows is unmarked. Its marking returns when you use or withdraw the target.
 
 Labels have opaque backgrounds and keep the same text size on screen. Markings and labels stay outside native windows and controls. Candidates at the same spot appear as numbered rows in the choice list beside the pointer.
 
-An object shows its object frame within 500 meters of the camera. Beyond that distance, it shows only its square marker and any label, in the color its object frame would have. You can still click the marker. The inspected object keeps its gold object frame and square marker at every distance. An object with nothing visible of its own to frame shows a [helper marker](#helper-markers-for-invisible-objects) instead.
+Within 500 meters of the camera, an object shows its object frame. Farther away, it shows only its square marker and any label, in the color its frame would have. You can still click the marker. The inspected object keeps its gold object frame and square marker at every distance. An object with nothing visible of its own to frame shows a [helper marker](#helper-markers-for-invisible-objects) instead.
 
 Labels are centered below their markers. If a label would cover another marker or a native panel, it moves to the side or above. Inactive objects remain selectable through their square markers and identity labels. During a replacement choice, if the inspected object also has a candidate label, that label starts with `Inspected: …`.
 
 ### What an object frame includes
 
-The patcher uses the object's renderers to determine its bounds. It leaves out effects such as smoke, water spray and lamp beams, invisible shadow casters, and lower levels of detail. A renderer hidden by the game's distance culling still counts. A static-batched building part counts once it has appeared with the patcher's markings since the map loaded. This keeps the object frame's size and shape stable as you zoom or the game culls the object. A renderer or object that is switched off does not count.
+The patcher determines the object's bounds from its renderers. It excludes effects such as smoke, water spray and lamp beams, invisible shadow casters, and lower levels of detail. A renderer hidden by the game's distance culling still counts. A static-batched building part counts once it has appeared with the patcher's markings since the map loaded. The frame's size and shape therefore stay stable as you zoom or the game culls the object. Switched-off renderers and objects don't count.
 
 The square marker sits at the middle of the framed box, at a point on the object. It stays on the object as you zoom and turn the camera, also when that point is outside the view, as for an object larger than the view. A crossing pad is framed along its whole length on the track, including where its ends meet the road. A crossing controller stands for the whole crossing: its frame surrounds the masts with their gates, the bell and the pads of its grade-crossing setup. Whistle signs and detection spans are outside that frame. At US19 Gov Island, the frame grew to include a mast after it moved about 300 m. Each mast, bell and pad keeps its own frame too.
 
 An object frame includes the part at the square marker and nearby parts. It leaves out a part that is far away or much larger. A baked scenery group, such as a station building with its platform and lamps, counts as one object and has an object frame around all its parts. An object with several parts has one object frame around them.
 
-The object frame is the on-screen outline of a box that turns with the object. It follows an object angled to the view rather than enclosing it in a screen-aligned rectangle. Clicking beside the object, inside that rectangle but outside the object frame, does not select it.
+The object frame outlines a box that turns with the object. For an object angled to the view, the frame follows that angle rather than enclosing it in a screen-aligned rectangle. Clicking beside the object, inside that rectangle but outside the frame, doesn't select it.
 
 Bridge construction scenery is framed around the objects it shows and hides that have no inventory entry of their own. If there are none, it shows a [helper marker](#helper-markers-for-invisible-objects) on its own pivot. It therefore never uses the bridge's object frame. Close up, the object frame remains visible even when the object fills the view. Every object frame is at least slightly larger than its square marker, so a small or distant object still has a visible outline around its `+`.
 
@@ -58,7 +58,7 @@ The box stops where the object, including its wider parts, meets the terrain or 
 
 ### Helper markers for invisible objects
 
-An invisible object has no visible model in the world, so it has no object frame of its own. It shows a helper marker instead: its square marker, with the `+` on the object's pivot, the point that the object's position on the **Placement** tab names. Invisible objects include:
+An invisible object has no visible model and no object frame of its own. Instead, it shows a helper marker. This is its square marker, with the `+` on the object's pivot, at the position shown on the **Placement** tab. Invisible objects include:
 
 - A light-only object, such as the `Spotlight Outdoor` groups at Whittier under the **Lights** category.
 - A spawn point, such as `World/POIs/Alarka` in the **Spawn point** family.
@@ -73,7 +73,7 @@ Without colliders, a helper marker has a small object frame around its `+` withi
 
 A helper marker shows wherever the object's marking shows, in the same colors: blue as the candidate, gold as the inspected object and green as a confirmed target. During **Select in world** it has its `+` like every other object. To select an invisible object, click its `+` or inside its frame, as for any other object. **Focus** moves the camera to the object's pivot. The gizmo stands on the pivot, and the helper marker moves with the object during a drag, after the drag and after native **Undo** and **Redo**.
 
-The patcher draws the helper marker on screen. It is not part of the scene, shows only during scene patch editing and is never saved in the scene patch file.
+The patcher draws the helper marker on screen only during scene patch editing. It isn't part of the scene and is never saved in the scene patch file.
 
 ## Select objects in a group
 
@@ -84,13 +84,13 @@ A group contains scene objects that the game handles together. Some follow a sha
 - A rail bridge construction contains its construction controller and the objects whose visibility it controls. At the Ela bridge, the controller `Ela Bridge Scenery` controls the steel and abutments of `Ela Bridge`, so the two form one group. Bryson `Bridge 1` and the `Almond Bridge` carry their controller on their group root, so each appears as one baked scenery group with its abutments and steel as parts. A plate girder bridge has no controller and appears as one object.
 - An industry storage display contains the storage piles or log pond filled by one industry's storage. An industry building is a separate group and contains no storage pile. The storage displays `Andrews Snowbird Paper`, `Sylva Paperboard` and `Connelly` are baked scenery groups with their piles as parts, so each appears as one group with its root and all its piles, also where two storages of the industry fill the piles, as at Connelly. `Whittier Log Pond` is a baked scenery group with its lake surface and its log pond as parts, so it appears as one group with both. The log pond has no renderer of its own; its frame is the area it lays its logs out in, as for a pile.
 
-A folder is not a group. For example, Bryson Yard is a folder, and each of its 13 yard lamp posts is a separate group. Objects do not form a group just because they are close together. An object outside every group appears on its own. Whistle signs remain separate objects at every distance.
+A folder doesn't count as a group. Bryson Yard, for example, is a folder with 13 yard lamp posts, each a separate group. Proximity alone doesn't group objects. An object outside every group appears on its own. Whistle signs remain separate objects at every distance.
 
-Grouping changes only how objects appear in the world. Each object keeps its inventory entry, outliner row and edits. A grade-crossing setup's controller manages its invisible detection spans. The spans do not appear in the group's object frame or choice list. They remain in the outliner under their controller in the **Crossing controller** family. To change detection, use the controller's **Connections** tab.
+Grouping changes only the objects' appearance in the world. Each object keeps its inventory entry, outliner row and edits. A grade-crossing setup's controller manages its invisible detection spans. These spans are excluded from the group's object frame and choice list but remain in the outliner under their controller in the **Crossing controller** family. To change detection, use the controller's **Connections** tab.
 
 ### Select at different distances
 
-The patcher measures the distance from the camera to the bounds of a group's visible objects. A grade-crossing setup's detection spans do not count.
+The patcher measures camera distance to the bounds of the group's visible objects. It excludes a grade-crossing setup's detection spans.
 
 At 125 meters or less, each object has its own square marker and object frame and can be selected individually. A baked scenery group with parts shows only its parts at this distance. To inspect the group, click **Select group** on a part's **Object** tab or select the group's outliner row.
 
@@ -124,21 +124,21 @@ During a world choice, every candidate of that type in view has a `+` marker eve
 
 Green also marks the current binding, every segment covered by the crossing and the track the object follows. The current binding appears while the **Connections** tab is open, whether it comes from the map or a scene patch. A confirmed target temporarily hides the current track marking as described above.
 
-World choices for replacements, snaps and track-following placement use the same candidate markings and choice lists. **Confirm** turns the candidate into a confirmed target, marked green. It does not inspect the candidate as **Select in world** does.
+Replacements, snaps and track-following placement use the same candidate markings and choice lists. **Confirm** makes the candidate a confirmed target and marks it green. It doesn't inspect the candidate as **Select in world** does.
 
 Use **Focus** in the footer to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source object.
 
-After you check the candidate, click **Confirm**. The patcher records the confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. Inspecting another inventory entry ends that confirmation, also when it belongs to the same object. A choice made through **Select in world** alone has no source object and does not show that line.
+Check the candidate, then click **Confirm**. The patcher records its confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. Inspecting another inventory entry ends the confirmation, even if that entry belongs to the same object. A choice made through **Select in world** alone has no source object and doesn't show that line.
 
 If the candidate is missing, ambiguous or has changed since you selected it, check the world and select it again. If the source object or loaded map context has changed, cancel the choice and start again.
 
 ### Resolve an ambiguous identity
 
-A scene patch identifies an object by its scene, path and component. If two objects share all three, it cannot distinguish them. Confirmation for an edit is refused and names the shared identity. Choose an object with a unique path instead. A replacement choice excludes objects with this ambiguity because the scene patch could not identify them.
+A scene patch identifies an object by its scene, path and component. It can't distinguish two objects that share all three. Confirmation for an edit is then refused, with the shared identity in the reason. Choose an object with a unique path instead. Replacement choices exclude ambiguous objects because the scene patch couldn't identify them.
 
 **Select in world** can still confirm such an object for inspection. **Supported edits** then explains why it cannot be edited. A refused confirmation shows its reason in the footer and the log.
 
-Click **Cancel** in the footer to close a pending choice. A pending choice changes no scene objects, scene patch file or completed edit history. Confirmation records a choice for an edit. The [v1 scene patch file reference](scene-patch-file-v1.md) describes the supported fields and how they apply.
+Click **Cancel** in the footer to close a pending choice. Pending choices don't change scene objects, the scene patch file or completed edit history. Confirmation records a choice for an edit. The [v1 scene patch file reference](scene-patch-file-v1.md) describes the supported fields and how they apply.
 
 ## Apply the edit
 

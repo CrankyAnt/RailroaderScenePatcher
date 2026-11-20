@@ -8,11 +8,11 @@ For other operations, see the [modder manual](modder-manual.md). To make changes
 
 ## Before you start
 
-Open your mod's map definition from the Editor menu. The patcher reads and writes `Data/scene-patches.json` and `Info.json` only in the edited mod. It does not access those files in mods that supply map layers or terrain tile sets. Save creates the scene patch file and declares the patcher dependency when needed.
+Open your mod's map definition from the Editor menu. The patcher reads and writes `Data/scene-patches.json` and `Info.json` only in the edited mod. It doesn't access those files in mods that supply map layers or terrain tile sets. Save creates the scene patch file and declares the patcher dependency when needed.
 
 A new scene patch file names the map definition's bottom map layer as its scene target map. If the definition has no map layers, the file names the definition itself. When the bottom map layer is the base-game map, the file also applies to a save of that map, where your map-changing script or map patch supplies your native changes. An existing scene patch file keeps its scene target map. See [the scene patch file reference](scene-patch-file-v1.md#scene-patch-file-fields).
 
-Open **Scene patches**, then click the page icon for session details. Under **Editing**, **Editing ready for** and the scene patch file path mean that you can begin. A problem reported there means the scene patch file is protected. The patcher never overwrites an unreadable file, a file in a newer format or one for another map. The **Scene patch file** section identifies the problem. Correct the file and read it again, or make a fresh start after backing it up. See [Recover a protected scene patch file](recover-scene-patch-files.md).
+Open **Scene patches**, then click the page icon for session details. Under **Editing**, look for **Editing ready for** and the scene patch file path. These mean you can begin. A problem there means the scene patch file is protected. The patcher never overwrites an unreadable file, a file in a newer format or one for another map. The **Scene patch file** section identifies the problem. Correct the file and read it again, or back it up and make a fresh start. See [Recover a protected scene patch file](recover-scene-patch-files.md).
 
 ## Choose a scene patch file version
 
@@ -34,7 +34,7 @@ None of these choices requires a reload. The version choice remains visible afte
 
 Click **Import** in the **Version choice** panel. The **Import** panel opens in its place and lists every change since the patcher last read or wrote the file. Each is marked **New**, **Changed** or **Removed** and explains its effect, including changes outside the modifications.
 
-The panel then lists conflicts, each with what the editor version and the file version hold, followed by its choice. A conflict occurs when:
+The panel then lists conflicts. Each shows the editor and file versions, followed by a choice between them. A conflict occurs when:
 
 - Your scene patch edits and the changed file both change the same entry.
 - Your edits and the file change one object under different modification IDs.
@@ -66,13 +66,13 @@ For an edit that keeps the same object selected and lets you review changes befo
 2. On the **Placement** tab, use **Numeric** mode to enter the values. Use a decimal point.
 3. Click **Apply**.
 
-For an object that supports fixed placement, six fields show the inspected position in map coordinates and rotation in degrees. The **Position (m)** and **Rotation (deg)** rows each label their fields **X**, **Y** and **Z**. Objects that cannot be edited show the values as two lines of text instead, such as `X 4361.091  Y 528.405  Z 5380.431 (m)`. The amber **Editing** message explains why the object cannot be edited.
+For an object that supports fixed placement, six fields show its inspected position in map coordinates and rotation in degrees. The **Position (m)** and **Rotation (deg)** rows each have **X**, **Y** and **Z** fields. Objects that can't be edited show the values as two lines of text instead, such as `X 4361.091  Y 528.405  Z 5380.431 (m)`. The amber **Editing** message explains why editing is unavailable.
 
 Fields display three decimal places and never use scientific notation. An unchanged field keeps the object's exact value. Changing X alone therefore leaves the other axes and rotation unchanged.
 
 **Apply** is disabled while the fields match the current placement. **Supported edits** on the **Object** tab explains why it is unavailable. As soon as a keystroke changes a value, **Apply** becomes available without requiring Enter or leaving the field. It becomes disabled again if the value matches the current one. Applying the object's placement without this mod removes the placement from the modification.
 
-Applying moves the object and creates or updates its modification in the scene patch file. The modification stores the fixed position and rotation as a quaternion. An axis that the game stores unchanged keeps its text in the file. For example, changing only Z does not replace X with a longer number read back from the game. Applying again replaces the values in the same modification; it does not add a second modification or accumulate movement. Click **Read** to refill the fields from the inspected observation.
+Applying moves the object and creates or updates its modification in the scene patch file. The modification stores the fixed position and rotation as a quaternion. An axis whose stored value is unchanged keeps its text in the file. For example, changing only Z doesn't replace X with a longer number read back from the game. Applying again replaces the values in the same modification. It doesn't add a second modification or accumulate movement. Click **Read** to refill the fields from the inspected observation.
 
 ### Check the result and refresh
 
@@ -102,7 +102,7 @@ If a patcher edit cannot be reversed or reapplied, the session details also show
 
 ## Remove a modification
 
-Click **Remove modification** to remove this mod's saved or unsaved modification of the selected object. The object returns to its effective underlying state: the state the loaded map gives it, with the remaining modifications in your scene patch file still applied. It does not return to an earlier position from a scene patch. Undo restores the modification; Save writes the removal.
+Click **Remove modification** to remove this mod's saved or unsaved modification of the selected object. The object returns to its effective underlying state, the state the loaded map gives it with the remaining modifications in your scene patch file still applied. It doesn't return to an earlier position from a scene patch. Undo restores the modification. Save writes the removal.
 
 If another modification in the file names this one in `dependsOn`, removal is refused. The message names the modifications you must change or remove first. This also applies to **Clear activity** and any other edit that would leave the modification empty.
 

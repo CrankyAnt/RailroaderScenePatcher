@@ -2,13 +2,13 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Add detection for extra tracks at an existing crossing
 
-This guide shows how to make an existing grade crossing detect trains on a track it does not cover yet, in the native map editor or in `Data/scene-patches.json`. Use it when you add a track through a crossing. To move a circuit from an old route to another track, or to detach a circuit, see [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). This guide does not create new crossings or change lights, gates, bells, models, signals, CTC or interlocking.
+Use this guide when you add a track through an existing grade crossing and need the crossing to detect trains on it. You can add detection in the native map editor or in `Data/scene-patches.json`. To move a circuit from an old route to another track, or to detach a circuit, see [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md). Adding detection doesn't create a crossing or change lights, gates, bells, models, signals, CTC or interlocking.
 
 ## What an addition is
 
-A crossing controller evaluates circuits. Each circuit has an approach A span, an island span and an approach B span. A detection addition is one further circuit that the patcher builds for the crossing. It has three spans of its own, and the patcher registers them in the track graph and adds the circuit to the controller after its native circuits.
+A crossing controller evaluates circuits. Each circuit has an approach A span, an island span and an approach B span. A detection addition adds another circuit with three spans of its own. The patcher builds the circuit, registers its spans in the track graph and adds it to the controller after the native circuits.
 
-You define an addition with three things:
+Define an addition with an ID, tracks and an area:
 
 | Part | Meaning |
 | --- | --- |
@@ -16,7 +16,7 @@ You define an addition with three things:
 | Tracks | The track segments the three spans lie on. You name each segment. |
 | Area | The distances along those segments where each span starts and ends. |
 
-The patcher never takes tracks or an area from nearby track. A track gets detection only when an addition names it.
+The patcher doesn't infer tracks or an area from nearby track. An addition detects a track only if you name it.
 
 ## What stays the same
 
@@ -27,14 +27,14 @@ The patcher never takes tracks or an area from nearby track. A track gets detect
 ## Add detection in the native map editor
 
 1. Open the Scene Patcher panel and inspect the crossing controller, either from the outliner (folder **Crossing controller**) or with **Select in world**.
-2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Addition ID** and select **Add detection** beside it.
+2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Addition ID** and click **Add detection** beside it.
 3. For each of **Approach A**, **Island** and **Approach B**, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the **From** and **To** distances in meters. To fill a role's segment from the world, click **Segment** next to the role, click the track, then click **Confirm**. When editing an existing addition, the role's current starting segment is excluded from its picker. You can pick segments used by other roles. **From** is the end next to the island for each approach, and the island's lower end for the island.
-4. Select **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
-5. Select **Apply** at the bottom of the tab. Apply uses the previewed tracks; preview again after you change a field.
+4. Click **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.
+5. Click **Apply** at the bottom of the tab. Apply uses the previewed tracks. Preview again after you change a field.
 
-To change the tracks of an addition, select **Edit Detection addition** with its ID, change the fields, preview and apply. The patcher replaces the addition's spans and keeps its circuit.
+To change an addition's tracks, click **Edit Detection addition** with its ID, change the fields, preview and apply. The patcher replaces the addition's spans and keeps its circuit.
 
-To delete an addition, select **Edit Detection addition** with its ID, then **Delete** at the bottom of the tab and apply. Its circuit leaves the crossing, and the patcher unregisters and removes its spans. Other additions and the native circuits keep their coverage. **Remove modification** in the footer deletes every addition of the crossing and returns its native circuits to their coverage without your mod.
+To delete an addition, click **Edit Detection addition** with its ID, then **Delete** at the bottom of the tab and apply. Its circuit leaves the crossing, and the patcher unregisters and removes its spans. Other additions and the native circuits keep their coverage. **Remove modification** in the footer deletes every addition of the crossing and returns its native circuits to their coverage without your mod.
 
 Native Undo and Redo reverse and repeat each applied change. Undo of an addition removes its circuit and spans. Undo of a deletion builds them again.
 
@@ -71,7 +71,7 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
 
 The scene, path and segment in this example are placeholders. Use the scene and path from the inspected crossing and the IDs of your own segments. The field rules are in the [scene patch file v1](scene-patch-file-v1.md#detection-additions).
 
-To delete an addition, remove its member from `additions`; when it was the last one, remove `additions` too, because an empty `additions` object is invalid. An addition exists only while the scene patch file lists it. To make one modification wait for another, name it in `dependsOn`. The order of the keys in the file has no effect.
+To delete an addition, remove its member from `additions`. If it was the last one, remove `additions` too, because an empty `additions` object is invalid. An addition exists only while the scene patch file lists it. To make one modification wait for another, name it in `dependsOn`. The order of the keys in the file has no effect.
 
 ## Multiplayer, later joins and reconnects
 
@@ -79,7 +79,7 @@ Each player's game builds the addition in its own world when that world loads. I
 
 A player who joins later or reconnects loads the map again. The patcher builds the addition once in the newly loaded world, under the same addition ID, and nothing of the earlier session stays behind. If the addition fails in one player's game, that game reports it, and the other players keep their detection. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 
-These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+These statements are based on the patcher's automated tests and the code of Railroader 0.6.3. They haven't been tested in a multiplayer session.
 
 ## Limits
 

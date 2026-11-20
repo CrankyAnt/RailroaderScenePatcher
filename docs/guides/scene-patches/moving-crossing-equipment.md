@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move or disable an existing crossing mast or bell
 
-You can move, rotate, disable or enable a mast of an existing crossing. You can also move, disable or enable its bell. This guide explains those edits, how the game hides a moved mast at a distance, and how the equipment keeps responding to its crossing controller.
+You can move, rotate, disable or enable a mast of an existing crossing. You can also move, disable or enable its bell. The equipment keeps responding to its crossing controller after these edits. This guide also explains how the game hides a moved mast at a distance.
 
 To add equipment, see [add lights and gates to an existing crossing](adding-crossing-equipment.md) and [add a bell to an existing crossing](adding-crossing-bells.md). For the native map editor workflow, including Save, Undo and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#existing-crossing-mast-and-bell).
 
@@ -29,17 +29,17 @@ The mast's light and gate move and rotate together. The crossing controller, the
 
 Existing crossing equipment uses fixed placement. It cannot use track-following placement, so **Follow** is unavailable.
 
-A bell's sound has no direction, so rotation does not apply to a bell. The **Rotation** values remain visible without editable fields, and the gizmo's **Rotate** tool is disabled. Both explain why rotation is unavailable. **Snap** sets the bell's position and writes a rotation, but that rotation has no effect.
+A bell's sound has no direction, so rotating a bell has no effect. The **Rotation** values remain visible as text, and the gizmo's **Rotate** tool is disabled. Both explain why you can't edit the rotation. **Snap** sets the bell's position and writes a rotation, but that rotation has no effect.
 
 ### Culling of a moved mast
 
 The game hides a crossing's masts when the camera is far from the crossing. If you move a mast outside the crossing's culling sphere, the patcher gives the mast its own sphere. This keeps it visible when the camera sees it at its new position. The crossing's culler keeps its radius and continues to hide and show the other mast. Moving the mast back, undoing the move or removing the modification returns the mast to the crossing's culler.
 
-**Runtime state** on the **Object** tab shows the culling state from the last **Refresh** or edit. It names the object in the crossing's culler list and shows whether that object left the list so the mast could use its own culling sphere. It also shows the center and radius of each separate sphere. It also lists every reference set in the scene to an object above the mast, including references in a map feature's or progression's switch list. Switching one of those objects also switches the mast.
+**Runtime state** on the **Object** tab shows the culling state from the last **Refresh** or edit. It names the object in the crossing's culler list and shows whether that object left the list to let the mast use its own culling sphere. It gives the center and radius of each separate sphere. The section also lists every reference set in the scene to an object above the mast, including references in a map feature's or progression's switch list. Switching any of those objects also switches the mast.
 
 ## Disable or enable a mast or bell
 
-On the **Object** tab, click **Disable** or **Enable**. Enabled is its own operation, with its own Undo step. Changing Enabled leaves the physical placement unchanged. Changing the physical placement leaves Enabled unchanged.
+On the **Object** tab, click **Disable** or **Enable**. Each Enabled change is a separate operation with its own Undo step. It doesn't change physical placement, and a placement edit doesn't change Enabled.
 
 - Disabling a mast switches off its light object, including the lights and gate. The crossing controller keeps running for the rest of the crossing.
 - Disabling the bell silences it. The game's bell player discards its sound when disabled, so the patcher configures it with the crossing's bell sound when you enable it again.
@@ -52,7 +52,7 @@ The patcher applies an explicit `"active": false` in the scene patch file on eve
 
 Native **Undo** and **Redo** reverse and reapply each completed move, rotation and Enabled change, including changes to the mast's culling. The **Saved** or **Unsaved** status lamp and the native map editor's **Save** button reflect any outstanding changes.
 
-Click **Remove modification** in the footer to remove this mod's physical placement and Enabled value for the object. The patcher recalculates the mast or bell's placement relative to its parent from the scene and any remaining mod values. It does not restore an earlier snapshot.
+Click **Remove modification** in the footer to remove this mod's physical placement and Enabled value for the object. The patcher recalculates the mast or bell's placement relative to its parent, using the scene and any remaining mod values. It doesn't restore an earlier snapshot.
 
 Clicking the native **Save** button writes the modification to the edited mod's scene patch file. When the world reloads, the patcher reapplies the file's placement and activity. Applying the same file again makes no further change.
 
@@ -76,7 +76,7 @@ A modification of a mast or bell records a fixed placement, an Enabled value, or
 
 ## Refusal reasons
 
-The patcher edits only masts and bells that match their supported source pattern. Equipment that does not match stays in the outliner. Every placement mode, **Numeric** included, the position and rotation fields, and the **Enable** and **Disable** buttons are disabled. **Numeric** still shows the physical placement as text. The tooltips show `Unavailable: <reason>`, using the reason in **Supported edits**, and **Why this equipment cannot be edited** on the **Object** tab opens this section. A modification that names such equipment fails before changing anything. The other modifications in the scene patch file still apply.
+The patcher edits only masts and bells that match their supported source pattern. Equipment that doesn't match stays in the outliner for inspection. All placement modes, including **Numeric**, are disabled, as are the position and rotation fields and the **Enable** and **Disable** buttons. **Numeric** still shows physical placement as text. The tooltips show `Unavailable: <reason>`, with the same reason as **Supported edits**. Click **Why this equipment cannot be edited** on the **Object** tab to open this section. A modification that names such equipment fails before changing anything. The other modifications in the scene patch file still apply.
 
 A mast matches `existing-crossing-mast-v1` when it meets every requirement below:
 
@@ -105,7 +105,7 @@ An operation can be unavailable even when other edits are supported. Its control
 
 ## Multiplayer, later joins and reconnects
 
-Each player's game moves or disables the mast or bell in its own world when that world loads. A player who joins later or reconnects loads the map again, and the patcher applies each modification once to the equipment of the newly loaded world. A moved mast then gets its culling again. If a modification fails in one player's game, that game reports it, and the other players are not affected. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+Each player's game moves or disables the mast or bell in its own world when that world loads. When a player joins later or reconnects, their game loads the map again. The patcher applies each modification once to the equipment in the newly loaded world. A moved mast then has its culling set up again. If a modification fails in one player's game, that game reports it. The failure doesn't affect the other players. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 
 These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
 

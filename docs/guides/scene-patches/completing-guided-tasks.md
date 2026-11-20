@@ -2,7 +2,9 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Complete an edit with a guided task
 
-Open **Scene patches** in the native map editor, inspect the object you want to change and click **Guided** beside its name. You can move or rotate the object, snap it to a track or endpoint, enable or disable it, set or detach its track binding, set a replacement ID, place a starter on track, or set whether a starter placement starts derailed (**Start derailed**). Tasks that are unavailable stay visible. Their tooltips explain why. If the **Object** tab reports a track binding problem, you can also start with **Repair with guided task**. For a duplicate marker ID on a generic track marker, click **Repair duplicate ID** instead. For a construction segment that no longer exists on a rail bridge, **Repair construction segments** opens the **Connections** tab, where you set the segments; no guided task sets them.
+Open **Scene patches** in the native map editor, inspect the object you want to change and click **Guided** beside its name. A guided task lets you move or rotate the object, snap it to a track or endpoint, enable or disable it, set or detach its track binding, set a replacement ID, place a starter on track, or choose whether a starter placement starts derailed (**Start derailed**). Unavailable tasks stay visible, with tooltips that explain why.
+
+You can also start from a detected problem on the **Object** tab. For a track binding problem, click **Repair with guided task**. For a duplicate marker ID on a generic track marker, click **Repair duplicate ID**. For a construction segment that no longer exists on a rail bridge, **Repair construction segments** opens the **Connections** tab. Set the segments there. No guided task sets them.
 
 1. In **Target**, choose a task. It starts with the inspected object's values and keeps that object as its target until you finish or cancel the task.
 2. In **Values**, enter your changes. For a snap, click **Track** or **Node** in the footer, click in the world and click **Confirm**. For a binding or starter placement, enter the segment, end and distance. For a replacement ID, enter the ID. For **Start derailed**, click **Yes** or **No**; choosing the setting the starting cars have without this mod removes the mod's value. You can also click **Segment** in the footer, click a track, confirm it and click **Picked** to fill in the values. The click supplies the segment, end and distance for both tasks.
@@ -10,7 +12,7 @@ Open **Scene patches** in the native map editor, inspect the object you want to 
 4. Click **Apply** in the footer. Guided tasks use the same operations as **Inspector**, with the same requirements and reasons for refusing an edit. Starter placement checks the whole car cut. Changing a crossing pad's binding regenerates the pad along the track at its marker's new location.
 5. When the edit succeeds, click **Back to inspector** to inspect the same object, or **Another guided task** to return to the task list. Use the native **Undo**, **Redo** and **Save** controls as you would after an Inspector edit.
 
-You cannot apply a numeric placement, activity, binding or **Start derailed** draft that matches the inspected values. The button's tooltip explains why.
+You can't apply a numeric placement, activity, binding or **Start derailed** draft that matches the inspected values. The button's tooltip explains why.
 
 ## Go back or cancel
 

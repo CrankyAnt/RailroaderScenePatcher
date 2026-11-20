@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Repair the construction segments of a rail bridge
 
-This guide shows how to set the construction segments of a rail bridge after you split or replaced its track in the native map editor. The construction segments are the track segments whose construction state a bridge's construction controller (`Game.Mow.TrackConstructionScenery`) reads to show or hide the parts of the bridge. The controller names them by ID. Construction segments require patcher 0.5.0 or later.
+Use this guide to set a rail bridge's construction segments after splitting or replacing its track in the native map editor. The bridge's construction controller (`Game.Mow.TrackConstructionScenery`) uses these segments' construction state to show or hide parts of the bridge. It identifies the segments by ID. Construction segments require patcher 0.5.0 or later.
 
 Three rail bridge constructions have a construction controller:
 
@@ -14,7 +14,7 @@ A plate girder bridge has no construction controller and no construction segment
 
 ## Why a repair is needed
 
-The game code shows that splitting a segment in the native map editor removes the segment and adds two segments with new IDs, and that replacing a segment also removes its ID. The controller keeps naming the old ID. In Railroader, after a construction segment of `Bridge 1` at Bryson was deleted, the bridge's parts stayed visible and the game reported an error when the world loaded. After a split and before a repair, the game reported `Error during DidRestore of Bridge 1 (Game.Mow.TrackConstructionScenery)` at every world load.
+The game code shows that splitting a segment in the native map editor removes it and adds two segments with new IDs. It also shows that replacing a segment removes its ID. The controller still refers to the old ID. In Railroader, deleting a construction segment of `Bridge 1` at Bryson left the bridge's parts visible and caused an error when the world loaded. After a split, the game reported `Error during DidRestore of Bridge 1 (Game.Mow.TrackConstructionScenery)` at every world load until the repair.
 
 The game normally runs the controller's update before scene patch files apply. If a native segment is missing and the patcher finds a replacement set on the loaded track, it can defer the update. It checks settings in load order and uses the last one that passes the segment check. A setting that restores the native set also passes that check and can leave the native error in place. The game runs a deferred update on the next frame after the patcher applies the files. In Railroader 0.6.3, repairing Bryson Bridge 1 eliminated its `DidRestore` error in a new game, a loaded save and the editor. A valid-looking repair blocked by `dependsOn` still produced the native error after the patcher reported the failed load. A repair with a missing replacement segment produced the native error before the patcher refused it.
 
@@ -30,23 +30,23 @@ The **Connections** tab lists each construction segment under **Observed binding
 1. Click **Set**.
 1. Click **Save** in the native map editor.
 
-**Set** replaces the construction segments with exactly the segments in the field. The order of the IDs does not matter, and setting the same segments again changes nothing. The bridge does not move. **Set** is unavailable while the field is empty or holds the construction's current segments.
+**Set** replaces the construction segments with exactly those in the field. The IDs can be in any order. Setting the same segments again changes nothing. The bridge doesn't move. **Set** is unavailable while the field is empty or holds the construction's current segments.
 
-The patcher checks every segment before it changes anything. A segment that is missing from the loaded track, or whose ID more than one loaded segment carries, refuses the edit with that segment's ID. The patcher never picks another segment instead. The segments the construction has without this mod are accepted as they are, also when one of them no longer exists.
+The patcher checks every segment before changing anything. It refuses the edit if a segment is missing from the loaded track or more than one loaded segment has its ID. The refusal names that ID. The patcher never substitutes another segment. It accepts the construction's segments without this mod as they are, even if one no longer exists.
 
 After the check, the patcher writes the segment IDs to the controller. If the controller is enabled and the segments exist, it updates the construction visibility. In Railroader 0.6.3, changing a replacement segment of Bryson Bridge 1 from Complete to Not Started hid the relevant bridge parts. Restoring Complete showed them again.
 
 ## Detach and clear
 
-You cannot detach the construction segments: a construction without segments has no meaning. **Detach** stays unavailable, and a hand-written `{ "detach": true }` fails before anything changes: at world load, with **Use file version** and with **Import**. The construction keeps its segments. After **Use file version**, the footer names the refused modification with the reason, and the **Changes** tab reads `Refused.` with the reason. If you remove such a modification on the **Changes** tab, native **Undo** puts it back in the scene patch file without applying it, as it stood before.
+You can't detach construction segments because a construction without segments has no meaning. **Detach** stays unavailable. A hand-written `{ "detach": true }` fails before anything changes, whether at world load, with **Use file version** or with **Import**. The construction keeps its segments. After **Use file version**, the footer names the refused modification and gives the reason. The **Changes** tab shows `Refused.` and the reason. If you remove that modification on the **Changes** tab, native **Undo** restores it to the scene patch file without applying it, just as it was before removal.
 
 **Clear segments** removes this mod's value: the construction returns to the segments it has without this mod. **Remove modification** on the **Changes** tab does the same and also removes this mod's placement and activity of the object. Native **Undo** returns the segments from before the edit, and **Redo** sets them again.
 
-When the segments that **Clear segments**, **Remove modification** or **Undo** returns include one that no longer exists, such as the old ID of a split segment, the patcher writes them back but does not let the controller show the construction by them. The parts of the bridge keep the visibility of the repair until the world reloads.
+If **Clear segments**, **Remove modification** or **Undo** restores a segment that no longer exists, such as the old ID of a split segment, the patcher writes the segments back but prevents the controller from using them to set construction visibility. The bridge's parts keep the visibility set by the repair until the world reloads.
 
 ## Ela Bridge Scenery
 
-The construction segments are the only edit of `Ela Bridge Scenery`. Its placement stays unavailable because its position has no effect in the game: the controller switches the bridge's parts wherever it stands. **Enable** and **Disable** stay unavailable because the bridge's construction visibility runs on the controller. Move or disable `Ela Bridge` instead.
+You can edit only the construction segments of `Ela Bridge Scenery`. Placement is unavailable because the controller's position has no effect in the game. It switches the bridge's parts wherever it stands. **Enable** and **Disable** are unavailable because the controller manages the bridge's construction visibility. Move or disable `Ela Bridge` instead.
 
 ## Write the relationship by hand
 
@@ -73,4 +73,4 @@ For `Ela Bridge Scenery`, use `Game.Mow.TrackConstructionScenery` as the `compon
 
 ## If the edit fails
 
-If the edit fails after the patcher wrote the segments, the patcher puts back the segments the controller named before the attempt. If it cannot confirm that, the footer reports that cleanup is incomplete and names the remaining construction segments. Further edits of the object are then blocked until you click **Recheck** or reload the native map editor.
+If an edit fails after writing the segments, the patcher restores the controller's segments from before the attempt. If it can't confirm the restoration, the footer reports incomplete cleanup and names the remaining construction segments. Further edits of the object stay blocked until you click **Recheck** or reload the native map editor.

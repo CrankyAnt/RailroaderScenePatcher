@@ -2,13 +2,13 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move or disable a station map icon
 
-This guide shows how to move a station map icon so that the map shows the station where it now stands, and how to disable and restore an icon. A station map icon is the icon that the map window draws for a station. The station itself, its track span, its depot house and its station agent are native map data, which you move in the native map editor.
+A station map icon is the icon shown for a station in the map window. Move it to show the station's new location. You can also disable and restore the icon. The station itself, its track span, its depot house and its station agent are native map data. Move those in the native map editor.
 
 Station map icons are the objects with a `UI.Map.MapIcon` component directly in the `World/Map Labels/Station Icons` folder of the scene. Each icon is listed once in the **Station map icon** family of the outliner, with physical placement and **Enabled**. The `Station Icons` folder itself has no row, and neither has any other object in it. Map icons that the game creates while it runs, such as those of cars and players, are not listed. A station map icon target requires patcher 0.5.0 or later. The native map editor's Save derives the dependency minimum from the scene patch file's content; see [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Move a station: native map data first, then the icon
 
-The patcher does not couple native map data and scene objects. Each moves only through its own edit, so move them in this order:
+Native map data and scene objects need separate edits. The patcher doesn't move one with the other. Move them in this order:
 
 1. In the native map editor, move the station's track span, its depot house and its station agent. The depot houses, such as `br-depot`, `an-newport-depot` and `db-depot-asset`, are native Props.
 2. Save in the native map editor.
@@ -24,7 +24,7 @@ If the station's building group is a scene object, move it in the **Baked scener
 3. On the **Placement** tab, in **Numeric** mode, change the position in map coordinates and, if needed, the rotation in degrees. Click **Apply** at the bottom of the tab. You can also drag the icon with the transform gizmo, as described in [use transform gizmos](using-transform-gizmos.md).
 4. Open the map window and check that the icon stands at the station's new place.
 
-The icon's object moves at once. Save, Undo, Redo and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal returns the icon to the placement that the loaded map gives it.
+The icon's object moves immediately. Save, Undo, Redo and **Remove modification** in the footer work as described in [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). Removal restores the icon's placement from the loaded map.
 
 In Railroader 0.6.3, a moved Bryson station icon appeared at its new map position in play. The test did not establish when an already open map refreshes.
 
@@ -65,7 +65,7 @@ Before it touches the icon, the patcher requires that:
 - the icon's own hierarchy has no missing script, no rigidbody and no culler; a culler on one icon makes only that icon **Not editable**,
 - the icon's map coordinates can be read.
 
-After each change, it checks that the icon has the mod's placement and activity, that it still stands in the same object, and that the map has the icon registered while it is active with its parents. Any difference fails the modification and restores the icon's placement and activity. If the restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the icon until **Recheck** succeeds or the world reloads.
+After each change, the patcher checks that the icon has the mod's placement and activity and still belongs to the same object. It also checks that the map registers the icon while both the icon and its parents are active. If any check finds a difference, the modification fails and the patcher restores the icon's placement and activity. If it can't verify restoration, it reports incomplete cleanup and refuses further edits to the icon until **Recheck** succeeds or the world reloads.
 
 ## Limits
 

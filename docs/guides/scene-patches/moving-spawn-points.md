@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move player spawn points
 
-This guide shows how to move, rotate, disable or restore a scene spawn point, so that players start, teleport and are rescued at places that fit your map. For the general native map editor workflow, Save, Undo and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#spawn-point).
+Move, rotate, disable or restore a scene spawn point to choose where players start, teleport and arrive after rescue on your map. For the general native map editor workflow, including Save, Undo and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#spawn-point).
 
 ## Scene spawn points and native spawns
 
-A scene spawn point is a scene object with a `Character.SpawnPoint` component, such as the 22 objects under `World/POIs` on the base map, named after the places they stand at, like `Alarka` or `Bryson`. The outliner lists each one once in the **Spawn point** family.
+A scene spawn point is a scene object with a `Character.SpawnPoint` component. The base-game map has 22 scene spawn points under `World/POIs`, with names such as `Alarka` or `Bryson` for their locations. The outliner lists each one once in the **Spawn point** family.
 
 A native spawn is an entry in the `spawns` section of a map's `Map.json`. The native map editor edits native spawns in its **Spawns** category. The patcher does not list or change them. The base map declares no native spawns.
 
@@ -14,14 +14,14 @@ A native spawn is an entry in the `spawns` section of a map's `Map.json`. The na
 
 The **Use in the game** section of the **Object** tab lists the uses of the inspected spawn point. Use the list below to choose what to check in a test save.
 
-- **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. If several active spawn points share that priority, the game does not fix which of them it takes, and the tab says so. With native spawns, the new game is expected to start at those instead.
+- **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. If several active spawn points share that priority, the game doesn't specify which it chooses, and the tab says so. If the map has native spawns, the new game is expected to use those instead.
 - **Rescue:** a stuck player is expected to be moved to the closest active spawn point.
 - **Teleport:** the `/tp` console command is expected to offer each active spawn point by its object name and jump to where it stands. Quick search also lists active spawn points, but only in a game version that opens it. Railroader 0.6.3 doesn't open quick search.
-- **Start setup:** when the game applies an active start setup that names the spawn point to a company with no cars and no balance yet, the new company game is expected to start there, also while the spawn point is disabled. The tab names each such setup by its identifier, or by its object name when it has none. Whether a start setup or the map's native spawns win when both exist has not been established.
+- **Start setup:** when the game applies an active start setup to a company with no cars and no balance yet, the new company game is expected to start at the spawn point that setup names, even if the point is disabled. The tab names each such setup by its identifier, or by its object name if it has no identifier. It hasn't been established whether a start setup or the map's native spawns take precedence when both exist.
 
 The game reads a spawn point's transform each time it uses it. In Railroader 0.6.3, `/tp alarka` took the player to the moved Alarka point. A new East Whittier company game without native spawns used the moved spawn point named by its start setup. Removing the modification returned the new company's start to its authored position.
 
-A new game reads its start spawn point while the map loads, before the patcher applies the rest of the scene patch file. So when a new game starts, the patcher applies the spawn point modifications first, just before the game reads them. A spawn point modification that depends on another modification, or uses a track-following placement, waits for the normal world-load application. A new game then starts at the spawn point's place on the loaded map.
+A new game reads its start spawn point while the map loads, before the patcher applies the rest of the scene patch file. The patcher therefore applies spawn point modifications first, just before the game reads those points. A spawn point modification that depends on another modification or uses track-following placement waits for the normal world-load application. In that case, the new game starts at the spawn point's position on the loaded map.
 
 ## Move a spawn point
 
@@ -60,7 +60,7 @@ Use the scene name and coordinates from the inspected identity. Add `"active": f
 
 ## What the patcher checks
 
-Before a change, the patcher requires that the spawn point's scene is loaded and that its path names exactly one spawn point. After the change, it checks that the spawn point has the mod's placement and activity. A difference fails the modification and restores the spawn point's placement and activity. If that restoration cannot be verified, the patcher reports incomplete cleanup and refuses further edits of the spawn point until **Recheck** succeeds or the world reloads.
+Before a change, the patcher checks that the spawn point's scene is loaded and its path names exactly one spawn point. After the change, it checks that the spawn point has the mod's placement and activity. If either differs, the modification fails and the patcher restores the spawn point's placement and activity. If it can't verify restoration, it reports incomplete cleanup and refuses further edits to the spawn point until **Recheck** succeeds or the world reloads.
 
 ## Limits
 

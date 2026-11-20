@@ -4,7 +4,7 @@
 
 You can add lights and gates to an existing grade crossing in the native map editor or in `Data/scene-patches.json`. The patcher copies a light or gate device already loaded in your map. The crossing controller then drives the copy.
 
-This does not create a crossing or edit a model. Bells use a different pattern, described in [add a bell to an existing crossing](adding-crossing-bells.md).
+Adding equipment doesn't create a crossing or edit a model. Bells use a different pattern, described in [add a bell to an existing crossing](adding-crossing-bells.md).
 
 ## Which devices qualify
 
@@ -17,13 +17,13 @@ A device qualifies if it responds to the crossing controller's keys and meets th
 - The device is in the same scene as the destination crossing, so its assets stay loaded as long as the copy exists.
 - The destination crossing controller has exactly one key-value object, on the controller's own object, and at most one culler.
 
-Within these requirements, the model, materials, colours and animation do not matter. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance does not qualify a device that works differently.
+Within these requirements, the model, materials, colours and animation don't matter. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
 
-The source must already be loaded in the map you are editing. The patcher does not load another scene to find it. If the named source is missing or ambiguous, the patcher does not substitute another device.
+The source must already be loaded in the map you're editing. The patcher doesn't load another scene to find it, or substitute another device if the named source is missing or ambiguous.
 
 ### Rejected sources
 
-The editor lists every device beneath a loaded crossing controller, including the bell player each controller generates. It explains why any device does not qualify:
+The editor lists every device beneath a loaded crossing controller, including the bell player each controller generates. It explains why a device doesn't qualify:
 
 | Reason | Meaning |
 | --- | --- |
@@ -65,7 +65,13 @@ To move an addition, click **Edit** under its name, change the fields, preview a
 
 **Remove modification** in the footer removes all of your mod's coverage, detection additions, lights, gates and bells for this crossing. Native Undo and Redo reverse and repeat each applied change, including rebuilding a removed addition.
 
-**Lights, gates and bells** shows the names of the added equipment. It shows whether a light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher cannot build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason. The additions of one crossing are built together, so one refused addition stops the others: each of them appears as **Not built** and names the refused addition. **Recheck** is refused for the same reason and changes nothing. Click **Edit** to correct or remove each refused addition. To correct its source, click **Use** for an eligible device or bell definition while its **Edit** form is open: the addition keeps its equipment ID and placement. Then click **Preview** and **Apply**. Correcting or removing one refused addition while another remains changes only the scene patch file; a correction is refused, before anything changes, when the modification would still be refused without the other refused additions, for example for the correction's own source or for the crossing's detection. The additions are built once no refused addition is left. While the crossing is blocked by an incomplete cleanup, you cannot edit or remove the refused addition, and **Recheck** stays refused; reload the native map editor to clear the block, then correct or remove it.
+**Lights, gates and bells** lists the added equipment by name. It shows whether each light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher can't build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason.
+
+The additions of one crossing are built together. One refused addition stops the others, which each appear as **Not built** and name the refused addition. **Recheck** is refused for the same reason and changes nothing. Click **Edit** to correct or remove each refused addition. To correct its source, keep its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+
+Correcting or removing one refused addition changes only the scene patch file while another refused addition remains. A correction is refused before anything changes if the modification would still be refused without the other refused additions, for example because of the correction's own source or the crossing's detection. The additions are built once no refused addition remains.
+
+If incomplete cleanup blocks the crossing, you can't edit or remove the refused addition, and **Recheck** stays refused. Reload the native map editor to clear the block, then correct or remove the addition.
 
 Save writes the additions to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the copies in native map data. The patcher rebuilds them from the scene patch file on each load. If copies already exist on a repeated load, the patcher reconciles them without duplicating them.
 
@@ -104,7 +110,7 @@ Each player's game builds the copy beneath its own crossing controller when its 
 
 A player who joins later or reconnects loads the map again. The patcher builds each addition once in the newly loaded world, under the same equipment ID. The copies of the earlier session went with the map when it unloaded. If an addition fails in one player's game, for example because its source is missing there, that game reports it, and the other players keep their equipment. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 
-These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+These statements are based on the patcher's automated tests and the code of Railroader 0.6.3. They haven't been tested in a multiplayer session.
 
 ## Limits
 

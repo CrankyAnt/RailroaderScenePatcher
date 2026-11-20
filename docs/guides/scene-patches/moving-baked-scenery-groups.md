@@ -4,9 +4,9 @@
 
 Use the patcher to move, rotate, disable or restore baked scenery groups and their parts. These groups include platforms, lamps, signs and small buildings that the native map editor does not edit. A part might be a sawmill jetty or a station lamp.
 
-When you move a group, its physical placement changes and everything below its group root moves with it, including its colliders and culling. Each part keeps its activity. When you edit a part, only that part and the objects below it are affected. The group root and other parts stay where they are. Moving or disabling a group or part changes no game function, unless a section below says otherwise.
+Moving a group changes its physical placement. Everything below its group root moves with it, including its colliders and culling, and each part keeps its activity. Editing a part affects only that part and the objects below it. The group root and other parts stay where they are. Moving or disabling a group or part doesn't change any game function unless a section below says otherwise.
 
-A baked scenery group is saved in the map's scene. Props, masks and other objects in the map's `Map.json` are native map data, which you edit in the native map editor. Editing a baked scenery group requires patcher 0.5.0 or later. When you click **Save** in the native map editor, the patcher derives the dependency minimum from the scene patch file's content. See [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
+The map's scene stores its baked scenery groups. Props, masks and other objects in the map's `Map.json` are native map data. Edit those in the native map editor. Editing a baked scenery group requires patcher 0.5.0 or later. When you click **Save** in the native map editor, the patcher derives the dependency minimum from the scene patch file's content. See [the scene patch file reference](scene-patch-file-v1.md#dependency-minimum).
 
 ## Which groups are listed
 
@@ -20,17 +20,17 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
 - Groups excluded by the Car loaders rule, such as the `Coal Loader` at Robinson Gap Mine, and everything below their roots. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader wouldn't move loading. A scene patch file modification targeting the loader or one of its parts fails with that reason.
 
-A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
+A group contains only the objects saved below its root in the scene. Nearby Props, tanks, conveyors and terrain masks in the map's `Map.json` are native map data. Move those in the native map editor. Moving the group leaves them in place. Examples include the coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews. These are Props.
 
 Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
+Groups containing track markers or spawn points are also marked `inspection only`, so you can't move them as a whole. Edit their markers in the **Track marker** family and their spawn points in the **Spawn point** family instead. If a group marked `inspection only` has a category, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
 ## Which parts are listed
 
 Each group in the **Baked scenery group** family lists its parts below its own row, sorted by name. A part's row shows the path from the group root, such as `Jetty / Piece (2)`. Its tooltip and searches use the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
 
-A part is a scene object at any depth below the root, rather than a renderer or component. To be listed, it must be saved in the scene and have a renderer, collider, light, storage pile or log pond at or below it, unless it holds a scene ground mask. A part can contain other parts, which move with it.
+A part is a scene object at any depth below the root, not a renderer or component. To appear in the list, it must be saved in the scene and have a renderer, collider, light, storage pile or log pond at or below it. A saved scene object that holds a scene ground mask is also listed, even without any of those. A part can contain other parts, which move with it.
 
 Some objects below a group root are not listed as parts:
 
@@ -61,9 +61,9 @@ If the root has a simple culler, as at Bryson House Track, the culler stops swit
 1. Select the part's row under **Baked scenery group**, for example `Bryson House Track / Ramp`. On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-part-v1`. **Use in the game** identifies the part as decorative.
 2. On the **Placement** tab, change the **Numeric** fields and click **Apply**, or use **Gizmo** or **Snap** as for other objects, unless a ground mask refuses the move. To switch the part off, click **Disable** at the bottom of the **Object** tab.
 
-A part with a fixed placement keeps its map coordinates when its group moves later, including during a **Gizmo** drag. This applies whether the group move is in the same scene patch file or another mod's, regardless of key or load order. The group placement applies first, followed by each fixed part placement. A part without a fixed placement moves with its group.
+A part with a fixed placement keeps its map coordinates when its group moves later, including during a **Gizmo** drag. This holds whether the group move comes from the same scene patch file or another mod's file, regardless of key or load order. The patcher applies the group placement first, then each fixed part placement. A part without a fixed placement moves with its group.
 
-Click **Remove modification** to restore a part's unmodified placement relative to its parent, which may be the group root or another part. The parent stays at its current placement, and the part moves with it again. A part below a moved part keeps its place relative to that moved part when you disable and enable it or remove its own modification.
+Click **Remove modification** to restore a part's unmodified placement relative to its parent, which may be the group root or another part. The parent stays at its current placement, and the part moves with it again. If a part is below another part that has moved, disabling and enabling the lower part or removing its own modification keeps its placement relative to the moved part.
 
 **Disable** is unavailable for a part that a game culler switches on and off by camera distance; the editor shows the reason. The culler would override a stored disable, so the patcher cannot maintain it. A placement edit leaves the part in the state set by the culler.
 
@@ -74,7 +74,7 @@ You can move or disable an industry's decorative buildings and its storage piles
 - **Industry building** lists decorative buildings of industries, such as `Bryson Coal Dealer`, `Whittier Saw Mill Culled` and `Mine 1` at Hewitt. On their **Object** tab, **Use in the game** says that the industry works on its native track spans, so moving or disabling the group or a part does not change loading or unloading.
 - **Storage display** lists the storage piles of `Andrews Snowbird Paper`, `Sylva Paperboard` and `Connelly` as groups. Each pile is a part of its group, such as `Connelly / Log Pile L1a` or `Andrews Snowbird Paper / Pulpwood Piles / Pile (3)`. Move a pile on its own, or move the whole group with all its piles.
 
-On a pile's **Object** tab, **Use in the game** names the storage that the pile shows, such as the pulpwood storage of its industry. Moving or disabling the pile does not change the storage. At its new place the pile still fills and empties with that storage, because the game links the pile to the storage by ID, not by position. The pile's logs, its collider and its culling move with it. A disabled pile shows nothing, and the storage stays as it is.
+On a pile's **Object** tab, **Use in the game** names the storage it shows, such as its industry's pulpwood storage. Moving or disabling the pile doesn't change that storage. The pile still fills and empties at its new position because the game links it to the storage by ID. The pile's logs, collider and culling move with it. Disabling the pile hides it and leaves the storage unchanged.
 
 The industry itself is native map data. Its position, its track spans and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
 
@@ -90,7 +90,7 @@ On the **Object** tab of the `Whittier Log Pond` group and of its `LogPond` part
 
 A Fontana lake is one object without parts. After a move, the patcher moves the sphere of its renderer culler to the lake's new place.
 
-If the game draws a lake surface from a static batch, a move would leave the water drawn at its old place. The patcher refuses such a move before it changes anything and says so; **Disable** and **Enable** still work. Under **Dependencies**, the **Object** tab of a lake surface says whether its water is part of a static batch.
+If the game draws a lake surface from a static batch, moving it would leave the water visible at its old position. The patcher refuses the move before changing anything and explains why. **Disable** and **Enable** still work. Under **Dependencies**, the lake surface's **Object** tab says whether its water is part of a static batch.
 
 ## Buildings with ground masks
 
@@ -98,17 +98,23 @@ A scene ground mask is a component that registers a shape in the game's terrain 
 
 In each of them, the mask is a `RectangleMapMask` on a child object named `Mask`. The patcher lists `Mask` as a part although it has no renderer, collider or light, because it is the part that holds the mask. On its **Object** tab, **Dependencies** says that it holds the scene ground mask, which also flattens the terrain height, and that it cannot be moved. The group root and any part above `Mask` name that part under **Dependencies** too.
 
-When the holder of the mask moves, the patcher asks the game to rebuild the mask through the game's own `Rebuild` method, so that the mask registers once, with its center and rotation at the holder, and the game regenerates terrain and vegetation at the old and the new place. Not yet observed in Railroader. The patcher tracks that terrain output for the edited object, at the center of the mask, as it does for a board: the **Terrain** section on the **Changes** tab shows it, and **Retry** asks again for a write that stops. A mask whose shape crosses a terrain tile border is tracked only on the tile of its center, so **Retry** asks again only for that tile; see [the limits](#limits). Save does not write the output. A write that does not complete within 30 seconds is reported with its completed and outstanding positions. See [move a board with its terrain effects](moving-boards.md#when-the-terrain-output-does-not-complete).
+When a mask's holder moves, the patcher calls the game's `Rebuild` method. This asks the game to register the mask once at its holder's center and rotation and regenerate terrain and vegetation at the old and new positions. This hasn't yet been observed in Railroader. As with a board, the patcher tracks the edited object's terrain output at the mask's center. The **Terrain** section on the **Changes** tab shows the output, and **Retry** requests another attempt if a write stops. If a mask crosses a terrain tile border, the patcher tracks only the tile containing its center. **Retry** requests work only for that tile; see [the limits](#limits). Save doesn't write the output. If a write doesn't complete within 30 seconds, the patcher reports the completed and outstanding positions. See [move a board with its terrain effects](moving-boards.md#when-the-terrain-output-does-not-complete).
 
-A part with its own fixed placement keeps its mask where it is when its group moves. The patcher expects disabling a group or part to release the mask through the component's own lifecycle, and enabling to register it again. It checks both, and fails the edit when the mask does not agree with the activity. Not yet observed in Railroader. After **Undo**, **Redo**, the restoration after a failed edit and **Remove modification**, the patcher checks that the mask stands at its holder again.
+A part with its own fixed placement keeps its mask where it is when its group moves. Disabling a group or part is expected to release the mask through the component's own lifecycle, and enabling it is expected to register the mask again. The patcher checks both and fails the edit if the mask doesn't match the activity. This hasn't yet been observed in Railroader. After **Undo**, **Redo**, restoration after a failed edit and **Remove modification**, the patcher checks that the mask is back at its holder.
 
-In Railroader 0.6.3, the masks of these buildings flatten the terrain height. A flattening mask refuses a move of its holder, of a part above the holder and of its group before anything changes. The refusal also applies to a move of the group when the flattening mask stands on a part that has its own fixed placement, although that part would stay behind. For `Mask`, the refusal reads `The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`. In the inspector, **Gizmo**, **Snap** and **Follow** are unavailable for such an object. **Numeric** stays open to show the placement, but its fields, **Apply** and **Read** are unavailable too, and **Supported edits** names only enabling and disabling, and for Hemingway flagstopstation its track binding. The tooltip of each unavailable control, the **Numeric** mode included, reads `Unavailable: A ground mask of this object flattens the terrain height, and it is not confirmed that the game restores the height after a move.` Enabling and disabling stay possible for every object. In this version, the groups and their `Mask` parts cannot be moved. Their other parts, such as lamps, signs and clocks, can be moved and disabled. This limit stands until a Railroader test confirms that the game restores the terrain height after **Undo** and removal.
+In Railroader 0.6.3, these buildings' masks flatten the terrain height. The patcher refuses to move a flattening mask's holder, any part above it or its group before changing anything. It also refuses to move the group if the mask sits on a part with its own fixed placement, even though that part would stay behind. For `Mask`, the refusal reads `The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`.
+
+In the inspector, **Gizmo**, **Snap** and **Follow** are unavailable for these objects. **Numeric** stays open to show the placement, but its fields, **Apply** and **Read** are unavailable. **Supported edits** lists only enabling and disabling, plus the track binding for Hemingway flagstopstation. Every unavailable control, including **Numeric** mode, has the tooltip `Unavailable: A ground mask of this object flattens the terrain height, and it is not confirmed that the game restores the height after a move.`
+
+You can still enable and disable every object. In this version, you can't move the groups or their `Mask` parts, but you can move and disable other parts such as lamps, signs and clocks. This limit remains until a Railroader test confirms that the game restores terrain height after **Undo** and removal.
 
 If the game's ground mask members are unavailable in a build, the group is refused with `The game's ground mask members are unavailable, so this group and its parts cannot be moved, enabled or disabled`.
 
 Hemingway flagstopstation is not a group. Its Generic track marker stands on the root of the building, so the object stays in the **Track marker** family. Only this station building gets mask handling in that family. A placement of its marker is refused before anything changes, because its ground mask flattens the terrain height. An existing scene patch file that moves the marker fails that modification on load with the reason `The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved`, and the file's other modifications still apply. On its **Object** tab, **Dependencies** names the object that holds the mask, because the **Track marker** family has no parts. The masks of other marker objects, such as a sign with a circle mask, are left as that family already left them: the patcher neither rebuilds nor refuses them.
 
-The game's progression switches the `Cochran flagstopstation`, `Alarka Depot` and `Alarka Jct Station` groups and the track marker on `Hemingway flagstopstation` on and off: when the map loads and whenever the industries change. Without a disable, the patcher leaves that switching to the game. A disable holds against it: the object stays off when progression would switch it on. The **Object** tab and the footer's message area then show an amber warning that the object stays off in the game although the game's progression switches it on, because your disable holds against it. **Enable**, **Clear activity**, Undo or **Remove modification** returns the object to the state that progression gives it now. While progression keeps an object off that you did not disable, **Enabled** reads `Yes; the game switches it off now`. If the disable could not hold, because the patcher cannot share the object's activity with progression in this load or the game's progression members are unavailable, **Disable** is unavailable and its tooltip gives the reason. In Railroader 0.6.3, the disabled Cochran station group stayed off after the Alarka Branch progression milestone and after Save & Quit and reload. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches).
+The game's progression switches the `Cochran flagstopstation`, `Alarka Depot` and `Alarka Jct Station` groups and the track marker on `Hemingway flagstopstation` on and off when the map loads and whenever industries change. Without a disable, the game controls this activity. If you disable an object, it stays off even when progression would switch it on. The **Object** tab and footer's message area show an amber warning explaining that your disable keeps the object off despite progression.
+
+**Enable**, **Clear activity**, Undo or **Remove modification** returns the object to the state progression currently sets. If progression keeps an object off and you haven't disabled it, **Enabled** reads `Yes; the game switches it off now`. **Disable** is unavailable if the patcher can't maintain the disable because it can't share the object's activity with progression in this load or the game's progression members are unavailable. Its tooltip explains why. In Railroader 0.6.3, the disabled Cochran station group stayed off after the Alarka Branch progression milestone and after Save & Quit and reload. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches).
 
 ## Buildings with lanterns and doors
 
@@ -120,7 +126,7 @@ Four buildings under **Railroad service building** have parts that you click in 
 
 Move or disable these buildings and their parts as you would any other group or part. After a move, test the lantern or door by clicking it at its new position.
 
-The game saves each lantern and stall door state by key under the building's ID. Moving the object preserves both. In Railroader 0.6.3, the moved Bryson Section House lantern could be switched at its new position and the moved Bryson roundhouse doors could be opened. The lit and open states survived Save & Quit and reload. If you disable the state holder or an object above it, the game stops tracking that ID and a save made while it is disabled might lose the states.
+The game saves each lantern and stall door state by key under the building's ID. Moving the object preserves both. In Railroader 0.6.3, the moved Bryson Section House lantern could be switched at its new position and the moved Bryson roundhouse doors could be opened. The lit and open states survived Save & Quit and reload. Disabling the state holder or an object above it stops the game tracking that ID. A save made while it is disabled might lose those states.
 
 On the **Object** tab, **Use in the game** names each interactive part and its key:
 
@@ -143,7 +149,7 @@ You can move, rotate or disable a rail bridge construction outside Ela so that i
 
 The construction moves with its colliders and culling. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere or capsule collider follow the construction. The patcher does not compare the bounds of mesh colliders. It also checks that the generated trestles near the bridge stay unchanged. The patcher refuses a construction that holds a track component or a generated trestle.
 
-The track stays native map data. The native map editor moves it, and the track keeps its own trestle or steel flags. A rail bridge does not follow its track: **Follow** is unavailable for a rail bridge and its parts, and a hand-written track-following placement is refused. Move the track first, and then move the construction onto it:
+Move the track in the native map editor. It remains native map data and keeps its own trestle or steel flags. A rail bridge doesn't follow its track. **Follow** is unavailable for a rail bridge and its parts, and the patcher refuses a hand-written track-following placement. Move the track first, then move the construction onto it:
 
 1. In the native map editor, move the track that the bridge carries.
 1. In **Scene patches**, select the construction under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
@@ -157,7 +163,7 @@ The **Connections** tab lists each construction segment under **Observed binding
 
 ### Disable an object that the construction switches
 
-You can disable the construction root, a part or a plate girder bridge. A disable holds when the controller would switch the object on. The **Object** tab and the footer show an amber warning. **Enable** or **Clear activity** returns the object to the controller's current choice. In Railroader 0.6.3, disabled steel on Almond Bridge stayed off when its segment reached Complete.
+You can disable the construction root, a part or a plate girder bridge. It stays disabled even when the controller would switch it on. The **Object** tab and footer show an amber warning. **Enable** or **Clear activity** returns the object to the state the controller currently sets. In Railroader 0.6.3, disabled steel on Almond Bridge stayed off when its segment reached Complete.
 
 A part moved outside its culler's sphere gets its own culling sphere, as described in [what the patcher checks](#what-the-patcher-checks). For a part that the controller switches, its own sphere shows the part only while the controller shows it.
 
@@ -172,7 +178,7 @@ You can move, rotate or disable a road bridge construction so that it stands whe
 - `Concrete Road Bridge - 20m` and `Whittier Road Bridge` below `World/Roads Whittier`.
 - `Wilmot Road Bridge` below `World/Roads Wilmot`.
 
-The road stays native map data. The native map editor moves it, and a bridge move does not move it. A road bridge does not follow track: **Follow** is unavailable for a road bridge and its parts, with the reason `Road bridges use fixed placement. Track-following placement does not apply to them. Move the road in the native map editor, then move the bridge onto it.`, and a hand-written track-following placement is refused before anything changes. Move the road first, and then move the bridge onto it:
+The road remains native map data. Move it in the native map editor; moving the bridge leaves it in place. A road bridge doesn't follow track. **Follow** is unavailable for a road bridge and its parts, with the reason `Road bridges use fixed placement. Track-following placement does not apply to them. Move the road in the native map editor, then move the bridge onto it.` The patcher also refuses a hand-written track-following placement before changing anything. Move the road first, then move the bridge onto it:
 
 1. In the native map editor, move the road that the bridge carries.
 1. In **Scene patches**, select the bridge under **Baked scenery group** > **Bridge** > **Road bridges** and move it onto the moved road, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only one object of the bridge, select that part instead.
@@ -215,7 +221,7 @@ The three unprotected crossings below `World/Roads Bryson/Old River Rd` have the
 }
 ```
 
-The outliner shows the ID in the row's name, for example `Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)`. On the **Object** tab, **Identity** shows it as **Pad marker ID** below the path, and **Copy ID** copies it as `padMarkerId` beside the path. Without `padMarkerId`, the path names all three crossbucks, so the modification fails before anything changes. A `padMarkerId` that matches no pad of a crossing at that path names no crossbuck and fails too. A crossbuck whose crossing's name is its own is named by its path alone: its target refuses `padMarkerId`, and so does every target that is no crossbuck.
+The outliner shows the ID in the row's name, for example `Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)`. On the **Object** tab, **Identity** shows it as **Pad marker ID** below the path. **Copy ID** copies it as `padMarkerId` beside the path. Without `padMarkerId`, the path names all three crossbucks, so the modification fails before anything changes. If `padMarkerId` matches no crossing pad at that path, it identifies no crossbuck and the modification also fails. When a crossing has a unique name, its crossbuck's path alone identifies it and the target refuses `padMarkerId`. Targets that aren't crossbucks also refuse this member.
 
 ## Write the modification by hand
 
@@ -281,7 +287,7 @@ A part with its own culler keeps that culler, which moves with the part. The sce
 
 After changing a part, the patcher also checks that every moved part outside a culler's sphere has a separate sphere at the part.
 
-If any check finds a difference, the modification fails and the patcher restores the group or part. If it cannot verify restoration, it reports incomplete cleanup and blocks further edits to that group or part until **Recheck** succeeds or the world reloads.
+If any check finds a difference, the modification fails and the patcher restores the group or part. If it can't verify restoration, it reports incomplete cleanup and blocks further edits to that group or part until **Recheck** succeeds or the world reloads.
 
 ## Limits
 

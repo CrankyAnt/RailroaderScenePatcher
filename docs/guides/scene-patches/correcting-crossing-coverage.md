@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Correct the detection coverage of an existing crossing
 
-You can change which tracks an existing grade crossing detects or detach one of its circuits, in the native map editor or in `Data/scene-patches.json`. This guide explains how to move detection from an old route to tracks you choose.
+Use the native map editor or `Data/scene-patches.json` to change which tracks an existing grade crossing detects or to detach one of its circuits. This guide explains how to move detection from an old route to tracks you choose.
 
 For tracks the crossing does not cover yet, see [add detection for extra tracks at an existing crossing](adding-crossing-detection.md). To add equipment, see [add lights and gates to an existing crossing](adding-crossing-equipment.md) or [add a bell to an existing crossing](adding-crossing-bells.md).
 
-These coverage edits apply only to existing crossings. They do not create crossings or change bells, models, signals, CTC or interlocking.
+Coverage edits apply only to existing crossings. They don't create crossings or change bells, models, signals, CTC or interlocking.
 
 ## How a crossing detects trains
 
@@ -20,7 +20,7 @@ Each circuit has one of three coverage settings:
 | Selected tracks | The circuit covers the tracks you name. The patcher creates its own three spans for them. |
 | Detached | The crossing stops evaluating the circuit. |
 
-The patcher never assigns coverage by proximity. A track near the crossing gets detection only when you select it.
+The patcher never assigns coverage by proximity. The crossing detects a nearby track only when you select it.
 
 ## What stays the same
 
@@ -32,12 +32,12 @@ The patcher never assigns coverage by proximity. A track near the crossing gets 
 ## Edit coverage in the native map editor
 
 1. Open the Scene Patcher panel and inspect the crossing controller, either from the outliner (folder **Crossing controller**) or with **Select in world**.
-2. On the **Connections** tab, under **Crossing coverage**, read the current coverage of each circuit, then select **Edit circuit** for the circuit to change.
+2. On the **Connections** tab, under **Crossing coverage**, read each circuit's current coverage, then click **Edit circuit** for the circuit to change.
 3. For each of **Approach A**, **Island** and **Approach B**, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the **From** and **To** distances in meters. To fill a role's segment from the world, click **Segment** next to the role, click the track, then click **Confirm**. The role's current starting segment is excluded from its picker. You can pick segments used by other roles. **From** is the end next to the island for each approach, and the island's lower end for the island.
-4. Select **Preview** at the bottom of the tab. The panel shows the intended relationship for every circuit: the selected tracks, which native spans stop triggering the crossing, and which circuits are retained. Nothing changes yet.
-5. Select **Apply** at the bottom of the tab. Apply uses the previewed tracks; preview again after you change a field.
+4. Click **Preview** at the bottom of the tab. The panel shows the intended relationship for every circuit, including the selected tracks, which native spans stop triggering the crossing and which circuits are retained. Nothing changes yet.
+5. Click **Apply** at the bottom of the tab. Apply uses the previewed tracks. Preview again after you change a field.
 
-To detach a circuit, select **Detach** at the bottom of the tab and apply it. To return a circuit to its coverage without this mod, select **Clear circuit** at the bottom of the tab and apply it. **Remove modification** in the footer returns every circuit of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including the spans the patcher created.
+To detach a circuit, click **Detach** at the bottom of the tab and apply it. To return a circuit to its coverage without this mod, click **Clear circuit** at the bottom of the tab and apply it. **Remove modification** in the footer returns every circuit of the crossing at once. Native Undo and Redo reverse and repeat each applied change, including the spans the patcher created.
 
 Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the scene patch file on every load, so a reload never duplicates them.
 
@@ -47,7 +47,7 @@ If an edit fails, the panel reports whether the prior coverage was restored. Whe
 
 ## Write coverage in the scene patch file
 
-Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`, and set the explicit circuits in the `circuits` object of `relationships.crossingCoverage`, each under the ID of its native island span. The modification itself is a member of `modifications` under its ID:
+Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`. Set each explicit circuit under its native island span's ID in the `circuits` object of `relationships.crossingCoverage`. Put the modification itself under its ID in `modifications`:
 
 ```json
 "cover-bryson-everett": {
@@ -72,7 +72,7 @@ Target the crossing controller with `component` `Track.Crossings.GradeCrossingCo
 }
 ```
 
-The scene, path and segment in this example are placeholders; use the scene, path and circuit IDs from the inspected crossing. The field rules are in the [scene patch file v1](scene-patch-file-v1.md#crossing-coverage).
+The scene, path and segment in this example are placeholders. Use the scene, path and circuit IDs from the inspected crossing. The field rules are in the [scene patch file v1](scene-patch-file-v1.md#crossing-coverage).
 
 ## Multiplayer, later joins and reconnects
 
@@ -80,7 +80,7 @@ Each player's game applies the coverage to its own crossing when its world loads
 
 A player who joins later or reconnects loads the map again. The patcher applies each circuit once in the newly loaded world, and the circuits you did not name keep their native spans. If the coverage fails in one player's game, that game reports it, and the other players keep their coverage. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 
-These statements come from the patcher's automated tests and from the code of Railroader 0.6.3. They have not been tested in a multiplayer session.
+These statements are based on the patcher's automated tests and the code of Railroader 0.6.3. They haven't been tested in a multiplayer session.
 
 ## Limits
 
