@@ -28,10 +28,10 @@ namespace RailroaderScenePatcher {
         internal GroundMaskWorld(BoardScene terrain) {
             this.terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             // The members this world reads are checked here: a missing one fails the adapter with its name, not an edit.
-            if (maskBase == null || shaped == null || rectangle == null) throw new InvalidOperationException("Ground mask types unavailable");
-            if (keys == null || rebuild == null) throw new MissingMemberException("Ground mask registration members unavailable");
-            if (flatten?.FieldType != typeof(bool) || targets == null || sizeX?.FieldType != typeof(float) || sizeZ?.FieldType != typeof(float) || degrees?.FieldType != typeof(float)) throw new MissingMemberException("Ground mask shape members unavailable");
-            if (targetKind == null || targetBiome?.FieldType != typeof(int) || targetName == null || !targetName.FieldType.IsEnum) throw new MissingMemberException("Ground mask target members unavailable");
+            if (maskBase == null || shaped == null || rectangle == null) throw new InvalidOperationException("The ground mask types are unavailable.");
+            if (keys == null || rebuild == null) throw new MissingMemberException("The ground mask registration members are unavailable.");
+            if (flatten?.FieldType != typeof(bool) || targets == null || sizeX?.FieldType != typeof(float) || sizeZ?.FieldType != typeof(float) || degrees?.FieldType != typeof(float)) throw new MissingMemberException("The ground mask shape members are unavailable.");
+            if (targetKind == null || targetBiome?.FieldType != typeof(int) || targetName == null || !targetName.FieldType.IsEnum) throw new MissingMemberException("The ground mask target members are unavailable.");
             Available = true;
         }
         internal static void Unavailable() => Available = false;
@@ -69,7 +69,7 @@ namespace RailroaderScenePatcher {
             return false;
         }
         static string IdOf(Transform root, Component mask) => (mask.transform == root ? "." : BoardScene.PathOf(mask.transform).Substring(BoardScene.PathOf(root).Length)) + "|" + mask.GetType().FullName + "#" + mask.GetInstanceID();
-        static GameObject Object(object target) => target as GameObject ?? throw new InvalidOperationException("The object no longer exists");
+        static GameObject Object(object target) => target as GameObject ?? throw new InvalidOperationException("The object no longer exists.");
         public IReadOnlyList<GroundMaskState> Masks(object target) {
             var go = Object(target);
             return Components(go).Select(mask => State(go.transform, mask)).ToArray();
@@ -134,7 +134,7 @@ namespace RailroaderScenePatcher {
         }
         public void Rebuild(object target, string id) {
             var go = Object(target);
-            var mask = Components(go).FirstOrDefault(c => IdOf(go.transform, c) == id) ?? throw new InvalidOperationException("The ground mask no longer exists");
+            var mask = Components(go).FirstOrDefault(c => IdOf(go.transform, c) == id) ?? throw new InvalidOperationException("The ground mask no longer exists.");
             rebuild.Invoke(mask, null);
         }
         public bool TileLoaded(double[] position) => terrain.TileLoaded(position);

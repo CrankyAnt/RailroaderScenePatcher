@@ -107,18 +107,18 @@ static class InteractiveBuildingTests {
             "The counts and the name text are bindings");
 
         string Use(bool part, params string[] bindings) => CommandBand.UseInGame(part, BakedSceneryCategories.RailroadServiceBuilding, null, bindings);
-        Assert(Use(true, lantern) == "Lantern switch: click the lantern in the game to switch it on or off. The game keeps its state by its key lantern.0, not by its position, so the state stays when this part moves. While this part is disabled, the lantern cannot be clicked.",
+        Assert(Use(true, lantern) == "Lantern switch: click the lantern in the game to switch it on or off. The game keeps its state by its key lantern.0, independently of its position. Moving this part preserves that state. While this part is disabled, you can't click the lantern.",
             "The lantern part names its switch: " + Use(true, lantern));
-        Assert(Use(true, door, CommandBand.KeyObjectBinding(null)).StartsWith("Door toggle: click the doors in the game to open or close them. The game keeps its state by its key doors, not by its position, so the state stays when this part moves. While this part is disabled, the doors cannot be clicked.", StringComparison.Ordinal),
+        Assert(Use(true, door, CommandBand.KeyObjectBinding(null)).StartsWith("Door toggle: click the doors in the game to open or close them. The game keeps its state by its key doors, independently of its position. Moving this part preserves that state. While this part is disabled, you can't click the doors.", StringComparison.Ordinal),
             "A stall names its door toggle: " + Use(true, door, CommandBand.KeyObjectBinding(null)));
-        Assert(Use(false, holder, CommandBand.TogglesBelowBinding(1)) == "This group holds the states of its toggles under the saved ID bryson-section-house. The game keeps them by this ID, not by position. A game save made while this group is disabled might not keep them. " +
-            "Its toggle keeps its state by its key, not by its position, and works at its new place.", "The Section House names the id and its toggle: " + Use(false, holder, CommandBand.TogglesBelowBinding(1)));
-        Assert(Use(false, CommandBand.KeyObjectBinding(null)) == "This group holds the states of its toggles. It has no saved ID, so the game does not save them.", "A key-value object without an id says the states are not saved");
+        Assert(Use(false, holder, CommandBand.TogglesBelowBinding(1)) == "This group stores its toggles' states under the saved ID bryson-section-house. The game keeps them by this ID, independently of position. Saving the game while this group is disabled might lose those states. " +
+            "Its toggle keeps its state by its key, independently of its position, and works at its new location.", "The Section House names the id and its toggle: " + Use(false, holder, CommandBand.TogglesBelowBinding(1)));
+        Assert(Use(false, CommandBand.KeyObjectBinding(null)) == "This group holds its toggles' states. It has no saved ID, so the game doesn't save those states.", "A key-value object without an id says the states are not saved");
         // Disabling a group or part above the object that holds the states disables that object too: it warns as well.
-        Assert(Use(false, holderBelow, CommandBand.TogglesBelowBinding(5)) == "Disabling this group also disables the object that holds the states of its toggles, so a game save made while this group is disabled might not keep them. " +
-            "Its 5 toggles keep their states by their keys, not by their positions, and work at their new place.", "The Bryson Turntable root warns about the holder below it: " + Use(false, holderBelow, CommandBand.TogglesBelowBinding(5)));
-        Assert(Use(true, CommandBand.TogglesBelowBinding(5)) == "Its 5 toggles keep their states by their keys, not by their positions, and work at their new place.", "A part above toggles counts them: " + Use(true, CommandBand.TogglesBelowBinding(5)));
-        Assert(Use(true, CommandBand.NameTextBinding("Chance Clayton")) == "Name text \"Chance Clayton\": the scene keeps the text with this part, not by its position, so the text moves with it.",
+        Assert(Use(false, holderBelow, CommandBand.TogglesBelowBinding(5)) == "Disabling this group also disables the object that holds its toggles' states. Saving the game while this group is disabled might lose those states. " +
+            "Its 5 toggles keep their states by their keys, independently of their positions, and work at their new locations.", "The Bryson Turntable root warns about the holder below it: " + Use(false, holderBelow, CommandBand.TogglesBelowBinding(5)));
+        Assert(Use(true, CommandBand.TogglesBelowBinding(5)) == "Its 5 toggles keep their states by their keys, independently of their positions, and work at their new locations.", "A part above toggles counts them: " + Use(true, CommandBand.TogglesBelowBinding(5)));
+        Assert(Use(true, CommandBand.NameTextBinding("Chance Clayton")) == "The scene stores the name text \"Chance Clayton\" with this part, independently of its position. The text moves with it.",
             "The name text names its text: " + Use(true, CommandBand.NameTextBinding("Chance Clayton")));
         Assert(Use(true) == CommandBand.PartDecorative && Use(false) == CommandBand.Decorative, "A part or group without toggles reads the decorative text");
         // The Object tab passes the selected entry's bindings; the group's bindings do not change a part's text.

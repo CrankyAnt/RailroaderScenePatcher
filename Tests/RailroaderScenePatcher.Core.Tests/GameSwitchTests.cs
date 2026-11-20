@@ -40,9 +40,9 @@ static class GameSwitchTests {
     static void HoldWarningNamesTheSwitch() {
         Assert(GameSwitchActivity.HoldWarning(GameSwitch.None) == null, "No switch, no warning");
         Assert(GameSwitchActivity.HoldWarning(GameSwitch.Construction) == GameSwitchActivity.ConstructionHoldWarning, "A construction controller keeps its warning");
-        Assert(GameSwitchActivity.HoldWarning(GameSwitch.Progression) == "This object stays off in the game although the game's progression switches it on: your disable holds against it. Click Enable or Clear activity to let progression switch it again.",
+        Assert(GameSwitchActivity.HoldWarning(GameSwitch.Progression) == "Your explicit disable keeps this object off in the game even when progression switches it on. Click Enable or Clear activity to let progression control it again.",
             "The progression warning: " + GameSwitchActivity.HoldWarning(GameSwitch.Progression));
-        Assert(GameSwitchActivity.HoldWarning(GameSwitch.MapFeature) == "This object stays off in the game although unlocking a map feature switches it on: your disable holds against it. Click Enable or Clear activity to let the map feature switch it again.",
+        Assert(GameSwitchActivity.HoldWarning(GameSwitch.MapFeature) == "Your explicit disable keeps this object off in the game even when unlocking a map feature switches it on. Click Enable or Clear activity to let the map feature control it again.",
             "The map feature warning: " + GameSwitchActivity.HoldWarning(GameSwitch.MapFeature));
         Assert(GameSwitchActivity.HoldWarning(GameSwitch.Progression | GameSwitch.MapFeature) == GameSwitchActivity.ProgressionOrMapFeatureHoldWarning
             && GameSwitchActivity.ProgressionOrMapFeatureHoldWarning.Contains("progression or a map feature"), "Both switches: " + GameSwitchActivity.ProgressionOrMapFeatureHoldWarning);

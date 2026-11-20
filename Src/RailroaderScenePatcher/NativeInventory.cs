@@ -164,7 +164,7 @@ namespace RailroaderScenePatcher {
                     if (!String.IsNullOrWhiteSpace(value)) bindings.Add(CommandBand.NameTextBinding(String.Join(" ", value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)).Trim()));
                 }
             }
-            if (toggles != 0) dependencies.Add("Pickable toggle: clicked through its collider where it stands; its state is read by key from the key-value object above it");
+            if (toggles != 0) dependencies.Add("Pickable toggle: clicks reach it through its collider at its current position. The game reads its state by key from the key-value object above it.");
             // What the parts below hold: disabling this object disables a key-value object there too.
             var saved = go.GetComponentsInChildren<Component>(true).Where(c => c != null && (c.gameObject.hideFlags & HideFlags.DontSave) == 0).Select(TypeName).ToArray();
             var holdersBelow = saved.Count(type => type == CommandBand.KeyValueObject) - holders;
@@ -350,7 +350,7 @@ namespace RailroaderScenePatcher {
                         if (ids != null) return ids;
                         if (idsError == null) {
                             try { return ids = TrackMarkerWorld.MarkerIds(); }
-                            catch (Exception e) { idsError = "the marker IDs of the scene could not be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
+                            catch (Exception e) { idsError = "The scene's marker IDs couldn't be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
                         }
                         throw new InvalidOperationException(idsError);
                     };
@@ -453,17 +453,17 @@ namespace RailroaderScenePatcher {
             if (TypeName(c) == Span) Read(() => {
                 bindings.Add("Span id=" + Text(Field(c, "id")));
                 Location(Field(c, "_lower"), "Lower", bindings, problems, segmentIds, graphError); Location(Field(c, "_upper"), "Upper", bindings, problems, segmentIds, graphError);
-                dependencies.Add("Track graph span registration and occupancy consumers");
+                dependencies.Add("Track graph span registration and occupancy consumers.");
             });
             var relative = TypeName(c) == Relative ? c : Get(go, Relative);
             if (relative != null) Read(() => {
                 foreach (var name in new[] { "targetTransform", "targetOffset", "targetAngle", "snapToTerrain", "targetActiveFollowsTrackGroup", "_observedGroupId" })
                     bindings.Add("Track-relative " + name + "=" + Describe(Field(relative, name)));
-                dependencies.Add("Track-relative placement and track-group subscription");
+                dependencies.Add("Track-relative placement and track-group subscription.");
             });
             if (TypeName(c) == Milepost) Read(() => {
                 foreach (var name in new[] { "prefix", "origin", "mileage" }) bindings.Add("Milepost " + name + "=" + Describe(Field(c, name)));
-                dependencies.Add("Milepost origin cache and rendered display");
+                dependencies.Add("Milepost origin cache and rendered display.");
             });
             // A spawn point names what teleport offers, its priority and the start setups that name it.
             if (TypeName(c) == SpawnPoints.Component) Read(() => {
@@ -482,15 +482,15 @@ namespace RailroaderScenePatcher {
                     if (targets == null) throw new InvalidOperationException("Construction scenery targets unavailable");
                     var condition = "state=" + Text(Field(entry, "trackConstructionState")) + "; condition=" + Text(Field(entry, "condition"));
                     foreach (var target in targets) {
-                        dependencies.Add("Construction target " + Describe(target) + "; " + condition);
+                        dependencies.Add("Construction target " + Describe(target) + "; " + condition + ".");
                         if (target == null) problems.Add("Missing construction-scenery target");
                     }
                 }
-                dependencies.Add("Native construction and track-group visibility control; target placement is separate from controller placement");
+                dependencies.Add("Native construction and track-group visibility control. Target placement is separate from controller placement.");
             });
             var controller = Parent(c, Crossing);
             if (controller != null) Read(() => {
-                dependencies.Add("Controller " + Label(controller));
+                dependencies.Add("Controller " + Label(controller) + ".");
                 var sets = Field(controller, "circuitSets") as IEnumerable;
                 if (sets == null) throw new InvalidOperationException("Crossing circuit sets unavailable");
                 int index = 0;
@@ -519,16 +519,16 @@ namespace RailroaderScenePatcher {
                     index++;
                 }
             });
-            if (Get(go, BoardScene.CullerType) != null) dependencies.Add("Culling registration and origin-dependent position");
-            if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output");
-            if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root");
+            if (Get(go, BoardScene.CullerType) != null) dependencies.Add("Culling registration and origin-dependent position.");
+            if (Get(go, BoardScene.MaskType) != null) dependencies.Add("Terrain mask registration and generated terrain/vegetation output.");
+            if (groupRoot) dependencies.Add("Culling and colliders of every part follow the group root.");
             if (part) dependencies.Add(BakedSceneryRules.PartCullingDependency);
             // A storage pile shows its industry's storage by the ids its synchronizer reads, wherever the pile stands. The
             // ids are a binding; the storage's name is presentation only.
             string storageName = null;
             if (part && Get(go, Pile) != null) Read(() => {
                 var storage = PileStorage(go);
-                if (storage != null) { bindings.Add(storage.Item1); storageName = storage.Item2; dependencies.Add("Industry storage display: the pile rebuilds its logs and collider where it stands"); }
+                if (storage != null) { bindings.Add(storage.Item1); storageName = storage.Item2; dependencies.Add("Industry storage display: the pile rebuilds its logs and collider at its current position."); }
             });
             // A log pond's logs show their storage as a pile does; a group root or part that holds them names that
             // storage for the Object tab, as presentation only.
@@ -539,7 +539,7 @@ namespace RailroaderScenePatcher {
                 var storage = PileStorage(ponds[0].gameObject);
                 storageName = storage?.Item2;
                 bindings.AddRange(CommandBand.LogPondBindings(self, self ? 0 : ponds.Length, storage?.Item1));
-                if (self) dependencies.Add("Industry storage display: the log pond lays its logs out where it stands");
+                if (self) dependencies.Add("Industry storage display: the log pond lays out its logs at its current position.");
             });
             // The water mesh of a lake surface moves with its object, unless the game draws it from a static batch; the
             // native lake masks and rivers do not move.
@@ -571,7 +571,7 @@ namespace RailroaderScenePatcher {
             // owns, its own object and those below it outside its parts, and counts the toggles in its parts. Other
             // groups read none of this, so their bindings stay as they were.
             if (groupRoot || part) Read(() => InteractiveBindings(go, groupRoot ? go : GroupWorld.GroupRootOf(go), bindings, dependencies));
-            if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling; separate construction scenery has its own placement");
+            if (family.StartsWith("Bridge", StringComparison.Ordinal)) dependencies.Add("Colliders and culling. Separate construction scenery has its own placement.");
             var icon = family == StationMapIconRules.Family;
             if (icon) dependencies.Add(StationMapIconRules.Dependency);
             // Crossing equipment sits under objects that a culler switches off when the camera is far away, so whether it
@@ -628,7 +628,7 @@ namespace RailroaderScenePatcher {
                 : MilepostWorld.MilepostProblem(go, markerReferrers, setups));
             var milepostEditable = milepost && milepostRefusal == null;
             var spawnPoint = family == SpawnPoints.Family;
-            string spawnRefusal = spawnPoint ? "Spawn point editing is unavailable" : null;
+            string spawnRefusal = spawnPoint ? "Scene spawn point editing is unavailable." : null;
             if (spawnPoint) Read(() => spawnRefusal = SpawnPointWorld.Problem(go));
             string iconRefusal = null;
             if (icon) Read(() => iconRefusal = MapIconWorld.Problem(go));

@@ -45,7 +45,7 @@ static class CommandBandTests {
         Check(CommandBand.CorrectedAddition("bell-as-light-a", entries) == "bell-as-light-a", "Use in the form of a refused addition corrects that addition");
         Check(CommandBand.CorrectedAddition("west", entries) == null && CommandBand.CorrectedAddition(null, entries) == null && CommandBand.CorrectedAddition("gone", entries) == null,
             "Use in a valid addition's form, without a form, or for an addition the file no longer holds starts a new addition");
-        var lines = new[] { "Remove bell-as-light-a from the scene patch file. Nothing is built, because the modification stays refused: Equipment bell-as-light-b: no." };
+        var lines = new[] { "Remove bell-as-light-a from the scene patch file. Nothing is built because the modification is still refused. Reason: Equipment bell-as-light-b: no." };
         Check(CommandBand.PreviewReport("Equipment", lines) == "Equipment preview completed. " + lines[0] + " Click Apply to apply it.",
             "The footer carries the preview line and asks for a click: " + CommandBand.PreviewReport("Equipment", lines));
         Check(CommandBand.PreviewReport("Coverage", new string[0]) == "Coverage preview completed. Click Apply to apply it.", "A preview without lines asks for the click only");
@@ -549,7 +549,7 @@ static class CommandBandTests {
         foreach (var row in new[] { new[] { "end", "A", "a" }, new[] { "end", "b", "b" }, new[] { "end", null, "" }, new[] { "segment", "S9728", "S9728" } })
             Check(CommandBand.Shown(row[0], row[1]) == row[2], "The value " + row[0] + "=" + row[1] + " shows as " + row[2]);
         // An offered list and a miss are instructions, not errors; a refusal is a problem.
-        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point. Nothing this choice offers is under the pointer.", "An offered list and a click that met no candidate read as ordinary text: nothing is broken");
+        Check(PendingSelection.IsInstruction(PendingSelection.SeveralOffers) && PendingSelection.IsInstruction(PendingSelection.NoOffer) && PendingSelection.NoOffer == "No candidate at this point. Nothing available for this selection is under the pointer.", "An offered list and a click that met no candidate read as ordinary text: nothing is broken");
         Check(!PendingSelection.IsInstruction(null) && !PendingSelection.IsInstruction("The candidate changed or no longer resolves uniquely: it is no longer found. Pick again."), "A refusal stays a problem, in red");
         // The log line of a world choice names the candidates of the clicked spot, and the object the choice is for only when it is for one.
         var offered = new[] { "Crossing light: World/Roads/Everett/Signal 1/Signal 1", "Crossing gate: World/Roads/Everett/Signal 1/Signal 1/Wishbone" };

@@ -283,7 +283,7 @@ static class ReplacementMarkerIdTests {
         Assert(CommandBand.OffersDuplicateRepair(TrackMarkerScene.Structure, yardLines) && !CommandBand.OffersDuplicateRepair(null, yardLines)
             && !CommandBand.OffersDuplicateRepair(TrackMarkerScene.Structure, Holders(w.Unrelated).Dependencies(w.Unrelated, true)),
             "Repair duplicate ID is offered for a generic track marker whose explanation names a duplicate marker ID");
-        Assert(CommandBand.NoDetectedProblems(true) == "None while this marker is inactive. Until its duplicate marker ID is repaired, activity, binding and track-following edits of it are refused.",
+        Assert(CommandBand.NoDetectedProblems(true) == "None while this marker is inactive. The patcher refuses changes to its activity, binding and track-following placement until its duplicate marker ID is repaired.",
             "Beside the repair, the section says why the duplicate marker ID is no problem now and what it still refuses: " + CommandBand.NoDetectedProblems(true));
         Assert(CommandBand.NoDetectedProblems(false) == "None detected", "Without the repair the section reads None detected");
     }
@@ -291,13 +291,13 @@ static class ReplacementMarkerIdTests {
     // The Marker ID row of the Connections tab and its guided task: the replacement id stays visible and disabled with its
     // reason for any marker that does not take one, and Set id and Clear id state why they cannot be used.
     static void MarkerIdRowStatesItsReasons() {
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(false, "Mpad", 1, false) == ReplacementMarkerIds.NotSupported + ".", "A marker of another kind keeps the row disabled with its reason");
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mown", 0, false) == "Marker ID Mown is held by this marker alone, so it needs no replacement ID.", "A marker ID of its own needs no replacement");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(false, "Mpad", 1, false) == ReplacementMarkerIds.NotSupported, "A marker of another kind keeps the row disabled with its reason");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mg6m", 0, true) == null,
             "A shared native id offers the replacement id, and a marker that already has one keeps the row");
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty + ".", "An empty field states the reason");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty, "An empty field states the reason");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "flare:1", "Mg6m").StartsWith("Replacement ID flare:1 begins with flare:", StringComparison.Ordinal), "A reserved prefix states the reason");
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "Mg6m", "Mg6m") == "The field holds the marker's current ID.", "The current id has nothing to set");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "Mg6m", "Mg6m") == "The field already contains the marker's current ID.", "The current id has nothing to set");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason("Editing is unavailable.", "Mx", "Mg6m") == "Editing is unavailable." && RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "Mx", "Mg6m") == null, "The general reason comes first");
         Assert(RailroaderScenePatcher.CommandBand.ClearMarkerIdReason(false) == "This mod sets no replacement ID for this marker, so there is nothing to clear." && RailroaderScenePatcher.CommandBand.ClearMarkerIdReason(true) == null, "Clear id states when there is nothing to clear");
         Assert(RailroaderScenePatcher.GuidedTaskState.Tasks.Contains(RailroaderScenePatcher.GuidedTaskKind.MarkerId), "The guided task list offers the replacement ID");
@@ -448,9 +448,9 @@ static class ReplacementMarkerIdTests {
     static void UnreadMapObjectsRefuseTheId() {
         var w = new World(); w.Markers.MapObjects = null; var before = w.Registrations();
         var load = w.Engine.Apply(Doc(Item("yard", YardPath, "\"markerId\":\"Mg6m-yard\""))).Outcomes["yard"];
-        Assert(!load.Applied && load.Error.Contains("could not be checked against the map objects") && w.Registrations() == before, "At load the ID is refused with the reason: " + load.Error);
+        Assert(!load.Applied && load.Error.Contains("couldn't be checked against them") && w.Registrations() == before, "At load the ID is refused with the reason: " + load.Error);
         var edit = w.Session.SetMarkerId(Marker(YardPath), "Mg6m-yard", null);
-        Assert(!edit.Applied && edit.Failure == FailureKind.Refused && edit.Error.Contains("could not be checked against the map objects") && w.Yard.Id == "Mg6m", "In scene patch editing the ID is refused with the reason: " + edit.Error);
+        Assert(!edit.Applied && edit.Failure == FailureKind.Refused && edit.Error.Contains("couldn't be checked against them") && w.Yard.Id == "Mg6m", "In scene patch editing the ID is refused with the reason: " + edit.Error);
     }
     static void SpacesAtEitherEndAreRefused() {
         var w = new World();

@@ -62,7 +62,7 @@ namespace RailroaderScenePatcher.Core {
                     var done = item.Outstanding.Where(w => w.Built).ToArray();
                     foreach (var write in done) { item.Outstanding.Remove(write); item.Completed.Add(write.Label); }
                 }
-                if (item.Outstanding.Count != 0 && world.Now - item.Since > Timeout) item.Error = "Terrain output did not complete within " + Timeout.ToString(CultureInfo.InvariantCulture) + " seconds";
+                if (item.Outstanding.Count != 0 && world.Now - item.Since > Timeout) item.Error = "Terrain output didn't complete within " + Timeout.ToString(CultureInfo.InvariantCulture) + " seconds";
             }
         }
         public DependentOutput Output(object target) {
@@ -77,7 +77,7 @@ namespace RailroaderScenePatcher.Core {
                 if (!world.TileLoaded(write.Position)) { item.Outstanding.Remove(write); item.Completed.Add(write.Label + " (tile unloaded; it builds from the current mask)"); continue; }
                 write.Built = false;
                 try { world.InvalidateTile(write.Position); }
-                catch (Exception e) { item.Error = "Terrain output could not be requested again: " + e.Message; return; }
+                catch (Exception e) { item.Error = "Couldn't request terrain output again: " + e.Message; return; }
             }
         }
         // The targets whose output stopped without completing, with their reports.

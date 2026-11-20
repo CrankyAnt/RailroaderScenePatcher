@@ -102,9 +102,9 @@ static class SpawnPointTests {
         Assert(early.Outcomes["move-alarka"].Applied && !early.Outcomes.ContainsKey("a-dependent") && !early.Outcomes.ContainsKey("following") && world.Mutations == 1,
             "Only the fixed, dependency-free spawn point modification applies early: " + String.Join(", ", early.Outcomes.Keys));
         Assert(early.EarlyRouteUnavailable != null, "The skipped modifications are named as waiting for the world load");
-        world.Refused = "The spawn point's scene is not loaded";
+        world.Refused = "The scene spawn point's scene isn't loaded.";
         var refused = new PatchEngine(scene).BeforeNewGameStart(Doc(Spawn("move-alarka", 5220)), "");
-        Assert(!refused.Outcomes.Any() && world.Mutations == 1 && refused.EarlyRouteUnavailable.Contains("not loaded"), "A target that is not ready is left untouched without a failure: " + refused.EarlyRouteUnavailable);
+        Assert(!refused.Outcomes.Any() && world.Mutations == 1 && refused.EarlyRouteUnavailable.Contains("isn't loaded"), "A target that is not ready is left untouched without a failure: " + refused.EarlyRouteUnavailable);
         world.Refused = null;
         var later = engine.Apply(Doc(Spawn("move-alarka", 5220)), "");
         Assert(later.Outcomes["move-alarka"].Applied && Math.Abs(spawn.Position[0] - 4220) < 1e-9, "The world-load apply still runs every modification: " + later.Outcomes["move-alarka"].Error);
@@ -140,9 +140,9 @@ static class SpawnPointTests {
     }
     static void PreflightRefusalLeavesSceneAndFileUnchanged() {
         var (world, spawn, scene) = Setup();
-        world.Refused = "The spawn point's scene is not loaded";
+        world.Refused = "The scene spawn point's scene isn't loaded.";
         var outcome = new PatchEngine(scene).Apply(Doc(Spawn("move-alarka"))).Outcomes["move-alarka"];
-        Assert(!outcome.Applied && outcome.Error.Contains("not loaded") && world.Mutations == 0 && Unedited(spawn), "A preflight refusal leaves the spawn point untouched: " + outcome.Error);
+        Assert(!outcome.Applied && outcome.Error.Contains("isn't loaded") && world.Mutations == 0 && Unedited(spawn), "A preflight refusal leaves the spawn point untouched: " + outcome.Error);
         var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
         var before = session.ScenePatchFileText;
@@ -219,8 +219,8 @@ static class SpawnPointTests {
         // Quick search lists spawn points, but Railroader 0.6.3 never opens it (QuickSearchController.Show is empty), so
         // only teleport is an expected use, and quick search is named only where the game offers it.
         var teleport = uses.Single(line => line.Contains("/tp"));
-        Assert(teleport.StartsWith("Teleport: the /tp console command is expected to offer this spawn point as Alarka and jump to where it stands.", StringComparison.Ordinal)
-            && teleport.Contains("in a game version that opens it; Railroader 0.6.3 doesn't open quick search."), "The teleport use names /tp and quick search only where the game offers it: " + teleport);
+        Assert(teleport.StartsWith("Teleport: the /tp console command is expected to list this spawn point as Alarka and teleport you to its position.", StringComparison.Ordinal)
+            && teleport.Contains("in game versions that open it. Railroader 0.6.3 doesn't open quick search."), "The teleport use names /tp and quick search only where the game offers it: " + teleport);
         Assert(!uses.Any(line => line.Contains("quick search are expected") || line.Contains("quick search is expected")) && !SpawnPoints.Dependency.Contains("quick search"),
             "No use or dependency says quick search is expected to offer the spawn point: " + String.Join(" | ", uses) + " | " + SpawnPoints.Dependency);
         Assert(uses.Any(line => line.Contains("no native spawns")), "Without native spawns the default start says so: " + String.Join(" | ", uses));
@@ -228,7 +228,7 @@ static class SpawnPointTests {
         Assert(native.Any(line => line.Contains("2 native spawns") && line.Contains("Spawns")) && native.Any(line => line.Contains("No start setup")),
             "With native spawns the uses name them and their Map Editor category, and a spawn point without a setup says so: " + String.Join(" | ", native));
         var unknown = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka") }, null);
-        Assert(unknown.Any(line => line.Contains("could not be read")), "Unknown native spawns are named as unread: " + String.Join(" | ", unknown));
+        Assert(unknown.Any(line => line.Contains("couldn't be read")), "Unknown native spawns are named as unread: " + String.Join(" | ", unknown));
         var setup = uses.Single(line => line.Contains("alarka-jct-start"));
         Assert(setup.Contains("expected") && setup.Contains("no cars") && setup.Contains("balance"),
             "The start setup use names its condition and stays expected behaviour: " + setup);
@@ -260,24 +260,24 @@ static class SpawnPointTests {
     static void DisabledSpawnPointIsNotOffered() {
         var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0), SpawnPoints.SetupBinding("alarka-jct-start") };
         var uses = SpawnPoints.Uses(bindings, 0, active: false);
-        Assert(!uses.Any(line => line.Contains("offer this spawn point as")), "A disabled spawn point is not said to be offered: " + String.Join(" | ", uses));
+        Assert(!uses.Any(line => line.Contains("list this spawn point as")), "A disabled spawn point is not said to be offered: " + String.Join(" | ", uses));
         Assert(!uses.Any(line => line.Contains("quick search")), "A disabled spawn point's uses leave quick search out: " + String.Join(" | ", uses));
         foreach (var expected in new[] { "rescue", "/tp", "new game" })
             Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0 && line.Contains("disabled")), "The disabled spawn point says " + expected + " passes it by: " + String.Join(" | ", uses));
-        Assert(uses.Any(line => line.Contains("alarka-jct-start") && line.Contains("also while this spawn point is disabled")), "A start setup still names it: " + String.Join(" | ", uses));
+        Assert(uses.Any(line => line.Contains("alarka-jct-start") && line.Contains("This also applies when this spawn point is disabled")), "A start setup still names it: " + String.Join(" | ", uses));
     }
     static void UsesStateConditionsAndCounts() {
         var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) };
         var one = SpawnPoints.Uses(bindings, 1);
         Assert(one.Any(line => line.Contains("declares 1 native spawn,")) && !one.Any(line => line.Contains("1 native spawns")), "One native spawn reads singular: " + String.Join(" | ", one));
         var tie = SpawnPoints.Uses(bindings, 0, samePriority: 3);
-        Assert(tie.Any(line => line.Contains("3 other active spawn points") && line.Contains("not fixed")), "Equal priorities say the choice among them is not fixed: " + String.Join(" | ", tie));
-        Assert(!SpawnPoints.Uses(bindings, 0).Any(line => line.Contains("not fixed")), "A unique priority names no tie");
+        Assert(tie.Any(line => line.Contains("This spawn point shares its priority with 3 other active spawn points") && line.Contains("isn't fixed")), "Equal priorities name this spawn point and say the choice among them is not fixed: " + String.Join(" | ", tie));
+        Assert(!SpawnPoints.Uses(bindings, 0).Any(line => line.Contains("isn't fixed")), "A unique priority names no tie");
         Assert(SpawnPoints.Priority(bindings) == 0 && SpawnPoints.Priority(new[] { SpawnPoints.NameBinding("x") }) == null, "The priority reads back from the bindings");
     }
     static void UnreadSetupsAreNamedAsUnread() {
         var uses = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.SetupsUnreadBinding("SetupDescriptor.spawnPoint is missing") }, 0);
-        Assert(uses.Any(line => line.Contains("start setups could not be read") && line.Contains("spawnPoint is missing")) && !uses.Any(line => line.Contains("No start setup")),
+        Assert(uses.Any(line => line.Contains("start setups couldn't be read") && line.Contains("spawnPoint is missing")) && !uses.Any(line => line.Contains("No start setup")),
             "Unread setups are named as unread, never as no setup: " + String.Join(" | ", uses));
         Assert(SpawnPoints.SetupBinding("  ") == null, "A setup without an identifier has no binding of its own; the adapter names it by its object");
     }
@@ -294,7 +294,7 @@ static class SpawnPointTests {
     static void MinimumHoldsWithoutTheCapability() {
         var capabilities = new SceneCapabilities(() => new[] { "map" });
         capabilities.Add(new Scene { Maps = new[] { "map" } });
-        capabilities.AddUnavailable(SpawnPoints.Structure, "Spawn point type unavailable");
+        capabilities.AddUnavailable(SpawnPoints.Structure, "The scene spawn point type is unavailable.");
         var store = new Store { Patch = Doc(Spawn("move-alarka")) }; var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store); mapEditor.Session = session;
         Assert(session.MinimumPatcherVersion == SpawnPoints.RequiredVersion, "A spawn point placement needs its version without the capability: " + session.MinimumPatcherVersion);

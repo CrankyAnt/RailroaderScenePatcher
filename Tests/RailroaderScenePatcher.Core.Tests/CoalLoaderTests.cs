@@ -48,7 +48,7 @@ static class CoalLoaderTests {
         Assert(BakedSceneryRules.CarLoaders == "Car loaders", "The rule is named as its coverage statement row: " + BakedSceneryRules.CarLoaders);
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing of the loader stands in the Inspection only group");
         Assert(!BakedSceneryRules.Parts(verdicts).Any(p => p.GroupPath == Loader || p.Path.StartsWith(Loader + "/", StringComparison.Ordinal)), "A group that is not listed has no parts");
-        Assert(BakedSceneryRules.CarLoaderRefusal == "This group holds a car loader, so it is not listed. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading",
+        Assert(BakedSceneryRules.CarLoaderRefusal == "This group isn't listed because it contains a car loader. The game loads Robinson Gap coal by teleport between the industry's track spans. It doesn't use the loader, so moving the loader wouldn't change where loading happens.",
             "The refusal names the rule and why: " + BakedSceneryRules.CarLoaderRefusal);
         Assert(BakedSceneryRules.CarLoaderRefusal.IndexOf('#') < 0 && !BakedSceneryRules.Exclusions.Any(e => e.Component == "RollingStock.CarContentSwapper"), "No ticket and no inspection-only exclusion names the loader");
         // The rule holds the car loader wherever it stands in a group, not only at Robinson Gap Mine.

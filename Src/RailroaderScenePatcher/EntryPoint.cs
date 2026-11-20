@@ -882,9 +882,9 @@ namespace RailroaderScenePatcher {
                 groundMasks.Poll();
                 foreach (var failure in groundMasks.Failures) {
                     var label = failure.Key is GameObject moved && moved != null ? BoardScene.PathOf(moved.transform) : "an unloaded object";
-                    Report("terrain/" + label + "/" + failure.Value.Error, "Terrain output for " + label + " did not complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". The object keeps its applied placement; reloading the map regenerates the output. Report to the patcher maintainer.");
+                    Report("terrain/" + label + "/" + failure.Value.Error, "Terrain output for " + label + " didn't complete: " + failure.Value.Error + ". Completed: " + Join(failure.Value.Completed) + ". Outstanding: " + Join(failure.Value.Outstanding) + ". The object keeps its applied placement. Reloading the map regenerates the output. Report this to the patcher maintainer.");
                 }
-            } catch (Exception e) { Report("terrain-masks", "Dependent terrain state of a ground mask remains unverified. Reload before retry. Report to the patcher maintainer. " + e.GetBaseException().Message); }
+            } catch (Exception e) { Report("terrain-masks", "The dependent terrain state of a ground mask couldn't be verified. Reload the map before retrying. Report this to the patcher maintainer. " + e.GetBaseException().Message); }
             if (presentation != null) {
                 // A closed window shows nothing: it computes no snapshot. Opening builds the content anew.
                 if (open) {
@@ -1664,7 +1664,7 @@ namespace RailroaderScenePatcher {
         // never jumps to another object of the same path, because it uses the inspected handle.
         void Focus(SceneObservation entry) {
             try {
-                if (!(entry.Handle is GameObject target) || target == null) throw new InvalidOperationException("the inspected object no longer exists; click Refresh and inspect it again");
+                if (!(entry.Handle is GameObject target) || target == null) throw new InvalidOperationException("The inspected object no longer exists. Click Refresh and inspect it again.");
                 var map = NativeInventory.MapPosition(target.transform);
                 var point = FocusTarget.Point(entry.Family, new double[] { map.x, map.y, map.z }, TrackPoints(entry), out var refusal);
                 if (point == null) throw new InvalidOperationException(refusal);
@@ -1718,8 +1718,8 @@ namespace RailroaderScenePatcher {
             if (trackPointFrame != Time.frameCount || !ReferenceEquals(trackPointOf, selected.Handle)) {
                 trackPointFrame = Time.frameCount; trackPointOf = selected.Handle;
                 trackPoint = null;
-                if (trackPoses == null) trackPointMissing = "the track graph is unavailable in this game build";
-                else if (!(selected.Handle is GameObject target) || target == null) trackPointMissing = "the inspected object no longer exists; click Refresh and inspect it again";
+                if (trackPoses == null) trackPointMissing = "The track graph is unavailable in this game build.";
+                else if (!(selected.Handle is GameObject target) || target == null) trackPointMissing = "The inspected object no longer exists. Click Refresh and inspect it again.";
                 else {
                     try { trackPoint = TrackPoints(selected)?.FirstOrDefault(); } catch { trackPoint = null; }
                     trackPointMissing = trackPoint == null ? StarterPlacements.NoTrackPoint : null;

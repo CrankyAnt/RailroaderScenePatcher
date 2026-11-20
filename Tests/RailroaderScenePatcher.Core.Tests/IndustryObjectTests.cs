@@ -78,22 +78,22 @@ static class IndustryObjectTests {
         Assert(byIds.Storage == "storage of load logs at industry component connelly.logs", "Unresolved names fall back to ids: " + byIds.Storage);
         Assert(CommandBand.StorageName("Andrews Snowbird Paper", "LPG", "x.y", "lpg") == "LPG storage of Andrews Snowbird Paper", "An acronym keeps its capitals");
         var text = CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, CommandBand.StorageName("Andrews Snowbird Paper", "Pulpwood", "a.b", "pulpwood"), false);
-        Assert(text == "This pile shows the pulpwood storage of Andrews Snowbird Paper. Moving or disabling the pile does not change the storage, and the industry keeps working on its native track spans.",
+        Assert(text == "This pile shows the pulpwood storage of Andrews Snowbird Paper. Moving or disabling the pile doesn't change the storage. The industry keeps working on its native track spans.",
             "The Object tab names the pile's storage and says moving the pile does not change it: " + text);
     }
     // A decorative industry building, its parts, and a storage display say that the industry works on its native track
     // spans; only a group or part that holds piles says that its piles keep showing the storage. Other groups keep the
     // plain decorative text.
     static void ObjectTabStatesTheNativeTrackSpans() {
-        const string Spans = "Decorative. The industry works on its native track spans, so moving or disabling this ";
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.IndustryBuilding, null, false) == Spans + "group does not change loading or unloading.",
+        const string Spans = "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this ";
+        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.IndustryBuilding, null, false) == Spans + "group doesn't affect loading or unloading.",
             "An industry building group states the native track spans: " + CommandBand.UseInGame(false, BakedSceneryCategories.IndustryBuilding, null, false));
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.IndustryBuilding, null, false) == Spans + "part does not change loading or unloading.", "An industry building part states the native track spans");
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, true) == Spans + "group does not change loading or unloading. Its piles keep showing the industry's storage.",
+        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.IndustryBuilding, null, false) == Spans + "part doesn't affect loading or unloading.", "An industry building part states the native track spans");
+        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, true) == Spans + "group doesn't affect loading or unloading. Its piles keep showing the industry's storage.",
             "A storage display group with piles also states its storage: " + CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, true));
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, true) == Spans + "part does not change loading or unloading. Its piles keep showing the industry's storage.",
+        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, true) == Spans + "part doesn't affect loading or unloading. Its piles keep showing the industry's storage.",
             "A part that holds piles, such as Pulpwood Piles, states its storage");
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, false) == Spans + "part does not change loading or unloading.",
+        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, false) == Spans + "part doesn't affect loading or unloading.",
             "A part of a storage display without piles, such as a retaining wall, does not mention piles");
         Assert(CommandBand.PilesBinding(2) == "Storage piles=2" && CommandBand.HoldsPiles(new[] { "Other=1", CommandBand.PilesBinding(2) }) && !CommandBand.HoldsPiles(new[] { "Other=1" }), "Whether an object holds piles travels as a binding");
         Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Platform, null, false) == CommandBand.Decorative && CommandBand.UseInGame(true, BakedSceneryCategories.Platform, null, false) == CommandBand.PartDecorative

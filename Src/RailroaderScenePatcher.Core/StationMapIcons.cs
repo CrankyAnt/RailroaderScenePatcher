@@ -16,8 +16,8 @@ namespace RailroaderScenePatcher.Core {
         // the game creates for cars and players while it runs, are not.
         public static bool Listed(string path) =>
             path != null && path.Length > Folder.Length + 1 && path.StartsWith(Folder + "/", StringComparison.Ordinal) && path.IndexOf('/', Folder.Length + 1) < 0;
-        public const string Operations = "Move, rotate, enable or disable this station map icon. The station's track span, house and station agent stay with the Map Editor.";
-        public const string Dependency = "Map window: the map shows the icon where it stands; enabling it registers it with the map";
+        public const string Operations = "Move, rotate, enable or disable this station map icon. Edit the station's track span, house and station agent in the Map Editor.";
+        public const string Dependency = "Map window: the map shows the icon at its position. Enabling the icon registers it with the map.";
     }
     // A station map icon as the capability reads it: its own placement and activity in map coordinates, the object it
     // stands in, whether it is active with its parents, and whether the map has it registered. Registered is null while
@@ -62,12 +62,12 @@ namespace RailroaderScenePatcher.Core {
         public void Preflight(object target) {
             var refusal = world.Refusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
-            if (!Finite(world.Observe(target).Root.Placement)) throw new InvalidOperationException("The station map icon's map coordinates are unavailable");
+            if (!Finite(world.Observe(target).Root.Placement)) throw new InvalidOperationException("The station map icon's map coordinates are unavailable.");
         }
         public void CheckRelationships(object target, ObjectState state) {
-            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
-            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
+            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship.");
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship.");
+            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship.");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Active == false && world.DisableRefusal(target) is string reason) throw new InvalidOperationException(reason);
         }
@@ -113,9 +113,9 @@ namespace RailroaderScenePatcher.Core {
             target != null && (target.Structure == StationMapIconRules.Structure || (target.Structure == null && target.Component == StationMapIconRules.Component));
 
         static void CheckPlacement(Placement placement) {
-            if (placement.Position == null || placement.Rotation == null || placement.Position.Length != 3 || placement.Rotation.Length != 4) throw new InvalidOperationException("Invalid placement coordinates");
-            if (placement.Position.Concat(placement.Rotation).Any(v => Double.IsNaN(v) || Double.IsInfinity(v) || Math.Abs(v) > Single.MaxValue)) throw new InvalidOperationException("Coordinate exceeds native precision");
-            if (Math.Abs(placement.Rotation.Sum(x => x * x) - 1) > 0.001) throw new InvalidOperationException("Rotation must be a unit quaternion");
+            if (placement.Position == null || placement.Rotation == null || placement.Position.Length != 3 || placement.Rotation.Length != 4) throw new InvalidOperationException("Invalid placement coordinates.");
+            if (placement.Position.Concat(placement.Rotation).Any(v => Double.IsNaN(v) || Double.IsInfinity(v) || Math.Abs(v) > Single.MaxValue)) throw new InvalidOperationException("A coordinate exceeds the game's numeric precision.");
+            if (Math.Abs(placement.Rotation.Sum(x => x * x) - 1) > 0.001) throw new InvalidOperationException("Rotation must be a unit quaternion.");
         }
         static bool Finite(Placement placement) => placement?.Position != null && placement.Position.Length == 3 && !placement.Position.Any(v => Double.IsNaN(v) || Double.IsInfinity(v));
         static bool SamePlacement(Placement a, Placement b) {

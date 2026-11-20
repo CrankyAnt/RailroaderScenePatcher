@@ -241,22 +241,22 @@ namespace RailroaderScenePatcher.Core {
         });
         // Why a group with a map icon is left out. Station map icons, in the Station Icons folder, have their own family;
         // a map icon elsewhere is in no family and has no edit. No ticket is needed.
-        public const string MapIconReason = "This group holds a map icon, which the patcher cannot move with a group.";
+        public const string MapIconReason = "This group contains a map icon, which the patcher can't move with a group.";
         // Why a group with a station click spot is left out: in Railroader 0.6.3 station click spots are native map data,
         // which the native map editor edits. No ticket is needed.
-        public const string StationAgentReason = "This group holds a station click spot, which is native map data that the Map Editor edits.";
+        public const string StationAgentReason = "This group contains a station click spot. It's native map data, which you edit in the Map Editor.";
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
-        public const string TrackMarkerReason = "This group is not moved as a whole. Its track markers are edited one by one in the Track marker family.";
+        public const string TrackMarkerReason = "You can't move this group as a whole. Edit its track markers individually in the Track marker family.";
         // A group with a car loader (RollingStock.CarContentSwapper) at any depth is not listed (CarLoaders). Railroader
         // 0.6.3 has one, the Robinson Gap Mine Coal Loader, and it loads nothing: the base map loads Robinson Gap coal by
         // teleport between the spans of its industry (a TeleportLoadingIndustry in Map.json), and no component references
         // the loader, so moving it would not move loading. No ticket.
         public const string CarLoader = "RollingStock.CarContentSwapper";
         // Why a modification that names a group with a car loader fails.
-        public const string CarLoaderRefusal = "This group holds a car loader, so it is not listed. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading";
+        public const string CarLoaderRefusal = "This group isn't listed because it contains a car loader. The game loads Robinson Gap coal by teleport between the industry's track spans. It doesn't use the loader, so moving the loader wouldn't change where loading happens.";
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
-        public const string SpawnPointReason = "This group is not moved as a whole. Its spawn points are edited one by one in the Spawn point family.";
+        public const string SpawnPointReason = "You can't move this group as a whole. Edit its spawn points individually in the Spawn point family.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
         public static readonly IReadOnlyList<string> RailBridgeFolders = Array.AsReadOnly(new[] { "Almond Bridge", "Plate Girder Bridge" });
         // A road bridge construction, wherever it stands: a root whose name contains Road Bridge. Its road is native
@@ -270,13 +270,13 @@ namespace RailroaderScenePatcher.Core {
         // its entries on and off by the construction state of the track segments it names, wherever it stands.
         public const string ConstructionController = "Game.Mow.TrackConstructionScenery";
         // Why a group that holds a construction controller but is no supported rail bridge construction is left out.
-        public const string ConstructionOutsideBridge = "This group holds a track construction controller but is not a supported rail bridge, so it cannot be edited as a group.";
+        public const string ConstructionOutsideBridge = "This group contains a track construction controller but isn't a supported rail bridge. You can't edit it as a group.";
         // Why a rail bridge construction or a part of one takes no track-following placement: its track is native map
         // data, and the construction is placed onto the moved track with fixed placement.
-        public const string RailBridgeNoFollowing = "Rail bridges use fixed placement. Track-following placement does not apply to them";
+        public const string RailBridgeNoFollowing = "Rail bridges use fixed placement. They don't support track-following placement.";
         // Why a road bridge construction or a part of one takes no track-following placement: it stands where its road
         // goes, which is native map data, and track following follows track.
-        public const string RoadBridgeNoFollowing = "Road bridges use fixed placement. Track-following placement does not apply to them";
+        public const string RoadBridgeNoFollowing = "Road bridges use fixed placement. They don't support track-following placement.";
         // Why a group of the subgroup, or a part of one, takes no track-following placement, or null: a bridge of
         // either subgroup is placed onto its moved track or road with fixed placement.
         public static string FollowingRefusal(string subcategory) =>
@@ -285,13 +285,13 @@ namespace RailroaderScenePatcher.Core {
         // what the game builds for it belong to the native map data, which a construction move must leave in place.
         public static string TrackOwnedRefusal(IEnumerable<string> types) {
             var owned = (types ?? Enumerable.Empty<string>()).FirstOrDefault(type => type != null && (type.StartsWith("Track.", StringComparison.Ordinal) || type.StartsWith("AutoTrestle.", StringComparison.Ordinal)));
-            return owned == null ? null : "The rail bridge holds the track-owned component " + owned + ", which belongs to the native track, so it cannot be moved, enabled or disabled";
+            return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled or disabled.";
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
             RendererCuller = "Helpers.Culling.RendererCuller", FolderRule = "Folders above group roots";
         // Crossbucks at unprotected crossings: each crossbuck is a group of its own under Grade crossing, wherever it
         // stands below World. Its models, the LOD levels below it, belong to its entry and are no parts.
-        public const string CrossbuckModels = "The models of a crossbuck belong to its entry";
+        public const string CrossbuckModels = "A crossbuck's models belong to its entry.";
         // The name of a crossbuck's entry: the crossbuck's own name at its crossing, as a crossing mast is named, so the
         // crossbucks of the base map read apart and a search finds them by crossing name. Where crossings at other paths
         // share the crossing's name, such as the two Crossing Unprotected - Robbinsville crossings, the name adds the
@@ -317,7 +317,7 @@ namespace RailroaderScenePatcher.Core {
         // Why a target with a pad marker id cannot name a crossbuck, from the crossbucks listed at its path, or null. The
         // id identifies a crossbuck only where several crossbucks share the path: a crossbuck with a path of its own is
         // named by its path alone, so the identity holds one identifier, never two.
-        public const string PadMarkerUnshared = "This crossbuck's path names it alone, so its target takes no padMarkerId. Remove padMarkerId from this target";
+        public const string PadMarkerUnshared = "This crossbuck's path identifies it uniquely, so its target doesn't accept padMarkerId. Remove padMarkerId from this target.";
         public static string PadMarkerRefusal(int crossbucksAtPath) =>
             crossbucksAtPath == 0 ? TargetIdentity.PadMarkerNotAccepted : crossbucksAtPath == 1 ? PadMarkerUnshared : null;
         static bool Protected(IHierarchyNode node) => node.Components.Contains(CrossingController);
@@ -388,9 +388,9 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with storage piles or a log pond cannot be edited while the game's bulk scenery members that the
         // refresh uses are unavailable, naming the kinds the group holds.
         public static string BulkMembersRefusal(bool piles, bool ponds) =>
-            piles && ponds ? "The game's storage pile and log pond members are unavailable, so this group, its piles and its log pond cannot be moved, enabled or disabled"
-            : ponds ? "The game's log pond members are unavailable, so this group and its log pond cannot be moved, enabled or disabled"
-            : "The game's storage pile members are unavailable, so this group and its piles cannot be moved, enabled or disabled";
+            piles && ponds ? "The game's storage pile and log pond members are unavailable. This group, its piles and its log pond can't be moved, enabled or disabled."
+            : ponds ? "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled or disabled."
+            : "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled or disabled.";
         // The box a log pond lays its logs out in, in its own coordinates, as centre and half extents: its width across
         // (X), its length plus width along (Z, the capsule's straight section and its two round ends), and one log's
         // radius up and down from the water line where the logs float (LogPond.ComputeLayout places them at height 0).
@@ -399,7 +399,7 @@ namespace RailroaderScenePatcher.Core {
         // Why the move of a lake surface whose water mesh is part of a static batch is refused: the game draws the
         // batched mesh where the scene had it, whatever the transform says.
         public static string StaticBatchRefusal(string water) =>
-            "The water surface " + water + " is part of a static batch, so the game would keep drawing it at its old place. This lake surface cannot be moved";
+            "The water surface " + water + " is part of a static batch. The game would keep drawing it at its old position, so this lake surface can't be moved.";
         // The logs of a log pond (Scenery.LogPond) are drawn the same way, without a collider: the scene gives the
         // object no renderer, but it shows the logs of the sawmill's storage inside the pond's water surface.
         public const string LogPond = "Scenery.LogPond";
@@ -510,7 +510,7 @@ namespace RailroaderScenePatcher.Core {
             return groupPath.Substring(groupPath.LastIndexOf('/') + 1) + " / " + path.Substring(groupPath.Length + 1).Replace("/", " / ");
         }
         // What the inspector says about the culling of a part.
-        public const string PartCullingDependency = "Culling and colliders move with the part. A part moved outside the sphere of a culler above it keeps its own culling, and that culler keeps its radius";
+        public const string PartCullingDependency = "Culling and colliders move with the part. A part moved outside the sphere of a culler above it keeps its own culling, and that culler keeps its radius.";
         // The inventory note for a simple culler whose handler other code replaced while the patcher listened to it: the
         // patcher's handler stays in the chain and only passes the game's events on. Information, not a warning.
         public static string LeftoverWrapper(string culler) => "Own culling left a pass-through handler on " + culler + " because another handler was installed after it";
@@ -896,9 +896,9 @@ namespace RailroaderScenePatcher.Core {
         // refused here, before any mutation.
         public void CheckRelationships(object target, ObjectState state) {
             ConstructionSegmentRule.Check(Segments, target, state?.Segments);
-            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
-            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
+            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship.");
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship.");
+            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship.");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state?.Placement?.Following != null && world.FollowingRefusal(target) is string following) throw new InvalidOperationException(following);
             var refusal = (state?.Placement == null ? null : world.PlacementRefusal(target) ?? masks?.PlacementRefusal(target))

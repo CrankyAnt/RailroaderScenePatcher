@@ -49,10 +49,10 @@ namespace RailroaderScenePatcher.Core {
     // separate construction controller at Ela share.
     public static class ConstructionSegmentRule {
         public const string RequiredVersion = "0.5.0";
-        public const string NoDetach = "The construction segments of a rail bridge cannot be detached: a construction without segments has no meaning. Select the segments of the bridge's track instead, or clear this mod's value to keep the native segments";
-        public const string NoRelationship = "This object has no supported construction-segment relationship";
-        internal static string Missing(string id) => "Construction segment " + id + " is missing on the loaded track; no other segment is used";
-        internal static string Ambiguous(string id) => "Construction segment " + id + " is ambiguous on the loaded track; no other segment is used";
+        public const string NoDetach = "A rail bridge needs construction segments, so they can't be detached. Select the segments of the bridge's track instead, or clear this mod's value to keep the native segments.";
+        public const string NoRelationship = "This object has no supported construction-segment relationship.";
+        internal static string Missing(string id) => "Construction segment " + id + " is missing on the loaded track. No other segment is used.";
+        internal static string Ambiguous(string id) => "Construction segment " + id + " matches more than one segment on the loaded track. No other segment is used.";
         // Refuses, before any mutation, a setting the object does not support: a detach, and a reference with a segment that
         // is missing or ambiguous on the loaded track. The native set is accepted as it stands, also with a segment that
         // no longer exists: it is what the object has without this mod.
@@ -104,8 +104,8 @@ namespace RailroaderScenePatcher.Core {
     // an Enabled setting that differs from the object's own is refused before any mutation.
     public sealed class ConstructionSceneryScene : IScene, IRelationshipScene, IVersionedScene, IConstructionSegmentScene {
         public const string Structure = "bridge-construction-scenery-v1", ComponentType = "Game.Mow.TrackConstructionScenery";
-        public const string NoPlacement = "The position of a construction controller has no effect in the game: it switches the bridge's parts wherever it stands. Move the bridge or its parts instead";
-        public const string NoActivity = "The construction's visibility control runs on this controller: disabling it would stop the game from switching the bridge's parts by construction progress. Disable the bridge or its parts instead";
+        public const string NoPlacement = "A construction controller switches the bridge's parts on or off regardless of its own position. Moving it has no effect in the game. Move the bridge or its parts instead.";
+        public const string NoActivity = "This controller switches the bridge's parts on or off as construction progresses. Disabling it would stop the game from doing this. Disable the bridge or its parts instead.";
         readonly IConstructionSceneryWorld world;
         public ConstructionSceneryScene(IConstructionSceneryWorld world, Capability capability = Capability.Unchecked) { this.world = world ?? throw new ArgumentNullException(nameof(world)); Capability = capability; }
         public IEnumerable<string> MapIds => world.MapIds;
@@ -117,12 +117,12 @@ namespace RailroaderScenePatcher.Core {
         public void Preflight(object target) {
             var refusal = world.Refusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
-            if (world.ConstructionSegments(target) == null) throw new InvalidOperationException("The object no longer holds a construction controller");
+            if (world.ConstructionSegments(target) == null) throw new InvalidOperationException("The object no longer holds a construction controller.");
         }
         public void CheckRelationships(object target, ObjectState state) {
-            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
-            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship");
-            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
+            if (state?.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship.");
+            if (state?.Coverage != null) throw new InvalidOperationException("This object has no supported crossing-coverage relationship.");
+            if (state?.Equipment != null) throw new InvalidOperationException("This object has no supported crossing-equipment relationship.");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             // The object's own placement and activity, which a complete desired state carries, change nothing.
             var placement = state?.Placement;

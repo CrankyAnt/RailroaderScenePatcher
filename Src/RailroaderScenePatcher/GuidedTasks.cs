@@ -187,7 +187,7 @@ namespace RailroaderScenePatcher {
                     PlainLabel(builder, "Remove the logical track binding without changing the object's placement or activity.");
                     break;
                 case GuidedTaskKind.MarkerId:
-                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, "An ID that no other scene marker or map object uses and that does not begin with passengerStop: or flare:.", column => false);
+                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, "Enter an ID that no other scene marker or map object uses. It can't begin with passengerStop: or flare:.", column => false);
                     break;
                 default:
                     ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, guidedFields, 0, ChoiceBlock, "Enter the segment ID, end a or b, and distance in meters.", column => column == 2);

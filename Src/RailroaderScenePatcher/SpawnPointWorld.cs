@@ -15,16 +15,16 @@ namespace RailroaderScenePatcher {
         const string SetupType = "Game.Progression.SetupDescriptor", NativeSpawns = "Game.MapSpawns";
         readonly Type spawn;
         internal SpawnPointWorld() {
-            spawn = Native.Type(SpawnPoints.Component) ?? throw new InvalidOperationException("Spawn point type unavailable");
+            spawn = Native.Type(SpawnPoints.Component) ?? throw new InvalidOperationException("The scene spawn point type is unavailable.");
             if (spawn.GetField("priority", Native.Flags) == null) throw new MissingFieldException(SpawnPoints.Component, "priority");
             if (SetupsProblem() is string problem) throw new InvalidOperationException(problem);
         }
         // Why the start setups cannot be read, or null: the setup type and the two fields the Object tab reads.
         internal static string SetupsProblem() {
             var setups = Native.Type(SetupType);
-            if (setups == null) return SetupType + " is unavailable";
+            if (setups == null) return SetupType + " is unavailable.";
             foreach (var field in new[] { "spawnPoint", "identifier" })
-                if (setups.GetField(field, Native.Flags) == null) return SetupType + "." + field + " is missing";
+                if (setups.GetField(field, Native.Flags) == null) return SetupType + "." + field + " is missing.";
             return null;
         }
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
@@ -35,9 +35,9 @@ namespace RailroaderScenePatcher {
         // Why a spawn point cannot be edited now, or null. Shared with the inventory.
         internal static string Problem(GameObject go) {
             var type = Native.Type(SpawnPoints.Component);
-            if (type == null) return "The game's spawn point type is unavailable";
-            if (!Loaded(go)) return "The spawn point's scene is not loaded";
-            if (go.GetComponent(type) == null) return "This object holds no spawn point";
+            if (type == null) return "The game's scene spawn point type is unavailable.";
+            if (!Loaded(go)) return "The scene spawn point's scene isn't loaded.";
+            if (go.GetComponent(type) == null) return "This object has no scene spawn point.";
             return null;
         }
         public ObjectState Observe(object target) {
@@ -52,10 +52,10 @@ namespace RailroaderScenePatcher {
             var rotation = new Quaternion(Checked(placement.Rotation[0]), Checked(placement.Rotation[1]), Checked(placement.Rotation[2]), Checked(placement.Rotation[3]));
             var moves = NativeInventory.MovesWithOrigin(go.transform);
             var scene = NativeInventory.ScenePosition(map, moves);
-            if ((NativeInventory.MapPosition(scene, moves) - map).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
+            if ((NativeInventory.MapPosition(scene, moves) - map).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Converting the position to scene coordinates and back changed the map coordinates.");
             go.transform.SetPositionAndRotation(scene, rotation);
         }
-        static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("Coordinate exceeds native precision"); return f; }
+        static float Checked(double value) { var f = (float)value; if (Single.IsNaN(f) || Single.IsInfinity(f)) throw new InvalidOperationException("A coordinate exceeds the game's numeric precision."); return f; }
         // The binding lines of a spawn point for the inventory: its name, its priority and every start setup the game
         // can use that names it. The game finds setups with FindObjectsByType, so only setups active in the hierarchy
         // count, as for the starter placement markers. A setup without an identifier is named by its object.

@@ -34,7 +34,7 @@ namespace RailroaderScenePatcher.Core {
         public string PadMarkerId { get; internal set; }
         public const string PadMarkerMember = "padMarkerId";
         // Why a scene refuses a target with a pad marker id, when it names no crossbuck at a shared path.
-        public const string PadMarkerNotAccepted = "padMarkerId identifies only a crossbuck at an unprotected crossing whose path other crossbucks share. Remove padMarkerId from this target";
+        public const string PadMarkerNotAccepted = "padMarkerId only identifies a crossbuck at an unprotected crossing when other crossbucks share its path. Remove padMarkerId from this target.";
         // Whether a target object of a scene patch file names this identity's object: the same scene, path, component
         // and pad marker id. The structure is compared by the caller.
         internal static bool SameObject(JObject target, TargetIdentity identity) =>
@@ -219,7 +219,7 @@ namespace RailroaderScenePatcher.Core {
             // The editor's transient default map, loaded before a map is chosen, is no map a player plays: nothing warns for it.
             if (maps.Length != 0 && maps[0] == SceneTargetMapCheck.EditorDefaultMap) return null;
             return "The scene patch file is for map " + mapId + ", which is neither the loaded map " + (maps.Length == 0 ? "unknown" : maps[0]) +
-                " nor one of its layers (" + (maps.Length < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "). Its modifications were not applied";
+                " nor one of its layers (" + (maps.Length < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "). Its modifications weren't applied";
         }
         readonly Dictionary<string, Outcome> failed = new Dictionary<string, Outcome>();
         readonly HashSet<object> unsafeTargets = new HashSet<object>(new ByReference());
@@ -359,7 +359,7 @@ namespace RailroaderScenePatcher.Core {
                     identity.Structure != null && identity.Structure != target.Structure || parsed.State.Marker?.Location == null) return false;
                 // A replacement ID changes the id the native check registers under, so it waits for the world load.
                 if (parsed.Dependencies.Length != 0 || parsed.State.Placement != null || parsed.State.Active != null || parsed.State.MarkerId != null) {
-                    unavailable = "Operation " + id + " requires world-load scheduling for dependencies, placement, activity or a replacement ID";
+                    unavailable = "Operation " + id + " needs world-load scheduling for dependencies, placement, activity or a replacement ID.";
                     return false;
                 }
                 // A prerequisite missing at OnEnable is not yet a failed runtime attempt. The definitive world-load
@@ -384,16 +384,16 @@ namespace RailroaderScenePatcher.Core {
                 var state = parsed.State;
                 if (parsed.Dependencies.Length != 0 || state.Placement?.Following != null || state.Marker != null || state.Coverage != null || state.Equipment != null ||
                     state.Starter != null || state.Segments != null || state.MarkerId != null) {
-                    unavailable = "Operation " + id + " requires world-load scheduling for dependencies, track-following placement or relationships";
+                    unavailable = "Operation " + id + " needs world-load scheduling for dependencies, track-following placement or relationships.";
                     return false;
                 }
                 try {
                     var matches = Matches(identity);
-                    if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target is not yet unique and available");
-                    if (IsUnsafe(matches[0])) throw new InvalidOperationException("Cleanup for this object could not be verified");
+                    if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("The target isn't yet uniquely identified and available.");
+                    if (IsUnsafe(matches[0])) throw new InvalidOperationException("Cleanup for this object couldn't be verified.");
                     scene.Preflight(matches[0]);
                     return true;
-                } catch (Exception e) { unavailable = "Early spawn point placement prerequisites unavailable: " + e.Message; return false; }
+                } catch (Exception e) { unavailable = "A prerequisite for placing spawn points before the new game starts is unavailable: " + e.Message; return false; }
             } catch (InvalidOperationException) { return false; }
         }
         Outcome Execute(string id, SortedDictionary<string,JObject> entries, Dictionary<string,Outcome> outcomes, HashSet<string> visiting, string scenePatchFileKey, IReadOnlyDictionary<string, InspectedTarget> inspectedTargets, bool retryFailures) {
@@ -831,17 +831,17 @@ namespace RailroaderScenePatcher.Core {
         // with its reason: a construction without segments has no meaning.
         static ConstructionSegments ParseSegments(JToken token) {
             var value = token as JObject;
-            if (value == null) throw new InvalidOperationException("Invalid relationship: constructionSegments must be an object with segments, the IDs of the bridge's track segments");
+            if (value == null) throw new InvalidOperationException("Invalid relationship: constructionSegments must be an object whose segments member lists the IDs of the bridge's track segments.");
             if (value["detach"] != null) {
                 if (!Only(value, "detach") || value["detach"].Type != JTokenType.Boolean || !(bool)value["detach"]) throw new InvalidOperationException("Invalid relationship: detach must be true and stand alone");
                 return ConstructionSegments.Detached;
             }
             if (!Only(value, "segments")) throw new InvalidOperationException("Unsupported relationship content");
             var ids = value["segments"] as JArray;
-            if (ids == null || ids.Count == 0) throw new InvalidOperationException("Invalid relationship: segments must list at least one track segment ID");
-            if (ids.Any(id => id.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)id))) throw new InvalidOperationException("Invalid relationship: each construction segment must be a track segment ID");
+            if (ids == null || ids.Count == 0) throw new InvalidOperationException("Invalid relationship: segments must list at least one track segment ID.");
+            if (ids.Any(id => id.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)id))) throw new InvalidOperationException("Invalid relationship: each construction segment must be a track segment ID.");
             var duplicate = ids.Select(id => (string)id).GroupBy(id => id, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1);
-            if (duplicate != null) throw new InvalidOperationException("Invalid relationship: construction segment " + duplicate.Key + " is listed more than once");
+            if (duplicate != null) throw new InvalidOperationException("Invalid relationship: construction segment " + duplicate.Key + " is listed more than once.");
             return ConstructionSegments.Of(ids.Select(id => (string)id));
         }
         // The starter placement of a starter placement marker: setup names the setup whose new-game car placement reads the

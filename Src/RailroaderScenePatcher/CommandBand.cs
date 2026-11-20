@@ -135,7 +135,7 @@ namespace RailroaderScenePatcher {
             starter ? WreckReason(setupsError, readers) : "This object is not a starter placement marker.";
         // The help line under the Start derailed choice in the guided task's Values, in the term of the inspector's
         // Starting cars section.
-        internal const string WreckValuesHelp = "Choose the setting the starting cars have without this mod to remove the mod's value.";
+        internal const string WreckValuesHelp = "To remove this mod's value, choose the setting the starting cars have without this mod.";
         // Why the Start derailed value of the guided task cannot be reviewed: it is the car placement's current setting.
         internal const string SameWreck = "The car placement already has the selected Start derailed setting.";
         // Why Clear activity cannot run for an object this mod sets no activity for, or null.
@@ -316,7 +316,7 @@ namespace RailroaderScenePatcher {
         // what the game uses it for: nothing reads it. The auto engineer's crossing horn reads the crossing's
         // Crossing-type pad marker, which keeps its own family.
         internal const string CrossbuckOperations = "Move, rotate, enable or disable this crossbuck. The crossing pad, the whistle signs and the other crossbuck stay in place.";
-        internal const string CrossbuckUse = "Decorative. The crossbuck marks the crossing for road users, and the game reads nothing from it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place, so moving or disabling the crossbuck changes no game function.";
+        internal const string CrossbuckUse = "Decorative. This crossbuck marks the crossing for road users, and the game doesn't read it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place. Moving or disabling the crossbuck doesn't affect game functions.";
         // The supported edits of a part of a listed baked scenery group.
         internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
         internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
@@ -327,11 +327,11 @@ namespace RailroaderScenePatcher {
         // storage by the ids the game reads, wherever it stands.
         // holdsPiles: the group root or part holds storage piles below it.
         internal static string UseInGame(bool part, string category, string storage, bool holdsPiles) {
-            if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile does not change the storage, and the industry keeps working on its native track spans.";
+            if (storage != null) return "This pile shows the " + storage + ". Moving or disabling the pile doesn't change the storage. The industry keeps working on its native track spans.";
             // Only crossbucks stand under Grade crossing in the family.
             if (!part && category == BakedSceneryCategories.GradeCrossing) return CrossbuckUse;
             if (category != BakedSceneryCategories.IndustryBuilding && category != BakedSceneryCategories.StorageDisplay) return part ? PartDecorative : Decorative;
-            return "Decorative. The industry works on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " does not change loading or unloading." +
+            return "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this " + (part ? "part" : "group") + " doesn't affect loading or unloading." +
                 (holdsPiles ? " Its piles keep showing the industry's storage." : "");
         }
         static object Member(object owner, string name) {
@@ -390,22 +390,22 @@ namespace RailroaderScenePatcher {
                 var key = at < 0 ? null : body.Substring(at + KeySeparator.Length);
                 var (action, thing) = kind == LanternSwitch ? ("click the lantern in the game to switch it on or off", "the lantern")
                     : kind == DoorToggle ? ("click the doors in the game to open or close them", "the doors") : ("click it in the game to switch it", "the toggle");
-                said.Add(kind + ": " + action + ". " + (key == null ? "It has no key, so the game keeps no state for it." : "The game keeps its state by its key " + key + ", not by its position, so the state stays when this " + self + " moves.") +
-                    " While this " + self + " is disabled, " + thing + " cannot be clicked.");
+                said.Add(kind + ": " + action + ". " + (key == null ? "It has no key, so the game doesn't keep its state." : "The game keeps its state by its key " + key + ", independently of its position. Moving this " + self + " preserves that state.") +
+                    " While this " + self + " is disabled, you can't click " + thing + ".");
             }
             foreach (var line in lines.Where(line => line.StartsWith(SavedStatesPrefix, StringComparison.Ordinal))) {
                 var value = line.Substring(SavedStatesPrefix.Length);
                 said.Add(value.StartsWith(SavedIdPrefix, StringComparison.Ordinal)
-                    ? "This " + self + " holds the states of its toggles under the saved ID " + value.Substring(SavedIdPrefix.Length) + ". The game keeps them by this ID, not by position. A game save made while this " + self + " is disabled might not keep them."
-                    : "This " + self + " holds the states of its toggles. It has no saved ID, so the game does not save them.");
+                    ? "This " + self + " stores its toggles' states under the saved ID " + value.Substring(SavedIdPrefix.Length) + ". The game keeps them by this ID, independently of position. Saving the game while this " + self + " is disabled might lose those states."
+                    : "This " + self + " holds its toggles' states. It has no saved ID, so the game doesn't save those states.");
             }
             if (lines.Any(line => line.StartsWith(SavedStatesBelowPrefix, StringComparison.Ordinal)))
-                said.Add("Disabling this " + self + " also disables the object that holds the states of its toggles, so a game save made while this " + self + " is disabled might not keep them.");
+                said.Add("Disabling this " + self + " also disables the object that holds its toggles' states. Saving the game while this " + self + " is disabled might lose those states.");
             foreach (var line in lines.Where(line => line.StartsWith(NameTextPrefix, StringComparison.Ordinal)))
-                said.Add("Name text \"" + line.Substring(NameTextPrefix.Length) + "\": the scene keeps the text with this " + self + ", not by its position, so the text moves with it.");
+                said.Add("The scene stores the name text \"" + line.Substring(NameTextPrefix.Length) + "\" with this " + self + ", independently of its position. The text moves with it.");
             var below = lines.Where(line => line.StartsWith(TogglesBelowPrefix, StringComparison.Ordinal)).Select(line => line.Substring(TogglesBelowPrefix.Length)).FirstOrDefault();
-            if (below == "1") said.Add("Its toggle keeps its state by its key, not by its position, and works at its new place.");
-            else if (below != null) said.Add("Its " + below + " toggles keep their states by their keys, not by their positions, and work at their new place.");
+            if (below == "1") said.Add("Its toggle keeps its state by its key, independently of its position, and works at its new location.");
+            else if (below != null) said.Add("Its " + below + " toggles keep their states by their keys, independently of their positions, and work at their new locations.");
             return said.Count == 0 ? null : String.Join(" ", said);
         }
         // The Use in the game text for an entry of the Baked scenery group family: for a part, its group's entry gives
@@ -467,9 +467,9 @@ namespace RailroaderScenePatcher {
             var interactive = Interactive(part, lines);
             if (interactive != null) return interactive;
             if (lines.Contains(LogPondSelf))
-                return "This log pond shows the " + shown + ". Moving or disabling the log pond does not change the storage, and the industry keeps working on its native track spans.";
+                return "This log pond shows the " + shown + ". Moving or disabling the log pond doesn't change the storage. The industry keeps working on its native track spans.";
             if (lines.Any(line => line.StartsWith(LogPondsBelowPrefix, StringComparison.Ordinal)))
-                return "Decorative. Its log pond shows the " + shown + ". Moving or disabling this " + (part ? "part" : "group") + " does not change the storage, and the industry keeps working on its native track spans.";
+                return "Decorative. Its log pond shows the " + shown + ". Moving or disabling this " + (part ? "part" : "group") + " doesn't change the storage. The industry keeps working on its native track spans.";
             return UseInGame(part, category, lines.Any(line => line.StartsWith(StoragePrefix, StringComparison.Ordinal)) ? storage : null, HoldsPiles(lines));
         }
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery) shows or hides parts of the bridge by
@@ -531,7 +531,7 @@ namespace RailroaderScenePatcher {
         internal static bool OffersConstructionRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(ConstructionProblem);
         internal static bool OffersBindingRepair(IEnumerable<string> problems) => (problems ?? Enumerable.Empty<string>()).Any(problem => problem != null && !ConstructionProblem(problem)
             && (problem.IndexOf("segment", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("binding", StringComparison.OrdinalIgnoreCase) >= 0 || problem.IndexOf("track location", StringComparison.OrdinalIgnoreCase) >= 0));
-        internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments";
+        internal const string ConstructionDependency = "Construction: the game shows or hides parts of this bridge by the construction state of its track segments.";
         // The binding lines of a construction controller's segment ids, checked against the segment ids the track graph
         // holds; known is null when the track graph could not be read. An empty id is a segment that does not exist.
         internal static IReadOnlyList<string> ConstructionBindings(IEnumerable<string> ids, ICollection<string> known) =>
@@ -559,9 +559,9 @@ namespace RailroaderScenePatcher {
             if (block != null) return block;
             var ids = SegmentIds(text);
             if (ids.Count == 0) return "Enter at least one segment ID.";
-            return current != null && new HashSet<string>(ids, StringComparer.Ordinal).SetEquals(current) ? "The field holds the construction's current segments." : null;
+            return current != null && new HashSet<string>(ids, StringComparer.Ordinal).SetEquals(current) ? "The field already lists the construction's current segments." : null;
         }
-        internal const string SegmentDetachReason = "A construction without segments has no meaning. Select the segments of the bridge's track instead.";
+        internal const string SegmentDetachReason = "The construction needs track segments. Select the segments of the bridge's track instead.";
         internal static string ClearSegmentsReason(bool hasValue) => hasValue ? null : "This mod sets no construction segments for this object, so there is nothing to clear.";
         // The Marker ID row of a track marker's Connections tab. Why the replacement ID is unavailable for the
         // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
@@ -574,20 +574,20 @@ namespace RailroaderScenePatcher {
         // What the Detected problems section says when the object has no problem. Beside Repair duplicate ID the holder
         // is inactive, which is never a problem, so the section says so and what the duplicate marker ID still refuses.
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
-            ? "None while this marker is inactive. Until its duplicate marker ID is repaired, activity, binding and track-following edits of it are refused."
+            ? "None while this marker is inactive. The patcher refuses changes to its activity, binding and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
         internal static string MarkerIdUnavailable(bool generic, string underlying, int sharers, bool hasValue) =>
-            !generic ? ReplacementMarkerIds.NotSupported + "."
+            !generic ? ReplacementMarkerIds.NotSupported
             : hasValue ? null
             : underlying == null ? "The marker ID could not be read."
-            : sharers == 0 ? "Marker ID " + underlying + " is held by this marker alone, so it needs no replacement ID." : null;
+            : sharers == 0 ? "Only this marker holds marker ID " + underlying + ", so it doesn't need a replacement ID." : null;
         // Why Set ID is unavailable: the general reason first, then an empty field, a reserved prefix, a space at either end
         // or the marker's current ID.
         internal static string MarkerIdSetReason(string block, string text, string current) {
             if (block != null) return block;
             var problem = ReplacementMarkerIds.Problem(text);
             if (problem != null) return Sentence(problem);
-            return text == current ? "The field holds the marker's current ID." : null;
+            return text == current ? "The field already contains the marker's current ID." : null;
         }
         internal static string ClearMarkerIdReason(bool hasValue) => hasValue ? null : "This mod sets no replacement ID for this marker, so there is nothing to clear.";
         // Why Clear ID is unavailable: the general reason first, then nothing to clear.
@@ -598,21 +598,21 @@ namespace RailroaderScenePatcher {
             current == underlying ? "Also holding " + underlying : "Still holding " + underlying + ", the underlying ID";
         // A construction controller on an object of its own, Ela Bridge Scenery: its construction segments are its only edit.
         internal const string ConstructionSceneryFamily = "Bridge construction scenery";
-        internal const string ConstructionSceneryOperations = "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.";
-        internal const string ControllerNoPlacement = ConstructionSceneryScene.NoPlacement + ".", ControllerNoActivity = ConstructionSceneryScene.NoActivity + ".";
+        internal const string ConstructionSceneryOperations = "Set this controller's construction segments. Its position has no effect in the game. It stays enabled because it controls which parts of the bridge the game shows.";
+        internal const string ControllerNoPlacement = ConstructionSceneryScene.NoPlacement, ControllerNoActivity = ConstructionSceneryScene.NoActivity;
         // The amber warning for an object that an explicit disable holds off against its construction controller, on the
         // Object tab and in the footer's message area.
         internal const string ConstructionHoldWarning = GameSwitchActivity.ConstructionHoldWarning;
         // The Enabled readout of an object that no explicit disable holds off while progression or a map feature
         // switches it off now.
-        internal const string SwitchedOffByGame = "Yes; the game switches it off now";
+        internal const string SwitchedOffByGame = "Yes, but currently switched off by the game";
         // Names in running text: "a", "a and b", "a, b and c".
         static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
         // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise
         // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height keeps
         // the object in place.
         const string GroupRootHolds = "the root of this group holds the scene ground mask";
-        const string GroundMaskPrefix = "Ground mask: ", HeightUnconfirmed = "cannot be moved, because it is not confirmed that the game restores the height after a move";
+        const string GroundMaskPrefix = "Ground mask: ", HeightUnconfirmed = "can't be moved because it's not confirmed that the game restores the height after a move.";
         // parts: the holders are parts of the object's family; below a marker object they are plain objects.
         // group: the object that holds the mask itself is a group root, as a road bridge is, not a part.
         internal static string GroundMaskDependency(bool self, IEnumerable<string> holders, bool flattens, bool parts = true, bool group = false) {
@@ -622,7 +622,7 @@ namespace RailroaderScenePatcher {
             var who = self ? (group ? GroupRootHolds : "this part holds the scene ground mask") : several ? "the " + kind + "s " + Listing(names) + " hold scene ground masks" : "the " + kind + " " + names.FirstOrDefault() + " holds the scene ground mask";
             if (flattens) return GroundMaskPrefix + who + (several ? ", and one or more also flatten the terrain height. " : ", which also flattens the terrain height. ") + (!self ? "This object " : group ? "The group " : "It ") + HeightUnconfirmed;
             return GroundMaskPrefix + who + ". Moving " + (!self ? "this object moves " + (several ? "those " + kind + "s" : "that " + kind) + " and the terrain shaping with " + (several ? "them" : "it") : group ? "the group moves the terrain shaping" : "it moves the terrain shaping") +
-                ", and the patcher asks the game to regenerate terrain and vegetation at the old and the new place";
+                ". The patcher asks the game to regenerate terrain and vegetation at the old and new positions.";
         }
         // Whether the Placement tab shows Numeric whatever mode was open: a pad, an object that cannot be edited, a
         // construction controller, and an object whose every move is refused have no use for the other modes.
@@ -653,7 +653,7 @@ namespace RailroaderScenePatcher {
         internal static string PlacementBlock(string edit, string pad, string controller, string moveBlock) => edit ?? pad ?? controller ?? moveBlock;
         // Why every move of the object is refused, or null: its dependency line names a mask that flattens the terrain
         // height. The placement modes and fields are then unavailable with this reason.
-        internal const string FlatteningMoveBlock = "A ground mask of this object flattens the terrain height, and it is not confirmed that the game restores the height after a move.";
+        internal const string FlatteningMoveBlock = "This object has a ground mask that flattens the terrain height. It's not confirmed that the game restores the height after a move.";
         internal static string GroundMaskMoveBlock(IEnumerable<string> dependencies) =>
             dependencies?.Any(line => line != null && line.StartsWith(GroundMaskPrefix, StringComparison.Ordinal) && line.EndsWith(HeightUnconfirmed, StringComparison.Ordinal)) == true ? FlatteningMoveBlock : null;
         // Whether the object has terrain output of a scene ground mask, by its dependency line.
@@ -661,8 +661,8 @@ namespace RailroaderScenePatcher {
         // The dependency a lake surface's inspection names: what moves with it, what stays native, and whether its water
         // is part of a static batch, which the game would keep drawing at its old place.
         internal static string LakeSurfaceDependency(bool batched) => batched
-            ? "Lake surface: the water surface is part of a static batch, so it cannot be moved. Native lake masks and rivers shape and color the terrain and stay with the native map editor"
-            : "Lake surface: the water surface moves with this object. Native lake masks and rivers shape and color the terrain and stay with the native map editor";
+            ? "Lake surface: the water surface is part of a static batch, so it can't be moved. Native lake masks and rivers shape and color the terrain. Edit them in the native map editor."
+            : "Lake surface: the water surface moves with this object. Native lake masks and rivers shape and color the terrain. Edit them in the native map editor.";
         // The storage a pile shows: the industry's load storage by the names the game shows, the load in lower case
         // inside the sentence unless it is an acronym, or by the ids its storage synchronizer reads when the industry
         // or load is not known.
@@ -774,9 +774,9 @@ namespace RailroaderScenePatcher {
             : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
             : railBridge && mode == FollowMode ? RailBridgeNoFollow : roadBridge && mode == FollowMode ? RoadBridgeNoFollow : null;
         // A road bridge construction does not follow track: move the road natively, then the bridge onto it.
-        internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RoadBridgeNoFollowing + ". Move the road in the native map editor, then move the bridge onto it.";
+        internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RoadBridgeNoFollowing + " Move the road in the native map editor, then move the bridge onto it.";
         // A rail bridge construction does not follow its track: move the track natively, then the construction onto it.
-        internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + ". Move the track in the native map editor, then move the bridge onto it.";
+        internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + " Move the track in the native map editor, then move the bridge onto it.";
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
         internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";
         // Why the rotation of an existing crossing bell cannot be set, or null for any other object: the bell is a

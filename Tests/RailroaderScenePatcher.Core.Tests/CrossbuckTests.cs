@@ -278,8 +278,8 @@ static class CrossbuckTests {
     // The Object tab names what the game uses a crossbuck for and its supported edits; the outliner lists the crossbucks
     // under Grade crossing and names the crossing, with its pad marker id where crossings share one path.
     static void ObjectTabAndOutliner() {
-        Check(CommandBand.UseInGame(false, BakedSceneryCategories.GradeCrossing, null, false) == CommandBand.CrossbuckUse && CommandBand.CrossbuckUse.Contains("game reads nothing")
-            && CommandBand.CrossbuckUse.Contains("moving or disabling the crossbuck changes no game function"), "the Object tab names the crossbuck's use and that moving or disabling it changes no game function");
+        Check(CommandBand.UseInGame(false, BakedSceneryCategories.GradeCrossing, null, false) == CommandBand.CrossbuckUse && CommandBand.CrossbuckUse.Contains("the game doesn't read it")
+            && CommandBand.CrossbuckUse.Contains("Moving or disabling the crossbuck doesn't affect game functions"), "the Object tab names the crossbuck's use and that moving or disabling it changes no game function");
         Check(CommandBand.CrossbuckOperations.StartsWith("Move, rotate, enable or disable this crossbuck.", StringComparison.Ordinal), "the supported edits name the crossbuck");
         Check(InventoryPresentationState.GroupWhere(OldRiver + "/Sign-Crossing0 (1)") == "Roads Bryson / Old River Rd / Crossing Unprotected"
             && InventoryPresentationState.GroupWhere(Own + "/Sign-Crossing0 (1)") == "Roads Bryson / Crossing Unprotected (1)", "a crossbuck row's location is its raw path");

@@ -19,28 +19,28 @@ namespace RailroaderScenePatcher {
         static readonly FieldInfo registry = builder?.GetField("_mapIcons", Native.Flags);
         static readonly PropertyInfo shared = builder?.GetProperty("Shared", Native.Flags);
         internal MapIconWorld() {
-            if (icon == null || builder == null) throw new InvalidOperationException("Map icon types unavailable");
+            if (icon == null || builder == null) throw new InvalidOperationException("The map icon types are unavailable.");
             if (registry == null || !typeof(IEnumerable).IsAssignableFrom(registry.FieldType) || shared == null) throw new MissingMemberException(MapBuilderType, "_mapIcons or Shared");
-            if (Native.Type("Helpers.WorldTransformer") == null) throw new InvalidOperationException("Floating origin unavailable");
+            if (Native.Type("Helpers.WorldTransformer") == null) throw new InvalidOperationException("The floating origin is unavailable.");
         }
         public IEnumerable<string> MapIds => ModScenePatchFiles.MapIds();
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
-        static GameObject Icon(object target) => target as GameObject ?? throw new InvalidOperationException("The station map icon no longer exists");
+        static GameObject Icon(object target) => target as GameObject ?? throw new InvalidOperationException("The station map icon no longer exists.");
         public IReadOnlyList<object> Find(string scene, string path) =>
             BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && g.GetComponent(icon) != null).Cast<object>().ToArray();
         public string Refusal(object target) => Problem(target as GameObject);
         // Why a station map icon cannot be edited, or null. Shared with the inventory.
         internal static string Problem(GameObject go) {
-            if (!Loaded(go)) return "The station map icon's scene is not loaded";
-            if (icon == null || go.GetComponent(icon) == null || !StationMapIconRules.Listed(BoardScene.PathOf(go.transform))) return "This object is not a station map icon";
+            if (!Loaded(go)) return "The station map icon's scene isn't loaded.";
+            if (icon == null || go.GetComponent(icon) == null || !StationMapIconRules.Listed(BoardScene.PathOf(go.transform))) return "This object isn't a station map icon.";
             var components = go.GetComponentsInChildren<Component>(true);
-            if (components.Any(c => c == null)) return "Missing script in the station map icon";
-            if (components.Any(c => c is Rigidbody)) return "The station map icon holds a rigidbody; only static colliders are supported";
+            if (components.Any(c => c == null)) return "The station map icon has a missing script.";
+            if (components.Any(c => c is Rigidbody)) return "The station map icon has a rigidbody. Only static colliders are supported.";
             // A culler holds a sphere at the place it registered; this capability does not move such a sphere, so a moved
             // icon could be hidden where it stands. Only the icon's own hierarchy counts: an icon without a culler stays
             // editable when another icon carries one.
             var culler = components.FirstOrDefault(c => { var n = c.GetType().FullName ?? ""; return n.StartsWith("Helpers.Culling.", StringComparison.Ordinal) || n == GroupWorld.SimpleCullerType; });
-            if (culler != null) return "The station map icon holds a culler (" + culler.GetType().FullName + ") that the patcher cannot move with it";
+            if (culler != null) return "The station map icon has a culler of type " + culler.GetType().FullName + ". The patcher can't move that culler with it.";
             return null;
         }
         public MapIconObservation Observe(object target) {
@@ -64,7 +64,7 @@ namespace RailroaderScenePatcher {
             var rotation = new Quaternion(Checked(placement.Rotation[0]), Checked(placement.Rotation[1]), Checked(placement.Rotation[2]), Checked(placement.Rotation[3]));
             var moves = NativeInventory.MovesWithOrigin(go.transform);
             var scene = NativeInventory.ScenePosition(map, moves);
-            if ((NativeInventory.MapPosition(scene, moves) - map).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Map/origin conversion failed its round trip");
+            if ((NativeInventory.MapPosition(scene, moves) - map).sqrMagnitude > 0.0001f) throw new InvalidOperationException("Converting the position to scene coordinates and back changed the map coordinates.");
             go.transform.SetPositionAndRotation(scene, rotation);
             // The icon's click collider is read by the map's raycasts; synchronise so they find it at its new place.
             Physics.SyncTransforms();
@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher {
         // A disable of an icon that progression or a map feature switches is refused while it cannot hold against them.
         public string DisableRefusal(object target) => GroupWorld.DisableProblem(target as GameObject);
         static float Checked(double value) {
-            if (Double.IsNaN(value) || Double.IsInfinity(value) || Math.Abs(value) > Single.MaxValue) throw new InvalidOperationException("Coordinate exceeds native precision");
+            if (Double.IsNaN(value) || Double.IsInfinity(value) || Math.Abs(value) > Single.MaxValue) throw new InvalidOperationException("A coordinate exceeds the game's numeric precision.");
             return (float)value;
         }
     }

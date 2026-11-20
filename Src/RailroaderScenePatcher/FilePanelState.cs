@@ -63,7 +63,7 @@ namespace RailroaderScenePatcher {
                 (result.Outcomes ?? new Dictionary<string, Outcome>()).Where(o => !o.Value.Applied).Select(o => new KeyValuePair<string, (FailureKind, string)>(o.Key, (o.Value.Failure, o.Value.Error))).ToArray());
         internal static string FileVersionApplied(string fileError, int applied, IReadOnlyList<KeyValuePair<string, (FailureKind Kind, string Reason)>> failed) {
             string Plain(string text) => (text ?? "").Trim().TrimEnd('.').TrimEnd();
-            if (fileError != null) return "File version applied. Its modifications are not applied: " + Plain(fileError) + ".";
+            if (fileError != null) return "File version applied. Its modifications weren't applied: " + Plain(fileError) + ".";
             if (failed == null || failed.Count == 0) return "File version applied.";
             string Count(int n) => n == 0 ? "No modifications" : n == 1 ? "1 modification" : n + " modifications";
             string Lower(string label) => Char.ToLowerInvariant(label[0]) + label.Substring(1);

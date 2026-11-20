@@ -714,7 +714,7 @@ static class PatchEditingTests {
         own.Session.Edit(P, PlacementAt(112), null); own.MapEditor.Save();
         own.Session.Edit(P, PlacementAt(130), null);
         own.Scene.FailApply = true; own.MapEditor.Undo(); own.Scene.FailApply = false;
-        Assert(own.Session.IncompleteOperation.Contains("could not be reversed") && (double)own.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "A patcher edit that cannot be reversed keeps its scene patch file state and reports the incomplete operation");
+        Assert(own.Session.IncompleteOperation.Contains("couldn't be reversed") && (double)own.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "A patcher edit that cannot be reversed keeps its scene patch file state and reports the incomplete operation");
         Assert(own.MapEditor.CanRedo && own.MapEditor.UndoGroups.Count == 1, "The failure leaves the native history grouping intact");
         own.MapEditor.Redo();
         Assert((double)own.ScenePatchFile["modifications"].First.First["placement"]["position"][0] == 130 && own.MapEditor.IsDirty, "History execution after the failure stays consistent with the scene patch file");

@@ -25,8 +25,8 @@ namespace RailroaderScenePatcher.Core {
     // moved spawn point is used at its new place.
     public static class SpawnPoints {
         public const string Family = "Spawn point", Component = "Character.SpawnPoint", Structure = "spawn-point-v1", RequiredVersion = "0.5.0";
-        public const string Operations = "Move, rotate, enable or disable this spawn point. Native spawns in the map data stay with the Map Editor's Spawns category.";
-        public const string Dependency = "Player start, rescue and teleport read this spawn point's placement when they run; only an active spawn point is offered, and a start setup reads it whatever its activity";
+        public const string Operations = "Move, rotate, enable or disable this spawn point. Edit native spawns in the map data under Spawns in the Map Editor.";
+        public const string Dependency = "Player start, rescue and teleport read this spawn point's placement when they run. Only active spawn points are offered. A start setup reads it even when it's disabled.";
         // The family of a component below a scene root of this name, or null: every scene spawn point that the inventory
         // can list at all, wherever it stands.
         public static string FamilyOf(string componentType, string sceneRoot) =>
@@ -57,21 +57,21 @@ namespace RailroaderScenePatcher.Core {
             var priority = After(lines, PriorityPrefix).FirstOrDefault();
             var uses = new List<string>();
             var choice = "the active spawn point with the highest priority" + (priority == null ? "" : " (this one: " + priority + ")")
-                + (samePriority > 0 ? "; " + Count(samePriority, "other active spawn point") + " share this priority, and the choice among them is not fixed" : "");
+                + (samePriority > 0 ? ". This spawn point shares its priority with " + Count(samePriority, "other active spawn point") + ", and the choice among them isn't fixed" : "");
             var fallback = active ? "a new game without a start setup is expected to start at " + choice + "."
-                : "a new game without a start setup is expected to start at the active spawn point with the highest priority; this spawn point is disabled, so it is passed by.";
-            uses.Add(nativeSpawns == null ? "New game: the map's native spawns could not be read. Without native spawns, " + fallback
+                : "a new game without a start setup is expected to start at the active spawn point with the highest priority. This spawn point is disabled, so the game is expected to skip it.";
+            uses.Add(nativeSpawns == null ? "New game: the map's native spawns couldn't be read. Without native spawns, " + fallback
                 : nativeSpawns == 0 ? "New game: the map declares no native spawns, so " + fallback
-                : "New game: the map declares " + Count(nativeSpawns.Value, "native spawn") + ", so a new game without a start setup is expected to start there. The Map Editor edits them under Spawns.");
+                : "New game: the map declares " + Count(nativeSpawns.Value, "native spawn") + ", so a new game without a start setup is expected to start there. Edit these under Spawns in the Map Editor.");
             uses.Add(active ? "Rescue: a stuck player is expected to be moved to the closest active spawn point."
-                : "Rescue: a stuck player is expected to be moved to the closest active spawn point; this spawn point is disabled, so it is passed by.");
-            uses.Add(active ? "Teleport: the /tp console command is expected to offer this spawn point as " + name + " and jump to where it stands. Quick search lists active spawn points too, in a game version that opens it; Railroader 0.6.3 doesn't open quick search."
-                : "Teleport: the /tp console command offers only active spawn points; this spawn point is disabled, so it's expected not to offer it.");
+                : "Rescue: a stuck player is expected to be moved to the closest active spawn point. This spawn point is disabled, so the game is expected to skip it.");
+            uses.Add(active ? "Teleport: the /tp console command is expected to list this spawn point as " + name + " and teleport you to its position. Quick search also lists active spawn points in game versions that open it. Railroader 0.6.3 doesn't open quick search."
+                : "Teleport: the /tp console command lists only active spawn points. This spawn point is disabled, so the command isn't expected to list it.");
             var unread = After(lines, SetupsUnreadPrefix).FirstOrDefault();
             var setups = After(lines, SetupPrefix).ToArray();
-            uses.Add(unread != null ? "Start setup: the start setups could not be read: " + unread + "."
+            uses.Add(unread != null ? "Start setup: the start setups couldn't be read. Reason: " + unread + "."
                 : setups.Length == 0 ? "No start setup names this spawn point."
-                : "Start setup: a new company game of " + String.Join(", ", setups) + " is expected to start here when the setup is applied to a company with no cars and no balance yet, also while this spawn point is disabled.");
+                : "Start setup: a new company game using " + String.Join(", ", setups) + " is expected to start here when the setup is applied to a company that has no cars and no balance yet. This also applies when this spawn point is disabled.");
             return uses;
         }
     }
@@ -101,12 +101,12 @@ namespace RailroaderScenePatcher.Core {
         public void Preflight(object target) {
             var refusal = world.Refusal(target);
             if (refusal != null) throw new InvalidOperationException(refusal);
-            if (!GroupChecks.Finite(world.Observe(target).Placement)) throw new InvalidOperationException("The spawn point's map coordinates are unavailable");
+            if (!GroupChecks.Finite(world.Observe(target).Placement)) throw new InvalidOperationException("The spawn point's map coordinates are unavailable.");
         }
         public void CheckRelationships(object target, ObjectState state) {
-            if (state?.Marker != null) throw new InvalidOperationException("Spawn points do not support track-marker relationships");
-            if (state?.Coverage != null) throw new InvalidOperationException("Spawn points do not support crossing-coverage relationships");
-            if (state?.Equipment != null) throw new InvalidOperationException("Spawn points do not support crossing-equipment relationships");
+            if (state?.Marker != null) throw new InvalidOperationException("Spawn points do not support track-marker relationships.");
+            if (state?.Coverage != null) throw new InvalidOperationException("Spawn points do not support crossing-coverage relationships.");
+            if (state?.Equipment != null) throw new InvalidOperationException("Spawn points do not support crossing-equipment relationships.");
             if (state?.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
         }
         public object Capture(object target) => world.Observe(target);
@@ -117,7 +117,7 @@ namespace RailroaderScenePatcher.Core {
             var active = state.Active ?? before.Active ?? true;
             Write(target, state.Placement, active, before.Active);
             var after = world.Observe(target);
-            if (!GroupChecks.SamePlacement(after.Placement, state.Placement ?? before.Placement) || after.Active != active) throw new InvalidOperationException("Applied spawn point placement or activity did not verify");
+            if (!GroupChecks.SamePlacement(after.Placement, state.Placement ?? before.Placement) || after.Active != active) throw new InvalidOperationException("Applied spawn point placement or activity did not verify.");
         }
         void Write(object target, Placement placement, bool active, bool? was) {
             if (active && was != true) world.SetActive(target, true);

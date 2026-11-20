@@ -262,10 +262,10 @@ static class GroundMaskTests {
     static void PlacementModesAreUnavailableForAFlatteningMask() {
         var flat = new[] { "Culling", CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }; var free = new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) };
         var reason = CommandBand.GroundMaskMoveBlock(flat);
-        Assert(reason == "A ground mask of this object flattens the terrain height, and it is not confirmed that the game restores the height after a move.", "The reason: " + reason);
+        Assert(reason == "This object has a ground mask that flattens the terrain height. It's not confirmed that the game restores the height after a move.", "The reason: " + reason);
         Assert(CommandBand.GroundMaskMoveBlock(free) == null && CommandBand.GroundMaskMoveBlock(new[] { "Culling" }) == null && CommandBand.GroundMaskMoveBlock(null) == null, "Only a flattening mask blocks a move");
         foreach (var mode in new[] { CommandBand.GizmoMode, CommandBand.SnapMode, CommandBand.FollowMode })
-            Assert(CommandBand.ModeBlock(mode, false, true, CommandBand.GroupOperations, moveBlock: reason) == reason && CommandBand.Tooltip("Drag", CommandBand.ModeBlock(mode, false, true, CommandBand.GroupOperations, moveBlock: reason)).StartsWith("Unavailable: A ground mask", StringComparison.Ordinal),
+            Assert(CommandBand.ModeBlock(mode, false, true, CommandBand.GroupOperations, moveBlock: reason) == reason && CommandBand.Tooltip("Drag", CommandBand.ModeBlock(mode, false, true, CommandBand.GroupOperations, moveBlock: reason)).StartsWith("Unavailable: This object has a ground mask", StringComparison.Ordinal),
                 "Mode " + mode + " is unavailable with the reason");
         Assert(CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.GroupOperations, moveBlock: reason) == null, "Numeric stays open and shows the placement");
         Assert(CommandBand.ModeBlock(CommandBand.GizmoMode, false, true, CommandBand.GroupOperations) == null, "An object without the block keeps its modes");
@@ -343,7 +343,7 @@ static class GroundMaskTests {
     // before any mutation, with the reason. Enabling and disabling stay possible.
     static void FlatteningMaskRefusesAMove() {
         var reason = GroundMasks.FlatteningRefusal("Mask");
-        Assert(reason == "The ground mask on Mask flattens the terrain height. It is not confirmed that the game restores the height after a move, so this object cannot be moved", "The refusal names the holder and why: " + reason);
+        Assert(reason == "The ground mask on Mask flattens the terrain height. It's not confirmed that the game restores the height after a move, so this object can't be moved.", "The refusal names the holder and why: " + reason);
         var f = new Stop(flattens: true); var rebuilds = f.Terrain.Rebuilds;
         var outcome = f.Engine.Apply(Doc(GroupMod("move-station", Far))).Outcomes["move-station"];
         Assert(!outcome.Applied && outcome.Failure == FailureKind.Refused && outcome.Error.Contains("flattens the terrain height") && f.World.Mutations == 0 && f.Terrain.Rebuilds == rebuilds && f.RegisteredOnceAt(Authored, 30),
@@ -518,13 +518,13 @@ static class GroundMaskTests {
     // The Object tab names the part that holds the ground mask and says that moving it moves the terrain shaping; the
     // group root and a part above the mask name the part that holds it. The Changes tab shows terrain output for them.
     static void ObjectTabNamesTheMaskHolder() {
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part holds the scene ground mask. Moving it moves the terrain shaping, and the patcher asks the game to regenerate terrain and vegetation at the old and the new place",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) == "Ground mask: this part holds the scene ground mask. Moving it moves the terrain shaping. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
             "The holder's line: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) == "Ground mask: the part Mask holds the scene ground mask. Moving this object moves that part and the terrain shaping with it, and the patcher asks the game to regenerate terrain and vegetation at the old and the new place",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) == "Ground mask: the part Mask holds the scene ground mask. Moving this object moves that part and the terrain shaping with it. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
             "The line of an object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false));
-        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) == "Ground mask: this part holds the scene ground mask, which also flattens the terrain height. It cannot be moved, because it is not confirmed that the game restores the height after a move",
+        Assert(CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) == "Ground mask: this part holds the scene ground mask, which also flattens the terrain height. It can't be moved because it's not confirmed that the game restores the height after a move.",
             "The holder of a flattening mask: " + CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true));
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) == "Ground mask: the part Mask holds the scene ground mask, which also flattens the terrain height. This object cannot be moved, because it is not confirmed that the game restores the height after a move",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) == "Ground mask: the part Mask holds the scene ground mask, which also flattens the terrain height. This object can't be moved because it's not confirmed that the game restores the height after a move.",
             "An object above a flattening mask: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true));
         Assert(CommandBand.HoldsGroundMask(new[] { "Culling", CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) }) && !CommandBand.HoldsGroundMask(new[] { "Culling" }) && !CommandBand.HoldsGroundMask(null),
             "Whether an object has terrain output travels as its dependency line");
@@ -541,7 +541,7 @@ static class GroundMaskTests {
         Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }) == "The building is decorative. Its ground mask shapes the ground and the vegetation where it stands, so disabling this group changes the terrain there.",
             "The use of a group above a flattening mask names no move");
         // Below a marker object the holder is no part of a family: the line calls it an object.
-        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask, which also flattens the terrain height. This object cannot be moved, because it is not confirmed that the game restores the height after a move",
+        Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask, which also flattens the terrain height. This object can't be moved because it's not confirmed that the game restores the height after a move.",
             "The line of a marker object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false));
         // Only the marker object of a station building gains the mask handling in the Track marker family.
         Assert(BakedSceneryRules.MaskedMarker("World/Large Scenery/Hemingway/Hemingway flagstopstation") && !BakedSceneryRules.MaskedMarker("World/Signs/Loc: Sylva Int") && !BakedSceneryRules.MaskedMarker(null),

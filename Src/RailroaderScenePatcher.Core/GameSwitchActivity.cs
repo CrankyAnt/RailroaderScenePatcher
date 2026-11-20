@@ -189,10 +189,10 @@ namespace RailroaderScenePatcher.Core {
 
         // The amber warning for an object an explicit disable holds off against the switches named, on the Object tab and
         // in the footer's message area; null for None. A construction controller keeps the warning of its own.
-        public const string ConstructionHoldWarning = "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.";
-        public const string ProgressionHoldWarning = "This object stays off in the game although the game's progression switches it on: your disable holds against it. Click Enable or Clear activity to let progression switch it again.";
-        public const string MapFeatureHoldWarning = "This object stays off in the game although unlocking a map feature switches it on: your disable holds against it. Click Enable or Clear activity to let the map feature switch it again.";
-        public const string ProgressionOrMapFeatureHoldWarning = "This object stays off in the game although progression or a map feature switches it on: your disable holds against it. Click Enable or Clear activity to let them switch it again.";
+        public const string ConstructionHoldWarning = "Your explicit disable keeps this object off in the game even when track construction progress switches it on. Click Enable or Clear activity to let construction progress control it again.";
+        public const string ProgressionHoldWarning = "Your explicit disable keeps this object off in the game even when progression switches it on. Click Enable or Clear activity to let progression control it again.";
+        public const string MapFeatureHoldWarning = "Your explicit disable keeps this object off in the game even when unlocking a map feature switches it on. Click Enable or Clear activity to let the map feature control it again.";
+        public const string ProgressionOrMapFeatureHoldWarning = "Your explicit disable keeps this object off in the game even when progression or a map feature switches it on. Click Enable or Clear activity to let them control it again.";
         // clearOnly: Enable is refused for the object, as for a track-group follower, so the warning names Clear activity
         // alone.
         public static string HoldWarning(GameSwitch held, bool clearOnly = false) {
@@ -205,8 +205,8 @@ namespace RailroaderScenePatcher.Core {
             return text != null && clearOnly ? text.Replace("Click Enable or Clear activity", "Click Clear activity") : text;
         }
         // Why an explicit disable of an object that progression or a map feature sets cannot hold, for IDisableRefusal.
-        public const string UnsharedRefusal = "The patcher cannot share this object's activity with the game's progression or map feature in this load, so a disable would not hold. This object cannot be disabled";
-        public const string ProgressionMembersRefusal = "The game's progression controller members are unavailable, so a disable of this object would not hold against progression. This object cannot be disabled";
-        public const string MapFeatureMembersRefusal = "The game's map feature members are unavailable, so a disable of this object would not hold against its map feature. This object cannot be disabled";
+        public const string UnsharedRefusal = "The patcher can't share control of this object's activity with the game's progression or map feature during this load. Disabling it wouldn't keep it off, so it can't be disabled.";
+        public const string ProgressionMembersRefusal = "The required members of the game's progression controller are unavailable. Disabling this object wouldn't keep it off against progression, so it can't be disabled.";
+        public const string MapFeatureMembersRefusal = "The required members of the game's map feature are unavailable. Disabling this object wouldn't keep it off against its map feature, so it can't be disabled.";
     }
 }

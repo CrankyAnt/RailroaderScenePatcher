@@ -644,7 +644,7 @@ namespace RailroaderScenePatcher.Core {
                 // without the replacement ID they need.
                 var clearing = id == null || (existing?[ReplacementMarkerIds.Member] != null && id == engine.Underlying(engine.ResolveUnique(target))?.MarkerId);
                 if (clearing) {
-                    if (existing?[ReplacementMarkerIds.Member] == null) throw new InvalidOperationException("This mod sets no replacement ID for this marker, so there is nothing to clear");
+                    if (existing?[ReplacementMarkerIds.Member] == null) throw new InvalidOperationException("This mod doesn't set a replacement ID for this marker, so there's nothing to clear.");
                     var rest = (JObject)existing.DeepClone();
                     rest.Remove(ReplacementMarkerIds.Member);
                     // Another holder's modification that needs this ID names this one in dependsOn. A modification that
@@ -703,7 +703,7 @@ namespace RailroaderScenePatcher.Core {
                 var value = existing == null ? new JObject { ["target"] = TargetJson(target) } : (JObject)existing.DeepClone();
                 var relationships = value["relationships"] as JObject;
                 if (ids == null && !detach) {
-                    if (relationships?["constructionSegments"] == null) throw new InvalidOperationException("This object has no construction segments set by this mod in the active scene patch file");
+                    if (relationships?["constructionSegments"] == null) throw new InvalidOperationException("This mod doesn't set construction segments for this object in the active scene patch file.");
                     relationships.Remove("constructionSegments");
                     if (!relationships.HasValues) value.Remove("relationships");
                     return Empty(value) ? null : value;
@@ -889,7 +889,7 @@ namespace RailroaderScenePatcher.Core {
             if (refused.Count == 0) whole = ModificationRefusal(existing, resolved);
             var stopped = refused.Count == 0 ? whole
                 : (refused.Count == 1 ? "addition " + refused[0] + " is" : "additions " + String.Join(", ", refused.Take(refused.Count - 1)) + " and " + refused[refused.Count - 1] + " are")
-                    + " refused, so no addition of this crossing is built";
+                    + " refused, so none of this crossing's additions are built";
             var entries = new List<EquipmentEntry>();
             foreach (var addition in modEquipment.Additions) {
                 var built = observed?.Find(addition.Key);
@@ -932,7 +932,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again.");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
@@ -944,7 +944,7 @@ namespace RailroaderScenePatcher.Core {
                     catch (InvalidOperationException e) when (existing != null && NotAppliedOf(key) != null) {
                         // A removal or correction in a modification that is not applied, which another addition keeps
                         // refused: only the scene patch file changes, and the scene keeps what it holds.
-                        var stays = " Nothing is built, because the modification stays refused: " + ScenePatchFile.Sentence(e.Message) + ".";
+                        var stays = " Nothing is built because the modification is still refused. Reason: " + ScenePatchFile.Sentence(e.Message) + ".";
                         var introduced = addition == null ? null : IntroducedRefusal(resolved, value, addition.Id);
                         if (introduced != null) throw new InvalidOperationException(introduced);
                         if (addition != null) return new EquipmentPreview(new[] { "Save " + CrossingEquipment.Named(addition, displayName) + " in the scene patch file." + stays }, null);
@@ -1323,12 +1323,12 @@ namespace RailroaderScenePatcher.Core {
                 } else {
                     value = current;
                     uncertain = true;
-                    IncompleteOperation = name + " could not be reversed or reapplied: " + ScenePatchFile.Sentence(withdrawal) + ". The scene patch file keeps the state shown; Save remains available.";
+                    IncompleteOperation = name + " couldn't be reversed or reapplied: " + ScenePatchFile.Sentence(withdrawal) + ". The scene patch file keeps the state shown. Save is still available.";
                 }
             } catch (Exception e) {
                 value = current;
                 uncertain = true;
-                IncompleteOperation = name + " could not be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown; Save remains available.";
+                IncompleteOperation = name + " couldn't be reversed or reapplied: " + e.Message + ". The scene patch file keeps the state shown. Save is still available.";
             }
             RegisterPatchAction(() => Replay(name, slot, target, current, generation, keyGeneration, equipmentStep && currentRefused, equipmentStep), name);
         }

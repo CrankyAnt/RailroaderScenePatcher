@@ -64,17 +64,17 @@ namespace RailroaderScenePatcher {
             var current = CurrentMarkerId();
             Section(builder, "Marker ID");
             ValueRow(builder, "Replacement ID", null, new[] { "ID" }, markerIdFields, 0, block,
-                "The ID the game registers this marker's track location under. A replacement ID repairs a duplicate marker ID: it must not be empty, have a space at either end, begin with passengerStop: or flare:, or match another scene marker or map object. Lua scripts and other mods that look up a marker by ID are not checked.", column => false, freeText: true);
+                "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. Enter a unique ID that no other scene marker or map object uses. It can't be empty, have a space at either end, or begin with passengerStop: or flare:. The patcher doesn't check Lua scripts or other mods that look up markers by ID.", column => false, freeText: true);
             builder.HStack(row => {
                 var set = Button(row, CommandBand.SetMarkerId, ApplyMarkerId);
                 Func<string> setReason = () => CommandBand.MarkerIdSetReason(block, markerIdFields[0], current);
                 set.Inactive(setReason() != null);
                 var provider = set.RectTransform.GetComponent<UI.Tooltips.UITooltipProvider>() ?? set.RectTransform.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
-                provider.DynamicTooltipInfo = () => new TooltipInfo("Set marker ID", CommandBand.Tooltip("Give this marker the ID in the field. Its registration moves to the new ID; every other holder of the old ID keeps its registration.", setReason()));
+                provider.DynamicTooltipInfo = () => new TooltipInfo("Set marker ID", CommandBand.Tooltip("Give this marker the ID in the field. Its registration moves to the new ID. Every other holder of the old ID keeps its registration.", setReason()));
                 typed.Add(() => { if (set.RectTransform != null) set.Inactive(setReason() != null); });
                 var clear = CommandBand.ClearMarkerIdReason(IsStarter ? StarterBlock() : EditBlock(), HasMarkerIdValue(identity));
                 Button(row, CommandBand.ClearMarkerId, () => Edit(MarkerIdPlace, "Clearing the marker ID value", (edit, inspection) => edit.SetMarkerId(identity, null, inspection)))
-                    .Inactive(clear != null).Tooltip("Clear marker ID", CommandBand.Tooltip("Clear this mod's replacement ID; the marker returns to its underlying ID.", clear));
+                    .Inactive(clear != null).Tooltip("Clear marker ID", CommandBand.Tooltip("Clear this mod's replacement ID to return the marker to its underlying ID.", clear));
                 row.Spacer();
             }).ChildrenKeepHeight().Height(RowHeight);
             if (reading.Underlying != null && reading.Sharers.Count != 0) {
@@ -92,7 +92,7 @@ namespace RailroaderScenePatcher {
                     Line(row, Literal(name), "Scene marker", name, RowHeight).EqualFlexibleWidth(0);
                     Button(row, "Select", () => SelectSharer(name)).Inactive(entry == null)
                         .Tooltip("Select scene marker", CommandBand.Tooltip("Inspect this scene marker. Its Connections tab can give it the replacement ID instead.",
-                            entry != null ? null : name == ReplacementMarkerIds.ForeignOwner ? "this registration belongs to an object that is not a scene marker." : "the object list does not include this scene marker; click Refresh."));
+                            entry != null ? null : name == ReplacementMarkerIds.ForeignOwner ? "This registration belongs to an object that isn't a scene marker." : "The outliner doesn't include this scene marker. Click Refresh."));
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
         }

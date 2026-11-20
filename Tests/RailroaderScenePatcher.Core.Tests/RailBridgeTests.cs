@@ -64,14 +64,14 @@ static class RailBridgeTests {
         var three = CommandBand.UseInGame(false, BakedSceneryCategories.Bridge, null, new[] { "a", "b", "c" }.Select(id => CommandBand.SegmentBinding(id, true)));
         Assert(three.StartsWith("The construction state of track segments a, b and c decides", StringComparison.Ordinal), "Three segments: " + three);
         Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Bridge, null, new string[0]) == CommandBand.Decorative, "A plate girder bridge without a controller is decorative");
-        Assert(CommandBand.ConstructionDependency == "Construction: the game shows or hides parts of this bridge by the construction state of its track segments",
+        Assert(CommandBand.ConstructionDependency == "Construction: the game shows or hides parts of this bridge by the construction state of its track segments.",
             "The dependency line: " + CommandBand.ConstructionDependency);
         // The inventory's lines for a controller's segments against the track graph's segment ids, or without a graph.
         var lines = CommandBand.ConstructionBindings(new[] { "seg-a", "seg-gone", " " }, new HashSet<string> { "seg-a" });
         Assert(lines.SequenceEqual(new[] { "Construction segment=seg-a", "Construction segment=seg-gone; no longer exists", "Construction segment= ; no longer exists" }), "The inventory lines mark a missing or empty segment: " + String.Join(" | ", lines));
         Assert(CommandBand.ConstructionBindings(new[] { "seg-a" }, null).SequenceEqual(new[] { "Construction segment=seg-a" }), "Without the track graph a segment is listed unchecked");
         Assert(CommandBand.ConstructionBindings(null, null).Count == 0, "No controller, no lines");
-        Assert(CommandBand.ConstructionHoldWarning == "This object stays off in the game although the game's track construction progress switches it on: your disable holds against it. Click Enable or Clear activity to let construction progress switch it again.",
+        Assert(CommandBand.ConstructionHoldWarning == "Your explicit disable keeps this object off in the game even when track construction progress switches it on. Click Enable or Clear activity to let construction progress control it again.",
             "The hold warning names the game feature and that the disable holds: " + CommandBand.ConstructionHoldWarning);
     }
 
@@ -499,7 +499,7 @@ static class RailBridgeTests {
         Assert(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Subcategory == BakedSceneryCategories.RailBridges, "An excluded kind keeps a rail bridge inspection only under Rail bridges");
         // Track-owned components belong to the native track: a rail bridge holding one is refused.
         Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", Controller }) == null, "A construction controller is no track-owned component");
-        Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", "AutoTrestle.AutoTrestle" }) == "The rail bridge holds the track-owned component AutoTrestle.AutoTrestle, which belongs to the native track, so it cannot be moved, enabled or disabled"
+        Assert(BakedSceneryRules.TrackOwnedRefusal(new[] { "UnityEngine.MeshRenderer", "AutoTrestle.AutoTrestle" }) == "This rail bridge contains the track-owned component AutoTrestle.AutoTrestle, which belongs to the native track. The bridge can't be moved, enabled or disabled."
             && BakedSceneryRules.TrackOwnedRefusal(new[] { "Track.TrackSegment" }) != null, "A generated trestle or a track component refuses the bridge");
         var road = At(verdicts, Large + "Almond/Almond Road Bridge");
         Assert(road?.Disposition == GroupDisposition.Group && road.Subcategory == BakedSceneryCategories.RoadBridges, "A road bridge is no rail bridge: it stands under Road bridges");

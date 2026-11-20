@@ -32,7 +32,7 @@ In Railroader 0.6.3, a moved Bryson station icon appeared at its new map positio
 
 Click **Disable** at the bottom of the **Object** tab to remove the icon from the map's icon list. **Enable**, **Clear activity**, Undo or removal can return it to that list when the game enables it.
 
-The game's progression switches 13 station map icons on and off with their station at load and when industries change. An explicit disable keeps the icon off the map when progression would switch it on. The **Object** tab and footer show an amber warning. **Enable**, **Clear activity**, Undo or removal returns control to progression. While progression keeps an icon off without your disable, **Enabled** reads `Yes; the game switches it off now`. If the patcher cannot keep the icon disabled through progression on this load, **Disable** is unavailable and its tooltip explains why. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches).
+The game's progression switches 13 station map icons on and off with their station at load and when industries change. An explicit disable keeps the icon off the map when progression would switch it on. The **Object** tab and footer show an amber warning. **Enable**, **Clear activity**, Undo or removal returns control to progression. While progression keeps an icon off without your disable, **Enabled** reads `Yes, but currently switched off by the game`. If the patcher cannot keep the icon disabled through progression on this load, **Disable** is unavailable and its tooltip explains why. See [objects the game switches](scene-patch-file-v1.md#objects-the-game-switches).
 
 ## Write the modification by hand
 

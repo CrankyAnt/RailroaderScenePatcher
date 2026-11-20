@@ -998,7 +998,7 @@ namespace RailroaderScenePatcher {
             candidates = candidates.Where(c => !c.Source.IsDefinition).ToList();
             // With the Edit form of a refused addition open, Use corrects that addition rather than adding a new one.
             var corrected = attachment == null ? null : CorrectedUse(attachment.Session);
-            string UseTip(string added) => corrected == null ? added : "Correct " + corrected + " with this source. Its equipment ID and placement stay. Click Preview, then Apply.";
+            string UseTip(string added) => corrected == null ? added : "Correct " + corrected + " with this source, keeping its equipment ID and placement. Click Preview, then Apply.";
             Line(builder, candidates.Count(c => c.Eligible) + " eligible and " + candidates.Count(c => !c.Eligible) + " rejected devices in the loaded map", null, null);
             foreach (var candidate in candidates) {
                 var source = candidate;
@@ -1110,7 +1110,7 @@ namespace RailroaderScenePatcher {
             }).Height(RowHeight);
             Section(builder, "Construction segments");
             ValueRow(builder, "Segments", null, new[] { "IDs" }, segmentFields, 0, block,
-                "The track segments whose construction state decides which parts of this bridge the game shows. Separate the IDs with commas. Set replaces the construction's segments with exactly these; the bridge does not move.", column => false);
+                "The construction state of these track segments determines which parts of this bridge the game shows. Separate the IDs with commas. Click Set to replace the construction's segments with exactly these segments. The bridge doesn't move.", column => false);
             Section(builder, "Observed bindings");
             var others = selected.Bindings.Where(line => !IsReader(line)).ToArray();
             if (others.Length == 0) Line(builder, "None observed", null, null);
@@ -1560,9 +1560,9 @@ namespace RailroaderScenePatcher {
                             Typed(Slot("Set", "Replace the construction segments with exactly the segments in the field. The bridge does not move.", null, ApplySegments, "Set construction segments", 1, 56),
                                 () => CommandBand.SegmentsReason(block, segmentFields[0], current)),
                             Slot("Detach", "Detach the construction from its segments.", block ?? CommandBand.SegmentDetachReason, () => { }, "Detach construction segments", 1, 72),
-                            Slot(CommandBand.ClearSegments, "Clear this mod's value for the construction segments; the construction returns to its native segments.", block ?? CommandBand.ClearSegmentsReason(HasSegmentValue(identity)),
+                            Slot(CommandBand.ClearSegments, "Clear this mod's construction segments value to return the construction to its native segments.", block ?? CommandBand.ClearSegmentsReason(HasSegmentValue(identity)),
                                 () => Edit(SegmentsPlace, "Clearing the construction segments value", (edit, inspection) => edit.SetConstructionSegments(identity, null, inspection)), null, 1, 124),
-                            Slot("Picked", "Add the confirmed segment to the segments field, in place of segments that no longer exist.", block ?? (pickedSegment ? null : "Choose a segment with Segment and confirm it first."),
+                            Slot("Picked", "Add the confirmed segment to the segments field and remove segments that no longer exist.", block ?? (pickedSegment ? null : "Click Segment to choose a segment, then confirm it."),
                                 () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier, CommandBand.MissingSegments(selected?.Bindings)); FieldsChanged(); }, "Picked segment", 1, 70) };
                     }
                     var pad = structure == CrossingPadScene.Structure;
@@ -1719,7 +1719,7 @@ namespace RailroaderScenePatcher {
             }
             DrawScenePatchFileRecovery(builder);
             Section(builder, "Supplied definitions");
-            if (String.IsNullOrEmpty(scenePatchFileInspection)) Line(builder, definitionsStale ? "Not read yet; click Refresh" : "None", null, null);
+            if (String.IsNullOrEmpty(scenePatchFileInspection)) Line(builder, definitionsStale ? "Not read yet. Click Refresh." : "None", null, null);
             else PlainLabel(builder, scenePatchFileInspection);
             Section(builder, "Diagnostics");
             if (diagnostics.Count == 0 && presentation.EntryProblem == null) Line(builder, "None", null, null);
@@ -1750,13 +1750,13 @@ namespace RailroaderScenePatcher {
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
-                    new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead; its Changes tab gives the reason." },
+                    new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },
                     new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
-                    new[] { "Spawn point", "The scene spawn points where players start, are rescued and teleport to. Native spawns in the map data stay in the Map Editor's Spawns category." },
-                    new[] { StarterPlacements.Family, "The markers whose track location an active new-game setup reads to place its starting cars. The marker's own position plays no part; Focus moves the camera to where the cars stand." },
-                    new[] { StationMapIconRules.Family, "The icons the map shows for stations. Move one where its station now stands after you move the station in the Map Editor." },
+                    new[] { "Spawn point", "Scene spawn points are where players start, teleport to or return after rescue. Edit native spawns in the Map Editor's Spawns category." },
+                    new[] { StarterPlacements.Family, "An active new-game setup reads these markers' track locations to place its starting cars. The marker's own position has no effect. Click Focus to move the camera to where the cars stand." },
+                    new[] { StationMapIconRules.Family, "The icons that show stations on the map. After moving a station in the Map Editor, move its icon to the station's new location." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
                     new[] { "Dimmed rows", "A dimmed group row holds matching parts but does not match the search itself." },
                     new[] { "Focus", "Moves the camera to the inspected object or the starting point of a car placement." },
@@ -1778,9 +1778,9 @@ namespace RailroaderScenePatcher {
                     new[] { "Gizmo", "The native gizmo stands on the object while this mode is open. Choose Move or Rotate and drag a handle; each release is one Undo step, and Escape during a drag restores. The fields show the placement and follow the drag." },
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
-                    new[] { "Bridges and boards", "A bridge moves with its colliders; track-owned scenery stays. The terrain output of a board or a ground mask regenerates after the move." },
+                    new[] { "Bridges and boards", "A bridge moves with its colliders. Track-owned scenery stays in place. The terrain output of a board or a ground mask regenerates after the move." },
                     new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
-                    new[] { "Spawn points", "The game reads a spawn point where it stands each time it starts, rescues or teleports a player. A disabled spawn point is not offered, except by a start setup that names it." } },
+                    new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
                     new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },
@@ -1795,14 +1795,14 @@ namespace RailroaderScenePatcher {
                     new[] { "Bells", "Adds a bell with sound from a bell definition in the content library. It rings when the crossing controller rings its own bell. Rejected definitions show why they cannot be used." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
-                    new[] { "Marker ID", "The ID the game registers a marker's track location under. When scene markers share an ID, the game removes the registration of all of them when one changes, so Enabled, the binding and Follow are refused. Give one of them a replacement ID with Set ID; the others keep their registrations. Clear ID returns the underlying ID." },
-                    new[] { "Construction segments", "The track segments whose construction state decides which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They cannot be detached. Clear segments returns the native segments." } },
+                    new[] { "Marker ID", "The game registers a marker's track location under this ID. When scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding and Follow. Click Set ID to give one marker a replacement ID. The others keep their registrations. Click Clear ID to restore the underlying ID." },
+                    new[] { "Construction segments", "The construction state of these track segments determines which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They can't be detached. Click Clear segments to restore the native segments." } },
                 Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Marker IDs", "repairing-duplicate-marker-ids.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Adding detection", "adding-crossing-detection.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Starter placement", "placing-starter-markers.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",
                 Terms = new[] {
                     new[] { "Remove modification", "Deletes this mod's modification and restores the object's underlying state, not an earlier patched position." },
                     new[] { "Recheck", "After a failed edit, compares the object with the scene patch file and unblocks it once they agree." },
-                    new[] { "Terrain output", "The game regenerates terrain after a move of a board or a ground mask. Save does not write that output. Retry asks for it again." } },
+                    new[] { "Terrain output", "The game regenerates terrain after moving a board or a ground mask. Save doesn't write that output. Click Retry to ask for it again." } },
                 Guides = new[] { new[] { "Editing in the Map Editor", "editing-placement-in-the-map-editor.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "File recovery", "recover-scene-patch-files.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
         };
         void DrawHelp(UIPanelBuilder builder, string region) {

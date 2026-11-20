@@ -32,7 +32,7 @@ static class ConstructionSegmentTests {
         Assert(FilePanelState.FileVersionApplied(null, 1, new KeyValuePair<string, (FailureKind, string)>[0]) == "File version applied.", "A file version without refusals");
         var mixed = FilePanelState.FileVersionApplied(null, 1, new[] { Failed("b", FailureKind.Refused, "Reason one"), Failed("c", FailureKind.Refused, "Reason two."), Failed("d", FailureKind.IncompleteCleanup, "Reason three"), Failed("e", FailureKind.Restored, "Reason four") });
         Assert(mixed == "File version applied. 1 modification applied, 2 modifications refused, 1 modification failed and restored, 1 modification failed with incomplete cleanup. Kept in the scene patch file but not applied: b (Reason one); c (Reason two). Failed and restored: e (Reason four). Failed with incomplete cleanup: d (Reason three).", "Several failure kinds: " + mixed);
-        Assert(FilePanelState.FileVersionApplied("Map mismatch", 0, new KeyValuePair<string, (FailureKind, string)>[0]) == "File version applied. Its modifications are not applied: Map mismatch.", "A file version that does not apply at all");
+        Assert(FilePanelState.FileVersionApplied("Map mismatch", 0, new KeyValuePair<string, (FailureKind, string)>[0]) == "File version applied. Its modifications weren't applied: Map mismatch.", "A file version that does not apply at all");
         Assert(FilePanelState.FileVersionApplied(null) == "File version applied.", "No application result");
         foreach (var relationship in new[] { "{\"detach\":true}", "{\"segments\":[\"S-gone\"]}" }) {
             var expected = relationship.Contains("detach") ? ConstructionSegmentRule.NoDetach : "S-gone";
@@ -47,7 +47,7 @@ static class ConstructionSegmentTests {
                 "Use file version refuses " + relationship + " before mutation with the reason: " + outcome?.Error + " writes " + f.World.SegmentWrites + " now " + Now());
             // The footer names the refused modification with its reason, and the Changes tab marks it as refused.
             var footer = FilePanelState.FileVersionApplied(session.LastVersionApplication);
-            Assert(footer == "File version applied. No modifications applied, 1 modification refused. Kept in the scene patch file but not applied: bad (" + outcome.Error + ").",
+            Assert(footer == "File version applied. No modifications applied, 1 modification refused. Kept in the scene patch file but not applied: bad (" + outcome.Error.TrimEnd('.') + ").",
                 "The footer states the refusal: " + footer);
             Assert(session.Changes(GroupId(Bryson)).SequenceEqual(new[] { "Refused. " + outcome.Error.TrimEnd('.') + "." }), "The Changes tab marks the modification as refused: " + String.Join(" | ", session.Changes(GroupId(Bryson))));
             // Remove modification of the refused modification, then Undo and Redo: nothing incomplete, the object unchanged.
@@ -151,7 +151,7 @@ static class ConstructionSegmentTests {
         var detached = new Scenery(); var detachScene = new SceneCapabilities(() => detached.MapIds, null); detachScene.Add(new ConstructionSceneryScene(detached));
         var refused = new PatchEngine(detachScene).Apply(Doc(Item("detach", "\"relationships\":{\"constructionSegments\":{\"detach\":true}}"))).Outcomes["detach"];
         Assert(!refused.Applied && refused.Error == ConstructionSegmentRule.NoDetach && detached.Writes == 0, "The Ela controller refuses a detach before mutation: " + refused.Error);
-        var unloaded = new Scenery { Refused = "The controller's scene is not loaded" }; var unloadedScene = new SceneCapabilities(() => unloaded.MapIds, null); unloadedScene.Add(new ConstructionSceneryScene(unloaded));
+        var unloaded = new Scenery { Refused = "The controller's scene isn't loaded." }; var unloadedScene = new SceneCapabilities(() => unloaded.MapIds, null); unloadedScene.Add(new ConstructionSceneryScene(unloaded));
         var preflight = new PatchEngine(unloadedScene).Apply(Doc(Item("segments", "\"relationships\":{\"constructionSegments\":{\"segments\":[\"S-ela-a\"]}}"))).Outcomes["segments"];
         Assert(!preflight.Applied && preflight.Failure == FailureKind.Refused && unloaded.Writes == 0 && String.Join(",", unloaded.Ids) == "S-ela", "A preflight refusal of the controller changes nothing: " + preflight.Error);
         // In scene patch editing, Remove modification returns the native segments.
@@ -229,8 +229,8 @@ static class ConstructionSegmentTests {
             Assert(f.World.SegmentWrites == 0 && Ids(f.World.SegmentsOf[f.Bridge1]) == "S-bryson" && Ids(f.World.SegmentsOf[f.AlmondRoot]) == "S-almond", what + " leaves every construction's segments as they were");
             Assert(result.Outcomes["other"].Applied && !f.AlmondRoot.Active, what + " leaves the file's other modifications applied");
         }
-        Refused("{\"segments\":[\"S-bryson-a\",\"S-bryson-gone\"]}", Bryson, "Construction segment S-bryson-gone is missing on the loaded track; no other segment is used", "A missing segment");
-        Refused("{\"segments\":[\"S-bryson-a\",\"S-twin\"]}", Bryson, "Construction segment S-twin is ambiguous on the loaded track; no other segment is used", "An ambiguous segment");
+        Refused("{\"segments\":[\"S-bryson-a\",\"S-bryson-gone\"]}", Bryson, "Construction segment S-bryson-gone is missing on the loaded track. No other segment is used.", "A missing segment");
+        Refused("{\"segments\":[\"S-bryson-a\",\"S-twin\"]}", Bryson, "Construction segment S-twin matches more than one segment on the loaded track. No other segment is used.", "An ambiguous segment");
         Refused("{\"detach\":true}", Bryson, ConstructionSegmentRule.NoDetach, "A detach");
         Refused("{\"segments\":[\"S-bryson-a\",\"S-bryson-a\"]}", Bryson, "construction segment S-bryson-a is listed more than once", "A duplicate segment");
         Refused("{\"segments\":[]}", Bryson, "segments must list at least one track segment ID", "An empty set");
@@ -357,9 +357,9 @@ static class ConstructionSegmentTests {
             "Picked replaces a segment that no longer exists and keeps the others: " + picked);
         Assert(CommandBand.AddSegment("S-a, typed", "S-b", CommandBand.MissingSegments(lines)) == "S-a, typed, S-b", "An ID the observed bindings do not name as missing stays");
         Assert(CommandBand.SegmentsReason(null, "", new[] { "S-a" }) == "Enter at least one segment ID.", "An empty field cannot be set");
-        Assert(CommandBand.SegmentsReason(null, "S-b, S-a", new[] { "S-a", "S-b" }) == "The field holds the construction's current segments.", "The current set cannot be set again, in any order");
+        Assert(CommandBand.SegmentsReason(null, "S-b, S-a", new[] { "S-a", "S-b" }) == "The field already lists the construction's current segments.", "The current set cannot be set again, in any order");
         Assert(CommandBand.SegmentsReason(null, "S-a, S-c", new[] { "S-a", "S-b" }) == null && CommandBand.SegmentsReason("Inspect an object first.", "S-c", new[] { "S-a" }) == "Inspect an object first.", "A different set can be set; the general reason comes first");
-        Assert(CommandBand.SegmentDetachReason == "A construction without segments has no meaning. Select the segments of the bridge's track instead.", "Detach states why it is unavailable: " + CommandBand.SegmentDetachReason);
+        Assert(CommandBand.SegmentDetachReason == "The construction needs track segments. Select the segments of the bridge's track instead.", "Detach states why it is unavailable: " + CommandBand.SegmentDetachReason);
         Assert(CommandBand.ClearSegmentsReason(false) == "This mod sets no construction segments for this object, so there is nothing to clear." && CommandBand.ClearSegmentsReason(true) == null, "Clear segments needs this mod's value");
         Assert(CommandBand.ActionRows.Any(row => row.Length == 4 && row[0][0] == "Set" && row[1][0] == "Detach" && row[2][0] == CommandBand.ClearSegments && row[3][0] == "Picked") && CommandBand.LabelWidths.ContainsKey(CommandBand.ClearSegments),
             "The construction segment row is one of the panel's action rows with a known label width");
@@ -385,17 +385,17 @@ static class ConstructionSegmentTests {
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela).Contains("Connections tab"), "The binding tasks point to where the controller's segments are set");
         // The controller is bound to track by its construction segments, which the Connections tab shows: the reason
         // says it holds no marker's track location, not that it has no track binding at all.
-        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela) == "The construction controller follows its construction segments, not a marker's track location. Set its construction segments on the Connections tab."
+        Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela) == "The construction controller uses construction segments rather than a marker's track location. Set its construction segments on the Connections tab."
             && GuidedTaskState.TargetBlock(GuidedTaskKind.DetachBinding, ela) == GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela),
             "The binding tasks do not deny the construction segments: " + GuidedTaskState.TargetBlock(GuidedTaskKind.Binding, ela));
         Assert(GuidedTaskState.Tasks.Count == 8, "The task list keeps every task visible");
         Assert(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, GroupId(Bryson)) == null, "A rail bridge group keeps its guided move");
         Assert(CommandBand.EditReason(CommandBand.ConstructionSceneryOperations) == "This object cannot be edited here.", "The generic reason is what the Ela controller showed while it counted as not editable");
-        Assert(CommandBand.ConstructionSceneryOperations == "Set the construction segments of this controller. Its position has no effect in the game, and it stays enabled because the bridge's construction visibility runs on it.",
+        Assert(CommandBand.ConstructionSceneryOperations == "Set this controller's construction segments. Its position has no effect in the game. It stays enabled because it controls which parts of the bridge the game shows.",
             "The Ela controller's Supported edits: " + CommandBand.ConstructionSceneryOperations);
         Assert(CommandBand.InspectionOnly(CommandBand.ConstructionSceneryFamily, false) == null, "No bridge construction controller is inspection only");
         for (var mode = 0; mode < 4; mode++)
             Assert(CommandBand.ModeBlock(mode, false, true, null, controller: true) == (mode == CommandBand.NumericMode ? null : CommandBand.ControllerNoPlacement), "Every placement mode but Numeric is unavailable for the controller, with the reason: mode " + mode);
-        Assert(CommandBand.ControllerNoPlacement == ConstructionSceneryScene.NoPlacement + "." && CommandBand.ControllerNoActivity == ConstructionSceneryScene.NoActivity + ".", "Placement and Enabled give the capability's reasons");
+        Assert(CommandBand.ControllerNoPlacement == ConstructionSceneryScene.NoPlacement && CommandBand.ControllerNoActivity == ConstructionSceneryScene.NoActivity, "Placement and Enabled give the capability's reasons");
     }
 }

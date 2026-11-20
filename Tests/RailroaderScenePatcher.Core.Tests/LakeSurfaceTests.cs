@@ -83,16 +83,16 @@ static class LakeSurfaceTests {
         Assert(CommandBand.LogPondBindings(false, 0, null).Count == 0, "An object without a log pond carries no log pond binding");
 
         var logs = CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, storage, own);
-        Assert(logs == "This log pond shows the logs storage of Whittier Saw Mill. Moving or disabling the log pond does not change the storage, and the industry keeps working on its native track spans.",
+        Assert(logs == "This log pond shows the logs storage of Whittier Saw Mill. Moving or disabling the log pond doesn't change the storage. The industry keeps working on its native track spans.",
             "The log pond names the storage and says moving it does not change it: " + logs);
         Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, CommandBand.LogPondBindings(true, 0, null)).StartsWith("This log pond shows the industry's storage.", StringComparison.Ordinal),
             "A log pond no synchronizer names still speaks of the log pond");
         var group = CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, storage, holder);
-        Assert(group == "Decorative. Its log pond shows the logs storage of Whittier Saw Mill. Moving or disabling this group does not change the storage, and the industry keeps working on its native track spans.",
+        Assert(group == "Decorative. Its log pond shows the logs storage of Whittier Saw Mill. Moving or disabling this group doesn't change the storage. The industry keeps working on its native track spans.",
             "The log pond group names the storage and says moving or disabling the group does not change it: " + group);
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, holder) == "Decorative. Its log pond shows the industry's storage. Moving or disabling this part does not change the storage, and the industry keeps working on its native track spans.",
+        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, holder) == "Decorative. Its log pond shows the industry's storage. Moving or disabling this part doesn't change the storage. The industry keeps working on its native track spans.",
             "A part above a log pond speaks of itself");
-        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, new string[0]) == "Decorative. The industry works on its native track spans, so moving or disabling this part does not change loading or unloading.",
+        Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, new string[0]) == "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this part doesn't affect loading or unloading.",
             "The water mesh is a decorative part of the storage display");
         Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Other, null, new string[0]) == CommandBand.Decorative, "A Fontana lake is decorative");
         // Piles keep the texts of #98, chosen from the same bindings.
@@ -101,9 +101,9 @@ static class LakeSurfaceTests {
             "Piles keep their texts");
         // A lake surface's dependency names what moves with it and what stays native, and whether its water is part of
         // a static batch, which the game run reads from the inspection.
-        Assert(CommandBand.LakeSurfaceDependency(false) == "Lake surface: the water surface moves with this object. Native lake masks and rivers shape and color the terrain and stay with the native map editor",
+        Assert(CommandBand.LakeSurfaceDependency(false) == "Lake surface: the water surface moves with this object. Native lake masks and rivers shape and color the terrain. Edit them in the native map editor.",
             "A lake surface's dependency: " + CommandBand.LakeSurfaceDependency(false));
-        Assert(CommandBand.LakeSurfaceDependency(true).StartsWith("Lake surface: the water surface is part of a static batch, so it cannot be moved.", StringComparison.Ordinal),
+        Assert(CommandBand.LakeSurfaceDependency(true).StartsWith("Lake surface: the water surface is part of a static batch, so it can't be moved.", StringComparison.Ordinal),
             "A batched lake surface's dependency says it cannot be moved: " + CommandBand.LakeSurfaceDependency(true));
     }
 
@@ -112,7 +112,7 @@ static class LakeSurfaceTests {
     // edit still applies.
     static void StaticBatchRefusesAMove() {
         var reason = BakedSceneryRules.StaticBatchRefusal("Fontana Lake (1)");
-        Assert(reason == "The water surface Fontana Lake (1) is part of a static batch, so the game would keep drawing it at its old place. This lake surface cannot be moved",
+        Assert(reason == "The water surface Fontana Lake (1) is part of a static batch. The game would keep drawing it at its old position, so this lake surface can't be moved.",
             "The refusal names the water surface and why: " + reason);
         var f = new Lakes(); f.World.PlacementRefused[f.Fontana] = reason;
         var outcome = f.Engine.Apply(Doc(GroupMod("move-fontana", Fontana1, FontanaTarget))).Outcomes["move-fontana"];
@@ -151,10 +151,10 @@ static class LakeSurfaceTests {
     // Refusal and failure texts of the bulk scenery refresh name the object kind: a log pond is no storage pile.
     static void BulkTextsNameTheKind() {
         Assert(BakedSceneryRules.BulkKind("Scenery.LogPond") == "log pond" && BakedSceneryRules.BulkKind("Scenery.Pile") == "storage pile", "The kind of a bulk scenery object");
-        Assert(BakedSceneryRules.BulkMembersRefusal(true, false) == "The game's storage pile members are unavailable, so this group and its piles cannot be moved, enabled or disabled", "Piles keep the #98 text");
-        Assert(BakedSceneryRules.BulkMembersRefusal(false, true) == "The game's log pond members are unavailable, so this group and its log pond cannot be moved, enabled or disabled",
+        Assert(BakedSceneryRules.BulkMembersRefusal(true, false) == "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled or disabled.", "Piles keep the #98 text");
+        Assert(BakedSceneryRules.BulkMembersRefusal(false, true) == "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled or disabled.",
             "A log pond group names the log pond: " + BakedSceneryRules.BulkMembersRefusal(false, true));
-        Assert(BakedSceneryRules.BulkMembersRefusal(true, true) == "The game's storage pile and log pond members are unavailable, so this group, its piles and its log pond cannot be moved, enabled or disabled",
+        Assert(BakedSceneryRules.BulkMembersRefusal(true, true) == "The game's storage pile and log pond members are unavailable. This group, its piles and its log pond can't be moved, enabled or disabled.",
             "Both kinds are named");
     }
 

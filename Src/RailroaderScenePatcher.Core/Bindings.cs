@@ -95,7 +95,7 @@ namespace RailroaderScenePatcher.Core {
         // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
         // sentences that follow the label of the action they refuse.
         public string Refusal(object self) => "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
-        const string Reason = "The game removes a marker's graph registration by marker ID from every scene marker that holds it, so an activity, binding or track-following edit of one of them is refused until the duplicate marker ID is repaired. Reloading or choosing another track does not change the duplicate marker ID.";
+        const string Reason = "When the game removes a marker's graph registration by marker ID, it removes the registration of every scene marker with that ID. You can't edit their activity, binding or track-following placement until the duplicate marker ID is repaired. Reloading or choosing another track doesn't change the duplicate marker ID.";
         // The problem of an active holder that can receive a replacement ID: a duplicate marker ID is then a defect the
         // modder repairs with the patcher. An inactive holder, and a holder that cannot receive a replacement ID, such as a
         // crossing pad, show the explanation without a problem. Null for a marker ID that one scene marker holds.
@@ -361,30 +361,30 @@ namespace RailroaderScenePatcher.Core {
     public static class ReplacementMarkerIds {
         public const string Member = "markerId", RequiredVersion = "0.5.0";
         public static readonly IReadOnlyList<string> ReservedPrefixes = Array.AsReadOnly(new[] { "passengerStop:", "flare:" });
-        public const string Empty = "The replacement ID is empty. Enter an ID that no other scene marker or map object uses";
-        public const string NotAString = "The replacement ID must be a string";
-        public const string NotSupported = "Only a generic track marker takes a replacement ID";
+        public const string Empty = "The replacement ID is empty. Enter an ID that no other scene marker or map object uses.";
+        public const string NotAString = "The replacement ID must be a string.";
+        public const string NotSupported = "Only a generic track marker can have a replacement ID.";
         public const string Offer = "Give one of them a replacement ID to repair it.";
         public const string ForeignOwner = "an object that is not a scene marker";
         // Why the id cannot be a replacement ID whatever the world holds, or null. A space at either end would make an ID
         // that looks like another one.
         public static string Problem(string id) {
             if (String.IsNullOrWhiteSpace(id)) return Empty;
-            if (id.Trim() != id) return "Replacement ID \"" + id + "\" begins or ends with a space. Remove the space";
+            if (id.Trim() != id) return "Replacement ID \"" + id + "\" begins or ends with a space. Remove the space.";
             var prefix = ReservedPrefixes.FirstOrDefault(p => id.StartsWith(p, StringComparison.Ordinal));
-            return prefix == null ? null : "Replacement ID " + id + " begins with " + prefix + ", which the game uses for its own track registrations. Choose an ID without that prefix";
+            return prefix == null ? null : "Replacement ID " + id + " begins with " + prefix + ", which the game uses for its own track registrations. Choose an ID without that prefix.";
         }
-        public static string UsedBy(string id, string user) => "Replacement ID " + id + " is already used by " + (user == ForeignOwner ? user : "the scene marker " + user) + ". Choose an ID that no other scene marker uses";
-        public static string UsedByMapObject(string id) => "Replacement ID " + id + " is already used by the map object " + id + " of the map context. Choose another ID";
+        public static string UsedBy(string id, string user) => "Replacement ID " + id + " is already used by " + (user == ForeignOwner ? user : "the scene marker " + user) + ". Choose an ID that no other scene marker uses.";
+        public static string UsedByMapObject(string id) => "Replacement ID " + id + " is already used by map object " + id + " in the map context. Choose another ID.";
         // The map objects of the map context could not be read, so the ID is not known to be free.
-        public static string MapObjectsUnknown(string id) => "Replacement ID " + id + " could not be checked against the map objects of the map context, because the game has not loaded them. Try again after the map has loaded";
+        public static string MapObjectsUnknown(string id) => "The game hasn't loaded the map objects in the map context, so replacement ID " + id + " couldn't be checked against them. Try again after the map has loaded.";
         // The modifications of other holders whose settings need this modification's replacement ID, by key.
-        public static string DependentRefusal(IReadOnlyList<string> dependents) => "This marker's replacement ID cannot be cleared because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name")
-            + " its modification in dependsOn: another holder's activity, binding or track-following settings need this ID. Change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first";
-        public static string Shared(string id) => "Replacement ID " + id + " is used by more than one modification; a replacement ID names one marker in its scene patch file";
+        public static string DependentRefusal(IReadOnlyList<string> dependents) => "This marker's replacement ID can't be cleared because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name")
+            + " its modification in dependsOn. Another holder's activity, binding or track-following settings need this ID. Change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first.";
+        public static string Shared(string id) => "Replacement ID " + id + " is used by more than one modification. A replacement ID must identify one marker in its scene patch file.";
         // Clearing the replacement ID would return a duplicate marker ID while the modification still changes the
         // marker's activity, binding or track-following placement.
-        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding and track-following settings need its replacement ID. Clear those settings first, or click Remove modification";
+        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding and track-following settings need its replacement ID. Clear those settings first, or click Remove modification.";
     }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:

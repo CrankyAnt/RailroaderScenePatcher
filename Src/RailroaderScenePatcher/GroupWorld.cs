@@ -377,7 +377,7 @@ namespace RailroaderScenePatcher {
         // A group that holds a scene ground mask is not edited while the mask cannot be read and rebuilt: a move would
         // leave the terrain shaping behind.
         static string MaskProblem(GameObject root) =>
-            !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so this group and its parts cannot be moved, enabled or disabled" : null;
+            !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so you can't move, enable or disable this group or its parts." : null;
         // A culling container, a group root and an object below a group with a car loader resolve too, so their
         // modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
@@ -420,7 +420,7 @@ namespace RailroaderScenePatcher {
             if (construction == null || ConstructionReadable) return null;
             var held = root.GetComponentsInChildren(construction, true).Length != 0;
             for (var t = root.transform.parent; t != null && !held; t = t.parent) held = t.GetComponent(construction) != null;
-            return held ? "The game's track construction members are unavailable, so this rail bridge cannot be moved, enabled or disabled" : null;
+            return held ? "The game's track construction members are unavailable, so you can't move, enable or disable this rail bridge." : null;
         }
         // A progression controller (Game.Progression.ProgressionEntityObjectController) sets the objects of its two lists
         // from its industry's or station's progression state, at Awake and on every IndustriesDidChange; a map feature
@@ -436,8 +436,8 @@ namespace RailroaderScenePatcher {
         static bool FeatureReadable => ObjectList(featureObjects);
         // Why the patcher cannot see what progression or a map feature switches, or null.
         static string SwitchMembersProblem =>
-            progression != null && !ProgressionReadable ? "The game's progression controller members are unavailable, so an explicit disable does not hold against progression"
-            : mapFeature != null && !FeatureReadable ? "The game's map feature members are unavailable, so an explicit disable does not hold against a map feature" : null;
+            progression != null && !ProgressionReadable ? "The game's progression controller members are unavailable, so progression can override an explicit disable."
+            : mapFeature != null && !FeatureReadable ? "The game's map feature members are unavailable, so a map feature can override an explicit disable." : null;
         // The loaded components of the switch types, read again only when the loaded scenes change: a switch is a scene
         // component, so the frames between scene changes find the same ones.
         static readonly Dictionary<Type, Component[]> loadedSwitches = new Dictionary<Type, Component[]>();
@@ -540,7 +540,7 @@ namespace RailroaderScenePatcher {
             if (construction == null || go == null) return null;
             for (var t = go.transform; t != null; t = t.parent) {
                 var controller = t.GetComponent(construction);
-                if (controller != null) return constructionSegments?.GetValue(controller) as string[] ?? throw new InvalidOperationException("Construction segment ids unavailable");
+                if (controller != null) return constructionSegments?.GetValue(controller) as string[] ?? throw new InvalidOperationException("The construction segment IDs are unavailable.");
             }
             return null;
         }
@@ -874,10 +874,10 @@ namespace RailroaderScenePatcher {
                 }
                 var index = (int)Native.Read(token, "Index");
                 var all = (BoundingSphere[])managerSpheres.GetValue(Native.Read(token, "Manager"));
-                if (index < 0 || index >= all.Length) throw new InvalidOperationException("The culling sphere of the " + BakedSceneryRules.BulkKind(pile.GetType().FullName) + " " + pile.name + " is not registered");
+                if (index < 0 || index >= all.Length) throw new InvalidOperationException("The culling sphere of the " + BakedSceneryRules.BulkKind(pile.GetType().FullName) + " " + pile.name + " isn't registered.");
                 var centre = Map(all[index].position, pile.transform);
                 if (Distance(centre, now.Position) > SphereDistance || Math.Abs(all[index].radius - (float)bulkRadius.Invoke(pile, null)) > SameDistance)
-                    throw new InvalidOperationException("The culling sphere of the " + BakedSceneryRules.BulkKind(pile.GetType().FullName) + " " + pile.name + " did not follow it to its new place");
+                    throw new InvalidOperationException("The culling sphere of the " + BakedSceneryRules.BulkKind(pile.GetType().FullName) + " " + pile.name + " didn't move with it to its new position.");
                 laidOut[pile] = now;
             }
         }

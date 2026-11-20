@@ -74,7 +74,7 @@ static class DuplicateMarkerIdTests {
     }
     // The refusal says that reloading does not help, and never advises it.
     static void AssertNoReloadAdvice(string error, string scenario) {
-        Assert(error.Contains("Reloading or choosing another track does not change the duplicate marker ID.") && error.IndexOf("Reload before", StringComparison.OrdinalIgnoreCase) < 0
+        Assert(error.Contains("Reloading or choosing another track doesn't change the duplicate marker ID.") && error.IndexOf("Reload before", StringComparison.OrdinalIgnoreCase) < 0
             && error.IndexOf("reload the", StringComparison.OrdinalIgnoreCase) < 0, scenario + ": the refusal explains that reloading does not help and gives no Reload advice: " + error);
         Assert(!error.Contains(": "), scenario + ": the refusal is plain sentences without a label of its own: " + error);
     }

@@ -59,7 +59,7 @@ static class RoadBridgeTests {
     // A road bridge stands where its road goes, and Follow follows track: a track-following placement of a road bridge
     // or of one of its parts is refused before any mutation, and the Follow placement mode is unavailable with the reason.
     static void RoadBridgesDoNotFollowTrack() {
-        Assert(BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RoadBridges) == "Road bridges use fixed placement. Track-following placement does not apply to them"
+        Assert(BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RoadBridges) == "Road bridges use fixed placement. They don't support track-following placement."
             && BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RailBridges) == BakedSceneryRules.RailBridgeNoFollowing && BakedSceneryRules.FollowingRefusal(null) == null,
             "Bridges of both subgroups refuse track following, each with its reason; other groups do not: " + BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RoadBridges));
         var f = new Span(); var scene = f.Scene(); scene.Tracks = new FixedTrack();
@@ -69,7 +69,7 @@ static class RoadBridgeTests {
         var result = new PatchEngine(scene).Apply(Doc(Follow("follow-bridge", GovBridge, BakedSceneryGroups.Structure), Follow("follow-deck", GovBridge + "/Deck", BakedSceneryParts.Structure)));
         Assert(result.Outcomes.Values.All(o => !o.Applied && o.Failure == FailureKind.Refused && o.Error.Contains("Road bridges use fixed placement")) && f.World.Mutations == 0 && f.RegisteredOnceAt(Authored, 90) && f.Terrain.Rebuilds == 0,
             "Track-following placement of a road bridge and of its part is refused before mutation: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Failure + " " + o.Error)));
-        Assert(CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.GroupOperations, roadBridge: true) == "Road bridges use fixed placement. Track-following placement does not apply to them. Move the road in the native map editor, then move the bridge onto it."
+        Assert(CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.GroupOperations, roadBridge: true) == "Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it."
             && CommandBand.ModeBlock(CommandBand.NumericMode, false, true, CommandBand.GroupOperations, roadBridge: true) == null && CommandBand.ModeBlock(CommandBand.GizmoMode, false, true, CommandBand.GroupOperations, roadBridge: true) == null,
             "Follow is unavailable for a road bridge with the reason; Numeric and Gizmo stay: " + CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.GroupOperations, roadBridge: true));
     }
@@ -118,10 +118,10 @@ static class RoadBridgeTests {
     // A bridge whose mask flattens the terrain height names disabling alone and blocks the placement modes.
     static void ObjectTabNamesTheMaskAndTheNativeRoad() {
         var line = CommandBand.GroundMaskDependency(true, new[] { "Concrete Road Bridge - 60m" }, false, group: true);
-        Assert(line == "Ground mask: the root of this group holds the scene ground mask. Moving the group moves the terrain shaping, and the patcher asks the game to regenerate terrain and vegetation at the old and the new place",
+        Assert(line == "Ground mask: the root of this group holds the scene ground mask. Moving the group moves the terrain shaping. The patcher asks the game to regenerate terrain and vegetation at the old and new positions.",
             "The line of a group whose root holds the mask: " + line);
         var flat = CommandBand.GroundMaskDependency(true, new[] { "Old Home Town Road Bridge" }, true, group: true);
-        Assert(flat == "Ground mask: the root of this group holds the scene ground mask, which also flattens the terrain height. The group cannot be moved, because it is not confirmed that the game restores the height after a move",
+        Assert(flat == "Ground mask: the root of this group holds the scene ground mask, which also flattens the terrain height. The group can't be moved because it's not confirmed that the game restores the height after a move.",
             "The line of a group whose root holds a flattening mask: " + flat);
         Assert(CommandBand.HoldsGroundMask(new[] { line }) && CommandBand.GroundMaskMoveBlock(new[] { line }) == null && CommandBand.GroundMaskMoveBlock(new[] { flat }) == CommandBand.FlatteningMoveBlock,
             "Both lines carry terrain output, and only the flattening one blocks a move");

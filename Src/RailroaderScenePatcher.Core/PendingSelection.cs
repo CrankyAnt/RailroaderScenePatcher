@@ -134,7 +134,7 @@ namespace RailroaderScenePatcher.Core {
             Kind == SelectionKind.SceneObject ? " objects." : " candidates.");
         public string OfferListInstruction => SeveralOffers;
         // A click that met no candidate, and one that met only the slot's current binding, which cannot be picked.
-        public const string NoOffer = "No candidate at this point. Nothing this choice offers is under the pointer.";
+        public const string NoOffer = "No candidate at this point. Nothing available for this selection is under the pointer.";
         const string NoOfferStart = "No candidate at this point. ";
         public static string CurrentBindingOffer(SelectionIdentity current) => NoOfferStart + current + " is the current binding, so it can't be picked.";
         // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks

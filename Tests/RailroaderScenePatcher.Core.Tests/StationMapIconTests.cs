@@ -110,7 +110,7 @@ static class StationMapIconTests {
         var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
         Assert(session.Edit(Id(Cochran), new Placement(CochranTarget, Upright), null).Applied && mapEditor.Save() == null, "A first edit applies and saves");
         var saved = store.Patch; var info = store.Info;
-        f.World.Refused = "The station map icon's scene is not loaded"; var mutations = f.World.Mutations;
+        f.World.Refused = "The station map icon's scene isn't loaded."; var mutations = f.World.Mutations;
         var refused = session.Edit(Id(Bryson), new Placement(BrysonTarget, Upright), false);
         Assert(!refused.Applied && refused.Error.Contains(f.World.Refused) && f.World.Mutations == mutations && Near(f.At(f.BrysonIcon), BrysonAuthored) && f.BrysonIcon.Active,
             "The refused edit changes nothing in the scene: " + refused.Error + " " + f.Where());
@@ -123,7 +123,7 @@ static class StationMapIconTests {
     static void MinimumHoldsWithoutTheCapability() {
         foreach (var structure in new[] { StationMapIconRules.Structure, null }) {
             var scene = new SceneCapabilities(() => new[] { "map" }, null);
-            scene.AddUnavailable(StationMapIconRules.Structure, "Map icon types unavailable");
+            scene.AddUnavailable(StationMapIconRules.Structure, "The map icon types are unavailable.");
             var target = "{\"scene\":\"" + SceneName + "\",\"path\":\"" + Bryson + "\",\"component\":\"" + StationMapIconRules.Component + "\"" + (structure == null ? "" : ",\"structure\":\"" + structure + "\"") + "}";
             var store = new Store { Patch = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"m\":{\"target\":" + target + ",\"placement\":{\"mode\":\"fixed\",\"position\":[1,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}" };
             var mapEditor = new NativeMapEditor(); var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
@@ -209,7 +209,7 @@ static class StationMapIconTests {
         Assert(enabled.Engine.Apply(Doc(Mod("show-cochran", Cochran, CochranTarget, true))).Outcomes.Values.All(o => o.Applied) && enabled.CochranIcon.Active && enabled.World.Registered.Contains(enabled.CochranIcon)
             && Near(enabled.At(enabled.CochranIcon), CochranTarget), "An enabled icon registers with the map at its new place: " + enabled.Where());
 
-        var refused = new Icons(); refused.World.Refused = "The station map icon's scene is not loaded";
+        var refused = new Icons(); refused.World.Refused = "The station map icon's scene isn't loaded.";
         var outcome = refused.Engine.Apply(Doc(Mod("move-bryson", Bryson, BrysonTarget))).Outcomes["move-bryson"];
         Assert(!outcome.Applied && outcome.Error.Contains(refused.World.Refused) && refused.World.Mutations == 0 && Near(refused.At(refused.BrysonIcon), BrysonAuthored), "A preflight refusal leaves the icon untouched: " + outcome.Error);
 
