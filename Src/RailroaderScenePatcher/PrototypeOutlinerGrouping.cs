@@ -24,8 +24,9 @@ namespace RailroaderScenePatcher {
         internal const int PlaceThreshold = 3;
         // Place folders appear only in a list longer than this; a shorter list reads well with each object's place.
         internal const int PlaceListMinimum = 10;
-        // Farther than this from the centre of its named place, an object closer to another place is marked.
-        internal const double ConflictDistance = 500;
+        // A place's radius: the 90th percentile of its members' distances from its centre, at least MinimumRadius
+        // metres, plus RadiusMargin.
+        internal const double MinimumRadius = 250, RadiusMargin = 150;
         internal const string NotSorted = "Not sorted", NoPlace = "No place", InspectionOnly = InventoryPresentationState.InspectionOnlyGroup;
         internal static bool LogPending = true;
 
@@ -34,8 +35,8 @@ namespace RailroaderScenePatcher {
             internal OutlineNode Node;
             internal SceneObservation Row;
             internal List<Level> Levels = new List<Level>();
-            internal string Place, Near;
-            internal bool Conflict;
+            internal string Place, Near, Inside;
+            internal bool Conflict, Nearest;
         }
         internal sealed class Result {
             internal IReadOnlyList<OutlineNode> Tops;
@@ -45,20 +46,22 @@ namespace RailroaderScenePatcher {
         }
 
         // ---- places ----
-        sealed class PlaceInfo { internal string Named, Near; internal double NamedDistance, NearDistance; }
+        // Named: the place the object's folder or name gives. Near: the place whose centre is nearest. Inside: the
+        // nearest other place whose radius holds the object.
+        sealed class PlaceInfo { internal string Named, Near, Inside; internal double NamedDistance, NearDistance, InsideDistance; }
         static IReadOnlyList<SceneObservation> placesFor;
         static Dictionary<string, string> aliases;
         static List<KeyValuePair<string, Regex>> aliasPatterns;
         static Dictionary<string, double[]> centres;
+        static Dictionary<string, double> radii;
         static Dictionary<SceneObservation, PlaceInfo> placeCache;
+        static Dictionary<SceneObservation, double[]> measured;
         const string Scenery = "World/Large Scenery/";
+        // Folders below Large Scenery named after a structure that stands in no single place.
+        static readonly HashSet<string> NoPlaceFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Plate Girder Bridge", "Global Signs" };
+        static readonly Regex StructureSuffix = new Regex(@"\s+(Signs|Bridge|Turntable)\z", RegexOptions.IgnoreCase);
 
         static string Last(string path) => path.Substring(path.LastIndexOf('/') + 1);
-        static string LocName(SceneObservation e) {
-            if (e.Family != "Track marker" && e.Family != "Starter placement") return null;
-            var last = Last(e.Identity.Path);
-            return last.StartsWith("Loc: ", StringComparison.Ordinal) ? last.Substring(5).Trim() : null;
-        }
         static string SceneryFolder(string path) {
             if (path == null || !path.StartsWith(Scenery, StringComparison.Ordinal)) return null;
             var rest = path.Substring(Scenery.Length); var slash = rest.IndexOf('/');
@@ -67,52 +70,80 @@ namespace RailroaderScenePatcher {
         static bool InSignsFolder(string path) => path.Split('/').Any(segment => segment.EndsWith("Signs", StringComparison.Ordinal) || segment == "Signs");
         static bool HasPosition(SceneObservation e) => e.Position != null && e.Position.Count >= 3;
 
+        // Where an object stands, as map x/z: the centre of the bounds of the renderers in its hierarchy (a group with
+        // its parts), not its pivot. A renderer that is off or inactive counts by its mesh's bounds, unless the mesh is a
+        // static batch, which spans more than the object; then by its transform. Without renderers: the pivot.
+        static double[] Measure(SceneObservation e) {
+            if (e == null) return null;
+            if (measured.TryGetValue(e, out var known)) return known;
+            double[] result = null;
+            try { result = MeasureBounds(e.Handle); } catch { result = null; }
+            if (result == null && HasPosition(e)) result = new[] { e.Position[0], e.Position[2] };
+            return measured[e] = result;
+        }
+        static double[] MeasureBounds(object handle) {
+            if (!(handle is UnityEngine.GameObject go) || go == null) return null;
+            var bounds = new UnityEngine.Bounds(); var any = false;
+            foreach (var renderer in go.GetComponentsInChildren<UnityEngine.Renderer>(true)) {
+                if (renderer == null) continue;
+                UnityEngine.Bounds own;
+                if (renderer.enabled && renderer.gameObject.activeInHierarchy && renderer.bounds.size != UnityEngine.Vector3.zero) own = renderer.bounds;
+                else {
+                    var filter = renderer.GetComponent<UnityEngine.MeshFilter>();
+                    var mesh = filter == null ? null : filter.sharedMesh;
+                    if (mesh == null || mesh.name.StartsWith("Combined Mesh", StringComparison.Ordinal)) own = new UnityEngine.Bounds(renderer.transform.position, UnityEngine.Vector3.zero);
+                    else {
+                        var local = mesh.bounds; var ext = local.extents;
+                        own = new UnityEngine.Bounds(renderer.transform.TransformPoint(local.center), UnityEngine.Vector3.zero);
+                        for (var i = 0; i < 8; i++)
+                            own.Encapsulate(renderer.transform.TransformPoint(local.center + new UnityEngine.Vector3((i & 1) == 0 ? -ext.x : ext.x, (i & 2) == 0 ? -ext.y : ext.y, (i & 4) == 0 ? -ext.z : ext.z)));
+                    }
+                }
+                if (any) bounds.Encapsulate(own); else { bounds = own; any = true; }
+            }
+            if (!any) return null;
+            var map = NativeInventory.MapPosition(bounds.center, NativeInventory.MovesWithOrigin(go.transform));
+            return Single.IsNaN(map.x) || Single.IsNaN(map.z) ? null : new double[] { map.x, map.z };
+        }
+        static double Distance(double[] a, double[] b) => Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]));
+
         static void Prepare(IReadOnlyList<SceneObservation> entries) {
             if (ReferenceEquals(placesFor, entries) && placeCache != null) return;
-            placesFor = entries; placeCache = new Dictionary<SceneObservation, PlaceInfo>();
-            var locs = new HashSet<string>(entries.Select(LocName).Where(n => !String.IsNullOrEmpty(n)), StringComparer.OrdinalIgnoreCase);
+            placesFor = entries; placeCache = new Dictionary<SceneObservation, PlaceInfo>(); measured = new Dictionary<SceneObservation, double[]>();
             var folders = new HashSet<string>(entries.Select(e => SceneryFolder(e.Identity.Path)).Where(f => f != null), StringComparer.OrdinalIgnoreCase);
-            var candidates = locs.Concat(folders).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            string Words(string text) => " " + text.ToLowerInvariant() + " ";
-            // A folder that starts with a place name belongs to that place (Alarka Signs, Almond Bridge); a folder named
-            // after a structure and no place is no place (Plate Girder Bridge, Global Signs).
-            string NormalizeFolder(string folder) {
-                if (locs.Contains(folder)) return NormalizeLoc(folder);
-                var prefix = candidates.Where(c => !c.Equals(folder, StringComparison.OrdinalIgnoreCase) && folder.StartsWith(c + " ", StringComparison.OrdinalIgnoreCase)).OrderByDescending(c => c.Length).FirstOrDefault();
-                if (prefix != null) return locs.Contains(prefix) ? NormalizeLoc(prefix) : NormalizeFolder(prefix);
-                if (Regex.IsMatch(folder, @"\b(Signs|Bridge|Turntable)\b")) return null;
-                return folder;
-            }
-            // A location marker name that holds a scenery folder's place name belongs to it (Whittier E, Sylva Int).
-            string NormalizeLoc(string loc) {
-                if (folders.Contains(loc)) return folders.First(f => f.Equals(loc, StringComparison.OrdinalIgnoreCase));
-                var inside = folders.Where(f => !Regex.IsMatch(f, @"\b(Signs|Bridge|Turntable)\b") && Words(loc).Contains(Words(f).TrimEnd() + " ")).OrderByDescending(f => f.Length).FirstOrDefault();
-                return inside ?? loc;
+            // A folder is its own place (Alarka, Alarka Jct). A folder whose name is a place followed by a structure word
+            // belongs to that place (Alarka Signs, Almond Bridge, Dillsboro Turntable). Plate Girder Bridge and Global
+            // Signs are no place.
+            string Normalize(string folder) {
+                if (NoPlaceFolders.Contains(folder)) return null;
+                var match = StructureSuffix.Match(folder);
+                if (!match.Success) return folder;
+                var rest = folder.Substring(0, match.Index);
+                return folders.FirstOrDefault(f => f.Equals(rest, StringComparison.OrdinalIgnoreCase)) ?? rest;
             }
             aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var f in folders) { var p = NormalizeFolder(f); if (p != null) aliases[f] = p; }
-            foreach (var l in locs) aliases[l] = NormalizeLoc(l);
+            foreach (var f in folders) { var p = Normalize(f); if (p != null) { aliases[f] = p; aliases[p] = p; } }
             aliasPatterns = aliases.Keys.OrderByDescending(a => a.Length)
                 .Select(a => new KeyValuePair<string, Regex>(a, new Regex(@"(?<![\w])" + Regex.Escape(a) + @"(?![\w])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))).ToList();
-            // A place's centre: the median of the objects in its scenery folders outside sign folders, else of its
-            // location markers.
+            // A place's centre: the median x and z of its members, measured at their bounds. Members are the objects
+            // outside any group or controller in the place's folders; sign folders are left out, because their signs
+            // spread along the line. Its radius: the 90th percentile of the members' distances from the centre, at least
+            // MinimumRadius, plus RadiusMargin.
             var points = new Dictionary<string, List<double[]>>(StringComparer.OrdinalIgnoreCase);
             foreach (var e in entries) {
-                if (e.GroupPath != null || !HasPosition(e)) continue;
+                if (e.GroupPath != null || e.HolderPath != null) continue;
                 var folder = SceneryFolder(e.Identity.Path);
                 if (folder == null || InSignsFolder(e.Identity.Path) || !aliases.TryGetValue(folder, out var place)) continue;
+                var at = Measure(e); if (at == null) continue;
                 if (!points.TryGetValue(place, out var list)) points[place] = list = new List<double[]>();
-                list.Add(new[] { e.Position[0], e.Position[2] });
-            }
-            var fromFolders = new HashSet<string>(points.Keys, StringComparer.OrdinalIgnoreCase);
-            foreach (var e in entries) {
-                var loc = LocName(e);
-                if (loc == null || !HasPosition(e) || !aliases.TryGetValue(loc, out var place) || fromFolders.Contains(place)) continue;
-                if (!points.TryGetValue(place, out var list)) points[place] = list = new List<double[]>();
-                list.Add(new[] { e.Position[0], e.Position[2] });
+                list.Add(at);
             }
             double Median(IEnumerable<double> values) { var s = values.OrderBy(v => v).ToArray(); return s.Length % 2 == 1 ? s[s.Length / 2] : (s[s.Length / 2 - 1] + s[s.Length / 2]) / 2; }
             centres = points.ToDictionary(p => p.Key, p => new[] { Median(p.Value.Select(v => v[0])), Median(p.Value.Select(v => v[1])) }, StringComparer.OrdinalIgnoreCase);
+            radii = points.ToDictionary(p => p.Key, p => {
+                var d = p.Value.Select(v => Distance(v, centres[p.Key])).OrderBy(v => v).ToArray();
+                return Math.Max(MinimumRadius, d[Math.Max(0, (int)Math.Ceiling(0.9 * d.Length) - 1)]) + RadiusMargin;
+            }, StringComparer.OrdinalIgnoreCase);
         }
 
         static PlaceInfo PlaceOf(SceneObservation e) {
@@ -125,14 +156,22 @@ namespace RailroaderScenePatcher {
                 var name = Last(e.Identity.Path);
                 foreach (var alias in aliasPatterns) if (alias.Value.IsMatch(name)) { info.Named = aliases[alias.Key]; break; }
             }
-            if (HasPosition(e) && centres.Count != 0) {
-                double Distance(double[] c) => Math.Sqrt((e.Position[0] - c[0]) * (e.Position[0] - c[0]) + (e.Position[2] - c[1]) * (e.Position[2] - c[1]));
-                var nearest = centres.OrderBy(c => Distance(c.Value)).First();
-                info.Near = nearest.Key; info.NearDistance = Distance(nearest.Value);
-                if (info.Named != null && centres.TryGetValue(info.Named, out var own)) info.NamedDistance = Distance(own);
+            var at = Measure(e);
+            if (at != null && centres.Count != 0) {
+                var nearest = centres.OrderBy(c => Distance(at, c.Value)).First();
+                info.Near = nearest.Key; info.NearDistance = Distance(at, nearest.Value);
+                if (info.Named != null && centres.TryGetValue(info.Named, out var own)) {
+                    info.NamedDistance = Distance(at, own);
+                    var inside = centres.Where(c => !c.Key.Equals(info.Named, StringComparison.OrdinalIgnoreCase) && Distance(at, c.Value) <= radii[c.Key]).OrderBy(c => Distance(at, c.Value)).FirstOrDefault();
+                    if (inside.Key != null) { info.Inside = inside.Key; info.InsideDistance = Distance(at, inside.Value); }
+                }
             }
             return placeCache[e] = info;
         }
+        // The conflict rule: the object stands outside its named place's radius and inside the radius of another place,
+        // nearer that place's centre than its own.
+        static bool IsConflict(PlaceInfo info) => info.Named != null && info.Inside != null && centres.ContainsKey(info.Named)
+            && info.NamedDistance > radii[info.Named] && info.InsideDistance < info.NamedDistance;
 
         // ---- kinds ----
         internal static readonly string[] SignKinds = { "Town sign groups", "Station signs", "Location signs", "Speed signs", "Yard limits", "Whistle signs", "CTC signs", "Mileposts", "Other signs" };
@@ -256,12 +295,13 @@ namespace RailroaderScenePatcher {
                 u.Node.Children.Sort((a, b) => { var by = StringComparer.OrdinalIgnoreCase.Compare(a.Label, b.Label); return by != 0 ? by : StringComparer.Ordinal.Compare(a.Row.Identity.Path, b.Row.Identity.Path); });
                 Classify(u, variant);
                 var place = PlaceOf(u.Row);
-                u.Place = place.Named ?? place.Near; u.Near = place.Near;
-                u.Conflict = place.Named != null && place.Near != null && !place.Named.Equals(place.Near, StringComparison.OrdinalIgnoreCase) && place.NamedDistance > ConflictDistance;
+                u.Place = place.Named ?? place.Near; u.Near = place.Near; u.Inside = place.Inside;
+                u.Nearest = place.Named == null && place.Near != null;
+                u.Conflict = IsConflict(place);
             }
             var result = new Result();
-            string Note(Unit u) => u.Conflict ? "(stands near " + u.Near + ")" : null;
-            string WithPlace(Unit u) => u.Place == null ? Note(u) : u.Place + (u.Conflict ? " " + Note(u) : "");
+            string Note(Unit u) => u.Conflict ? "(stands in " + u.Inside + ")" : u.Nearest ? "(nearest place)" : null;
+            string WithPlace(Unit u) => u.Place == null ? Note(u) : u.Place + (Note(u) == null ? "" : " " + Note(u));
 
             void Fill(OutlineNode folder, List<Unit> members, int depth, string prefix, bool placeFolders) {
                 var loose = new List<Unit>();
@@ -280,7 +320,7 @@ namespace RailroaderScenePatcher {
                     folder.Children.AddRange(subfolders[0].Children); folder.Count = subfolders[0].Count; return;
                 }
                 folder.Children.AddRange(subfolders);
-                var placeGroups = placeFolders && loose.Count > PlaceListMinimum ? loose.Where(m => m.Place != null).GroupBy(m => m.Place, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() >= PlaceThreshold).ToList() : new List<IGrouping<string, Unit>>();
+                var placeGroups = placeFolders && loose.Count > PlaceListMinimum ? loose.Where(m => m.Place != null && !m.Nearest).GroupBy(m => m.Place, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() >= PlaceThreshold).ToList() : new List<IGrouping<string, Unit>>();
                 // One place folder that would hold every loose object only repeats a place: the objects stand loose with it.
                 if (placeGroups.Count == 1 && placeGroups[0].Count() == loose.Count && subfolders.Count == 0) placeGroups.Clear();
                 var inFolders = new HashSet<Unit>(placeGroups.SelectMany(g => g));
@@ -315,7 +355,7 @@ namespace RailroaderScenePatcher {
             }
             foreach (var u in units.Where(u => u.Conflict)) {
                 var info = PlaceOf(u.Row);
-                result.Conflicts.Add(u.Node.Label + " (" + u.Row.Identity.Path + "): named " + info.Named + " at " + Math.Round(info.NamedDistance).ToString(CultureInfo.InvariantCulture) + " m, nearest " + info.Near + " at " + Math.Round(info.NearDistance).ToString(CultureInfo.InvariantCulture) + " m");
+                result.Conflicts.Add(u.Node.Label + " (" + u.Row.Identity.Path + "): named " + info.Named + " at " + Math.Round(info.NamedDistance).ToString(CultureInfo.InvariantCulture) + " m (radius " + Math.Round(radii[info.Named]).ToString(CultureInfo.InvariantCulture) + "), inside " + info.Inside + " at " + Math.Round(info.InsideDistance).ToString(CultureInfo.InvariantCulture) + " m (radius " + Math.Round(radii[info.Inside]).ToString(CultureInfo.InvariantCulture) + ")");
             }
             result.Tops = tops;
             result.Listed = tops.Sum(t => t.Count);
@@ -329,7 +369,7 @@ namespace RailroaderScenePatcher {
             UnityEngine.Debug.Log("Scene Patcher PROTOTYPE outliner: view=" + (ByPlace ? "Place" : "Category") + " variant=" + VariantKeys[Variant] + " (" + VariantNames[Variant] + ") tops=" + result.Tops.Count
                 + " listed=" + result.Listed + " shown=" + rowsShown + " notPlaced=" + result.Unplaced + " dropped=" + (rowsShown - result.Listed) + " filter=" + filter + " search='" + search + "' [" + tops + "]");
             UnityEngine.Debug.Log("Scene Patcher PROTOTYPE outliner detail: catchAll=" + result.CatchAll.Count + " {" + String.Join(" | ", result.CatchAll) + "} conflicts=" + result.Conflicts.Count + " {" + String.Join(" | ", result.Conflicts) + "} places={"
-                + String.Join(", ", (centres ?? new Dictionary<string, double[]>()).OrderBy(c => c.Key).Select(c => c.Key + "@" + Math.Round(c.Value[0]) + "," + Math.Round(c.Value[1]))) + "}");
+                + String.Join(", ", (centres ?? new Dictionary<string, double[]>()).OrderBy(c => c.Key).Select(c => c.Key + "@" + Math.Round(c.Value[0]) + "," + Math.Round(c.Value[1]) + " r" + Math.Round(radii[c.Key]))) + "}");
         }
         internal static void LogCurrent(int tops, int rowsShown) =>
             UnityEngine.Debug.Log("Scene Patcher PROTOTYPE outliner: view=Category variant=0 (Current outliner) tops=" + tops + " listed=" + rowsShown + " notPlaced=0");

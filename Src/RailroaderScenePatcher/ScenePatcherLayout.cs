@@ -444,7 +444,7 @@ namespace RailroaderScenePatcher {
                         : (ReferenceEquals(group.Key, InventoryPresentationState.InspectionOnlyGroup) ? "group:" : "family:") + group.Key;
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
-                    var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + (protoTop?.Count ?? group.Value.Count).ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(protoTop?.Label ?? group.Key));
+                    var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + (protoTop != null ? "(" + protoTop.Count.ToString(CultureInfo.InvariantCulture) + ")" : group.Value.Count.ToString(CultureInfo.InvariantCulture)) + "<alpha=#FF> " + Literal(protoTop?.Label ?? group.Key));
                     var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
                     // A family whose objects the game itself tells apart shows them under subgroups; a family group
                     // only, never the Inspection only group.
@@ -497,7 +497,7 @@ namespace RailroaderScenePatcher {
                         UIOutlineItem made; string key;
                         if (node.Row == null) {
                             key = groupKey + "/" + node.Key;
-                            made = new UIOutlineItem(key, "<alpha=#99>" + node.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(node.Label) + (node.Where == null ? "" : "  <alpha=#99>" + Literal(node.Where) + "<alpha=#FF>"));
+                            made = new UIOutlineItem(key, "<alpha=#99>" + (protoTop != null ? "(" + node.Count.ToString(CultureInfo.InvariantCulture) + ")" : node.Count.ToString(CultureInfo.InvariantCulture)) + "<alpha=#FF> " + Literal(node.Label) + (node.Where == null ? "" : "  <alpha=#99>" + Literal(node.Where) + "<alpha=#FF>"));
                         } else {
                             key = indices[node.Row].ToString(CultureInfo.InvariantCulture);
                             made = Row(node.Row, node.Label, above, node.Where, node.Context);
