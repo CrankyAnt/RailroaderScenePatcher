@@ -703,9 +703,10 @@ namespace RailroaderScenePatcher {
                 operations = CommandBand.AddedEquipmentOperations(displayName);
             }
             // A mast and a bell are named with their crossing, which tells the masts of several crossings apart.
-            // A crossbuck is named with its crossing, which tells the 52 crossbucks of the base map apart.
+            // A crossbuck is named with its crossing, and its place where crossings share a name, which tells the 52
+            // crossbucks of the base map apart.
             string padMarkerId = null;
-            if (groupRoot && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = BakedSceneryRules.CrossbuckName(verdict.Path, padMarkerId); });
+            if (groupRoot && verdict?.Crossbuck == true) Read(() => { padMarkerId = GroupWorld.TargetPadMarkerId(go); displayName = BakedSceneryRules.CrossbuckName(verdict.Path, padMarkerId, GroupWorld.SharedCrossingNames()); });
             if ((mast || ownBell) && controller != null) Read(() => displayName = go.name + " at " + CrossingEquipment.Place(controller.gameObject.name, Ancestors(controller.transform)));
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.

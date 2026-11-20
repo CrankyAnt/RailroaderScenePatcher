@@ -293,14 +293,26 @@ namespace RailroaderScenePatcher.Core {
         // stands below World. Its models, the LOD levels below it, belong to its entry and are no parts.
         public const string CrossbuckModels = "The models of a crossbuck belong to its entry";
         // The name of a crossbuck's entry: the crossbuck's own name at its crossing, as a crossing mast is named, so the
-        // crossbucks of the base map read apart and a search finds them by crossing name. A crossbuck that the pad marker
-        // id identifies names that id. The full path stays in the tooltip.
-        public static string CrossbuckName(string path, string padMarkerId = null) {
+        // crossbucks of the base map read apart and a search finds them by crossing name. Where crossings at other paths
+        // share the crossing's name, such as the two Crossing Unprotected - Robbinsville crossings, the name adds the
+        // place the crossing stands at (CrossingEquipment.Place). A crossbuck that the pad marker id identifies names
+        // that id. The full path stays in the tooltip.
+        public static string CrossbuckName(string path, string padMarkerId = null, ISet<string> sharedCrossingNames = null) {
             if (path == null) return null;
             var last = path.LastIndexOf('/');
             if (last <= 0) return path;
             var crossing = path.LastIndexOf('/', last - 1);
-            return path.Substring(last + 1) + " at " + path.Substring(crossing + 1, last - crossing - 1) + (padMarkerId == null ? "" : " (pad marker " + padMarkerId + ")");
+            var name = path.Substring(crossing + 1, last - crossing - 1);
+            var place = sharedCrossingNames != null && sharedCrossingNames.Contains(name) && crossing > 0
+                ? " in " + CrossingEquipment.Place(null, path.Substring(0, crossing).Split('/').Reverse().ToArray()) : "";
+            return path.Substring(last + 1) + " at " + name + place + (padMarkerId == null ? "" : " (pad marker " + padMarkerId + ")");
+        }
+        // The crossing names that crossings at two or more hierarchy paths hold, from the paths of the listed crossbucks.
+        // The crossings that share one path, as below Old River Rd, are told apart by their pad marker id instead.
+        public static ISet<string> SharedCrossingNames(IEnumerable<string> crossbuckPaths) {
+            var crossings = (crossbuckPaths ?? Enumerable.Empty<string>()).Where(path => path != null && path.LastIndexOf('/') > 0)
+                .Select(path => path.Substring(0, path.LastIndexOf('/'))).Distinct(StringComparer.Ordinal);
+            return new HashSet<string>(crossings.GroupBy(crossing => crossing.Substring(crossing.LastIndexOf('/') + 1), StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key), StringComparer.Ordinal);
         }
         // Why a target with a pad marker id cannot name a crossbuck, from the crossbucks listed at its path, or null. The
         // id identifies a crossbuck only where several crossbucks share the path: a crossbuck with a path of its own is

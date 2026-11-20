@@ -235,8 +235,13 @@ namespace RailroaderScenePatcher {
                 }
             }
             verdictKey = text; partVerdicts = parts; driven = drivenNow; toggleRoots = togglesNow;
+            sharedCrossingNames = BakedSceneryRules.SharedCrossingNames(found.Values.Where(v => v.Disposition == GroupDisposition.Group && v.Crossbuck).Select(v => v.Path));
             return verdicts = found;
         }
+        // The crossing names that crossings at two or more paths hold, read with the verdicts, so that a crossbuck's
+        // entry name adds its crossing's place (BakedSceneryRules.CrossbuckName).
+        static ISet<string> sharedCrossingNames = new HashSet<string>();
+        internal static ISet<string> SharedCrossingNames() { Verdicts(); return sharedCrossingNames; }
         // The listed group roots that hold a pickable toggle at any depth, read once with the verdicts: only their entries
         // read the toggles, key-value objects and name texts they own (NativeInventory.InteractiveBindings).
         static readonly Type pickableToggle = Native.Type(CommandBand.PickableToggle);

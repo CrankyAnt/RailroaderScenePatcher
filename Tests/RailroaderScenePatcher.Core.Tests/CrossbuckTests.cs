@@ -284,28 +284,41 @@ static class CrossbuckTests {
         Check(InventoryPresentationState.GroupWhere(OldRiver + "/Sign-Crossing0 (1)") == "Roads Bryson / Old River Rd / Crossing Unprotected"
             && InventoryPresentationState.GroupWhere(Own + "/Sign-Crossing0 (1)") == "Roads Bryson / Crossing Unprotected (1)", "a crossbuck row's location is its raw path");
         // The row label names the crossbuck at its crossing, so the crossbucks read apart and a search finds them by
-        // crossing name; the full path stays in the tooltip.
-        Check(BakedSceneryRules.CrossbuckName(Own + "/Sign-Crossing0 (1)") == "Sign-Crossing0 (1) at Crossing Unprotected (1)"
-            && BakedSceneryRules.CrossbuckName(OldRiver + "/Sign-Crossing0 (2)", "Mbkd") == "Sign-Crossing0 (2) at Crossing Unprotected (pad marker Mbkd)"
-            && BakedSceneryRules.CrossbuckName("World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)") == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville",
-            "a crossbuck is named with its crossing, with the pad marker id where crossings share one path");
+        // crossing name; the full path stays in the tooltip. Where crossings at other paths share the crossing's name,
+        // the label adds the place the crossing stands at, as a crossing mast is named.
+        const string Andrews = "World/Roads Andrews/Crossing Unprotected - Robbinsville", Topton = "World/Roads Topton/Crossing Unprotected - Robbinsville";
+        var paths = new[] { OldRiver + "/Sign-Crossing0 (1)", OldRiver + "/Sign-Crossing0 (1)", Own + "/Sign-Crossing0 (1)", Nantahala + "/Sign-Crossing0 (1)",
+            Andrews + "/Sign-Crossing0 (1)", Andrews + "/Sign-Crossing0 (2)", Topton + "/Sign-Crossing0 (1)", Topton + "/Sign-Crossing0 (2)" };
+        var shared = BakedSceneryRules.SharedCrossingNames(paths);
+        Check(shared.SetEquals(new[] { "Crossing Unprotected", "Crossing Unprotected - Robbinsville" }),
+            "a crossing name is shared when crossings at two or more paths hold it; the crossings of one path share no name (got " + String.Join(", ", shared) + ")");
+        Check(BakedSceneryRules.CrossbuckName(Own + "/Sign-Crossing0 (1)", null, shared) == "Sign-Crossing0 (1) at Crossing Unprotected (1)"
+            && BakedSceneryRules.CrossbuckName(OldRiver + "/Sign-Crossing0 (2)", "Mbkd", shared) == "Sign-Crossing0 (2) at Crossing Unprotected in Old River Rd (pad marker Mbkd)"
+            && BakedSceneryRules.CrossbuckName(Nantahala + "/Sign-Crossing0 (1)", null, shared) == "Sign-Crossing0 (1) at Crossing Unprotected in Nantahala"
+            && BakedSceneryRules.CrossbuckName(Andrews + "/Sign-Crossing0 (1)", null, shared) == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Andrews"
+            && BakedSceneryRules.CrossbuckName(Topton + "/Sign-Crossing0 (1)", null, shared) == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Topton"
+            && BakedSceneryRules.CrossbuckName(Andrews + "/Sign-Crossing0 (1)") == "Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville",
+            "a crossbuck is named with its crossing, with the place where crossings share a name and the pad marker id where crossings share one path");
         SceneObservation Row(string path, string pad = null) => new SceneObservation(new object(), new TargetIdentity(Scene, path, "UnityEngine.Transform", BakedSceneryGroups.Structure, pad), BakedSceneryRules.Family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], CommandBand.CrossbuckOperations,
-            displayName: BakedSceneryRules.CrossbuckName(path, pad), category: BakedSceneryCategories.GradeCrossing);
+            displayName: BakedSceneryRules.CrossbuckName(path, pad, shared), category: BakedSceneryCategories.GradeCrossing);
         var listed = new Listing();
-        listed.Objects.AddRange(new[] { Row(OldRiver + "/Sign-Crossing0 (1)", "Mbkd"), Row(OldRiver + "/Sign-Crossing0 (1)", "M0sh"), Row("World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)"),
-            Row("World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (2)") });
+        listed.Objects.AddRange(new[] { Row(OldRiver + "/Sign-Crossing0 (1)", "Mbkd"), Row(OldRiver + "/Sign-Crossing0 (1)", "M0sh"), Row(Andrews + "/Sign-Crossing0 (1)"),
+            Row(Andrews + "/Sign-Crossing0 (2)"), Row(Topton + "/Sign-Crossing0 (1)"), Row(Topton + "/Sign-Crossing0 (2)") });
         var inventory = new SceneInventory(listed); inventory.Refresh();
         var tree = InventoryPresentationState.Categories(InventoryPresentationState.Groups(InventoryPresentationState.Rows(inventory, "", OutlinerFilter.All, null))[0].Value, inventory.Entries, "");
         var labels = tree.Single(n => n.Label == BakedSceneryCategories.GradeCrossing).Children.Select(n => n.Label).ToArray();
-        Check(labels.Length == 4 && labels.Distinct().Count() == 4 && labels.Contains("Sign-Crossing0 (1) at Crossing Unprotected (pad marker Mbkd)") && labels.Contains("Sign-Crossing0 (2) at Crossing Unprotected - Robbinsville"),
+        Check(labels.Length == 6 && labels.Distinct().Count() == 6 && labels.Contains("Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)")
+            && labels.Contains("Sign-Crossing0 (2) at Crossing Unprotected - Robbinsville in Andrews") && labels.Contains("Sign-Crossing0 (2) at Crossing Unprotected - Robbinsville in Topton"),
             "the outliner rows under Grade crossing read apart by their crossing (got " + String.Join(", ", labels) + ")");
         var found = InventoryPresentationState.Rows(inventory, "Robbinsville", OutlinerFilter.All, null);
-        Check(found.Count() == 2 && found.All(row => row.DisplayName.EndsWith("at Crossing Unprotected - Robbinsville", StringComparison.Ordinal)), "a search by crossing name finds that crossing's crossbucks");
+        Check(found.Count() == 4 && found.Select(row => row.DisplayName).Distinct().Count() == 4 && found.Count(row => row.DisplayName.EndsWith("Robbinsville in Andrews", StringComparison.Ordinal)) == 2,
+            "a search by crossing name finds the crossbucks of both crossings of that name, each label alike to no other");
+        Check(InventoryPresentationState.Rows(inventory, "Robbinsville in Topton", OutlinerFilter.All, null).Count() == 2, "a search by crossing name and place finds that crossing's crossbucks");
         Check(InventoryPresentationState.Rows(inventory, "pad marker M0sh", OutlinerFilter.All, null).Single().Identity.PadMarkerId == "M0sh", "a search by pad marker id finds the Old River Rd crossbuck");
         var copied = JObject.Parse(PatchEditingSession.CopyId(new[] { "map" }, listed.Objects[0]))["target"];
         Check((string)copied["path"] == OldRiver + "/Sign-Crossing0 (1)" && (string)copied["padMarkerId"] == "Mbkd", "Copy ID shows the pad marker id beside the raw path: " + copied);
         var tip = InventoryPresentationState.OutlinerTooltip(listed.Objects[0], false);
-        Check(tip.StartsWith("Sign-Crossing0 (1) at Crossing Unprotected (pad marker Mbkd)\n" + OldRiver + "/Sign-Crossing0 (1)", StringComparison.Ordinal), "the tooltip shows the full name and path: " + tip);
+        Check(tip.StartsWith("Sign-Crossing0 (1) at Crossing Unprotected in Old River Rd (pad marker Mbkd)\n" + OldRiver + "/Sign-Crossing0 (1)", StringComparison.Ordinal), "the tooltip shows the full name and path: " + tip);
     }
 }
