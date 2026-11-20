@@ -100,10 +100,9 @@ namespace RailroaderScenePatcher {
                 headingLayout.flexibleWidth = 0;
                 foreach (var text in heading.GetComponentsInChildren<TMP_Text>(true)) text.textWrappingMode = TextWrappingModes.NoWrap;
                 var headingText = heading.GetComponentInChildren<TMP_Text>(true);
-                presentation.DisclosureTriangle(heading.parent, longForm, headingText != null ? headingText.color : Color.white, toggle)
-                    .Tooltip(title, CommandBand.DisclosureTip(longForm));
+                presentation.DisclosureTriangle(heading.parent, longForm, headingText != null ? headingText.color : Color.white, toggle, heading, title, CommandBand.DisclosureTip(longForm));
                 row.Spacer();
-            }).Height(LineHeight);
+            }).Height(NativePresentation.DisclosureHitSize);
         }
         // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.

@@ -152,15 +152,20 @@ namespace RailroaderScenePatcher {
         }
         // The native disclosure triangle, with the sprites AddExpandable draws (UIBuilderAssets.disclosureCollapsed and
         // disclosureExpanded), as a button of its own in a builder row: the 10-unit triangle in the given colour stands
-        // in a clear 20-unit square that takes the click, so it is easy to hit. A click runs click and rebuilds the panel.
-        internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click) {
-            var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
+        // in a clear square as large as a native compact button, 24 units, that takes the click. label, the heading the
+        // triangle follows, takes the same click and tooltip, so the heading and the triangle form one target. A click
+        // runs click and rebuilds the panel. The game's tooltip raycast reads only objects on the UI layer, so every
+        // object made here takes the layer of the row it stands in.
+        internal const float DisclosureHitSize = 24;
+        internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click, RectTransform label, string title, string tip) {
+            var layer = parent.gameObject.layer;
+            var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave, layer = layer };
             var rect = (RectTransform)hit.transform;
             rect.SetParent(parent, false);
             var layout = hit.AddComponent<LayoutElement>();
-            layout.minWidth = layout.preferredWidth = 20; layout.minHeight = layout.preferredHeight = 20; layout.flexibleWidth = 0;
+            layout.minWidth = layout.preferredWidth = DisclosureHitSize; layout.minHeight = layout.preferredHeight = DisclosureHitSize; layout.flexibleWidth = 0;
             var area = hit.AddComponent<Image>(); area.color = Color.clear;
-            var icon = new GameObject("Triangle", typeof(RectTransform)) { hideFlags = HideFlags.DontSave };
+            var icon = new GameObject("Triangle", typeof(RectTransform)) { hideFlags = HideFlags.DontSave, layer = layer };
             var iconRect = (RectTransform)icon.transform;
             iconRect.SetParent(rect, false);
             iconRect.anchorMin = iconRect.anchorMax = new Vector2(.5f, .5f); iconRect.sizeDelta = new Vector2(10, 10); iconRect.anchoredPosition = Vector2.zero;
@@ -172,6 +177,15 @@ namespace RailroaderScenePatcher {
             button.targetGraphic = area; button.transition = Selectable.Transition.None;
             var run = Action(click);
             button.onClick.AddListener(() => run());
+            rect.Tooltip(title, tip);
+            if (label != null) {
+                var text = label.GetComponentInChildren<TMP_Text>(true);
+                if (text != null) text.raycastTarget = true;
+                var labelButton = label.GetComponent<Button>() ?? label.gameObject.AddComponent<Button>();
+                labelButton.targetGraphic = text; labelButton.transition = Selectable.Transition.None;
+                labelButton.onClick.AddListener(() => run());
+                label.Tooltip(title, tip);
+            }
             return rect;
         }
         // Every title-bar glyph is one size and one stroke weight, those of the native close cross beside them, which
