@@ -207,8 +207,36 @@ namespace RailroaderScenePatcher {
         // change, gizmo preview and Undo, or its observed position for anything else.
         static Vector3 Live(SpatialCandidate candidate, Vector3 origin) =>
             candidate.Observation != null && candidate.Choice.Handle is GameObject go && go != null ? go.transform.position : candidate.Position + origin;
+        // The families of the inventory objects on each scene object, from the inventory snapshot, read again when the
+        // snapshot is another one: an object framed whole leaves out the renderers of some objects below it
+        // (ObjectMarkingGeometry.WholeCounts).
+        object familiesFrom;
+        readonly Dictionary<GameObject, List<string>> families = new Dictionary<GameObject, List<string>>();
+        List<string> FamiliesOf(GameObject go) {
+            var snapshot = Inventory?.Invoke();
+            if (!ReferenceEquals(snapshot, familiesFrom)) {
+                familiesFrom = snapshot; families.Clear();
+                if (snapshot != null)
+                    foreach (var o in snapshot)
+                        if (o?.Handle is GameObject owner && owner != null && o.Family != null) {
+                            if (!families.TryGetValue(owner, out var list)) families[owner] = list = new List<string>();
+                            list.Add(o.Family);
+                        }
+            }
+            return go != null && families.TryGetValue(go, out var found) ? found : null;
+        }
+        // The families of the inventory objects on a renderer's scene object and above it, up to an object, nearest first.
+        IEnumerable<string> FamiliesBetween(Renderer renderer, GameObject go) {
+            for (var t = renderer.transform; t != null && t != go.transform; t = t.parent) {
+                var on = FamiliesOf(t.gameObject);
+                if (on != null) foreach (var family in on) yield return family;
+            }
+        }
         Renderer[] ListRenderers(GameObject go) {
             var own = go.GetComponentsInChildren<Renderer>(true);
+            // A crossing controller is framed whole, around its setup, without its whistle signs and detection spans.
+            var whole = FamiliesOf(go)?.FirstOrDefault(ObjectMarkingGeometry.FramesWhole);
+            if (whole != null) own = own.Where(renderer => renderer != null && ObjectMarkingGeometry.WholeCounts(whole, FamiliesBetween(renderer, go))).ToArray();
             if (!controlled.TryGetValue(go, out var targets)) {
                 var found = new List<GameObject>();
                 try {

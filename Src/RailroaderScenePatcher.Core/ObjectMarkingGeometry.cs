@@ -420,9 +420,17 @@ namespace RailroaderScenePatcher.Core {
             return WorldRibbonGeometry.Hull(all);
         }
         // Whether an inventory object of a family stands for everything below it and is framed whole: the root of a
-        // baked scenery group, which the inventory lists as one entry for the whole group.
-        public const string WholeFamily = "Baked scenery group";
-        public static bool FramesWhole(string family) => family == WholeFamily;
+        // baked scenery group, which the inventory lists as one entry for the whole group, and a crossing controller,
+        // which stands for the whole crossing: its scene object is the root of the grade-crossing setup it controls.
+        public const string WholeFamily = "Baked scenery group", ControllerFamily = "Crossing controller";
+        public static bool FramesWhole(string family) => family == WholeFamily || family == ControllerFamily;
+        // Whether a renderer below an object framed whole counts for its frame. families holds the families of the
+        // inventory objects on the renderer's scene object and above it, up to the framed object, nearest first. A
+        // crossing controller's frame leaves out its whistle signs, which are no part of its setup
+        // (GameDefinedGroups.Of), and its detection spans, which are invisible; the masts with their gates, the bell
+        // and the pads count. Everything below another object framed whole counts.
+        public static bool WholeCounts(string family, IEnumerable<string> families) =>
+            family != ControllerFamily || families == null || !families.Any(f => f == "Track marker" || f == "Track span");
         // Where a marker with a frame stands on screen, from its world point projected to x and y: on that point
         // whenever it lies in front of the camera, also outside the frame's rectangle or the view, so it stays on its
         // world point as the camera zooms and turns; the center of the visible part of a frame larger than the view
