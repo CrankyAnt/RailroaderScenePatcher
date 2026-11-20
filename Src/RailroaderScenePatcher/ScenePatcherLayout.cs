@@ -107,24 +107,13 @@ namespace RailroaderScenePatcher {
         // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.
         void BindingFields(UIPanelBuilder builder, string line) {
-            var first = line.IndexOf('=');
-            if (first < 0) {
+            var values = InventoryPresentationState.BindingValues(line);
+            if (values == null) {
                 var colon = line.IndexOf(": ", StringComparison.Ordinal);
                 if (colon > 0) Field(builder, line.Substring(0, colon), Breakable(line.Substring(colon + 2))); else PlainLabel(builder, Breakable(line));
                 return;
             }
-            // The words before the first key name the group: "Marker", "Track-relative", "Circuit 0".
-            var space = line.LastIndexOf(' ', first);
-            var group = space < 0 ? "" : line.Substring(0, space);
-            string key = null, value = null;
-            foreach (var part in line.Substring(space + 1).Split(new[] { "; " }, StringSplitOptions.None)) {
-                var equals = part.IndexOf('=');
-                // A part without a key continues the value before it.
-                if (equals <= 0) { if (key != null) value += "; " + part; continue; }
-                if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(CommandBand.Shown(key, value)));
-                key = part.Substring(0, equals); value = part.Substring(equals + 1);
-            }
-            if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(CommandBand.Shown(key, value)));
+            foreach (var pair in values.Value.Values) Field(builder, (values.Value.Group + " " + pair.Key).Trim(), Breakable(CommandBand.Shown(pair.Key, pair.Value)));
         }
         // A group of named values in the native inspector's form (DtoInspectorPanel.AddStackedField with AddAxisField):
         // the group's caption above the row, then each short label in front of its input box, the boxes sharing the
