@@ -85,7 +85,6 @@ Plate Girder Bridge | Plate Girder Bridge (4) | Group | Bridge / Rail bridges
 Plate Girder Bridge | Plate Girder Bridge End | Group | Bridge / Rail bridges
 Plate Girder Bridge | Plate Girder Bridge End (1) | Group | Bridge / Rail bridges
 Rhodo | Rhodo Station | Group | Station building
-Robinson Gap Mine | Coal Loader | Group | Industry building
 Sylva | Sylva Culled | Group | Industry building
 Sylva | Sylva Depot | Group | Station building
 Sylva | Sylva Paperboard | Group | Storage display

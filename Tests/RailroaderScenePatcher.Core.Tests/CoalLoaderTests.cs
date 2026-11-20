@@ -25,7 +25,10 @@ static class CoalLoaderTests {
             new Node("Model",
                 new Node("MineLoader", MineLoaderRenderers.Select(name => new Node(name).Solid()).ToArray()).With("UnityEngine.Animator", "RollingStock.Controls.KeyValueBoolAnimator"),
                 new Node("Spotlight Outdoor").With("UnityEngine.Light", "Effects.NightLightController", "UnityEngine.Rendering.Universal.UniversalAdditionalLightData").Solid()).With(BakedSceneryRules.SimpleCuller))
-            .With("RollingStock.CarContentSwapper", "KeyValue.Runtime.KeyValueObject", "RollingStock.Controls.GlobalKeyValueObject"))));
+            .With("RollingStock.CarContentSwapper", "KeyValue.Runtime.KeyValueObject", "RollingStock.Controls.GlobalKeyValueObject"),
+        new Node("Mine Office").Solid())));
+    // A listed group beside the loader, whose modification in the same file still applies.
+    internal const string Neighbour = "World/Large Scenery/Robinson Gap Mine/Mine Office";
 
     public static void Run() {
         TheLoaderGroupStaysOutWithItsReason();
@@ -53,36 +56,44 @@ static class CoalLoaderTests {
         Assert(elsewhere.Disposition == GroupDisposition.NotListed && elsewhere.Reason == BakedSceneryRules.CarLoaders, "A car loader deeper in a group keeps the group out: " + elsewhere.Disposition + " " + elsewhere.Reason);
     }
 
-    // A group or part modification that names the loader, or an object below it, fails before any change.
+    // A group or part modification that names the loader, or an object below it, fails with the Car loaders reason
+    // before any change, and the file's other modifications still apply.
     const string SceneName = "BushnellWhittier-MapManager";
     static void TheLoaderCannotBeTargeted() {
         var world = new FakeGroupWorld();
         var group = new FakeGroup { Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null };
         group.Position = new[] { 317.85, 602.86, 2188.55 };
-        group.Add(new FakePart { Id = "Spotlight Outdoor#1", Offset = new[] { 2.0, 8, 0 } });
+        var light = group.Add(new FakePart { Id = "Spotlight Outdoor#1", Offset = new[] { 2.0, 8, 0 } });
+        var chute = group.Add(new FakePart { Id = "Chute#2", Offset = new[] { 0.0, 3, 1 } });
+        var office = new FakeGroup { Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null };
+        office.Position = new[] { 340.0, 602.86, 2190.0 };
         var verdicts = BakedSceneryRules.Classify(World());
         world.GroupVerdicts = verdicts.ToDictionary(v => v.Path, v => v);
         world.Verdicts = BakedSceneryRules.Parts(verdicts).ToDictionary(v => v.Path, v => v);
-        // The game's adapter resolves a part only through a part verdict (GroupWorld.FindParts); an inspection-only group
-        // has none, so no part path is registered.
+        // The game's adapter finds every loaded object at a path (BoardScene.LoadedAt). The loader has no part verdicts,
+        // so an object below it resolves only through the group with the car loader above it.
         world.Objects[Loader] = new List<object> { group };
-        world.SetActive(group, true); world.Mutations = 0;
+        world.Objects[Neighbour] = new List<object> { office };
+        world.PartsAt[Loader + "/Model/Spotlight Outdoor"] = new List<object> { light };
+        world.PartsAt[Loader + "/Model/MineLoader/Chute"] = new List<object> { chute };
+        world.SetActive(group, true); world.SetActive(office, true); world.Mutations = 0;
         var holds = new PartHolds();
         var scene = new SceneCapabilities(() => world.Maps, null);
         scene.Add(new BakedSceneryGroups(world, holds: holds)); scene.Add(new BakedSceneryParts(world, holds));
         var engine = new PatchEngine(scene);
-        string Mod(string id, string path, string structure) =>
+        string Mod(string id, string path, string structure, double x) =>
             "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
-            ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", new[] { 1337.85, 602.86, 2178.55 }.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+            ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", new[] { x, 602.86, 2178.55 }.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
         var result = engine.Apply("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",",
-            Mod("group", Loader, BakedSceneryGroups.Structure), Mod("loaderAsPart", Loader, BakedSceneryParts.Structure), Mod("light", Loader + "/Model/Spotlight Outdoor", BakedSceneryParts.Structure),
-            Mod("chute", Loader + "/Model/MineLoader/Chute", BakedSceneryParts.Structure)) + "}}");
-        // A group or part modification that names the loader fails with the reason; an object below it is no entry, so
-        // its modification finds nothing.
-        var named = new[] { "group", "loaderAsPart" };
-        Assert(result.Outcomes.Count == 4 && named.All(id => !result.Outcomes[id].Applied && (result.Outcomes[id].Error ?? "").Contains(BakedSceneryRules.CarLoaderRefusal))
-            && new[] { "light", "chute" }.All(id => !result.Outcomes[id].Applied && result.Outcomes[id].Error.Contains("resolve uniquely")) && world.Mutations == 0,
-            "A modification that names the loader is refused with the reason, and none reaches its objects: " + String.Join("; ", result.Outcomes.Select(o => o.Key + " " + o.Value.Applied + " " + o.Value.Error)));
+            Mod("group", Loader, BakedSceneryGroups.Structure, 1337.85), Mod("loaderAsPart", Loader, BakedSceneryParts.Structure, 1337.85),
+            Mod("light", Loader + "/Model/Spotlight Outdoor", BakedSceneryParts.Structure, 1337.85), Mod("chute", Loader + "/Model/MineLoader/Chute", BakedSceneryParts.Structure, 1337.85),
+            Mod("office", Neighbour, BakedSceneryGroups.Structure, 1350.0)) + "}}");
+        var refused = new[] { "group", "loaderAsPart", "light", "chute" };
+        Assert(result.Outcomes.Count == 5 && refused.All(id => !result.Outcomes[id].Applied && (result.Outcomes[id].Error ?? "").Contains(BakedSceneryRules.CarLoaderRefusal)),
+            "A modification that names the loader or an object below it is refused with the Car loaders reason: " + String.Join("; ", result.Outcomes.Select(o => o.Key + " " + o.Value.Applied + " " + o.Value.Error)));
+        Assert(group.Position.SequenceEqual(new[] { 317.85, 602.86, 2188.55 }) && light.Offset.SequenceEqual(new[] { 2.0, 8, 0 }) && chute.Offset.SequenceEqual(new[] { 0.0, 3, 1 })
+            && group.Active && light.Active && chute.Active, "No refused modification reaches the loader's objects");
+        Assert(result.Outcomes["office"].Applied && Math.Abs(office.Position[0] - 350.0) < 1e-9, "The file's other modification still applies: " + result.Outcomes["office"].Error + " " + office.Position[0]);
     }
 
     // The driven-transform rule stays: an object with a KeyValueBoolAnimator is animated, so it and everything below it

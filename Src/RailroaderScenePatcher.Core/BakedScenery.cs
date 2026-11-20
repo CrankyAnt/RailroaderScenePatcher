@@ -115,7 +115,6 @@ namespace RailroaderScenePatcher.Core {
             "Nantahala:" + Crossbucks("Crossing Unprotected") + ";Nantahala Station=S;Whittier Haywood Road Bridge=BW",
             "Plate Girder Bridge:Plate Girder Bridge=BR;Plate Girder Bridge (1)=BR;Plate Girder Bridge (2)=BR;Plate Girder Bridge (3)=BR;Plate Girder Bridge (4)=BR;Plate Girder Bridge End=BR;Plate Girder Bridge End (1)=BR",
             "Rhodo:Rhodo Station=S",
-            "Robinson Gap Mine:Coal Loader=I",
             "Sylva:Sylva Culled=I;Sylva Depot=S;Sylva Paperboard=D;Sylva Signs=N",
             "Topton:Topton Station=S",
             "Whittier:Connelly=D;Connelly Culled=I;Southern Combination Depot=S;Spotlight Outdoor=L;Spotlight Outdoor (1)=L;Tall Post Shade=L;Tall Post Shade (1)=L;Whittier Log Pond=D;Whittier Saw Mill Culled=I;Whittier Signs=N;Whittier Stenzel=L",
@@ -437,6 +436,11 @@ namespace RailroaderScenePatcher.Core {
         public static string PartRefusal(PartVerdict verdict, GroupRootVerdict group) =>
             group?.Disposition == GroupDisposition.Group ? GroupRootRefusal : group?.Reason == CarLoaders ? CarLoaderRefusal : PartRefusal(verdict);
         public static bool Resolves(PartVerdict verdict, GroupRootVerdict group) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict, group) != null;
+        // The group verdict a part modification is judged by: the object's own, or else the verdict of a group with a car
+        // loader above it, nearest first. An object below the loader then fails with the loader's reason, not as a path
+        // that resolves to nothing.
+        public static GroupRootVerdict GroupOf(GroupRootVerdict own, IEnumerable<GroupRootVerdict> above) =>
+            own ?? above?.FirstOrDefault(verdict => verdict?.Reason == CarLoaders);
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
         // A part is one scene object, not a renderer or a component. An inspection-only group has no part entries.
         public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {

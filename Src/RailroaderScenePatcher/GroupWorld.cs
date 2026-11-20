@@ -373,14 +373,18 @@ namespace RailroaderScenePatcher {
         // leave the terrain shaping behind.
         static string MaskProblem(GameObject root) =>
             !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so this group and its parts cannot be moved, enabled or disabled" : null;
-        // A culling container and a group root resolve too, so their modification fails with the reason (BakedSceneryRules.PartRefusal).
+        // A culling container, a group root and an object below a group with a car loader resolve too, so their
+        // modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
-            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.Resolves(PartVerdictOf(g), VerdictOf(g))).Cast<object>().ToArray();
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.Resolves(PartVerdictOf(g), HolderOf(g))).Cast<object>().ToArray();
         public string PartRefusal(object part) => PartProblem(part as GameObject);
+        // The group verdict a part modification at the object is judged by (BakedSceneryRules.GroupOf).
+        static GroupRootVerdict HolderOf(GameObject go) => BakedSceneryRules.GroupOf(VerdictOf(go), Above(go));
+        static IEnumerable<GroupRootVerdict> Above(GameObject go) { for (var t = go.transform.parent; t != null; t = t.parent) yield return VerdictOf(t.gameObject); }
         // Why a part cannot be edited, or null: what refuses its group refuses the part. Shared with the inventory.
         internal static string PartProblem(GameObject part) {
             if (!Loaded(part)) return "The part's scene is not loaded";
-            var rule = BakedSceneryRules.PartRefusal(PartVerdictOf(part), VerdictOf(part));
+            var rule = BakedSceneryRules.PartRefusal(PartVerdictOf(part), HolderOf(part));
             if (rule != null) return rule;
             if (!IsPart(part)) return "This object is not listed as a baked scenery part";
             var root = GroupRootOf(part);
