@@ -26,7 +26,7 @@ namespace RailroaderScenePatcher {
                 if (problem.StartLine > 0)
                     location += problem.StartLine == problem.EndLine ? ", line " + problem.StartLine : ", lines " + problem.StartLine + " to " + problem.EndLine;
                 return location + ": " + CommandBand.Sentence(problem.Message)
-                    + (String.IsNullOrEmpty(problem.Fragment) ? "" : "\n" + problem.Fragment)
+                    + (String.IsNullOrEmpty(problem.Fragment) ? "" : "\nText there:\n" + problem.Fragment)
                     + (String.IsNullOrEmpty(problem.Expected) ? "" : "\nExpected: " + problem.Expected)
                     + (String.IsNullOrEmpty(problem.TechnicalDetail) ? "" : "\nTechnical detail: " + problem.TechnicalDetail);
             }));
@@ -97,14 +97,7 @@ namespace RailroaderScenePatcher {
                 if (!String.IsNullOrEmpty(problem.Expected)) Field(builder, "Expected", problem.Expected);
                 if (!String.IsNullOrEmpty(problem.TechnicalDetail)) Field(builder, "Technical detail", problem.TechnicalDetail);
             }
-            if (problems.Count != 0 || session.Blocked != null) {
-                builder.HStack(row => {
-                    row.ConfigureLayout(4f);
-                    Button(row, "Format reference", () => Application.OpenURL(ScenePatchFileDiagnostic.FormatReference)).Tooltip("Format reference", "Open the scene patch file reference in your browser. It describes each field and its values.");
-                    Button(row, "Recovery guide", () => Application.OpenURL(ScenePatchFileDiagnostic.RecoveryReference)).Tooltip("Recovery guide", "Open the guide to correcting a protected scene patch file in your browser.");
-                    row.Spacer();
-                }).Height(RowHeight);
-            }
+            if (problems.Count != 0 || session.Blocked != null) ReferenceButtons(builder);
             if (session.LastBackup != null)
                 FieldMarkup(builder, "Backup of the original", PathBreaks(Literal(session.LastBackup + (session.FreshStartPending ? " (Save replaces the original with the new empty scene patch file)" : ""))));
             if (problems.Count != 0)
@@ -131,6 +124,15 @@ namespace RailroaderScenePatcher {
                     }).Height(RowHeight);
                     break;
             }
+        }
+        // The format reference and the recovery guide, offered wherever a scene patch file's problems are shown.
+        void ReferenceButtons(UIPanelBuilder builder) {
+            builder.HStack(row => {
+                row.ConfigureLayout(4f);
+                Button(row, "Format reference", () => Application.OpenURL(ScenePatchFileDiagnostic.FormatReference)).Tooltip("Format reference", "Open in your browser the scene patch file reference. It describes each field and its values.");
+                Button(row, "Recovery guide", () => Application.OpenURL(ScenePatchFileDiagnostic.RecoveryReference)).Tooltip("Recovery guide", "Open in your browser the guide to correcting a protected scene patch file.");
+                row.Spacer();
+            }).Height(RowHeight);
         }
         void Confirmation(UIPanelBuilder builder, string label, string tooltip, Action confirm) {
             builder.HStack(row => {

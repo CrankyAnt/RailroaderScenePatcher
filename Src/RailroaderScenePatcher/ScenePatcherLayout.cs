@@ -1705,7 +1705,10 @@ namespace RailroaderScenePatcher {
             if (attachment?.Session.VersionState == FileVersionState.Repair) {
                 Section(builder, "Scene patch file", divider: false);
                 PlainLabel(builder, FullDiagnosis(attachment.Session));
-                Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(attachment.Session));
+                // A file that needs repair offers its format reference and recovery guide, as the recovery section does.
+                ReferenceButtons(builder);
+                Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(attachment.Session))
+                    .Tooltip("Copy to clipboard", "Copy the full diagnosis to share or save it.");
                 Button(builder, "Reload Map Editor...", () => MapEditorReload.Request(attachment, MapEditorReload.ActiveMapId))
                     .Disable(MapEditorReload.Error != null).Tooltip("Reload Map Editor", CommandBand.Tooltip(ReloadTip, MapEditorReload.Error == null ? null : CommandBand.Sentence(MapEditorReload.Error)));
                 if (MapEditorReload.Error != null) PlainLabel(builder, MapEditorReload.Error);

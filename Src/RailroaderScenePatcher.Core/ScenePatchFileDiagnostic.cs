@@ -12,6 +12,8 @@ namespace RailroaderScenePatcher.Core {
         public const string RecoveryReference = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/recover-scene-patch-files.md";
         // The most lines and characters a fragment shows.
         public const int FragmentLines = 8, FragmentCharacters = 1200;
+        // The line after a fragment of an unreadable file that reaches its last line: the open text there is the file's own.
+        public const string EndOfFile = "(The file ends here.)";
         // The JSON path of the problem, such as modifications.place-board.placement; empty for the whole scene patch file.
         public string Path { get; private set; }
         // The first and last line of the problem in the text; zero when the text has no line for it, such as a missing field.
@@ -27,7 +29,8 @@ namespace RailroaderScenePatcher.Core {
         public string Reference => FormatReference;
         // The guide that describes the corrections scene patch editing offers for a protected scene patch file.
         public string Corrections => RecoveryReference;
-        internal static ScenePatchFileDiagnostic Create(string text, string path, string message, string expected, JToken token = null, int line = 0, string technicalDetail = null) {
+        // unreadable: reading stopped at the line, so a fragment that reaches the file's last line says that the file ends there.
+        internal static ScenePatchFileDiagnostic Create(string text, string path, string message, string expected, JToken token = null, int line = 0, string technicalDetail = null, bool unreadable = false) {
             var start = (token as IJsonLineInfo)?.HasLineInfo() == true ? ((IJsonLineInfo)token).LineNumber : line;
             var end = start;
             if (start > 0 && token is JContainer container)
@@ -42,6 +45,7 @@ namespace RailroaderScenePatcher.Core {
             if (cut) fragment += "\n... " + (span - FragmentLines) + " more " + (span - FragmentLines == 1 ? "line" : "lines") + ", to line " + end;
             // A scene patch file written on one long line still shows a bounded fragment.
             if (fragment.Length > FragmentCharacters) { fragment = fragment.Substring(0, FragmentCharacters) + "..."; cut = true; }
+            if (unreadable && start > 0 && start <= lines.Length && start + Math.Min(FragmentLines, span) - 1 >= lines.Length) fragment += "\n" + EndOfFile;
             return new ScenePatchFileDiagnostic { Path = path ?? "", StartLine = start, EndLine = end, Fragment = fragment, Message = message, Expected = expected,
                 TechnicalDetail = technicalDetail, Truncated = cut };
         }

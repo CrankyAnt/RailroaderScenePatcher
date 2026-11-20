@@ -167,6 +167,12 @@ static class RecoveryTests {
         Assert(!String.IsNullOrEmpty(broken.TechnicalDetail) && !broken.Message.Contains(broken.TechnicalDetail), "Only Details includes the technical parser message.");
         Assert(broken.Message == "Unreadable scene patch file" && broken.StartLine >= 4 && broken.Expected == null,
             "Unreadable JSON reports the line where reading stopped and keeps the exact parser error in the technical detail: " + broken.StartLine);
+        // A file cut off inside a string shows its last line, then says that the file ends there, so an open quote does
+        // not read as a fragment the patcher cut.
+        var cutOff = ScenePatchFile.Load("{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n    \"a\": {\n      \"placem").Diagnostics.Single();
+        Assert(cutOff.Message == "Unreadable scene patch file" && cutOff.StartLine == 6 && cutOff.Fragment == "      \"placem\n" + ScenePatchFileDiagnostic.EndOfFile && !cutOff.Truncated,
+            "A cut-off file closes its fragment with the end of the file: " + cutOff.StartLine + " " + cutOff.Fragment);
+        Assert(ScenePatchFileDiagnostic.EndOfFile == "(The file ends here.)", "The end mark reads as a sentence: " + ScenePatchFileDiagnostic.EndOfFile);
         var block = "{\n  \"formatVersion\": 1,\n  \"sourceMap\": {\"mapId\": \"map\"},\n  \"modifications\": {\n    \"later\": {\n" + String.Join(",\n", Enumerable.Range(0, 20).Select(i => "      \"f" + i + "\": " + i)) + "\n    }\n  }\n}\n";
         var later = ScenePatchFile.Load(block);
         var unknown = later.Diagnostics.Single();

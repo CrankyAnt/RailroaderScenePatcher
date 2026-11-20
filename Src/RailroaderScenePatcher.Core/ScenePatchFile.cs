@@ -232,9 +232,9 @@ namespace RailroaderScenePatcher.Core {
                 diagnostics.Add(ScenePatchFileDiagnostic.Create(original, place?.Path ?? "", EditError, "Numbers written as plain JSON literals; correct values such as NaN or Infinity outside scene patch editing", place ?? (JToken)Root));
             }
         }
-        static ScenePatchFile Protected(string json, string message, string path, string expected, JToken token = null, int line = 0, string technicalDetail = null) {
+        static ScenePatchFile Protected(string json, string message, string path, string expected, JToken token = null, int line = 0, string technicalDetail = null, bool unreadable = false) {
             var rejected = new ScenePatchFile(null, technicalDetail == null ? message : message + ". " + Sentence(technicalDetail), json);
-            rejected.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, path, message, expected, token, line, technicalDetail));
+            rejected.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, path, message, expected, token, line, technicalDetail, unreadable));
             return rejected;
         }
         const string VersionExpected = "\"formatVersion\": 1 as the first thing the scene patch file declares; a newer scene patch file needs the patcher version that wrote it";
@@ -267,7 +267,7 @@ namespace RailroaderScenePatcher.Core {
                 return loaded;
             } catch (Exception e) when (e is JsonException || e is ArgumentException || e is InvalidOperationException || e is OverflowException) {
                 var reader = e as JsonReaderException;
-                return Protected(json, "Unreadable scene patch file", reader?.Path ?? "", null, line: reader?.LineNumber ?? 0, technicalDetail: e.Message);
+                return Protected(json, "Unreadable scene patch file", reader?.Path ?? "", null, line: reader?.LineNumber ?? 0, technicalDetail: e.Message, unreadable: true);
             }
         }
         // Why the text's declared format version keeps any of its content from being read, or null. Before this answer

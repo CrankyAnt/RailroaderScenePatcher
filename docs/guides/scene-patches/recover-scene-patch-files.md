@@ -14,7 +14,7 @@ If the scene patch file was deleted outside the editing session, **Keep editor v
 2. Read the reason for protection in the **Scene patch file** section. Each problem lists:
    - the JSON path, such as `sourceMap.mapId` or `modifications.place-board`;
    - the line or lines in the file, or **none** when a field is missing;
-   - **Text there**: up to eight lines and 1,200 characters from that place, followed by the number of omitted lines if the passage is longer;
+   - **Text there**: up to eight lines and 1,200 characters from that place, followed by the number of omitted lines if the passage is longer. For a file that can't be read, a passage that reaches the end of the file ends with `(The file ends here.)`, so an open quote or bracket there belongs to the file;
    - **Expected**: the structure or value the format expects.
 3. Click **Format reference** to open the [scene patch file reference](scene-patch-file-v1.md) or **Recovery guide** to open this guide.
 
