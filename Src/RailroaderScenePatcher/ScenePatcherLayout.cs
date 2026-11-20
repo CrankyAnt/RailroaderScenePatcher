@@ -703,9 +703,10 @@ namespace RailroaderScenePatcher {
                 if (offersRepair) PlainLabel(builder, CommandBand.NoDetectedProblems(true)); else Line(builder, CommandBand.NoDetectedProblems(false), null, null);
             }
             // After a replacement ID, a track binding problem that remains says that it is another problem.
-            var repaired = selected.Problems.Count != 0 && OffersBindingRepair ? RepairedMarkerId() : null;
+            var repaired = selected.Problems.Count != 0 ? RepairedMarkerId() : null;
             var boundSegment = CommandBand.BindingSlotSegments(selected.Bindings).FirstOrDefault();
-            foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, CommandBand.ProblemText(problem, repaired, boundSegment)));
+            // A generic track marker's binding is optional (BindingRules.Need), the one need a repaired marker has.
+            foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, CommandBand.ProblemText(problem, repaired, boundSegment, selected.Enabled, BindingNeed.Optional)));
             if (selected.Problems.Count != 0) DrawProblemTasks(builder);
             // An inactive holder of a duplicate marker ID has no problem, and its explanation still offers the repair here.
             DrawDuplicateIdTasks(builder);

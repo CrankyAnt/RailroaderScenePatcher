@@ -40,7 +40,6 @@ namespace RailroaderScenePatcher {
             }
             return sharerReading = reading;
         }
-        bool OffersBindingRepair => CommandBand.OffersBindingRepair(selected?.Problems);
         // The duplicate marker ID that the inspected generic marker's replacement ID repaired, or null.
         string RepairedMarkerId() {
             if (!IsGenericMarker || attachment == null) return null;
