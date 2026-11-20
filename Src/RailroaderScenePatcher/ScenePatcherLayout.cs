@@ -319,16 +319,19 @@ namespace RailroaderScenePatcher {
                     .Tooltip("Copy ID", CommandBand.Tooltip("Copy the object's ID, placement and the map ID needed by the scene patch file.", copy));
                 row.Spacer();
                 // The window's "?" belongs in the title bar; it stands here only when the title bar could not take it.
-                if (!presentation.TitleHelp) HelpButton(row, NativePresentation.WindowHelpRegion, "Window");
+                // Like the title bar's, it stays available while the file panel locks the other controls.
+                windowHelpButton = presentation.TitleHelp ? null : HelpButton(row, NativePresentation.WindowHelpRegion, "Window");
             }).Height(RowHeight);
         }
         // The same button opens and closes its region's help.
-        void HelpButton(UIPanelBuilder row, string region, string scope) {
+        RectTransform windowHelpButton;
+        RectTransform HelpButton(UIPanelBuilder row, string region, string scope) {
             var open = presentation.HelpRegion == region;
             IConfigurableElement button = null;
             button = Button(row, "?", () => presentation.ToggleHelp(region, button.RectTransform));
             if (FitButton(button, "?") == 0) button.Width(28);
             button.Tooltip(scope + " help", open ? "Close the " + scope.ToLowerInvariant() + " help." : "Explain the " + scope.ToLowerInvariant() + ".");
+            return button.RectTransform;
         }
         bool Unsaved(out string text) {
             if (attachment == null) { text = String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus; return false; }
@@ -512,7 +515,10 @@ namespace RailroaderScenePatcher {
 
         void DrawInspector(UIPanelBuilder builder) {
             builder.ConfigureLayout(4f);
-            LockControls(DrawRightBand(builder));
+            LockControls(DrawRightBand(builder), windowHelpButton);
+            // While the file panel waits for a decision and nothing is inspected, its own heading is the first heading:
+            // the empty inspector's heading and instruction would only stand above it.
+            if (FileLocked && selected == null) { DrawFilePanel(builder); DrawFooter(builder); return; }
             RectTransform headingRow;
             if (selected == null) {
                 // Keep the instruction across the full width while Guided is available without an inspected object.
@@ -1500,7 +1506,7 @@ namespace RailroaderScenePatcher {
                     if (block == null && structure == CrossingCoverageScene.Structure) {
                         var session = attachment.Session;
                         var circuitKey = coverageCircuit; var additionId = coverageAddition;
-                        var none = circuitKey == null ? "Select Edit circuit or Add detection first." : null;
+                        var none = circuitKey == null ? "Click Edit circuit or Add detection first." : null;
                         CrossingCoverage current = null;
                         try { current = session.Coverage(identity); } catch { }
                         // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach too.
@@ -1711,7 +1717,7 @@ namespace RailroaderScenePatcher {
             }
             DrawScenePatchFileRecovery(builder);
             Section(builder, "Supplied definitions");
-            if (String.IsNullOrEmpty(scenePatchFileInspection)) Line(builder, definitionsStale ? "Not read yet; select Refresh" : "None", null, null);
+            if (String.IsNullOrEmpty(scenePatchFileInspection)) Line(builder, definitionsStale ? "Not read yet; click Refresh" : "None", null, null);
             else PlainLabel(builder, scenePatchFileInspection);
             Section(builder, "Diagnostics");
             if (diagnostics.Count == 0 && presentation.EntryProblem == null) Line(builder, "None", null, null);
@@ -1747,6 +1753,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
                     new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
                     new[] { "Spawn point", "The scene spawn points where players start, are rescued and teleport to. Native spawns in the map data stay in the Map Editor's Spawns category." },
+                    new[] { StarterPlacements.Family, "The markers whose track location an active new-game setup reads to place its starting cars. The marker's own position plays no part; Focus moves the camera to where the cars stand." },
                     new[] { StationMapIconRules.Family, "The icons the map shows for stations. Move one where its station now stands after you move the station in the Map Editor." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
                     new[] { "Dimmed rows", "A dimmed group row holds matching parts but does not match the search itself." },

@@ -39,6 +39,7 @@ static class FileVersionTests {
         public bool VersionBackupExists(string path) => Backup != null;
     }
     public static void Run() {
+        RestoredFileDropsTheRepairDiagnosis();
         PollDetectsInvalidUtf8AndDeletedBackup();
         DeletedFileCanBeRestored();
         FailedBackupCanBeRetried();
@@ -121,6 +122,21 @@ static class FileVersionTests {
         if (!use.Applied || box.Active || session.LastVersionApplication.Outcomes["missing"].Applied || !session.LastVersionApplication.Outcomes["valid"].Applied)
             throw new Exception("An unavailable target does not prevent a valid file entry from applying: " + use.Error + " / " + session.LastVersionApplication?.Outcomes["valid"].Error);
         CorrectedFailedEntryRetries();
+    }
+    // A file that needed repair and is restored outside the game to what the editor holds is no longer described by the
+    // repair's diagnosis: the session details show what the file holds now, not the unreadable line.
+    static void RestoredFileDropsTheRepairDiagnosis() {
+        var original = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}";
+        var store = new BackupStore { Patch = original };
+        var session = new PatchEditingSession(new PatchEngine(new Scene()), new NativeMapEditor(), store);
+        store.Patch = "{ \"formatVersion\": 1,\n \"modifications\": { broken";
+        session.CheckFileVersion();
+        if (session.VersionState != FileVersionState.Repair || session.ScenePatchFileDiagnostics.Count == 0 || session.ScenePatchFileDiagnostics[0].StartLine != 2)
+            throw new Exception("The unreadable file needs repair and names its line");
+        store.Patch = original;
+        session.CheckFileVersion();
+        if (session.VersionState != FileVersionState.None || session.VersionMessage != null || session.ScenePatchFileDiagnostics.Count != 0)
+            throw new Exception("The restored file leaves no stale diagnosis: " + String.Join(" | ", session.ScenePatchFileDiagnostics.Select(d => d.Message)));
     }
     static void PollDetectsInvalidUtf8AndDeletedBackup() {
         var files = new MemoryFiles(); var storage = new ModStorage("test", files);

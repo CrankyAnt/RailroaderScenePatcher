@@ -18,6 +18,9 @@ namespace RailroaderScenePatcher.Core {
                 + " Cancel keeps the Map Editor open. Your working location is restored when available.";
         }
         public string ReloadWarning(bool nativeDirty) => ReloadWarning(nativeDirty, out _);
+        // Whether a reload now discards unsaved work. Only then does the prompt offer Save and Reload and Discard and
+        // Reload; with everything saved it offers Cancel and Reload, as the native Exit prompt offers Cancel and Exit.
+        public bool ReloadDiscardsWork(bool nativeDirty) => Outstanding(nativeDirty).Count != 0;
         string ReloadWarning(bool nativeDirty, out string changes) {
             var outstanding = Outstanding(nativeDirty);
             changes = outstanding.Count == 0 ? null : OutstandingWriteList(outstanding);

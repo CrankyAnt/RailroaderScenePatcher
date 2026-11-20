@@ -323,7 +323,7 @@ namespace RailroaderScenePatcher.Core {
                             continue;
                         }
                         if (targets.Any(t => ReferenceEquals(t.Item2, resolved))) continue;
-                        if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for the object of modification " + key + " could not be verified. Select Recheck or reload the Map Editor before importing");
+                        if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for the object of modification " + key + " could not be verified. Click Recheck or reload the Map Editor before importing");
                         scene.Preflight(resolved);
                         targets.Add(Tuple.Create(identity, resolved));
                     }

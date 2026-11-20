@@ -61,7 +61,12 @@ namespace RailroaderScenePatcher.Core {
                     try { if (PreservingJson.SameContent(PreservingJson.Parse(text).Root, acceptedContent)) return; }
                     catch { /* A damaged replacement goes through the diagnostic read below. */ }
                 }
-                if (!ChangedOutside(text)) { VersionState = FileVersionState.None; VersionMessage = null; ClearVersionAcceptance(); Import = null; return; }
+                if (!ChangedOutside(text)) {
+                    // A file restored to what the editor holds is described by its own read again, not by the
+                    // diagnosis of the changed or damaged version that the choice was about.
+                    if (previous != FileVersionState.None && text != null) ScenePatchFileDiagnostics = ScenePatchFile.Load(text).Diagnostics;
+                    VersionState = FileVersionState.None; VersionMessage = null; ClearVersionAcceptance(); Import = null; return;
+                }
                 var loaded = text == null ? null : ScenePatchFile.Load(text);
                 var refusal = loaded == null ? "The file no longer exists" : Refusal(loaded, text);
                 VersionState = refusal == null ? FileVersionState.Changed : FileVersionState.Repair;

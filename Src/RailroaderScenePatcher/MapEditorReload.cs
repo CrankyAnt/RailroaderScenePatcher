@@ -53,7 +53,8 @@ namespace RailroaderScenePatcher {
             if (confirming || relaunching) return;
             try {
                 current.Session.CheckFileVersion();
-                var canSave = current.Session.CanSaveForReload;
+                var unsaved = current.Session.ReloadDiscardsWork(current.NativeDirty);
+                var canSave = unsaved && current.Session.CanSaveForReload;
                 var message = current.Session.ReloadPrompt(current.NativeDirty);
                 Action<int> choose = value => {
                     confirming = false;
@@ -74,10 +75,11 @@ namespace RailroaderScenePatcher {
                     }
                 };
                 confirming = true;
-                PresentChoices(message, choose, canSave);
+                PresentChoices(message, choose, canSave, unsaved);
             } catch (Exception e) { confirming = false; current.Fault = "Reload cancelled: " + e.GetBaseException().Message; }
         }
-        static void PresentChoices(string message, Action<int> choose, bool canSave) {
+        // Without unsaved work the reload discards nothing, so its one action is Reload.
+        static void PresentChoices(string message, Action<int> choose, bool canSave, bool unsaved) {
             var dismissed = false;
             void Select(int value, Action dismiss) {
                 if (dismissed) return;
@@ -96,7 +98,7 @@ namespace RailroaderScenePatcher {
                 builder.AlertButtons(buttons => {
                     buttons.AddButtonMedium("Cancel", () => Select(0, dismiss));
                     if (canSave) buttons.AddButtonMedium("Save and Reload", () => Select(1, dismiss));
-                    buttons.AddButtonMedium("Discard and Reload", () => Select(2, dismiss));
+                    buttons.AddButtonMedium(unsaved ? "Discard and Reload" : "Reload", () => Select(2, dismiss));
                 });
             }, escapeDismisses: false, width: 600, onCancel: dismiss => Select(0, dismiss));
         }

@@ -105,6 +105,11 @@ static class ReloadDecisionTests {
         Assert(prompt == "Reload the Map Editor? Reloading ends the Map Editor's Undo and Redo history. "
             + "All required work is saved. Cancel keeps the Map Editor open. Your working location is restored when available.",
             "The reload confirmation reports the saved state without claiming that Save writes anything");
+        // As the native Exit prompt offers only Cancel and Exit, a saved state offers no Save or Discard: the reload
+        // itself discards nothing.
+        Assert(!w.Session.ReloadDiscardsWork(w.MapEditor.NativeDirty), "A saved state has no work for Save and Reload or Discard and Reload");
+        w.MapEditor.NativeEdit(7);
+        Assert(w.Session.ReloadDiscardsWork(w.MapEditor.NativeDirty), "Unsaved native work offers Save and Reload and Discard and Reload");
     }
     static void ReloadPromptNamesOnlyOutstandingWrites() {
         const string initial = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{}}";

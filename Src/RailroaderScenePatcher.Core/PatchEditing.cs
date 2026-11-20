@@ -524,7 +524,7 @@ namespace RailroaderScenePatcher.Core {
                 outcome.ResolvedTarget = resolved;
                 var report = true;
                 try {
-                    if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before following the track again");
+                    if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before following the track again");
                     var mapContext = scene.MapIds.ToArray();
                     scene.Preflight(resolved);
                     var desired = engine.Desired(scenePatchFile.Modifications, resolved, scenePatchFileKey);
@@ -767,7 +767,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before editing it again");
+                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
@@ -932,7 +932,7 @@ namespace RailroaderScenePatcher.Core {
                 if (Blocked != null) throw new InvalidOperationException(Blocked);
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
-                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before editing it again");
+                if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
@@ -1096,7 +1096,7 @@ namespace RailroaderScenePatcher.Core {
                 var resolved = engine.ResolveUnique(target);
                 inspected?.Validate(scene, target, resolved);
                 outcome.ResolvedTarget = resolved;
-                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Select Recheck or reload the Map Editor before editing it again");
+                if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
                 if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");

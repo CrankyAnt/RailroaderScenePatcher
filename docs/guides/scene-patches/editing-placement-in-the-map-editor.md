@@ -167,6 +167,7 @@ Click **Reload Map Editor...** in **Scene patches**. The confirmation warns that
 - **Cancel** keeps the native map editor and your work open.
 - **Save and Reload** saves the required native and patcher work, then reloads once every write completes.
 - **Discard and Reload** discards remaining unsaved work. Writes completed during a partial Save stay on disk.
+- **Reload** replaces **Save and Reload** and **Discard and Reload** when all work is saved, because the reload discards nothing.
 
 If Save fails, the native map editor stays open and reports the completed and outstanding writes.
 

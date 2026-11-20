@@ -1652,7 +1652,7 @@ namespace RailroaderScenePatcher {
         // never jumps to another object of the same path, because it uses the inspected handle.
         void Focus(SceneObservation entry) {
             try {
-                if (!(entry.Handle is GameObject target) || target == null) throw new InvalidOperationException("the inspected object no longer exists; select Refresh and inspect it again");
+                if (!(entry.Handle is GameObject target) || target == null) throw new InvalidOperationException("the inspected object no longer exists; click Refresh and inspect it again");
                 var map = NativeInventory.MapPosition(target.transform);
                 var point = FocusTarget.Point(entry.Family, new double[] { map.x, map.y, map.z }, TrackPoints(entry), out var refusal);
                 if (point == null) throw new InvalidOperationException(refusal);
@@ -1707,7 +1707,7 @@ namespace RailroaderScenePatcher {
                 trackPointFrame = Time.frameCount; trackPointOf = selected.Handle;
                 trackPoint = null;
                 if (trackPoses == null) trackPointMissing = "the track graph is unavailable in this game build";
-                else if (!(selected.Handle is GameObject target) || target == null) trackPointMissing = "the inspected object no longer exists; select Refresh and inspect it again";
+                else if (!(selected.Handle is GameObject target) || target == null) trackPointMissing = "the inspected object no longer exists; click Refresh and inspect it again";
                 else {
                     try { trackPoint = TrackPoints(selected)?.FirstOrDefault(); } catch { trackPoint = null; }
                     trackPointMissing = trackPoint == null ? StarterPlacements.NoTrackPoint : null;

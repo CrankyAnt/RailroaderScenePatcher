@@ -99,17 +99,18 @@ namespace RailroaderScenePatcher {
         internal bool TitleDetails => titleDetails != null;
         RectTransform titleHelp, titleReset, titleDetails, titleClose;
         // Why the window's own controls are unavailable while the file panel is open, or null. The session details stay
-        // available: the Repair panel's Details opens them.
+        // available: the Repair panel's Details opens them. The window help stays available too, so the help is at hand
+        // while a version choice, repair or import waits for a decision; a region's help closes with its region.
         string lockReason;
         bool repairMode => lockReason != null;
         internal void SetFileLock(string reason) {
             lockReason = reason;
-            if (reason != null) CloseHelp();
+            if (reason != null && HelpRegion != WindowHelpRegion) CloseHelp();
             if (divider != null) divider.enabled = reason == null;
             SetTitleRepairControls();
         }
         void SetTitleRepairControls() {
-            foreach (var rect in new[] { titleHelp, titleReset, titleClose }) {
+            foreach (var rect in new[] { titleReset, titleClose }) {
                 var button = rect == null ? null : rect.GetComponent<Button>();
                 if (button != null) button.interactable = !repairMode;
             }
@@ -198,7 +199,7 @@ namespace RailroaderScenePatcher {
                     }
                 }
                 var tooltip = titleHelp.GetComponent<UI.Tooltips.UITooltipProvider>() ?? titleHelp.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
-                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", CommandBand.Tooltip(HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Open Scene Patcher help.", lockReason));
+                tooltip.DynamicTooltipInfo = () => new TooltipInfo("Window help", CommandBand.Tooltip(HelpRegion == WindowHelpRegion ? "Close the help for the whole window." : "Open Scene Patcher help.", null));
                 titleHelp.SetAsLastSibling();
             } catch (Exception e) {
                 if (titleHelp != null) UnityEngine.Object.Destroy(titleHelp.gameObject);
