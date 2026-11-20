@@ -25,6 +25,7 @@ static class GuidedTaskTests {
         RefreshClearsMessagesButKeepsContext();
         GuidedStepChangesClearEarlierRefusals();
         StarterPlacementMarkerOffersTheWreckSetting();
+        AppliedStepFollowsNativeHistory();
     }
     // The task list of a starter placement marker offers the inspector's Start derailed setting as a guided task, next to
     // placing the starter on track. It is available where the inspector's checkbox is, for the one car placement that
@@ -48,6 +49,21 @@ static class GuidedTaskTests {
         Check(state.Kind == GuidedTaskKind.Wreck && state.Step == GuidedTaskStep.Values && state.Draft[0] == "Yes", "Back from Review keeps the wreck draft");
         Check(CommandBand.FieldReason(null, new[] { "No" }, new[] { "No" }, CommandBand.SameWreck) == "The car placement already has the selected Start derailed setting." &&
             CommandBand.FieldReason(null, new[] { "Yes" }, new[] { "No" }, CommandBand.SameWreck) == null, "An unchanged wreck setting cannot be reviewed");
+    }
+    // The Apply step says the edit is complete only while its Undo step is in the native undo history: native Undo
+    // reverses it and the step says so, and Redo makes it complete again. Without a known step it keeps the plain result.
+    static void AppliedStepFollowsNativeHistory() {
+        var state = new GuidedTaskState(); var step = new object();
+        state.Start(GuidedTaskKind.Placement, Target("sign"), new[] { "1", "2", "3", "0", "0", "0" }); state.Review();
+        state.Complete(true, null, null, step);
+        Check(state.AppliedText(new[] { new object(), step }) == "The edit is complete. Save when you're done.", "The applied edit is complete while its step is in the undo history");
+        Check(state.AppliedText(new[] { new object() }) == "Undo reversed this edit. Redo in the Map Editor applies it again.", "After native Undo the Apply step no longer says the edit is complete: " + state.AppliedText(new object[0]));
+        Check(state.AppliedText(new[] { step }) == "The edit is complete. Save when you're done.", "After Redo the edit is complete again");
+        var unknown = new GuidedTaskState();
+        unknown.Start(GuidedTaskKind.Placement, Target("sign"), new[] { "1", "2", "3", "0", "0", "0" }); unknown.Review(); unknown.Complete(true, null, null);
+        Check(unknown.AppliedText(new object[0]) == "The edit is complete. Save when you're done.", "Without a known step the Apply step keeps the plain result");
+        state.AnotherTask();
+        Check(state.AppliedText(new[] { step }) == null, "Another guided task forgets the applied step");
     }
     static void CrossingControllerCannotMoveOrChangeActivity() {
         foreach (var crossing in new[] {

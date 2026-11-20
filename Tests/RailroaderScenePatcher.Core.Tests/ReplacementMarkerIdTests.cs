@@ -86,6 +86,8 @@ static class ReplacementMarkerIdTests {
         AMapLabelCacheMakesAPlacementDependOnTheReplacementId();
         UnreadMapObjectsRefuseTheId();
         SpacesAtEitherEndAreRefused();
+        ReviewChecksTheIdAgainstTheWorld();
+        ClearBindingStatesWhenThereIsNothingToClear();
         Console.WriteLine("PASS: a replacement ID repairs a duplicate marker ID and every other holder keeps its registration");
     }
     static string Doc(string items) => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + items + "}}";
@@ -288,12 +290,39 @@ static class ReplacementMarkerIdTests {
         Assert(CommandBand.NoDetectedProblems(false) == "None detected", "Without the repair the section reads None detected");
     }
 
+    // Guided Review checks the replacement ID against the world as Apply does, before anything changes: an ID that
+    // another scene marker or a map object uses is refused in Review, naming its user.
+    static void ReviewChecksTheIdAgainstTheWorld() {
+        var w = new World(); var yard = Marker(YardPath); var before = w.Registrations();
+        var marker = w.Session.MarkerIdRefusal(yard, "Mown");
+        Assert(marker != null && marker.StartsWith("Replacement ID Mown is already used by the scene marker ", StringComparison.Ordinal) && marker.Contains(UnrelatedPath), "An ID another scene marker uses is refused, naming it: " + marker);
+        Assert(w.Session.MarkerIdRefusal(yard, "water-tower-1") == ReplacementMarkerIds.UsedByMapObject("water-tower-1"), "An ID a map object uses is refused, naming it");
+        Assert(w.Session.MarkerIdRefusal(yard, "flare:1").Contains("begins with flare:"), "A reserved prefix is refused");
+        Assert(w.Session.MarkerIdRefusal(yard, "Mg6m-yard") == null, "A free ID passes Review");
+        Assert(w.Registrations() == before && w.Markers.Mutations == 0 && w.Yard.Id == "Mg6m", "The check changes nothing: " + w.Registrations());
+        Assert(w.Session.MarkerIdRefusal(yard, "Mg6m") == null, "The marker's own ID is left to Apply, which treats it as no change or a clear");
+    }
+    // Clear binding of a marker or crossing pad is available only while this mod sets its track binding; otherwise it
+    // states that there is nothing to clear, as Clear ID and Clear location do.
+    static void ClearBindingStatesWhenThereIsNothingToClear() {
+        var w = new World(); var unrelated = Marker(UnrelatedPath);
+        Assert(!w.Session.HasTrackBinding(unrelated), "An unchanged marker has no track binding value");
+        Assert(RailroaderScenePatcher.CommandBand.ClearBindingReason(false) == "This mod sets no track binding for this marker, so there is nothing to clear." && RailroaderScenePatcher.CommandBand.ClearBindingReason(true) == null,
+            "Clear binding states when there is nothing to clear");
+        Assert(w.Session.Bind(unrelated, MarkerBinding.At(new TrackLocation("Sa", "a", 10))).Applied && w.Session.HasTrackBinding(unrelated), "A rebind sets the track binding value");
+        Assert(w.Session.Edit(Marker(WhistlePaths[0]), new Placement(new[] { 1080.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null).Applied && !w.Session.HasTrackBinding(Marker(WhistlePaths[0])), "A placement alone sets no track binding value");
+    }
     // The Marker ID row of the Connections tab and its guided task: the replacement id stays visible and disabled with its
     // reason for any marker that does not take one, and Set id and Clear id state why they cannot be used.
     static void MarkerIdRowStatesItsReasons() {
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(false, "Mpad", 1, false) == ReplacementMarkerIds.NotSupported, "A marker of another kind keeps the row disabled with its reason");
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
-        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable(true, "Mg6m", 0, true) == null,
+        // A milepost and a starter placement marker are native track markers of type Generic too, so the reason names the
+        // families instead of the marker type.
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false) == "Only objects in the Track marker family can have a replacement ID. This object is in the Milepost family.",
+            "A marker of another family keeps the row disabled with its reason: " + RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Milepost", false, "Mpad", 1, false));
+        Assert(ReplacementMarkerIds.NotSupported == "Only objects in the Track marker family can have a replacement ID." && !ReplacementMarkerIds.NotSupported.Contains("generic"),
+            "The refusal names the family, not the marker type Generic that a milepost also shows: " + ReplacementMarkerIds.NotSupported);
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mown", 0, false) == "Only this marker holds marker ID Mown, so it doesn't need a replacement ID.", "A marker ID of its own needs no replacement");
+        Assert(RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 1, false) == null && RailroaderScenePatcher.CommandBand.MarkerIdUnavailable("Track marker", true, "Mg6m", 0, true) == null,
             "A shared native id offers the replacement id, and a marker that already has one keeps the row");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "", "Mg6m") == ReplacementMarkerIds.Empty, "An empty field states the reason");
         Assert(RailroaderScenePatcher.CommandBand.MarkerIdSetReason(null, "flare:1", "Mg6m").StartsWith("Replacement ID flare:1 begins with flare:", StringComparison.Ordinal), "A reserved prefix states the reason");

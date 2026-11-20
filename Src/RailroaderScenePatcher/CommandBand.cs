@@ -116,6 +116,8 @@ namespace RailroaderScenePatcher {
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
         internal const string ClearActivity = "Clear activity", DiscardPrepared = "Discard", RemoveModification = "Remove modification", ClearBinding = "Clear binding", ClearCircuit = "Clear circuit", ClearLocation = "Clear location", ClearSegments = "Clear segments";
+        // Why Clear binding has nothing to clear: this mod sets no track binding for the marker or crossing pad.
+        internal static string ClearBindingReason(bool hasValue) => hasValue ? null : "This mod sets no track binding for this marker, so there is nothing to clear.";
         // Why Clear location has nothing to clear: this mod sets no track location for the starter placement marker.
         internal static string ClearLocationReason(bool hasValue) => hasValue ? null : "This mod sets no track location for this marker, so there is nothing to clear.";
         // The name of a wreck edit, after the checkbox's new state.
@@ -576,8 +578,8 @@ namespace RailroaderScenePatcher {
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
             ? "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
-        internal static string MarkerIdUnavailable(bool generic, string underlying, int sharers, bool hasValue) =>
-            !generic ? ReplacementMarkerIds.NotSupported
+        internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
+            !generic ? ReplacementMarkerIds.NotSupportedFor(family)
             : hasValue ? null
             : underlying == null ? "The marker ID could not be read."
             : sharers == 0 ? "Only this marker holds marker ID " + underlying + ", so it doesn't need a replacement ID." : null;

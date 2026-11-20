@@ -693,6 +693,18 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<string> MarkerIdUsers(TargetIdentity target, string id) {
             try { return scene is IMarkerIdScene markers && id != null ? markers.MarkerIdUsers(engine.ResolveUnique(target), id) : Array.Empty<string>(); } catch (Exception) { return Array.Empty<string>(); }
         }
+        // Why the object cannot take this replacement ID now, or null, checked as the edit checks it before mutation but
+        // without changing anything: guided Review refuses what Apply would. The underlying ID passes: setting it clears
+        // the mod's value, which Apply checks with its own refusals.
+        public string MarkerIdRefusal(TargetIdentity target, string id) {
+            var problem = ReplacementMarkerIds.Problem(id);
+            if (problem != null) return problem;
+            if (!(scene is IMarkerIdScene markers)) return ReplacementMarkerIds.NotSupported;
+            try {
+                var resolved = engine.ResolveUnique(target);
+                return id == engine.Underlying(resolved)?.MarkerId ? null : markers.MarkerIdRefusal(resolved, id);
+            } catch (Exception e) { return e.GetBaseException().Message; }
+        }
         // Sets or replaces this mod's construction segments of a rail bridge construction with exactly the selected
         // segments. Null ids clear the mod's value: the construction returns to its effective underlying segments. detach
         // writes an explicit detach, which every capability refuses with its reason. Placement and activity keep their mod
@@ -743,6 +755,17 @@ namespace RailroaderScenePatcher.Core {
         public ConstructionSegments ConstructionSegmentsOf(TargetIdentity target) {
             var resolved = engine.ResolveUnique(target);
             return scene.Read(resolved).Segments;
+        }
+        // Whether the active scene patch file sets the track binding of this marker or crossing pad, a detach included.
+        // Read from the scene patch file alone.
+        public bool HasTrackBinding(TargetIdentity target) {
+            if (scenePatchFile == null || target == null) return false;
+            foreach (var item in scenePatchFile.Items) {
+                var other = item["target"] as JObject;
+                if (other == null || !TargetIdentity.SameObject(other, target)) continue;
+                if (item["relationships"]?["trackMarker"] != null) return true;
+            }
+            return false;
         }
         // Whether the active scene patch file sets construction segments for this object. Read from the scene patch file alone.
         public bool HasConstructionSegments(TargetIdentity target) {

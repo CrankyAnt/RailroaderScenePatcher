@@ -51,13 +51,24 @@ namespace RailroaderScenePatcher {
             else if (Step == GuidedTaskStep.Values) { Step = GuidedTaskStep.Target; Target = null; Kind = null; draft = Array.Empty<string>(); Message = null; Recovery = null; Success = false; }
         }
         internal void Open() { Cancel(); Enabled = true; }
-        internal void Cancel() { Enabled = false; Step = GuidedTaskStep.Target; Kind = null; Target = null; draft = Array.Empty<string>(); Message = null; Recovery = null; Success = false; }
+        internal void Cancel() { appliedStep = null; Enabled = false; Step = GuidedTaskStep.Target; Kind = null; Target = null; draft = Array.Empty<string>(); Message = null; Recovery = null; Success = false; }
         internal void AnotherTask() { if (Step == GuidedTaskStep.Applied) Open(); }
         internal SceneObservation BackToInspector() { if (Step != GuidedTaskStep.Applied) return null; var target = Target; Cancel(); return target; }
-        internal void Complete(bool applied, string message, string recovery) {
+        // The native Undo step of the applied edit, or null when it is not known.
+        object appliedStep;
+        internal void Complete(bool applied, string message, string recovery, object step = null) {
             if (Step != GuidedTaskStep.Review) return;
             Success = applied; Message = message; Recovery = recovery;
-            if (applied) Step = GuidedTaskStep.Applied;
+            if (applied) { Step = GuidedTaskStep.Applied; appliedStep = step; }
+        }
+        internal const string AppliedComplete = "The edit is complete. Save when you're done.", AppliedUndone = "Undo reversed this edit. Redo in the Map Editor applies it again.";
+        // What the Apply step says, given the native undo history: the edit is complete while its Undo step is in it,
+        // and reversed after Undo took it out. Null outside the Apply step.
+        internal string AppliedText(System.Collections.Generic.IEnumerable<object> undoGroups) {
+            if (Step != GuidedTaskStep.Applied) return null;
+            if (appliedStep == null || undoGroups == null) return AppliedComplete;
+            foreach (var group in undoGroups) if (ReferenceEquals(group, appliedStep)) return AppliedComplete;
+            return AppliedUndone;
         }
         internal void Start(GuidedTaskKind kind, SceneObservation target, string[] values) {
             var copiedValues = (string[])values.Clone();

@@ -150,12 +150,16 @@ namespace RailroaderScenePatcher {
                     }
                 } else if (guided.Step == GuidedTaskStep.Values) DrawGuidedValues(body);
                 else if (guided.Step == GuidedTaskStep.Review) DrawGuidedReview(body);
-                else PlainLabel(body, "The edit is complete. Save when you're done.");
+                else PlainLabel(body, guided.AppliedText(UndoGroups()));
             });
             var fill = view.GetComponent<LayoutElement>();
             if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
             // Reserve the inspector tab action row, even though guided actions live in the footer.
             ActionRow(builder, Array.Empty<Act>(), null); builder.Spacer(TabGap);
+        }
+        // The native undo history, newest last, or null when it cannot be read.
+        System.Collections.Generic.IReadOnlyList<object> UndoGroups() {
+            try { return attachment?.History?.UndoGroups; } catch { return null; }
         }
         void DrawGuidedValues(UIPanelBuilder builder) {
             Field(builder, "Target", guided.Target.Identity.Path);
@@ -269,7 +273,10 @@ namespace RailroaderScenePatcher {
                 try {
                     pin(selected).Validate(capabilities, guided.Target.Identity, guided.Target.Handle);
                     guidedInspection.Validate(capabilities, guided.Target.Identity, guided.Target.Handle);
-                    guided.Review();
+                    // Review refuses a replacement ID that Apply would refuse, such as one another scene marker uses.
+                    var refusal = guided.Kind == GuidedTaskKind.MarkerId ? attachment?.Session.MarkerIdRefusal(guided.Target.Identity, guidedFields[0]) : null;
+                    if (refusal != null) { feedback.Refuse(GuidedPlace, "Review", refusal); guided.Review(null, GuidedValuesRecovery); }
+                    else guided.Review();
                 } catch (Exception e) {
                     feedback.Refuse(GuidedPlace, "Review", e.GetBaseException().Message);
                     guided.Review(null, GuidedRecovery);
@@ -290,7 +297,7 @@ namespace RailroaderScenePatcher {
                     var target = guided.BackToInspector(); CancelGuided();
                     selected = inventoryPresentation.CurrentSelection(inventory, target); ReadPlacement();
                 }), Slot("Another guided task", "Return to the task list.", null, GuidedTarget) };
-            if (guided.Step == GuidedTaskStep.Target) return new[] { Slot("Inspector", "Return to Inspector.", wait, LeaveGuided) };
+            if (guided.Step == GuidedTaskStep.Target) return new[] { Slot("Inspector", "Leave Guided mode and return to Inspector.", wait, LeaveGuided, "Return to Inspector") };
             if (guided.Step == GuidedTaskStep.Values) {
                 var back = Slot("Back", "Discard the draft and return to the task list.", wait, GuidedTarget);
                 var next = Typed(Slot("Next", "Review your changes without applying them.", wait, ReviewGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock());
@@ -350,7 +357,8 @@ namespace RailroaderScenePatcher {
                 return GuidedOperation(session);
             }, consumes, applied => {
                 var cleanup = !applied && guided.Target != null && attachment?.Session.CleanupUnverified(guided.Target.Identity) == true;
-                guided.Complete(applied, null, applied ? null : cleanup ? "Return to Inspector and click Recheck before trying again." : checkedTarget ? GuidedValuesRecovery : GuidedRecovery);
+                var step = applied ? UndoGroups()?.LastOrDefault() : null;
+                guided.Complete(applied, null, applied ? null : cleanup ? "Return to Inspector and click Recheck before trying again." : checkedTarget ? GuidedValuesRecovery : GuidedRecovery, step);
                 feedback.View(GuidedFeedbackView(), preserve: true);
                 presentation?.RequestRefresh();
             });

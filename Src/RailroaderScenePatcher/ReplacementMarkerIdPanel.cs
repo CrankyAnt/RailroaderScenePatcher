@@ -53,7 +53,7 @@ namespace RailroaderScenePatcher {
             var block = IsStarter ? StarterBlock() : EditBlock();
             if (block != null) return block;
             var reading = ReadSharers();
-            return CommandBand.MarkerIdUnavailable(IsGenericMarker, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected?.Identity));
+            return CommandBand.MarkerIdUnavailable(selected?.Family, IsGenericMarker, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected?.Identity));
         }
         // The Marker ID section: the field with Set ID and Clear ID, then the scene markers that hold the underlying ID.
         // The section stays visible for every marker; for a marker that takes no replacement ID it is disabled with the reason.

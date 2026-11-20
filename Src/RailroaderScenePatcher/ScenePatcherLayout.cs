@@ -575,8 +575,10 @@ namespace RailroaderScenePatcher {
             DrawFooter(builder);
         }
         void DrawModeSwitch(UIPanelBuilder row) => row.AddSegmentedControlCompact(modes => {
-            modes.AddSegment("Inspector", !guided.Enabled, presentation.Action(LeaveGuided));
-            modes.AddSegment("Guided", guided.Enabled, presentation.Action(OpenGuided));
+            modes.AddSegment("Inspector", !guided.Enabled, presentation.Action(LeaveGuided))
+                .Tooltip("Inspector", "Show the object's values and edits in tabs. An unfinished guided task ends without writing anything.");
+            modes.AddSegment("Guided", guided.Enabled, presentation.Action(OpenGuided))
+                .Tooltip("Guided", "Complete one edit step by step: Target, Values, Review, and Apply.");
         }, true);
         // One line under the name: the object's badges and problem count, then its family and states, in the native status
         // colors. The line ends in an ellipsis beside the Inspector and Guided switch, so what is cut off is the family's end,
@@ -1053,7 +1055,7 @@ namespace RailroaderScenePatcher {
                     if (refusal != null) return CommandBand.Sentence(refusal);
                 }
             } catch { }
-            return "Only Generic track markers, mileposts, and crossing pads have editable track bindings.";
+            return "Only track markers, mileposts, and crossing pads have editable track bindings.";
         }
         void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; for (var i = 0; i < coverageFields.Length; i++) coverageFields[i] = ""; }
         // The message that says a form is open. It leaves when the form closes or another one opens.
@@ -1121,6 +1123,9 @@ namespace RailroaderScenePatcher {
             var ids = CommandBand.SegmentIds(segmentFields[0]);
             if (ids.Count == 0) { feedback.Refuse(SegmentsPlace, "Construction segments", "enter at least one segment ID"); return; }
             Edit(SegmentsPlace, "Construction segments", (current, inspection) => current.SetConstructionSegments(identity, ids, inspection), true);
+        }
+        bool HasBindingValue(TargetIdentity identity) {
+            try { return attachment != null && identity != null && attachment.Session.HasTrackBinding(identity); } catch { return false; }
         }
         bool HasSegmentValue(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasConstructionSegments(identity); } catch { return false; }
@@ -1573,7 +1578,7 @@ namespace RailroaderScenePatcher {
                     return new[] {
                         Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding", 1, 56), () => CommandBand.FieldReason(unavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds)),
                         Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : CurrentBinding()[0].Length == 0 ? CommandBand.AlreadyDetached : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)), "Detach binding", 1, 72),
-                        Slot(CommandBand.ClearBinding, "Clear this mod's value for the binding; the marker returns to its underlying binding.", unavailable, () => Edit(BindingPlace, "Clearing the binding's mod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
+                        Slot(CommandBand.ClearBinding, "Clear this mod's value for the binding; the marker returns to its underlying binding.", unavailable ?? CommandBand.ClearBindingReason(HasBindingValue(identity)), () => Edit(BindingPlace, "Clearing the binding's mod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
                         HasPickedBinding ? Slot("Cancel", "Restore the current binding in the fields.", null, CancelPickedBinding) :
                         Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70) };
                 }
@@ -1689,6 +1694,7 @@ namespace RailroaderScenePatcher {
                 };
             }
         }
+        const string ReloadTip = "Reload the Map Editor. If you have unsaved work, you can save or discard it first. Reloading clears the Undo and Redo history.";
         // The session details, in their own window: session state that the panel shows nowhere else. The messages are
         // in the footer and the reasons of the two lamps in their tooltips, so they are not repeated here.
         void DrawSession(UIPanelBuilder builder) {
@@ -1697,7 +1703,7 @@ namespace RailroaderScenePatcher {
                 PlainLabel(builder, FullDiagnosis(attachment.Session));
                 Button(builder, "Copy to clipboard", () => GUIUtility.systemCopyBuffer = FullDiagnosis(attachment.Session));
                 Button(builder, "Reload Map Editor...", () => MapEditorReload.Request(attachment, MapEditorReload.ActiveMapId))
-                    .Disable(MapEditorReload.Error != null);
+                    .Disable(MapEditorReload.Error != null).Tooltip("Reload Map Editor", CommandBand.Tooltip(ReloadTip, MapEditorReload.Error == null ? null : CommandBand.Sentence(MapEditorReload.Error)));
                 if (MapEditorReload.Error != null) PlainLabel(builder, MapEditorReload.Error);
                 return;
             }
@@ -1711,7 +1717,7 @@ namespace RailroaderScenePatcher {
                 var session = attachment.Session;
                 if (reloadRequirement != null) PlainLabel(builder, "Reload required: " + reloadRequirement);
                 Button(builder, "Reload Map Editor...", () => MapEditorReload.Request(attachment, MapEditorReload.ActiveMapId))
-                    .Disable(MapEditorReload.Error != null);
+                    .Disable(MapEditorReload.Error != null).Tooltip("Reload Map Editor", CommandBand.Tooltip(ReloadTip, MapEditorReload.Error == null ? null : CommandBand.Sentence(MapEditorReload.Error)));
                 if (MapEditorReload.Error != null) PlainLabel(builder, MapEditorReload.Error);
                 if (session.LastSave != null && session.LastSave.Error != null) builder.AddLabel(Tint(Red, "Last Save failed: " + session.LastSave.Error + " Completed: " + (session.LastSave.Completed.Count == 0 ? "none" : String.Join(", ", session.LastSave.Completed.Select(PatchEditingSession.DisplayItem))) + ". Outstanding: " + String.Join(", ", session.LastSave.Outstanding.Select(PatchEditingSession.DisplayItem)) + ". Edits remain in memory; correct the cause and Save again."));
                 if (session.IncompleteOperation != null) builder.AddLabel(Tint(Red, "Incomplete operation: " + session.IncompleteOperation));
@@ -1784,7 +1790,7 @@ namespace RailroaderScenePatcher {
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
                     new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },
-            [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
+            [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Check what the object is connected to, and change the connections it supports.",
                 Terms = new[] {
                     new[] { "Track binding", "The track location a marker is registered at. Changing it does not move the object." },
                     new[] { "Replacement targets", "Choose a target in the world, check its ID, and confirm it. Confirming changes nothing." },

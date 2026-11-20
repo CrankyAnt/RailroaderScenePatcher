@@ -103,6 +103,7 @@ namespace RailroaderScenePatcher.Core {
         public ObjectState Read(object target) => Owner(target).Read(target);
         public IReadOnlyList<string> MarkerIdUsers(object target, string id) => Owner(target) is IMarkerIdScene ids ? ids.MarkerIdUsers(target, id) : Array.Empty<string>();
         public bool RewritesRegistration(object target, ObjectState state) => Owner(target) is IMarkerIdScene ids && ids.RewritesRegistration(target, state);
+        public string MarkerIdRefusal(object target, string id) => Owner(target) is IMarkerIdScene ids ? ids.MarkerIdRefusal(target, id) : ReplacementMarkerIds.NotSupported;
         public void Apply(object target, ObjectState state) { Owner(target).Apply(target, state); }
         public bool Restore(object target, object snapshot) => Owner(target).Restore(target, snapshot);
         // Relationships belong to the adapter that resolved the object; an adapter without them refuses any relationship.

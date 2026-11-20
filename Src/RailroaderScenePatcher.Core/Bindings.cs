@@ -353,6 +353,9 @@ namespace RailroaderScenePatcher.Core {
         // a setting of its activity, binding or track following, or any setting while a dependent cache such as a map
         // label's track group disagrees with its location.
         bool RewritesRegistration(object target, ObjectState state);
+        // Why the marker cannot take this replacement ID in the world as it is, or null, as the edit checks it before
+        // mutation. The marker's own ID is no change and passes.
+        string MarkerIdRefusal(object target, string id);
     }
     // The rules of a replacement ID, which repairs a duplicate marker ID: one holder takes an id that is not empty,
     // does not begin with a prefix the game uses for its own registrations, and that no other scene marker, graph
@@ -363,7 +366,10 @@ namespace RailroaderScenePatcher.Core {
         public static readonly IReadOnlyList<string> ReservedPrefixes = Array.AsReadOnly(new[] { "passengerStop:", "flare:" });
         public const string Empty = "The replacement ID is empty. Enter an ID that no other scene marker or map object uses.";
         public const string NotAString = "The replacement ID must be a string.";
-        public const string NotSupported = "Only a generic track marker can have a replacement ID.";
+        public const string NotSupported = "Only objects in the Track marker family can have a replacement ID.";
+        // The reason the Connections tab gives for an object of another family. A milepost or a starter placement marker
+        // is a native track marker of type Generic too, so the reason names the families.
+        public static string NotSupportedFor(string family) => NotSupported + (String.IsNullOrWhiteSpace(family) ? "" : " This object is in the " + family + " family.");
         public const string Offer = "Give one of them a replacement ID to repair it.";
         public const string ForeignOwner = "an object that is not a scene marker";
         // Why the id cannot be a replacement ID whatever the world holds, or null. A space at either end would make an ID
@@ -402,6 +408,7 @@ namespace RailroaderScenePatcher.Core {
         public void UseMasks(GroundMasks value) { if (masks == null) masks = value; }
         public IReadOnlyList<string> MarkerIdUsers(object target, string id) => relationship.IdUsers(target, id);
         public bool RewritesRegistration(object target, ObjectState state) => relationship.RewritesRegistration(target, state);
+        public string MarkerIdRefusal(object target, string id) => relationship.MarkerIdRefusal(target, id);
         public DependentOutput Output(object target) => masks?.Output(target) ?? DependentOutput.None;
         public void RetryOutput(object target) => masks?.RetryOutput(target);
         void Masked(object target, Action change) { var before = masks?.Observe(target); change(); masks?.Follow(target, target, before); }
@@ -460,6 +467,11 @@ namespace RailroaderScenePatcher.Core {
         // change: a value equal to the current one counts too, so a later load in another order still finds it.
         internal bool RewritesRegistration(object target, ObjectState state) =>
             state != null && (state.Active.HasValue || state.Marker != null || state.Placement?.Following != null || world.DependentProblem(target) != null);
+        // Why the marker cannot take this replacement ID, or null; its own ID is no change.
+        internal string MarkerIdRefusal(object target, string id) {
+            if (ids == null) return ReplacementMarkerIds.NotSupported;
+            return id != null && id == ids.MarkerId(target) ? null : Unavailable(target, id);
+        }
         // Why the marker cannot take this replacement ID in the world as it is, or null.
         string Unavailable(object target, string id) {
             var problem = ReplacementMarkerIds.Problem(id);

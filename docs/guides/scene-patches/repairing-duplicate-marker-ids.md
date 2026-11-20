@@ -32,7 +32,7 @@ Each repair changes one holder, and each replacement ID belongs to one marker. A
 1. Click **Set ID**. The result appears in the footer's message area under **Marker ID**.
 1. Set the activity or the track location of the marker. Click **Enable** or **Disable** on the **Object** tab, or enter the location and click **Set** at the bottom of the **Connections** tab. The repaired marker accepts these edits. The other holders do not change.
 
-**Set ID** is unavailable if the field is empty, contains only spaces, or holds the marker's current ID. It's also unavailable if the ID begins with a reserved prefix or begins or ends with a space. Its tooltip explains why. The **Marker ID** section is disabled, with a reason, for markers that aren't generic track markers. It's also disabled for a generic track marker whose underlying ID no other scene marker shares, unless this mod already sets a replacement ID.
+**Set ID** is unavailable if the field is empty, contains only spaces, or holds the marker's current ID. It's also unavailable if the ID begins with a reserved prefix or begins or ends with a space. Its tooltip explains why. The **Marker ID** section is disabled for objects outside the **Track marker** family. Its reason names the object's family, such as **Milepost**, because a milepost or a starter placement marker also shows the marker type **Generic**. It's also disabled for a generic track marker whose underlying ID no other scene marker shares, unless this mod already sets a replacement ID.
 
 After **Set ID**, the caption above the other holders changes from **Also holding** to **Still holding** and includes the underlying ID, for example `Still holding Mg6m, the underlying ID`. The list names the holders that keep that ID. The selected marker now has a unique replacement ID, so its detected problem disappears. The other holders keep sharing the underlying ID until each has its own.
 
@@ -43,7 +43,7 @@ Use this route to have every step of the change checked in a single guided task.
 1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section for a generic track marker whose explanation names a duplicate marker ID, active or inactive.
 1. In **Target**, select **Set replacement ID** in the task list.
 1. In **Values**, enter the ID in the **Replacement ID** field. The same checks as **Set ID** apply.
-1. Click **Next**. **Review** shows the proposed **Marker ID**. It lists the settings that stay unchanged: placement, activity, and track binding. Every other holder keeps its registration.
+1. Click **Next**. **Review** checks the ID against the scene markers and map objects, as **Apply** does. An ID that's already in use is refused in **Review**, with the marker or map object that uses it. **Review** shows the proposed **Marker ID**. It lists the settings that stay unchanged: placement, activity, and track binding. Every other holder keeps its registration.
 1. Click **Apply** in the footer. Then click **Back to inspector**, or **Another guided task** to repair the next holder.
 
 The task changes only the ID. To enable or rebind the marker, use a separate task or the inspector.
@@ -126,7 +126,7 @@ Without `markerId`, the marker keeps its ID. A modification with `markerId` requ
 
 The patcher checks these rules before changing anything. If it refuses the edit, the marker and its registrations stay as they were.
 
-- **Target.** Only a generic track marker takes a replacement ID: a target with the structure `track-marker-v1`. A modification with `markerId` on any other target fails with `Only a generic track marker takes a replacement ID`. Such targets include crossing pads, mileposts, starter placement markers, and objects that are not markers. The other modifications of the file still apply.
+- **Target.** Only a generic track marker takes a replacement ID: a target with the structure `track-marker-v1`. A modification with `markerId` on any other target fails with `Only objects in the Track marker family can have a replacement ID.` Such targets include crossing pads, mileposts, starter placement markers, and objects that are not markers. The other modifications of the file still apply.
 - **Empty and invalid values.** The patcher refuses an empty or whitespace-only ID and any value that isn't a string, including `null`. It also refuses an ID that begins or ends with a space because it would look like another ID.
 - **Reserved prefixes.** An ID that begins with `passengerStop:` or `flare:` is refused. The game uses these prefixes for its own track registrations.
 - **Uniqueness.** The ID must not be used by another scene marker, by a graph registration of an object that is not a scene marker, or by a map object of the loaded map context. The refusal names the user, for example `Replacement ID <id> is already used by the scene marker <scene/path>. Choose an ID that no other scene marker uses.`
