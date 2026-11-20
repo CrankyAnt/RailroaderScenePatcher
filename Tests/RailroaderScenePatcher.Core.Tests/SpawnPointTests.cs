@@ -1,0 +1,316 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
+using RailroaderScenePatcher.Core;
+
+// One scene spawn point under World/POIs: a transform without a renderer, collider or light.
+class FakeSpawn {
+    public double[] Position = { 4194.8, 645.5, -3139.2 }, Rotation = { 0, 0, 0, 1 };
+    public bool Active = true;
+}
+// Controlled world: map coordinates are scene coordinates plus Origin on X, as the moving origin has them.
+class FakeSpawnWorld : ISpawnPointWorld {
+    public string[] Maps = { "map" };
+    public IEnumerable<string> MapIds => Maps;
+    public Dictionary<string, List<object>> Objects = new Dictionary<string, List<object>>();
+    public double Origin = 1000;
+    public string Refused;
+    public int Mutations;
+    // Failure injections: a throw after the placement is written, and a placement that does not stick, once or always.
+    public bool ThrowAfterPlacement, DriftOnPlacement, KeepDrift;
+    public IReadOnlyList<object> Find(string scene, string path) => scene == "level4" && Objects.TryGetValue(path, out var found) ? found : new List<object>();
+    public string Refusal(object spawn) => Refused;
+    public ObjectState Observe(object target) {
+        var spawn = (FakeSpawn)target;
+        return new ObjectState(new Placement(new[] { spawn.Position[0] + Origin, spawn.Position[1], spawn.Position[2] }, (double[])spawn.Rotation.Clone()), spawn.Active);
+    }
+    public void SetActive(object target, bool active) { Mutations++; ((FakeSpawn)target).Active = active; }
+    public void SetPlacement(object target, Placement placement) {
+        Mutations++;
+        var spawn = (FakeSpawn)target;
+        spawn.Position = new[] { placement.Position[0] - Origin, placement.Position[1], placement.Position[2] };
+        spawn.Rotation = (double[])placement.Rotation.Clone();
+        if (DriftOnPlacement) { spawn.Position[1] += 3; DriftOnPlacement = KeepDrift; }
+        if (ThrowAfterPlacement) { ThrowAfterPlacement = false; throw new Exception("injected after placement"); }
+    }
+}
+static class SpawnPointTests {
+    const string Alarka = "World/POIs/Alarka";
+    static readonly TargetIdentity AlarkaId = new TargetIdentity("level4", Alarka, SpawnPoints.Component, SpawnPoints.Structure);
+    static void Assert(bool value, string message) { if (!value) throw new Exception(message); }
+    static string Spawn(string id, double x = 5210, string path = Alarka, string extra = "", bool placement = true) =>
+        "\"" + id + "\":{\"target\":{\"scene\":\"level4\",\"path\":\"" + path + "\",\"component\":\"Character.SpawnPoint\",\"structure\":\"spawn-point-v1\"}" +
+        (placement ? ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + x.ToString(System.Globalization.CultureInfo.InvariantCulture) + ",650,-3100],\"rotation\":[0,0.707107,0,0.707107]}" : "") + extra + ",\"dependsOn\":[]}";
+    static string Doc(string items, string map = "map") => "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"" + map + "\"},\"modifications\":{" + items + "}}";
+    static (FakeSpawnWorld world, FakeSpawn spawn, SpawnPointScene scene) Setup() {
+        var world = new FakeSpawnWorld(); var spawn = new FakeSpawn();
+        world.Objects[Alarka] = new List<object> { spawn };
+        return (world, spawn, new SpawnPointScene(world, Capability.Unchecked));
+    }
+    static bool Unedited(FakeSpawn spawn) => spawn.Position.SequenceEqual(new[] { 4194.8, 645.5, -3139.2 }) && spawn.Rotation.SequenceEqual(new[] { 0.0, 0, 0, 1 }) && spawn.Active;
+    static bool Moved(FakeSpawn spawn) => Math.Abs(spawn.Position[0] - 4210) < 1e-9 && spawn.Position[1] == 650 && spawn.Position[2] == -3100 && spawn.Rotation[1] == 0.707107;
+    public static void Run() {
+        FixedPlacementThroughTheOrigin();
+        TargetResolutionIsExact();
+        ActivityAndRepeatedApplication();
+        PreflightRefusalLeavesSceneAndFileUnchanged();
+        FailureAfterMutationRestoresPlacementAndActivity();
+        UnverifiedCleanupBlocksRetry();
+        EditingHistoryRemovalSaveAndReload();
+        ObjectTabNamesTheUses();
+        InventoryListsEachSpawnPointOnceWithoutProblems();
+        GroupsWithSpawnPointsPointToTheFamily();
+        DisabledSpawnPointIsNotOffered();
+        UsesStateConditionsAndCounts();
+        UnreadSetupsAreNamedAsUnread();
+        RelationshipsAreRefusedBeforeMutation();
+        MinimumHoldsWithoutTheCapability();
+        SpawnPointRootIsNoGroupRow();
+        NewGameStartPlacesSpawnPointsFirst();
+        NewGameStartLeavesOtherWorkForTheWorldLoad();
+    }
+    // A new game reads the start setup's spawn point before the world-load apply; the spawn point modifications apply
+    // first, through the same engine, and the world load then finds them in place.
+    static void NewGameStartPlacesSpawnPointsFirst() {
+        var (world, spawn, scene) = Setup();
+        var engine = new PatchEngine(scene);
+        var doc = Doc(Spawn("move-alarka", extra: ",\"active\":false"));
+        var early = engine.BeforeNewGameStart(doc, "");
+        Assert(early.Error == null && early.Outcomes["move-alarka"].Applied && Moved(spawn) && !spawn.Active, "The spawn point is moved and disabled before the new game reads it: " + early.Error);
+        var load = engine.Apply(doc, "");
+        Assert(load.Outcomes["move-alarka"].Applied && Moved(spawn) && !spawn.Active, "The world-load apply keeps the move: " + load.Outcomes["move-alarka"].Error);
+        var store = new Store { Patch = doc }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store); mapEditor.Session = session;
+        Assert(session.Remove(AlarkaId).Applied && Unedited(spawn), "Remove modification still returns the authored placement and activity, captured before the early apply");
+    }
+    // Only a spawn point modification without dependencies, with a fixed placement and a target ready now applies early;
+    // anything else is left to the world-load apply, untouched and without a failure.
+    static void NewGameStartLeavesOtherWorkForTheWorldLoad() {
+        var (world, spawn, scene) = Setup();
+        world.Objects["World/POIs/Bryson"] = new List<object> { new FakeSpawn() };
+        world.Objects["World/POIs/Dillsboro"] = new List<object> { new FakeSpawn() };
+        var dependent = Spawn("a-dependent", path: "World/POIs/Bryson").Replace("\"dependsOn\":[]", "\"dependsOn\":[\"move-alarka\"]");
+        var following = "\"following\":{\"target\":{\"scene\":\"level4\",\"path\":\"World/POIs/Dillsboro\",\"component\":\"Character.SpawnPoint\",\"structure\":\"spawn-point-v1\"}," +
+            "\"placement\":{\"mode\":\"trackFollowing\",\"track\":{\"segment\":\"S1\",\"end\":\"a\",\"distance\":10},\"offset\":[0,0,0],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
+        var doc = Doc(Spawn("move-alarka") + "," + dependent + "," + following);
+        var engine = new PatchEngine(scene);
+        var early = engine.BeforeNewGameStart(doc, "");
+        Assert(early.Outcomes["move-alarka"].Applied && !early.Outcomes.ContainsKey("a-dependent") && !early.Outcomes.ContainsKey("following") && world.Mutations == 1,
+            "Only the fixed, dependency-free spawn point modification applies early: " + String.Join(", ", early.Outcomes.Keys));
+        Assert(early.EarlyRouteUnavailable != null, "The skipped modifications are named as waiting for the world load");
+        world.Refused = "The scene spawn point's scene isn't loaded.";
+        var refused = new PatchEngine(scene).BeforeNewGameStart(Doc(Spawn("move-alarka", 5220)), "");
+        Assert(!refused.Outcomes.Any() && world.Mutations == 1 && refused.EarlyRouteUnavailable.Contains("isn't loaded"), "A target that is not ready is left untouched without a failure: " + refused.EarlyRouteUnavailable);
+        world.Refused = null;
+        var later = engine.Apply(Doc(Spawn("move-alarka", 5220)), "");
+        Assert(later.Outcomes["move-alarka"].Applied && Math.Abs(spawn.Position[0] - 4220) < 1e-9, "The world-load apply still runs every modification: " + later.Outcomes["move-alarka"].Error);
+    }
+    static void FixedPlacementThroughTheOrigin() {
+        var (world, spawn, scene) = Setup();
+        var result = new PatchEngine(scene).Apply(Doc(Spawn("move-alarka")));
+        Assert(result.Error == null && result.Outcomes["move-alarka"].Applied, "Spawn point placement applies: " + result.Error + result.Outcomes["move-alarka"].Error);
+        Assert(Moved(spawn) && spawn.Active, "The spawn point takes the map placement through the current origin");
+    }
+    static void TargetResolutionIsExact() {
+        var (world, spawn, scene) = Setup();
+        var engine = new PatchEngine(scene);
+        Assert(!engine.Apply(Doc(Spawn("other-map"), "other")).Outcomes.Any() && world.Mutations == 0, "A scene patch file for another map touches nothing");
+        Assert(!engine.Apply(Doc(Spawn("missing", path: "World/POIs/Nowhere"))).Outcomes["missing"].Applied && world.Mutations == 0, "A path without a spawn point resolves to nothing");
+        world.Objects["World/POIs/Twin"] = new List<object> { new FakeSpawn(), new FakeSpawn() };
+        Assert(!engine.Apply(Doc(Spawn("twin", path: "World/POIs/Twin"))).Outcomes["twin"].Applied && world.Mutations == 0, "An ambiguous spawn point identity fails");
+        var group = Spawn("group").Replace("spawn-point-v1", BakedSceneryGroups.Structure).Replace("Character.SpawnPoint", "UnityEngine.Transform");
+        Assert(!engine.Apply(Doc(group)).Outcomes["group"].Applied && world.Mutations == 0, "A baked scenery group identity does not resolve as a spawn point");
+        Assert(scene.Resolve(new TargetIdentity("level4", Alarka, SpawnPoints.Component, null)).Count == 1, "An identity without a structure names the spawn point by its component");
+    }
+    static void ActivityAndRepeatedApplication() {
+        var (world, spawn, scene) = Setup();
+        var engine = new PatchEngine(scene);
+        var disable = Doc(Spawn("hide-alarka", extra: ",\"active\":false"));
+        Assert(engine.Apply(disable).Outcomes["hide-alarka"].Applied && !spawn.Active && Moved(spawn), "An explicit disable deactivates the moved spawn point");
+        spawn.Active = true;
+        Assert(engine.Apply(disable).Outcomes["hide-alarka"].Applied && !spawn.Active && Moved(spawn), "Repeated application keeps the absolute placement and the disable");
+        world.Origin = 1010;
+        Assert(new PatchEngine(scene).Apply(disable).Outcomes["hide-alarka"].Applied && Math.Abs(spawn.Position[0] - 4200) < 1e-9, "A new load at another origin reaches the same map placement");
+        var enable = Doc(Spawn("show-alarka", extra: ",\"active\":true", placement: false));
+        Assert(new PatchEngine(scene).Apply(enable).Outcomes["show-alarka"].Applied && spawn.Active, "An explicit enable activates the spawn point and keeps its placement");
+    }
+    static void PreflightRefusalLeavesSceneAndFileUnchanged() {
+        var (world, spawn, scene) = Setup();
+        world.Refused = "The scene spawn point's scene isn't loaded.";
+        var outcome = new PatchEngine(scene).Apply(Doc(Spawn("move-alarka"))).Outcomes["move-alarka"];
+        Assert(!outcome.Applied && outcome.Error.Contains("isn't loaded") && world.Mutations == 0 && Unedited(spawn), "A preflight refusal leaves the spawn point untouched: " + outcome.Error);
+        var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
+        var before = session.ScenePatchFileText;
+        var edit = session.Edit(AlarkaId, new Placement(new[] { 5210.0, 650, -3100 }, new[] { 0, 0.707107, 0, 0.707107 }), null);
+        Assert(!edit.Applied && session.ScenePatchFileText == before && world.Mutations == 0 && Unedited(spawn) && !mapEditor.IsDirty, "A refused edit leaves the scene and the scene patch file unchanged: " + edit.Error);
+    }
+    static void FailureAfterMutationRestoresPlacementAndActivity() {
+        foreach (var inject in new Action<FakeSpawnWorld>[] { w => w.ThrowAfterPlacement = true, w => w.DriftOnPlacement = true }) {
+            var (world, spawn, scene) = Setup();
+            inject(world);
+            var engine = new PatchEngine(scene);
+            var outcome = engine.Apply(Doc(Spawn("move-alarka", extra: ",\"active\":false"))).Outcomes["move-alarka"];
+            Assert(!outcome.Applied && outcome.Error.StartsWith("The change failed. The object is back as it was. Reason:", StringComparison.Ordinal), "A failure after mutation is restored: " + outcome.Error);
+            Assert(Unedited(spawn), "The captured placement and activity are restored");
+        }
+    }
+    static void UnverifiedCleanupBlocksRetry() {
+        var (world, spawn, scene) = Setup();
+        world.DriftOnPlacement = world.KeepDrift = true;
+        var engine = new PatchEngine(scene);
+        var outcome = engine.Apply(Doc(Spawn("move-alarka"))).Outcomes["move-alarka"];
+        Assert(!outcome.Applied && outcome.Error.Contains("could not be verified"), "Incomplete cleanup is reported explicitly: " + outcome.Error);
+        world.DriftOnPlacement = world.KeepDrift = false;
+        var mutations = world.Mutations;
+        var retry = engine.Apply(Doc(Spawn("again", 5220))).Outcomes["again"];
+        Assert(!retry.Applied && retry.Error.Contains("Cleanup") && world.Mutations == mutations, "The retry on the affected spawn point is blocked: " + retry.Error);
+        var reloaded = new PatchEngine(scene).Apply(Doc(Spawn("again", 5220))).Outcomes["again"];
+        Assert(reloaded.Applied && Math.Abs(spawn.Position[0] - 4220) < 1e-9, "A world reload lifts the block: " + reloaded.Error);
+    }
+    static void EditingHistoryRemovalSaveAndReload() {
+        var (world, spawn, scene) = Setup();
+        var store = new Store(); var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(scene), mapEditor, store); mapEditor.Session = session;
+        var all = new[] { PatchEditingSession.NativeData, PatchEditingSession.PatchData, PatchEditingSession.Metadata };
+        void Persistence(bool dirty, string[] outstanding, string step) {
+            var now = session.Outstanding(mapEditor.NativeDirty);
+            Assert(mapEditor.IsDirty == dirty && now.SequenceEqual(outstanding), step + ": title indication and Save availability read " + mapEditor.IsDirty + " for outstanding " + String.Join(", ", now));
+        }
+        var moved = new Placement(new[] { 5210.0, 650, -3100 }, new[] { 0, 0.707107, 0, 0.707107 });
+        Assert(session.Edit(AlarkaId, moved, null).Applied && Moved(spawn), "A move in scene patch editing moves the spawn point");
+        var item = (JObject)JObject.Parse(session.ScenePatchFileText)["modifications"].First.First;
+        Assert((string)item["target"]["structure"] == SpawnPoints.Structure && (string)item["target"]["component"] == SpawnPoints.Component && item["placement"] != null && item["active"] == null,
+            "The scene patch file records the spawn point's placement under its own structure: " + item);
+        Assert(session.MinimumPatcherVersion == SpawnPoints.RequiredVersion, "A spawn point placement requires the spawn point capability version: " + session.MinimumPatcherVersion);
+        Assert(session.Edit(AlarkaId, null, false).Applied && !spawn.Active, "A disable in scene patch editing deactivates the spawn point");
+        Persistence(true, all, "After two edits");
+        mapEditor.Undo(); Assert(spawn.Active && Moved(spawn), "Undo enables the moved spawn point");
+        mapEditor.Undo(); Assert(Unedited(spawn), "Undo returns the spawn point to its scene placement");
+        Persistence(false, new string[0], "After Undo back to the unedited spawn point");
+        mapEditor.Redo(); mapEditor.Redo(); Assert(Moved(spawn) && !spawn.Active, "Redo reapplies both edits");
+        Persistence(true, all, "After Redo");
+        Assert(session.Remove(AlarkaId).Applied && Unedited(spawn), "Remove modification returns the spawn point to its effective underlying state");
+        mapEditor.Undo(); Assert(Moved(spawn) && !spawn.Active, "Undo of the removal restores this mod's edits");
+        Assert(mapEditor.Save() == null && store.Info.Contains("crankyant/scene-patcher >=" + SpawnPoints.RequiredVersion) && (int)JObject.Parse(store.Patch)["formatVersion"] == 1,
+            "Save keeps format version 1 and raises the minimum patcher dependency: " + store.Info);
+        Persistence(false, new string[0], "After Save");
+        var fresh = new FakeSpawn(); var replay = new FakeSpawnWorld { Origin = 990 }; replay.Objects[Alarka] = new List<object> { fresh };
+        var engine = new PatchEngine(new SpawnPointScene(replay, Capability.Unchecked));
+        var reload = engine.Apply(store.Patch);
+        Assert(((JObject)JObject.Parse(store.Patch)["modifications"]).Count == 1 && reload.Outcomes.Values.Single().Applied && Math.Abs(fresh.Position[0] - 4220) < 1e-9 && !fresh.Active,
+            "A reloaded world reproduces the move from one modification");
+        var once = String.Join(",", fresh.Position);
+        Assert(engine.Apply(store.Patch).Outcomes.Values.All(o => o.Applied) && String.Join(",", fresh.Position) == once, "Applying the saved file again adds no offset");
+        var strict = new Store { Info = "{\"identifier\":\"author/pack\",\"version\":\"1.0.0\",\"dependencies\":{\"required\":[\"crankyant/scene-patcher >=0.9.0\"]}}" };
+        var (_, _, otherScene) = Setup(); var strictEditor = new NativeMapEditor();
+        var kept = new PatchEditingSession(new PatchEngine(otherScene), strictEditor, strict); strictEditor.Session = kept;
+        Assert(kept.Edit(AlarkaId, moved, null).Applied && strictEditor.Save() == null && strict.Info.Contains(">=0.9.0") && !strict.Info.Contains(">=" + SpawnPoints.RequiredVersion + "\""), "A stricter existing constraint is retained: " + strict.Info);
+    }
+    static void ObjectTabNamesTheUses() {
+        var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0), SpawnPoints.SetupBinding("alarka-jct-start") };
+        var uses = SpawnPoints.Uses(bindings, 0);
+        foreach (var expected in new[] { "rescue", "/tp", "new game", "alarka-jct-start", "Alarka" })
+            Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0), "The uses name " + expected + ": " + String.Join(" | ", uses));
+        // Quick search lists spawn points, but Railroader 0.6.3 never opens it (QuickSearchController.Show is empty), so
+        // only teleport is an expected use, and quick search is named only where the game offers it.
+        var teleport = uses.Single(line => line.Contains("/tp"));
+        Assert(teleport.StartsWith("Teleport: the /tp console command is expected to list this spawn point as Alarka and teleport you to its position.", StringComparison.Ordinal)
+            && teleport.Contains("in game versions that open it. Railroader 0.6.3 doesn't open quick search."), "The teleport use names /tp and quick search only where the game offers it: " + teleport);
+        Assert(!uses.Any(line => line.Contains("quick search are expected") || line.Contains("quick search is expected")) && !SpawnPoints.Dependency.Contains("quick search"),
+            "No use or dependency says quick search is expected to offer the spawn point: " + String.Join(" | ", uses) + " | " + SpawnPoints.Dependency);
+        Assert(uses.Any(line => line.Contains("no native spawns")), "Without native spawns the default start says so: " + String.Join(" | ", uses));
+        var native = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) }, 2);
+        Assert(native.Any(line => line.Contains("2 native spawns") && line.Contains("Spawns")) && native.Any(line => line.Contains("No start setup")),
+            "With native spawns the uses name them and their Map Editor category, and a spawn point without a setup says so: " + String.Join(" | ", native));
+        var unknown = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka") }, null);
+        Assert(unknown.Any(line => line.Contains("couldn't be read")), "Unknown native spawns are named as unread: " + String.Join(" | ", unknown));
+        var setup = uses.Single(line => line.Contains("alarka-jct-start"));
+        Assert(setup.Contains("expected") && setup.Contains("no cars") && setup.Contains("balance"),
+            "The start setup use names its condition and stays expected behaviour: " + setup);
+        Assert(SpawnPoints.Operations.StartsWith("Move, rotate, enable, or disable", StringComparison.Ordinal), "The supported edits name placement and Enabled: " + SpawnPoints.Operations);
+    }
+    static SceneObservation Row(string name, bool enabled) =>
+        new SceneObservation(name, new TargetIdentity("level4", "World/POIs/" + name, SpawnPoints.Component, SpawnPoints.Structure), SpawnPoints.Family, enabled,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { SpawnPoints.NameBinding(name) }, new[] { SpawnPoints.Dependency }, BindingRules.Problems(enabled, new string[0], new string[0]),
+            SpawnPoints.Operations, new string[0], enabled, new string[0], null);
+    static void InventoryListsEachSpawnPointOnceWithoutProblems() {
+        Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, "World") == SpawnPoints.Family, "A spawn point below World is listed in the Spawn point family");
+        Assert(SpawnPoints.FamilyOf("Helpers.MilePost", "World") == null, "Another component is not a spawn point");
+        Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, "Setups") == null, "An object below a kept-out root stays out");
+        var rows = new[] { Row("Bryson", true), Row("Alarka", false), Row("Whittier", true) };
+        var groups = InventoryPresentationState.Groups(rows);
+        var family = groups.Single(g => g.Key == SpawnPoints.Family);
+        Assert(family.Value.Select(r => r.Identity.Path).SequenceEqual(new[] { "World/POIs/Alarka", "World/POIs/Bryson", "World/POIs/Whittier" }) && groups.Count == 1,
+            "Every spawn point stands once in the Spawn point family, in name order");
+        Assert(family.Value.All(r => r.Problems.Count == 0 && r.InspectionOnly == null), "An inactive spawn point shows no problem and none is inspection only");
+    }
+    static void GroupsWithSpawnPointsPointToTheFamily() {
+        var verdict = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Spawn").With(SpawnPoints.Component), new Node("Shell").Solid())))))
+            .Single(v => v.Path == "World/Large Scenery/Town/Depot");
+        Assert(verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Ticket == null && verdict.Reason == BakedSceneryRules.SpawnPointReason && verdict.ReasonIsSentence,
+            "A group that holds a spawn point names the Spawn point family, without a ticket: " + verdict.Reason + " " + verdict.Ticket);
+    }
+    // A disabled spawn point is not in SpawnPoint.All: rescue, teleport and the default start pass it by;
+    // a start setup that names it still reads it.
+    static void DisabledSpawnPointIsNotOffered() {
+        var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0), SpawnPoints.SetupBinding("alarka-jct-start") };
+        var uses = SpawnPoints.Uses(bindings, 0, active: false);
+        Assert(!uses.Any(line => line.Contains("list this spawn point as")), "A disabled spawn point is not said to be offered: " + String.Join(" | ", uses));
+        Assert(!uses.Any(line => line.Contains("quick search")), "A disabled spawn point's uses leave quick search out: " + String.Join(" | ", uses));
+        foreach (var expected in new[] { "rescue", "/tp", "new game" })
+            Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0 && line.Contains("disabled")), "The disabled spawn point says " + expected + " passes it by: " + String.Join(" | ", uses));
+        Assert(uses.Any(line => line.Contains("alarka-jct-start") && line.Contains("This also applies when this spawn point is disabled")), "A start setup still names it: " + String.Join(" | ", uses));
+    }
+    static void UsesStateConditionsAndCounts() {
+        var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) };
+        var one = SpawnPoints.Uses(bindings, 1);
+        Assert(one.Any(line => line.Contains("declares 1 native spawn,")) && !one.Any(line => line.Contains("1 native spawns")), "One native spawn reads singular: " + String.Join(" | ", one));
+        var tie = SpawnPoints.Uses(bindings, 0, samePriority: 3);
+        Assert(tie.Any(line => line.Contains("This spawn point shares its priority with 3 other active spawn points") && line.Contains("isn't fixed")), "Equal priorities name this spawn point and say the choice among them is not fixed: " + String.Join(" | ", tie));
+        Assert(!SpawnPoints.Uses(bindings, 0).Any(line => line.Contains("isn't fixed")), "A unique priority names no tie");
+        Assert(SpawnPoints.Priority(bindings) == 0 && SpawnPoints.Priority(new[] { SpawnPoints.NameBinding("x") }) == null, "The priority reads back from the bindings");
+    }
+    static void UnreadSetupsAreNamedAsUnread() {
+        var uses = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.SetupsUnreadBinding("SetupDescriptor.spawnPoint is missing") }, 0);
+        Assert(uses.Any(line => line.Contains("start setups couldn't be read") && line.Contains("spawnPoint is missing")) && !uses.Any(line => line.Contains("No start setup")),
+            "Unread setups are named as unread, never as no setup: " + String.Join(" | ", uses));
+        Assert(SpawnPoints.SetupBinding("  ") == null, "A setup without an identifier has no binding of its own; the adapter names it by its object");
+    }
+    static void RelationshipsAreRefusedBeforeMutation() {
+        var (world, spawn, scene) = Setup();
+        foreach (var (item, expected) in new[] {
+            (Spawn("marker", extra: ",\"relationships\":{\"trackMarker\":{\"segment\":\"S1\",\"end\":\"a\",\"distance\":1}}"), "track-marker"),
+            (Spawn("starter", placement: false, extra: ",\"starterPlacement\":{\"setup\":\"alarka-jct-start\",\"track\":{\"segment\":\"S1\",\"end\":\"a\",\"distance\":1}}"), StarterPlacements.NotAStarter) }) {
+            var outcome = new PatchEngine(scene).Apply(Doc(item)).Outcomes.Values.Single();
+            Assert(!outcome.Applied && outcome.Error.Contains(expected) && world.Mutations == 0 && Unedited(spawn), "A relationship on a spawn point is refused before mutation: " + outcome.Error);
+        }
+    }
+    // The dependency minimum follows the content, whether or not this build can edit spawn points.
+    static void MinimumHoldsWithoutTheCapability() {
+        var capabilities = new SceneCapabilities(() => new[] { "map" });
+        capabilities.Add(new Scene { Maps = new[] { "map" } });
+        capabilities.AddUnavailable(SpawnPoints.Structure, "The scene spawn point type is unavailable.");
+        var store = new Store { Patch = Doc(Spawn("move-alarka")) }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(new PatchEngine(capabilities), mapEditor, store); mapEditor.Session = session;
+        Assert(session.MinimumPatcherVersion == SpawnPoints.RequiredVersion, "A spawn point placement needs its version without the capability: " + session.MinimumPatcherVersion);
+        var bare = Doc(Spawn("by-component").Replace(",\"structure\":\"spawn-point-v1\"", ""));
+        var other = new Store { Patch = bare }; var otherEditor = new NativeMapEditor();
+        var byComponent = new PatchEditingSession(new PatchEngine(capabilities), otherEditor, other); otherEditor.Session = byComponent;
+        Assert(byComponent.MinimumPatcherVersion == SpawnPoints.RequiredVersion, "A target named by its spawn point component alone needs it too: " + byComponent.MinimumPatcherVersion);
+    }
+    // A spawn point root carries a family of its own, so the baked scenery rule makes it no group, also when it has
+    // something physical, and no part of a group either.
+    static void SpawnPointRootIsNoGroupRow() {
+        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("POIs",
+            new Node("Alarka").With(SpawnPoints.Component).Family(),
+            new Node("Bryson").With(SpawnPoints.Component, "UnityEngine.BoxCollider").Solid().Family())));
+        foreach (var path in new[] { "World/POIs/Alarka", "World/POIs/Bryson" })
+            Assert(verdicts.Single(v => v.Path == path).Disposition == GroupDisposition.ExistingFamily, path + " is no group row: " + verdicts.Single(v => v.Path == path).Disposition);
+        Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, BakedSceneryRules.WorldRoot) == SpawnPoints.Family, "The family rule the inventory calls lists it");
+    }
+}

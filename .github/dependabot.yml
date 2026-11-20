@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - /Src/RailroaderScenePatcher.Core
+      - /Src/RailroaderScenePatcher
+      - /Tests/RailroaderScenePatcher.Core.Tests
+      - /Tests/NativeObservation
+      - /Tests/FaultInjection
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      per-dependency:
+        group-by: dependency-name
+        patterns: ["*"]

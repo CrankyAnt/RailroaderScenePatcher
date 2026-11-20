@@ -24,4 +24,7 @@ CI work runs in a shared part unless the catalogue's decision rule places it in 
 
 ## Repository choices
 
-None.
+- Building the DLL mod needs the managed assemblies of a local Railroader installation (`$(GameManaged)`), which no hosted runner has. Those builds stay local commands under Testing instructions, and CI runs the core tests only.
+- `dependabot-auto-merge` is off: the only NuGet packages are `Newtonsoft.Json` and `Lib.Harmony`, and CI neither builds the DLL mod that ships them nor runs them in the game.
+- `Newtonsoft.Json` stays at the version of `Newtonsoft.Json.dll` in the game's managed folder (`$(GameManaged)`, `Railroader_Data/Managed/` of the installation), because the game loads its own copy before any mod. A Dependabot pull request for another version is closed with a comment that names the game's version; when the game ships a new version, the reference follows it.
+- A `Lib.Harmony` update ships with the mod and merges only after the mod has been built against the game and its patches were checked in the game.

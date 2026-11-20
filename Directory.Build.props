@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <Authors>CrankyAnt</Authors>
+    <Version>0.5.0</Version>
+    <BuildArtifactsRoot Condition="'$(BuildArtifactsRoot)' == ''">$([System.IO.Path]::Combine($([System.IO.Path]::GetTempPath()), 'RailroaderScenePatcherBuild'))</BuildArtifactsRoot>
+    <BaseOutputPath>$(BuildArtifactsRoot)/$(MSBuildProjectName)/bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(BuildArtifactsRoot)/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+    <!-- Test-only fault injection: only a build with -p:SceneFaults=true compiles the hooks and the FaultInjection switch. -->
+    <DefineConstants Condition="'$(SceneFaults)' == 'true'">$(DefineConstants);SCENE_PATCHER_FAULTS</DefineConstants>
+  </PropertyGroup>
+</Project>

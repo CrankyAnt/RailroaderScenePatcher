@@ -1,0 +1,230 @@
+// SPDX-FileCopyrightText: 2026 CrankyAnt
+// SPDX-License-Identifier: MIT
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using RailroaderScenePatcher;
+using RailroaderScenePatcher.Core;
+
+static class GuidedTaskTests {
+    static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    static SceneObservation Target(string path) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), "Track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
+    internal static void Run() {
+        CrossingControllerCannotMoveOrChangeActivity();
+        StartingPinsTheTargetAndCopiesValues();
+        SelectionCannotReplacePinnedDraft();
+        FailureAndSuccessKeepTheirRecoveryPaths();
+        DraftCannotBeChangedThroughAnArrayAlias();
+        ReviewUpdatesARefusal();
+        BackClearsRecovery();
+        SharedHandleDoesNotIdentifyAComponent();
+        InvalidStepActionsAreIgnored();
+        SelectionAndBackOutsidePinnedSteps();
+        ClearingPinnedTargetIsRefused();
+        StartHandlesMissingValuesWithoutCorruptingState();
+        GuidedResultSurvivesInspectorRestoration();
+        RefreshClearsMessagesButKeepsContext();
+        GuidedStepChangesClearEarlierRefusals();
+        StarterPlacementMarkerOffersTheWreckSetting();
+        AppliedStepFollowsNativeHistory();
+    }
+    // The task list of a starter placement marker offers the inspector's Start derailed setting as a guided task, next to
+    // placing the starter on track. It is available where the inspector's checkbox is, for the one car placement that
+    // reads the marker, and refused with the checkbox's reason otherwise.
+    static void StarterPlacementMarkerOffersTheWreckSetting() {
+        var tasks = GuidedTaskState.Tasks.ToList();
+        Check(tasks.IndexOf(GuidedTaskKind.Wreck) == tasks.IndexOf(GuidedTaskKind.StarterPlacement) + 1, "The wreck task follows Place starter on track in the task list");
+        const string reader = StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no";
+        Check(CommandBand.WreckTaskReason(true, null, new[] { reader }) == null, "A starter placement marker read by one car placement offers the wreck task");
+        Check(CommandBand.WreckTaskReason(true, null, new string[0]) == CommandBand.WreckReason(null, new string[0]) &&
+            CommandBand.WreckTaskReason(true, "placements unavailable", new[] { reader }) == CommandBand.WreckReason("placements unavailable", new[] { reader }),
+            "The wreck task is refused with the reason of the inspector's checkbox");
+        Check(CommandBand.WreckTaskReason(false, null, new[] { reader }) == "This object is not a starter placement marker.", "Another object does not offer the wreck task");
+        var controller = new TargetIdentity("scene", "Ela Bridge Scenery", "Game.Mow.TrackConstructionScenery", ConstructionSceneryScene.Structure);
+        Check(GuidedTaskState.TargetBlock(GuidedTaskKind.Wreck, controller) == "The construction controller isn't a starter placement marker.", "The construction controller does not offer the wreck task");
+        // The Values help line uses the term of the inspector's section, Starting cars.
+        Check(CommandBand.WreckValuesHelp == "To remove this mod's value, choose the setting the starting cars have without this mod.", "The Values help line names the starting cars: " + CommandBand.WreckValuesHelp);
+        // Values starts from the effective setting; an unchanged value cannot be reviewed.
+        var state = new GuidedTaskState(); var target = Target("starter");
+        state.Start(GuidedTaskKind.Wreck, target, new[] { "No" }); state.SetValues(new[] { "Yes" }); state.Review(); state.Back();
+        Check(state.Kind == GuidedTaskKind.Wreck && state.Step == GuidedTaskStep.Values && state.Draft[0] == "Yes", "Back from Review keeps the wreck draft");
+        Check(CommandBand.FieldReason(null, new[] { "No" }, new[] { "No" }, CommandBand.SameWreck) == "The car placement already has the selected Start derailed setting." &&
+            CommandBand.FieldReason(null, new[] { "Yes" }, new[] { "No" }, CommandBand.SameWreck) == null, "An unchanged wreck setting cannot be reviewed");
+    }
+    // The Apply step follows the session's history identity, as the native undo manager makes it: every Undo and Redo
+    // builds a new group object, a new edit clears the redo stack, and the oldest groups are pruned.
+    static void AppliedStepFollowsNativeHistory() {
+        var scene = new Scene(); var box = new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } };
+        scene.Objects["p"] = new List<object> { box };
+        var editor = new NativeMapEditor(); var session = new PatchEditingSession(new PatchEngine(scene), editor, new Store()); editor.Session = session;
+        var p = new TargetIdentity("s", "p", "c"); var x = 150.0;
+        GuidedTaskState Applied(bool known = true) {
+            var guided = new GuidedTaskState();
+            guided.Start(GuidedTaskKind.Placement, Target("p"), new[] { "1", "2", "3", "0", "0", "0" }); guided.Review();
+            Check(session.Edit(p, new Placement(new[] { x++, 2, 3 }, new[] { 0.0, 0, 0, 1 }), null).Applied, "The guided edit applies");
+            if (known) guided.Complete(true, null, null, session.HistoryState); else guided.Complete(true, null, null);
+            return guided;
+        }
+        const string complete = "The edit is complete. Save when you're done.", undone = "Undo reversed this edit. Redo in the Map Editor applies it again.",
+            discarded = "Undo reversed this edit, and a later edit removed it from Redo.";
+        var state = Applied();
+        string Text() => state.AppliedText(session.StepOf);
+        Check(Text() == complete, "The applied edit is complete: " + Text());
+        editor.NativeEdit(5);
+        Check(Text() == complete, "A later edit leaves it complete: " + Text());
+        editor.Undo(); editor.Undo();
+        Check(Text() == undone, "After native Undo of the edit the step says so and offers Redo: " + Text());
+        editor.Redo();
+        Check(Text() == complete, "After Redo, which builds a new group, the edit is complete again: " + Text());
+        editor.Undo(); editor.NativeEdit(7);
+        Check(Text() == discarded, "After Undo and a new edit, Redo no longer holds it: " + Text());
+        // Pruning the oldest groups keeps the edit; it claims no Undo.
+        editor.MaxLevels = 2;
+        var pruned = Applied();
+        for (var i = 0; i < 4; i++) editor.NativeEdit(10 + i);
+        Check(pruned.AppliedText(session.StepOf) == complete, "A pruned step still stands: " + pruned.AppliedText(session.StepOf));
+        // Another guided task forgets the earlier step: an Undo of the earlier edit no longer changes its text.
+        editor.MaxLevels = 50;
+        var next = Applied();
+        next.AnotherTask();
+        Check(next.Step == GuidedTaskStep.Target && next.AppliedText(session.StepOf) == null, "Another guided task leaves the Apply step");
+        next.Start(GuidedTaskKind.Activity, Target("p"), new[] { "Yes" }); next.Review(); next.Complete(true, null, null);
+        editor.Undo();
+        Check(next.AppliedText(session.StepOf) == complete, "The new task does not keep the earlier step: " + next.AppliedText(session.StepOf));
+        var unknown = Applied(known: false); editor.Undo();
+        Check(unknown.AppliedText(session.StepOf) == complete, "Without a known step the Apply step keeps the plain result");
+    }
+    static void CrossingControllerCannotMoveOrChangeActivity() {
+        foreach (var crossing in new[] {
+            new TargetIdentity("scene", "crossing", "other", CrossingCoverageScene.Structure),
+            new TargetIdentity("scene", "crossing", CrossingCoverageScene.ComponentType, null)
+        }) {
+            foreach (var task in new[] { GuidedTaskKind.Placement, GuidedTaskKind.Snap, GuidedTaskKind.Activity })
+                Check(GuidedTaskState.TargetBlock(task, crossing) == "You cannot move, rotate, enable, or disable a crossing controller.", "A crossing controller cannot offer " + task);
+            foreach (var task in new[] { GuidedTaskKind.Binding, GuidedTaskKind.DetachBinding, GuidedTaskKind.StarterPlacement })
+                Check(GuidedTaskState.TargetBlock(task, crossing) == null, "Other task rules decide whether a crossing controller can offer " + task);
+        }
+        var marker = new TargetIdentity("scene", "marker", "Track.TrackMarker", TrackMarkerScene.Structure);
+        foreach (GuidedTaskKind task in Enum.GetValues(typeof(GuidedTaskKind)))
+            Check(GuidedTaskState.TargetBlock(task, marker) == null, "The crossing rule does not block a track marker's " + task);
+        var differentStructure = new TargetIdentity("scene", "other", CrossingCoverageScene.ComponentType, TrackMarkerScene.Structure);
+        Check(GuidedTaskState.TargetBlock(GuidedTaskKind.Placement, differentStructure) == null, "An explicit different structure takes precedence over the component fallback");
+    }
+    static void StartingPinsTheTargetAndCopiesValues() {
+        var state = new GuidedTaskState(); var target = Target("first"); var values = new[] { "1", "2" };
+        state.Start(GuidedTaskKind.Placement, target, values); values[0] = "changed";
+        Check(state.Enabled && state.Step == GuidedTaskStep.Values && state.Kind == GuidedTaskKind.Placement && ReferenceEquals(state.Target, target) && state.Draft[0] == "1", "Starting a task pins its target and copies the inspected values");
+    }
+    static void SelectionCannotReplacePinnedDraft() {
+        var state = new GuidedTaskState(); var first = Target("first"); var second = Target("second");
+        state.Start(GuidedTaskKind.Placement, first, new[] { "old" }); state.SetValues(new[] { "draft" });
+        Check(!state.Select(second) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && !String.IsNullOrEmpty(state.Message), "A different selection cannot replace a pinned draft");
+        state.Review();
+        Check(!state.Select(second) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft", "Review also keeps the pinned target and draft");
+        state.Back();
+        Check(state.Step == GuidedTaskStep.Values && state.Draft[0] == "draft", "Back from Review keeps the draft");
+        state.Back();
+        Check(state.Step == GuidedTaskStep.Target && state.Target == null && state.Draft.Length == 0 && state.Select(second), "Back from Values discards the draft and permits selection");
+    }
+    static void FailureAndSuccessKeepTheirRecoveryPaths() {
+        var state = new GuidedTaskState(); var first = Target("first");
+        state.Open(); Check(state.Enabled && state.Step == GuidedTaskStep.Target, "Open shows the task list");
+        state.Start(GuidedTaskKind.Binding, first, new[] { "binding" }); state.Review("stale", "refresh");
+        Check(state.Step == GuidedTaskStep.Review && state.Message == "stale" && state.Recovery == "refresh", "Review presents the refusal and recovery");
+        state.Complete(false, "failed", "retry");
+        Check(state.Step == GuidedTaskStep.Review && !state.Success && state.Recovery == "retry" && state.Draft[0] == "binding", "Failure stays in Review with its draft and recovery");
+        state.Complete(true, "applied", null);
+        Check(state.Step == GuidedTaskStep.Applied && state.Success && ReferenceEquals(state.BackToInspector(), first) && !state.Enabled && state.Draft.Length == 0, "Success returns to the same inspector and discards the task");
+        state.Start(GuidedTaskKind.Activity, first, new[] { "active" }); state.Review(); state.Complete(true, "applied", null); state.AnotherTask();
+        Check(state.Enabled && state.Step == GuidedTaskStep.Target && state.Target == null && state.Draft.Length == 0, "Another task returns to the task list");
+        state.Start(GuidedTaskKind.Snap, first, new[] { "track" }); state.Cancel();
+        Check(!state.Enabled && state.Target == null && state.Draft.Length == 0, "Cancel discards the pinned task");
+    }
+    static void DraftCannotBeChangedThroughAnArrayAlias() {
+        var state = new GuidedTaskState(); state.Start(GuidedTaskKind.Placement, Target("first"), new[] { "old" });
+        var edited = new[] { "draft" }; state.SetValues(edited); edited[0] = "outside";
+        var read = state.Draft; read[0] = "outside again";
+        Check(state.Draft[0] == "draft", "The draft owns its values after both input and output");
+    }
+    static void ReviewUpdatesARefusal() {
+        var state = new GuidedTaskState(); state.Start(GuidedTaskKind.Placement, Target("first"), new[] { "draft" });
+        state.Review(); state.Review("stale", "refresh");
+        Check(state.Step == GuidedTaskStep.Review && state.Message == "stale" && state.Recovery == "refresh" && state.Draft[0] == "draft", "A later refusal updates Review without losing the draft");
+    }
+    static void BackClearsRecovery() {
+        var state = new GuidedTaskState(); state.Start(GuidedTaskKind.Placement, Target("first"), new[] { "draft" });
+        state.Review("stale", "refresh"); state.Back();
+        Check(state.Step == GuidedTaskStep.Values && state.Message == null && state.Recovery == null && !state.Success && state.Draft[0] == "draft", "Back clears the Review outcome while preserving the draft");
+    }
+    static void SharedHandleDoesNotIdentifyAComponent() {
+        var first = Target("first");
+        var other = new SceneObservation(first.Handle, new TargetIdentity("scene", "first", "Other"), "Track marker", true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, Array.Empty<string>(), Array.Empty<string>(), Array.Empty<string>(), "placement");
+        var state = new GuidedTaskState(); state.Start(GuidedTaskKind.Placement, first, new[] { "draft" });
+        Check(!state.Select(other) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft", "A different component on the same handle cannot replace the pinned target");
+    }
+    static void InvalidStepActionsAreIgnored() {
+        var state = new GuidedTaskState(); state.Open(); state.Review("ignored", "ignored"); state.Complete(true, "ignored", "ignored");
+        Check(state.Step == GuidedTaskStep.Target && state.Message == null && state.Recovery == null && !state.Success, "Review and Complete do nothing on Target");
+        var first = Target("first"); state.Start(GuidedTaskKind.Placement, first, new[] { "draft" }); state.Complete(true, "ignored", "ignored");
+        Check(state.Step == GuidedTaskStep.Values && state.Message == null && !state.Success && state.Draft[0] == "draft", "Complete does nothing on Values");
+        state.Review(); state.Complete(true, "applied", null); state.Review("ignored", "ignored"); state.Complete(false, "ignored", "ignored");
+        Check(state.Step == GuidedTaskStep.Applied && state.Message == "applied" && state.Recovery == null && state.Success, "Review and Complete do nothing after application");
+    }
+    static void SelectionAndBackOutsidePinnedSteps() {
+        var state = new GuidedTaskState(); var first = Target("first"); var second = Target("second"); state.Open();
+        Check(state.Select(first) && ReferenceEquals(state.Target, first) && state.Select(second) && ReferenceEquals(state.Target, second), "Target permits a different selection");
+        state.Start(GuidedTaskKind.Placement, second, new[] { "draft" }); state.Review(); state.Complete(true, "applied", null);
+        Check(state.Select(first), "Applied permits selection"); state.Back();
+        Check(state.Step == GuidedTaskStep.Applied && state.Success && ReferenceEquals(state.Target, second) && state.Draft[0] == "draft", "Back from Applied leaves the result and its target intact");
+    }
+    static void ClearingPinnedTargetIsRefused() {
+        var state = new GuidedTaskState(); var first = Target("first"); state.Start(GuidedTaskKind.Placement, first, new[] { "draft" });
+        Check(!state.Select(null) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "Finish this task or return to Inspector before clearing the selection or selecting another object.", "Clearing Values is refused with the selection feedback");
+        state.Review();
+        Check(!state.Select(null) && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "Finish this task or return to Inspector before clearing the selection or selecting another object.", "Clearing Review is refused with the selection feedback");
+    }
+    static void StartHandlesMissingValuesWithoutCorruptingState() {
+        var state = new GuidedTaskState(); var first = Target("first"); var second = Target("second");
+        state.Start(GuidedTaskKind.DetachBinding, first, Array.Empty<string>());
+        Check(state.Step == GuidedTaskStep.Values && state.Draft.Length == 0 && ReferenceEquals(state.Target, first), "A task can start without entered values");
+        state.SetValues(new[] { "draft" }); state.Review("refused", "recover");
+        try { state.Start(GuidedTaskKind.Placement, second, null); throw new Exception("Null values must be refused"); }
+        catch (NullReferenceException) { }
+        Check(state.Enabled && state.Step == GuidedTaskStep.Review && state.Kind == GuidedTaskKind.DetachBinding && ReferenceEquals(state.Target, first) && state.Draft[0] == "draft" && state.Message == "refused" && state.Recovery == "recover" && !state.Success, "A failed Start leaves the previous task untouched");
+    }
+    static void GuidedResultSurvivesInspectorRestoration() {
+        var feedback = new EditFeedback(); var first = new object(); feedback.Inspecting(first); feedback.View("guided");
+        feedback.Report("Placement", "Move completed"); feedback.View("inspector/placement", preserve: true);
+        Check(feedback.Result == "Move completed", "Restoring the inspector retains the guided result");
+        feedback.View("inspector/connections");
+        Check(feedback.Result == "", "An ordinary tab change clears the retained result");
+        feedback.View("guided"); feedback.Report("Placement", "Move completed"); feedback.View("inspector/placement", preserve: true); feedback.HistoryMoved();
+        Check(feedback.Result == "", "History changes still clear a retained result");
+        feedback.View("guided"); feedback.Report("Placement", "Move completed"); feedback.View("inspector/placement", preserve: true); feedback.Inspecting(new object());
+        Check(feedback.Result == "", "Inspecting another object still clears a retained result");
+        feedback.View("guided"); feedback.Report("Placement", "Move completed"); feedback.View("inspector/placement", preserve: false);
+        Check(feedback.Result == "", "An explicit ordinary view change still clears tab results");
+    }
+    static void RefreshClearsMessagesButKeepsContext() {
+        var feedback = new EditFeedback(); var first = new object(); feedback.Inspecting(first); feedback.View("guided/Values");
+        feedback.Refuse("Placement", "Move", "stale"); feedback.Refreshed();
+        Check(feedback.Messages.Count == 0, "Refreshing removes the earlier refusal");
+        feedback.Report("Placement", "Move completed"); feedback.Inspecting(first); feedback.View("guided/Values");
+        Check(feedback.Result == "Move completed", "The same object and view retain a new result after refresh");
+        feedback.View("guided/Review");
+        Check(feedback.Messages.Count == 0, "A later view change clears the new result");
+        feedback.Report("Placement", "Move completed"); feedback.Inspecting(new object());
+        Check(feedback.Messages.Count == 0, "Refresh retains the inspected identity, so another object clears the result");
+    }
+    static void GuidedStepChangesClearEarlierRefusals() {
+        var feedback = new EditFeedback(); feedback.Inspecting(new object()); feedback.View("guided/Values");
+        feedback.Refuse("Placement", "Move", "invalid"); feedback.View("guided/Review");
+        Check(feedback.Messages.Count == 0, "Entering Review clears the Values refusal");
+        feedback.Refuse("Placement", "Move", "stale"); feedback.View("guided/Target");
+        Check(feedback.Messages.Count == 0, "Returning to Target clears the Review refusal");
+        feedback.View("guided/Review"); feedback.Report("Placement", "Move completed"); feedback.View("guided/Applied", preserve: true);
+        Check(feedback.Result == "Move completed", "Applied retains the new Apply result");
+        feedback.View("inspector/placement", preserve: true);
+        Check(feedback.Result == "Move completed", "Returning to Inspector retains the Apply result");
+    }
+}

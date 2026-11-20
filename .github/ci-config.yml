@@ -1,1 +1,14 @@
 version: 1
+parts:
+  dotnet-test:
+    projects:
+      - sdk-version: "10.0.x"
+        project: Tests/RailroaderScenePatcher.Core.Tests/RailroaderScenePatcher.Core.Tests.csproj
+        console-runner: true
+    paths:
+      - Src/RailroaderScenePatcher.Core/
+      - Tests/RailroaderScenePatcher.Core.Tests/
+      - Src/RailroaderScenePatcher/
+      - Directory.Build.props
+dependabot:
+  nuget: [/Src/RailroaderScenePatcher.Core, /Src/RailroaderScenePatcher, /Tests/RailroaderScenePatcher.Core.Tests, /Tests/NativeObservation, /Tests/FaultInjection]
