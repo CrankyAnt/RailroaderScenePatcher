@@ -45,6 +45,12 @@ namespace RailroaderScenePatcher {
             }
             return sharerReading = reading;
         }
+        bool OffersBindingRepair => CommandBand.OffersBindingRepair(selected?.Problems);
+        // The duplicate marker ID that the inspected generic marker's replacement ID repaired, or null.
+        string RepairedMarkerId() {
+            if (!IsGenericMarker || attachment == null) return null;
+            try { return attachment.Session.RepairedMarkerId(selected.Identity); } catch { return null; }
+        }
         bool HasMarkerIdValue(TargetIdentity identity) {
             try { return attachment != null && identity != null && attachment.Session.HasMarkerId(identity); } catch { return false; }
         }

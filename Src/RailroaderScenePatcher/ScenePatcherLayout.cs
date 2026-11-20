@@ -675,12 +675,16 @@ namespace RailroaderScenePatcher {
             }
             // Problems first: the red count in the state line points at text that is in view.
             Section(builder, "Detected problems");
+            // A stale object list keeps the problems of its last refresh, also those another object's edit has solved.
+            if (inventory == null || inventory.IsStale || definitionsStale) builder.AddLabel(Tint(Amber, CommandBand.StaleProblems));
             // Beside Repair duplicate ID, an inactive holder says why it has no problem, in a sentence that wraps.
             if (selected.Problems.Count == 0) {
                 var offersRepair = CommandBand.OffersDuplicateRepair(selected.Identity.Structure, selected.Dependencies);
                 if (offersRepair) PlainLabel(builder, CommandBand.NoDetectedProblems(true)); else Line(builder, CommandBand.NoDetectedProblems(false), null, null);
             }
-            foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, problem));
+            // After a replacement ID, a track binding problem that remains says that it is another problem.
+            var repaired = selected.Problems.Count != 0 && OffersBindingRepair ? RepairedMarkerId() : null;
+            foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, CommandBand.ProblemText(problem, repaired)));
             if (selected.Problems.Count != 0) DrawProblemTasks(builder);
             // An inactive holder of a duplicate marker ID has no problem, and its explanation still offers the repair here.
             DrawDuplicateIdTasks(builder);
