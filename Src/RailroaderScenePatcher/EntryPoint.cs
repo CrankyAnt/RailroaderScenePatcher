@@ -19,12 +19,18 @@ namespace RailroaderScenePatcher {
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
-            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this);
+            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install();
             if (NativeSaveClick.Problem != null) context.Log.Info(NativeSaveClick.Problem);
             if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
+            if (DeferredRestores.Error != null) context.Log.Info(DeferredRestores.Error + ". The game runs its restore-time callbacks before scene patch files apply.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
+        // Every exit path hands the restore-time callbacks the patcher deferred back to the game, after the apply.
         public void OnWorldLoad() {
+            try { LoadWorld(); }
+            finally { DeferredRestores.HandBack(); }
+        }
+        void LoadWorld() {
             GroupWorld.WorldLoaded();
             object map, attempt;
             try { map = MapContext(); attempt = AttemptIdentity(); }
@@ -86,6 +92,7 @@ namespace RailroaderScenePatcher {
         // The world's patcher state stays for a later load attempt over the same map context; the next attempt releases the
         // state of every object that did not survive. Parts bound to the native map editor end with the world.
         public void OnWorldUnload() {
+            DeferredRestores.HandBack();
             NativeRepairHooks.Reset();
             world?.State?.EndAttempt();
             world?.EndAttempt();
@@ -95,7 +102,7 @@ namespace RailroaderScenePatcher {
             NativeRepairHooks.Reset();
             world?.Release();
             ReleaseReporter();
-            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove();
+            MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove(); DeferredRestores.Remove();
         }
         void ReleaseReporter() {
             if (reporter == null) return;

@@ -11,8 +11,9 @@ namespace RailroaderScenePatcher {
     // The construction segments of a rail bridge's construction controller (Game.Mow.TrackConstructionScenery, Railroader
     // 0.6.3): segmentIds names the track segments; the controller caches them in _cachedSegments at its first use and
     // reads their construction state in UpdateVisibility to switch the objects of its entries. The decompiled game code
-    // shows UpdateVisibility dereferencing each segment before it switches anything, so a missing segment would stop it
-    // there; this is not yet observed in Railroader.
+    // shows UpdateVisibility dereferencing each segment before it switches anything, so a missing segment stops it there;
+    // Railroader logs that at world load as an error during DidRestore. DeferredRestores holds that restore-time call back
+    // until the world-load apply has written the repair.
     internal static class ConstructionSegmentNative {
         static readonly Type controller = Native.Type(BakedSceneryRules.ConstructionController), graph = Native.Type("Track.Graph");
         static readonly FieldInfo ids = controller?.GetField("segmentIds", Native.Flags), cache = controller?.GetField("_cachedSegments", Native.Flags);

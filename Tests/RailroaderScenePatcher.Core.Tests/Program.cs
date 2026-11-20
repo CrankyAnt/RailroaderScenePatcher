@@ -320,6 +320,7 @@ class Program {
         RailBridgeTests.Run();
         RoadBridgeTests.Run();
         ConstructionSegmentTests.Run();
+        DeferredRestoreTests.Run();
         InteractiveBuildingTests.Run();
         PartCullingTests.Run();
         ExistingEquipmentTests.Run();
