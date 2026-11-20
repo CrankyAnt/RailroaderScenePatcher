@@ -384,6 +384,27 @@ namespace RailroaderScenePatcher {
                 fit = Button(row, "Fit", () => FitOutliner(fit.RectTransform.GetComponentInChildren<TMP_Text>(true)));
                 fit.Tooltip("Fit names", "Size this column to most names shown. Drag the divider for another width.");
             }).Height(30);
+            #region Prototype outliner grouping
+            // PROTOTYPE: the list's top level, by category or by place. Under the current outliner (0) a place view
+            // switches to variant A.
+            builder.AddSegmentedControlCompact(segments => {
+                segments.AddSegment("By category", !PrototypeOutlinerGrouping.ByPlace, presentation.Action(() => { PrototypeOutlinerGrouping.ByPlace = false; PrototypeOutlinerGrouping.LogPending = true; }))
+                    .Tooltip("By category", "List objects by what they are: categories, then kinds, then places.");
+                segments.AddSegment("By place", PrototypeOutlinerGrouping.ByPlace, presentation.Action(() => { PrototypeOutlinerGrouping.ByPlace = true; if (PrototypeOutlinerGrouping.Variant == 0) PrototypeOutlinerGrouping.Variant = 1; PrototypeOutlinerGrouping.LogPending = true; }))
+                    .Tooltip("By place", "List objects by place, with the same categories and kinds under each place.");
+            });
+            // PROTOTYPE switcher, magenta so it is never mistaken for a product control.
+            builder.AddSegmentedControlCompact(segments => {
+                for (var v = 0; v < PrototypeOutlinerGrouping.VariantKeys.Length; v++) {
+                    var variant = v;
+                    var label = "<color=#FF4FD8>" + PrototypeOutlinerGrouping.VariantKeys[v] + " " + PrototypeOutlinerGrouping.VariantShort[v] + "</color>";
+                    segments.AddSegment(label, PrototypeOutlinerGrouping.Variant == v, presentation.Action(() => {
+                        PrototypeOutlinerGrouping.Variant = variant; if (variant == 0) PrototypeOutlinerGrouping.ByPlace = false; PrototypeOutlinerGrouping.LogPending = true;
+                    })).Tooltip("PROTOTYPE " + PrototypeOutlinerGrouping.VariantKeys[v], PrototypeOutlinerGrouping.VariantKeys[v] + ": " + PrototypeOutlinerGrouping.VariantNames[v]
+                        + ". Kind folder from " + PrototypeOutlinerGrouping.KindThreshold + " objects, place folder from " + PrototypeOutlinerGrouping.PlaceThreshold + " objects of one kind in one place, in a list of more than " + PrototypeOutlinerGrouping.PlaceListMinimum + ".");
+                }
+            });
+            #endregion
             builder.AddSegmentedControlCompact(segments => {
                 // All first, then the rest by name.
                 segments.AddSegment(CommandBand.AllFilter, outlinerFilter == OutlinerFilter.All, presentation.Action(() => outlinerFilter = OutlinerFilter.All)).Tooltip(CommandBand.AllFilter, "Show all objects.");
@@ -403,12 +424,27 @@ namespace RailroaderScenePatcher {
                 var state = narrowed ? filteredOutline : inventoryOutline;
                 var indices = new Dictionary<SceneObservation, int>();
                 if (inventory != null) for (var i = 0; i < inventory.Entries.Count; i++) indices[inventory.Entries[i]] = i;
-                foreach (var group in InventoryPresentationState.Groups(shown)) {
+                // PROTOTYPE: under variant A or B, the top-level nodes come from the prototype grouping.
+                PrototypeOutlinerGrouping.Result proto = null;
+                if (PrototypeOutlinerGrouping.Variant != 0)
+                    try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter); }
+                    catch (Exception e) { Debug.LogWarning("Scene Patcher PROTOTYPE outliner failed, showing the current outliner: " + e); }
+                var protoTops = proto == null ? null : proto.Tops.ToDictionary(top => top.Key);
+                var drawn = proto == null ? InventoryPresentationState.Groups(shown)
+                    : (IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>>)proto.Tops.Select(top => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(top.Key, Array.Empty<SceneObservation>())).ToList();
+                if (PrototypeOutlinerGrouping.LogPending) {
+                    PrototypeOutlinerGrouping.LogPending = false;
+                    if (proto != null) PrototypeOutlinerGrouping.Log(proto, shown.Count, filter, outlinerFilter.ToString());
+                    else PrototypeOutlinerGrouping.LogCurrent(drawn.Count, shown.Count);
+                }
+                foreach (var group in drawn) {
+                    var protoTop = protoTops?[group.Key];
                     // The Inspection only group stands after the families and has a key no family can have.
-                    var groupKey = (ReferenceEquals(group.Key, InventoryPresentationState.InspectionOnlyGroup) ? "group:" : "family:") + group.Key;
+                    var groupKey = protoTop != null ? "proto:" + PrototypeOutlinerGrouping.VariantKeys[PrototypeOutlinerGrouping.Variant] + (PrototypeOutlinerGrouping.ByPlace ? "p:" : "c:") + group.Key
+                        : (ReferenceEquals(group.Key, InventoryPresentationState.InspectionOnlyGroup) ? "group:" : "family:") + group.Key;
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
-                    var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + group.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(group.Key));
+                    var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + (protoTop?.Count ?? group.Value.Count).ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(protoTop?.Label ?? group.Key));
                     var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
                     // A family whose objects the game itself tells apart shows them under subgroups; a family group
                     // only, never the Inspection only group.
@@ -470,7 +506,9 @@ namespace RailroaderScenePatcher {
                         var below = above.Concat(new[] { key }).ToArray();
                         foreach (var child in node.Children) Nest(made, child, below);
                     }
-                    if (groupKey == "family:" + BakedSceneryRules.Family)
+                    if (protoTop != null)
+                        foreach (var child in protoTop.Children) Nest(parent, child, new[] { groupKey });
+                    else if (groupKey == "family:" + BakedSceneryRules.Family)
                         foreach (var category in InventoryPresentationState.Categories(group.Value, inventory?.Entries, filter)) Nest(parent, category, new[] { groupKey });
                     // The Crossing controller family lists each controller with the spans it holds beneath it.
                     else if (groupKey == "family:" + InventoryPresentationState.HolderFamily)
