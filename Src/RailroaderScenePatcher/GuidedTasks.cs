@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher {
             var fill = view.GetComponent<LayoutElement>();
             if (fill != null) { fill.preferredHeight = TabBodyMinimumHeight; fill.flexibleHeight = 10000; }
             // Reserve the inspector tab action row, even though guided actions live in the footer.
-            ActionRow(builder, Array.Empty<Act>(), null); builder.Spacer(TabGap);
+            ActionRow(builder, Array.Empty<Act>(), null);
         }
         // Where the history holds a state; a state it cannot read stands.
         HistoryStep StepOf(long state) {

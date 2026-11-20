@@ -36,7 +36,6 @@ namespace RailroaderScenePatcher {
             if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
             ActionRow(builder, FilePanelActs(kind, session), null);
-            builder.Spacer(TabGap);
         }
         void DrawVersionChoice(UIPanelBuilder builder, PatchEditingSession session) {
             PlainLabel(builder, CommandBand.Sentence(session.VersionMessage));

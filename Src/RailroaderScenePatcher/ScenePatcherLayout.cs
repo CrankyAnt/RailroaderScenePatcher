@@ -26,8 +26,11 @@ namespace RailroaderScenePatcher {
         // (CommandBand.FilterSegments), which is also more than its band needs: Refresh and both status lamps with
         // their words, 251.
         // The inspector's minimum holds the four footer slots, their spacing and the resize grip.
-        const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 100, TabGap = 8,
-            RowHeight = 24, LineHeight = 20, TabStripHeight = 30, InspectorMessageHeight = 104, FilePanelMessageHeight = 64,
+        const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 100,
+            RowHeight = 24, LineHeight = 20, TabStripHeight = 30,
+            // The message areas take the height that a gap above the footer and a spacer below its row held before: the tab's
+            // own row stands just above the footer's divider, and the footer's row at the window's lower edge.
+            InspectorMessageHeight = 124, FilePanelMessageHeight = 84,
             // What a row adds to its name: the folder and child indent, the two markers and the scroll bar.
             RowDecoration = 80;
         // The changed state reads the same in the state line and on the Changes tab: the native map editor's badge.
@@ -594,7 +597,7 @@ namespace RailroaderScenePatcher {
                 // Give the tab container a fixed preferred height so the body, through its flexible height,
                 // takes the remainder after the pinned rows and fixed footer.
                 var tabsLayout = tabView.GetComponent<LayoutElement>() ?? tabView.gameObject.AddComponent<LayoutElement>();
-                tabsLayout.minHeight = tabsLayout.preferredHeight = TabStripHeight + TabBodyMinimumHeight + RowHeight + TabGap;
+                tabsLayout.minHeight = tabsLayout.preferredHeight = TabStripHeight + TabBodyMinimumHeight + RowHeight;
                 tabsLayout.flexibleHeight = 10000;
             }
             if (tabView != null) foreach (var toggle in tabView.GetComponentsInChildren<Toggle>(true)) {
@@ -639,8 +642,9 @@ namespace RailroaderScenePatcher {
         // A tab body scrolls inside its own rectangle. Its first row names what the tab is for and holds the tab's own
         // "?", so that help visibly belongs to the tab; the help opens in its own window. Below the scrolling part
         // the tab's own actions stand in a pinned row of fixed height, inside the tab, so that their place says they
-        // belong to the tab; a gap sets the row apart from the footer, whose row is the same on every tab. The
-        // native map editor puts a tool's actions directly under its fields; here they stay in view while the fields scroll.
+        // belong to the tab; the row stands just above the footer's divider, which sets it apart from the footer, whose
+        // row is the same on every tab. The native map editor puts a tool's actions directly under its fields; here they
+        // stay in view while the fields scroll.
         void Tab(UIPanelBuilder builder, string id, Action<UIPanelBuilder> body) {
             var view = presentation.Scroll(builder, TabBodyMinimumHeight, content => {
                 content.ConfigureLayout(4f);
@@ -661,7 +665,6 @@ namespace RailroaderScenePatcher {
             if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
             ActionRow(builder, TabActs(id), ChoiceBlock);
-            builder.Spacer(TabGap);
         }
 
         // A rail bridge construction outside Ela or a road bridge construction, or a part of one: it takes no
@@ -1344,13 +1347,11 @@ namespace RailroaderScenePatcher {
             area.preferredHeight = messageHeight;
             area.flexibleHeight = 0;
             // While the file panel is open, the footer's row waits for it with the panel's reason.
+            // The row is the window's last: it stands at the lower edge, on the native padding below the last row. Its
+            // buttons start at the left, so the native resize grip in the lower right corner covers only the row's
+            // empty end.
             ActionRow(builder, guided.Enabled && !FileLocked && selection?.Pending == null ? GuidedActs() : FooterActs(), FileLockReason);
-            // The native resize grip takes the window's lower right corner, 22 units high, and the row would reach 12
-            // units into its height: the row stands that much higher, so the footer and the grip do not overlap.
-            builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
         }
-        // The native resize grip's height, and the window's padding below its last row, in canvas units.
-        const float GripHeight = 22, RowPadding = 10;
         // One padding rule for every button of the panel (CommandBand.ButtonWidth): a button is as wide as its label
         // and the native compact padding on both sides. The native compact button does that by itself for one label.
         // A button whose label changes in place gets the width of its widest label here, so the change moves no

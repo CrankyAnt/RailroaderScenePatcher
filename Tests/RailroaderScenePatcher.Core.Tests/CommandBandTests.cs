@@ -489,8 +489,6 @@ static class CommandBandTests {
         var tabs = new[] { "object", "placement", "connections", "changes" };
         Check(CommandBand.ClosesHelp("object", "placement", tabs) && !CommandBand.ClosesHelp("placement", "placement", tabs), "A tab's help closes on a switch to another tab");
         Check(!CommandBand.ClosesHelp("outliner", "placement", tabs) && !CommandBand.ClosesHelp("main", "changes", tabs) && !CommandBand.ClosesHelp(null, "object", tabs), "The outliner's and the window's help stay through a tab switch");
-        // The footer's row clears the resize grip: the grip is 22 high and 10 units of padding lie below the row.
-        Check(CommandBand.GripClearance(22, 10) == 12 && CommandBand.GripClearance(10, 22) == 0, "The row stands as much higher as the grip reaches into it");
         // A component the game adds while it runs is no dependency.
         Check(HierarchyDependencies.IsRuntimeComponent("Helpers.Animation.PlayableGraphAnimatorAdapter") && !HierarchyDependencies.IsRuntimeComponent("RollingStock.Controls.KeyValueBoolAnimator")
             && !HierarchyDependencies.IsRuntimeComponent("UnityEngine.Animator") && !HierarchyDependencies.IsRuntimeComponent(null), "The playable-graph adapter an animator adds while running is runtime state; the animator itself is authored");
