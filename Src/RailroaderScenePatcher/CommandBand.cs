@@ -166,9 +166,6 @@ namespace RailroaderScenePatcher {
             foreach (var name in tabs) if (name == openRegion) return true;
             return false;
         }
-        // How far the footer's row stands above the window's lower edge beyond its own padding, so that it clears the
-        // native resize grip in the lower right corner: the grip's height less the padding below the row.
-        internal static float GripClearance(float gripHeight, float paddingBelowRow) => Math.Max(0, gripHeight - paddingBelowRow);
         // One padding rule for every button of the panel: the band, a tab's row, the footer's row and the buttons inside
         // a tab. A button is as wide as its label and the native compact padding on both sides, 6 units each (measured
         // on the band: "Refresh" is 62.15 wide in a button of 74.15). A button whose label changes in place, such as
