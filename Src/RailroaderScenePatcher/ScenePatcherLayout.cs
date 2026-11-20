@@ -674,7 +674,11 @@ namespace RailroaderScenePatcher {
             }
             // Problems first: the red count in the state line points at text that is in view.
             Section(builder, "Detected problems");
-            if (selected.Problems.Count == 0) Line(builder, "None detected", null, null);
+            // Beside Repair duplicate ID, an inactive holder says why it has no problem, in a sentence that wraps.
+            if (selected.Problems.Count == 0) {
+                var offersRepair = CommandBand.OffersDuplicateRepair(selected.Identity.Structure, selected.Dependencies);
+                if (offersRepair) PlainLabel(builder, CommandBand.NoDetectedProblems(true)); else Line(builder, CommandBand.NoDetectedProblems(false), null, null);
+            }
             foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, problem));
             if (selected.Problems.Count != 0) DrawProblemTasks(builder);
             // An inactive holder of a duplicate marker ID has no problem, and its explanation still offers the repair here.

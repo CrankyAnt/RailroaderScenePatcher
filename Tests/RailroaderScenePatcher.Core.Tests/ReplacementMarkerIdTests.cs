@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // A replacement ID repairs a duplicate marker ID: one holder takes a new id that no other scene marker, map object
@@ -276,6 +277,15 @@ static class ReplacementMarkerIdTests {
         Assert(Holders(w.Speed).Problem(w.Speed, false) == null, "An active holder that cannot receive a replacement ID, such as a crossing pad, has no problem");
         Assert(Holders(w.Whistles[0]).Problem(w.Whistles[0], true).Contains("2 other scene markers"), "A group names how many others share the id: " + Holders(w.Whistles[0]).Problem(w.Whistles[0], true));
         Assert(Holders(w.Unrelated).Problem(w.Unrelated, true) == null, "An id of its own is no problem");
+        // The Object tab's Detected problems section agrees with the repair it offers: an inactive generic holder has no
+        // problem, so the section says why instead of None detected beside Repair duplicate ID.
+        var yardLines = Holders(w.Yard).Dependencies(w.Yard, true);
+        Assert(CommandBand.OffersDuplicateRepair(TrackMarkerScene.Structure, yardLines) && !CommandBand.OffersDuplicateRepair(null, yardLines)
+            && !CommandBand.OffersDuplicateRepair(TrackMarkerScene.Structure, Holders(w.Unrelated).Dependencies(w.Unrelated, true)),
+            "Repair duplicate ID is offered for a generic track marker whose explanation names a duplicate marker ID");
+        Assert(CommandBand.NoDetectedProblems(true) == "None while this marker is inactive. Until its duplicate marker ID is repaired, activity, binding and track-following edits of it are refused.",
+            "Beside the repair, the section says why the duplicate marker ID is no problem now and what it still refuses: " + CommandBand.NoDetectedProblems(true));
+        Assert(CommandBand.NoDetectedProblems(false) == "None detected", "Without the repair the section reads None detected");
     }
 
     // The Marker ID row of the Connections tab and its guided task: the replacement id stays visible and disabled with its

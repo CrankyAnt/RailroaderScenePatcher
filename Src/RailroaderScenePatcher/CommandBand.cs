@@ -564,6 +564,15 @@ namespace RailroaderScenePatcher {
         // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
         // shares takes one, and a marker that already has one keeps the row to change or clear it.
         internal const string SetMarkerId = "Set ID", ClearMarkerId = "Clear ID", RepairDuplicateId = "Repair duplicate ID";
+        // Whether the Object tab offers Repair duplicate ID: for a generic track marker whose explanation names a
+        // duplicate marker ID, active or not.
+        internal static bool OffersDuplicateRepair(string structure, IEnumerable<string> dependencies) =>
+            structure == TrackMarkerScene.Structure && dependencies?.Any(line => line != null && line.StartsWith("Duplicate marker ID ", StringComparison.Ordinal)) == true;
+        // What the Detected problems section says when the object has no problem. Beside Repair duplicate ID the holder
+        // is inactive, which is never a problem, so the section says so and what the duplicate marker ID still refuses.
+        internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
+            ? "None while this marker is inactive. Until its duplicate marker ID is repaired, activity, binding and track-following edits of it are refused."
+            : "None detected";
         internal static string MarkerIdUnavailable(bool generic, string underlying, int sharers, bool hasValue) =>
             !generic ? ReplacementMarkerIds.NotSupported + "."
             : hasValue ? null

@@ -118,7 +118,7 @@ namespace RailroaderScenePatcher {
         // The duplicate explanation of a holder that can receive a replacement ID offers the repair, active or not: for
         // the inspected marker through its guided task, and for each other scene marker that shares the ID through Select.
         void DrawDuplicateIdTasks(UIPanelBuilder builder) {
-            if (!IsGenericMarker || !selected.Dependencies.Any(line => line.StartsWith("Duplicate marker ID ", StringComparison.Ordinal))) return;
+            if (!CommandBand.OffersDuplicateRepair(selected?.Identity.Structure, selected?.Dependencies)) return;
             var reason = GuidedBlock(GuidedTaskKind.MarkerId);
             Button(builder, CommandBand.RepairDuplicateId, () => StartGuided(GuidedTaskKind.MarkerId)).Inactive(reason != null)
                 .Tooltip("Repair duplicate marker ID", CommandBand.Tooltip("Start a guided task that gives this marker a replacement ID.", reason));
