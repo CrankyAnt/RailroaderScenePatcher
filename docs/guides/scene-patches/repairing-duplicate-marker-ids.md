@@ -28,7 +28,7 @@ Each repair changes one holder, and each replacement ID belongs to one marker. A
 
 1. Open **Scene patches**, click **Refresh** in the command band, and select the row of the marker you want to change in the outliner.
 1. On the **Connections** tab, find the **Marker ID** section. Under the caption **Also holding**, the section lists the other scene markers that hold the underlying ID. To give the replacement ID to one of them instead, click **Select** beside its name. The patcher inspects that marker and opens its **Connections** tab. **Select** also closes an open coverage or equipment form.
-1. Enter the new ID in the **Replacement ID** field.
+1. Enter the new ID in the **Replacement ID** field. Make up an ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The text below the field reads `Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.`
 1. Click **Set ID**. The result appears in the footer's message area under **Marker ID**.
 1. Set the activity or the track location of the marker. Click **Enable** or **Disable** on the **Object** tab, or enter the location and click **Set** at the bottom of the **Connections** tab. The repaired marker accepts these edits. The other holders do not change.
 
@@ -46,7 +46,7 @@ Use this route to have every step of the change checked in a single guided task.
 
 1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section for a generic track marker whose explanation names a duplicate marker ID, active or inactive.
 1. In **Target**, select **Set replacement ID** in the task list.
-1. In **Values**, enter the ID in the **Replacement ID** field. The same checks as **Set ID** apply.
+1. In **Values**, enter a new ID that you make up in the **Replacement ID** field. The same text as on the **Connections** tab stands below the field, and the same checks as **Set ID** apply.
 1. Click **Next**. **Review** checks the ID against the scene markers and map objects, as **Apply** does. An ID that's already in use is refused in **Review**, with the marker or map object that uses it. **Review** shows the proposed **Marker ID**. It lists the settings that stay unchanged: placement, activity, and track binding. Every other holder keeps its registration.
 1. Click **Apply** in the footer. Then click **Back to inspector**, or **Another guided task** to repair the next holder.
 
