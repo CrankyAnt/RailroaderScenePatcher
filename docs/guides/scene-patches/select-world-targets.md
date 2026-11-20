@@ -8,14 +8,14 @@ Use world markings to inspect a supported inventory object or choose a target fo
 
 1. Open **Scene patches** in the native map editor.
 2. Click **Select in world** in the command band.
-3. Click an object's square marker, object frame or identity label to make it the candidate.
+3. Click an object's square marker, object frame, or identity label to make it the candidate.
 4. Check the candidate, then click **Confirm** in the footer to inspect it.
 
 Each square marker is at its object's position, and you can click its `+`. If you click inside object frames without hitting a `+`, the patcher chooses the object whose `+` is nearest on screen. The candidate appears blue, with a more saturated blue under the pointer. After you click, it stays plain blue. Confirming it turns its object frame and square marker gold. If the object is editable, **Numeric** mode on the **Placement** tab shows its inspected placement.
 
 The footer's first message slot, **World choice**, tells you what to choose, for example `Choose an object in the world.` The native map editor can still respond to world clicks while **Select in world** is open.
 
-After you click a candidate, the footer shows it on a blue `Object <n>: …` line and enables **Details**. Click **Details** to show its scene, path, component and any binding identifiers below that line. Click it again to hide them.
+After you click a candidate, the footer shows it on a blue `Object <n>: …` line and enables **Details**. Click **Details** to show its scene, path, component, and any binding identifiers below that line. Click it again to hide them.
 
 ## Choose between overlapping markings
 
@@ -39,9 +39,9 @@ Labels are centered below their markers. If a label would cover another marker o
 
 ### What an object frame includes
 
-The patcher determines the object's bounds from its renderers. It excludes effects such as smoke, water spray and lamp beams, invisible shadow casters, and lower levels of detail. A renderer hidden by the game's distance culling still counts. A static-batched building part counts once it has appeared with the patcher's markings since the map loaded. The frame's size and shape therefore stay stable as you zoom or the game culls the object. Switched-off renderers and objects don't count.
+The patcher determines the object's bounds from its renderers. It excludes effects such as smoke, water spray, and lamp beams, invisible shadow casters, and lower levels of detail. A renderer hidden by the game's distance culling still counts. A static-batched building part counts once it has appeared with the patcher's markings since the map loaded. The frame's size and shape therefore stay stable as you zoom or the game culls the object. Switched-off renderers and objects don't count.
 
-The square marker sits at the middle of the framed box, at a point on the object. It stays on the object as you zoom and turn the camera, also when that point is outside the view, as for an object larger than the view. A crossing pad is framed along its whole length on the track, including where its ends meet the road. A crossing controller stands for the whole crossing: its frame surrounds the masts with their gates, the bell and the pads of its grade-crossing setup. Whistle signs and detection spans are outside that frame. At US19 Gov Island, the frame grew to include a mast after it moved about 300 m. Each mast, bell and pad keeps its own frame too.
+The square marker sits at the middle of the framed box, at a point on the object. It stays on the object as you zoom and turn the camera, also when that point is outside the view, as for an object larger than the view. A crossing pad is framed along its whole length on the track, including where its ends meet the road. A crossing controller stands for the whole crossing: its frame surrounds the masts with their gates, the bell, and the pads of its grade-crossing setup. Whistle signs and detection spans are outside that frame. At US19 Gov Island, the frame grew to include a mast after it moved about 300 m. Each mast, bell, and pad keeps its own frame too.
 
 An object frame includes the part at the square marker and nearby parts. It leaves out a part that is far away or much larger. A baked scenery group, such as a station building with its platform and lamps, counts as one object and has an object frame around all its parts. An object with several parts has one object frame around them.
 
@@ -71,7 +71,7 @@ The collider frame follows the rules of an object frame: it includes the collide
 
 Without colliders, a helper marker has a small object frame around its `+` within 500 meters of the camera. Beyond 500 meters, only the `+` shows, except on the inspected object, which keeps its frame at every distance.
 
-A helper marker shows wherever the object's marking shows, in the same colors: blue as the candidate, gold as the inspected object and green as a confirmed target. During **Select in world** it has its `+` like every other object. To select an invisible object, click its `+` or inside its frame, as for any other object. **Focus** moves the camera to the object's pivot. The gizmo stands on the pivot, and the helper marker moves with the object during a drag, after the drag and after native **Undo** and **Redo**.
+A helper marker shows wherever the object's marking shows, in the same colors: blue as the candidate, gold as the inspected object, and green as a confirmed target. During **Select in world** it has its `+` like every other object. To select an invisible object, click its `+` or inside its frame, as for any other object. **Focus** moves the camera to the object's pivot. The gizmo stands on the pivot, and the helper marker moves with the object during a drag, after the drag, and after native **Undo** and **Redo**.
 
 The patcher draws the helper marker on screen only during scene patch editing. It isn't part of the scene and is never saved in the scene patch file.
 
@@ -79,14 +79,14 @@ The patcher draws the helper marker on screen only during scene patch editing. I
 
 A group contains scene objects that the game handles together. Some follow a shared root; others follow the objects named by a game component:
 
-- A grade-crossing setup contains its controller and the inventory objects below its root, such as crossing masts, the bell, detection spans and crossing pads. Each mast is one inventory entry for its light object and the gate on a child object.
+- A grade-crossing setup contains its controller and the inventory objects below its root, such as crossing masts, the bell, detection spans, and crossing pads. Each mast is one inventory entry for its light object and the gate on a child object.
 - A baked scenery group, such as Bryson Coal Dealer, contains its group root and the inventory objects below it. These include its parts and objects of other families, such as the signs of a station building.
 - A rail bridge construction contains its construction controller and the objects whose visibility it controls. At the Ela bridge, the controller `Ela Bridge Scenery` controls the steel and abutments of `Ela Bridge`, so the two form one group. Bryson `Bridge 1` and the `Almond Bridge` carry their controller on their group root, so each appears as one baked scenery group with its abutments and steel as parts. A plate girder bridge has no controller and appears as one object.
-- An industry storage display contains the storage piles or log pond filled by one industry's storage. An industry building is a separate group and contains no storage pile. The storage displays `Andrews Snowbird Paper`, `Sylva Paperboard` and `Connelly` are baked scenery groups with their piles as parts, so each appears as one group with its root and all its piles, also where two storages of the industry fill the piles, as at Connelly. `Whittier Log Pond` is a baked scenery group with its lake surface and its log pond as parts, so it appears as one group with both. The log pond has no renderer of its own; its frame is the area it lays its logs out in, as for a pile.
+- An industry storage display contains the storage piles or log pond filled by one industry's storage. An industry building is a separate group and contains no storage pile. The storage displays `Andrews Snowbird Paper`, `Sylva Paperboard`, and `Connelly` are baked scenery groups with their piles as parts, so each appears as one group with its root and all its piles, also where two storages of the industry fill the piles, as at Connelly. `Whittier Log Pond` is a baked scenery group with its lake surface and its log pond as parts, so it appears as one group with both. The log pond has no renderer of its own; its frame is the area it lays its logs out in, as for a pile.
 
 A folder doesn't count as a group. Bryson Yard, for example, is a folder with 13 yard lamp posts, each a separate group. Proximity alone doesn't group objects. An object outside every group appears on its own. Whistle signs remain separate objects at every distance.
 
-Grouping changes only the objects' appearance in the world. Each object keeps its inventory entry, outliner row and edits. A grade-crossing setup's controller manages its invisible detection spans. These spans are excluded from the group's object frame and choice list but remain in the outliner under their controller in the **Crossing controller** family. To change detection, use the controller's **Connections** tab.
+Grouping changes only the objects' appearance in the world. Each object keeps its inventory entry, outliner row, and edits. A grade-crossing setup's controller manages its invisible detection spans. These spans are excluded from the group's object frame and choice list but remain in the outliner under their controller in the **Crossing controller** family. To change detection, use the controller's **Connections** tab.
 
 ### Select at different distances
 
@@ -100,13 +100,13 @@ Beyond 125 meters, click the group's square marker or object frame to open a cho
 
 When you select a single grade-crossing setup and the list contains only its objects, the footer says `N objects in this crossing setup. Select a row from the list next to the pointer.`
 
-Select a row to make that object the candidate, then click **Confirm** to inspect it. The candidate has its own blue square marker and object frame. The inspected object has its own gold square marker and object frame. The rest of the group keeps its shared marking. Opening, using or closing the choice list changes no scene objects, scene patch data or completed edits. You can still navigate the world while it is open.
+Select a row to make that object the candidate, then click **Confirm** to inspect it. The candidate has its own blue square marker and object frame. The inspected object has its own gold square marker and object frame. The rest of the group keeps its shared marking. Opening, using or closing the choice list changes no scene objects, scene patch data, or completed edits. You can still navigate the world while it is open.
 
 These rules apply to every scene-object choice. If a replacement choice offers only some objects in a group, the group still appears, but its choice list contains only those objects. If a choice offers only a setup's detection spans, the spans appear individually and no group appears.
 
 ### Find a baked scenery group in the outliner
 
-The **Baked scenery group** family groups its rows under these categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Industry building contains buildings where production uses inputs and produces outputs. Other contains listed groups that fit no other category. Every road bridge appears under Road bridges, including the road bridges below the `World/Roads` folders; see [road bridges](moving-baked-scenery-groups.md#road-bridges). The bridge and the construction controller of a rail bridge construction, such as `Ela Bridge` and `Ela Bridge Scenery`, appear under Rail bridges as rows of their own.
+The **Baked scenery group** family groups its rows under these categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, and Other. Bridge has the subgroups Rail bridges and Road bridges. Industry building contains buildings where production uses inputs and produces outputs. Other contains listed groups that fit no other category. Every road bridge appears under Road bridges, including the road bridges below the `World/Roads` folders; see [road bridges](moving-baked-scenery-groups.md#road-bridges). The bridge and the construction controller of a rail bridge construction, such as `Ela Bridge` and `Ela Bridge Scenery`, appear under Rail bridges as rows of their own.
 
 Each group appears under its category. Its row shows the group's name followed by its location, for example `Alarka Jct / Crossing Unprotected (1)`. Parts appear beneath their group, never as separate rows outside it. If a search or filter matches only a part, the outliner shows it beneath a dimmed group row. The dimming means that the group itself does not match: a group does not match a search through the names of the objects below it. A group with no supported edit remains under its category, marked `inspection only`.
 
@@ -114,7 +114,7 @@ When you inspect a part, the **Object** tab starts with `Part of:` and the group
 
 ## Confirm a target for an edit
 
-On the inspected object's **Connections** tab, click **Object**, **Segment** or **Node**. For crossing coverage, open a circuit or detection addition and click **Segment** beside the role you want to change. The source object keeps its gold object frame to show which object the choice belongs to.
+On the inspected object's **Connections** tab, click **Object**, **Segment**, or **Node**. For crossing coverage, open a circuit or detection addition and click **Segment** beside the role you want to change. The source object keeps its gold object frame to show which object the choice belongs to.
 
 For a segment, click the track in the world. For a node, click its marking. Under **World choice**, the footer shows the candidate in blue as `Candidate: …` or `Candidate <n>: …` if it has a number in the choice list. **Details** shows the segment ID and both endpoint IDs, or the node ID and map position.
 
@@ -122,30 +122,30 @@ Hover over a track to see a selectable ribbon along its curve. The ribbon covers
 
 During a world choice, every candidate of that type in view has a `+` marker even when the pointer is elsewhere. A track has this marker within 500 meters of the camera. When choosing a track location, you can select another point on the current segment. A crossing role's choice excludes its current starting segment.
 
-Green also marks the current binding, every segment covered by the crossing and the track the object follows. The current binding appears while the **Connections** tab is open, whether it comes from the map or a scene patch. A confirmed target temporarily hides the current track marking as described above.
+Green also marks the current binding, every segment covered by the crossing, and the track the object follows. The current binding appears while the **Connections** tab is open, whether it comes from the map or a scene patch. A confirmed target temporarily hides the current track marking as described above.
 
-Replacements, snaps and track-following placement use the same candidate markings and choice lists. **Confirm** makes the candidate a confirmed target and marks it green. It doesn't inspect the candidate as **Select in world** does.
+Replacements, snaps, and track-following placement use the same candidate markings and choice lists. **Confirm** makes the candidate a confirmed target and marks it green. It doesn't inspect the candidate as **Select in world** does.
 
 Use **Focus** in the footer to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source object.
 
 Check the candidate, then click **Confirm**. The patcher records its confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. Inspecting another inventory entry ends the confirmation, even if that entry belongs to the same object. A choice made through **Select in world** alone has no source object and doesn't show that line.
 
-If the candidate is missing, ambiguous or has changed since you selected it, check the world and select it again. If the source object or loaded map context has changed, cancel the choice and start again.
+If the candidate is missing, ambiguous, or has changed since you selected it, check the world and select it again. If the source object or loaded map context has changed, cancel the choice and start again.
 
 ### Resolve an ambiguous identity
 
-A scene patch identifies an object by its scene, path and component. It can't distinguish two objects that share all three. Confirmation for an edit is then refused, with the shared identity in the reason. Choose an object with a unique path instead. Replacement choices exclude ambiguous objects because the scene patch couldn't identify them.
+A scene patch identifies an object by its scene, path, and component. It can't distinguish two objects that share all three. Confirmation for an edit is then refused, with the shared identity in the reason. Choose an object with a unique path instead. Replacement choices exclude ambiguous objects because the scene patch couldn't identify them.
 
 **Select in world** can still confirm such an object for inspection. **Supported edits** then explains why it cannot be edited. A refused confirmation shows its reason in the footer and the log.
 
-Click **Cancel** in the footer to close a pending choice. Pending choices don't change scene objects, the scene patch file or completed edit history. Confirmation records a choice for an edit. The [v1 scene patch file reference](scene-patch-file-v1.md) describes the supported fields and how they apply.
+Click **Cancel** in the footer to close a pending choice. Pending choices don't change scene objects, the scene patch file, or completed edit history. Confirmation records a choice for an edit. The [v1 scene patch file reference](scene-patch-file-v1.md) describes the supported fields and how they apply.
 
 ## Apply the edit
 
-Confirm or cancel a pending choice before applying placement or activity changes in **Scene patches**. Completed edits use the native map editor's **Undo**, **Redo** and **Save** controls. See [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md).
+Confirm or cancel a pending choice before applying placement or activity changes in **Scene patches**. Completed edits use the native map editor's **Undo**, **Redo**, and **Save** controls. See [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md).
 
 For a one-time physical placement, use **Track** or **Node** in **Snap** mode on the **Placement** tab. Confirmation prepares the result; **Apply** makes the edit. See [snap an object's position to a track](snapping-to-track.md).
 
-Editing actions on the **Placement** and **Connections** tabs pause native map editor world clicks, including right-click. You can still rotate and pan the camera with the right and middle mouse buttons, use **Scene patches**, make world choices and use gizmo handles.
+Editing actions on the **Placement** and **Connections** tabs pause native map editor world clicks, including right-click. You can still rotate and pan the camera with the right and middle mouse buttons, use **Scene patches**, make world choices, and use gizmo handles.
 
-The block ends when the corresponding action ends through **Apply**, **Discard**, **Start**, **Set**, **Confirm** or **Cancel**. **Read** also ends it, as does leaving a **Numeric** field without a change. In **Gizmo** mode, the block ends when you switch mode or tab, clear the inspection or close the window.
+The block ends when the corresponding action ends through **Apply**, **Discard**, **Start**, **Set**, **Confirm**, or **Cancel**. **Read** also ends it, as does leaving a **Numeric** field without a change. In **Gizmo** mode, the block ends when you switch mode or tab, clear the inspection, or close the window.

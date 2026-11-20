@@ -310,15 +310,15 @@ namespace RailroaderScenePatcher {
             : snap ? EscapeStep.CancelSnap
             : EscapeStep.None;
         // The supported edits of a group root of the Baked scenery group family.
-        internal const string GroupOperations = "Move, rotate, enable or disable the whole group. Its parts move with it.";
+        internal const string GroupOperations = "Move, rotate, enable, or disable the whole group. Its parts move with it.";
         internal const string Decorative = "Decorative. Moving or disabling this group changes no game function.";
         // The supported edits of a crossbuck of an unprotected crossing, a group of its own under Grade crossing, and
         // what the game uses it for: nothing reads it. The auto engineer's crossing horn reads the crossing's
         // Crossing-type pad marker, which keeps its own family.
-        internal const string CrossbuckOperations = "Move, rotate, enable or disable this crossbuck. The crossing pad, the whistle signs and the other crossbuck stay in place.";
+        internal const string CrossbuckOperations = "Move, rotate, enable, or disable this crossbuck. The crossing pad, the whistle signs, and the other crossbuck stay in place.";
         internal const string CrossbuckUse = "Decorative. This crossbuck marks the crossing for road users, and the game doesn't read it. The auto engineer sounds the horn at the crossing's pad marker, which stays in place. Moving or disabling the crossbuck doesn't affect game functions.";
         // The supported edits of a part of a listed baked scenery group.
-        internal const string PartOperations = "Move, rotate, enable or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
+        internal const string PartOperations = "Move, rotate, enable, or disable this part. The group and its other parts stay unchanged. A fixed placement keeps this part at its map coordinates when the group moves.";
         internal const string PartDecorative = "Decorative. Moving or disabling this part does not affect game functions.";
         // What the Object tab says under Use in the game for a group root or part of the Baked scenery group family.
         // category is the category of the group, also for a part. storage names what a storage pile shows, null for
@@ -574,7 +574,7 @@ namespace RailroaderScenePatcher {
         // What the Detected problems section says when the object has no problem. Beside Repair duplicate ID the holder
         // is inactive, which is never a problem, so the section says so and what the duplicate marker ID still refuses.
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
-            ? "None while this marker is inactive. The patcher refuses changes to its activity, binding and track-following placement until its duplicate marker ID is repaired."
+            ? "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
         internal static string MarkerIdUnavailable(bool generic, string underlying, int sharers, bool hasValue) =>
             !generic ? ReplacementMarkerIds.NotSupported
@@ -607,7 +607,7 @@ namespace RailroaderScenePatcher {
         // switches it off now.
         internal const string SwitchedOffByGame = "Yes, but currently switched off by the game";
         // Names in running text: "a", "a and b", "a, b and c".
-        static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
+        static string Listing(IReadOnlyList<string> names) => names.Count == 1 ? names[0] : String.Join(", ", names.Take(names.Count - 1)) + (names.Count == 2 ? " and " : ", and ") + names[names.Count - 1];
         // The dependency an object with a scene ground mask names. self: the object holds the one mask itself; otherwise
         // holders names the parts at or below it that hold a mask. A mask that also flattens the terrain height keeps
         // the object in place.
@@ -634,11 +634,11 @@ namespace RailroaderScenePatcher {
         // Why Apply and Read of Numeric are inactive: the block of the placement for both, then, for Apply, the fields.
         internal static (string Apply, string Read) NumericActionReasons(string block, string fieldReason) => (block ?? fieldReason, block);
         // Supported edits of an object whose move a ground mask blocks: only what still applies.
-        internal const string MarkerOperations = "Set, replace or detach the marker's track binding. Edit placement and activity separately.";
+        internal const string MarkerOperations = "Set, replace, or detach the marker's track binding. Edit placement and activity separately.";
         internal static string OperationsWithoutMove(string operations) =>
             operations == GroupOperations ? "Enable or disable the whole group."
             : operations == PartOperations ? "Enable or disable this part. The group and its other parts stay unchanged."
-            : operations == MarkerOperations ? "Set, replace or detach the marker's track binding. Edit activity separately."
+            : operations == MarkerOperations ? "Set, replace, or detach the marker's track binding. Edit activity separately."
             : operations;
         internal static bool ForcesNumeric(bool pad, bool editable, bool controller, string moveBlock) => pad || !editable || controller || moveBlock != null;
         // Why the placement actions of the tab, Read and Apply included, are unavailable, or null: the first block that holds.
@@ -787,9 +787,9 @@ namespace RailroaderScenePatcher {
         // circuit, is a supported kind whose edit is crossing coverage on its controller; any other span has no edit.
         internal static string SpanInspectionOnly(bool controllerHolds) => InspectionOnly("Track span", controllerHolds);
         // What an existing crossing mast's Supported edits says: the light and its gate as one, and what stays unchanged.
-        internal const string MastOperations = "Move, rotate, enable or disable this mast. Its light and gate move, rotate and are enabled or disabled together. They keep the same connection to the crossing controller, which continues to control them.";
+        internal const string MastOperations = "Move, rotate, enable, or disable this mast. Its light and gate move, rotate, and are enabled or disabled together. They keep the same connection to the crossing controller, which continues to control them.";
         // What an existing crossing bell's Supported edits says.
-        internal const string BellOperations = "Move, enable or disable this bell. The crossing controller continues to control when it rings. A bell's sound has no direction, so rotation does not apply to it.";
+        internal const string BellOperations = "Move, enable, or disable this bell. The crossing controller continues to control when it rings. A bell's sound has no direction, so rotation does not apply to it.";
         // What the Supported edits of a detection span says: no placement of its own, and where its one supported
         // edit, crossing coverage, is made.
         internal const string DetectionSpanOperations = NotEditablePrefix + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.";
@@ -817,7 +817,7 @@ namespace RailroaderScenePatcher {
         internal const string PadFollowsTrack = "A crossing pad follows its track: its geometry is generated along its track binding. Bind it to another track under Connections.";
         internal static string PadModeBlock(int mode) => mode == NumericMode || mode == GizmoMode || mode == SnapMode || mode == FollowMode ? PadFollowsTrack : null;
         // What a milepost's Supported edits says: placement, activity and binding as separate settings, and what stays unchanged.
-        internal const string MilepostOperations = "Move, rotate, enable or disable the milepost. You can also set, replace or detach its track binding. The model and displayed mile value stay the same.";
+        internal const string MilepostOperations = "Move, rotate, enable, or disable the milepost. You can also set, replace, or detach its track binding. The model and displayed mile value stay the same.";
         // What a crossing pad's Supported edits says: its binding and its activity, and no placement of its own.
         internal const string PadOperations = "The pad moves only when you change its track location. The game rebuilds it along the track. Enable or disable it separately.";
         // Whether the fields of an edit hold the object's current values: the edit would change nothing, so its
@@ -939,7 +939,7 @@ namespace RailroaderScenePatcher {
             return parts;
         }
         // The search field's tooltip: a fixed title and what the field does, like every other control.
-        internal const string SearchTitle = "Search objects", SearchTip = "Show only the objects whose name, path, family, binding identifiers, dependencies or problems contain the text you type.";
+        internal const string SearchTitle = "Search objects", SearchTip = "Show only the objects whose name, path, family, binding identifiers, dependencies, or problems contain the text you type.";
         // A modification that is not applied changes nothing: its object shows the refused or the not applied badge
         // instead of the changed one.
         internal static IReadOnlyList<Badge> Badges(bool changed, bool added, FailureKind? failure = null) {

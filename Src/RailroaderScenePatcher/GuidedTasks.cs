@@ -226,11 +226,11 @@ namespace RailroaderScenePatcher {
             const string track = " The object keeps following the same track at the new offset.";
             switch (guided.Kind) {
                 case GuidedTaskKind.Placement: return "Activity and logical bindings." + (follow ? track : "");
-                case GuidedTaskKind.Snap: return "Rotation, activity and logical bindings." + (follow ? track : "");
+                case GuidedTaskKind.Snap: return "Rotation, activity, and logical bindings." + (follow ? track : "");
                 case GuidedTaskKind.Activity: return "Placement and logical bindings.";
-                case GuidedTaskKind.StarterPlacement: return "The marker's position and activity, the wreck setting and other car placements.";
-                case GuidedTaskKind.Wreck: return "The marker's position, activity and track location, and other car placements.";
-                case GuidedTaskKind.MarkerId: return "Placement, activity and track binding. Every other scene marker that holds the old ID keeps its registration.";
+                case GuidedTaskKind.StarterPlacement: return "The marker's position and activity, the wreck setting, and other car placements.";
+                case GuidedTaskKind.Wreck: return "Other car placements and the marker's position, activity, and track location.";
+                case GuidedTaskKind.MarkerId: return "Placement, activity, and track binding. Every other scene marker that holds the old ID keeps its registration.";
                 default: return IsPad ? "Activity. The pad follows its marker to the new location." : "Physical placement and activity.";
             }
         }

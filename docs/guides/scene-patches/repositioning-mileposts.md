@@ -2,11 +2,11 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Reposition or rebind a milepost
 
-This guide explains how to move, rotate or disable a milepost and how to set, replace or detach its track binding. A milepost is a post beside the track that displays a mile value. Its object holds a `Helpers.MilePost` with a prefix, an origin flag and a mile value, a `Track.TrackMarker` and a `Helpers.TextSynchronizer` with the displayed text.
+This guide explains how to move, rotate, or disable a milepost and how to set, replace, or detach its track binding. A milepost is a post beside the track that displays a mile value. Its object holds a `Helpers.MilePost` with a prefix, an origin flag, and a mile value, a `Track.TrackMarker`, and a `Helpers.TextSynchronizer` with the displayed text.
 
 Physical placement and track binding are separate settings. Moving the post leaves its binding unchanged; changing the binding does not move the post. The post's track marker stores the binding as a segment ID, the end of the segment from which the distance is measured, and the distance in metres. The track graph registers the marker under that segment.
 
-Edits do not change the milepost's model, mile value, prefix, origin flag or displayed text. The patcher never recalculates a mile value. Once something looks up the origin for a prefix, the game caches the origin milepost. The cache holds the post itself, not its location, so an edit leaves it unchanged. A scene patch file with a milepost modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
+Edits do not change the milepost's model, mile value, prefix, origin flag, or displayed text. The patcher never recalculates a mile value. Once something looks up the origin for a prefix, the game caches the origin milepost. The cache holds the post itself, not its location, so an edit leaves it unchanged. A scene patch file with a milepost modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
 
 ## What qualifies
 
@@ -21,19 +21,19 @@ The patcher edits a milepost when all of these hold:
 
 The inventory lists an object that meets these conditions in the `Milepost` family with the structure `milepost-v1`. For any other milepost, **Supported edits** on the **Object** tab reads **Not editable:** and gives the reason.
 
-## Move, rotate or disable the milepost in the native map editor
+## Move, rotate, or disable the milepost in the native map editor
 
 1. Open **Scene patches** and select the milepost in the outliner's **Milepost** folder. You can also use **Select in world**, as described in [select world targets](select-world-targets.md).
-2. On the **Placement** tab, move or rotate the post with **Numeric**, **Gizmo** or **Snap**. See [edit placement in the map editor](editing-placement-in-the-map-editor.md) and [use the transform gizmos](using-transform-gizmos.md). The binding stays unchanged. **Follow** is inactive because a milepost uses fixed placement.
+2. On the **Placement** tab, move or rotate the post with **Numeric**, **Gizmo**, or **Snap**. See [edit placement in the map editor](editing-placement-in-the-map-editor.md) and [use the transform gizmos](using-transform-gizmos.md). The binding stays unchanged. **Follow** is inactive because a milepost uses fixed placement.
 3. To hide the post, click **Disable** at the bottom of the **Object** tab. If the post's activity follows its track group, it stays off when the group is enabled later. **Enable** is unavailable for these posts. Its tooltip explains why. **Clear activity** returns it to its group, as described in [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
-## Set, replace or detach the binding in the native map editor
+## Set, replace, or detach the binding in the native map editor
 
-1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end and distance, and each track location the game lists under the marker ID, each in a **Track location listed by the game** row; a location that belongs to another object says so.
-2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**. To pick the segment in the world, click **Segment** under **Replacement targets**, click the track and click **Confirm** in the footer. The **Segment** field takes the confirmed segment.
+1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end, and distance, and each track location the game lists under the marker ID, each in a **Track location listed by the game** row; a location that belongs to another object says so.
+2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in metres in **Distance**. To pick the segment in the world, click **Segment** under **Replacement targets**, click the track, and click **Confirm** in the footer. The **Segment** field takes the confirmed segment.
 3. Click **Set**. **Detach** removes the post from the track, and **Clear binding** returns it to its underlying binding.
 
-The patcher refuses a missing or ambiguous segment or a distance beyond the segment's length before changing anything. Native Undo and Redo reverse and repeat each edit. **Remove modification** returns the post to its underlying placement, activity and binding.
+The patcher refuses a missing or ambiguous segment or a distance beyond the segment's length before changing anything. Native Undo and Redo reverse and repeat each edit. **Remove modification** returns the post to its underlying placement, activity, and binding.
 
 ## Write the modification by hand
 
@@ -59,8 +59,8 @@ Omit `placement` or `relationships.trackMarker` to leave that setting to the sce
 
 ## Limits
 
-The automated tests use a controlled track graph; they do not load Railroader. They check placement, binding, detach, explicit disable of a group-driven post, and refusal of missing and ambiguous mileposts and replacement tracks. They also check a scene target map that is not the loaded map, order-independent dependencies, repetition, the origin cache entry, preflight refusal, failure after a change with restoration or guarded retry, Undo, Redo, clear, removal, Save and reload.
+The automated tests use a controlled track graph; they do not load Railroader. They check placement, binding, detach, explicit disable of a group-driven post, and refusal of missing and ambiguous mileposts and replacement tracks. They also check a scene target map that is not the loaded map, order-independent dependencies, repetition, the origin cache entry, preflight refusal, failure after a change with restoration or guarded retry, Undo, Redo, clear, removal, Save, and reload.
 
 The patcher does not repair a milepost's binding before the game checks its track markers at world load. A broken milepost binding therefore still raises the game's "not on the track" warning once in that load, before the patcher applies the scene patch file and repairs it. The early repair described under [repair feedback](repairing-track-bindings.md#repair-feedback-in-the-native-map-editor) covers Generic track markers only.
 
-In research on Railroader 0.6.2, T-46 was rebound from `Stvw` to T-47's location on `Stky0cg9c`, rebound again and restored, with the T prefix cache populated. T-46 was the origin milepost. The cache kept the same T-46 object, T-47 kept T-46 as its origin, and the displayed `47` and both mile values stayed unchanged. The trial did not test an entry that existed before it, other prefixes, a group change, reload or persistence.
+In research on Railroader 0.6.2, T-46 was rebound from `Stvw` to T-47's location on `Stky0cg9c`, rebound again and restored, with the T prefix cache populated. T-46 was the origin milepost. The cache kept the same T-46 object, T-47 kept T-46 as its origin, and the displayed `47` and both mile values stayed unchanged. The trial did not test an entry that existed before it, other prefixes, a group change, reload, or persistence.

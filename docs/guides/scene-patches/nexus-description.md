@@ -25,7 +25,7 @@ See Railroader's [mod installation guide](https://docs.railroadergame.com/moddin
 
 ### Report an application failure
 
-If a scene change fails to apply, look for a **Railroader Scene Patcher** warning in the game's **Log** window. In your report, include the full warning, the map you loaded and steps to reproduce the failure. The warning identifies the mod that supplied the change, its ID and version when available, the operation, the object if resolved, the error, and the patcher and game versions.
+If a scene change fails to apply, look for a **Railroader Scene Patcher** warning in the game's **Log** window. In your report, include the full warning, the map you loaded, and steps to reproduce the failure. The warning identifies the mod that supplied the change, its ID and version when available, the operation, the object if resolved, the error, and the patcher and game versions.
 
 Follow the **Report to** instruction in the warning. For an invalid definition, contact the author of the mod that supplied the change. The warning can include the mod's author and published website. For an unknown cause or a patcher fault, contact the patcher maintainer through [GitHub Issues](https://github.com/CrankyAnt/RailroaderScenePatcher/issues).
 

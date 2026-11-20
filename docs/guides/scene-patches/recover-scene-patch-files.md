@@ -2,9 +2,9 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Recover a protected scene patch file
 
-Use this guide when **Scene patches** reports that the edited mod's `Data/scene-patches.json` is protected from overwrite. The patcher protects a scene patch file if it cannot read it, its format version is missing, unrecognized or newer, it names another map, or it contains numbers whose written form cannot be preserved exactly. The native map editor's Save will not overwrite a protected scene patch file. If the mod's `Info.json` cannot be read, editing is also unavailable. Correct `Info.json` and click **Read again**. **Start fresh** is unavailable because the problem is in `Info.json`.
+Use this guide when **Scene patches** reports that the edited mod's `Data/scene-patches.json` is protected from overwrite. The patcher protects a scene patch file if it cannot read it, its format version is missing, unrecognized, or newer, it names another map, or it contains numbers whose written form cannot be preserved exactly. The native map editor's Save will not overwrite a protected scene patch file. If the mod's `Info.json` cannot be read, editing is also unavailable. Correct `Info.json` and click **Read again**. **Start fresh** is unavailable because the problem is in `Info.json`.
 
-If a readable scene patch file changes outside the editing session, you can click **Use file version**, **Keep editor version** or **Import** in the **Version choice** panel. If it is malformed, unreadable or has an unsupported version, **Scene patches** shows **File needs repair** in the **Repair** panel. Before **Keep editor version** allows Save to overwrite that file, the patcher must create and verify a backup.
+If a readable scene patch file changes outside the editing session, you can click **Use file version**, **Keep editor version**, or **Import** in the **Version choice** panel. If it is malformed, unreadable, or has an unsupported version, **Scene patches** shows **File needs repair** in the **Repair** panel. Before **Keep editor version** allows Save to overwrite that file, the patcher must create and verify a backup.
 
 If the scene patch file was deleted outside the editing session, **Keep editor version** needs no backup. The next Save writes the editor version.
 
@@ -41,7 +41,7 @@ If the original or the backup changes after **Back up and start fresh**, Save is
 
 ## Keep content you do not understand
 
-Every read, edit and Save preserves unknown fields at the scene patch file root and inside known objects, along with modifications the patcher cannot apply. You cannot edit or remove a modification with such content in the native map editor. Correct or remove it in the scene patch file, then read the scene patch file again.
+Every read, edit, and Save preserves unknown fields at the scene patch file root and inside known objects, along with modifications the patcher cannot apply. You cannot edit or remove a modification with such content in the native map editor. Correct or remove it in the scene patch file, then read the scene patch file again.
 
 Save adds or raises the patcher dependency in `Info.json` only if the scene patch file requires it. It preserves a stricter minimum and every other constraint, and adds no upper bound. If a constraint excludes the required version, Save reports it without changing the constraint.
 
@@ -51,6 +51,6 @@ Click **Keep editor version** if the scene patch file needs repair and you want 
 
 The patcher writes a byte-for-byte copy beside the changed file and verifies it before Save can overwrite the original. If it cannot write or verify the backup, the original remains protected. The review shows a new backup path before you retry. After a successful backup, the diagnosis stays visible and its line numbers refer to the backup. To copy the full diagnosis, click **Copy** in the **Repair** panel before the backup, or **Copy to clipboard** in the session details afterward. Later checks do not return the scene patch file to **File needs repair** unless its content changes again. If a check finds that the file is readable but still has outside changes, **Scene patches** says `The file is readable again.` and offers the normal version choice.
 
-After the backup, **Scene patches** says `Scene Patcher will not change the backup. Delete it when you no longer need it. It will be published with the mod while it remains there.` The backup stays beside the scene patch file and is included when the mod is published. The patcher does not delete it. Delete it when you no longer need it. Save writes the full editor version, including the scene patch file's content at the start of the session, any unknown content and your scene patch edits. The backup remains in place.
+After the backup, **Scene patches** says `Scene Patcher will not change the backup. Delete it when you no longer need it. It will be published with the mod while it remains there.` The backup stays beside the scene patch file and is included when the mod is published. The patcher does not delete it. Delete it when you no longer need it. Save writes the full editor version, including the scene patch file's content at the start of the session, any unknown content, and your scene patch edits. The backup remains in place.
 
 If the original changes after the backup is written, review its new version before saving. Changing or deleting the verified backup does not return the file to repair while the original stays unchanged.

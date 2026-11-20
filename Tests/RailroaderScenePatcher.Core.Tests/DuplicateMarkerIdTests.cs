@@ -237,7 +237,7 @@ static class DuplicateMarkerIdTests {
         var g = new World();
         g.Markers.SetActive(g.Whistles[0], false); g.Markers.Load(g.Whistles[1]); g.Markers.Load(g.Whistles[2]); g.Markers.Mutations = 0; // a load with the first sign inactive
         var group = g.Session.Bind(Marker(WhistlePaths[2]), MarkerBinding.At(new TrackLocation("Sc", "a", 9))).Error;
-        Assert(group.StartsWith("Duplicate marker ID Mkft is held by 3 scene markers, " + WhistlePaths[2] + " (active), " + WhistlePaths[1] + " (active) and " + WhistlePaths[0] + " (inactive). ", StringComparison.Ordinal),
+        Assert(group.StartsWith("Duplicate marker ID Mkft is held by 3 scene markers, " + WhistlePaths[2] + " (active), " + WhistlePaths[1] + " (active), and " + WhistlePaths[0] + " (inactive). ", StringComparison.Ordinal),
             "The edited sign first, the active sign next and the inactive sign last: " + group);
     }
     // A holder whose activity follows its track group: its explicit disable would install the hold and deactivate it,

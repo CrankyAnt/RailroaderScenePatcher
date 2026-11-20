@@ -247,7 +247,7 @@ namespace RailroaderScenePatcher.Core {
                 var source = PreservingJson.Parse(json);
                 var root = source.Root as JObject;
                 if (root == null)
-                    return Protected(json, "Invalid scene patch file envelope. The scene patch file must be a JSON object", "", "A JSON object with formatVersion, sourceMap and modifications", source.Root);
+                    return Protected(json, "Invalid scene patch file envelope. The scene patch file must be a JSON object", "", "A JSON object with formatVersion, sourceMap, and modifications", source.Root);
                 if (!(root["sourceMap"] is JObject sceneTargetMap) || sceneTargetMap["mapId"]?.Type != JTokenType.String || String.IsNullOrWhiteSpace((string)sceneTargetMap["mapId"]))
                     return Protected(json, "The scene patch file needs a map ID", "sourceMap.mapId", "\"sourceMap\": { \"mapId\": \"<the scene target map>\" } with the ID of the edited map or one of its map layers. Use a map definition that is not a map patch, normally the bottom map layer", root["sourceMap"]?["mapId"] ?? root["sourceMap"]);
                 if (!(root["modifications"] is JObject modifications))
@@ -261,7 +261,7 @@ namespace RailroaderScenePatcher.Core {
                     try { PatchEngine.Parse((JObject)property.Value, "", property.Name); }
                     catch (InvalidOperationException e) {
                         loaded.diagnostics.Add(ScenePatchFileDiagnostic.Create(json, property.Path, "Modification " + property.Name + " is not executed. " + Sentence(e.Message),
-                            "A target, a placement and/or active, relationships and a dependsOn list as the format reference describes. Correct known values outside scene patch editing; keep content of a newer patcher unless you mean to remove it", property.Value));
+                            "A target, a placement and/or active, relationships, and a dependsOn list as the format reference describes. Correct known values outside scene patch editing; keep content of a newer patcher unless you mean to remove it", property.Value));
                     }
                 }
                 return loaded;

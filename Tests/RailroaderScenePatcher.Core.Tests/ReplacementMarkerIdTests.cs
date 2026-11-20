@@ -283,7 +283,7 @@ static class ReplacementMarkerIdTests {
         Assert(CommandBand.OffersDuplicateRepair(TrackMarkerScene.Structure, yardLines) && !CommandBand.OffersDuplicateRepair(null, yardLines)
             && !CommandBand.OffersDuplicateRepair(TrackMarkerScene.Structure, Holders(w.Unrelated).Dependencies(w.Unrelated, true)),
             "Repair duplicate ID is offered for a generic track marker whose explanation names a duplicate marker ID");
-        Assert(CommandBand.NoDetectedProblems(true) == "None while this marker is inactive. The patcher refuses changes to its activity, binding and track-following placement until its duplicate marker ID is repaired.",
+        Assert(CommandBand.NoDetectedProblems(true) == "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired.",
             "Beside the repair, the section says why the duplicate marker ID is no problem now and what it still refuses: " + CommandBand.NoDetectedProblems(true));
         Assert(CommandBand.NoDetectedProblems(false) == "None detected", "Without the repair the section reads None detected");
     }

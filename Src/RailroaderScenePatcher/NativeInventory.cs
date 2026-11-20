@@ -679,8 +679,8 @@ namespace RailroaderScenePatcher {
             else only = CommandBand.InspectionOnly(family, board || bridge || pad || crossing || starter || milepost || mast || ownBell || icon || spawnPoint);
             if (only != null) markerEditable = false;
             var structure = only != null ? null : part ? (partRefusal == null ? BakedSceneryParts.Structure : null) : groupRoot ? (groupRefusal == null ? BakedSceneryGroups.Structure : null) : starter ? StarterPlacementScene.Structure : board ? BoardScene.Structure : bridge ? BridgeScene.Structure : markerEditable ? TrackMarkerScene.Structure : padEditable ? CrossingPadScene.Structure : milepostEditable ? MilepostScene.Structure : coverageEditable ? CrossingCoverageScene.Structure : mast && equipmentRefusal == null ? ExistingEquipmentScene.MastStructure : ownBell && equipmentRefusal == null ? ExistingEquipmentScene.BellStructure : icon && iconRefusal == null ? StationMapIconRules.Structure : spawnPoint && spawnRefusal == null ? SpawnPoints.Structure : scenery && sceneryRefusal == null ? ConstructionSceneryScene.Structure : null;
-            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable or disable this board." : CommandBand.NotEditable(refusal))
-                : bridge ? (bridgeRefusal == null ? "Move, rotate, enable or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
+            var operations = only != null ? only : part ? (partRefusal == null ? CommandBand.PartOperations : CommandBand.NotEditable(partRefusal)) : groupRoot ? (groupRefusal == null ? (verdict?.Crossbuck == true ? CommandBand.CrossbuckOperations : CommandBand.GroupOperations) : CommandBand.NotEditable(groupRefusal)) : starter ? StarterPlacements.Operations : board ? (refusal == null ? "Move, rotate, enable, or disable this board." : CommandBand.NotEditable(refusal))
+                : bridge ? (bridgeRefusal == null ? "Move, rotate, enable, or disable the bridge. Track scenery stays in place." : CommandBand.NotEditable(bridgeRefusal))
                 : markerEditable ? CommandBand.MarkerOperations
                 : marked ? CommandBand.NotEditable(markerRefusal)
                 : padEditable ? CommandBand.PadOperations
@@ -693,7 +693,7 @@ namespace RailroaderScenePatcher {
                 : icon ? (iconRefusal == null ? StationMapIconRules.Operations : CommandBand.NotEditable(iconRefusal))
                 : scenery ? (sceneryRefusal == null ? CommandBand.ConstructionSceneryOperations : CommandBand.NotEditable(sceneryRefusal))
                 : spanHolder != null ? CommandBand.DetectionSpanOperations
-                : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates and bells. The crossing and its original detection spans stay in place."
+                : coverageEditable ? "Set which tracks each circuit detects or detach the circuit. You can add detection for extra tracks, or add lights, gates, and bells. The crossing and its original detection spans stay in place."
                 : CommandBand.NotEditable(coverageRefusal);
             // An added light, gate or bell is edited on its crossing's Connections tab, not as an object of its own.
             string displayName = null;

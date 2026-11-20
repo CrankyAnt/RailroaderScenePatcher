@@ -16,7 +16,7 @@ namespace RailroaderScenePatcher.Core {
         // the game creates for cars and players while it runs, are not.
         public static bool Listed(string path) =>
             path != null && path.Length > Folder.Length + 1 && path.StartsWith(Folder + "/", StringComparison.Ordinal) && path.IndexOf('/', Folder.Length + 1) < 0;
-        public const string Operations = "Move, rotate, enable or disable this station map icon. Edit the station's track span, house and station agent in the Map Editor.";
+        public const string Operations = "Move, rotate, enable, or disable this station map icon. Edit the station's track span, house, and station agent in the Map Editor.";
         public const string Dependency = "Map window: the map shows the icon at its position. Enabling the icon registers it with the map.";
     }
     // A station map icon as the capability reads it: its own placement and activity in map coordinates, the object it

@@ -359,7 +359,7 @@ namespace RailroaderScenePatcher.Core {
                     identity.Structure != null && identity.Structure != target.Structure || parsed.State.Marker?.Location == null) return false;
                 // A replacement ID changes the id the native check registers under, so it waits for the world load.
                 if (parsed.Dependencies.Length != 0 || parsed.State.Placement != null || parsed.State.Active != null || parsed.State.MarkerId != null) {
-                    unavailable = "Operation " + id + " needs world-load scheduling for dependencies, placement, activity or a replacement ID.";
+                    unavailable = "Operation " + id + " needs world-load scheduling for dependencies, placement, activity, or a replacement ID.";
                     return false;
                 }
                 // A prerequisite missing at OnEnable is not yet a failed runtime attempt. The definitive world-load
@@ -384,7 +384,7 @@ namespace RailroaderScenePatcher.Core {
                 var state = parsed.State;
                 if (parsed.Dependencies.Length != 0 || state.Placement?.Following != null || state.Marker != null || state.Coverage != null || state.Equipment != null ||
                     state.Starter != null || state.Segments != null || state.MarkerId != null) {
-                    unavailable = "Operation " + id + " needs world-load scheduling for dependencies, track-following placement or relationships.";
+                    unavailable = "Operation " + id + " needs world-load scheduling for dependencies, track-following placement, or relationships.";
                     return false;
                 }
                 try {
@@ -863,7 +863,7 @@ namespace RailroaderScenePatcher.Core {
                 return new StarterSetting((string)starter["setup"], null, wreck);
             }
             var track = starter["track"] as JObject;
-            if (track == null) throw new InvalidOperationException("Invalid starter placement: track must be a track location with segment, end and distance");
+            if (track == null) throw new InvalidOperationException("Invalid starter placement: track must be a track location with segment, end, and distance");
             if (track["detach"] != null) {
                 if (!Only(track, "detach") || track["detach"].Type != JTokenType.Boolean || !(bool)track["detach"]) throw new InvalidOperationException("Invalid starter placement: detach must be true and stand alone");
                 return new StarterSetting((string)starter["setup"], MarkerBinding.Detached, wreck);
@@ -903,7 +903,7 @@ namespace RailroaderScenePatcher.Core {
                     for (var i = 0; i < 3; i++) {
                         var role = CircuitCoverage.Roles[i];
                         var range = circuit[role] as JObject;
-                        if (range == null) throw new InvalidOperationException("Invalid relationship: " + label + " needs approachA, island and approachB" + (addition ? "" : ", or an explicit detach"));
+                        if (range == null) throw new InvalidOperationException("Invalid relationship: " + label + " needs approachA, island, and approachB" + (addition ? "" : ", or an explicit detach"));
                         if (!Only(range, "from", "to")) throw new InvalidOperationException("Unsupported relationship content");
                         ranges[i] = new SpanRange(RangeEnd(range["from"]), RangeEnd(range["to"]));
                     }
@@ -954,7 +954,7 @@ namespace RailroaderScenePatcher.Core {
             return new CrossingEquipment(parsed, false);
         }
         static TrackLocation RangeEnd(JToken token) {
-            if (!(token is JObject location)) throw new InvalidOperationException("Invalid relationship: a track location needs segment, end and distance");
+            if (!(token is JObject location)) throw new InvalidOperationException("Invalid relationship: a track location needs segment, end, and distance");
             return ParseLocation(location, "relationship");
         }
         static bool RequiredString(JObject obj, string name) { return obj[name]?.Type == JTokenType.String && !String.IsNullOrWhiteSpace((string)obj[name]); }

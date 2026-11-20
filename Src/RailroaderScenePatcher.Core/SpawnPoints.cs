@@ -25,8 +25,8 @@ namespace RailroaderScenePatcher.Core {
     // moved spawn point is used at its new place.
     public static class SpawnPoints {
         public const string Family = "Spawn point", Component = "Character.SpawnPoint", Structure = "spawn-point-v1", RequiredVersion = "0.5.0";
-        public const string Operations = "Move, rotate, enable or disable this spawn point. Edit native spawns in the map data under Spawns in the Map Editor.";
-        public const string Dependency = "Player start, rescue and teleport read this spawn point's placement when they run. Only active spawn points are offered. A start setup reads it even when it's disabled.";
+        public const string Operations = "Move, rotate, enable, or disable this spawn point. Edit native spawns in the map data under Spawns in the Map Editor.";
+        public const string Dependency = "Player start, rescue, and teleport read this spawn point's placement when they run. Only active spawn points are offered. A start setup reads it even when it's disabled.";
         // The family of a component below a scene root of this name, or null: every scene spawn point that the inventory
         // can list at all, wherever it stands.
         public static string FamilyOf(string componentType, string sceneRoot) =>

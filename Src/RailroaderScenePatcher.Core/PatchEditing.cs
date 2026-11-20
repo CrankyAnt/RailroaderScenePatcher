@@ -724,7 +724,7 @@ namespace RailroaderScenePatcher.Core {
         // tracks of the addition that has it. The ID names one addition in the scene patch file. Native circuits keep their coverage.
         public Outcome AddDetection(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
             return Change("Add crossing detection", target, inspected, existing => {
-                if (tracks == null || tracks.Kind != CircuitKind.Added) throw new InvalidOperationException("Explicitly select the tracks of the approach A, island and approach B spans for the addition");
+                if (tracks == null || tracks.Kind != CircuitKind.Added) throw new InvalidOperationException("Explicitly select the tracks of the approach A, island, and approach B spans for the addition");
                 return CoverageValue(target, existing, id, tracks, true);
             }, null, "cover-");
         }
@@ -736,7 +736,7 @@ namespace RailroaderScenePatcher.Core {
         // The effect AddDetection, or with null tracks DeleteDetection, would have on every circuit and addition, without
         // changing the scene, the scene patch file or the history.
         public CoveragePreview PreviewAddition(TargetIdentity target, string id, CircuitCoverage tracks, InspectedTarget inspected = null) {
-            if (tracks != null && tracks.Kind != CircuitKind.Added) return new CoveragePreview(Array.Empty<string>(), "Explicitly select the tracks of the approach A, island and approach B spans for the addition");
+            if (tracks != null && tracks.Kind != CircuitKind.Added) return new CoveragePreview(Array.Empty<string>(), "Explicitly select the tracks of the approach A, island, and approach B spans for the addition");
             return Preview(target, id, tracks, inspected, true);
         }
         // The construction segments the object's construction controller names now, or null for an object without one.
@@ -888,7 +888,7 @@ namespace RailroaderScenePatcher.Core {
             string whole = null;
             if (refused.Count == 0) whole = ModificationRefusal(existing, resolved);
             var stopped = refused.Count == 0 ? whole
-                : (refused.Count == 1 ? "addition " + refused[0] + " is" : "additions " + String.Join(", ", refused.Take(refused.Count - 1)) + " and " + refused[refused.Count - 1] + " are")
+                : (refused.Count == 1 ? "addition " + refused[0] + " is" : "additions " + String.Join(", ", refused.Take(refused.Count - 1)) + (refused.Count == 2 ? " and " : ", and ") + refused[refused.Count - 1] + " are")
                     + " refused, so none of this crossing's additions are built";
             var entries = new List<EquipmentEntry>();
             foreach (var addition in modEquipment.Additions) {

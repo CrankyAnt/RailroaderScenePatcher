@@ -217,7 +217,7 @@ namespace RailroaderScenePatcher {
             }
             try {
                 titleDetails = TitleIcon(manager, close.transform.parent, "CrankyAnt Scene Patcher session details", DetailsGlyph(), ToggleDetails,
-                    () => new TooltipInfo("Session details", DetailsOpen ? "Close the session details." : "Open the session details in their own window: the edited mod's scene patch file, supplied definitions, diagnostics and the candidates of a world choice."), out detailsGlyph);
+                    () => new TooltipInfo("Session details", DetailsOpen ? "Close the session details." : "Open the session details in their own window: the edited mod's scene patch file, supplied definitions, diagnostics, and the candidates of a world choice."), out detailsGlyph);
             } catch (Exception e) {
                 if (titleDetails != null) UnityEngine.Object.Destroy(titleDetails.gameObject);
                 titleDetails = null; detailsGlyph = null;

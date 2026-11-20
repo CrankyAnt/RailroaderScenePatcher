@@ -377,7 +377,7 @@ namespace RailroaderScenePatcher {
         // A group that holds a scene ground mask is not edited while the mask cannot be read and rebuilt: a move would
         // leave the terrain shaping behind.
         static string MaskProblem(GameObject root) =>
-            !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so you can't move, enable or disable this group or its parts." : null;
+            !GroundMaskWorld.Available && GroundMaskWorld.Holds(root) ? "The game's ground mask members are unavailable, so you can't move, enable, or disable this group or its parts." : null;
         // A culling container, a group root and an object below a group with a car loader resolve too, so their
         // modification fails with the reason (BakedSceneryRules.PartRefusal).
         public IReadOnlyList<object> FindParts(string scene, string path) =>
@@ -420,7 +420,7 @@ namespace RailroaderScenePatcher {
             if (construction == null || ConstructionReadable) return null;
             var held = root.GetComponentsInChildren(construction, true).Length != 0;
             for (var t = root.transform.parent; t != null && !held; t = t.parent) held = t.GetComponent(construction) != null;
-            return held ? "The game's track construction members are unavailable, so you can't move, enable or disable this rail bridge." : null;
+            return held ? "The game's track construction members are unavailable, so you can't move, enable, or disable this rail bridge." : null;
         }
         // A progression controller (Game.Progression.ProgressionEntityObjectController) sets the objects of its two lists
         // from its industry's or station's progression state, at Awake and on every IndustriesDidChange; a map feature

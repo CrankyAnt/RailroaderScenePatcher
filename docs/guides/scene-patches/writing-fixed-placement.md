@@ -2,9 +2,9 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Write fixed scene placement
 
-Use this guide to write a v1 scene patch file that sets an independent board's fixed placement. The supported board has the `independent-board-v1` structure, a `Helpers.Culling.RendererCuller`, one circle map mask and no track relationship. The example uses the Sylva location board, `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene.
+Use this guide to write a v1 scene patch file that sets an independent board's fixed placement. The supported board has the `independent-board-v1` structure, a `Helpers.Culling.RendererCuller`, one circle map mask, and no track relationship. The example uses the Sylva location board, `World/Signs/Loc: Sylva Int` in the `BushnellWhittier-MapManager` scene.
 
-An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed placement, visible rendering, culler membership and mask position after a measured origin shift. The test covered one build and sampled camera distances. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects and failure limits. For the general workflow, see [Write a scene patch file](writing-scene-patch-files.md).
+An isolated test on Railroader 0.6.2 build 26335745 verified that board's fixed placement, visible rendering, culler membership, and mask position after a measured origin shift. The test covered one build and sampled camera distances. [Move a board with its terrain effects](moving-boards.md) explains the board pattern, its terrain effects, and failure limits. For the general workflow, see [Write a scene patch file](writing-scene-patch-files.md).
 
 ## Add the scene patch file
 
@@ -47,19 +47,19 @@ Add one member to the `modifications` object for each desired placement. The mem
 
 The target identity must identify exactly one board in the loaded map context that matches the board pattern. The position has three finite numbers in map coordinates. The rotation has four finite numbers in quaternion order and must be a unit quaternion. The patcher uses the game's coordinate conversion to turn map coordinates into world coordinates. After moving the board, it updates the culling position and rebuilds the circle map mask.
 
-Give each modification a unique, non-empty key. A modification has no `id` member. Key order doesn't matter. List prerequisite modification IDs in `dependsOn`, or leave it empty if there are no prerequisites. A missing, failed or cyclic dependency prevents the dependent modification from applying.
+Give each modification a unique, non-empty key. A modification has no `id` member. Key order doesn't matter. List prerequisite modification IDs in `dependsOn`, or leave it empty if there are no prerequisites. A missing, failed, or cyclic dependency prevents the dependent modification from applying.
 
 ## Distribute for multiplayer
 
 Every player in a multiplayer session must install your mod and Railroader Scene Patcher and enable the game's DLL mod permission on their own installation. Railroader checks required mods and versions to decide who can join. The patcher adds no admission check and doesn't compare scene patch file contents between players.
 
-The host and each client apply your scene patch file to their own scene when their world loads. Each checks the map context, target identity and capability prerequisites locally. A failure appears in the affected player's game. It doesn't undo changes for others or disconnect anyone. Fixed placement uses map coordinates, so every player's board reaches the same map position even when their local world origins differ.
+The host and each client apply your scene patch file to their own scene when their world loads. Each checks the map context, target identity, and capability prerequisites locally. A failure appears in the affected player's game. It doesn't undo changes for others or disconnect anyone. Fixed placement uses map coordinates, so every player's board reaches the same map position even when their local world origins differ.
 
-When a player's game loads the world again, the patcher uses the stored map position. If the game rebuilt an object, the patcher applies your modification to it as new and removes anything it built for the old object. In single-player, loading the same save again rebuilt the objects and applied each modification once. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer) for repeat application, failure handling and multiplayer evidence limits.
+When a player's game loads the world again, the patcher uses the stored map position. If the game rebuilt an object, the patcher applies your modification to it as new and removes anything it built for the old object. In single-player, loading the same save again rebuilt the objects and applied each modification once. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer) for repeat application, failure handling, and multiplayer evidence limits.
 
 ## Check the support boundary
 
-The board's parents, culler and circle map mask must be active. The board itself may be disabled through `active`. The patcher rejects a height-flattening mask, `Track.*` components and other culling or mask components in the hierarchy. It also checks that the required game functions for map-coordinate conversion, culling, masks and terrain are available. For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md). The [Current native targets](scene-patch-file-v1.md#current-native-targets) section lists all supported object families. Families not listed there are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
+The board's parents, culler, and circle map mask must be active. The board itself may be disabled through `active`. The patcher rejects a height-flattening mask, `Track.*` components, and other culling or mask components in the hierarchy. It also checks that the required game functions for map-coordinate conversion, culling, masks, and terrain are available. For the supported bridge, see [move or disable a bridge with its collision](placing-bridges.md). The [Current native targets](scene-patch-file-v1.md#current-native-targets) section lists all supported object families. Families not listed there are not implemented. The runtime reports `Capability.Unchecked` even when these prerequisites are available. The isolated fixture observations described above provide evidence for the tested board and build; they do not change that capability classification or establish the complete culling range.
 
 The engine doesn't retry a failed modification during the same load. Correct the scene patch file or target before a later load.
 

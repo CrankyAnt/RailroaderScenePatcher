@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move a board with its terrain effects
 
-This guide shows how to move, rotate, disable or restore an independent board, such as a location sign, and what happens to its culling, terrain mask and the generated terrain around it. For the general native map editor workflow, Save, Undo and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md).
+This guide shows how to move, rotate, disable, or restore an independent board, such as a location sign, and what happens to its culling, terrain mask, and the generated terrain around it. For the general native map editor workflow, Save, Undo, and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md).
 
 ## Check that the object is an independent board
 
@@ -12,14 +12,14 @@ An independent board is a scene object with these parts:
 - exactly one `Map.Runtime.MaskComponents.CircleMapMask` on the same object, which keeps generated trees and other masked terrain output away from it,
 - no track relationship: no `Track.*` component anywhere in its hierarchy.
 
-In the native map editor, open **Scene patches**, click **Refresh** in the command band and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** starts with **Not editable:**, it names the reason after that. The patcher refuses a board in these cases:
+In the native map editor, open **Scene patches**, click **Refresh** in the command band, and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** starts with **Not editable:**, it names the reason after that. The patcher refuses a board in these cases:
 
 - its culler or mask is disabled, or it carries more than one circle mask,
 - a parent object is inactive (the board itself may be disabled),
 - its mask flattens terrain height,
-- its hierarchy contains a `Track.*` component, another culler, another mask component or another culling handler.
+- its hierarchy contains a `Track.*` component, another culler, another mask component, or another culling handler.
 
-A board placement holds a position and a rotation only. It never names a track, segment or marker, and the patcher does not attach the board to one.
+A board placement holds a position and a rotation only. It never names a track, segment, or marker, and the patcher does not attach the board to one.
 
 ## Move or rotate the board
 
@@ -27,7 +27,7 @@ A board placement holds a position and a rotation only. It never names a track, 
 2. On the **Placement** tab, in **Numeric** mode, enter the position in map coordinates and the rotation in degrees.
 3. Click **Apply** at the bottom of the tab.
 
-The patcher moves the board, asks the culler to update its culling position and rebuilds the circle mask. It then checks that the culling sphere and every mask registration sit at the new position. If they do not, the edit fails and the board returns to its previous state.
+The patcher moves the board, asks the culler to update its culling position, and rebuilds the circle mask. It then checks that the culling sphere and every mask registration sit at the new position. If they do not, the edit fails and the board returns to its previous state.
 
 The game then regenerates the terrain at the old and the new position: trees return where the board stood and disappear where it now stands. This takes a moment. The **Terrain** section of the **Changes** tab shows **Terrain output outstanding**, with the affected positions, until the game has rebuilt each loaded terrain tile and its terrain work is idle. While the board is inspected, the message area reports each change under the source **Terrain output**: outstanding, then complete, or stopped when the game does not finish in time. It then shows **Terrain output complete**. A position whose tile is not built needs no rebuild; the game builds that tile from the board's current mask when it loads, and the section counts that position as complete.
 
@@ -37,7 +37,7 @@ Click **Disable** at the bottom of the **Object** tab. The culler and the mask r
 
 An explicit `"active": false` in the scene patch file is applied on every load, so a later activation by the game does not keep a disabled board visible.
 
-## Undo, Redo and removal
+## Undo, Redo, and removal
 
 The native map editor's **Undo** and **Redo** return the board to the earlier or later placement and activity, with its culling and mask registrations, and the terrain regenerates again. **Remove modification** in the footer returns the board to its effective underlying state: its position in the loaded map, with any other modifications in your scene patch file still applied. None of these steps leaves an extra culling sphere or mask registration behind.
 
@@ -59,8 +59,8 @@ In ordinary play, a terrain output that does not complete produces a warning in 
 
 ## When an edit fails
 
-A failed edit restores the board's previous placement, activity, culling sphere and mask registration. The restored terrain then regenerates. Until it has, the patcher refuses further edits of that board and says so; the next edit is accepted once the restored terrain output completes. If the patcher cannot verify the restoration, or the restored terrain output stops, it blocks the board until you click **Recheck** in the footer and the check succeeds. Recheck applies the scene patch file's state again if the board differs, requests the stopped terrain output again, and accepts edits once that output completes. Reloading the native map editor also clears the block.
+A failed edit restores the board's previous placement, activity, culling sphere, and mask registration. The restored terrain then regenerates. Until it has, the patcher refuses further edits of that board and says so; the next edit is accepted once the restored terrain output completes. If the patcher cannot verify the restoration, or the restored terrain output stops, it blocks the board until you click **Recheck** in the footer and the check succeeds. Recheck applies the scene patch file's state again if the board differs, requests the stopped terrain output again, and accepts edits once that output completes. Reloading the native map editor also clears the block.
 
 ## Limits
 
-The behavior above rests on research with the Sylva location board on Railroader 0.6.2 build 26335745. In that research, moving the board's circle mask onto a generated tree removed the tree from the generated tile output, and moving it back restored the tree. The automated tests check the patcher's rules against a controlled model of the culler, mask and terrain system; a recorded run of this patcher version in the game is not yet part of this guide. The patcher reports `Capability.Unchecked` on every build. Other boards are accepted because they match the same component pattern; none has been tested individually. Rendered pixels, GPU tree buffers, height effects and vegetation configurations other than the tested tree are not established.
+The behavior above rests on research with the Sylva location board on Railroader 0.6.2 build 26335745. In that research, moving the board's circle mask onto a generated tree removed the tree from the generated tile output, and moving it back restored the tree. The automated tests check the patcher's rules against a controlled model of the culler, mask, and terrain system; a recorded run of this patcher version in the game is not yet part of this guide. The patcher reports `Capability.Unchecked` on every build. Other boards are accepted because they match the same component pattern; none has been tested individually. Rendered pixels, GPU tree buffers, height effects, and vegetation configurations other than the tested tree are not established.

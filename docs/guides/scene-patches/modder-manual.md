@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Edit scene objects in Railroader
 
-Use this manual to find an existing scene object, make a supported edit and save it with your mod. Railroader Scene Patcher is under development and has no official release or mod package.
+Use this manual to find an existing scene object, make a supported edit, and save it with your mod. Railroader Scene Patcher is under development and has no official release or mod package.
 
 ## Choose where to edit
 
@@ -14,8 +14,8 @@ A scene patch file applies to its scene target map and any map that inherits it 
 
 ## Find the object and check what it uses
 
-1. Open **Scene patches** and click **Refresh**. Search the [outliner](inspect-scene-objects.md) by name, path, family or binding ID, or [select an object in the world](select-world-targets.md). Confirm a world choice before editing it.
-2. On the **Object** tab, check **Identity**, **Supported edits**, **Detected problems** and **Dependencies**. Click **Copy ID** for the scene target map and the object's stored identity. A path or display name alone can be ambiguous. Use the copied identifiers when writing JSON.
+1. Open **Scene patches** and click **Refresh**. Search the [outliner](inspect-scene-objects.md) by name, path, family, or binding ID, or [select an object in the world](select-world-targets.md). Confirm a world choice before editing it.
+2. On the **Object** tab, check **Identity**, **Supported edits**, **Detected problems**, and **Dependencies**. Click **Copy ID** for the scene target map and the object's stored identity. A path or display name alone can be ambiguous. Use the copied identifiers when writing JSON.
 3. Check the current placement and observed bindings on **Placement** and **Connections**. An inactive object or a valid connection to the wrong track might need attention even when the **Problems** filter lists nothing. After a native edit, Undo or Redo, click **Refresh** and inspect the object again.
 
 ## Choose an operation
@@ -24,13 +24,13 @@ Physical placement controls where an object stands. Use [numeric placement](edit
 
 | What you want to change | Where to start |
 | --- | --- |
-| Fix a marker registration or a duplicate marker ID | [Track bindings](repairing-track-bindings.md), [replacement marker IDs](repairing-duplicate-marker-ids.md) and [mileposts](repositioning-mileposts.md) |
+| Fix a marker registration or a duplicate marker ID | [Track bindings](repairing-track-bindings.md), [replacement marker IDs](repairing-duplicate-marker-ids.md), and [mileposts](repositioning-mileposts.md) |
 | Place starting cars or set whether they start derailed | [Starter placement](placing-starter-markers.md) and [guided tasks](completing-guided-tasks.md) |
-| Move a board, a bridge or a group with its colliders, culling or terrain mask | [Boards](moving-boards.md), [the Ela bridge](placing-bridges.md) and [baked scenery groups and parts](moving-baked-scenery-groups.md) |
+| Move a board, a bridge, or a group with its colliders, culling, or terrain mask | [Boards](moving-boards.md), [the Ela bridge](placing-bridges.md), and [baked scenery groups and parts](moving-baked-scenery-groups.md) |
 | Move a station's map icon or a player spawn point | [Station map icons](moving-station-map-icons.md) and [spawn points](moving-spawn-points.md) |
-| Move an existing mast, bell or crossbuck | [Existing crossing equipment](moving-crossing-equipment.md) and [crossbucks](moving-baked-scenery-groups.md#crossbucks-at-unprotected-crossings) |
+| Move an existing mast, bell, or crossbuck | [Existing crossing equipment](moving-crossing-equipment.md) and [crossbucks](moving-baked-scenery-groups.md#crossbucks-at-unprotected-crossings) |
 | Remove obsolete detection or cover another track at an existing crossing | [Correct coverage](correcting-crossing-coverage.md) or [add detection](adding-crossing-detection.md). Check the approach spans and island for every affected circuit before applying. |
-| Add working lights, gates or a bell to an existing crossing | [Lights and gates](adding-crossing-equipment.md) use eligible devices loaded in the crossing's scene. [Bells](adding-crossing-bells.md) use eligible bell definitions from the content library. Check the guide's source requirements and confirm the controller relationship. |
+| Add working lights, gates, or a bell to an existing crossing | [Lights and gates](adding-crossing-equipment.md) use eligible devices loaded in the crossing's scene. [Bells](adding-crossing-bells.md) use eligible bell definitions from the content library. Check the guide's source requirements and confirm the controller relationship. |
 
 ## Save, restore or recover
 
@@ -38,4 +38,4 @@ Use native **Undo** and **Redo** for completed edits. Use **Remove modification*
 
 If an edit fails, read the reason in the footer and click **Guide** for that action. If cleanup is incomplete, use **Recheck** as directed in [retry after a failed edit](editing-placement-in-the-map-editor.md#retry-after-a-failed-edit). For a protected file, open **Session details** and follow [Recover a protected scene patch file](recover-scene-patch-files.md).
 
-For multiplayer testing, install the supplying mod and a compatible patcher on the host and each client, and allow DLL mods on each computer. Each peer applies the scene patch file to its own world. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer) for load, reconnect and evidence limits.
+For multiplayer testing, install the supplying mod and a compatible patcher on the host and each client, and allow DLL mods on each computer. Each peer applies the scene patch file to its own world. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer) for load, reconnect, and evidence limits.

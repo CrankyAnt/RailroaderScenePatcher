@@ -90,12 +90,12 @@ namespace RailroaderScenePatcher.Core {
         static string Activity(MarkerIdHolder holder) => holder.Registers ? "active" : "inactive";
         string Names(object self) {
             var names = Ordered(self).Select(h => h.Name + " (" + Activity(h) + ")").ToArray();
-            return names.Length < 2 ? String.Join("", names) : String.Join(", ", names.Take(names.Length - 1)) + " and " + names[names.Length - 1];
+            return names.Length < 2 ? String.Join("", names) : String.Join(", ", names.Take(names.Length - 1)) + (names.Length == 2 ? " and " : ", and ") + names[names.Length - 1];
         }
         // The refusal of an edit that changes the activity, binding or track-following placement of a holder: plain
         // sentences that follow the label of the action they refuse.
         public string Refusal(object self) => "Duplicate marker ID " + Id + " is held by " + Holders.Count + " scene markers, " + Names(self) + ". " + Reason;
-        const string Reason = "When the game removes a marker's graph registration by marker ID, it removes the registration of every scene marker with that ID. You can't edit their activity, binding or track-following placement until the duplicate marker ID is repaired. Reloading or choosing another track doesn't change the duplicate marker ID.";
+        const string Reason = "When the game removes a marker's graph registration by marker ID, it removes the registration of every scene marker with that ID. You can't edit their activity, binding, or track-following placement until the duplicate marker ID is repaired. Reloading or choosing another track doesn't change the duplicate marker ID.";
         // The problem of an active holder that can receive a replacement ID: a duplicate marker ID is then a defect the
         // modder repairs with the patcher. An inactive holder, and a holder that cannot receive a replacement ID, such as a
         // crossing pad, show the explanation without a problem. Null for a marker ID that one scene marker holds.
@@ -380,11 +380,11 @@ namespace RailroaderScenePatcher.Core {
         public static string MapObjectsUnknown(string id) => "The game hasn't loaded the map objects in the map context, so replacement ID " + id + " couldn't be checked against them. Try again after the map has loaded.";
         // The modifications of other holders whose settings need this modification's replacement ID, by key.
         public static string DependentRefusal(IReadOnlyList<string> dependents) => "This marker's replacement ID can't be cleared because " + String.Join(", ", dependents) + (dependents.Count == 1 ? " names" : " name")
-            + " its modification in dependsOn. Another holder's activity, binding or track-following settings need this ID. Change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first.";
+            + " its modification in dependsOn. Another holder's activity, binding, or track-following settings need this ID. Change or remove " + (dependents.Count == 1 ? "that modification" : "those modifications") + " first.";
         public static string Shared(string id) => "Replacement ID " + id + " is used by more than one modification. A replacement ID must identify one marker in its scene patch file.";
         // Clearing the replacement ID would return a duplicate marker ID while the modification still changes the
         // marker's activity, binding or track-following placement.
-        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding and track-following settings need its replacement ID. Clear those settings first, or click Remove modification.";
+        public static string ClearRefusal(string id, string user) => "Marker ID " + id + " is also held by " + user + ", so this marker's activity, binding, and track-following settings need its replacement ID. Clear those settings first, or click Remove modification.";
     }
     // Repairs, replaces and detaches the location relationship of a Generic track marker together with its graph
     // registration, and places or enables the marker object. A relationship edit never moves the object:

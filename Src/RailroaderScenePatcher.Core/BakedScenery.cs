@@ -155,7 +155,7 @@ namespace RailroaderScenePatcher.Core {
         public const string MapLabels = "Map Labels", StationIcons = "Station Icons", BuilderPhotoSetup = "Builder Photo Setup";
         // The coverage rules that keep a candidate out, by the name of their row in the coverage statement.
         public const string NoPhysicalPresence = "Objects without physical presence", RuntimeObject = "Objects the game creates while running",
-            NativeMapData = "Track spans, passenger stops, industries, spawns, turntables and other native map data", MapLabel = "Map labels",
+            NativeMapData = "Track spans, passenger stops, industries, spawns, turntables, and other native map data", MapLabel = "Map labels",
             BuilderPhotoRig = "Builder photo rig", NoFunction = "Objects without a model or function in the game", CarLoaders = "Car loaders";
         // The renderers of visual effects, which draw particles that nothing can run into: a particle system and a VFX
         // Graph effect, such as the fireflies under World/Environment Effects.
@@ -285,7 +285,7 @@ namespace RailroaderScenePatcher.Core {
         // what the game builds for it belong to the native map data, which a construction move must leave in place.
         public static string TrackOwnedRefusal(IEnumerable<string> types) {
             var owned = (types ?? Enumerable.Empty<string>()).FirstOrDefault(type => type != null && (type.StartsWith("Track.", StringComparison.Ordinal) || type.StartsWith("AutoTrestle.", StringComparison.Ordinal)));
-            return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled or disabled.";
+            return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled, or disabled.";
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
             RendererCuller = "Helpers.Culling.RendererCuller", FolderRule = "Folders above group roots";
@@ -388,9 +388,9 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with storage piles or a log pond cannot be edited while the game's bulk scenery members that the
         // refresh uses are unavailable, naming the kinds the group holds.
         public static string BulkMembersRefusal(bool piles, bool ponds) =>
-            piles && ponds ? "The game's storage pile and log pond members are unavailable. This group, its piles and its log pond can't be moved, enabled or disabled."
-            : ponds ? "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled or disabled."
-            : "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled or disabled.";
+            piles && ponds ? "The game's storage pile and log pond members are unavailable. This group, its piles, and its log pond can't be moved, enabled, or disabled."
+            : ponds ? "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled, or disabled."
+            : "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled, or disabled.";
         // The box a log pond lays its logs out in, in its own coordinates, as centre and half extents: its width across
         // (X), its length plus width along (Z, the capsule's straight section and its two round ends), and one log's
         // radius up and down from the water line where the logs float (LogPond.ComputeLayout places them at height 0).

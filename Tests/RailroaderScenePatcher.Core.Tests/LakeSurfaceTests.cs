@@ -151,10 +151,10 @@ static class LakeSurfaceTests {
     // Refusal and failure texts of the bulk scenery refresh name the object kind: a log pond is no storage pile.
     static void BulkTextsNameTheKind() {
         Assert(BakedSceneryRules.BulkKind("Scenery.LogPond") == "log pond" && BakedSceneryRules.BulkKind("Scenery.Pile") == "storage pile", "The kind of a bulk scenery object");
-        Assert(BakedSceneryRules.BulkMembersRefusal(true, false) == "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled or disabled.", "Piles keep the #98 text");
-        Assert(BakedSceneryRules.BulkMembersRefusal(false, true) == "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled or disabled.",
+        Assert(BakedSceneryRules.BulkMembersRefusal(true, false) == "The game's storage pile members are unavailable. This group and its piles can't be moved, enabled, or disabled.", "Piles keep the #98 text");
+        Assert(BakedSceneryRules.BulkMembersRefusal(false, true) == "The game's log pond members are unavailable. This group and its log pond can't be moved, enabled, or disabled.",
             "A log pond group names the log pond: " + BakedSceneryRules.BulkMembersRefusal(false, true));
-        Assert(BakedSceneryRules.BulkMembersRefusal(true, true) == "The game's storage pile and log pond members are unavailable. This group, its piles and its log pond can't be moved, enabled or disabled.",
+        Assert(BakedSceneryRules.BulkMembersRefusal(true, true) == "The game's storage pile and log pond members are unavailable. This group, its piles, and its log pond can't be moved, enabled, or disabled.",
             "Both kinds are named");
     }
 

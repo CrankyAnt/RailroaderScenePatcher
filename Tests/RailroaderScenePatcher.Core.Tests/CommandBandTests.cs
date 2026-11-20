@@ -305,7 +305,7 @@ static class CommandBandTests {
             new object[] { false, true, false, false, "not paused: never hidden" } })
             Check(CommandBand.HidesTooltip((bool)row[0], (bool)row[1], (bool)row[2]) == (bool)row[3], "The tooltip, " + row[4]);
         Check(CommandBand.Clear(false, false) == "Nothing is inspected and no world choice is pending.", "Clear is disabled only when nothing is inspected and no world choice is pending");
-        Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo or snap. Changes that were made stay.", CommandBand.Clear(false, false))
+        Check(CommandBand.Tooltip("End the inspection and cancel a pending world choice, gizmo, or snap. Changes that were made stay.", CommandBand.Clear(false, false))
             == "Unavailable: Nothing is inspected and no world choice is pending.", "The disabled Clear gives only why it cannot be used");
         Check(CommandBand.Focus(false) == "Inspect an object first." && CommandBand.CopyId(false) == "Inspect an object first.", "Focus and Copy ID are disabled when nothing is inspected, with that reason");
         Check(CommandBand.CopyId(true, "Invalid JSON. The scene patch file is protected from overwrite.") == "Invalid JSON. The scene patch file is protected from overwrite."

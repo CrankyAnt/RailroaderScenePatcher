@@ -233,7 +233,7 @@ namespace RailroaderScenePatcher {
                 var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileLocked) Inspect(); });
                 refreshButton = refresh.RectTransform;
                 if (FileLocked) AllowDuringRepair(refresh.RectTransform);
-                refresh.Tooltip("Refresh", "Read the scene, scene patch file and supplied definitions again without applying changes.");
+                refresh.Tooltip("Refresh", "Read the scene, scene patch file, and supplied definitions again without applying changes.");
                 var lamps = new[] { CommandBand.Inventory(stale, !FileLocked), CommandBand.Save(unsaved, attachment != null && attachment.Session.SaveRefusal == null) };
                 var reasons = new[] { FileLocked ? FileLockReason : InventoryPresentationState.Notice(inventory, definitionsStale), saveText };
                 var reserved = new[] { CommandBand.InventoryWord, CommandBand.SaveWord };
@@ -313,10 +313,10 @@ namespace RailroaderScenePatcher {
                 var keepDraft = guided.Enabled && (guided.Step == GuidedTaskStep.Values || guided.Step == GuidedTaskStep.Review);
                 var clear = keepDraft && !pending ? "No world choice is pending." : CommandBand.Clear(selected != null, pending);
                 Button(row, "Clear", ClearInspection).Inactive(clear != null)
-                    .Tooltip("Clear", CommandBand.Tooltip(keepDraft ? "Cancel the world choice and keep the object and draft." : "End the inspection and cancel a pending world choice, gizmo or snap. Applied changes stay.", clear));
+                    .Tooltip("Clear", CommandBand.Tooltip(keepDraft ? "Cancel the world choice and keep the object and draft." : "End the inspection and cancel a pending world choice, gizmo, or snap. Applied changes stay.", clear));
                 var copy = CommandBand.CopyId(selected != null, attachment?.Session.CopyIdRefusal);
                 Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
-                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the object's ID, placement and the map ID needed by the scene patch file.", copy));
+                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the object's ID, placement, and the map ID needed by the scene patch file.", copy));
                 row.Spacer();
                 // The window's "?" belongs in the title bar; it stands here only when the title bar could not take it.
                 // Like the title bar's, it stays available while the file panel locks the other controls.
@@ -825,7 +825,7 @@ namespace RailroaderScenePatcher {
                 Line(builder, "<style=Footnote>" + (preparedSnap != null ? "Next: Apply moves the object to this position."
                     : offered != null ? "Next: Confirm takes the candidate; Apply then moves the object."
                     : choosingSnap ? "Next: click a track or endpoint in the world."
-                    : "Next: Track or Node, then click in the world, Confirm and Apply.") + "</style>", null, null);
+                    : "Next: Track or Node, then click in the world, Confirm, and Apply.") + "</style>", null, null);
             } else {
                 TrackFollowing following = null;
                 if (block == null && trackPoses != null) try { following = attachment.Session.FollowingOf(selected.Identity); } catch { }
@@ -838,7 +838,7 @@ namespace RailroaderScenePatcher {
                 if (following == null && picked == null) Field(builder, "Following", "Nothing");
                 Line(builder, "<style=Footnote>" + (picked != null ? "Next: Start keeps the object's placement relative to the picked track."
                     : following != null ? "Stop ends following. Track or Node picks another track to follow."
-                    : "Next: Track or Node, then click in the world, Confirm and Start.") + "</style>", null, null);
+                    : "Next: Track or Node, then click in the world, Confirm, and Start.") + "</style>", null, null);
             }
         }
         // The confirmed choice made for the inspected inventory entry, not for another entry of the same object.
@@ -935,7 +935,7 @@ namespace RailroaderScenePatcher {
                 else {
                     var idInput = builder.AddInputField(equipmentFields[0] ?? "", value => equipmentFields[0] = value);
                     idInput.GetComponent<TMP_InputField>().onValueChanged.AddListener(value => { equipmentFields[0] = value; preparedEquipment = null; FieldsChanged(); });
-                    idInput.Tooltip("Equipment ID", "A persistent ID for this " + EquipmentKind + " in this mod's scene patch file. Use letters, digits, '.', '_' or '-'.");
+                    idInput.Tooltip("Equipment ID", "A persistent ID for this " + EquipmentKind + " in this mod's scene patch file. Use letters, digits, '.', '_', or '-'.");
                 }
                 ValueRow(builder, "Position", "m", new[] { "X", "Y", "Z" }, equipmentFields, 1, block, bell ? "The bell's position in map coordinates. Its sound comes from this position." : "The copy's position in map coordinates.", column => true);
                 ValueRow(builder, "Rotation", "°", new[] { "X", "Y", "Z" }, equipmentFields, 4, block, bell ? "The bell's rotation in degrees." : "The copy's rotation in degrees.", column => true);
@@ -950,11 +950,11 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var block = EditBlock();
             var wait = ChoiceBlock ?? block;
-            Section(builder, "Lights, gates and bells");
+            Section(builder, "Lights, gates, and bells");
             CrossingEquipment current = null;
             IReadOnlyList<EquipmentEntry> mine = Array.Empty<EquipmentEntry>();
             if (attachment != null) try { current = attachment.Session.Equipment(identity); mine = attachment.Session.EquipmentEntries(identity); }
-                catch (Exception e) { builder.AddLabel(Tint(Red, "Lights, gates and bells unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
+                catch (Exception e) { builder.AddLabel(Tint(Red, "Lights, gates, and bells unavailable: " + CommandBand.Sentence(e.GetBaseException().Message))); }
             IReadOnlyList<SourceCandidate> candidates = null;
             string sourcesUnavailable = null;
             if (attachment != null) try { candidates = attachment.Session.EquipmentSources(identity); }
@@ -1053,7 +1053,7 @@ namespace RailroaderScenePatcher {
                     if (refusal != null) return CommandBand.Sentence(refusal);
                 }
             } catch { }
-            return "Only Generic track markers, mileposts and crossing pads have editable track bindings.";
+            return "Only Generic track markers, mileposts, and crossing pads have editable track bindings.";
         }
         void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; for (var i = 0; i < coverageFields.Length; i++) coverageFields[i] = ""; }
         // The message that says a form is open. It leaves when the form closes or another one opens.
@@ -1403,7 +1403,7 @@ namespace RailroaderScenePatcher {
             var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.");
             return new[] {
                 // The whole modification goes: the control says so in full and takes two cells.
-                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
+                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
                     var removed = current.Remove(identity, inspection);
                     // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
                     if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
@@ -1738,23 +1738,23 @@ namespace RailroaderScenePatcher {
                 Terms = new[] {
                     new[] { "Save", "The Map Editor's Save button writes map data, Data/scene-patches.json and the patcher dependency in Info.json. Save never reloads." },
                     new[] { "Title bar", "Reset layout restores the window position and outliner width. Session details shows information about this editing session." },
-                    new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo or snap. Clicking the inspected row does the same. Applied changes stay. During guided Values or Review, either action cancels a pending world choice and keeps the target and draft. Without a pending choice, neither action is allowed. Return to Inspector to cancel the task. With the pointer over this window, Escape closes an open choice list first. Further presses cancel a drag or a pending world choice, gizmo or snap, one action per press. Escape keeps the inspection and guided task." },
+                    new[] { "Clear", "Ends the inspection and cancels a pending world choice, gizmo, or snap. Clicking the inspected row does the same. Applied changes stay. During guided Values or Review, either action cancels a pending world choice and keeps the target and draft. Without a pending choice, neither action is allowed. Return to Inspector to cancel the task. With the pointer over this window, Escape closes an open choice list first. Further presses cancel a drag or a pending world choice, gizmo, or snap, one action per press. Escape keeps the inspection and guided task." },
                     new[] { "Undo and Redo", "Every completed edit here is one Undo step. Use Undo and Redo in the Map Editor." },
-                    new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after a native edit, Undo or Redo; a stale object list refuses edits." },
+                    new[] { "Refresh", "Reads the scene again and applies nothing. Refresh after a native edit, Undo, or Redo; a stale object list refuses edits." },
                     new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
                     new[] { "Current, Stale, Paused, Saved, Unsaved, Blocked", "The lamps above the outliner show whether its contents are current and whether changes need saving. When a lamp shows Paused, follow the instructions in Version choice, Repair, or Import before inspecting objects. Blocked means Save is unavailable. Hover over a lamp for details." },
                     new[] { "* and +", "* marks an object this mod changes. + marks an object this mod adds. The Unsaved lamp tells you when to save." },
-                    new[] { "Footer", "Remove modification, Recheck and Guide appear below the messages on every tab. Actions specific to a tab appear at the bottom of that tab." },
+                    new[] { "Footer", "Remove modification, Recheck, and Guide appear below the messages on every tab. Actions specific to a tab appear at the bottom of that tab." },
                     new[] { "Failed edit", "A refused edit changes nothing. If an edit fails after it starts, the patcher restores the object to how it was. If it cannot verify that restoration, the message lists what remains and further edits are blocked until Recheck succeeds or you reload the Map Editor. Guide opens the guide for the failed action." } },
                 Guides = new[] { new[] { "Modder manual", "modder-manual.md" }, new[] { "Guided tasks", "completing-guided-tasks.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
-                    new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies and problems." },
+                    new[] { "Search", "Matches names, paths, families, binding identifiers, dependencies, and problems." },
                     new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },
                     new[] { "Disabled", "Objects that are switched off themselves, whatever their parents are. They are never listed under Problems; find them here." },
                     new[] { "Problems", "Objects with a detected problem, marked !: a binding the game needs and cannot use, or a stored reference to a segment that no longer exists: a defect you can repair here. Why an object cannot be edited, and what the inspection could not read, are not problems. An object that is switched off itself is never one. No detected problem does not prove correct placement or the intended track." },
-                    new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
-                    new[] { "Spawn point", "Scene spawn points are where players start, teleport to or return after rescue. Edit native spawns in the Map Editor's Spawns category." },
+                    new[] { "Baked scenery group", "This family lists its groups under categories: Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, and Other. Bridge has the subgroups Rail bridges and Road bridges. Each group lists its parts beneath it. A group marked inspection only has no edit yet." },
+                    new[] { "Spawn point", "Scene spawn points are where players start, teleport to, or return after rescue. Edit native spawns in the Map Editor's Spawns category." },
                     new[] { StarterPlacements.Family, "An active new-game setup reads these markers' track locations to place its starting cars. The marker's own position has no effect. Click Focus to move the camera to where the cars stand." },
                     new[] { StationMapIconRules.Family, "The icons that show stations on the map. After moving a station in the Map Editor, move its icon to the station's new location." },
                     new[] { "Inspection only", "The last group, shown only while it holds objects: objects of a kind the patcher has no edit for yet and the Map Editor does not edit. They have no problem marker and no edit; the Object tab gives the reason." },
@@ -1762,15 +1762,15 @@ namespace RailroaderScenePatcher {
                     new[] { "Focus", "Moves the camera to the inspected object or the starting point of a car placement." },
                     new[] { "Fit names", "Sizes the column to most names. Drag the divider for another width." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
-            [ObjectTab] = new HelpText { Title = "Object", Intro = "Check the object's state, problems and dependencies before choosing an edit.",
+            [ObjectTab] = new HelpText { Title = "Object", Intro = "Check the object's state, problems, and dependencies before choosing an edit.",
                 Terms = new[] {
                     new[] { "Supported edits", "What this patcher can change on this object, or why it cannot be edited. That reason is not a problem." },
                     new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },
                     new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear activity returns it to its underlying activity." },
                     new[] { "Track group", "Some markers switch with their track group. Disable holds the marker inactive. Click Clear activity to let the group control it again." },
-                    new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks and visibility. The patcher checks direct links." },
+                    new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links." },
                     new[] { "Runtime state", "Enabled flags the game switches while it runs. They are shown and do not make the object list stale." },
-                    new[] { "Copy ID", "Copies the object's ID, placement and the map ID needed by the scene patch file." } },
+                    new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
                 Terms = new[] {
@@ -1779,23 +1779,23 @@ namespace RailroaderScenePatcher {
                     new[] { "Snap", "Moves the object once onto a chosen track or endpoint: Track or Node, a click in the world, Confirm, then Apply. Discard drops a prepared snap. Rotation and binding stay; Save records fixed coordinates." },
                     new[] { "Follow", "Keeps the current placement relative to a chosen track or endpoint, and moves the object when that track moves: Track or Node, a click in the world, Confirm, then Start. Stop ends it." },
                     new[] { "Bridges and boards", "A bridge moves with its colliders. Track-owned scenery stays in place. The terrain output of a board or a ground mask regenerates after the move." },
-                    new[] { "Baked scenery groups", "Moving a group also moves its parts, culling and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
-                    new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
+                    new[] { "Baked scenery groups", "Moving a group also moves its parts, culling, and colliders. Each part keeps its own Enabled setting. A part with a fixed placement stays at its map coordinates when the group moves." },
+                    new[] { "Spawn points", "The game reads a spawn point's current location each time a player starts, is rescued, or teleports. A disabled spawn point isn't offered, except by a start setup that names it." } },
                 Guides = new[] { new[] { "Fixed placement", RecoveryGuidance.NumericPlacementGuide }, new[] { "Transform gizmos", "using-transform-gizmos.md" }, new[] { "Snapping", "snapping-to-track.md" },
                     new[] { "Following a track", "following-track.md" }, new[] { "Bridges", "placing-bridges.md" }, new[] { "Boards", "moving-boards.md" }, new[] { "Baked scenery groups", "moving-baked-scenery-groups.md" }, new[] { "Spawn points", "moving-spawn-points.md" },
                     new[] { "Station map icons", "moving-station-map-icons.md" }, new[] { "Existing crossing equipment", "moving-crossing-equipment.md" } } },
             [ConnectionsTab] = new HelpText { Title = "Connections", Intro = "Choose which track the object uses, then set the connection.",
                 Terms = new[] {
                     new[] { "Track binding", "The track location a marker is registered at. Changing it does not move the object." },
-                    new[] { "Replacement targets", "Choose a target in the world, check its ID and confirm it. Confirming changes nothing." },
+                    new[] { "Replacement targets", "Choose a target in the world, check its ID, and confirm it. Confirming changes nothing." },
                     new[] { "Set, Detach, Clear binding", "Set registers the marker at the entered location. Detach removes it from the track. Clear binding returns it to its underlying binding." },
-                    new[] { "Crossing coverage", "Each circuit has an approach A, an island and an approach B. Select the tracks a circuit covers, or detach it; proximity never assigns coverage. Preview shows the result for every circuit before Apply." },
+                    new[] { "Crossing coverage", "Each circuit has an approach A, an island, and an approach B. Select the tracks a circuit covers, or detach it; proximity never assigns coverage. Preview shows the result for every circuit before Apply." },
                     new[] { "Detection addition", "Makes the crossing detect an extra track: a circuit of its own with three spans on tracks you select, under an ID you give it. Delete removes it again." },
                     new[] { "Lights and gates", "Adds a copy of a light or gate already loaded in the crossing's scene. The crossing controller drives it and culls it with its own equipment. A rejected device names why it does not qualify." },
                     new[] { "Bells", "Adds a bell with sound from a bell definition in the content library. It rings when the crossing controller rings its own bell. Rejected definitions show why they cannot be used." },
                     new[] { "Crossing pad", "A pad has the binding of its marker. Setting it regenerates the pad geometry and its culling along the track at that location; the pad object does not move. A pad cannot be detached: disable it to hide it." },
                     new[] { "Milepost", "Set a milepost's track binding to register its marker at that track location. The post stays in place and keeps its model and mile value." },
-                    new[] { "Marker ID", "The game registers a marker's track location under this ID. When scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding and Follow. Click Set ID to give one marker a replacement ID. The others keep their registrations. Click Clear ID to restore the underlying ID." },
+                    new[] { "Marker ID", "The game registers a marker's track location under this ID. When scene markers share an ID, changing one removes all their registrations. The patcher therefore refuses changes to Enabled, the binding, and Follow. Click Set ID to give one marker a replacement ID. The others keep their registrations. Click Clear ID to restore the underlying ID." },
                     new[] { "Construction segments", "The construction state of these track segments determines which parts of a rail bridge the game shows. After you split or replace the bridge's track in the native map editor, select the new segments and click Set. They can't be detached. Click Clear segments to restore the native segments." } },
                 Guides = new[] { new[] { "Track bindings", "repairing-track-bindings.md" }, new[] { "Marker IDs", "repairing-duplicate-marker-ids.md" }, new[] { "Mileposts", "repositioning-mileposts.md" }, new[] { "Crossing pads", "rebinding-crossing-pads.md" }, new[] { "Crossing coverage", "correcting-crossing-coverage.md" }, new[] { "Adding detection", "adding-crossing-detection.md" }, new[] { "Lights and gates", "adding-crossing-equipment.md" }, new[] { "Bells", "adding-crossing-bells.md" }, new[] { "Construction segments", "repairing-construction-segments.md" }, new[] { "Starter placement", "placing-starter-markers.md" }, new[] { "Selecting in the world", "select-world-targets.md" } } },
             [ChangesTab] = new HelpText { Title = "Changes", Intro = "Check what this mod changes on the object and complete outstanding work.",

@@ -65,7 +65,7 @@ namespace RailroaderScenePatcher.Core {
         // Null when the ID can name an addition: 1 to 64 letters, digits, '.', '_' or '-'.
         public static string IdProblem(string id) {
             if (String.IsNullOrEmpty(id) || id.Length > 64 || !id.All(c => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-'))
-                return "An equipment ID must contain 1 to 64 characters: letters, digits, '.', '_' or '-'";
+                return "An equipment ID must contain 1 to 64 characters: letters, digits, '.', '_', or '-'";
             return null;
         }
         internal static bool SameBuild(EquipmentAddition a, EquipmentAddition b) => a.Key == b.Key && a.Pattern == b.Pattern && EquipmentSource.Same(a.Source, b.Source);

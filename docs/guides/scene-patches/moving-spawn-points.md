@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move player spawn points
 
-Move, rotate, disable or restore a scene spawn point to choose where players start, teleport and arrive after rescue on your map. For the general native map editor workflow, including Save, Undo and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#spawn-point).
+Move, rotate, disable, or restore a scene spawn point to choose where players start, teleport, and arrive after rescue on your map. For the general native map editor workflow, including Save, Undo, and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#spawn-point).
 
 ## Scene spawn points and native spawns
 
@@ -25,15 +25,15 @@ A new game reads its start spawn point while the map loads, before the patcher a
 
 ## Move a spawn point
 
-1. Open **Scene patches**, click **Refresh** in the command band, open the **Spawn point** family and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
+1. Open **Scene patches**, click **Refresh** in the command band, open the **Spawn point** family, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
 2. Click **Focus** in the command band. A spawn point has no model, so it shows a [helper marker](select-world-targets.md#helper-markers-for-invisible-objects): a `+` on its pivot.
 3. On the **Placement** tab, enter the position in map coordinates and the rotation in degrees in **Numeric** mode and click **Apply**, or drag the [transform gizmo](using-transform-gizmos.md).
 
-The spawn point moves at once, and its helper marker moves with it. Save, Undo, Redo and **Remove modification** in the footer work as for other objects. Removal returns the spawn point to the placement the loaded map gives it.
+The spawn point moves at once, and its helper marker moves with it. Save, Undo, Redo, and **Remove modification** in the footer work as for other objects. Removal returns the spawn point to the placement the loaded map gives it.
 
 ## Disable or enable a spawn point
 
-Click **Disable** at the bottom of the **Object** tab to take the spawn point out of rescue, teleport and the default start. Click **Enable**, Undo, or **Remove modification** to bring it back.
+Click **Disable** at the bottom of the **Object** tab to take the spawn point out of rescue, teleport, and the default start. Click **Enable**, Undo, or **Remove modification** to bring it back.
 
 ## Write the modification by hand
 

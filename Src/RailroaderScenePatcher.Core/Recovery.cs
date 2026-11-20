@@ -194,7 +194,7 @@ namespace RailroaderScenePatcher.Core {
                 case FailureKind.Blocked: return "Click Recheck or reload the Map Editor.";
                 case FailureKind.DependencyFailed: return "First correct the modification that this one depends on.";
             }
-            if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. Refresh the object list, inspect the object again and repeat the action.";
+            if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. Refresh the object list, inspect the object again, and repeat the action.";
             if (Mentions(problem, "resolve uniquely")) return "Nothing changed. The object is missing from the loaded scene, or more than one object matches. Refresh the object list and inspect it again.";
             if (Mentions(problem, "protected from overwrite")) return "Nothing changed. This scene patch file cannot be overwritten.";
             if (Mentions(problem, "Reload before", "Reload the Map Editor before")) return "";

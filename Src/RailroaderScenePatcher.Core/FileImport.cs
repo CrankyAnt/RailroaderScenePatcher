@@ -231,7 +231,7 @@ namespace RailroaderScenePatcher.Core {
                 case "markerId": return "the replacement ID";
                 case "trackMarker": return "the track binding";
                 case "crossingCoverage": return "the crossing coverage";
-                case "crossingEquipment": return "the added lights, gates and bells";
+                case "crossingEquipment": return "the added lights, gates, and bells";
                 case "constructionSegments": return "the construction segments";
                 default: return "content this patcher version does not apply (" + member + ")";
             }
@@ -239,7 +239,7 @@ namespace RailroaderScenePatcher.Core {
         static string List(IReadOnlyList<string> items) {
             if (items.Count == 0) return "nothing";
             if (items.Count == 1) return items[0];
-            return String.Join(", ", items.Take(items.Count - 1)) + " and " + items[items.Count - 1];
+            return String.Join(", ", items.Take(items.Count - 1)) + (items.Count == 2 ? " and " : ", and ") + items[items.Count - 1];
         }
         ImportConflict Conflict(int number, ImportConflictCase kind, List<string> keys, JObject file, JObject read, JObject start, JObject editor) {
             var name = keys.Select(k => TargetName(Entry(file, k), Entry(editor, k), Entry(read, k), Entry(start, k))).FirstOrDefault(n => n != null);

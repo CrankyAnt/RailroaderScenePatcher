@@ -232,7 +232,7 @@ static class SpawnPointTests {
         var setup = uses.Single(line => line.Contains("alarka-jct-start"));
         Assert(setup.Contains("expected") && setup.Contains("no cars") && setup.Contains("balance"),
             "The start setup use names its condition and stays expected behaviour: " + setup);
-        Assert(SpawnPoints.Operations.StartsWith("Move, rotate, enable or disable", StringComparison.Ordinal), "The supported edits name placement and Enabled: " + SpawnPoints.Operations);
+        Assert(SpawnPoints.Operations.StartsWith("Move, rotate, enable, or disable", StringComparison.Ordinal), "The supported edits name placement and Enabled: " + SpawnPoints.Operations);
     }
     static SceneObservation Row(string name, bool enabled) =>
         new SceneObservation(name, new TargetIdentity("level4", "World/POIs/" + name, SpawnPoints.Component, SpawnPoints.Structure), SpawnPoints.Family, enabled,

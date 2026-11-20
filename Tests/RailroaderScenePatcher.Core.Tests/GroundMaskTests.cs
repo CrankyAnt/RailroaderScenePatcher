@@ -326,7 +326,7 @@ static class GroundMaskTests {
         Assert(CommandBand.BlockedValueTip(reason) == "Unavailable: " + reason.TrimEnd('.') + ".", "A blocked value row's tooltip starts with Unavailable: " + CommandBand.BlockedValueTip(reason));
         Assert(CommandBand.OperationsWithoutMove(CommandBand.GroupOperations) == "Enable or disable the whole group.", "A blocked group: " + CommandBand.OperationsWithoutMove(CommandBand.GroupOperations));
         Assert(CommandBand.OperationsWithoutMove(CommandBand.PartOperations) == "Enable or disable this part. The group and its other parts stay unchanged.", "A blocked part: " + CommandBand.OperationsWithoutMove(CommandBand.PartOperations));
-        Assert(CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations) == "Set, replace or detach the marker's track binding. Edit activity separately.", "A blocked marker: " + CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations));
+        Assert(CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations) == "Set, replace, or detach the marker's track binding. Edit activity separately.", "A blocked marker: " + CommandBand.OperationsWithoutMove(CommandBand.MarkerOperations));
         Assert(CommandBand.OperationsWithoutMove("Something else.") == "Something else." && CommandBand.OperationsWithoutMove(null) == null, "Other texts stay");
     }
 
