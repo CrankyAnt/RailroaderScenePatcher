@@ -38,7 +38,7 @@ After **Set ID**, the caption above the other holders changes from **Also holdin
 
 The other holders' duplicate problem goes away when you click **Refresh**. Until then the object list is stale, and the **Detected problems** section starts with `The object list is stale, so these problems might be out of date. Click Refresh to check them again.`
 
-The replacement ID doesn't change the marker's track binding. If that binding names a segment that doesn't exist, the marker shows that problem once it's enabled, as a different problem from the duplicate, for example `Marker broken binding: missing segment z5w8si. Duplicate marker ID Mg6m is repaired. This is a different problem: the track binding names a segment that doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab.` See [repairing track bindings](repairing-track-bindings.md).
+The replacement ID doesn't change the marker's track binding. If that binding names a segment that doesn't exist, the marker shows that problem once it's enabled, as a different problem from the duplicate, for example `Marker broken binding: missing segment z5w8si. Duplicate marker ID Mg6m is repaired. This is a different problem: the marker's track binding doesn't name an existing track. Click Repair with guided task, or set an existing track on the Connections tab.` See [repairing track bindings](repairing-track-bindings.md).
 
 ## Give a replacement ID with a guided task
 
