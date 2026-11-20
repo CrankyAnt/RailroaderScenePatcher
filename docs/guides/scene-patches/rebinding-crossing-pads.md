@@ -25,8 +25,8 @@ The inventory shows such an object in the `Crossing pad marker` family with the 
 
 1. Open **Scene patches** and select the pad's row in the outliner, in the folder **Crossing pad marker**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
 2. On the **Connections** tab, check the stored segment, end and distance under **Current binding** in **Crossing pad binding**. Each **Track location listed by the game** entry shows a location the game lists for this marker ID and tells you if it belongs to another object.
-3. Enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**, on the row **Track location (m)**. To take the segment from the world, select **Segment** in the **Replacement targets** section, click the track and choose **Confirm** in the footer: the **Segment** field takes the confirmed segment.
-4. Select **Set** at the bottom of the tab.
+3. Enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**, on the row **Track location (m)**. To take the segment from the world, click **Segment** in the **Replacement targets** section, click the track and click **Confirm** in the footer: the **Segment** field takes the confirmed segment.
+4. Click **Set** at the bottom of the tab.
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration and geometry.
 

@@ -2,12 +2,12 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Snap an object's position to a track
 
-Use this route in the native map editor for an object with a supported fixed-placement adapter. Open **Scene patches**, select **Refresh** in the command band, inspect the object and select **Snap** on the **Placement** tab. Check its current physical placement and logical relationships before starting.
+Use this route in the native map editor for an object with a supported fixed-placement adapter. Open **Scene patches**, click **Refresh** in the command band, inspect the object and click **Snap** on the **Placement** tab. Check its current physical placement and logical relationships before starting.
 
-1. Select **Track** at the bottom of the tab to choose a track segment, or **Node** to choose a track node. Click the track ribbon or node marking in the world. Navigate with the camera as needed.
+1. Click **Track** at the bottom of the tab to pick a track segment, or **Node** to pick a track node. Click the track ribbon or node marking in the world. Navigate with the camera as needed.
 2. Check the candidate's ID. A segment also shows both endpoint IDs; a node shows its map position. If candidates overlap, choose one explicitly in the session details (the page icon in the title bar). Until you confirm, **Target** on the **Placement** tab shows it as a candidate, and a **Next** line names the step that follows. Use **Focus** in the footer to inspect it.
-3. Choose **Confirm** in the footer. The **Placement** tab shows the snap target under **Target** and the resulting map position under **Position**. Confirmation prepares the operation without moving the object or adding history.
-4. Select **Apply** at the bottom of the tab. A segment snap uses the closest point on that selected segment's cubic curve to the inspected object's position, including the segment ends. An endpoint snap uses exactly that node's position. Both keep the object's rotation, activity and logical binding. There is no lateral or height offset.
+3. Click **Confirm** in the footer. The **Placement** tab shows the snap target under **Target** and the resulting map position under **Position**. Confirmation prepares the operation without moving the object or adding history.
+4. Click **Apply** at the bottom of the tab. A segment snap uses the closest point on that selected segment's cubic curve to the inspected object's position, including the segment ends. An endpoint snap uses exactly that node's position. Both keep the object's rotation, activity and logical binding. There is no lateral or height offset.
 5. Use the native **Undo** and **Redo** controls to reverse or reapply the completed edit. Use the native **Save** button to persist it, then reload the world when you need to verify fresh-world reconstruction. Reload ends the native map editor's Undo/Redo history.
 
 Click **Cancel** in the footer before confirmation or **Discard** at the bottom of the tab afterwards. Switching to another placement mode drops the snap target and any prepared snap. Closing the patcher panel, refreshing or changing the inspected object also clears a prepared snap.

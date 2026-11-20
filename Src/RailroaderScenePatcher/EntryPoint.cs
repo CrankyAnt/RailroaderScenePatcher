@@ -980,7 +980,7 @@ namespace RailroaderScenePatcher {
                 terrainState = state;
                 if (state == "outstanding") feedback.Follow(TerrainPlace, "Terrain pending: the game is regenerating it. Retry is on the Changes tab.");
                 else if (state == "complete") { feedback.Follow(TerrainPlace, "Terrain updated."); selection?.ClearSurface(); }
-                else if (state == "stopped") feedback.Follow(TerrainPlace, "Terrain update stopped: " + output.Error + ". Select Retry on the Changes tab.");
+                else if (state == "stopped") feedback.Follow(TerrainPlace, "Terrain update stopped: " + output.Error + ". Click Retry on the Changes tab.");
             }
             return problem ?? String.Join("|", String.Join(";", output.Completed), String.Join(";", output.Outstanding), output.Error);
         }

@@ -25,13 +25,13 @@ The inventory lists an object that meets these conditions in the `Milepost` fami
 
 1. Open **Scene patches** and select the milepost in the outliner's **Milepost** folder. You can also use **Select in world**, as described in [select world targets](select-world-targets.md).
 2. On the **Placement** tab, move or rotate the post with **Numeric**, **Gizmo** or **Snap**. See [edit placement in the map editor](editing-placement-in-the-map-editor.md) and [use the transform gizmos](using-transform-gizmos.md). The binding stays unchanged. **Follow** is inactive because a milepost uses fixed placement.
-3. To hide the post, select **Disable** at the bottom of the **Object** tab. If the post's activity follows its track group, it stays off when the group is enabled later. **Enable** is unavailable for these posts. Its tooltip explains why. **Clear activity** returns it to its group, as described in [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
+3. To hide the post, click **Disable** at the bottom of the **Object** tab. If the post's activity follows its track group, it stays off when the group is enabled later. **Enable** is unavailable for these posts. Its tooltip explains why. **Clear activity** returns it to its group, as described in [follow a track or endpoint](following-track.md#disable-an-object-whose-activity-follows-a-track-group).
 
 ## Set, replace or detach the binding in the native map editor
 
 1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end and distance, and each track location the game lists under the marker ID, each in a **Track location listed by the game** row; a location that belongs to another object says so.
-2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**. To select the segment in the world, choose **Segment** under **Replacement targets**, click the track and choose **Confirm** in the footer. The **Segment** field takes the confirmed segment.
-3. Select **Set**. **Detach** removes the post from the track, and **Clear binding** returns it to its underlying binding.
+2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End** and the distance in metres in **Distance**. To pick the segment in the world, click **Segment** under **Replacement targets**, click the track and click **Confirm** in the footer. The **Segment** field takes the confirmed segment.
+3. Click **Set**. **Detach** removes the post from the track, and **Clear binding** returns it to its underlying binding.
 
 The patcher refuses a missing or ambiguous segment or a distance beyond the segment's length before changing anything. Native Undo and Redo reverse and repeat each edit. **Remove modification** returns the post to its underlying placement, activity and binding.
 

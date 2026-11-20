@@ -132,7 +132,7 @@ A failed write never damages the file it was replacing. The patcher writes the c
 
 If another program, such as a virus scanner or sync client, briefly holds the file open, Save retries for up to half a second before reporting failure.
 
-Correct the cause, such as a locked or read-only file, then click **Save** again. The retry writes only what remains outstanding. If `Data/scene-patches.json` changed outside the session after the patcher read it, the retry refuses to overwrite it. Choose **Use file version**, **Keep editor version** or **Import** before retrying. A file that needs repair requires a backup first.
+Correct the cause, such as a locked or read-only file, then click **Save** again. The retry writes only what remains outstanding. If `Data/scene-patches.json` changed outside the session after the patcher read it, the retry refuses to overwrite it. Click **Use file version**, **Keep editor version** or **Import** before retrying. A file that needs repair requires a backup first.
 
 Save refuses to write the dependency if an existing constraint in `Info.json`, such as `^0.1.0`, excludes the version the scene patch file needs. Correct the constraint and save again.
 
@@ -171,7 +171,7 @@ Click **Reload Map Editor...** in **Scene patches**. The confirmation warns that
 
 If Save fails, the native map editor stays open and reports the completed and outstanding writes.
 
-While a file version choice is pending or the file needs repair, reload and exit offer only discard or cancel. Save becomes available after you choose **Use file version** or **Keep editor version**. In repair state, the backup must also succeed. After an unrecovered native history error, the native map editor may be unable to prove that native map data is clean. The confirmation identifies the outstanding work so you can cancel or discard it.
+While a file version choice is pending or the file needs repair, reload and exit offer only discard or cancel. Save becomes available after you click **Use file version** or **Keep editor version**. In repair state, the backup must also succeed. After an unrecovered native history error, the native map editor may be unable to prove that native map data is clean. The confirmation identifies the outstanding work so you can cancel or discard it.
 
 Reload reopens the requested map definition. For the same map, the patcher records the camera's ground location in map coordinates and requests a return when the native map editor and camera are ready. This request survives mod replacement in the same process. It expires after five minutes and is discarded if another map opens. Before reporting arrival, the patcher checks the settled horizontal ground position. Reload does not preserve selection, camera angle or native history.
 

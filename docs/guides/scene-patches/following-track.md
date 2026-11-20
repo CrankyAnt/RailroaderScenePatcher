@@ -8,10 +8,10 @@ Track following stores where the object stands relative to the track. When the t
 
 ## Make an object follow a track
 
-1. Open **Scene patches**, select **Refresh** in the command band and select the object's row in the outliner, or select it in the world as described in [select world targets](select-world-targets.md).
+1. Open **Scene patches**, click **Refresh** in the command band and select the object's row in the outliner, or select it in the world as described in [select world targets](select-world-targets.md).
 2. Place the object where it belongs relative to the track first, with numeric placement, a snap or a [transform gizmo](using-transform-gizmos.md).
 3. On the **Placement** tab, select **Follow**, then click **Track** at the bottom of the tab and click a track segment, or **Node** and click a track node. Check the candidate's identity in the footer's first message slot, under **World choice**, with **Details** in the footer for its identity, and click **Confirm**. The track an inspected object follows is marked green in the world, labeled `Follows: …`; it keeps that marking while you pick another track, beside the blue candidate.
-4. Select **Start** at the bottom of the tab. The object stays where it is. For a segment, the patcher takes the location on that segment nearest to the object, measured from end `a`. For an endpoint, it uses the node.
+4. Click **Start** at the bottom of the tab. The object stays where it is. For a segment, the patcher takes the location on that segment nearest to the object, measured from end `a`. For an endpoint, it uses the node.
 
 The **Placement** tab then shows the followed track under **Following** and the offset in the track's frame under **Offset**. The edit is one native Undo step. Save writes it to `Data/scene-patches.json` as [`placement.mode = "trackFollowing"`](scene-patch-file-v1.md#placement) and raises the patcher dependency to 0.5.0.
 

@@ -41,7 +41,7 @@ After **Set ID**, the caption above the other holders changes from **Also holdin
 Use this route to have every step of the change checked in a single guided task.
 
 1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section for a generic track marker whose explanation names a duplicate marker ID, active or inactive.
-1. In **Target**, choose **Set replacement ID**.
+1. In **Target**, select **Set replacement ID** in the task list.
 1. In **Values**, enter the ID in the **Replacement ID** field. The same checks as **Set ID** apply.
 1. Click **Next**. **Review** shows the proposed **Marker ID**. It lists the settings that stay unchanged: placement, activity and track binding. Every other holder keeps its registration.
 1. Click **Apply** in the footer. Then click **Back to inspector**, or **Another guided task** to repair the next holder.
