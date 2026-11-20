@@ -64,6 +64,7 @@ static class ReplacementMarkerIdTests {
         ParseRefusesEmptyAndReservedIdsBeforeMutation();
         UniquenessNamesTheMarkerOrMapObjectThatUsesTheId();
         YardLimitRepairAppliesBeforeEnableAndRebind();
+        ARepairedHolderShowsItsMissingSegmentAsAnotherProblem();
         WhistleRepairLetsOneHolderBeDisabled();
         LoadOrderCollisionFailsTheLaterModification();
         TheSameIdInTwoModificationsFailsBoth();
@@ -128,6 +129,38 @@ static class ReplacementMarkerIdTests {
         var refused = new World();
         var enable = refused.Engine.Apply(Doc(Item("yard", YardPath, "\"active\":true"))).Outcomes["yard"];
         Assert(!enable.Applied && enable.Error.Contains("Mg6m"), "Enable alone stays refused: " + enable.Error);
+    }
+    // An active holder A and an inactive holder B of Mg6m, B bound to a segment that does not exist. A shows the duplicate
+    // problem and B none. After a replacement ID on B and a refresh A shows none; enabling B shows the missing segment as
+    // a problem of its own that says the duplicate is repaired; binding B to an existing segment clears it. The problems
+    // are composed as the inventory composes them for a generic track marker.
+    static void ARepairedHolderShowsItsMissingSegmentAsAnotherProblem() {
+        var w = new World();
+        w.Yard.Segment = "z5w8si";
+        var yard = Marker(YardPath);
+        string[] Problems(FakeMarker m, string path) {
+            var all = new List<string>();
+            var holders = w.Markers.IdHolders(m).With(w.Markers.Registrations(m));
+            if (holders.Problem(m, true) is string duplicate) all.Add(duplicate);
+            if (BindingRules.Problem(BindingNeed.Optional, m.Active, "Marker", m.Segment, w.Markers.Segments.ContainsKey(m.Segment)) is string binding) all.Add(binding);
+            var repaired = w.Session.RepairedMarkerId(Marker(path));
+            return BindingRules.Problems(m.Active, all, null).Select(problem => CommandBand.ProblemText(problem, repaired)).ToArray();
+        }
+        Assert(Problems(w.Speed, SpeedPath).SequenceEqual(new[] { "Duplicate marker ID Mg6m is shared with 1 other scene marker. Give one of them a replacement ID to repair it." }), "A shows the duplicate problem: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
+        Assert(Problems(w.Yard, YardPath).Length == 0, "The inactive B shows none: " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        Assert(w.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied, "B takes a replacement ID");
+        Assert(Problems(w.Speed, SpeedPath).Length == 0, "After a refresh A shows none: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
+        Assert(w.Session.RepairedMarkerId(Marker(SpeedPath)) == null && w.Session.RepairedMarkerId(Marker(UnrelatedPath)) == null, "Only the holder that took a replacement ID has a repaired duplicate");
+        Assert(w.Session.RepairedMarkerId(yard) == "Mg6m", "B repaired duplicate marker ID Mg6m");
+        var enable = w.Session.Edit(yard, null, true);
+        Assert(enable.Applied && w.Yard.Active, "B is enabled: " + enable.Error);
+        Assert(Problems(w.Yard, YardPath).SequenceEqual(new[] { "Marker broken binding: missing segment z5w8si. Duplicate marker ID Mg6m is repaired. This is a different problem: the track binding names a segment that doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab." }),
+            "Enabled B shows the missing segment as another problem: " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        var rebind = w.Session.Bind(yard, MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3)));
+        Assert(rebind.Applied && Problems(w.Yard, YardPath).Length == 0, "Binding B to an existing segment clears it: " + rebind.Error + " " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        // Without a repaired duplicate, a problem reads as before.
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", null) == "Marker broken binding: missing segment z5w8si", "A problem without a repaired duplicate is unchanged");
+        Assert(CommandBand.ProblemText("Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Mg6m") == "Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Only a binding problem names the repaired duplicate");
     }
     static void WhistleRepairLetsOneHolderBeDisabled() {
         var w = new World();

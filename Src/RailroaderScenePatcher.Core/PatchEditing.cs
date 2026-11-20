@@ -700,6 +700,13 @@ namespace RailroaderScenePatcher.Core {
         public string UnderlyingMarkerId(TargetIdentity target) {
             try { return engine.Underlying(engine.ResolveUnique(target))?.MarkerId; } catch (Exception) { return null; }
         }
+        // The duplicate marker ID that this object's replacement ID repaired, or null: its underlying ID, when the scene
+        // marker now holds another ID and another scene marker or registration still uses the underlying one.
+        public string RepairedMarkerId(TargetIdentity target) {
+            var underlying = UnderlyingMarkerId(target);
+            var current = MarkerIdOf(target);
+            return underlying != null && current != null && underlying != current && MarkerIdUsers(target, underlying).Count != 0 ? underlying : null;
+        }
         // The scene markers and registrations other than the object that use the id, by name; empty for an object that
         // takes no replacement ID.
         public IReadOnlyList<string> MarkerIdUsers(TargetIdentity target, string id) {

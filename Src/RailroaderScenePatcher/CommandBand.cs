@@ -578,6 +578,16 @@ namespace RailroaderScenePatcher {
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
             ? "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
+        // The Detected problems section of a stale object list: its problems are those of the last refresh.
+        internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
+        // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID, a
+        // track binding problem that remains says that the duplicate is repaired and that this problem is another one,
+        // with the two routes that repair it. repairedId is the duplicate marker ID the replacement ID repaired, or null.
+        internal static string ProblemText(string problem, string repairedId) =>
+            repairedId != null && problem != null && problem.StartsWith("Marker ", StringComparison.Ordinal) && (problem.IndexOf("missing segment", StringComparison.Ordinal) >= 0 || problem.IndexOf("empty segment binding", StringComparison.Ordinal) >= 0)
+                ? problem + ". Duplicate marker ID " + repairedId + " is repaired. This is a different problem: the track binding " + (problem.IndexOf("missing segment", StringComparison.Ordinal) >= 0 ? "names a segment that doesn't exist" : "is empty")
+                    + ". Click Repair with guided task, or set an existing track on the Connections tab."
+                : problem;
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
             !generic ? ReplacementMarkerIds.NotSupportedFor(family)
             : hasValue ? null
