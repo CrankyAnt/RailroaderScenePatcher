@@ -16,7 +16,7 @@ A scene patch file applies to its scene target map and any map that inherits it 
 
 1. Open **Scene patches** and click **Refresh**. Search the [outliner](inspect-scene-objects.md) by name, path, family or binding ID, or [select an object in the world](select-world-targets.md). Confirm a world choice before editing it.
 2. On the **Object** tab, check **Identity**, **Supported edits**, **Detected problems** and **Dependencies**. Click **Copy ID** for the scene target map and the object's stored identity. A path or display name alone can be ambiguous. Use the copied identifiers when writing JSON.
-3. Check the current placement and observed bindings on **Placement** and **Connections**. An inactive object or a valid connection to the wrong track may need attention even when the **Problems** filter lists nothing. After a native edit, Undo or Redo, click **Refresh** and inspect the object again.
+3. Check the current placement and observed bindings on **Placement** and **Connections**. An inactive object or a valid connection to the wrong track might need attention even when the **Problems** filter lists nothing. After a native edit, Undo or Redo, click **Refresh** and inspect the object again.
 
 ## Choose an operation
 

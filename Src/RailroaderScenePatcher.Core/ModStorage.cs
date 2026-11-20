@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher.Core {
                     if (files.Exists(path) && (removePartial || Digest(files.Read(path)).SequenceEqual(Digest(original)))) files.Delete(path);
                     mayRemain = files.Exists(path);
                 } catch { }
-                if (mayRemain) throw new IOException("The failed backup may remain at " + path + ". Delete it when you no longer need it. " + error.Message, error);
+                if (mayRemain) throw new IOException("The failed backup might remain at " + path + ". Delete it when you no longer need it. " + error.Message, error);
                 throw;
             }
             backups[path] = Digest(original);

@@ -31,7 +31,7 @@ Follow the **Report to** instruction in the warning. For an invalid definition, 
 
 ### Understand an overlap notice
 
-If multiple mods try to change the same existing scene object, an informational notice in the **Log** names the object and the mods. They may be incompatible, but the notice doesn't prove a conflict. The patcher continues in Railroader's load order without choosing a winner. Check each mod's description of its changes when deciding whether to use them together.
+If multiple mods try to change the same existing scene object, an informational notice in the **Log** names the object and the mods. They might be incompatible, but the notice doesn't prove a conflict. The patcher continues in Railroader's load order without choosing a winner. Check each mod's description of its changes when deciding whether to use them together.
 
 ### Tested maps
 

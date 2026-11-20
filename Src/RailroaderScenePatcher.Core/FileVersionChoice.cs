@@ -111,7 +111,7 @@ namespace RailroaderScenePatcher.Core {
                         Exception cleanupError = null;
                         if (path != null) { try { backup.RemoveVersionBackupIfUnchanged(path); } catch (Exception e) { cleanupError = e; } }
                         backupPreview = backup.ReserveVersionBackup();
-                        if (cleanupError != null) throw new InvalidOperationException(error.Message + " The backup may remain at " + path + "; delete it when no longer needed.", error);
+                        if (cleanupError != null) throw new InvalidOperationException(error.Message + " The backup might remain at " + path + "; delete it when no longer needed.", error);
                         throw;
                     }
                     replacementBackup = path; versionBackup = true; backedVersionFingerprint = shown; LastBackup = path; lastVersionBackup = true;

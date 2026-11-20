@@ -47,7 +47,7 @@ Use the scene name and coordinates from the inspected identity. Add `"active": f
 
 Before it touches the bridge, the patcher requires:
 
-- active parents and an enabled renderer culler on the bridge root; the root itself may be disabled by your modification,
+- active parents and an enabled renderer culler on the bridge root; the root itself might be disabled by your modification,
 - at least one collider in the bridge hierarchy and no rigidbody,
 - no track-owned component in the bridge hierarchy, such as `Track.*` or a generated `AutoTrestle`,
 - no construction-scenery entry that switches the bridge root,

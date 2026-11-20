@@ -1534,7 +1534,7 @@ namespace RailroaderScenePatcher.Core {
             if (alignNativeCleanPending && error == null && nativeIdentity != null) savedNativeIdentity = nativeIdentity.Current;
             alignNativeCleanPending = false;
             if (error == null) return;
-            unrecovered = "Undo or Redo stopped on an error: " + error.Message + ". Undo history could not be recovered and may stop recording edits. Save still writes the current changes. Reload the Map Editor to clear its unsaved status.";
+            unrecovered = "Undo or Redo stopped on an error: " + error.Message + ". Undo history could not be recovered and might stop recording edits. Save still writes the current changes. Reload the Map Editor to clear its unsaved status.";
             IncompleteOperation = unrecovered;
         }
         // Raised after a history change outside native Undo and Redo was accounted, such as a patch-only edit, so the native
