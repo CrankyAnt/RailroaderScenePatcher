@@ -641,14 +641,13 @@ namespace RailroaderScenePatcher {
             if (partOf != null) {
                 var group = InventoryPresentationState.GroupOf(inventory, selected);
                 builder.HStack(row => {
-                    Line(row, Literal(partOf), "Group", selected.GroupPath, RowHeight);
+                    Line(row, Literal(partOf), "Group", selected.GroupPath, RowHeight).EqualFlexibleWidth(0);
                     Button(row, "Select group", () => {
                         var entry = InventoryPresentationState.GroupOf(inventory, selected);
                         if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
                         CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
                     }).Inactive(group == null)
                         .Tooltip("Select group", CommandBand.Tooltip("Inspect the group that this part belongs to.", group == null ? "the object list does not include this part's group; click Refresh" : null));
-                    row.Spacer();
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
             // A detection span names the crossing controller that holds it first, with the button that inspects the
@@ -657,14 +656,13 @@ namespace RailroaderScenePatcher {
             if (heldBy != null) {
                 var holder = InventoryPresentationState.HolderOf(inventory, selected);
                 builder.HStack(row => {
-                    Line(row, Literal(heldBy), "Crossing controller", selected.HolderPath, RowHeight);
+                    Line(row, Literal(heldBy), "Crossing controller", selected.HolderPath, RowHeight).EqualFlexibleWidth(0);
                     Button(row, "Select controller", () => {
                         var entry = InventoryPresentationState.HolderOf(inventory, selected);
                         if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
                         CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
                     }).Inactive(holder == null)
                         .Tooltip("Select controller", CommandBand.Tooltip("Inspect the crossing controller that holds this detection span. Set crossing coverage on its Connections tab.", holder == null ? "the object list does not include this detection span's crossing controller; click Refresh" : null));
-                    row.Spacer();
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
             // An object of a kind no supported family covers says so first, with the reason it is not yet supported.

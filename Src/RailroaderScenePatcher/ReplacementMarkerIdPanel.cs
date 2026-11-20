@@ -88,11 +88,11 @@ namespace RailroaderScenePatcher {
             foreach (var name in sharers) {
                 var entry = SharerEntry(name);
                 builder.HStack(row => {
-                    Line(row, Literal(name), "Scene marker", name, RowHeight);
+                    // The name gives way, ending in an ellipsis, so that Select stays clear of the scroll bar.
+                    Line(row, Literal(name), "Scene marker", name, RowHeight).EqualFlexibleWidth(0);
                     Button(row, "Select", () => SelectSharer(name)).Inactive(entry == null)
                         .Tooltip("Select scene marker", CommandBand.Tooltip("Inspect this scene marker. Its Connections tab can give it the replacement ID instead.",
                             entry != null ? null : name == ReplacementMarkerIds.ForeignOwner ? "this registration belongs to an object that is not a scene marker." : "the object list does not include this scene marker; click Refresh."));
-                    row.Spacer();
                 }).ChildrenKeepHeight().Height(RowHeight);
             }
         }
