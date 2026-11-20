@@ -1044,17 +1044,21 @@ namespace RailroaderScenePatcher {
             }
             catch (Exception e) { selectionProblem = "World markings unavailable: " + e.GetBaseException().Message; }
         }
-        void BeginSelection(SelectionKind kind, SceneObservation origin, int? coverageRole = null) {
+        // bindingSlot says the choice fills the inspected marker's track binding, a crossing pad's included.
+        void BeginSelection(SelectionKind kind, SceneObservation origin, int? coverageRole = null, bool bindingSlot = false) {
             if (selection?.Pending != null) return;
             CancelGizmo();
             ClearSnap();
             // A choice without a source object only inspects what it confirms; no scene patch file names it.
             try {
-                // A coverage role does not offer its current segment, and a construction does not offer its current
-                // construction segments: picking one would add nothing.
+                // A binding slot's current binding cannot be picked as a candidate: a coverage role does not offer its
+                // current segment, a marker's binding, a crossing pad's included, not its marker segment, and a
+                // construction not its current construction segments.
                 var role = coverageRole.HasValue ? crossingCoverageScene?.RoleSegment(origin.Handle, coverageCircuit, coverageRole.Value) : null;
+                var own = kind == SelectionKind.TrackSegment && ReferenceEquals(origin, selected) && origin != null;
                 IReadOnlyList<SelectionIdentity> excluded = role != null ? new[] { role }
-                    : kind == SelectionKind.TrackSegment && ReferenceEquals(origin, selected) && HoldsConstructionSegments ? CurrentSegments().Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray() : null;
+                    : own && HoldsConstructionSegments ? CurrentSegments().Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray()
+                    : own && bindingSlot ? CommandBand.BindingSlotSegments(origin.Bindings).Select(id => SelectionIdentity.Graph(SelectionKind.TrackSegment, id)).ToArray() : null;
                 var purpose = coverageRole.HasValue ? "Select track segment for " + CircuitCoverage.RoleCaption(CircuitCoverage.Roles[coverageRole.Value]) : null;
                 selection.Begin(kind, origin, origin == null && kind == SelectionKind.SceneObject, excluded, purpose);
                 choosingCoverageRole = coverageRole;

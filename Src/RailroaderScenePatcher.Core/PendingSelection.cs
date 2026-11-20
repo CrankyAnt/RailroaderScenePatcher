@@ -115,13 +115,16 @@ namespace RailroaderScenePatcher.Core {
         // The choice only inspects its result, as Select in world does: no scene patch file will name it.
         public bool InspectOnly { get; set; }
         bool crossingSetup;
-        public void Offer(IEnumerable<SelectionCandidate> hits, bool isCrossingSetup = false) {
+        // currentBindings are the current bindings of the slot under the click, which the choice does not offer: a
+        // click that met only those names the first as the reason nothing is offered.
+        public void Offer(IEnumerable<SelectionCandidate> hits, bool isCrossingSetup = false, IEnumerable<SelectionCandidate> currentBindings = null) {
             if (!IsPending) return;
             Offers = Array.AsReadOnly(hits.Where(c => c != null && c.Identity.Kind == Kind).ToArray());
             crossingSetup = isCrossingSetup && Kind == SelectionKind.SceneObject;
             Candidate = Offers.Count == 1 ? Offers[0] : null;
             Highlight = null;
-            Problem = Offers.Count == 0 ? NoOffer :
+            var bound = Offers.Count == 0 ? currentBindings?.FirstOrDefault(c => c != null && c.Identity.Kind == Kind) : null;
+            Problem = bound != null ? CurrentBindingOffer(bound.Identity) : Offers.Count == 0 ? NoOffer :
                 Offers.Count > 1 ? SeveralOffers : null;
         }
         // A group's objects or overlapping markers offer a list beside the pointer. The same number names each
@@ -130,11 +133,13 @@ namespace RailroaderScenePatcher.Core {
         public string OfferCountText => Offers.Count + (crossingSetup && ListOpen ? " objects in this crossing setup." :
             Kind == SelectionKind.SceneObject ? " objects." : " candidates.");
         public string OfferListInstruction => SeveralOffers;
-        // A click that met no candidate.
-        public const string NoOffer = "No candidate at this point";
+        // A click that met no candidate, and one that met only the slot's current binding, which cannot be picked.
+        public const string NoOffer = "No candidate at this point. Nothing this choice offers is under the pointer.";
+        const string NoOfferStart = "No candidate at this point. ";
+        public static string CurrentBindingOffer(SelectionIdentity current) => NoOfferStart + current + " is the current binding, so it can't be picked.";
         // Whether a problem text is no problem of an item: the panel shows it as ordinary text, because red marks
         // only what is broken. An offered list and a click that met no candidate are nothing broken.
-        public static bool IsInstruction(string problem) => problem == SeveralOffers || problem == NoOffer;
+        public static bool IsInstruction(string problem) => problem == SeveralOffers || (problem != null && problem.StartsWith(NoOfferStart, StringComparison.Ordinal));
         // The number a candidate carries among the offers, from 1; 0 for one that is not offered.
         public int Number(SelectionCandidate candidate) {
             for (var i = 0; i < Offers.Count; i++) if (ReferenceEquals(Offers[i], candidate)) return i + 1;

@@ -298,7 +298,7 @@ namespace RailroaderScenePatcher {
                     Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
                     Slot("Node", "Choose the endpoint to snap to.", wait, () => BeginSnap(SelectionKind.TrackNode)), next };
                 if (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement) return new[] { back,
-                    Slot("Segment", "Choose a track segment in the world.", wait, () => { inspectorTab.Value = ConnectionsTab; BeginSelection(SelectionKind.TrackSegment, selected); }),
+                    Slot("Segment", "Choose a track segment in the world.", wait, () => { inspectorTab.Value = ConnectionsTab; BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: guided.Kind == GuidedTaskKind.Binding); }),
                     Slot("Picked", "Fill the fields from the confirmed track location.", wait ?? (GuidedPickedTarget() != null ? null : "Choose and confirm a track segment first."), GuidedPicked), next };
                 return new[] { back, next };
             }

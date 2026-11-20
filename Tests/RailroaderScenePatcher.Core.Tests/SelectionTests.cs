@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 static class SelectionTests {
@@ -79,6 +80,27 @@ static class SelectionTests {
         ReplacementChoices(scene, scenePatchFile.ToString(), candidates, candidate, result, original, replacement);
         PatchEditingHistory();
         ConfirmationFindsOneIdentity();
+        CurrentBindingIsNoCandidate();
+    }
+    // A binding slot's current binding cannot be picked as a candidate: a crossing pad's marker segment, like a coverage
+    // role's segment, is left out of the slot's choice, and a click on it says why nothing is offered.
+    static void CurrentBindingIsNoCandidate() {
+        var pad = new[] { "Marker segment=Sjh7; end=a; distance=53.561", "Marker binding note: x", "Lower segment=S2" };
+        Check(CommandBand.BindingSlotSegments(pad).SequenceEqual(new[] { "Sjh7" }), "A marker's binding slot holds its marker segment only: " + String.Join(",", CommandBand.BindingSlotSegments(pad)));
+        Check(CommandBand.BindingSlotSegments(new[] { "Marker segment=; end=a; distance=" }).Count == 0, "A detached marker has no current segment to leave out");
+        var candidates = new Candidates();
+        var choice = new PendingSelection(candidates, SelectionKind.TrackSegment, "Select replacement track segment");
+        var current = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "Sjh7"), "Sjh7");
+        choice.Offer(Array.Empty<SelectionCandidate>(), currentBindings: new[] { current });
+        Check(choice.Candidate == null && choice.Problem == "No candidate at this point. Track segment Sjh7 is the current binding, so it can't be picked.",
+            "A click on the current binding names it as the reason: " + choice.Problem);
+        Check(PendingSelection.IsInstruction(choice.Problem), "The current binding reason is ordinary text, not a defect");
+        choice.Offer(Array.Empty<SelectionCandidate>());
+        Check(choice.Problem == PendingSelection.NoOffer && PendingSelection.NoOffer.EndsWith(".", StringComparison.Ordinal) && PendingSelection.NoOffer.Length > "No candidate at this point.".Length,
+            "A click that met nothing gives its reason and ends with a period: " + choice.Problem);
+        var other = new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, "Sp3f"), "Sp3f");
+        choice.Offer(new[] { other }, currentBindings: new[] { current });
+        Check(ReferenceEquals(choice.Candidate, other) && choice.Problem == null, "Another segment is offered normally");
     }
     // A scene that can find one identity confirms without discovering every candidate, and still refuses a candidate
     // that changed, disappeared or became ambiguous.

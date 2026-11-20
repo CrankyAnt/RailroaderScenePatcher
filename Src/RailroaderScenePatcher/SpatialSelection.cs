@@ -219,6 +219,11 @@ namespace RailroaderScenePatcher {
             var offered = new HashSet<SelectionCandidate>(SelectionOffers.For(all.Select(c => c.Choice), false, excluded));
             return all.Where(c => offered.Contains(c.Choice)).ToArray();
         }
+        SelectionCandidate[] CurrentBindingHits(Camera camera, Vector2 pointer, IReadOnlyList<Rect> covered) {
+            var left = new HashSet<SelectionIdentity>(excluded.Where(identity => identity != null));
+            var current = scene.Scan(Pending.Kind).Where(c => c.Points.Length != 0 && left.Contains(c.Choice.Identity)).ToArray();
+            return current.Length == 0 ? null : overlay.Pick(current, camera, WorldOffset(), pointer, covered, null, out _, out _);
+        }
         bool inspectOnly;
         IReadOnlyList<SelectionIdentity> excluded;
         internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false, IReadOnlyList<SelectionIdentity> excluded = null, string purpose = null) {
@@ -260,7 +265,10 @@ namespace RailroaderScenePatcher {
             }
             candidates = current;
             lastPointer = pointer;
-            Pending.Offer(hits, isCrossingSetup);
+            // A click that met nothing offered may have met the slot's current binding, which the choice leaves out:
+            // the footer then names it as the reason.
+            var bound = hits.Length == 0 && excluded != null && excluded.Count != 0 ? CurrentBindingHits(camera, pointer, covered) : null;
+            Pending.Offer(hits, isCrossingSetup, bound);
         }
         // The pointer of the last click that offered candidates, in GUI coordinates.
         Vector2? lastPointer;
