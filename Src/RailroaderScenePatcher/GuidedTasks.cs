@@ -195,8 +195,9 @@ namespace RailroaderScenePatcher {
                     PlainLabel(builder, "Remove the logical track binding without changing the object's placement or activity.");
                     break;
                 case GuidedTaskKind.MarkerId:
-                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, CommandBand.ReplacementIdInstruction, column => false);
-                    PlainLabel(builder, CommandBand.ReplacementIdInstruction);
+                    // The same field as the Connections tab's: free text, with the instruction below it while it can be edited.
+                    ValueRow(builder, "Replacement ID", null, new[] { "ID" }, guidedFields, 0, ChoiceBlock, CommandBand.ReplacementIdTip, column => false, freeText: true);
+                    if (ChoiceBlock == null) PlainLabel(builder, CommandBand.ReplacementIdInstruction);
                     break;
                 default:
                     ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, guidedFields, 0, ChoiceBlock, "Enter the segment ID, end a or b, and distance in meters.", column => column == 2);
