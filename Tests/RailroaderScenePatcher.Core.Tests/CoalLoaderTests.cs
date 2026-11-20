@@ -7,10 +7,11 @@ using System.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
-// The Robinson Gap Mine Coal Loader stays out of the Baked scenery group family as a settled rule without a ticket. In
-// Railroader 0.6.3 the base map loads Robinson Gap coal by teleport between the spans of its industry (a
-// TeleportLoadingIndustry in Map.json), not at the loader; the unedited loader loads nothing, so moving it would not
-// move loading. The controlled hierarchy is the recorded Railroader 0.6.3 scene (Records/InventoryLedger/
+// The Robinson Gap Mine Coal Loader stays out of the inventory as a settled rule without a ticket, under the coverage
+// statement's Car loaders rule. In Railroader 0.6.3 the base map loads Robinson Gap coal by teleport between the spans
+// of its industry (a TeleportLoadingIndustry in Map.json), not at the loader; a confirming game run left an empty hopper
+// under the unedited loader for 24 game hours, and no component references the loader, so moving it would not move
+// loading. The controlled hierarchy is the recorded Railroader 0.6.3 scene (Records/InventoryLedger/
 // level4_mb_rows.json, Records/InventoryCoverage/renderer_coverage.csv): the car loader
 // (RollingStock.CarContentSwapper) and its key-value objects stand on the group root; a simple culler on Model holds
 // MineLoader, whose KeyValueBoolAnimator animates it and its 15 renderers, and Spotlight Outdoor.
@@ -33,27 +34,26 @@ static class CoalLoaderTests {
         Console.WriteLine("PASS: coal loader");
     }
 
-    // The loader group is inspection only under Industry building, with the settled reason and no ticket, and it has
-    // no parts.
+    // The loader group is not listed, under the Car loaders rule of the coverage statement: it has no inventory entry, no
+    // category and no parts, and it is not in the Inspection only group.
     static void TheLoaderGroupStaysOutWithItsReason() {
         var verdicts = BakedSceneryRules.Classify(World());
         var group = verdicts.SingleOrDefault(v => v.Path == Loader);
-        Assert(group?.Disposition == GroupDisposition.InspectionOnly && group.Ticket == null && group.Reason == BakedSceneryRules.CarLoaderReason && group.ReasonIsSentence,
-            "The loader group is left out with the settled reason: " + group?.Disposition + " " + group?.Reason + " " + group?.Ticket);
-        Assert(group.Category == BakedSceneryCategories.IndustryBuilding, "The loader group stays under Industry building: " + group.Category);
-        Assert(CommandBand.GroupInspectionOnly(group, BakedSceneryRules.Family) == "Not editable as a group: " + BakedSceneryRules.CarLoaderReason,
-            "The Object tab reads Not editable as a group: " + CommandBand.GroupInspectionOnly(group, BakedSceneryRules.Family));
-        Assert(BakedSceneryRules.CarLoaderReason == "This group holds a car loader. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading.",
-            "The reason names the teleport rule: " + BakedSceneryRules.CarLoaderReason);
-        Assert(BakedSceneryRules.CarLoaderReason.IndexOf('#') < 0 && !BakedSceneryRules.Exclusions.Any(e => e.Ticket == "#92"), "No ticket is named for the loader");
-        Assert(!BakedSceneryRules.Parts(verdicts).Any(p => p.GroupPath == Loader), "An inspection-only group has no parts");
+        Assert(group?.Disposition == GroupDisposition.NotListed && group.Reason == BakedSceneryRules.CarLoaders && group.Ticket == null && group.Category == null,
+            "The loader group is not listed under the Car loaders rule: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
+        Assert(BakedSceneryRules.CarLoaders == "Car loaders", "The rule is named as its coverage statement row: " + BakedSceneryRules.CarLoaders);
+        Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing of the loader stands in the Inspection only group");
+        Assert(!BakedSceneryRules.Parts(verdicts).Any(p => p.GroupPath == Loader || p.Path.StartsWith(Loader + "/", StringComparison.Ordinal)), "A group that is not listed has no parts");
+        Assert(BakedSceneryRules.CarLoaderRefusal == "This group holds a car loader, so it is not listed. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading",
+            "The refusal names the rule and why: " + BakedSceneryRules.CarLoaderRefusal);
+        Assert(BakedSceneryRules.CarLoaderRefusal.IndexOf('#') < 0 && !BakedSceneryRules.Exclusions.Any(e => e.Component == "RollingStock.CarContentSwapper"), "No ticket and no inspection-only exclusion names the loader");
         // The rule holds the car loader wherever it stands in a group, not only at Robinson Gap Mine.
         var elsewhere = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Tipple", new Node("Chute").With("RollingStock.CarContentSwapper").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Tipple");
-        Assert(elsewhere.Disposition == GroupDisposition.InspectionOnly && elsewhere.Reason == BakedSceneryRules.CarLoaderReason, "A car loader deeper in a group leaves the group out: " + elsewhere.Reason);
+        Assert(elsewhere.Disposition == GroupDisposition.NotListed && elsewhere.Reason == BakedSceneryRules.CarLoaders, "A car loader deeper in a group keeps the group out: " + elsewhere.Disposition + " " + elsewhere.Reason);
     }
 
-    // A group or part modification that names the loader or an object below it fails before any change.
+    // A group or part modification that names the loader, or an object below it, fails before any change.
     const string SceneName = "BushnellWhittier-MapManager";
     static void TheLoaderCannotBeTargeted() {
         var world = new FakeGroupWorld();
@@ -75,10 +75,14 @@ static class CoalLoaderTests {
             "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
             ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", new[] { 1337.85, 602.86, 2178.55 }.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}";
         var result = engine.Apply("{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{" + String.Join(",",
-            Mod("group", Loader, BakedSceneryGroups.Structure), Mod("light", Loader + "/Model/Spotlight Outdoor", BakedSceneryParts.Structure),
+            Mod("group", Loader, BakedSceneryGroups.Structure), Mod("loaderAsPart", Loader, BakedSceneryParts.Structure), Mod("light", Loader + "/Model/Spotlight Outdoor", BakedSceneryParts.Structure),
             Mod("chute", Loader + "/Model/MineLoader/Chute", BakedSceneryParts.Structure)) + "}}");
-        Assert(result.Outcomes.Count == 3 && result.Outcomes.Values.All(o => !o.Applied && o.Error.Contains("resolve uniquely")) && world.Mutations == 0,
-            "No modification reaches the loader or its objects: " + String.Join("; ", result.Outcomes.Select(o => o.Key + " " + o.Value.Applied + " " + o.Value.Error)));
+        // A group or part modification that names the loader fails with the reason; an object below it is no entry, so
+        // its modification finds nothing.
+        var named = new[] { "group", "loaderAsPart" };
+        Assert(result.Outcomes.Count == 4 && named.All(id => !result.Outcomes[id].Applied && (result.Outcomes[id].Error ?? "").Contains(BakedSceneryRules.CarLoaderRefusal))
+            && new[] { "light", "chute" }.All(id => !result.Outcomes[id].Applied && result.Outcomes[id].Error.Contains("resolve uniquely")) && world.Mutations == 0,
+            "A modification that names the loader is refused with the reason, and none reaches its objects: " + String.Join("; ", result.Outcomes.Select(o => o.Key + " " + o.Value.Applied + " " + o.Value.Error)));
     }
 
     // The driven-transform rule stays: an object with a KeyValueBoolAnimator is animated, so it and everything below it

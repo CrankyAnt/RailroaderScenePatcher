@@ -18,10 +18,11 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 - Visual effects, such as the fireflies under `World/Environment Effects`.
 - Folders, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that folder is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
+- Groups that contain a car loader, such as the `Coal Loader` at Robinson Gap Mine. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader wouldn't move loading. A scene patch file modification that targets the loader fails with that reason.
 
 A group contains only what the scene saves below its root. Props, tanks, conveyors and terrain masks in the map's `Map.json` may stand beside a group, but they are native map data. The native map editor moves them; moving the group leaves them in place. The coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews are such Props.
 
-Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot, map icon or car loader. The `Coal Loader` group at Robinson Gap Mine holds a car loader and stays `inspection only`: the game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader would not move loading. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
+Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
 Groups containing track markers or spawn points are also marked `inspection only`. Such a group is not moved as a whole. Instead, you edit each of its markers in the **Track marker** family and each of its spawn points in the **Spawn point** family. If a category names a group marked `inspection only`, it stays under that category in the **Baked scenery group** family. Otherwise, it appears in the **Inspection only** group at the end of the outliner. A group marked `inspection only` lists no parts.
 
