@@ -53,7 +53,7 @@ The editor lists every bell definition in the content library and explains why a
 
 ## Add a bell in the native map editor
 
-1. Open the Scene patches window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
+1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a bell** lists the bell definitions, with a reason for each one that does not qualify. **Why a bell definition isn't eligible** opens the table above.
 3. Click **Use** for an eligible definition. Each button shows its display name, such as **Use US&S Teardrop Crossing Bell**. A form opens at the top of the tab with an unused **Equipment ID** and a position five metres beside the inspected crossing. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.

@@ -826,8 +826,8 @@ namespace RailroaderScenePatcher {
                 reloadRequirement = attachment.Session.ReloadRequirement;
                 nextReloadCheck = Time.unscaledTime + 1f;
             }
-            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene patches" : "Scene patches: reload",
-                reloadRequirement ?? "Open the Scene patches window.");
+            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene Patcher" : "Scene Patcher: reload",
+                reloadRequirement ?? "Open the Scene Patcher window.");
             bool open = presentation != null && presentation.IsOpen;
             if (!open) CancelGizmo();
             SyncInputRegions();

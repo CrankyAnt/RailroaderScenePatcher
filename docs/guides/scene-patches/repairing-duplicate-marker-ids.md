@@ -26,7 +26,7 @@ Each repair changes one holder, and each replacement ID belongs to one marker. A
 
 ## Give a replacement ID in the inspector
 
-1. Open **Scene patches**, click **Refresh** in the command band, and select the row of the marker you want to change in the outliner.
+1. Open **Scene Patcher**, click **Refresh** in the command band, and select the row of the marker you want to change in the outliner.
 1. On the **Connections** tab, find the **Marker ID** section. From the **Object** tab, click **Set ID on Connections tab** below the **Detected problems** section to open it. Under the caption **Also holding**, the section lists the other scene markers that hold the underlying ID. To give the replacement ID to one of them instead, click **Select** beside its name. The patcher inspects that marker and opens its **Connections** tab. **Select** also closes an open coverage or equipment form.
 1. Enter the new ID in the **Replacement ID** field. Make up an ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The text below the field reads `Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.`
 1. Click **Set ID**. The result appears in the footer's message area under **Marker ID**.

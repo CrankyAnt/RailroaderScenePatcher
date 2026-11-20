@@ -61,9 +61,9 @@ namespace RailroaderScenePatcher {
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 32760;
             canvas.scaleFactor = 1;
-            toggleRegion = Region("Scene patches button", layer);
-            panelRegion = Region("Scene patches panel", layer);
-            dragRegion = Region("Scene patches pointer capture", layer);
+            toggleRegion = Region("Scene Patcher button", layer);
+            panelRegion = Region("Scene Patcher panel", layer);
+            dragRegion = Region("Scene Patcher pointer capture", layer);
             dragImage = dragRegion.GetComponent<Image>();
             InitializeNativeWindow();
             WorldInputHooks.Acquire(); worldHooks = true;

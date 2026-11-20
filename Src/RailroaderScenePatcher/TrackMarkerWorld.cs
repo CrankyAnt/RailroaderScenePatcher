@@ -115,7 +115,7 @@ namespace RailroaderScenePatcher {
                 .Where(g => VisibleForCheck(g) && g.scene.name == identity.Scene && BoardScene.PathOf(g.transform) == identity.Path && belongs(g)).Cast<object>().ToArray();
         }
         // The reference scan of a discovery the owner vouches for, or null. The check of a marker reads every field of
-        // every loaded component, which is most of a discovery; the Scene patches window supplies the scan of the discovery its
+        // every loaded component, which is most of a discovery; the Scene Patcher window supplies the scan of the discovery its
         // snapshot was compared with instead. Runtime application and the check while a marker is enabled never use it.
         internal Func<ReferenceScan> KnownReferrers;
         public virtual string PatternProblem(object target) =>

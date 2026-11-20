@@ -8,7 +8,7 @@ To add equipment, see [add lights and gates to an existing crossing](adding-cros
 
 ## Find the mast or bell
 
-In the native map editor, open **Scene patches** and click **Refresh** in the command band.
+In the native map editor, open **Scene Patcher** and click **Refresh** in the command band.
 
 - Each crossing mast has one row in the **Crossing mast** family, named for the mast and its crossing, such as `Signal 1 at Bryson Everett`. The row represents the mast's light object, for example `Grade Crossing - Bryson Everett/Signal 1/Signal 1`. Its gate is on a child of the light object and is part of the same row; the gate has no row of its own. The **Connections** tab lists each light and gate, the key each observes, and the crossing controller that drives them.
 - The bell that a crossing controller creates has one row in the **Crossing bell** family, such as `Crossing Bell at Bryson Everett`.

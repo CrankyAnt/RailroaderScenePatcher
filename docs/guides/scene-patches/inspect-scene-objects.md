@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Inspect scene objects
 
-Open **Scene patches** from the **Scene Patcher** icon in the top-right icon strip of the native map editor. The icon appears only in the native map editor. If the strip has no room for it, a floating **Scene Patcher** button replaces it. **Diagnostics** in the session details explains why.
+To open the **Scene Patcher** window, click the **Scene Patcher** icon in the top-right icon strip of the native map editor. The icon appears only in the native map editor. If the strip has no room for it, a floating **Scene Patcher** button replaces it. **Diagnostics** in the session details explains why.
 
 The window opens flush with the left screen edge, directly below the native Map Editor window, and extends to the bottom of the screen. Its default width is 734 units, or the Map Editor window's width if that's greater. On shorter displays, such as a 1080-high screen, it opens at the top right below the button strip and status readout. The default side stays the same across UI scales as long as the minimum window height fits there.
 
