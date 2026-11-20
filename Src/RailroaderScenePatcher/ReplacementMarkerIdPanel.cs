@@ -70,7 +70,8 @@ namespace RailroaderScenePatcher {
             var current = CurrentMarkerId();
             Section(builder, "Marker ID");
             ValueRow(builder, "Replacement ID", null, new[] { "ID" }, markerIdFields, 0, block,
-                "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. " + CommandBand.ReplacementIdInstruction + " The patcher doesn't check Lua scripts or other mods that look up markers by ID.", column => false, freeText: true);
+                CommandBand.ReplacementIdTip, column => false, freeText: true);
+            // The instruction stands below the field while the field can be edited, here and in the guided task.
             if (block == null) PlainLabel(builder, CommandBand.ReplacementIdInstruction);
             builder.HStack(row => {
                 var set = Button(row, CommandBand.SetMarkerId, ApplyMarkerId);
