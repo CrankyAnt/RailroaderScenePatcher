@@ -267,7 +267,7 @@ Sources: `Track.KeyValueLampMaterialController.OnEnableWithProperties` and `Roll
 
 `StationMapIconScene` implements `IScene`, `IVersionedScene` and `IRelationshipScene` over `IMapIconWorld`, which `MapIconWorld` implements with Unity. Its target component is `UI.Map.MapIcon` and its structure `station-map-icon-v1` (`StationMapIconRules`). `Resolve` takes only a path directly in `World/Map Labels/Station Icons` (`StationMapIconRules.Listed`), the same objects that `BakedSceneryRules.Classify` makes candidates there, so the map icons the game creates for cars and players never resolve.
 
-- `MapIconWorld.Problem` refuses an unloaded scene, an object outside the folder, missing scripts, rigidbodies and any culler (`Helpers.Culling.*`, `Helpers.SimpleCuller`) in the icon's own hierarchy, because the capability moves no culling sphere; another icon stays editable. The inventory shows the same reason under Supported edits.
+- `MapIconWorld.Problem` refuses an unloaded scene, an object outside the Station Icons container object, missing scripts, rigidbodies and any culler (`Helpers.Culling.*`, `Helpers.SimpleCuller`) in the icon's own hierarchy, because the capability moves no culling sphere; another icon stays editable. The inventory shows the same reason under Supported edits.
 - `Observe` returns a `MapIconObservation`: the icon's own placement in map coordinates and `activeSelf`, `activeInHierarchy`, its parent object, and whether `MapBuilder.Shared._mapIcons` holds its `MapIcon`, or null while there is no map builder.
 - `SetPlacement` converts map coordinates with the origin rule and synchronises physics for the icon's click collider. `SetActive` switches the object; `MapIcon.OnEnable` and `OnDisable` add it to the map builder and remove it.
 
