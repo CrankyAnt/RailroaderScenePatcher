@@ -7,21 +7,27 @@ using UnityEngine;
 using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
-    // PROTOTYPE (throwaway): the content of the compact scene patch window. Not production code. Three structurally
-    // different variants, switched in the game with the prototype pill at the top of the compact window.
+    // PROTOTYPE (throwaway): the content of the compact scene patch window. Not production code. Compact mode keeps the
+    // edit in progress while the world needs the screen: the inspected object, its state, and the interactive elements a
+    // modder needs with an active selection. Each variant has its own purpose:
+    // A, selection toolbar: choose and confirm in the world.
+    // B, placement strip: place the inspected object while watching it.
+    // C, side rail: browse the list and choose, with the view's centre free.
+    // Every variant ends in the world choice bar, so a pending choice can be confirmed in compact mode.
     public sealed partial class PatcherBehaviour {
         // The pill's colour sets it apart from every control of the product.
         const string PrototypePill = "#E070E0";
+        // The placement mode body's height: Numeric's two groups of fields.
+        const float PrototypePlacementBody = NativePresentation.PrototypePlacementBody;
 
         void DrawCompactPrototype(UIPanelBuilder builder) {
             typed.Clear();
             builder.ConfigureLayout(4f);
             PrototypeSwitcher(builder);
             switch (presentation.PrototypeVariant) {
-                case NativePresentation.PrototypeCompactVariant.SlimStrip: PrototypeSlimStrip(builder); break;
+                case NativePresentation.PrototypeCompactVariant.PlacementStrip: PrototypePlacementStrip(builder); break;
                 case NativePresentation.PrototypeCompactVariant.SideRail: PrototypeSideRail(builder); break;
-                case NativePresentation.PrototypeCompactVariant.OwnerWithChoice: PrototypeOwnerLayout(builder, true); break;
-                default: PrototypeOwnerLayout(builder, false); break;
+                default: PrototypeSelectionToolbar(builder); break;
             }
         }
 
@@ -36,47 +42,48 @@ namespace RailroaderScenePatcher {
             }).Height(RowHeight);
         }
 
-        // A: the owner's description. The full window's two columns without the outliner's search, filters and
-        // reminders, without tabs, tab bodies and footers: the left band over a short scrollable outliner, the right
-        // band over the heading, the state line and the Inspector and Guided switch.
-        // D is A with one line of a pending world choice under the state line.
-        void PrototypeOwnerLayout(UIPanelBuilder builder, bool choiceLine) {
-            var columns = builder.HStack(row => {
-                var width = Mathf.Clamp(outlinerWidth, OutlinerMinimumWidth, OutlinerMaximum());
-                leftBandWidth = width;
-                var outlinerRect = row.VStack(column => DrawOutliner(column, true));
-                var outliner = outlinerRect.gameObject.AddComponent<LayoutElement>();
-                outliner.minWidth = width; outliner.preferredWidth = width; outliner.flexibleWidth = 0; outliner.flexibleHeight = 10000;
-                row.AddVRule().Width(NativePresentation.DividerWidth);
-                var inspectorRect = row.VStack(column => {
-                    column.ConfigureLayout(4f);
-                    DrawRightBand(column);
-                    PrototypeHeading(column);
-                    if (choiceLine) PrototypeChoiceLine(column);
-                    column.AddExpandingVerticalSpacer();
-                });
-                var inspector = inspectorRect.gameObject.AddComponent<LayoutElement>();
-                inspector.minWidth = 200; inspector.preferredWidth = 200; inspector.flexibleWidth = 10000; inspector.flexibleHeight = 10000;
-            }).gameObject.AddComponent<LayoutElement>();
-            columns.flexibleWidth = 10000; columns.flexibleHeight = 10000;
-        }
-
-        // B: a slim strip along the bottom: the two lamps beside the heading, then the state line with the switch. No
-        // commands, no outliner rows.
-        void PrototypeSlimStrip(UIPanelBuilder builder) {
+        // A: a toolbar along the bottom for choosing in the world. Refresh and the lamps beside Select in world, Focus,
+        // Clear and Copy ID; the heading; the state line with the switch; the position line; the world choice bar.
+        void PrototypeSelectionToolbar(UIPanelBuilder builder) {
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                var lamps = row.VStack(DrawLeftBand);
-                var own = lamps.gameObject.AddComponent<LayoutElement>();
-                own.minWidth = own.preferredWidth = OutlinerMinimumWidth; own.flexibleWidth = 0;
-                var name = selected == null ? "No Selection" : selected.DisplayName;
-                Heading(row, Literal(name), "Object", selected?.Identity.Path).EqualFlexibleWidth(0);
+                leftBandWidth = OutlinerMinimumWidth;
+                var lamps = row.VStack(DrawLeftBand).gameObject.AddComponent<LayoutElement>();
+                lamps.minWidth = lamps.preferredWidth = OutlinerMinimumWidth; lamps.flexibleWidth = 0;
+                var commands = row.VStack(column => DrawRightBand(column)).gameObject.AddComponent<LayoutElement>();
+                commands.flexibleWidth = 10000;
             }).ChildrenKeepHeight().Height(RowHeight);
-            PrototypeStateRow(builder);
+            PrototypeHeading(builder);
+            PrototypePositionLine(builder);
+            PrototypeChoiceBar(builder);
         }
 
-        // C: a narrow rail at the right screen edge: the band's commands, the heading, the state line and the switch on
-        // rows of their own, then the left band over the outliner, which takes the rest of the height.
+        // B: a strip along the bottom for placing the inspected object: the heading with the switch, the state line, the
+        // Placement tab's mode switch and the open mode's fields or state, the mode's own action row and the world choice
+        // bar, which Snap and Follow need. The strip opens the Placement tab, so the gizmo stands in Gizmo mode.
+        void PrototypePlacementStrip(UIPanelBuilder builder) {
+            var pending = selection?.Pending != null;
+            if (!guided.Enabled && !pending && inspectorTab.Value != PlacementTab) inspectorTab.Value = PlacementTab;
+            PrototypeHeading(builder);
+            var body = presentation.Scroll(builder, PrototypePlacementBody, content => {
+                content.ConfigureLayout(4f);
+                if (guided.Enabled) Line(content, Literal("A guided task is open. Its steps are in the full window."), null, null);
+                else if (selected == null) Line(content, Literal("Inspect an object first. The selection toolbar and the side rail choose one."), null, null);
+                else if (inspectorTab.Value != PlacementTab) Line(content, Literal("The world choice belongs to the " + PrototypeTabTitle(inspectorTab.Value) + " tab. Confirm or cancel it to place the object here."), null, null);
+                else DrawPlacement(content);
+            });
+            var fill = body.GetComponent<LayoutElement>();
+            if (fill != null) { fill.minHeight = fill.preferredHeight = PrototypePlacementBody; fill.flexibleHeight = 10000; }
+            var viewport = body.GetComponent<ScrollRect>().viewport;
+            if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null) viewport.gameObject.AddComponent<RectMask2D>();
+            var tabActs = guided.Enabled || inspectorTab.Value != PlacementTab ? new Act[0] : TabActs(PlacementTab);
+            ActionRow(builder, tabActs, ChoiceBlock);
+            PrototypeChoiceBar(builder);
+        }
+
+        // C: a narrow rail at the right screen edge for browsing and choosing: the band's commands on two rows, the
+        // heading, the state line, the switch, the position line, the world choice bar, then Refresh with the lamps over
+        // the outliner, which takes the rest of the height.
         void PrototypeSideRail(UIPanelBuilder builder) {
             leftBandWidth = NativePresentation.PrototypeRailContent;
             PrototypeRailBand(builder);
@@ -84,6 +91,8 @@ namespace RailroaderScenePatcher {
             Heading(builder, Literal(name), "Object", selected?.Identity.Path).Height(RowHeight);
             Line(builder, StateLine(out var states), "State", states, RowHeight);
             builder.HStack(row => { DrawModeSwitch(row); row.Spacer(); }).ChildrenKeepHeight().Height(RowHeight);
+            PrototypePositionLine(builder);
+            PrototypeChoiceBar(builder);
             var outliner = builder.VStack(column => DrawOutliner(column, true)).gameObject.AddComponent<LayoutElement>();
             outliner.flexibleHeight = 10000; outliner.flexibleWidth = 10000;
         }
@@ -127,10 +136,6 @@ namespace RailroaderScenePatcher {
                 return;
             }
             Heading(builder, Literal(selected.DisplayName), "Object", IsAdded(selected) ? selected.DisplayName : selected.Identity.Path).Height(RowHeight);
-            PrototypeStateRow(builder);
-        }
-
-        void PrototypeStateRow(UIPanelBuilder builder) {
             var state = StateLine(out var states);
             builder.HStack(row => {
                 Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
@@ -138,17 +143,71 @@ namespace RailroaderScenePatcher {
             }).ChildrenKeepHeight().Height(RowHeight);
         }
 
-        // One line of a pending world choice: what to click, then the clicked candidate. The full text, as the footer
-        // words it, is in the tooltip. Without a pending choice the line stays empty and keeps its height.
-        void PrototypeChoiceLine(UIPanelBuilder builder) {
-            var pending = selection?.Pending;
-            if (pending == null) { builder.Spacer(RowHeight); return; }
-            var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
-            var candidate = selection.Find(pending.Candidate);
-            var what = candidate == null ? purpose + " in the world." : CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation);
-            var full = purpose + " in the world." + (candidate == null ? " Nothing is clicked yet." : " " + what + " Open the full window to confirm.");
-            Line(builder, "<b>World choice</b> " + Tint(Blue, what), "World choice", full, RowHeight);
+        // The inspected object's position and rotation as last observed, and whether it is enabled: where it stands now.
+        void PrototypePositionLine(UIPanelBuilder builder) {
+            var values = selected == null ? null : CurrentPlacement();
+            string markup, full;
+            if (selected == null) { markup = full = "Position and rotation appear here when an object is inspected."; markup = Literal(markup); }
+            else if (values == null || values.Length < 6) { full = "This object has no placement of its own."; markup = Literal(full); }
+            else {
+                var position = values[0] + ", " + values[1] + ", " + values[2];
+                var rotation = values[3] + ", " + values[4] + ", " + values[5];
+                var enabled = OwnActivity(selected) ? "Enabled" : "Disabled";
+                markup = "<style=FieldLabel>POSITION</style> " + Literal(position) + "   <style=FieldLabel>ROTATION</style> " + Literal(rotation) + "   " + Literal(enabled);
+                full = "Position in map coordinates, in meters: " + position + ". Rotation in degrees: " + rotation + ". " + enabled + ". As last observed; a completed edit observes the object again.";
+            }
+            Line(builder, markup, "Placement", full, RowHeight);
         }
+
+        // The world choice bar: one line, then the footer's Confirm, Cancel, Focus and Details. The line shows the pending
+        // choice and its clicked candidate; without a choice it shows the confirmed target or the newest result. Without a
+        // choice the four buttons stay in place, inactive with their reason. During a gizmo drag the row holds its Cancel.
+        void PrototypeChoiceBar(UIPanelBuilder builder) {
+            var pending = selection?.Pending;
+            string markup, title, full;
+            if (pending != null) {
+                var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
+                var candidate = selection.Find(pending.Candidate);
+                title = "World choice";
+                if (candidate == null) {
+                    markup = "<b>World choice</b> " + Tint(Blue, purpose + " in the world.");
+                    full = purpose + " in the world." + (pending.InspectOnly ? "" : " Map Editor selection is paused. Click Cancel to resume it.");
+                } else {
+                    var line = CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation);
+                    var next = choosingSnap ? " Confirm chooses it. Apply moves the object." : pending.InspectOnly ? " Confirm inspects this object." : " Confirm chooses this target.";
+                    // Details shows the candidate's identity in the line itself, as it does in the footer's message area.
+                    markup = "<b>World choice</b> " + Tint(Blue, candidateDetails ? candidate.Choice.Identity.ToString() : line);
+                    full = line + next + "\n" + candidate.Choice.Identity + (string.IsNullOrEmpty(candidate.Details) ? "" : "\n" + candidate.Details);
+                }
+                if (selectionProblem != null) { markup += " " + Tint(Red, selectionProblem); full += "\n" + selectionProblem; }
+            } else if (ConfirmedForInspected is ConfirmedSelection confirmed) {
+                title = "World choice";
+                var name = selection.ConfirmedName ?? confirmed.Identity.ToString();
+                markup = "<b>World choice</b> " + Tint(Green, "Confirmed choice: " + name);
+                full = "Confirmed choice: " + name + ". Open the full window to use it.";
+            } else if (feedback.Messages.Count != 0) {
+                var message = feedback.Messages[0];
+                var text = WithoutSource(message);
+                var tone = message.Recovery != null ? (CommandBand.RecoveryWarning(message.Recovery.Kind) ? Amber : Red) : ToneOf(message.Text);
+                title = message.Source;
+                markup = (string.IsNullOrEmpty(message.Source) ? "" : "<b>" + Literal(message.Source) + "</b> ") + (tone == null ? Literal(text) : Tint(tone, text));
+                full = text;
+            } else {
+                title = "World choice";
+                full = "No world choice is pending.";
+                markup = Literal(full);
+            }
+            Line(builder, markup, title, full, RowHeight);
+            const string none = "No world choice is pending.";
+            var acts = pending != null || gizmo?.Active == true ? FooterActs() : new[] {
+                Slot("Confirm", "Confirm the candidate's identity. Confirming changes nothing.", none, () => { }),
+                Slot("Cancel", "Cancel the world choice.", none, () => { }),
+                Slot("Focus", "Move the camera to the candidate.", none, () => { }),
+                Slot("Details", "Show or hide the clicked candidate's identity in the line above.", none, () => { }, "Candidate details") };
+            ActionRow(builder, acts, null);
+        }
+
+        static string PrototypeTabTitle(string id) => id == PlacementTab ? "Placement" : id == ConnectionsTab ? "Connections" : id == ChangesTab ? "Changes" : "Object";
 
         void PrototypeLog(string state) {
             var pending = selection?.Pending;

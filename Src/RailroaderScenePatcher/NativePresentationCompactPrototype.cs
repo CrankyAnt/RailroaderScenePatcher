@@ -9,9 +9,9 @@ namespace RailroaderScenePatcher {
     // mode should look like and what the game's window allows. Mode and variant live in memory only; the native
     // window's saved bounds are kept at the full window's while compact.
     internal sealed partial class NativePresentation {
-        internal enum PrototypeCompactVariant { OwnerLayout, SlimStrip, SideRail, OwnerWithChoice }
-        internal static readonly string[] PrototypeVariantNames = { "A: Owner's layout", "B: Slim bottom strip", "C: Side rail", "D: Owner's layout with world choice line" };
-        internal const int PrototypeVariantCount = 4;
+        internal enum PrototypeCompactVariant { SelectionToolbar, PlacementStrip, SideRail }
+        internal static readonly string[] PrototypeVariantNames = { "A: Selection toolbar", "B: Placement strip", "C: Side rail" };
+        internal const int PrototypeVariantCount = 3;
         // Where the user left each variant's compact window, in screen pixels, for this session only. A variant the user
         // has not moved or resized opens at its own place.
         readonly Rect[] prototypeVariantRects = new Rect[PrototypeVariantCount];
@@ -137,9 +137,9 @@ namespace RailroaderScenePatcher {
             var frame = ((RectTransform)native.transform).rect.size - native.GetContentSize();
             float width, height, x, y;
             switch (PrototypeVariant) {
-                case PrototypeCompactVariant.SlimStrip:
+                case PrototypeCompactVariant.PlacementStrip:
                     width = prototypeFullRect.width;
-                    height = (PrototypeSlimContent + frame.y) * scale;
+                    height = (PrototypePlacementContent + frame.y) * scale;
                     x = (Screen.width - width) * 0.5f; y = Screen.height - height;
                     break;
                 case PrototypeCompactVariant.SideRail:
@@ -149,7 +149,7 @@ namespace RailroaderScenePatcher {
                     break;
                 default:
                     width = prototypeFullRect.width;
-                    height = ((PrototypeVariant == PrototypeCompactVariant.OwnerWithChoice ? PrototypeOwnerContent + PrototypeChoiceLine : PrototypeOwnerContent) + frame.y) * scale;
+                    height = (PrototypeToolbarContent + frame.y) * scale;
                     x = (Screen.width - width) * 0.5f; y = Screen.height - height;
                     break;
             }
@@ -159,8 +159,10 @@ namespace RailroaderScenePatcher {
             boundsFrame = -1;
         }
 
-        // Content heights and the rail's content width, in canvas units.
-        internal const float PrototypeOwnerContent = 236, PrototypeChoiceLine = 24, PrototypeSlimContent = 92, PrototypeRailContent = 300;
+        // Content heights and the rail's content width, in canvas units: rows of 24 with 4 between them and 12 of the
+        // window's own padding. The toolbar has seven rows; the placement strip has six rows and a mode body that holds
+        // the mode switch and Numeric's two groups of fields.
+        internal const float PrototypePlacementBody = 150, PrototypeToolbarContent = 7 * 24 + 6 * 4 + 12, PrototypePlacementContent = 6 * 24 + PrototypePlacementBody + 6 * 4 + 12, PrototypeRailContent = 300;
 
         string PrototypeState() {
             var bounds = PanelBounds;
