@@ -10,13 +10,13 @@ The map's scene stores its baked scenery groups. Props, masks, and other objects
 
 ## Which groups are listed
 
-The **Baked scenery group** family in the outliner lists one entry per group root, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object one level below a `World` folder, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, the root is one level below a town folder, such as `World/Large Scenery/Bryson/Bryson House Track`. The `World/Large Scenery/Almond Bridge` folder is itself a group root, because it holds the construction of one rail bridge; see [rail bridges outside Ela](#rail-bridges-outside-ela).
+The **Baked scenery group** family in the outliner lists one entry per group root, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object one level below a container object under `World`, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, the root is one level below a place's container object, such as `World/Large Scenery/Bryson/Bryson House Track`. The scene object `World/Large Scenery/Almond Bridge` is itself a group root, because it holds the construction of one rail bridge; see [rail bridges outside Ela](#rail-bridges-outside-ela).
 
 To be listed, a group must be saved in the scene, have a renderer, collider, light, storage pile, or log pond at or below its root, and belong to no other family. The following objects have no group entry:
 
 - Objects without a renderer, collider, light, storage pile, or log pond. A spawn point under `World/POIs` has its own **Spawn point** family; see [move player spawn points](moving-spawn-points.md).
 - Visual effects, such as the fireflies under `World/Environment Effects`.
-- Folders, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that folder is its own group.
+- Container objects, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that container object is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
 - Groups excluded by the Car loaders rule, such as the `Coal Loader` at Robinson Gap Mine, and everything below their roots. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader wouldn't move loading. A scene patch file modification targeting the loader or one of its parts fails with that reason.
 
@@ -144,7 +144,7 @@ The object that animates a stall's doors, such as `Stall (2) / Roundhouse Modula
 You can move, rotate, or disable a rail bridge construction outside Ela so that it stands where you moved its track in the native map editor. Each construction is a group under **Bridge** > **Rail bridges**, beside `Ela Bridge`:
 
 - `Bridge 1` at Bryson, with its parts `Bridge 1 / Abutments` and `Bridge 1 / Steel` and the objects below them.
-- `Almond Bridge`, the folder `World/Large Scenery/Almond Bridge`, with its parts `Almond Bridge / Abutments` and `Almond Bridge / Steel`. The folder carries the bridge's construction controller and culler, so the abutments and steel are parts of one group.
+- `Almond Bridge`, the group root at `World/Large Scenery/Almond Bridge`, with its parts `Almond Bridge / Abutments` and `Almond Bridge / Steel`. The group root carries the bridge's construction controller and culler, so the abutments and steel are parts of one group.
 - Each of the seven plate girder bridges below `World/Large Scenery/Plate Girder Bridge`, such as `Plate Girder Bridge (1)`. Each one is one object without parts.
 
 The construction moves with its colliders and culling. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere, or capsule collider follow the construction. The patcher does not compare the bounds of mesh colliders. It also checks that the generated trestles near the bridge stay unchanged. The patcher refuses a construction that holds a track component or a generated trestle.
@@ -172,7 +172,7 @@ A part moved outside its culler's sphere gets its own culling sphere, as describ
 You can move, rotate or disable a road bridge construction so that it stands where you moved its road in the native map editor. Each road bridge is a group under **Bridge** > **Road bridges**, with its deck, abutments, and other objects as parts:
 
 - `Almond Road Bridge` and `Whittier Haywood Road Bridge` below `World/Large Scenery`.
-- `Concrete Road Bridge - 20m` below `World/Roads Bryson`, and `Concrete Road Bridge - 60m` in the folder `World/Roads Bryson/US19 Gov Island`.
+- `Concrete Road Bridge - 20m` below `World/Roads Bryson`, and `Concrete Road Bridge - 60m` under the container object `World/Roads Bryson/US19 Gov Island`.
 - `Dillsboro Haywood Road Bridge`, `Dillsboro Road Bridge 1`, `Dillsboro Road Bridge 2`, and `Old Home Town Road Bridge` below `World/Roads Dillsboro`.
 - `Sylva Road Bridge`, `Sylva Road Bridge 20m`, and `Sylva Road Bridge 20m (1)` below `World/Roads Sylva`.
 - `Concrete Road Bridge - 20m` and `Whittier Road Bridge` below `World/Roads Whittier`.
@@ -193,7 +193,7 @@ Two bridges differ:
 - The mask of `Old Home Town Road Bridge` also flattens the terrain height. As for the station buildings, the patcher refuses a move of this bridge before anything changes, with `The ground mask on Old Home Town Road Bridge flattens the terrain height. The game might not restore that height after a move, so this object can't be moved.` **Gizmo**, **Snap**, and **Follow** are unavailable for it and the **Numeric** fields are unavailable too. You can disable the bridge and move or disable its parts.
 - The mask component of `Whittier Road Bridge` is disabled in the scene. It holds no registration, so the bridge moves without a rebuild and without terrain output. Its **Dependencies** name no ground mask, **Use in the game** names no terrain, and the **Changes** tab shows no **Terrain** section for it.
 
-The 60-metre bridge at US19 Gov Island stands beside the grade-crossing setup of that crossing, in the same folder, and is not part of it. A move of the bridge leaves the crossing, its lights, gates, and bells where they are. To move the crossing's lights, gates, and bells, see [move existing crossing equipment](moving-crossing-equipment.md).
+The 60-metre bridge at US19 Gov Island stands beside the grade-crossing setup under the same container object. A move of the bridge leaves the crossing, its lights, gates, and bells where they are. To move the crossing's lights, gates, and bells, see [move existing crossing equipment](moving-crossing-equipment.md).
 
 Two smoke decals at Dillsboro, `World/Roads Dillsboro/Bridge Smoke Decal Projector` and `Bridge Smoke Decal Projector (1)`, stand 9 m from the root of `Dillsboro Road Bridge 1` and 4 m from the root of `Old Home Town Road Bridge`, and are expected to darken those bridges above the track. They are scene objects of their own beside the bridges, not parts of them, and the patcher does not list them because a decal projector has no renderer, collider, or light. The decal keeps its position. At Dillsboro Road Bridge 1, the soot stopped appearing after the bridge moved and returned on Undo.
 
@@ -269,7 +269,7 @@ The part placement uses map coordinates, not coordinates relative to the group.
 
 ## What the patcher checks
 
-Before changing a group, the patcher checks that its scene is loaded, its path names exactly one listed group root, and it contains no missing script or rigidbody. If the path names a folder, such as `World/Large Scenery/Bryson/Bryson Yard`, the modification fails with an explanation that the folder only holds groups. A modification also fails if its path names no group or several groups. In each case, the file's other modifications still apply.
+Before changing a group, the patcher checks that its scene is loaded, its path names exactly one listed group root, and it contains no missing script or rigidbody. If the path names a container object, such as `World/Large Scenery/Bryson/Bryson Yard`, the modification fails with the message "This path names a container object. Edit the groups it holds." A modification also fails if its path names no group or several groups. In each case, the file's other modifications still apply.
 
 For a part, the path must name exactly one listed part, and its group must pass the same checks. If a part modification names a group root, such as a yard lamp post below Bryson Yard, it fails with an explanation that the path names a group root. The file's other modifications still apply. Edit that object as a baked scenery group.
 
@@ -293,7 +293,7 @@ If any check finds a difference, the modification fails and the patcher restores
 
 Grass and other terrain detail under a group come from the terrain and its masks. A native map mask, such as `br-house-track` under Bryson House Track, keeps the ground clear at the group's original position. After a move, grass grows through the group at its new position until you move or add the mask in the native map editor. A scene ground mask is different: the scene saves it, and the patcher moves it with its holder, as described in [buildings with ground masks](#buildings-with-ground-masks). Native masks in `Map.json` stay where they are.
 
-Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews, and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. In those runs Bryson Yard was still listed as one group: it moved with all its posts and lamps, and no part remained at its old position. Bryson Yard is now a folder, and each of its lamp posts is its own group. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
+Automated tests check group behavior with a controlled group. Runs on the base map in Railroader 0.6.2 build 26335745 observed Bryson House Track, Bryson Oil, Coal & Oil at Andrews, and the inactive Alarka/Platform render at their new positions both nearby and at 220 to 450 m. In those runs Bryson Yard was still listed as one group: it moved with all its posts and lamps, and no part remained at its old position. Bryson Yard is now a container object, and each of its lamp posts is its own group. The player character stood on the moved Bryson House Track platform and was stopped at its edge, walked freely through its old position, and encountered neither position while the group was disabled. A disabled group with a simple culler on its root stayed off when the camera came near. After Enable, it appeared only when the camera came near again. After a camera jump shifted the floating origin, a moved group kept its map position and the saved position had no origin offset.
 
 In Railroader 0.6.3, moving a crossbuck at Old River Rd changed only the one named by its pad marker ID. Undo, Redo, disabling, removal, Save and reload kept that identity. At Nantahala, the culling sphere followed the moved crossbuck and returned on removal. The crossbuck was visible at 500 m and culled by 1 km. Multiplayer remains untested.
 
