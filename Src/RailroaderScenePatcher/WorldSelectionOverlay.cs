@@ -804,7 +804,7 @@ namespace RailroaderScenePatcher {
                 Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods = null;
                 var boxes = new List<ObjectMarkingBox>();
                 // What is read once per renderer and per place is read within a share of the frame: a renderer whose
-                // kind is not known yet, once that share is used up, leaves its object without its renderer boxes until a
+                // kind is not known yet, once that share is used up, leaves its object without boxes until a
                 // later frame, so the first view after a load builds up over some frames instead of in one.
                 var waits = false;
                 // The mesh renderers that are on but hidden without a known box yet.
@@ -884,7 +884,7 @@ namespace RailroaderScenePatcher {
                     boxes.Add(new ObjectMarkingBox(name, Point(bounds.center), Point(bounds.extents), oriented, kind, ground));
                 }
                 // A storage pile or log pond has no renderer of its own: the box it lays its logs out in stands in, from
-                // its layout settings, so it is framed like any other renderer box whether or not the camera has culled it.
+                // its layout settings, so it is framed like any other box whether or not the camera has culled it.
                 if (!waits)
                     foreach (var pile in Piles(go)) {
                         var oriented = PileBox(pile);
@@ -934,7 +934,7 @@ namespace RailroaderScenePatcher {
                         shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
                     }
                 } else if (InFront(camera, anchor) && (frameDistance > ObjectMarkingGeometry.FrameDistance || ObjectMarkingGeometry.FramesMarker((camera.transform.position - (candidate.Position + origin)).magnitude))) {
-                    // Its renderer bounds are still being read (waits), or a hidden renderer's box is not known yet (unseen):
+                    // Its boxes are still being read (waits), or a hidden renderer's box is not known yet (unseen):
                     // until then the object has a frame within the frame distance, about its marker. An object that is asked for at its group's frame distance has it
                     // wherever its marker stands.
                     shape.Outline = ObjectMarkingGeometry.MarkerOutline(anchor.x, anchor.y);

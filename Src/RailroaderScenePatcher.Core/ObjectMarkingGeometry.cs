@@ -182,9 +182,9 @@ namespace RailroaderScenePatcher.Core {
         // The anchor is the object's position and the camera the camera's position, both in world coordinates. The
         // projection maps a world point to clip coordinates (-w <= x, y, z <= w is visible). Decisions, when given,
         // receive one line per box.
-        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> parts,
+        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> boxes,
             Func<WorldPoint, ClipPoint> project, ScreenRect view, List<string> decisions) =>
-            Frame(anchor, camera, parts, project, view, decisions, FrameDistance, null);
+            Frame(anchor, camera, boxes, project, view, decisions, FrameDistance, null);
         // frameDistance is the distance to the object's bounds beyond which it has no frame. An object of a
         // game-defined group that shows as one gives its outline to the group's frame, whose frame distance counts
         // from the group's bounds: its own frame is then asked for without a limit.
@@ -198,12 +198,12 @@ namespace RailroaderScenePatcher.Core {
         // object. An object that stands for everything below it, whole, is framed by all its boxes: the root of a
         // baked scenery group, whose marker stands at the root. The box nearest it
         // can be a lamp beside a station building.
-        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> parts,
+        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> boxes,
             Func<WorldPoint, ClipPoint> project, ScreenRect view, List<string> decisions, double frameDistance, WorldBasis? orientation = null, bool whole = false) {
-            if (parts == null) throw new ArgumentNullException(nameof(parts));
+            if (boxes == null) throw new ArgumentNullException(nameof(boxes));
             if (project == null) throw new ArgumentNullException(nameof(project));
             var open = new List<ObjectMarkingBox>();
-            foreach (var box in parts) {
+            foreach (var box in boxes) {
                 var reason = box.Kind == ObjectMarkingBoxKind.Effect ? "effect"
                     : box.Kind == ObjectMarkingBoxKind.ShadowsOnly ? "shadows only"
                     : box.Kind == ObjectMarkingBoxKind.LowerLod ? "lower level of detail"
@@ -316,11 +316,11 @@ namespace RailroaderScenePatcher.Core {
             var center = new WorldPoint(corners.Average(c => c.X), corners.Average(c => c.Y), corners.Average(c => c.Z));
             return Valid(center) ? center : (WorldPoint?)null;
         }
-        // The eight corners of a box's box: its own oriented box where that is known, else its world-aligned box.
+        // Use the eight oriented corners when valid. Fall back to the world-aligned corners.
         internal static IReadOnlyList<WorldPoint> CornersOf(ObjectMarkingBox box) =>
             box.Oriented != null && box.Oriented.Count == 8 && box.Oriented.All(Valid) ? box.Oriented : BoxCorners(box);
-        // The directions of a box's own box, from its corners: corner 0 and the corners that differ from it in bit
-        // 0, bit 1 and bit 2. The world's directions for a box without an oriented box, or with a flat one.
+        // The directions of the oriented box, from corner 0 to the corners that differ from it in bit
+        // 0, bit 1 and bit 2. Use world directions if the oriented corners are unavailable or the box is flat.
         static WorldBasis BasisOf(ObjectMarkingBox box) {
             if (box.Oriented == null || box.Oriented.Count != 8 || !box.Oriented.All(Valid)) return WorldBasis.World;
             WorldPoint o = box.Oriented[0];
@@ -437,10 +437,8 @@ namespace RailroaderScenePatcher.Core {
         // would wander. A point behind the camera falls back to the center of the frame's rectangle.
         public static ScreenPoint MarkerScreen(bool inFront, double x, double y, ScreenRect rect) =>
             inFront ? new ScreenPoint(x, y) : new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
-        // Every inventory object within the frame distance has a frame. An object none of whose renderers can be framed,
-        // because it has no renderer of its own or all its renderers are switched off, takes the least frame about its
-        // square marker: the marker with its margin on each side. distance is from the camera to the object's
-        // position, in metres.
+        // Within the frame distance, an object with no boxes to frame gets a frame around its square marker,
+        // including the margin on each side. Distance is measured from the camera to the object in metres.
         public static bool FramesMarker(double distance) => distance <= FrameDistance;
         public static IReadOnlyList<ScreenPoint> MarkerOutline(double x, double y) {
             var half = MarkerSize / 2 + MarkerMargin;

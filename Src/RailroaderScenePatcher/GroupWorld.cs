@@ -362,7 +362,7 @@ namespace RailroaderScenePatcher {
         // Why a group root cannot be edited, or null. Shared with the inventory.
         internal static string Problem(GameObject root) {
             if (!Loaded(root)) return "The group's scene is not loaded";
-            // A folder of the category table, such as Bryson Yard, and a group with a car loader resolve so that they
+            // A container object in the category table, such as Bryson Yard, and a group with a car loader resolve so that they
             // fail with this reason.
             var refusal = BakedSceneryRules.GroupRefusal(VerdictOf(root), BoardScene.PathOf(root.transform));
             if (refusal != null) return refusal;

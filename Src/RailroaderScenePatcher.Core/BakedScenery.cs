@@ -336,7 +336,7 @@ namespace RailroaderScenePatcher.Core {
         }
         static bool RoadBridge(IHierarchyNode node) => RoadBridge(node.Name);
         // One or more crossings, or crossings and road bridges.
-        static bool CrossingContainer(IHierarchyNode node) =>
+        static bool CrossingContainerObject(IHierarchyNode node) =>
             !node.HasFamily && node.Children.Any(Crossing) && node.Children.All(child => Crossing(child) || RoadBridge(child));
         static void Candidate(string town, IHierarchyNode node, string path, List<GroupRootVerdict> verdicts) {
             if (!node.Serialized) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, RuntimeObject)); return; }
@@ -344,7 +344,7 @@ namespace RailroaderScenePatcher.Core {
             if (node.HasFamily) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.ExistingFamily, null)); return; }
             if (BakedSceneryCategories.WithoutFunction.Contains(path)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoFunction)); return; }
             // A scene object the category table marks as a container object, such as Bryson Yard, is no group: its children are.
-            if (BakedSceneryCategories.IsContainerObject(path) || CrossingContainer(node)) { foreach (var child in node.Children) Candidate(town, child, path + "/" + child.Name, verdicts); return; }
+            if (BakedSceneryCategories.IsContainerObject(path) || CrossingContainerObject(node)) { foreach (var child in node.Children) Candidate(town, child, path + "/" + child.Name, verdicts); return; }
             if (Unprotected(node)) {
                 var pad = PadMarkerId(node);
                 foreach (var child in node.Children) {

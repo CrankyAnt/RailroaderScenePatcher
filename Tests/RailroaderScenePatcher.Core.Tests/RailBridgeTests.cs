@@ -11,7 +11,7 @@ using RailroaderScenePatcher.Core;
 // Rail bridges outside Ela: Bryson Bridge 1, the plate girder bridges and the Almond Bridge join the Baked scenery group
 // family under Bridge / Rail bridges, each construction with its parts. Controlled hierarchies follow the Railroader 0.6.3
 // scene (Records/InventoryLedger level4_mb_rows): Bryson Bridge 1 carries a renderer culler and its track construction
-// controller on its root, above Abutments and Steel; the Almond Bridge folder below World/Large Scenery carries a simple
+// controller on its root, above Abutments and Steel; the Almond Bridge group root below World/Large Scenery carries a simple
 // culler and its construction controller above Abutments and Steel; each plate girder bridge is a model of its own
 // without a controller.
 static class RailBridgeTests {
@@ -182,7 +182,7 @@ static class RailBridgeTests {
         public readonly FakeGroup Bridge1 = new FakeGroup { Position = new[] { 2391.0, 532, 4315 }, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null };
         public readonly FakeGroup Plate = new FakeGroup { Position = new[] { 4098.0, 529, 5667 }, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = null };
         public readonly FakePart Abutments, Steel, Beam;
-        // The Almond Bridge: the folder root carries a simple culler of 200 m and the construction controller, which
+        // The Almond Bridge: the group root carries a simple culler of 200 m and the construction controller, which
         // switches its abutments and steel; a bolt stands below the abutments and a truss below the steel.
         public readonly FakeGroup AlmondRoot = new FakeGroup { Position = new[] { -7206.0, 529, 608 }, Parts = new List<FakePart>(), Cullers = new List<FakeCuller>(), RootCulling = true, RailBridge = true };
         public readonly FakePart AlmondAbutments, Bolt, AlmondSteel, Truss;
@@ -302,7 +302,7 @@ static class RailBridgeTests {
         Assert(!outcome.Applied && failed.Steel.Active && !failed.World.Constructions.Held(failed.Steel), "A failed disable is restored and the controller switches the steel again: " + outcome.Error);
     }
 
-    // The Almond Bridge's steel moved outside the 200 m sphere of the folder's culler gets a culling sphere of its own.
+    // The Almond Bridge's steel moved outside the 200 m sphere of the group root's culler gets a culling sphere of its own.
     // Own culling then shows the controller's current choice while that sphere is in view: the controller hiding the
     // steel after the plan was made hides it at every visibility change, and the controller showing it again shows it
     // while its sphere is in view. The abutments, which stand above a moved bolt, follow the controller the same way.
@@ -311,7 +311,7 @@ static class RailBridgeTests {
         var far = new[] { -6206.0 + 600, 529, 608 + 400 };
         var bolt = new[] { -6206.0 - 450, 532, 608 - 500 };
         var result = f.Engine.Apply(Doc(PartMod("move-steel", Almond + "/Steel", far), PartMod("move-bolt", Almond + "/Abutments/Bridge Abutment", bolt)));
-        Assert(result.Outcomes.Values.All(o => o.Applied), "The steel and the bolt move outside the folder's sphere: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
+        Assert(result.Outcomes.Values.All(o => o.Applied), "The steel and the bolt move outside the group root's sphere: " + String.Join("; ", result.Outcomes.Values.Select(o => o.Error)));
         FakeRegistration Own(FakePart part) => f.World.Native.Registered.SingleOrDefault(r => r.Owner == part);
         Assert(Own(f.AlmondSteel) != null && Own(f.Bolt) != null && f.World.Culling.Desired(f.AlmondSteel) != null && f.World.Culling.Desired(f.AlmondAbutments) != null,
             "The moved steel and bolt have spheres of their own, and own culling switches the steel and the abutments above the bolt");
@@ -335,9 +335,9 @@ static class RailBridgeTests {
         f.World.Controller(f.AlmondSteel, true);
         Assert(!f.AlmondSteel.Active, "The disabled steel stays off although the controller shows it");
         Assert(f.Engine.Apply(Doc(PartMod("show-steel", Almond + "/Steel", far, true))).Outcomes["show-steel"].Applied && f.AlmondSteel.Active, "Enable shows the steel as the controller chose");
-        // Moved back inside the folder's sphere, the steel goes back to its controller.
+        // Moved back inside the group root's sphere, the steel goes back to its controller.
         Assert(f.Engine.Apply(Doc(PartMod("back-steel", Almond + "/Steel", new[] { -6206.0, 529, 608 }))).Outcomes["back-steel"].Applied, "The steel moves back");
-        Assert(f.World.Culling.Desired(f.AlmondSteel) == null && !f.World.Diverted(f.AlmondSteel), "The steel back in the folder's sphere has no own culling and goes back to its controller");
+        Assert(f.World.Culling.Desired(f.AlmondSteel) == null && !f.World.Diverted(f.AlmondSteel), "The steel back in the group root's sphere has no own culling and goes back to its controller");
         f.World.Controller(f.AlmondSteel, false);
         Assert(!f.AlmondSteel.Active, "The controller switches the steel directly again");
     }
@@ -349,7 +349,7 @@ static class RailBridgeTests {
         var f = new Bridges();
         var far = new[] { -6206.0 + 600, 529, 608 + 400 };
         f.World.HideSpheresOnApply = true;
-        Assert(f.Engine.Apply(Doc(PartMod("move-steel", Almond + "/Steel", far))).Outcomes["move-steel"].Applied, "The steel moves outside the folder's sphere");
+        Assert(f.Engine.Apply(Doc(PartMod("move-steel", Almond + "/Steel", far))).Outcomes["move-steel"].Applied, "The steel moves outside the group root's sphere");
         var own = f.World.Native.Registered.Single(r => r.Owner == f.AlmondSteel);
         Assert(!f.AlmondSteel.Active && f.World.Diverted(f.AlmondSteel), "Out of view, own culling holds the steel off and takes the controller's writes");
         f.World.Controller(f.AlmondSteel, false);
@@ -472,7 +472,7 @@ static class RailBridgeTests {
     }
 
     // Each rail bridge construction root outside Ela is listed once as a group of the family under Bridge / Rail bridges:
-    // Bryson Bridge 1 and the Almond Bridge, whose root is the folder that carries its controller and culler, each with
+    // Bryson Bridge 1 and the Almond Bridge, whose group root carries its controller and culler, each with
     // its parts, and every plate girder bridge on its own. Road bridges stand under Road bridges.
     static void InventoryListsEachConstructionOnceWithItsParts() {
         var verdicts = BakedSceneryRules.Classify(World());
