@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
-// PROTOTYPE: throwaway view switch of the outliner grouping prototype: two icon buttons on the object count line.
+// PROTOTYPE: throwaway view switch and layout helpers of the outliner grouping prototype.
 using System;
 using System.Linq;
+using RailroaderScenePatcher.Core;
+using TMPro;
 using UI.Builder;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,27 +12,82 @@ using UnityEngine.UI;
 namespace RailroaderScenePatcher {
     public sealed partial class PatcherBehaviour {
         const string ByCategoryIcon = "CrankyAnt Scene Patcher by category", ByPlaceIcon = "CrankyAnt Scene Patcher by place";
+        const float ViewIconButtonWidth = 28f, ViewIconGlyphSize = 16f;
         static IDisposable byCategoryRegistration, byPlaceRegistration;
+        static Sprite byCategorySprite, byPlaceSprite;
         static bool spriteLibraryLogged;
 
-        // The game's icon buttons take a sprite from its sprite library, which a mod may add to. The two icons are drawn
-        // here: a bulleted list for By category and a map pin for By place. The active view's icon is full white, the
-        // other dimmed.
+        void SwitchOutlinerView(bool place) {
+            if (PrototypeOutlinerGrouping.ByPlace == place) return;
+            PrototypeOutlinerGrouping.ByPlace = place;
+            PrototypeOutlinerGrouping.LogPending = true;
+            // Reveal the currently inspected object in the new view's hierarchy.
+            revealed = null;
+        }
+
+        // Reuses TrackPoints and FocusTarget.Point so starter placements and unheld spans place by track location.
+        double[] PrototypeTrackPoint(SceneObservation entry) {
+            if (entry == null || (entry.Family != StarterPlacements.Family && entry.Family != FocusTarget.Span)) return null;
+            try {
+                var point = FocusTarget.Point(entry.Family, null, TrackPoints(entry), out _);
+                return point != null && point.Length >= 3 ? new[] { point[0], point[2] } : null;
+            } catch { return null; }
+        }
+
+        // Two compact native segments on the object count line: native segmentSelected / segment styling marks the
+        // active view while both icons stay full white (never dimmed like a disabled button). Clicks on the active
+        // view are ignored.
         void PrototypeViewIcons(UIPanelBuilder row) {
             try {
                 RegisterViewIcons();
-                foreach (var (icon, place, title, body) in new[] {
-                    (ByCategoryIcon, false, "By category", "List objects by what they are: category, then kind, then place."),
-                    (ByPlaceIcon, true, "By place", "List objects by place, with the same categories and kinds under each place.") }) {
-                    var button = row.AddIconButton(icon, presentation.Action(() => { PrototypeOutlinerGrouping.ByPlace = place; PrototypeOutlinerGrouping.LogPending = true; }));
-                    button.Tooltip(title, body + (PrototypeOutlinerGrouping.ByPlace == place ? " Shown now." : ""));
-                    var image = button.RectTransform.GetComponentsInChildren<Image>(true).FirstOrDefault(i => i.gameObject.name == "Icon");
-                    if (image != null) image.color = new Color(1, 1, 1, PrototypeOutlinerGrouping.ByPlace == place ? 1f : 0.4f);
-                }
+                var items = new[] {
+                    (ByCategoryIcon, byCategorySprite, false, "By category", "List objects by what they are: category, then kind, then place."),
+                    (ByPlaceIcon, byPlaceSprite, true, "By place", "List objects by place, with the same categories and kinds under each place.")
+                };
+                row.AddSegmentedControlCompact(segments => {
+                    foreach (var (iconName, sprite, place, title, body) in items) {
+                        var active = PrototypeOutlinerGrouping.ByPlace == place;
+                        var action = active ? (Action)(() => { }) : presentation.Action(() => SwitchOutlinerView(place));
+                        var segment = segments.AddSegment("", active, action);
+                        segment.Tooltip(title, body + (active ? " Shown now." : ""));
+                        AttachPrototypeIcon(segment.RectTransform, sprite, iconName);
+                    }
+                });
             } catch (Exception e) {
                 Debug.LogWarning("Scene Patcher PROTOTYPE view icons unavailable, using text: " + e.GetBaseException().Message);
-                Button(row, PrototypeOutlinerGrouping.ByPlace ? "By category" : "By place", () => { PrototypeOutlinerGrouping.ByPlace = !PrototypeOutlinerGrouping.ByPlace; PrototypeOutlinerGrouping.LogPending = true; });
+                Button(row, PrototypeOutlinerGrouping.ByPlace ? "By category" : "By place", () => SwitchOutlinerView(!PrototypeOutlinerGrouping.ByPlace));
             }
+        }
+
+        static void AttachPrototypeIcon(RectTransform segment, Sprite fallback, string iconName) {
+            foreach (var label in segment.GetComponentsInChildren<TMP_Text>(true)) label.gameObject.SetActive(false);
+            var hlg = segment.GetComponent<HorizontalLayoutGroup>();
+            if (hlg != null) {
+                hlg.childAlignment = TextAnchor.MiddleCenter;
+                hlg.childForceExpandWidth = false;
+                hlg.childForceExpandHeight = false;
+                hlg.padding = new RectOffset(6, 6, 4, 4);
+            }
+            var layout = segment.GetComponent<LayoutElement>() ?? segment.gameObject.AddComponent<LayoutElement>();
+            layout.minWidth = layout.preferredWidth = ViewIconButtonWidth;
+            layout.minHeight = layout.preferredHeight = RowHeight;
+            layout.flexibleWidth = 0; layout.flexibleHeight = 0;
+
+            Sprite sprite = fallback;
+            if (UI.SpriteLibrary.TryGet(iconName, out var registered) && registered != null) sprite = registered;
+            var iconObject = new GameObject("Icon", typeof(RectTransform), typeof(Image)) { layer = segment.gameObject.layer };
+            var iconRect = (RectTransform)iconObject.transform;
+            iconRect.SetParent(segment, false);
+            iconRect.sizeDelta = new Vector2(ViewIconGlyphSize, ViewIconGlyphSize);
+            var image = iconObject.GetComponent<Image>();
+            image.sprite = sprite;
+            image.color = Color.white;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            var iconLayout = iconObject.AddComponent<LayoutElement>();
+            iconLayout.minWidth = iconLayout.preferredWidth = ViewIconGlyphSize;
+            iconLayout.minHeight = iconLayout.preferredHeight = ViewIconGlyphSize;
+            iconLayout.flexibleWidth = 0; iconLayout.flexibleHeight = 0;
         }
 
         static void RegisterViewIcons() {
@@ -41,8 +98,10 @@ namespace RailroaderScenePatcher {
                     Debug.Log("Scene Patcher PROTOTYPE sprite library: " + names);
                 } catch (Exception e) { Debug.Log("Scene Patcher PROTOTYPE sprite library unreadable: " + e.GetBaseException().Message); }
             }
-            if (byCategoryRegistration == null) byCategoryRegistration = UI.SpriteLibrary.Register(ByCategoryIcon, Draw(ByCategoryIcon, ListPixel));
-            if (byPlaceRegistration == null) byPlaceRegistration = UI.SpriteLibrary.Register(ByPlaceIcon, Draw(ByPlaceIcon, PinPixel));
+            if (byCategorySprite == null) byCategorySprite = Draw(ByCategoryIcon, ListPixel);
+            if (byPlaceSprite == null) byPlaceSprite = Draw(ByPlaceIcon, PinPixel);
+            if (byCategoryRegistration == null) byCategoryRegistration = UI.SpriteLibrary.Register(ByCategoryIcon, byCategorySprite);
+            if (byPlaceRegistration == null) byPlaceRegistration = UI.SpriteLibrary.Register(ByPlaceIcon, byPlaceSprite);
         }
 
         const int IconSize = 32;

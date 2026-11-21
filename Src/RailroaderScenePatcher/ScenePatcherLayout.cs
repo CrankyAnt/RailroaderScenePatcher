@@ -231,7 +231,7 @@ namespace RailroaderScenePatcher {
             var unsaved = Unsaved(out var saveText);
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileLocked) Inspect(); });
+                var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileLocked) { PrototypeOutlinerGrouping.InvalidatePlaces(); Inspect(); } });
                 refreshButton = refresh.RectTransform;
                 if (FileLocked) AllowDuringRepair(refresh.RectTransform);
                 refresh.Tooltip("Refresh", "Read the scene, scene patch file, and supplied definitions again without applying changes.");
@@ -391,20 +391,24 @@ namespace RailroaderScenePatcher {
                 segments.AddSegment(CommandBand.DisabledFilter, outlinerFilter == OutlinerFilter.Disabled, presentation.Action(() => outlinerFilter = OutlinerFilter.Disabled)).Tooltip(CommandBand.DisabledFilter, "Show the objects that are switched off, whatever their parents are.");
                 segments.AddSegment(CommandBand.ProblemsFilter, outlinerFilter == OutlinerFilter.Problems, presentation.Action(() => outlinerFilter = OutlinerFilter.Problems)).Tooltip(CommandBand.ProblemsFilter, "Show the objects with a detected problem.");
             });
+            // PROTOTYPE: the object count line with right-aligned view icons sits outside the rebuildable list so typing
+            // in Search updates the count without rebuilding the view switch.
+            TMP_Text measure = null;
+            builder.HStack(countRow => {
+                countRow.ConfigureLayout(4f);
+                var countLine = Line(countRow, "<style=Footnote></style>", "Objects", "Inactive loaded objects are included.", RowHeight);
+                measure = countLine.GetComponent<TMP_Text>();
+                if (measure != null) measure.verticalAlignment = VerticalAlignmentOptions.Middle;
+                var grow = countLine.GetComponent<LayoutElement>() ?? countLine.gameObject.AddComponent<LayoutElement>();
+                grow.flexibleWidth = 1; grow.minWidth = 0;
+                PrototypeViewIcons(countRow);
+            }).ChildrenKeepHeight().Height(RowHeight);
             results = builder.AddRebuildableSection(items => {
                 items.ConfigureLayout(4f);
-                var shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged);
-                var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
-                // PROTOTYPE: the view icons stand right-aligned on the line with the object count.
-                TMP_Text measure = null;
-                items.HStack(countRow => {
-                    countRow.ConfigureLayout(4f);
-                    var countLine = Line(countRow, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.");
-                    measure = countLine.GetComponent<TMP_Text>();
-                    var grow = countLine.GetComponent<LayoutElement>() ?? countLine.gameObject.AddComponent<LayoutElement>();
-                    grow.flexibleWidth = 1; grow.minWidth = 0;
-                    PrototypeViewIcons(countRow);
-                }).Height(RowHeight);
+                // PROTOTYPE: search also matches computed place, kind and crossing name.
+                IReadOnlyList<SceneObservation> shown;
+                try { shown = PrototypeOutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, PrototypeTrackPoint); }
+                catch { shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged); }
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
                 string selectedKey = null;
@@ -414,12 +418,18 @@ namespace RailroaderScenePatcher {
                 if (inventory != null) for (var i = 0; i < inventory.Entries.Count; i++) indices[inventory.Entries[i]] = i;
                 // PROTOTYPE: the top-level nodes come from the one-tree grouping.
                 PrototypeOutlinerGrouping.Result proto = null;
-                try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter); }
+                try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, PrototypeTrackPoint); }
                 catch (Exception e) { Debug.LogWarning("Scene Patcher PROTOTYPE outliner failed, showing the current outliner: " + e); }
+                // PROTOTYPE: header count matches the visible tree (excluding hidden container objects and native track spans).
+                var summary = inventory == null ? "Inspection is unavailable"
+                    : proto != null ? proto.Listed.ToString(CultureInfo.InvariantCulture) + " of " + Math.Max(0, inventory.Entries.Count - PrototypeOutlinerGrouping.HiddenCount(inventory.Entries)).ToString(CultureInfo.InvariantCulture) + " objects"
+                    : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
+                if (measure != null) measure.text = "<style=Footnote>" + Literal(summary) + "</style>";
                 var protoTops = proto == null ? null : proto.Tops.ToDictionary(top => top.Key);
                 var drawn = proto == null ? InventoryPresentationState.Groups(shown)
                     : (IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>>)proto.Tops.Select(top => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(top.Key, Array.Empty<SceneObservation>())).ToList();
-                if (PrototypeOutlinerGrouping.LogPending) {
+                // PROTOTYPE: consume LogPending only once the inventory has been populated, not on the initial empty build.
+                if (PrototypeOutlinerGrouping.LogPending && inventory != null && inventory.Entries.Count > 0) {
                     PrototypeOutlinerGrouping.LogPending = false;
                     if (proto != null) PrototypeOutlinerGrouping.Log(proto, shown.Count, filter, outlinerFilter.ToString());
                 }
@@ -464,7 +474,8 @@ namespace RailroaderScenePatcher {
                         var context = label == null && repeated.Contains(name) && segments.Length > 1 ? "  <alpha=#99>" + Literal(segments[segments.Length - 2]) + "<alpha=#FF>" : "";
                         // A row of the Inspection only group names its family, which its folder does not. A group
                         // that stays under its category without a supported edit is marked as inspection only.
-                        if (item.InspectionOnly != null) context += "  <alpha=#99>" + (item.Category == null ? Literal(item.Family) : "inspection only") + "<alpha=#FF>";
+                        // PROTOTYPE: in the one-tree outliner every inspection-only row sits in its category or family folder and carries "inspection only".
+                        if (item.InspectionOnly != null) context += "  <alpha=#99>" + (protoTop != null || item.Category != null ? "inspection only" : Literal(item.Family)) + "<alpha=#FF>";
                         if (where != null) context = "  <alpha=#99>" + Literal(where) + "<alpha=#FF>" + context;
                         var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
                         string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
@@ -528,8 +539,10 @@ namespace RailroaderScenePatcher {
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
-            var widths = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row =>
-                measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
+            // PROTOTYPE: include deeper prototype indentation and Where suffixes when fitting the column.
+            var widths = PrototypeOutlinerGrouping.FitWidths(measure)
+                ?? InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row =>
+                    measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
             var divider = NativePresentation.DividerWidth + 26;
             outlinerWidth = InventoryPresentationState.FitWidth(widths, RowDecoration, presentation.ContentWidth, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
             StoreOutlinerWidth(outlinerWidth);
