@@ -288,7 +288,7 @@ namespace RailroaderScenePatcher.Core {
             return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled, or disabled.";
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
-            RendererCuller = "Helpers.Culling.RendererCuller", FolderRule = "Folders above group roots";
+            RendererCuller = "Helpers.Culling.RendererCuller", FolderRule = "Container objects above group roots";
         // Crossbucks at unprotected crossings: each crossbuck is a group of its own under Grade crossing, wherever it
         // stands below World. Its models, the LOD levels below it, belong to its entry and are no parts.
         public const string CrossbuckModels = "A crossbuck's models belong to its entry.";
@@ -433,7 +433,7 @@ namespace RailroaderScenePatcher.Core {
         public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullingContainers ? CullingContainerRefusal : null;
         // Why a modification cannot edit, as a group, the object at a path the group rule did not list, or null: the
         // category table marks the path as a folder, such as Bryson Yard.
-        public const string FolderRefusal = "This path names a folder, which only holds groups; it is not a group. Edit its groups instead";
+        public const string FolderRefusal = "This path names a container object. Edit the groups it holds.";
         public static string GroupRefusal(string path) => BakedSceneryCategories.IsFolder(path) ? FolderRefusal : null;
         // Why a modification cannot edit the object at a path as a group, from the group rule's verdict for it, or null:
         // a folder, which has no verdict, and a group with a car loader, which the Car loaders rule keeps out.

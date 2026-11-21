@@ -187,7 +187,7 @@ static class BakedPartTests {
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard", Post = Yard + "/Tall Post Shade";
         var f = new Fixture();
         var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()))))));
-        Assert(BakedSceneryRules.GroupRefusal(Yard) == BakedSceneryRules.FolderRefusal && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a folder of the category table is refused as a group");
+        Assert(BakedSceneryRules.GroupRefusal(Yard) == "This path names a container object. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a container object in the category table is refused with the container object message");
         var lamp = verdicts.Single(v => v.Path == Post);
         Assert(BakedSceneryRules.PartRefusal(null, lamp) == BakedSceneryRules.GroupRootRefusal && BakedSceneryRules.PartRefusal(null, null) == null, "A group root is refused as a part with its own reason");
         Assert(BakedSceneryRules.ResolvesGroup(null, Yard) && BakedSceneryRules.ResolvesGroup(lamp, Post) && !BakedSceneryRules.ResolvesGroup(null, Post + "/Bulb"), "A folder resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
