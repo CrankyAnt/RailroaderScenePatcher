@@ -278,13 +278,17 @@ A kind of scene object that the patcher supports under its own rules, such as tr
 Map data that the native map editor edits, such as Props, masks, Builtins, spawns, turntables, tracks, industries, track spans and passenger stops. The inventory lists no native map data.
 
 **Baked scenery group**:
-A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces or bridge constructions, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery.
+A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces or bridge constructions, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery. It is a group by hierarchy: one scene object and the scene objects below it. Railroader has no term for it. Compare game-defined group, a group by a game component.
 
 **Group root**:
 The scene object at the top of a baked scenery group. The inventory lists a baked scenery group as one entry for its root.
 
 **Part**:
-A scene object inside a baked scenery group, other than its group root, that can receive its own physical placement or activity.
+A scene object inside a baked scenery group, other than its group root, that can receive its own physical placement or activity. A component or mesh inside one scene object is not a part.
+
+**Container object**:
+A scene object that only holds other scene objects and has nothing visible of its own, such as `Bryson Signs` or a place's object under `World/Large Scenery`. A container object is not a group: the scene objects it holds are listed and edited by their own family or group. The native map editor's Folder is a folder of map data, not a container object.
+_Avoid_: Folder
 
 **Scene spawn point**:
 A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a spawn in native map data.
@@ -408,5 +412,5 @@ The native dropdown beside the pointer that lists the scene objects of one click
 _Avoid_: Picker, popup
 
 **Game-defined group**:
-Scene objects that a game component holds together, which the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a station, a rail bridge construction or an industry storage display. Each of its objects keeps its own inventory entry and edits.
+Scene objects that a game component holds together, which the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a station, a rail bridge construction or an industry storage display. Each of its objects keeps its own inventory entry and edits. It is a group by a game component, whose objects can stand apart in the scene hierarchy. Compare baked scenery group, a group by hierarchy.
 _Avoid_: Cluster, marker group
