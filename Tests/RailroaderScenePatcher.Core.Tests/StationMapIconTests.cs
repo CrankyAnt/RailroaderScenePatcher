@@ -9,11 +9,11 @@ using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // Station map icons: the map icons below World/Map Labels/Station Icons form the Station map icon family, each with
-// physical placement and Enabled. Controlled hierarchies follow the Railroader 0.6.3 scene: the Station Icons folder
+// physical placement and Enabled. Controlled hierarchies follow the Railroader 0.6.3 scene: the Station Icons container object
 // holds one object per station with a UI.Map.MapIcon, an image and a box collider; map labels stand beside it.
 static class StationMapIconTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception("Station map icons: " + message); }
-    const string SceneName = "level4", Folder = StationMapIconRules.Folder, Bryson = Folder + "/Bryson", Cochran = Folder + "/Cochran", Whittier = Folder + "/Whittier";
+    const string SceneName = "level4", IconsPath = StationMapIconRules.IconsPath, Bryson = IconsPath + "/Bryson", Cochran = IconsPath + "/Cochran", Whittier = IconsPath + "/Whittier";
     static Node Icon(string name) => new Node(name, new Node("Text").With("TMPro.TextMeshProUGUI")).With(StationMapIconRules.Component, "UnityEngine.UI.Image", "UnityEngine.BoxCollider").Solid().Family();
     internal static Node World() => new Node("World",
         new Node("Map Labels", new Node("Bryson").With("UI.Map.MapLabel").Solid(), new Node("Station Icons", Icon("Bryson"), Icon("Cochran"), Icon("Whittier"))),
@@ -22,7 +22,7 @@ static class StationMapIconTests {
     public static void Run() {
         InventoryListsEveryStationMapIconOnce();
         OnlyStationIconsAreListed();
-        FolderChildrenThatAreNoIconsStayOut();
+        ContainerChildrenWithoutMapIconsStayOut();
         IconEditsApplyRepeatAndRestore();
         IconEditsInScenePatchEditing();
         RefusalInScenePatchEditingLeavesTheFile();
@@ -30,12 +30,12 @@ static class StationMapIconTests {
         Console.WriteLine("PASS: station map icons");
     }
 
-    // The Station Icons folder is no group and gets no row: its icons keep their own family, each once. The map label
-    // beside it stays out, and nothing in the folder is inspection only. In the outliner every icon stands once in the
+    // The Station Icons container object is no group and gets no row: its icons keep their own family, each once. The map label
+    // beside it stays out, and nothing in the container object is inspection only. In the outliner every icon stands once in the
     // Station map icon family, outside the Inspection only group.
     static void InventoryListsEveryStationMapIconOnce() {
         var verdicts = BakedSceneryRules.Classify(World());
-        Assert(!verdicts.Any(v => v.Path == Folder), "The Station Icons folder has no verdict of its own: " + String.Join(", ", verdicts.Where(v => v.Path == Folder).Select(v => v.Disposition + " " + v.Reason)));
+        Assert(!verdicts.Any(v => v.Path == IconsPath), "The Station Icons container object has no verdict of its own: " + String.Join(", ", verdicts.Where(v => v.Path == IconsPath).Select(v => v.Disposition + " " + v.Reason)));
         foreach (var path in new[] { Bryson, Cochran, Whittier }) {
             var found = verdicts.Where(v => v.Path == path).ToArray();
             Assert(found.Length == 1 && found[0].Disposition == GroupDisposition.ExistingFamily, path + " keeps its family once: " + String.Join(", ", found.Select(v => v.Disposition + " " + v.Reason)));
@@ -56,18 +56,18 @@ static class StationMapIconTests {
     static SceneObservation Row(string path) => new SceneObservation(new object(), new TargetIdentity(SceneName, path, StationMapIconRules.Component, StationMapIconRules.Structure),
         StationMapIconRules.Family, true, new[] { 1.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }, new string[0], new[] { StationMapIconRules.Dependency }, new string[0], StationMapIconRules.Operations);
 
-    // Only map icons below the Station Icons folder are station map icons; the capability resolves no other target.
+    // Only map icons below the Station Icons container object are station map icons; the capability resolves no other target.
     static void OnlyStationIconsAreListed() {
-        Assert(StationMapIconRules.Listed(Bryson), "An icon directly in the folder is listed");
-        Assert(!StationMapIconRules.Listed(Folder + "/Group/Deep") && !StationMapIconRules.Listed(Folder + "/"), "An icon in a subgroup of the folder is not listed");
-        Assert(!StationMapIconRules.Listed(Folder) && !StationMapIconRules.Listed("World/Map Labels/Bryson") && !StationMapIconRules.Listed("Car/Map Icon") && !StationMapIconRules.Listed(null)
-            && !StationMapIconRules.Listed(Folder + " (1)/Bryson"), "The folder itself, map labels and runtime icons are not listed");
+        Assert(StationMapIconRules.Listed(Bryson), "An icon directly in the container object is listed");
+        Assert(!StationMapIconRules.Listed(IconsPath + "/Group/Deep") && !StationMapIconRules.Listed(IconsPath + "/"), "An icon in a subgroup of the container object is not listed");
+        Assert(!StationMapIconRules.Listed(IconsPath) && !StationMapIconRules.Listed("World/Map Labels/Bryson") && !StationMapIconRules.Listed("Car/Map Icon") && !StationMapIconRules.Listed(null)
+            && !StationMapIconRules.Listed(IconsPath + " (1)/Bryson"), "The container object itself, map labels and runtime icons are not listed");
         var f = new Icons();
         Assert(f.Scene.Resolve(Id(Bryson)).Count == 1, "A station map icon resolves");
         Assert(f.Scene.Resolve(new TargetIdentity(SceneName, Bryson, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure)).Count == 0
             && f.Scene.Resolve(new TargetIdentity(SceneName, Bryson, StationMapIconRules.Component, BakedSceneryParts.Structure)).Count == 0, "Another component or structure does not resolve");
         f.World.Objects["World/Map Labels/Bryson"] = new List<object> { new FakeIcon() };
-        Assert(f.Scene.Resolve(new TargetIdentity(SceneName, "World/Map Labels/Bryson", StationMapIconRules.Component, StationMapIconRules.Structure)).Count == 0, "A map icon outside the folder does not resolve");
+        Assert(f.Scene.Resolve(new TargetIdentity(SceneName, "World/Map Labels/Bryson", StationMapIconRules.Component, StationMapIconRules.Structure)).Count == 0, "A map icon outside the container object does not resolve");
         // A group elsewhere that holds a map icon is not moved as a whole, without a ticket.
         var held = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Icon").With(StationMapIconRules.Component), new Node("Shell").Solid())))))
             .Single(v => v.Path == "World/Large Scenery/Town/Depot");
@@ -86,22 +86,22 @@ static class StationMapIconTests {
         Assert(RecoveryGuidance.Guide("Object", null, StationMapIconRules.Structure).Value == "moving-station-map-icons.md", "A failed icon edit opens the station map icon guide");
     }
 
-    // Only a direct child of the Station Icons folder that carries a map icon is an icon. A child without one is not
+    // Only a direct child of the Station Icons container object that carries a map icon is an icon. A child without one is not
     // listed, and neither is a subgroup that holds an icon: no editable group, no inspection-only row, and no row for the
     // icon inside it, which Listed does not accept either.
-    static void FolderChildrenThatAreNoIconsStayOut() {
+    static void ContainerChildrenWithoutMapIconsStayOut() {
         var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Map Labels", new Node("Station Icons",
             Icon("Bryson"),
             new Node("Backdrop").With("UnityEngine.MeshRenderer").Solid(),
             new Node("Group", Icon("Nested")).Solid()))));
         Assert(verdicts.Single(v => v.Path == Bryson).Disposition == GroupDisposition.ExistingFamily, "The icon keeps its family");
-        foreach (var path in new[] { Folder + "/Backdrop", Folder + "/Group" }) {
+        foreach (var path in new[] { IconsPath + "/Backdrop", IconsPath + "/Group" }) {
             var verdict = verdicts.SingleOrDefault(v => v.Path == path);
             Assert(verdict?.Disposition == GroupDisposition.NotListed && verdict.Reason == BakedSceneryRules.MapLabel, path + " is not listed: " + verdict?.Disposition + " " + verdict?.Reason);
         }
-        Assert(!verdicts.Any(v => v.Path == Folder + "/Group/Nested"), "The icon in a subgroup gets no verdict");
-        Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly), "Nothing in the folder is an editable or inspection-only group");
-        Assert(!StationMapIconRules.Listed(Folder + "/Group/Nested"), "The nested icon is in no family");
+        Assert(!verdicts.Any(v => v.Path == IconsPath + "/Group/Nested"), "The icon in a subgroup gets no verdict");
+        Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly), "Nothing in the container object is an editable or inspection-only group");
+        Assert(!StationMapIconRules.Listed(IconsPath + "/Group/Nested"), "The nested icon is in no family");
     }
 
     // A preflight refusal in scene patch editing changes neither the icon nor the scene patch file, and nothing waits to be saved.

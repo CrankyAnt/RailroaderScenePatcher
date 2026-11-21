@@ -503,6 +503,6 @@ static class RailBridgeTests {
             && BakedSceneryRules.TrackOwnedRefusal(new[] { "Track.TrackSegment" }) != null, "A generated trestle or a track component refuses the bridge");
         var road = At(verdicts, Large + "Almond/Almond Road Bridge");
         Assert(road?.Disposition == GroupDisposition.Group && road.Subcategory == BakedSceneryCategories.RoadBridges, "A road bridge is no rail bridge: it stands under Road bridges");
-        Assert(BakedSceneryCategories.Find(Almond)?.Folder == false && BakedSceneryCategories.Find(Almond + "/Abutments") == null, "The category table names the Almond Bridge itself as the group");
+        Assert(BakedSceneryCategories.Find(Almond)?.IsContainerObject == false && BakedSceneryCategories.Find(Almond + "/Abutments") == null, "The category table names the Almond Bridge itself as the group");
     }
 }

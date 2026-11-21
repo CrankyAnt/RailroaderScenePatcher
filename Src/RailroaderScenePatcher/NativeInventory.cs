@@ -397,7 +397,7 @@ namespace RailroaderScenePatcher {
             // by distance. Which components exist is a dependency; whether each is enabled is runtime state.
             var runtime = new List<string>();
             var components = go.GetComponentsInChildren<Component>(true);
-            var parts = new List<HierarchyPart>();
+            var hierarchyComponents = new List<HierarchyComponent>();
             // A crossing pad's builder generates its mesh into a container and destroys whatever is there first.
             Transform container = null;
             if (family == "Crossing pad marker") try { container = Field(Get(go, "Track.TrackCurveMeshBuilder"), "meshContainer") as Transform; } catch { }
@@ -414,12 +414,12 @@ namespace RailroaderScenePatcher {
                 }
                 if (HierarchyDependencies.IsRuntimeComponent(TypeName(child))) { runtime.Add("Runtime component " + Label(child)); continue; }
                 // Which components exist, and who references them from an authored field, is a dependency; whether a
-                // behaviour is enabled is runtime state, so the part carries no enabled value.
-                parts.Add(new HierarchyPart(Label(child), null, false, incoming.TryGetValue(child, out var refs) ? refs : null));
+                // behaviour is enabled is runtime state, so the component carries no enabled value.
+                hierarchyComponents.Add(new HierarchyComponent(Label(child), null, false, incoming.TryGetValue(child, out var refs) ? refs : null));
                 if (child is Behaviour behaviour) runtime.Add(Label(child) + " enabled=" + behaviour.enabled);
                 if (working.TryGetValue(child, out var held)) runtime.AddRange(held);
             }
-            dependencies.AddRange(HierarchyDependencies.Describe(family == "Crossing pad marker", parts));
+            dependencies.AddRange(HierarchyDependencies.Describe(family == "Crossing pad marker", hierarchyComponents));
             if (incoming.TryGetValue(go, out var rootRefs)) dependencies.AddRange(rootRefs);
             if (working.TryGetValue(go, out var rootHeld)) runtime.AddRange(rootHeld);
             if (scanErrors != 0) problems.Add("Direct-reference scan incomplete: " + scanErrors + " unreadable fields");
@@ -649,7 +649,7 @@ namespace RailroaderScenePatcher {
             if (mast || ownBell) Read(() => runtime.AddRange(CrossingDeviceWorld.CullingState(go)));
             // Who names an object above the equipment in an authored field, such as a culler's list or a map feature's
             // or a progression's switch list: those can switch the equipment with the object above it.
-            // Every object up to the scene root counts: a progression list on a town folder can name the crossing.
+            // Every object up to the scene root counts: a progression list on a place's scene object can name the crossing.
             if (mast || ownBell)
                 for (var t = go.transform.parent; t != null; t = t.parent)
                     if (incoming.TryGetValue(t.gameObject, out var above)) foreach (var line in above) runtime.Add("Above this object, " + BoardScene.PathOf(t) + ": " + line);

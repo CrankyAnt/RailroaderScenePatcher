@@ -263,9 +263,9 @@ namespace RailroaderScenePatcher {
             for (var t = part.transform.parent; t != null; t = t.parent) if (VerdictOf(t.gameObject)?.Disposition == GroupDisposition.Group) return t.gameObject;
             return null;
         }
-        // The identity of the objects from World down to the group roots: World, its folders, the town folders below
+        // The identity of the objects from World down to the group roots: World, its container objects, the objects for each place below
         // World/Large Scenery and the candidates below them.
-        // Objects below the candidates, such as the children of a crossing folder, are read again at the next whole discovery.
+        // Objects below the candidates, such as the children of a crossing container object, are read again at the next whole discovery.
         static void Signature(Transform t, int depth, System.Text.StringBuilder key, int limit = 2) {
             key.Append(t.GetInstanceID()).Append(',');
             if (depth == 1 && t.name == BakedSceneryRules.LargeScenery) limit = 3;
@@ -353,7 +353,7 @@ namespace RailroaderScenePatcher {
             BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g), path)).Cast<object>().ToArray();
         public string Refusal(object group) => Problem(group as GameObject);
         // The construction segments of the controller on the group root itself, such as on Bryson Bridge 1 and the
-        // Almond Bridge folder; a group without one has no construction-segment relationship.
+        // Almond Bridge group root; a group without one has no construction-segment relationship.
         static Component OwnController(object group) => group is GameObject root && RailBridgeRoot(root) ? ConstructionSegmentNative.On(root) : null;
         public IReadOnlyList<string> ConstructionSegments(object group) => ConstructionSegmentNative.Read(OwnController(group));
         public IReadOnlyList<string> NativeConstructionSegments(object group) => ConstructionSegmentNative.NativeOf(OwnController(group));
@@ -364,8 +364,8 @@ namespace RailroaderScenePatcher {
             if (!Loaded(root)) return "The group's scene is not loaded";
             // A folder of the category table, such as Bryson Yard, and a group with a car loader resolve so that they
             // fail with this reason.
-            var folder = BakedSceneryRules.GroupRefusal(VerdictOf(root), BoardScene.PathOf(root.transform));
-            if (folder != null) return folder;
+            var refusal = BakedSceneryRules.GroupRefusal(VerdictOf(root), BoardScene.PathOf(root.transform));
+            if (refusal != null) return refusal;
             if (VerdictOf(root)?.Disposition != GroupDisposition.Group) return "This object is not a group root of the Baked scenery group family";
             var components = root.GetComponentsInChildren<Component>(true);
             if (components.Any(c => c == null)) return "Missing script in the group hierarchy";

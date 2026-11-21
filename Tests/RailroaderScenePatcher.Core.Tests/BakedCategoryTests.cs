@@ -6,14 +6,14 @@ using System.Linq;
 using RailroaderScenePatcher.Core;
 using RailroaderScenePatcher;
 
-// Baked scenery categories: which category the rule gives each group root, which scene objects are folders, which are
+// Baked scenery categories: which category the rule gives each group root, which scene objects are container objects, which are
 // kept out, and how the outliner nests groups under categories and parts under groups. All from supplied hierarchy
 // and component facts.
 static class BakedCategoryTests {
     static void Check(bool value, string message) { if (!value) throw new Exception("Baked scenery category: " + message); }
 
-    // The category table of the Railroader 0.6.3 Large Scenery catalogue, as the ticket records it: folder below
-    // World/Large Scenery, group or folder below it, kind, category.
+    // The category table of the Railroader 0.6.3 Large Scenery catalogue, as the ticket records it: scene object below
+    // World/Large Scenery, group or scene object below it, kind, category.
     const string Table = @"
 Alarka Jct | Alarka Jct Station | Group | Station building
 Alarka Jct | Crossing Unprotected (1)/Sign-Crossing0 (1) | Group | Grade crossing
@@ -52,7 +52,7 @@ Bryson | Bryson Section House | Group | Railroad service building
 Bryson | Bryson Signs | Group | Sign
 Bryson | Bryson Tower Chance Clayton | Group | Railroad service building
 Bryson | Bryson Turntable | Group | Railroad service building
-Bryson | Bryson Yard | Folder | -
+Bryson | Bryson Yard | Container | -
 Bryson | Bryson Yard/Tall Post Shade | Group | Lights
 Bryson | Bryson Yard/Tall Post Shade (1) | Group | Lights
 Bryson | Bryson Yard/Tall Post Shade (2) | Group | Lights
@@ -102,18 +102,18 @@ Whittier | Whittier Saw Mill Culled | Group | Industry building
 Whittier | Whittier Signs | Group | Sign
 Whittier | Whittier Stenzel | Group | Lights
 Wilmot | Wilmot Station | Group | Station building";
-    sealed class Row { public string Path; public bool Folder; public string Category, Subcategory; }
+    sealed class Row { public string Path; public bool Container; public string Category, Subcategory; }
     static readonly Row[] Rows = Table.Split('\n').Select(line => line.Trim()).Where(line => line.Length != 0).Select(line => {
         var cells = line.Split('|').Select(cell => cell.Trim()).ToArray();
         var category = cells[3].Split(new[] { " / " }, StringSplitOptions.None);
-        return new Row { Path = ("World/Large Scenery/" + cells[0] + "/" + cells[1]).TrimEnd('/'), Folder = cells[2] == "Folder", Category = cells[2] == "Folder" ? null : category[0], Subcategory = category.Length > 1 ? category[1] : null };
+        return new Row { Path = ("World/Large Scenery/" + cells[0] + "/" + cells[1]).TrimEnd('/'), Container = cells[2] == "Container", Category = cells[2] == "Container" ? null : category[0], Subcategory = category.Length > 1 ? category[1] : null };
     }).ToArray();
     static readonly string[] Categories = { "Station building", "Platform", "Lights", "Sign", "Grade crossing", "Bridge", "Industry building", "Storage display", "Railroad service building", "Other" };
 
     public static void Run() {
         CategoryNames();
         EveryRootTakesItsTableCategory();
-        FolderHasNoGroupEntry();
+        ContainerObjectHasNoGroupEntry();
         VerdictsKeepObjectsOut();
         OutlinerNestsGroupsAndParts();
         BridgesOutsideTheTable();
@@ -125,11 +125,11 @@ Wilmot | Wilmot Station | Group | Station building";
         Check(BakedSceneryCategories.All.SequenceEqual(Categories), "the family has the ten categories of the ticket, in its order (got " + String.Join(", ", BakedSceneryCategories.All) + ")");
         Check(BakedSceneryCategories.Subcategories("Bridge").SequenceEqual(new[] { "Rail bridges", "Road bridges" }), "Bridge has the subgroups Rail bridges and Road bridges");
         Check(Categories.Where(c => c != "Bridge").All(c => BakedSceneryCategories.Subcategories(c).Count == 0), "no other category has subgroups");
-        Check(Rows.Where(r => !r.Folder).All(r => Categories.Contains(r.Category)), "every category in the category table is one of the family's categories");
+        Check(Rows.Where(r => !r.Container).All(r => Categories.Contains(r.Category)), "every category in the category table is one of the family's categories");
     }
 
     // The world of the table: every row a scene object at its path. A crossbuck stands in an unprotected crossing, a
-    // folder holds only its child groups, and every other root is a model with one part.
+    // container object holds only its child groups, and every other root is a model with one part.
     static Node Find(Node parent, string name) { var found = parent.Kids.FirstOrDefault(k => k.Name == name); if (found == null) parent.Kids.Add(found = new Node(name)); return found; }
     static Node World() {
         var world = new Node("World");
@@ -137,7 +137,7 @@ Wilmot | Wilmot Station | Group | Station building";
             var names = row.Path.Split('/');
             var at = world;
             for (var i = 1; i < names.Length; i++) at = Find(at, names[i]);
-            if (row.Folder) continue;
+            if (row.Container) continue;
             if (at.Name.StartsWith("Sign-Crossing0", StringComparison.Ordinal)) { at.With("Helpers.Culling.RendererCuller"); at.Kids.Add(new Node("LOD0").Solid()); }
             else at.Kids.Add(new Node("Model").Solid());
         }
@@ -153,13 +153,13 @@ Wilmot | Wilmot Station | Group | Station building";
 
     static void EveryRootTakesItsTableCategory() {
         var verdicts = BakedSceneryRules.Classify(World());
-        foreach (var row in Rows.Where(r => !r.Folder)) {
+        foreach (var row in Rows.Where(r => !r.Container)) {
             var verdict = At(verdicts, row.Path);
             Check(verdict != null && (verdict.Disposition == GroupDisposition.Group || verdict.Disposition == GroupDisposition.InspectionOnly), row.Path + " is a listed group root");
             Check(verdict.Category == row.Category && verdict.Subcategory == row.Subcategory, row.Path + " stands under " + row.Category + (row.Subcategory == null ? "" : " / " + row.Subcategory) + " (got " + verdict.Category + (verdict.Subcategory == null ? "" : " / " + verdict.Subcategory) + ")");
         }
         var listed = verdicts.Where(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly).ToArray();
-        Check(listed.Length == Rows.Count(r => !r.Folder), "the table's groups are the listed group roots, no more (got " + listed.Length + ")");
+        Check(listed.Length == Rows.Count(r => !r.Container), "the table's groups are the listed group roots, no more (got " + listed.Length + ")");
         // Whittier Stenzel is a Lights group whose two spotlights stay parts nested under it.
         var stenzel = new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Stenzel", new Node("Spotlight Outdoor").Solid(), new Node("Spotlight Outdoor (1)").Solid()))));
         var lights = BakedSceneryRules.Classify(stenzel);
@@ -169,21 +169,21 @@ Wilmot | Wilmot Station | Group | Station building";
         Check(Rows.Where(r => r.Category == "Industry building").All(r => At(verdicts, r.Path).Category == "Industry building"), "an industry building is a group root of its own in Industry building");
     }
 
-    // A scene object in a group-root position that the table marks as a folder has no group entry; its children are the
+    // A scene object in a group-root position that the table marks as a container object has no group entry; its children are the
     // group roots, each with its parts.
-    static void FolderHasNoGroupEntry() {
+    static void ContainerObjectHasNoGroupEntry() {
         var posts = new[] { "", " (1)", " (2)", " (3)", " (4)", " (6)", " (7)", " (8)", " (9)", " (10)", " (11)", " (12)", " (13)" }.Select(n => "Tall Post Shade" + n).ToArray();
         var yard = new Node("Bryson Yard", posts.Select(name => new Node(name, new Node("Post").Solid(), new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller")).ToArray());
         var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", yard, new Node("Bryson Depot", new Node("Roof").Solid())))));
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard";
-        Check(At(verdicts, Yard) == null, "Bryson Yard is a folder: it has no group entry");
+        Check(At(verdicts, Yard) == null, "Bryson Yard is a container object: it has no group entry");
         var lamps = verdicts.Where(v => v.Path.StartsWith(Yard + "/", StringComparison.Ordinal)).ToArray();
         Check(lamps.Length == 13 && lamps.All(v => v.Disposition == GroupDisposition.Group && v.Category == "Lights") && posts.All(name => lamps.Any(v => v.Path == Yard + "/" + name)), "each of the 13 yard lamp posts is its own group in Lights (got " + lamps.Length + ")");
         var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
-        Check(posts.All(name => parts.Count(p => p.GroupPath == Yard + "/" + name) == 2) && !parts.Any(p => p.GroupPath == Yard), "each lamp post lists its own parts, and none is a part of the folder");
-        // The same object anywhere else stays a group: only the table makes a folder.
+        Check(posts.All(name => parts.Count(p => p.GroupPath == Yard + "/" + name) == 2) && !parts.Any(p => p.GroupPath == Yard), "each lamp post lists its own parts, and none is a part of the container object");
+        // The same object anywhere else stays a group: only the table makes a container object.
         var other = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Sylva", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Post").Solid()))))));
-        Check(At(other, "World/Large Scenery/Sylva/Bryson Yard")?.Disposition == GroupDisposition.Group, "an object the table does not mark as a folder stays a group root");
+        Check(At(other, "World/Large Scenery/Sylva/Bryson Yard")?.Disposition == GroupDisposition.Group, "an object the table does not mark as a container object stays a group root");
     }
 
     static void VerdictsKeepObjectsOut() {
@@ -240,7 +240,7 @@ Wilmot | Wilmot Station | Group | Station building";
             "groups stand under their categories in the family's order, Bridge under its subgroups, and each group lists its parts beneath it (got " + Shape(tree) + ")");
         Check(tree.Select(n => n.Count).SequenceEqual(new[] { 1, 2, 3 }), "a category counts the rows beneath it");
         // A group row says where it stands, so groups of one name can be told apart.
-        Check(tree[2].Children[0].Where == "Bryson" && tree[2].Children[0].Children.All(part => part.Where == null), "a group row names its folder below World/Large Scenery; a part row does not");
+        Check(tree[2].Children[0].Where == "Bryson" && tree[2].Children[0].Children.All(part => part.Where == null), "a group row names its parent below World/Large Scenery; a part row does not");
         Check(InventoryPresentationState.GroupWhere("World/Large Scenery/Alarka Jct/Crossing Unprotected (1)/Sign-Crossing0 (1)") == "Alarka Jct / Crossing Unprotected (1)"
             && InventoryPresentationState.GroupWhere("World/Roads Barkers/1932 Chevy Truck LP") == "Roads Barkers" && InventoryPresentationState.GroupWhere("World/Lone") == null,
             "a group's place is the path between World/Large Scenery, or World, and its name");

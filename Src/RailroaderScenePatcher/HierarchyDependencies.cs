@@ -5,8 +5,8 @@ using System.Collections.Generic;
 namespace RailroaderScenePatcher {
     // One component of an inspected hierarchy, with copied values: its label, its enabled state when it is a behaviour,
     // whether it belongs to a runtime-generated (DontSave) object, and the direct references to it.
-    internal sealed class HierarchyPart {
-        internal HierarchyPart(string label, bool? enabled, bool generated, IEnumerable<string> incoming = null) {
+    internal sealed class HierarchyComponent {
+        internal HierarchyComponent(string label, bool? enabled, bool generated, IEnumerable<string> incoming = null) {
             Label = label; Enabled = enabled; Generated = generated; Incoming = incoming ?? new string[0];
         }
         internal string Label { get; }
@@ -30,12 +30,12 @@ namespace RailroaderScenePatcher {
         // saved with the scene: it is runtime state, and its arrival changes no observation.
         internal static bool IsRuntimeComponent(string typeName) => typeName == "Helpers.Animation.PlayableGraphAnimatorAdapter";
         internal const string GeneratedPad = "Generated pad mesh and culling sphere, rebuilt by native generation from the marker location";
-        internal static IEnumerable<string> Describe(bool crossingPad, IEnumerable<HierarchyPart> parts) {
+        internal static IEnumerable<string> Describe(bool crossingPad, IEnumerable<HierarchyComponent> components) {
             if (crossingPad) yield return GeneratedPad;
-            foreach (var part in parts) {
-                if (crossingPad && part.Generated) continue;
-                yield return "Component " + part.Label + (part.Enabled.HasValue ? "; enabled=" + (part.Enabled.Value ? "True" : "False") : "");
-                foreach (var reference in part.Incoming) yield return reference;
+            foreach (var component in components) {
+                if (crossingPad && component.Generated) continue;
+                yield return "Component " + component.Label + (component.Enabled.HasValue ? "; enabled=" + (component.Enabled.Value ? "True" : "False") : "");
+                foreach (var reference in component.Incoming) yield return reference;
             }
         }
     }

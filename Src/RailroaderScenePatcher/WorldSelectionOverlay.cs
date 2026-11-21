@@ -43,7 +43,7 @@ namespace RailroaderScenePatcher {
         float trackRadius;
         Material trackMaterial;
         // The outline kind of each renderer seen, read once: its components, shadow mode and level of detail stay.
-        readonly Dictionary<Renderer, ObjectMarkingPartKind> kinds = new Dictionary<Renderer, ObjectMarkingPartKind>();
+        readonly Dictionary<Renderer, ObjectMarkingBoxKind> kinds = new Dictionary<Renderer, ObjectMarkingBoxKind>();
 
         // The height of the surface an object stands in at a place (ObjectMarkingGeometry.Surface): the terrain, or the
         // ballast of track that lies on it. One ray from above meets everything on the game's Terrain and Track layers
@@ -178,7 +178,7 @@ namespace RailroaderScenePatcher {
                 return corners;
             } catch { return null; }
         }
-        // The bounds of an invisible object's colliders, at and below it, as parts for its helper marker
+        // The bounds of an invisible object's colliders, at and below it, as boxes for its helper marker
         // (HelperMarkers.Mark): each collider's own box in the world, from its shape. Which colliders frame the object
         // (HelperMarkers.Framing: on, with every object up to the scene root on or off only through a culler; no
         // terrain collider; triggers only without a solid collider) is decided once and kept on the renderers' beat,
@@ -188,7 +188,7 @@ namespace RailroaderScenePatcher {
         const string TerrainColliderType = "UnityEngine.TerrainCollider";
         sealed class Framed { internal Collider[] All; internal IReadOnlyList<int> Framing; internal int Until; }
         readonly Dictionary<GameObject, Framed> colliders = new Dictionary<GameObject, Framed>();
-        IReadOnlyList<ObjectMarkingPart> Colliders(GameObject go) {
+        IReadOnlyList<ObjectMarkingBox> Colliders(GameObject go) {
             if (!colliders.TryGetValue(go, out var kept) || Time.frameCount >= kept.Until) {
                 var all = go.GetComponentsInChildren<Collider>(true);
                 var facts = all.Select(collider => {
@@ -201,7 +201,7 @@ namespace RailroaderScenePatcher {
                 }).ToArray();
                 colliders[go] = kept = new Framed { All = all, Framing = HelperMarkers.Framing(facts), Until = Time.frameCount + 90 + (go.GetInstanceID() & 63) };
             }
-            return HelperMarkers.ColliderParts(kept.Framing, i => kept.All[i] == null ? null : GroupWorld.Corners(kept.All[i]).Select(Point).ToArray());
+            return HelperMarkers.ColliderBoxes(kept.Framing, i => kept.All[i] == null ? null : GroupWorld.Corners(kept.All[i]).Select(Point).ToArray());
         }
         // Where a candidate stands in the world now: the transform of its scene object, which follows every placement
         // change, gizmo preview and Undo, or its observed position for anything else.
@@ -394,7 +394,7 @@ namespace RailroaderScenePatcher {
             // at the group distance or less, where only its parts show.
             internal bool[] Absent;
         }
-        // What one pass measured of a scene object: its frame, with the bounds and the parts of its framed piece. A
+        // What one pass measured of a scene object: its frame, with the bounds and the boxes of its framed piece. A
         // group takes its bounds and its one box from these, without reading the object again.
         sealed class Measured { internal ObjectMarkingFrame Frame; }
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
@@ -518,7 +518,7 @@ namespace RailroaderScenePatcher {
                 var anchors = objects.Select(member => Point(Live(member, origin))).ToArray();
                 var frames = parts.Select(part => part?.Frame).ToArray();
                 // The group's one box stands in the orientation of the scene object that anchors it, the crossing
-                // controller's root, around where its objects stand and around the parts of their pieces, and is cut
+                // controller's root, around where its objects stand and around the boxes of their pieces, and is cut
                 // at the surface like the box of an object.
                 var root = groups[g].Root;
                 var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera), listed);
@@ -549,7 +549,7 @@ namespace RailroaderScenePatcher {
             return shapes;
         }
         // A candidate that shows on its own in a group within the group's frame distance has its own frame, although
-        // its own bounds, or without parts its marker, may lie beyond the frame distance: it is projected again at
+        // its own bounds, or without boxes its marker, may lie beyond the frame distance: it is projected again at
         // the group's frame distance. That is the candidate of the choice and the inspected object, at most.
         void OwnFrames(SpatialCandidate[] candidates, Shape[] shapes, Measured[] measured, GroupLayout layout, Camera camera, Vector3 origin) {
             foreach (var m in layout.OwnAtGroupDistance) {
@@ -802,9 +802,9 @@ namespace RailroaderScenePatcher {
                 // stands in, so the pad is framed whole and not cut off where its ends meet the road.
                 var ground = PadFamilies.Contains(candidate.Observation.Family) ? null : (Func<double, double, double?>)GroundAt;
                 Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods = null;
-                var parts = new List<ObjectMarkingPart>();
+                var boxes = new List<ObjectMarkingBox>();
                 // What is read once per renderer and per place is read within a share of the frame: a renderer whose
-                // kind is not known yet, once that share is used up, leaves its object without its parts until a
+                // kind is not known yet, once that share is used up, leaves its object without its renderer boxes until a
                 // later frame, so the first view after a load builds up over some frames instead of in one.
                 var waits = false;
                 // The mesh renderers that are on but hidden without a known box yet.
@@ -856,7 +856,7 @@ namespace RailroaderScenePatcher {
                             if (budget.Exhausted) { waits = true; break; }
                             hiddenKind = budget.Read(() => Kind(renderer, go, ref lods));
                         }
-                        if (hiddenKind == ObjectMarkingPartKind.Mesh) unseen++;
+                        if (hiddenKind == ObjectMarkingBoxKind.Mesh) unseen++;
                         continue;
                     }
                     // A mesh renderer that shows outlines with its own oriented box inside its world box; a hidden one
@@ -881,23 +881,23 @@ namespace RailroaderScenePatcher {
                         if (budget.Exhausted) { waits = true; break; }
                         kind = budget.Read(() => Kind(renderer, go, ref lods));
                     }
-                    parts.Add(new ObjectMarkingPart(name, Point(bounds.center), Point(bounds.extents), oriented, kind, ground));
+                    boxes.Add(new ObjectMarkingBox(name, Point(bounds.center), Point(bounds.extents), oriented, kind, ground));
                 }
                 // A storage pile or log pond has no renderer of its own: the box it lays its logs out in stands in, from
-                // its layout settings, so it is framed like any other visible part whether or not the camera has culled it.
+                // its layout settings, so it is framed like any other renderer box whether or not the camera has culled it.
                 if (!waits)
                     foreach (var pile in Piles(go)) {
                         var oriented = PileBox(pile);
                         if (oriented == null) continue;
                         var bounds = new Bounds(Vector(oriented[0]), Vector3.zero);
                         foreach (var corner in oriented) bounds.Encapsulate(Vector(corner));
-                        parts.Add(new ObjectMarkingPart("pile " + pile.name, Point(bounds.center), Point(bounds.extents), oriented, ObjectMarkingPartKind.Mesh, ground));
+                        boxes.Add(new ObjectMarkingBox("pile " + pile.name, Point(bounds.center), Point(bounds.extents), oriented, ObjectMarkingBoxKind.Mesh, ground));
                     }
-                if (waits) parts.Clear();
+                if (waits) boxes.Clear();
                 var view = camera.pixelRect;
                 // One frame per object, around the piece its marker belongs to. Picking uses the same rectangle.
-                // The box of an object of several parts stands in the object's own orientation.
-                var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), parts, Projection(camera), ViewOf(camera), decisions, frameDistance, Basis(go.transform),
+                // The frame around multiple boxes uses the object's orientation.
+                var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), boxes, Projection(camera), ViewOf(camera), decisions, frameDistance, Basis(go.transform),
                     ObjectMarkingGeometry.FramesWhole(candidate.Observation.Family));
                 measured = new Measured { Frame = result };
                 if (HelperMarkers.Shows(result, waits, unseen)) {
@@ -934,7 +934,7 @@ namespace RailroaderScenePatcher {
                         shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
                     }
                 } else if (InFront(camera, anchor) && (frameDistance > ObjectMarkingGeometry.FrameDistance || ObjectMarkingGeometry.FramesMarker((camera.transform.position - (candidate.Position + origin)).magnitude))) {
-                    // Its parts are still being read (waits), or a hidden renderer's box is not known yet (unseen):
+                    // Its renderer bounds are still being read (waits), or a hidden renderer's box is not known yet (unseen):
                     // until then the object has a frame within the frame distance, about its marker. An object that is asked for at its group's frame distance has it
                     // wherever its marker stands.
                     shape.Outline = ObjectMarkingGeometry.MarkerOutline(anchor.x, anchor.y);
@@ -1041,7 +1041,7 @@ namespace RailroaderScenePatcher {
         }
         // What the renderer is to the outline (ObjectMarkingGeometry.KindOf), from its type, the component types on its
         // object with their base types, its shadow mode and its level of detail.
-        ObjectMarkingPartKind Kind(Renderer renderer, GameObject go, ref Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods) {
+        ObjectMarkingBoxKind Kind(Renderer renderer, GameObject go, ref Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods) {
             if (kinds.TryGetValue(renderer, out var known)) return known;
             if (lods == null) lods = Lods(go);
             var components = new List<string>();

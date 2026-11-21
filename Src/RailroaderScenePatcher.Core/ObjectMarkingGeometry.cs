@@ -8,24 +8,24 @@ using System.Linq;
 namespace RailroaderScenePatcher.Core {
     // What a renderer is to the object's outline. Only meshes outline it: an effect reaches past the object, a
     // shadows-only renderer is invisible and a lower level of detail repeats the first one.
-    public enum ObjectMarkingPartKind { Mesh, Effect, ShadowsOnly, LowerLod }
+    public enum ObjectMarkingBoxKind { Mesh, Effect, ShadowsOnly, LowerLod }
 
     // One renderer of an object in world coordinates: its world-aligned box as centre and half extents, and, when known,
     // the eight corners of its own oriented box, which lies inside the world-aligned one, and the height of the
     // surface it stands on, terrain or ballast, at a place.
-    public sealed class ObjectMarkingPart {
-        public ObjectMarkingPart(string name, WorldPoint center, WorldPoint extents, IReadOnlyList<WorldPoint> oriented = null,
-            ObjectMarkingPartKind kind = ObjectMarkingPartKind.Mesh, Func<double, double, double?> ground = null) {
+    public sealed class ObjectMarkingBox {
+        public ObjectMarkingBox(string name, WorldPoint center, WorldPoint extents, IReadOnlyList<WorldPoint> oriented = null,
+            ObjectMarkingBoxKind kind = ObjectMarkingBoxKind.Mesh, Func<double, double, double?> ground = null) {
             Name = name ?? ""; Center = center; Extents = extents; Oriented = oriented; Kind = kind; Ground = ground;
         }
         // The world height of the surface under a world x and z, terrain or ballast, or null where none is known.
-        // Null when the surface is unknown for the whole part.
+        // Null when the surface is unknown for the whole box.
         public Func<double, double, double?> Ground { get; }
         public string Name { get; }
         public WorldPoint Center { get; }
         public WorldPoint Extents { get; }
         public IReadOnlyList<WorldPoint> Oriented { get; }
-        public ObjectMarkingPartKind Kind { get; }
+        public ObjectMarkingBoxKind Kind { get; }
     }
 
     // One object between a renderer and the scene root, as the outline rule reads it: whether it is switched on, and
@@ -43,7 +43,7 @@ namespace RailroaderScenePatcher.Core {
     }
 
     // Three directions at right angles, such as an object's own right, up and forward: the directions of the one box
-    // that frames an object of several parts, or a group.
+    // that frames an object of several boxes, or a group.
     public readonly struct WorldBasis {
         public WorldBasis(WorldPoint x, WorldPoint y, WorldPoint z) { X = x; Y = y; Z = z; }
         public WorldPoint X { get; }
@@ -68,13 +68,13 @@ namespace RailroaderScenePatcher.Core {
         // The rectangle around the group's outline and that outline, as an object's frame has them: the outline of
         // the one box around all the group's objects. Null unless the group shows its marker and frame, and null
         // when that box is not in view: the group then takes the least frame about its square marker, as an object
-        // without parts does.
+        // without boxes does.
         public ScreenRect? Frame { get; }
         public IReadOnlyList<ScreenPoint> Outline { get; }
     }
 
     public sealed class ObjectMarkingFrame {
-        internal ObjectMarkingFrame(ScreenRect? frame, double distance, IReadOnlyList<ScreenPoint> outline = null, WorldBox? bounds = null, IReadOnlyList<ObjectMarkingPart> piece = null, WorldPoint? marker = null) {
+        internal ObjectMarkingFrame(ScreenRect? frame, double distance, IReadOnlyList<ScreenPoint> outline = null, WorldBox? bounds = null, IReadOnlyList<ObjectMarkingBox> piece = null, WorldPoint? marker = null) {
             Frame = frame; Distance = distance; Outline = outline; Bounds = bounds; this.piece = piece; Marker = marker;
         }
         // The world point the square marker stands at: while the object has a frame, the center of the one box the
@@ -82,16 +82,16 @@ namespace RailroaderScenePatcher.Core {
         // object, so the marker stays on it as the camera zooms and turns; the center of the frame's rectangle on
         // screen would wander. Null when no piece was found or no box could be projected.
         public WorldPoint? Marker { get; }
-        // The parts of the framed piece, whether or not the object has a frame at its distance: a group's one box
+        // The boxes of the framed piece, whether or not the object has a frame at its distance: a group's one box
         // surrounds them.
-        readonly IReadOnlyList<ObjectMarkingPart> piece;
+        readonly IReadOnlyList<ObjectMarkingBox> piece;
         internal IEnumerable<WorldPoint> PieceCorners() => piece == null ? Enumerable.Empty<WorldPoint>() : piece.SelectMany(ObjectMarkingGeometry.CornersOf);
         // The world-aligned box around the framed piece, which the distance runs to; null when no piece was found.
         public WorldBox? Bounds { get; }
         // The rectangle around the outline in top-left screen pixels, or null when the object shows only its square
         // marker. The marker stands at its centre.
         public ScreenRect? Frame { get; }
-        // The frame as it is drawn and picked: the outline on screen of the one box around the object's parts, with
+        // The frame as it is drawn and picked: the outline on screen of the one box around the object's boxes, with
         // the margin around it. Null with a null Frame.
         public IReadOnlyList<ScreenPoint> Outline { get; }
         // Metres from the camera to the bounds of the framed piece; NaN when no piece was found.
@@ -106,17 +106,17 @@ namespace RailroaderScenePatcher.Core {
         // pointer over each, 550 m, less one 50 m measurement step. It equals the native map editor's default gizmo
         // distance of 500 m.
         public const double FrameDistance = 500;
-        // A part far larger than the part at the object's marker, such as a culling or proxy volume, does not outline
+        // A box far larger than the box at the object's marker, such as a culling or proxy volume, does not outline
         // the object: larger than this factor and this margin in metres.
         public const double ExtentFactor = 4, ExtentMargin = 10;
-        // Parts closer than this to the growing piece join it: a fraction of the marker part's size, at least a metre.
+        // Boxes closer than this to the growing piece join it: a fraction of the marker box's size, at least a metre.
         public const double JoinFraction = .25, MinimumJoin = 1;
-        // Pixels around a projected part.
+        // Pixels around a projected box.
         public const double Margin = 4;
-        // Every part is cut off at the surface it stands in, terrain or ballast, so the frame shows only what stands
-        // above it. The surface is read under the centre of each piece of the part: a part is divided along each of
+        // Every box is cut off at the surface it stands in, terrain or ballast, so the frame shows only what stands
+        // above it. The surface is read under the centre of each piece of the box: a box is divided along each of
         // its own axes into pieces of this length over the ground, in metres, and into at most this many, so a long
-        // part on a slope is cut along the slope and not at one height. Along an axis longer than the two together
+        // box on a slope is cut along the slope and not at one height. Along an axis longer than the two together
         // allow, 50 metres, the pieces are longer: a fifth of that axis each.
         public const double GroundPiece = 10;
         public const int GroundPieces = 5;
@@ -166,14 +166,14 @@ namespace RailroaderScenePatcher.Core {
         // What a renderer is to the outline, from its type, the types of the components on its object with their base
         // types, its shadow mode and its level of detail. Effects reach past the object they belong to: particles,
         // visual-effect graphs such as water spray, lines, trails, billboards and the beam geometry of a volumetric light.
-        public static ObjectMarkingPartKind KindOf(string rendererType, IReadOnlyList<string> componentTypes, bool shadowsOnly, int lodLevel) {
+        public static ObjectMarkingBoxKind KindOf(string rendererType, IReadOnlyList<string> componentTypes, bool shadowsOnly, int lodLevel) {
             var type = rendererType ?? "";
-            if (Array.IndexOf(EffectRenderers, type) >= 0) return ObjectMarkingPartKind.Effect;
+            if (Array.IndexOf(EffectRenderers, type) >= 0) return ObjectMarkingBoxKind.Effect;
             if (componentTypes != null)
                 foreach (var component in componentTypes)
-                    if (component != null && component.StartsWith("VLB.BeamGeometry", StringComparison.Ordinal)) return ObjectMarkingPartKind.Effect;
-            if (shadowsOnly) return ObjectMarkingPartKind.ShadowsOnly;
-            return lodLevel > 0 ? ObjectMarkingPartKind.LowerLod : ObjectMarkingPartKind.Mesh;
+                    if (component != null && component.StartsWith("VLB.BeamGeometry", StringComparison.Ordinal)) return ObjectMarkingBoxKind.Effect;
+            if (shadowsOnly) return ObjectMarkingBoxKind.ShadowsOnly;
+            return lodLevel > 0 ? ObjectMarkingBoxKind.LowerLod : ObjectMarkingBoxKind.Mesh;
         }
         static readonly string[] EffectRenderers = {
             "UnityEngine.ParticleSystemRenderer", "UnityEngine.VFX.VFXRenderer", "UnityEngine.LineRenderer", "UnityEngine.TrailRenderer", "UnityEngine.BillboardRenderer"
@@ -181,53 +181,53 @@ namespace RailroaderScenePatcher.Core {
 
         // The anchor is the object's position and the camera the camera's position, both in world coordinates. The
         // projection maps a world point to clip coordinates (-w <= x, y, z <= w is visible). Decisions, when given,
-        // receive one line per part.
-        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingPart> parts,
+        // receive one line per box.
+        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> parts,
             Func<WorldPoint, ClipPoint> project, ScreenRect view, List<string> decisions) =>
             Frame(anchor, camera, parts, project, view, decisions, FrameDistance, null);
         // frameDistance is the distance to the object's bounds beyond which it has no frame. An object of a
         // game-defined group that shows as one gives its outline to the group's frame, whose frame distance counts
         // from the group's bounds: its own frame is then asked for without a limit.
         //
-        // An object frame is one box. An object of one part is framed by that part's own box. An object of several
-        // parts is framed by one box around all of them, in the object's orientation: its own right, up and forward.
-        // Without an orientation the box takes the directions of the part at the marker, or the world's.
+        // An object frame uses one box. For several source
+        // boxes, the frame encloses them in the object's orientation.
+        // Without an orientation the box takes the directions of the box at the marker, or the world's.
         //
-        // Most objects are framed by the piece their marker belongs to: the part at the marker and the parts next to
-        // it, without a part far larger than it or apart from it, since the scene object can hold more than the
-        // object. An object that stands for everything below it, whole, is framed by all its parts: the root of a
-        // baked scenery group, whose marker stands at the root and not at any one part, so that the part nearest it
+        // Most objects are framed by the piece their marker belongs to: the box at the marker and the boxes next to
+        // it, without a box far larger than it or apart from it, since the scene object can hold more than the
+        // object. An object that stands for everything below it, whole, is framed by all its boxes: the root of a
+        // baked scenery group, whose marker stands at the root. The box nearest it
         // can be a lamp beside a station building.
-        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingPart> parts,
+        public static ObjectMarkingFrame Frame(WorldPoint anchor, WorldPoint camera, IReadOnlyList<ObjectMarkingBox> parts,
             Func<WorldPoint, ClipPoint> project, ScreenRect view, List<string> decisions, double frameDistance, WorldBasis? orientation = null, bool whole = false) {
             if (parts == null) throw new ArgumentNullException(nameof(parts));
             if (project == null) throw new ArgumentNullException(nameof(project));
-            var open = new List<ObjectMarkingPart>();
-            foreach (var part in parts) {
-                var reason = part.Kind == ObjectMarkingPartKind.Effect ? "effect"
-                    : part.Kind == ObjectMarkingPartKind.ShadowsOnly ? "shadows only"
-                    : part.Kind == ObjectMarkingPartKind.LowerLod ? "lower level of detail"
-                    : !Valid(part.Center) || !Valid(part.Extents) || part.Extents.X < 0 || part.Extents.Y < 0 || part.Extents.Z < 0 ? "bounds not finite"
+            var open = new List<ObjectMarkingBox>();
+            foreach (var box in parts) {
+                var reason = box.Kind == ObjectMarkingBoxKind.Effect ? "effect"
+                    : box.Kind == ObjectMarkingBoxKind.ShadowsOnly ? "shadows only"
+                    : box.Kind == ObjectMarkingBoxKind.LowerLod ? "lower level of detail"
+                    : !Valid(box.Center) || !Valid(box.Extents) || box.Extents.X < 0 || box.Extents.Y < 0 || box.Extents.Z < 0 ? "bounds not finite"
                     : null;
-                if (reason == null) open.Add(part); else decisions?.Add(part.Name + ": excluded, " + reason);
+                if (reason == null) open.Add(box); else decisions?.Add(box.Name + ": excluded, " + reason);
             }
             if (open.Count == 0 || !Valid(anchor) || !Valid(camera)) {
-                foreach (var part in open) decisions?.Add(part.Name + ": excluded, no anchor or camera");
+                foreach (var box in open) decisions?.Add(box.Name + ": excluded, no anchor or camera");
                 return new ObjectMarkingFrame(null, Double.NaN);
             }
-            // The part the marker belongs to: under it, else the nearest; then the centre nearest it; then the smaller.
+            // The box the marker belongs to: under it, else the nearest; then the centre nearest it; then the smaller.
             var seed = open[0];
-            foreach (var part in open) {
-                double d = Distance(part, anchor), best = Distance(seed, anchor);
-                if (d < best || (d == best && (Square(part.Center, anchor) < Square(seed.Center, anchor) ||
-                    (Square(part.Center, anchor) == Square(seed.Center, anchor) && Size(part) < Size(seed))))) seed = part;
+            foreach (var box in open) {
+                double d = Distance(box, anchor), best = Distance(seed, anchor);
+                if (d < best || (d == best && (Square(box.Center, anchor) < Square(seed.Center, anchor) ||
+                    (Square(box.Center, anchor) == Square(seed.Center, anchor) && Size(box) < Size(seed))))) seed = box;
             }
             double limit = whole ? Double.PositiveInfinity : Math.Max(Size(seed) * ExtentFactor, Size(seed) + ExtentMargin);
             double join = whole ? Double.PositiveInfinity : Math.Max(MinimumJoin, Size(seed) * JoinFraction);
-            var piece = new List<ObjectMarkingPart> { seed };
+            var piece = new List<ObjectMarkingBox> { seed };
             open.Remove(seed);
             for (int i = open.Count - 1; i >= 0; i--)
-                if (Size(open[i]) > limit) { decisions?.Add(open[i].Name + ": excluded, far larger than the part at the marker"); open.RemoveAt(i); }
+                if (Size(open[i]) > limit) { decisions?.Add(open[i].Name + ": excluded, far larger than the box at the marker"); open.RemoveAt(i); }
             double minX = seed.Center.X - seed.Extents.X, maxX = seed.Center.X + seed.Extents.X, minY = seed.Center.Y - seed.Extents.Y,
                 maxY = seed.Center.Y + seed.Extents.Y, minZ = seed.Center.Z - seed.Extents.Z, maxZ = seed.Center.Z + seed.Extents.Z;
             for (bool joined = true; joined;) {
@@ -242,12 +242,12 @@ namespace RailroaderScenePatcher.Core {
                     piece.Add(p); open.RemoveAt(i); joined = true;
                 }
             }
-            foreach (var part in open) decisions?.Add(part.Name + ": excluded, apart from the object's piece");
+            foreach (var box in open) decisions?.Add(box.Name + ": excluded, apart from the object's piece");
             double dx = Gap(minX, maxX, camera.X, 0), dy = Gap(minY, maxY, camera.Y, 0), dz = Gap(minZ, maxZ, camera.Z, 0);
             var distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
             var bounds = new WorldBox(new WorldPoint(minX, minY, minZ), new WorldPoint(maxX, maxY, maxZ));
             if (!(distance <= frameDistance)) {
-                foreach (var part in piece) decisions?.Add(part.Name + ": included, beyond the frame distance at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m");
+                foreach (var box in piece) decisions?.Add(box.Name + ": included, beyond the frame distance at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m");
                 // Without a frame the marker stands on the center of the uncut box around the piece: the ground is
                 // not read for an object that shows only its marker.
                 var uncut = piece.Count == 1 ? CornersOf(piece[0]) : Enclose(piece.SelectMany(CornersOf), orientation ?? BasisOf(seed));
@@ -258,18 +258,18 @@ namespace RailroaderScenePatcher.Core {
             // The frame is the outline of one box on screen. A rectangle around a box that stands at an angle to the
             // view is larger than the box, at its corners; the outline is not. The outline is convex: one closed
             // line per object, easy to test a point against.
-            // Burial is decided for the object, not for each part. An object that lies wholly under the surface
+            // Burial is decided for the object, not for each box. An object that lies wholly under the surface
             // found from above, as in a tunnel or under an overhang, is not buried: that surface is not the ground
             // it stands in, so it is framed whole. Otherwise whatever lies wholly under the surface is buried and
-            // adds nothing: a footing, a pier, or a piece of a wide part, while other parts stand above it.
-            var cut = new List<KeyValuePair<ObjectMarkingPart, List<Piece>>>();
+            // adds nothing: a footing, a pier, or a piece of a wide box, while other boxes stand above it.
+            var cut = new List<KeyValuePair<ObjectMarkingBox, List<Piece>>>();
             var stands = false;
-            foreach (var part in piece) {
-                var pieces = Pieces(CornersOf(part), part.Ground);
+            foreach (var box in piece) {
+                var pieces = Pieces(CornersOf(box), box.Ground);
                 if (pieces.Any(q => q.Above)) stands = true;
-                cut.Add(new KeyValuePair<ObjectMarkingPart, List<Piece>>(part, pieces));
+                cut.Add(new KeyValuePair<ObjectMarkingBox, List<Piece>>(box, pieces));
             }
-            var standing = new List<KeyValuePair<ObjectMarkingPart, List<Piece>>>();
+            var standing = new List<KeyValuePair<ObjectMarkingBox, List<Piece>>>();
             foreach (var entry in cut) {
                 if (stands && !entry.Value.Any(q => q.Above)) decisions?.Add(entry.Key.Name + ": included, under the surface");
                 else standing.Add(entry);
@@ -277,24 +277,24 @@ namespace RailroaderScenePatcher.Core {
             List<ScreenPoint> points = null;
             WorldPoint? marker = null;
             if (standing.Count == 1) {
-                // One part: its own oriented box, which lies inside its world-aligned box, or the world-aligned
+                // For a single box, use its oriented bounds or fall back to its world-aligned
                 // box where the oriented one is unknown.
-                var part = standing[0].Key;
+                var sourceBox = standing[0].Key;
                 var box = stands ? Standing(standing[0].Value) : Whole(standing[0].Value);
                 points = Project(box, false, project, view, out var finite);
                 marker = CenterOf(box);
                 // The world-aligned box stands in for an oriented box that gives nothing: one whose projection is
-                // not finite, or one that lies outside the view although its part does not.
-                if (points == null && part.Oriented != null && part.Oriented.Count == 8) {
-                    var aligned = Pieces(BoxCorners(part), part.Ground);
+                // not finite, or one that lies outside the view although its box does not.
+                if (points == null && sourceBox.Oriented != null && sourceBox.Oriented.Count == 8) {
+                    var aligned = Pieces(BoxCorners(sourceBox), sourceBox.Ground);
                     box = stands ? Standing(aligned) : Whole(aligned);
                     points = Project(box, false, project, view, out finite);
                     marker = CenterOf(box);
                 }
-                decisions?.Add(part.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
+                decisions?.Add(sourceBox.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
             } else if (standing.Count > 1) {
-                // Several parts: one box around all of them, in the object's orientation, cut at the surface it
-                // stands in like the box of one part.
+                // Several boxes: one box around all of them, in the object's orientation, cut at the surface it
+                // stands in, as for a single box.
                 var box = Enclose(standing.SelectMany(entry => CornersOf(entry.Key)), orientation ?? BasisOf(seed));
                 var ground = standing.Select(entry => entry.Key.Ground).FirstOrDefault(g => g != null);
                 var pieces = Pieces(box, ground);
@@ -316,15 +316,15 @@ namespace RailroaderScenePatcher.Core {
             var center = new WorldPoint(corners.Average(c => c.X), corners.Average(c => c.Y), corners.Average(c => c.Z));
             return Valid(center) ? center : (WorldPoint?)null;
         }
-        // The eight corners of a part's box: its own oriented box where that is known, else its world-aligned box.
-        internal static IReadOnlyList<WorldPoint> CornersOf(ObjectMarkingPart part) =>
-            part.Oriented != null && part.Oriented.Count == 8 && part.Oriented.All(Valid) ? part.Oriented : BoxCorners(part);
-        // The directions of a part's own box, from its corners: corner 0 and the corners that differ from it in bit
-        // 0, bit 1 and bit 2. The world's directions for a part without an oriented box, or with a flat one.
-        static WorldBasis BasisOf(ObjectMarkingPart part) {
-            if (part.Oriented == null || part.Oriented.Count != 8 || !part.Oriented.All(Valid)) return WorldBasis.World;
-            WorldPoint o = part.Oriented[0];
-            WorldPoint Edge(int bit) => new WorldPoint(part.Oriented[bit].X - o.X, part.Oriented[bit].Y - o.Y, part.Oriented[bit].Z - o.Z);
+        // The eight corners of a box's box: its own oriented box where that is known, else its world-aligned box.
+        internal static IReadOnlyList<WorldPoint> CornersOf(ObjectMarkingBox box) =>
+            box.Oriented != null && box.Oriented.Count == 8 && box.Oriented.All(Valid) ? box.Oriented : BoxCorners(box);
+        // The directions of a box's own box, from its corners: corner 0 and the corners that differ from it in bit
+        // 0, bit 1 and bit 2. The world's directions for a box without an oriented box, or with a flat one.
+        static WorldBasis BasisOf(ObjectMarkingBox box) {
+            if (box.Oriented == null || box.Oriented.Count != 8 || !box.Oriented.All(Valid)) return WorldBasis.World;
+            WorldPoint o = box.Oriented[0];
+            WorldPoint Edge(int bit) => new WorldPoint(box.Oriented[bit].X - o.X, box.Oriented[bit].Y - o.Y, box.Oriented[bit].Z - o.Z);
             WorldPoint x = Edge(1), y = Edge(2), z = Edge(4);
             return Length(x) > 0 && Length(y) > 0 && Length(z) > 0 ? new WorldBasis(x, y, z) : WorldBasis.World;
         }
@@ -357,7 +357,7 @@ namespace RailroaderScenePatcher.Core {
         // anchors, and around the bounds of their framed pieces; the distance runs from the camera to those bounds.
         // frames holds the frame of each object, or null for an object without one. While the group shows its
         // marker and frame, its one frame is the outline of one box around all its objects: around where they stand
-        // and around the parts of their pieces, in the given orientation, that of the game component that anchors
+        // and around the boxes of their pieces, in the given orientation, that of the game component that anchors
         // the group, or the world's without one. Like the box of an object it is cut at the surface the group
         // stands in, and framed whole when it lies wholly under the surface found from above. listed says, per
         // object, whether it counts for the bounds and the box (GameDefinedGroup.Listed); without it every object does.
@@ -437,8 +437,8 @@ namespace RailroaderScenePatcher.Core {
         // would wander. A point behind the camera falls back to the center of the frame's rectangle.
         public static ScreenPoint MarkerScreen(bool inFront, double x, double y, ScreenRect rect) =>
             inFront ? new ScreenPoint(x, y) : new ScreenPoint(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
-        // Every inventory object within the frame distance has a frame. An object none of whose parts can be framed,
-        // because it has no renderer of its own or all its parts are switched off, takes the least frame about its
+        // Every inventory object within the frame distance has a frame. An object none of whose renderers can be framed,
+        // because it has no renderer of its own or all its renderers are switched off, takes the least frame about its
         // square marker: the marker with its margin on each side. distance is from the camera to the object's
         // position, in metres.
         public static bool FramesMarker(double distance) => distance <= FrameDistance;
@@ -476,8 +476,8 @@ namespace RailroaderScenePatcher.Core {
             return triangles;
         }
 
-        // One piece of a part: its eight corners, the height of the surface under its centre when one is known, and
-        // whether anything of it stands above that surface. Whole marks the part's undivided box.
+        // One piece of a box: its eight corners, the height of the surface under its centre when one is known, and
+        // whether anything of it stands above that surface. Whole marks the box's undivided box.
         // Range holds where a piece lies along the whole box's three axes, as fractions: from and to for each axis.
         sealed class Piece { internal WorldPoint[] Corners; internal double? Height; internal bool Above; internal bool Whole; internal double[] Range; }
         // The pieces of a box along its own axes, read from its corners: corner 0 and the corners that differ from it
@@ -507,7 +507,7 @@ namespace RailroaderScenePatcher.Core {
         }
         static List<Piece> Whole(List<Piece> pieces) => pieces.Where(q => q.Whole).ToList();
         // What stands above the surface, as one box. The whole box shrinks along its own axes to the pieces that stand
-        // above the surface, so a part that runs into a bank loses what lies inside it. Its lower face, across its most
+        // above the surface, so a box that runs into a bank loses what lies inside it. Its lower face, across its most
         // upright axis, then rises to the lowest surface under those pieces. On a slope the box keeps some ground on its
         // high side, but the frame stays the outline of one box and leaves nothing that stands above out. A box without
         // an upright axis, turned on its edge, is not raised.
@@ -557,7 +557,7 @@ namespace RailroaderScenePatcher.Core {
             new[] { 0, 1 }, new[] { 2, 3 }, new[] { 4, 5 }, new[] { 6, 7 }, new[] { 0, 2 }, new[] { 1, 3 }, new[] { 4, 6 }, new[] { 5, 7 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 }
         };
         // The screen points of pieces above their surface and inside the view. With cut set, each piece is cut off
-        // at the height of its surface; the whole box of a part is never cut. Null when nothing is left, or, with
+        // at the height of its surface; the whole box of a box is never cut. Null when nothing is left, or, with
         // finite false, when the projection is not finite.
         //
         // A piece is a convex box, and so is what is left of it above a level surface: its corners above the surface
@@ -635,23 +635,23 @@ namespace RailroaderScenePatcher.Core {
         };
         // The eight corners in the order Project expects: bit 0 for x, bit 1 for y, bit 2 for z, so corners that differ
         // in one bit share an edge.
-        static WorldPoint[] BoxCorners(ObjectMarkingPart part) {
+        static WorldPoint[] BoxCorners(ObjectMarkingBox box) {
             var corners = new WorldPoint[8];
             for (int i = 0; i < 8; i++)
-                corners[i] = new WorldPoint(part.Center.X + ((i & 1) == 0 ? -1 : 1) * part.Extents.X,
-                    part.Center.Y + ((i & 2) == 0 ? -1 : 1) * part.Extents.Y, part.Center.Z + ((i & 4) == 0 ? -1 : 1) * part.Extents.Z);
+                corners[i] = new WorldPoint(box.Center.X + ((i & 1) == 0 ? -1 : 1) * box.Extents.X,
+                    box.Center.Y + ((i & 2) == 0 ? -1 : 1) * box.Extents.Y, box.Center.Z + ((i & 4) == 0 ? -1 : 1) * box.Extents.Z);
             return corners;
         }
         static double Gap(double min, double max, double center, double extent) =>
             Math.Max(0, Math.Max(min - (center + extent), (center - extent) - max));
-        static double Distance(ObjectMarkingPart part, WorldPoint p) {
-            double dx = Math.Max(0, Math.Abs(p.X - part.Center.X) - part.Extents.X), dy = Math.Max(0, Math.Abs(p.Y - part.Center.Y) - part.Extents.Y),
-                dz = Math.Max(0, Math.Abs(p.Z - part.Center.Z) - part.Extents.Z);
+        static double Distance(ObjectMarkingBox box, WorldPoint p) {
+            double dx = Math.Max(0, Math.Abs(p.X - box.Center.X) - box.Extents.X), dy = Math.Max(0, Math.Abs(p.Y - box.Center.Y) - box.Extents.Y),
+                dz = Math.Max(0, Math.Abs(p.Z - box.Center.Z) - box.Extents.Z);
             return Math.Sqrt(dx * dx + dy * dy + dz * dz);
         }
         static double Square(WorldPoint a, WorldPoint b) => (a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y) + (a.Z - b.Z) * (a.Z - b.Z);
-        // A part's size: its largest world dimension in metres.
-        static double Size(ObjectMarkingPart part) => 2 * Math.Max(part.Extents.X, Math.Max(part.Extents.Y, part.Extents.Z));
+        // A box's size: its largest world dimension in metres.
+        static double Size(ObjectMarkingBox box) => 2 * Math.Max(box.Extents.X, Math.Max(box.Extents.Y, box.Extents.Z));
         static ScreenRect Rect(double left, double top, double right, double bottom) =>
             ScreenRect.FromEdges((float)left, (float)top, (float)right, (float)bottom);
         // The square "+" marker of a world marking and the room a frame keeps around it, in screen pixels.
