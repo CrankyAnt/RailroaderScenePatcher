@@ -101,7 +101,7 @@ Desired changes that a supplying mod makes to supported scene objects and their 
 _Avoid_: Patch, patch history, movement script
 
 **Scene patch file**:
-The file in a mod, `Data/scene-patches.json`, that expresses the mod's scene patch. It is not the map data file of a map patch.
+The file in a mod that expresses the mod's scene patch. It is not the map data file of a map patch.
 _Avoid_: Patch, patch document, scene-patch document, patch history
 
 **Equal content**:
@@ -163,7 +163,7 @@ A protected road crossing already present in the map, whose crossing coverage or
 _Avoid_: New standalone crossing
 
 **Map context**:
-The context against which a scene patch's targets, tracks included, are identified: in the native map editor, the edited map definition and its map layers. In a save, the map ids in play are the loaded map and its map layers, and an applied map patch's id is not one of them.
+The context against which a scene patch's targets, tracks included, are identified: in the native map editor, the edited map definition and its map layers. In a save, the map IDs in play are the loaded map and its map layers, and an applied map patch's ID is not one of them.
 
 **Supplying mod**:
 The mod that owns a scene patch file, regardless of which map definition or mod contains an existing target.
@@ -217,19 +217,19 @@ A scene object's dependence on its track group, through which enabling or disabl
 A mod value that holds a scene object inactive, which takes precedence over later group-driven activity.
 
 **Circuit**:
-One detection unit of an existing crossing's controller, whose approach and island spans decide when the crossing's equipment activates.
+One detection unit of an existing crossing's controller, whose detection spans, such as its approach and island spans, decide when the crossing's equipment activates.
 
 **Detection span**:
-A span that a circuit of an existing crossing uses to detect trains on the tracks in its crossing coverage, such as an approach or island span. It is either native to the map or an owned span.
+A crossing's track span in the scene, which a circuit of that crossing uses to detect trains on the tracks in its crossing coverage. The patcher lists it under its crossing and lets the modder assign, change or detach it; approach spans and island spans are detection spans. It is either one of the map's own detection spans or an owned span.
 
 **Crossing coverage**:
 The tracks each circuit of an existing crossing detects, set per circuit by a supplying mod as omitted, explicitly selected tracks or explicitly detached. Proximity never assigns it.
 
 **Owned span**:
-A detection span that a supplying mod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; native spans are never removed.
+A detection span that a supplying mod's coherent operation constructs and registers for selected tracks. Removal and cleanup remove owned spans; the map's own detection spans are never removed.
 
 **Detection addition**:
-A circuit that a supplying mod adds at an existing crossing: explicitly selected tracks and areas for its spans, with an identity scoped to the supplying mod. It adds detection without changing the crossing's native circuits. It is not an added object.
+A circuit that a supplying mod adds at an existing crossing: explicitly selected tracks and areas for its detection spans, with an identity scoped to the supplying mod. It adds detection without changing the crossing's native circuits. It is not an added object.
 _Avoid_: Authored addition
 
 **Modification**:
@@ -245,7 +245,7 @@ Physical placement fixed in map coordinates, independent of any track. It is dis
 State that a supplying mod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.
 
 **Refusal**:
-An edit that the patcher refuses before it changes anything, with the reason stated. Nothing needs restoring after a refusal.
+An edit or a modification that the patcher refuses before it changes anything, with the reason stated. Nothing needs restoring after a refusal.
 _Avoid_: Rejection
 
 **Restored failure**:
@@ -275,19 +275,41 @@ The development reference, outside scene patch editing, that names each rule kee
 A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. The outliner groups inventory scene objects by family.
 
 **Native map data**:
-Map data that the native map editor edits, such as Props, masks, Builtins, spawns, turntables, tracks, industries, track spans and passenger stops. The inventory lists no native map data.
+Map data that the native map editor edits, such as Props, native masks, Builtins, native spawns, turntables, tracks, industries, native track spans and passenger stops. The inventory lists no native map data.
+
+**Track span**:
+The game's word for a span of track, which this context keeps for every span. A span is either a native track span, in native map data, or a detection span, in the scene at an existing crossing.
+
+**Native track span**:
+A track span in native map data, which the native map editor edits, such as industry spans and passenger stop spans.
+
+**Native spawn**:
+A spawn in native map data, which the native map editor edits and calls Spawn. It is distinct from a scene spawn point.
 
 **Baked scenery group**:
-A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces or bridge constructions, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery.
+A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces, rail bridge constructions or road bridges, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery. It is a group by hierarchy: one scene object and the scene objects below it. Railroader has no term for it. Compare game-defined group, a group by a game component.
 
 **Group root**:
 The scene object at the top of a baked scenery group. The inventory lists a baked scenery group as one entry for its root.
 
 **Part**:
-A scene object inside a baked scenery group, other than its group root, that can receive its own physical placement or activity.
+A scene object inside a baked scenery group, other than its group root, that can receive its own physical placement or activity. A component or mesh inside one scene object is not a part.
+
+**Container object**:
+A scene object that only holds other scene objects and has nothing visible of its own, such as the Bryson Signs object or a place's object under Large Scenery. A container object is not a group: the scene objects it holds are listed and edited by their own family or group. The native map editor's Folder is a folder of map data, not a container object.
+_Avoid_: Folder
+
+**Game culler**:
+A game component that culls the objects it covers: the object it stands on, the renderers below it, or the objects on its list. Its three kinds are the simple culler, the renderer culler and the game-object culler.
+
+**Culling sphere**:
+A sphere, with a centre and a radius, that the game keeps for culling the objects it covers. A game culler holds one for its group or part, and a part that a move takes out of the sphere of a culler above it gets a culling sphere of its own.
+
+**Culling container**:
+A container object below a baked scenery group root that carries a simple culler and has no renderer, collider, light, storage pile or log pond of its own. It is not an object to edit: its parts stay listed and edited under their group.
 
 **Scene spawn point**:
-A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a spawn in native map data.
+A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a native spawn.
 
 **Station map icon**:
 A scene object that shows a station on the map.
@@ -296,20 +318,49 @@ A scene object that shows a station on the map.
 The invisible part of a station's baked scenery group that opens the station window.
 _Avoid_: Click volume
 
+**Milepost**:
+A scene object that the game shows as a mile marker, with a prefix, a mile value and displayed text. A milepost with the origin flag is the origin of its prefix, and the game caches that origin.
+
 **Industry storage display**:
 The storage piles or log pond whose fill shows one industry's storage.
 
+**Scene ground mask**:
+A mask component that the game holds on a scene object and that registers a shape in the game's terrain system where the object stands, shaping the ground and the vegetation there. A native mask, which the native map editor edits, is a different thing.
+_Avoid_: Scene mask, scene terrain mask
+
+**Lake surface**:
+A water mesh that the scene saves for a lake and that the game draws where its scene object stands. The lake's native mask and river are native map data.
+_Avoid_: Water surface
+
+**Log pond**:
+The game's bulk scenery component for an industry's logs on water, part of an industry storage display beside its lake surface.
+
+**Rail bridge construction**:
+A rail bridge whose root holds a construction controller, which shows or hides its parts as its construction segments change. It is a game-defined group and needs its construction segments.
+
+**Road bridge**:
+A bridge for a road, a baked scenery group whose group root holds no construction controller. It is not a rail bridge construction.
+_Avoid_: Road bridge construction
+
+**Construction segment**:
+A track segment that the construction controller of a rail bridge construction reads to show or hide the construction's parts. A rail bridge construction needs its construction segments.
+_Avoid_: Construction scenery segment
+
+**Construction controller**:
+The game's controller on the root of a rail bridge construction. It sets the activity of the objects its entries name whenever the construction state of its segments changes.
+_Avoid_: Track construction controller
+
 **Scene marker**:
-A scene object, such as a track marker, that the game registers under a marker id.
+A scene object, such as a track marker, that the game registers under a marker ID.
 
-**Marker id**:
-The identifier under which the game registers a scene marker. The scene markers that hold the same marker id are its holders.
+**Marker ID**:
+The identifier under which the game registers a scene marker. The scene markers that hold the same marker ID are its holders.
 
-**Duplicate marker id**:
-A marker id that more than one scene marker holds.
+**Duplicate marker ID**:
+A marker ID that more than one scene marker holds.
 
-**Replacement id**:
-A new, unique marker id that repairs a duplicate marker id by replacing the id of one of its holders.
+**Replacement ID**:
+A new, unique marker ID that repairs a duplicate marker ID by replacing the ID of one of its holders.
 
 **Starter placement marker**:
 A scene object that a new-game car placement reads for its track location. Its object position is not used.
@@ -329,6 +380,13 @@ The place on a track that a track binding names, as a segment, an end and a dist
 **Track point**:
 The map position on the loaded track where a track location lies. A track location that does not resolve on the loaded track has no track point. For a starter placement marker, it is where the front of the car cut stands, not the marker's object position.
 
+**Named location**:
+The track location under which the game registers an enabled, active scene marker by its marker ID. It is distinct from the marker's stored track location, and a marker whose location does not resolve has none.
+_Avoid_: Listed track location
+
+**Binding slot**:
+The place on a scene marker, a crossing pad included, where the marker's track binding is held and edited on the Connections tab. Crossing coverage and construction segments are not binding slots.
+
 **Wreck setting**:
 The setting of a new-game car placement that decides whether its cars start derailed as a wreck.
 
@@ -343,6 +401,9 @@ A road crossing without a crossing controller, whose root holds one or more cros
 
 **Crossbuck**:
 The X-shaped road sign beside an unprotected crossing.
+
+**Bell definition**:
+A definition in the game's content library of the kind Bell, which holds a bell's audio and is named by its identifier. The bell's supported source pattern takes a bell definition as its equipment source.
 
 ### Editor terminology
 
@@ -362,7 +423,7 @@ _Avoid_: Inspection only category
 The outliner filter that limits the list to scene objects with a detected problem.
 
 **Problem**:
-A defect of one scene object that the modder can repair with the patcher for that object, such as a duplicate marker id or a broken binding.
+A defect of one scene object that the modder can repair with the patcher for that object, such as a duplicate marker ID or a broken binding.
 
 **Recheck**:
 The explicit action that compares an inspected scene object with the scene patch file again, applies the file's state where they differ, and lifts the block of an incomplete cleanup once they agree. A refresh of the inventory alone applies nothing.
@@ -408,5 +469,5 @@ The native dropdown beside the pointer that lists the scene objects of one click
 _Avoid_: Picker, popup
 
 **Game-defined group**:
-Scene objects that a game component holds together, which the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a station, a rail bridge construction or an industry storage display. Each of its objects keeps its own inventory entry and edits.
+Scene objects that a game component holds together, which the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a station, a rail bridge construction or an industry storage display. Each of its objects keeps its own inventory entry and edits. It is a group by a game component, whose objects can stand apart in the scene hierarchy. Compare baked scenery group, a group by hierarchy.
 _Avoid_: Cluster, marker group
