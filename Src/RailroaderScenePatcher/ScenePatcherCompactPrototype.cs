@@ -1,217 +1,493 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using RailroaderScenePatcher.Core;
+using TMPro;
 using UI.Builder;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
-    // PROTOTYPE (throwaway): the content of the compact scene patch window. Not production code. Compact mode keeps the
-    // edit in progress while the world needs the screen: the inspected object, its state, and the interactive elements a
-    // modder needs with an active selection. Each variant has its own purpose:
-    // A, selection toolbar: choose and confirm in the world.
-    // B, placement strip: place the inspected object while watching it.
-    // C, side rail: browse the list and choose, with the view's centre free.
-    // Every variant ends in the world choice bar, so a pending choice can be confirmed in compact mode.
+    // PROTOTYPE (throwaway): a single context-aware side rail for compact mode. Not production code.
+    // Keeps the active edit without changing tabs or dropping state: Refresh and status lamps, the four right-band
+    // commands on one row, object name and state with a read-only mode label, a context section that follows the active
+    // tab or guided task, a two-line scrolling choice and message area reusing the full footer's message priority, one
+    // action row reusing the full footer's action pattern, and a collapsible outliner with a filter-status bar.
     public sealed partial class PatcherBehaviour {
-        // The pill's colour sets it apart from every control of the product.
-        const string PrototypePill = "#E070E0";
-        // The placement mode body's height: Numeric's two groups of fields.
-        const float PrototypePlacementBody = NativePresentation.PrototypePlacementBody;
-
         void DrawCompactPrototype(UIPanelBuilder builder) {
             typed.Clear();
+            gizmoPlacement = null;
+            gizmoDragMessage = null;
             builder.ConfigureLayout(4f);
-            PrototypeSwitcher(builder);
-            switch (presentation.PrototypeVariant) {
-                case NativePresentation.PrototypeCompactVariant.PlacementStrip: PrototypePlacementStrip(builder); break;
-                case NativePresentation.PrototypeCompactVariant.SideRail: PrototypeSideRail(builder); break;
-                default: PrototypeSelectionToolbar(builder); break;
-            }
-        }
-
-        // The variant switcher, shown only in compact mode: left and right arrows around the variant's key and name.
-        void PrototypeSwitcher(UIPanelBuilder builder) {
-            builder.HStack(row => {
-                row.ConfigureLayout(4f);
-                Button(row, "<", () => presentation.PrototypeCycleVariant(-1)).Tooltip("Previous variant", "Prototype: show the previous compact variant.");
-                row.AddLabel("<color=" + PrototypePill + "><b>PROTOTYPE</b> " + Literal(NativePresentation.PrototypeVariantNames[(int)presentation.PrototypeVariant]) + " (" + ((int)presentation.PrototypeVariant + 1) + "/" + NativePresentation.PrototypeVariantCount + ")</color>")
-                    .TextWrap(TMPro.TextOverflowModes.Ellipsis, TMPro.TextWrappingModes.NoWrap).Height(RowHeight).FlexibleWidth();
-                Button(row, ">", () => presentation.PrototypeCycleVariant(1)).Tooltip("Next variant", "Prototype: show the next compact variant.");
-            }).Height(RowHeight);
-        }
-
-        // A: a toolbar along the bottom for choosing in the world. Refresh and the lamps beside Select in world, Focus,
-        // Clear and Copy ID; the heading; the state line with the switch; the position line; the world choice bar.
-        void PrototypeSelectionToolbar(UIPanelBuilder builder) {
-            builder.HStack(row => {
-                row.ConfigureLayout(4f);
-                leftBandWidth = OutlinerMinimumWidth;
-                var lamps = row.VStack(DrawLeftBand).gameObject.AddComponent<LayoutElement>();
-                lamps.minWidth = lamps.preferredWidth = OutlinerMinimumWidth; lamps.flexibleWidth = 0;
-                var commands = row.VStack(column => DrawRightBand(column)).gameObject.AddComponent<LayoutElement>();
-                commands.flexibleWidth = 10000;
-            }).ChildrenKeepHeight().Height(RowHeight);
-            PrototypeHeading(builder);
-            PrototypePositionLine(builder);
-            PrototypeChoiceBar(builder);
-        }
-
-        // B: a strip along the bottom for placing the inspected object: the heading with the switch, the state line, the
-        // Placement tab's mode switch and the open mode's fields or state, the mode's own action row and the world choice
-        // bar, which Snap and Follow need. The strip opens the Placement tab, so the gizmo stands in Gizmo mode.
-        void PrototypePlacementStrip(UIPanelBuilder builder) {
-            var pending = selection?.Pending != null;
-            if (!guided.Enabled && !pending && inspectorTab.Value != PlacementTab) inspectorTab.Value = PlacementTab;
-            PrototypeHeading(builder);
-            var body = presentation.Scroll(builder, PrototypePlacementBody, content => {
-                content.ConfigureLayout(4f);
-                if (guided.Enabled) Line(content, Literal("A guided task is open. Its steps are in the full window."), null, null);
-                else if (selected == null) Line(content, Literal("Inspect an object first. The selection toolbar and the side rail choose one."), null, null);
-                else if (inspectorTab.Value != PlacementTab) Line(content, Literal("The world choice belongs to the " + PrototypeTabTitle(inspectorTab.Value) + " tab. Confirm or cancel it to place the object here."), null, null);
-                else DrawPlacement(content);
-            });
-            var fill = body.GetComponent<LayoutElement>();
-            if (fill != null) { fill.minHeight = fill.preferredHeight = PrototypePlacementBody; fill.flexibleHeight = 10000; }
-            var viewport = body.GetComponent<ScrollRect>().viewport;
-            if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null) viewport.gameObject.AddComponent<RectMask2D>();
-            var tabActs = guided.Enabled || inspectorTab.Value != PlacementTab ? new Act[0] : TabActs(PlacementTab);
-            ActionRow(builder, tabActs, ChoiceBlock);
-            PrototypeChoiceBar(builder);
-        }
-
-        // C: a narrow rail at the right screen edge for browsing and choosing: the band's commands on two rows, the
-        // heading, the state line, the switch, the position line, the world choice bar, then Refresh with the lamps over
-        // the outliner, which takes the rest of the height.
-        void PrototypeSideRail(UIPanelBuilder builder) {
             leftBandWidth = NativePresentation.PrototypeRailContent;
-            PrototypeRailBand(builder);
-            var name = selected == null ? "No Selection" : selected.DisplayName;
-            Heading(builder, Literal(name), "Object", selected?.Identity.Path).Height(RowHeight);
-            Line(builder, StateLine(out var states), "State", states, RowHeight);
-            builder.HStack(row => { DrawModeSwitch(row); row.Spacer(); }).ChildrenKeepHeight().Height(RowHeight);
-            PrototypePositionLine(builder);
-            PrototypeChoiceBar(builder);
-            var outliner = builder.VStack(column => DrawOutliner(column, true)).gameObject.AddComponent<LayoutElement>();
-            outliner.flexibleHeight = 10000; outliner.flexibleWidth = 10000;
+            DrawLeftBand(builder);
+            DrawRightBand(builder);
+            PrototypeHeading(builder);
+            PrototypeContext(builder);
+            PrototypeFooter(builder);
+            PrototypeOutlinerSection(builder);
+            builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
         }
 
-        // The band's four commands on two rows, so the rail's width holds them: Select in world and Focus, then Clear
-        // and Copy ID. The states and tooltips are the full band's (DrawRightBand).
-        void PrototypeRailBand(UIPanelBuilder builder) {
-            var pending = selection?.Pending != null;
-            builder.HStack(row => {
-                row.ConfigureLayout(4f);
-                var select = CommandBand.SelectInWorld(selection != null, pending);
-                Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
-                    .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
-                var focus = CommandBand.Focus(selected != null, FocusUnavailable());
-                var starter = selected != null && selected.Family == StarterPlacements.Family;
-                Button(row, "Focus", () => { if (selected != null) Focus(selected); }).Inactive(focus != null)
-                    .Tooltip("Focus", CommandBand.Tooltip(starter ? "Move the camera to the marker's track point, where the start setup places its cars." : "Move the camera to the inspected object.", focus));
-                row.Spacer();
-            }).Height(RowHeight);
-            builder.HStack(row => {
-                row.ConfigureLayout(4f);
-                var keepDraft = guided.Enabled && (guided.Step == GuidedTaskStep.Values || guided.Step == GuidedTaskStep.Review);
-                var clear = keepDraft && !pending ? "No world choice is pending." : CommandBand.Clear(selected != null, pending);
-                Button(row, "Clear", ClearInspection).Inactive(clear != null)
-                    .Tooltip("Clear", CommandBand.Tooltip(keepDraft ? "Cancel the world choice and keep the object and draft." : "End the inspection and cancel a pending world choice, gizmo, or snap. Applied changes stay.", clear));
-                var copy = CommandBand.CopyId(selected != null, attachment?.Session.CopyIdRefusal);
-                Button(row, "Copy ID", CopyIdentity).Inactive(copy != null)
-                    .Tooltip("Copy ID", CommandBand.Tooltip("Copy the object's ID, placement, and the map ID needed by the scene patch file.", copy));
-                row.Spacer();
-            }).Height(RowHeight);
-        }
-
-        // The heading row and the state row as the full window draws them.
+        // Heading and state line with a read-only mode label instead of the live Inspector/Guided switch.
         void PrototypeHeading(UIPanelBuilder builder) {
             if (selected == null) {
                 builder.HStack(row => {
                     Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
-                    DrawModeSwitch(row);
+                    PrototypeModeLabel(row);
                 }).ChildrenKeepHeight().Height(RowHeight);
-                Heading(builder, StateLine(out _), null, null).Height(RowHeight);
+                Line(builder, StateLine(out _), null, null, RowHeight);
                 return;
             }
-            Heading(builder, Literal(selected.DisplayName), "Object", IsAdded(selected) ? selected.DisplayName : selected.Identity.Path).Height(RowHeight);
+            var name = selected.DisplayName;
+            var added = IsAdded(selected);
+            var heading = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path).Height(RowHeight);
+            if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
             var state = StateLine(out var states);
             builder.HStack(row => {
                 Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
-                DrawModeSwitch(row);
+                PrototypeModeLabel(row);
             }).ChildrenKeepHeight().Height(RowHeight);
         }
 
-        // The inspected object's position and rotation as last observed, and whether it is enabled: where it stands now.
-        void PrototypePositionLine(UIPanelBuilder builder) {
-            var values = selected == null ? null : CurrentPlacement();
-            string markup, full;
-            if (selected == null) { markup = full = "Position and rotation appear here when an object is inspected."; markup = Literal(markup); }
-            else if (values == null || values.Length < 6) { full = "This object has no placement of its own."; markup = Literal(full); }
-            else {
-                var position = values[0] + ", " + values[1] + ", " + values[2];
-                var rotation = values[3] + ", " + values[4] + ", " + values[5];
-                var enabled = OwnActivity(selected) ? "Enabled" : "Disabled";
-                markup = "<style=FieldLabel>POSITION</style> " + Literal(position) + "   <style=FieldLabel>ROTATION</style> " + Literal(rotation) + "   " + Literal(enabled);
-                full = "Position in map coordinates, in meters: " + position + ". Rotation in degrees: " + rotation + ". " + enabled + ". As last observed; a completed edit observes the object again.";
-            }
-            Line(builder, markup, "Placement", full, RowHeight);
+        void PrototypeModeLabel(UIPanelBuilder row) {
+            var text = guided.Enabled ? "<color=" + Blue + "><b>Guided</b></color>" : "<alpha=#99>" + Literal(PrototypeTabTitle(inspectorTab.Value)) + "</alpha>";
+            var title = guided.Enabled ? "Guided mode" : "Active tab";
+            var tip = guided.Enabled
+                ? "Guided mode is active. Switch to the full window to finish or leave the guided task."
+                : "Compact mode follows the " + PrototypeTabTitle(inspectorTab.Value) + " tab. Switch to the full window to change tabs or modes.";
+            var rect = row.AddLabel(text, label => label.alignment = TextAlignmentOptions.Right)
+                .TextWrap(TextOverflowModes.Overflow, TextWrappingModes.NoWrap).Height(RowHeight).Tooltip(title, tip);
+            var layout = rect.gameObject.GetComponent<LayoutElement>() ?? rect.gameObject.AddComponent<LayoutElement>();
+            layout.flexibleWidth = 0;
         }
 
-        // The world choice bar: one line, then the footer's Confirm, Cancel, Focus and Details. The line shows the pending
-        // choice and its clicked candidate; without a choice it shows the confirmed target or the newest result. Without a
-        // choice the four buttons stay in place, inactive with their reason. During a gizmo drag the row holds its Cancel.
-        void PrototypeChoiceBar(UIPanelBuilder builder) {
-            var pending = selection?.Pending;
-            string markup, title, full;
-            if (pending != null) {
-                var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
-                var candidate = selection.Find(pending.Candidate);
-                title = "World choice";
-                if (candidate == null) {
-                    markup = "<b>World choice</b> " + Tint(Blue, purpose + " in the world.");
-                    full = purpose + " in the world." + (pending.InspectOnly ? "" : " Map Editor selection is paused. Click Cancel to resume it.");
-                } else {
-                    var line = CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation);
-                    var next = choosingSnap ? " Confirm chooses it. Apply moves the object." : pending.InspectOnly ? " Confirm inspects this object." : " Confirm chooses this target.";
-                    // Details shows the candidate's identity in the line itself, as it does in the footer's message area.
-                    markup = "<b>World choice</b> " + Tint(Blue, candidateDetails ? candidate.Choice.Identity.ToString() : line);
-                    full = line + next + "\n" + candidate.Choice.Identity + (string.IsNullOrEmpty(candidate.Details) ? "" : "\n" + candidate.Details);
-                }
-                if (selectionProblem != null) { markup += " " + Tint(Red, selectionProblem); full += "\n" + selectionProblem; }
-            } else if (ConfirmedForInspected is ConfirmedSelection confirmed) {
-                title = "World choice";
-                var name = selection.ConfirmedName ?? confirmed.Identity.ToString();
-                markup = "<b>World choice</b> " + Tint(Green, "Confirmed choice: " + name);
-                full = "Confirmed choice: " + name + ". Open the full window to use it.";
-            } else if (feedback.Messages.Count != 0) {
-                var message = feedback.Messages[0];
-                var text = WithoutSource(message);
-                var tone = message.Recovery != null ? (CommandBand.RecoveryWarning(message.Recovery.Kind) ? Amber : Red) : ToneOf(message.Text);
-                title = message.Source;
-                markup = (string.IsNullOrEmpty(message.Source) ? "" : "<b>" + Literal(message.Source) + "</b> ") + (tone == null ? Literal(text) : Tint(tone, text));
-                full = text;
-            } else {
-                title = "World choice";
-                full = "No world choice is pending.";
-                markup = Literal(full);
+        // Follows the active tab or guided task without mutating inspectorTab.
+        void PrototypeContext(UIPanelBuilder builder) {
+            if (guided.Enabled) { PrototypeGuidedContext(builder); return; }
+            if (selected == null) {
+                Line(builder, Literal("Select a row in the list or click Select in world."), null, null, RowHeight);
+                return;
             }
-            Line(builder, markup, title, full, RowHeight);
-            const string none = "No world choice is pending.";
-            var acts = pending != null || gizmo?.Active == true ? FooterActs() : new[] {
-                Slot("Confirm", "Confirm the candidate's identity. Confirming changes nothing.", none, () => { }),
-                Slot("Cancel", "Cancel the world choice.", none, () => { }),
-                Slot("Focus", "Move the camera to the candidate.", none, () => { }),
-                Slot("Details", "Show or hide the clicked candidate's identity in the line above.", none, () => { }, "Candidate details") };
-            ActionRow(builder, acts, null);
+            switch (inspectorTab.Value) {
+                case PlacementTab: PrototypePlacementContext(builder); break;
+                case ConnectionsTab: PrototypeConnectionsContext(builder); break;
+                case ChangesTab: PrototypeChangesContext(builder); break;
+                default: PrototypeObjectContext(builder); break;
+            }
         }
+
+        void PrototypePlacementContext(UIPanelBuilder builder) {
+            var collapsed = !presentation.PrototypeListOpen;
+            var minHeight = collapsed ? 140f : NativePresentation.PrototypePlacementBody;
+            var body = presentation.Scroll(builder, minHeight, content => {
+                content.ConfigureLayout(4f);
+                DrawPlacement(content);
+            });
+            var fill = body.GetComponent<LayoutElement>();
+            if (fill != null) {
+                fill.minHeight = minHeight;
+                fill.preferredHeight = NativePresentation.PrototypePlacementBody;
+                fill.flexibleHeight = collapsed ? 10000 : 0;
+            }
+            var viewport = body.GetComponent<ScrollRect>().viewport;
+            if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null) viewport.gameObject.AddComponent<RectMask2D>();
+        }
+
+        void PrototypeObjectContext(UIPanelBuilder builder) {
+            PrototypeHonestPlacement(builder);
+            if (selected.Problems.Count == 0) return;
+            var first = selected.Problems[0];
+            var suffix = selected.Problems.Count > 1 ? " (+" + (selected.Problems.Count - 1) + " more)" : "";
+            Line(builder, "<color=" + Red + "><b>Problem</b></color> " + Literal(first + suffix),
+                "Detected problems", String.Join("\n", selected.Problems), LineHeight);
+        }
+
+        void PrototypeConnectionsContext(UIPanelBuilder builder) {
+            if (IsStarter) {
+                PrototypeStarterLines(builder);
+                return;
+            }
+            if (HoldsConstructionSegments) {
+                var segments = String.IsNullOrWhiteSpace(segmentFields[0]) ? "None" : segmentFields[0];
+                Line(builder, "<style=FieldLabel>SEGMENTS</style> " + Literal(segments),
+                    "Construction segments", "Current construction segments: " + segments, LineHeight);
+                PrototypePositionOnlyLine(builder);
+                return;
+            }
+            if (selected.Identity.Structure == CrossingCoverageScene.Structure) {
+                if (coverageCircuit != null) {
+                    var label = coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition;
+                    Line(builder, "<b>" + Literal(label) + "</b>", "Crossing coverage", "Editing " + label + ". Pick each role's segment in the world, then switch to the full window to preview and apply.", LineHeight);
+                    var roles = new[] {
+                        "A: " + (String.IsNullOrWhiteSpace(coverageFields[0]) ? "none" : coverageFields[0]),
+                        "Island: " + (String.IsNullOrWhiteSpace(coverageFields[4]) ? "none" : coverageFields[4]),
+                        "B: " + (String.IsNullOrWhiteSpace(coverageFields[8]) ? "none" : coverageFields[8])
+                    };
+                    var summary = String.Join("   ", roles);
+                    Line(builder, Literal(summary), "Role segments", String.Join("\n", new[] {
+                        "Approach A: " + (String.IsNullOrWhiteSpace(coverageFields[0]) ? "none" : coverageFields[0]),
+                        "Island: " + (String.IsNullOrWhiteSpace(coverageFields[4]) ? "none" : coverageFields[4]),
+                        "Approach B: " + (String.IsNullOrWhiteSpace(coverageFields[8]) ? "none" : coverageFields[8])
+                    }), LineHeight);
+                } else if (equipmentSource != null) {
+                    Line(builder, "<b>Equipment form</b> " + Literal(equipmentLabel ?? EquipmentKind), "Equipment form", "Switch to the full window to preview or apply this equipment form.", LineHeight);
+                    PrototypePositionOnlyLine(builder);
+                } else {
+                    PrototypePositionOnlyLine(builder);
+                    Line(builder, "<style=Footnote>Switch to the full window to edit coverage or equipment.</style>", null, null, LineHeight);
+                }
+                return;
+            }
+            var bindingText = PrototypeBindingDisplay();
+            Line(builder, "<style=FieldLabel>" + (IsPad ? "PAD BINDING" : "TRACK BINDING") + "</style> " + Literal(bindingText),
+                IsPad ? "Crossing pad binding" : "Track binding",
+                IsPad ? "Track location: " + bindingText + ". The pad's geometry is generated along this binding." : "Track location: " + bindingText + ". Changing a binding does not move the object.", LineHeight);
+            if (HasPickedBinding) {
+                var pickedText = PrototypeDraftBindingDisplay();
+                Line(builder, "<style=FieldLabel>PICKED</style> " + Tint(Green, pickedText), "Picked track location",
+                    "Picked track location ready for Set: " + pickedText + ".", LineHeight);
+            } else if (IsPad) PrototypeEnabledLine(builder);
+            else PrototypePositionOnlyLine(builder);
+        }
+
+        void PrototypeChangesContext(UIPanelBuilder builder) {
+            var changed = IsChanged(selected);
+            var shownFailure = FailureOf(selected);
+            var badge = shownFailure != null ? CommandBand.Badges(changed, false, shownFailure)[0].Markup : changed ? ChangedBadge : "Unchanged";
+            Line(builder, "<style=FieldLabel>THIS MOD</style> " + badge, "Changes", "Whether Data/scene-patches.json of the edited mod holds a modification of this object.", LineHeight);
+            if (changed && attachment != null) {
+                IReadOnlyList<string> lines = null;
+                try { lines = attachment.Session.Changes(selected.Identity); } catch { }
+                if (lines != null && lines.Count != 0) {
+                    var full = String.Join("\n", lines);
+                    Line(builder, Literal(lines[0]), "Changed settings", full, LineHeight);
+                    if (lines.Count > 1) {
+                        var second = lines.Count == 2 ? lines[1] : lines[1] + " (+" + (lines.Count - 2) + " more)";
+                        Line(builder, Literal(second), "Changed settings", full, LineHeight);
+                    }
+                }
+            } else PrototypeHonestPlacement(builder);
+            if (!HasTerrain) return;
+            var problem = (string)null;
+            var output = attachment == null || !Editable ? DependentOutput.None : inspectedOutput.Of(attachment.Session, selected, out problem);
+            var terrain = CommandBand.Terrain(problem, output.Error, output.Settled, Join(output.Completed), Join(output.Outstanding), output.Completed.Count != 0);
+            Line(builder, problem != null ? Tint(Red, terrain) : Literal(terrain), "Terrain", terrain, LineHeight);
+        }
+
+        void PrototypeGuidedContext(UIPanelBuilder builder) {
+            var summary = guided.Kind == null
+                ? "Guided mode: select a task in the full window."
+                : "Guided: " + GuidedName(guided.Kind.Value) + " (" + guided.Step + ")";
+            Line(builder, "<b>" + Literal(summary) + "</b>", "Guided task", summary, LineHeight);
+            if (selected != null) PrototypeHonestPlacement(builder);
+            if (guided.Step == GuidedTaskStep.Values && guided.Kind == GuidedTaskKind.Snap) {
+                var snapText = preparedSnap?.Identity.ToString() ?? "None chosen";
+                Line(builder, "<style=FieldLabel>SNAP TARGET</style> " + Literal(snapText), "Snap target", snapText, LineHeight);
+            } else if (guided.Step == GuidedTaskStep.Values && (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement)) {
+                var draft = guidedFields.Length >= 3 && !String.IsNullOrWhiteSpace(guidedFields[0])
+                    ? guidedFields[0] + " / " + guidedFields[1] + " / " + guidedFields[2] + " m"
+                    : "None entered";
+                Line(builder, "<style=FieldLabel>DRAFT LOCATION</style> " + Literal(draft), "Draft track location", draft, LineHeight);
+            }
+            Line(builder, "<style=Footnote>Switch to the full window to finish this guided task.</style>", null, null, LineHeight);
+        }
+
+        // Honest placement lines with units: track point for starter markers, binding for crossing pads, and two-line
+        // position and rotation with units for physical objects.
+        void PrototypeHonestPlacement(UIPanelBuilder builder) {
+            if (IsStarter) { PrototypeStarterLines(builder); return; }
+            if (IsPad) {
+                var bindingText = PrototypeBindingDisplay();
+                Line(builder, "<style=FieldLabel>PAD BINDING</style> " + Literal(bindingText), "Crossing pad binding",
+                    "Track location: " + bindingText + ". A crossing pad moves by its track binding, not by its object position.", LineHeight);
+                PrototypeEnabledLine(builder);
+                return;
+            }
+            if (IsController) {
+                Line(builder, Literal("Construction controller: no editable placement or activity."), "Controller",
+                    "This controller sets visibility from its construction segments on the Connections tab.", LineHeight);
+                return;
+            }
+            var values = CurrentPlacement();
+            if (values == null || values.Length < 6) {
+                Line(builder, Literal("This object has no placement of its own."), "Placement", "This object has no placement of its own.", LineHeight);
+                PrototypeEnabledLine(builder);
+                return;
+            }
+            var pos = CommandBand.RunningLine(CommandBand.Axes, values.Take(3).ToArray(), CommandBand.PlacementUnits[0]);
+            var rot = CommandBand.RunningLine(CommandBand.Axes, values.Skip(3).Take(3).ToArray(), CommandBand.PlacementUnits[1]);
+            Line(builder, "<style=FieldLabel>POSITION</style> " + Literal(pos), "Position", "Position in map coordinates: " + pos + ".", LineHeight);
+            Line(builder, "<style=FieldLabel>ROTATION</style> " + Literal(rot), "Rotation", "Rotation in degrees: " + rot + ".", LineHeight);
+            PrototypeEnabledLine(builder);
+        }
+
+        void PrototypePositionOnlyLine(UIPanelBuilder builder) {
+            var values = CurrentPlacement();
+            if (values == null || values.Length < 3) return;
+            var pos = CommandBand.RunningLine(CommandBand.Axes, values.Take(3).ToArray(), CommandBand.PlacementUnits[0]);
+            Line(builder, "<style=FieldLabel>POSITION</style> " + Literal(pos), "Position", "Position in map coordinates: " + pos + ".", LineHeight);
+        }
+
+        void PrototypeStarterLines(UIPanelBuilder builder) {
+            var point = InspectedTrackPoint();
+            var pointText = point == null
+                ? "None (" + (FocusUnavailable() ?? StarterPlacements.NoTrackPoint) + ")"
+                : CommandBand.RunningLine(CommandBand.Axes, point.Select(CommandBand.Number).ToArray(), CommandBand.PlacementUnits[0]);
+            Line(builder, "<style=FieldLabel>TRACK POINT</style> " + Literal(pointText), "Track point",
+                "Where the start setup places the front of this marker's car cut, in map coordinates: " + pointText + ". The marker's object position is not used.", LineHeight);
+            var locationText = HasPickedBinding ? PrototypeDraftBindingDisplay() : PrototypeBindingDisplay();
+            var locationLabel = HasPickedBinding ? "PICKED LOCATION" : "TRACK LOCATION";
+            Line(builder, "<style=FieldLabel>" + locationLabel + "</style> " + (HasPickedBinding ? Tint(Green, locationText) : Literal(locationText)),
+                HasPickedBinding ? "Picked track location" : "Track location",
+                (HasPickedBinding ? "Picked track location ready for Set: " : "Registered track location: ") + locationText + ".", LineHeight);
+        }
+
+        string PrototypeDraftBindingDisplay() =>
+            binding == null || binding.Length < 3 || String.IsNullOrWhiteSpace(binding[0]) ? "None"
+                : binding[0] + " / " + (binding[1] ?? "").ToLowerInvariant() + " / " + binding[2] + " m";
+
+        void PrototypeEnabledLine(UIPanelBuilder builder) {
+            var own = OwnActivity(selected);
+            var switchedOff = selected.Handle is GameObject shown && GroupWorld.OffThroughProgression(shown);
+            var text = own ? (switchedOff ? CommandBand.SwitchedOffByGame : selected.Active ? "Yes" : "Yes; a parent is inactive") : "No";
+            Line(builder, "<style=FieldLabel>ENABLED</style> " + Literal(text), "Enabled", "Whether this object is active in the scene: " + text + ".", LineHeight);
+        }
+
+        string PrototypeBindingDisplay() {
+            var current = CurrentBinding();
+            if (current == null || current.Length < 3 || String.IsNullOrWhiteSpace(current[0])) return "None";
+            return current[0] + " / " + current[1].ToLowerInvariant() + " / " + current[2] + " m";
+        }
+
+        // Two-line scrolling choice and message area reusing DrawFooter's exact priority rules and live gizmo drag row,
+        // followed by one action row reusing the full footer's action pattern.
+        void PrototypeFooter(UIPanelBuilder builder) {
+            builder.AddHRule();
+            var pending = selection?.Pending;
+            string source = null, state = "";
+            if (pending == null) candidateDetails = false;
+            var session = attachment?.Session;
+            var confirmation = selection?.Confirmed;
+            var confirmedForInspected = selected != null && confirmation?.Source != null && confirmation.Source.Equals(SelectionIdentity.SceneObject(selected.Identity));
+            var primary = feedback.Primary(session, Requests.Place != null, pending != null, confirmedForInspected);
+            if (primary == EditFeedback.PrimaryMessage.Working) { source = Requests.Place; state = "Working..."; }
+            else if (primary == EditFeedback.PrimaryMessage.WorldChoice) {
+                var candidate = selection.Find(pending.Candidate);
+                source = "World choice";
+                var purpose = choosingCoverageRole.HasValue ? pending.Purpose : choosingSnap ? "Choose the snap target" : pending.Kind == SelectionKind.SceneObject ? "Choose an object" : pending.Kind == SelectionKind.TrackSegment ? "Choose a track" : "Choose an endpoint";
+                state = (pending.ListOpen ? Tint(Blue, pending.OfferCountText + " ") + Literal(pending.OfferListInstruction) : Literal(purpose + " in the world.")) +
+                    (pending.InspectOnly ? "" : Literal(" Map Editor selection is paused. Click Cancel to resume it.")) +
+                    (pending.Problem == null || pending.Problem == PendingSelection.SeveralOffers ? "" : " " + (PendingSelection.IsInstruction(pending.Problem) ? Literal(pending.Problem) : Tint(Red, pending.Problem))) +
+                    (inputBlocker.WorldInputProblem == null ? "" : " " + Tint(Red, inputBlocker.WorldInputProblem)) +
+                    (selectionProblem == null ? "" : " " + Tint(Red, selectionProblem)) +
+                    (candidate == null ? "" : "\n" + Tint(Blue, CommandBand.ChoiceLine(pending.Kind == SelectionKind.SceneObject ? "Object" : "Candidate", pending.Number(candidate.Choice), pending.Offers.Count, candidate.Choice.Label, pending.Offers.Select(o => o.Label), candidate.Observation)) + Literal(choosingSnap ? guided.Enabled ? " Click Confirm to choose this target, then finish in the full window." : " Confirm chooses it. Apply moves the object." : pending.InspectOnly ? " Confirm inspects this object." : " Confirm chooses this target.")) +
+                    (candidate == null || !candidateDetails ? "" : "\n" + Literal(candidate.Choice.Identity.ToString()) + (String.IsNullOrEmpty(candidate.Details) ? "" : "\n" + Literal(candidate.Details)));
+            } else if (guided.Enabled && !String.IsNullOrEmpty(guided.Recovery)) { source = "Guided task"; state = Literal(guided.Recovery); }
+            else if (primary == EditFeedback.PrimaryMessage.BackupDiagnosis) { source = RecoveryPlace; state = Literal(EditFeedback.BackupNotice(session)); }
+            else if (selectionProblem != null) { source = "World choice"; state = Tint(Red, selectionProblem); }
+            else if (primary == EditFeedback.PrimaryMessage.Reported) { state = null; }
+            else if (primary == EditFeedback.PrimaryMessage.ConfirmedChoice) {
+                source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmation.Identity.ToString()));
+            } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
+            else if (feedback.Recovery?.Kind != FailureKind.IncompleteCleanup && feedback.Recovery?.Kind != FailureKind.Blocked && CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
+            else if (!guided.Enabled && HoldWarning is string warning) { source = ActivityPlace; state = Tint(Amber, warning); }
+
+            var messages = feedback.Messages;
+            var messageArea = presentation.Scroll(builder, NativePresentation.PrototypeMessageHeight, lines => {
+                gizmoDragMessage = MessageSlot(lines, GizmoPlace, Literal(GizmoController.DraggingState), false).gameObject;
+                ShowLiveGizmoDrag();
+                var firstReport = 0;
+                if (!String.IsNullOrEmpty(state)) MessageSlot(lines, source, state, false);
+                else if (messages.Count != 0) { ReportSlot(0); firstReport = 1; }
+                for (var i = firstReport; i < messages.Count; i++) ReportSlot(i);
+                if ((primary == EditFeedback.PrimaryMessage.ConfirmedChoice || primary == EditFeedback.PrimaryMessage.Reported) && EditFeedback.HasBackupNotice(session))
+                    MessageSlot(lines, RecoveryPlace, Literal(EditFeedback.BackupNotice(session)), true);
+
+                void ReportSlot(int i) {
+                    var message = messages[i]; var older = i > 0;
+                    var tone = message.Recovery != null ? (CommandBand.RecoveryWarning(message.Recovery.Kind) ? Amber : Red) : ToneOf(message.Text);
+                    var text = WithoutSource(message);
+                    MessageSlot(lines, message.Source, PathBreaks(tone == null ? Literal(text) : Tint(tone + (older ? "80" : ""), text)), older);
+                }
+            }, false);
+            var messageScroll = messageArea.GetComponent<ScrollRect>();
+            if (messageScroll.verticalScrollbarVisibility == ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport)
+                messageScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            if (messageScroll.horizontalScrollbarVisibility == ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport)
+                messageScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            var viewport = messageScroll.viewport;
+            var scrollbar = messageScroll.verticalScrollbar == null ? null : messageScroll.verticalScrollbar.transform as RectTransform;
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.offsetMin = Vector2.zero;
+            viewport.offsetMax = new Vector2(scrollbar == null ? 0 : -Mathf.Max(0, scrollbar.rect.width + messageScroll.verticalScrollbarSpacing), 0);
+            var flexMessages = !presentation.PrototypeListOpen && !(inspectorTab.Value == PlacementTab && !guided.Enabled && selected != null);
+            var area = messageArea.GetComponent<LayoutElement>();
+            area.minHeight = area.preferredHeight = NativePresentation.PrototypeMessageHeight;
+            area.flexibleHeight = flexMessages ? 10000 : 0;
+
+            ActionRow(builder, PrototypeActs(), null);
+        }
+
+        // One shared action row: world-choice and gizmo-drag actions take it over (as in DrawFooter); otherwise it holds
+        // the lightweight actions of the active tab or guided step.
+        Act[] PrototypeActs() {
+            if (selection?.Pending != null || gizmo?.Active == true) return FooterActs();
+            if (guided.Enabled) {
+                var wait = Requests.Pending ? "Wait for the scene check to finish." : null;
+                if (guided.Step == GuidedTaskStep.Values && guided.Kind == GuidedTaskKind.Snap) return new[] {
+                    Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
+                    Slot("Node", "Choose the endpoint to snap to.", wait, () => BeginSnap(SelectionKind.TrackNode)) };
+                if (guided.Step == GuidedTaskStep.Values && (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement)) return new[] {
+                    Slot("Segment", "Choose a track segment in the world.", wait, () => { inspectorTab.Value = ConnectionsTab; BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: guided.Kind == GuidedTaskKind.Binding); }),
+                    Slot("Picked", "Fill the guided draft fields from the confirmed track location.", wait ?? (GuidedPickedTarget() != null ? null : "Choose and confirm a track segment first."), GuidedPicked) };
+                return new Act[0];
+            }
+            if (selected == null) return new Act[0];
+            switch (inspectorTab.Value) {
+                case PlacementTab: return TabActs(PlacementTab);
+                case ConnectionsTab: return PrototypeConnectionsActs();
+                case ChangesTab: return PrototypeChangesActs();
+                default: return PrototypeObjectActs();
+            }
+        }
+
+        Act[] PrototypeObjectActs() {
+            var acts = new List<Act>(TabActs(ObjectTab));
+            var partOf = InventoryPresentationState.PartOf(selected);
+            if (partOf != null) {
+                var group = InventoryPresentationState.GroupOf(inventory, selected);
+                acts.Add(Slot("Select group", "Inspect the group that this part belongs to.",
+                    group == null ? "the object list does not include this part's group; click Refresh" : null, () => {
+                        var entry = InventoryPresentationState.GroupOf(inventory, selected);
+                        if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
+                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
+                    }));
+            }
+            var heldBy = InventoryPresentationState.HeldBy(selected);
+            if (heldBy != null) {
+                var holder = InventoryPresentationState.HolderOf(inventory, selected);
+                acts.Add(Slot("Select controller", "Inspect the crossing controller that holds this detection span.",
+                    holder == null ? "the object list does not include this detection span's crossing controller; click Refresh" : null, () => {
+                        var entry = InventoryPresentationState.HolderOf(inventory, selected);
+                        if (entry == null || !inventoryPresentation.CanSelect(inventory, entry)) return;
+                        CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, entry); ReadPlacement();
+                    }));
+            }
+            return acts.ToArray();
+        }
+
+        Act[] PrototypeConnectionsActs() {
+            var block = EditBlock();
+            var busy = block ?? (selection == null ? "World selection is unavailable." : ChoiceBlock);
+            if (IsStarter) {
+                var confirmedTrack = ConfirmedForInspected?.Identity;
+                var picked = confirmedTrack != null && confirmedTrack.Kind == SelectionKind.TrackSegment;
+                return new[] {
+                    Slot("Segment", "Click the track where the front of the car cut belongs and confirm the segment.", busy, () => BeginSelection(SelectionKind.TrackSegment, selected), "Place on a segment"),
+                    Typed(Slot("Set", "Place the front of the car cut at the entered track location.", null, ApplyStarterLocation, "Set track location"),
+                        () => CommandBand.FieldReason(block, binding, CurrentBinding(), CommandBand.SameLocation, CommandBand.BindingIds)),
+                    HasPickedBinding ? Slot("Cancel", "Restore the current track location in the fields.", null, CancelPickedBinding)
+                        : Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment") };
+            }
+            if (HoldsConstructionSegments) {
+                var current = CurrentSegments();
+                var chosen = ConfirmedForInspected?.Identity;
+                var pickedSegment = chosen != null && chosen.Kind == SelectionKind.TrackSegment;
+                return new[] {
+                    Slot("Segment", "Choose a track segment in the world and confirm its identity.", busy, () => BeginSelection(SelectionKind.TrackSegment, selected), "Replacement segment"),
+                    Slot("Picked", "Add the confirmed segment to the segments field and remove segments that no longer exist.", block ?? (pickedSegment ? null : "Click Segment to choose a segment, then confirm it."),
+                        () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier, CommandBand.MissingSegments(selected?.Bindings)); FieldsChanged(); }, "Picked segment"),
+                    Typed(Slot("Set", "Replace the construction segments with the segments in the field.", null, ApplySegments, "Set construction segments"),
+                        () => CommandBand.SegmentsReason(block, segmentFields[0], current)) };
+            }
+            var coverage = selected.Identity.Structure == CrossingCoverageScene.Structure;
+            if (coverage) {
+                if (coverageCircuit != null) {
+                    var pickBlock = ChoiceBlock ?? block ?? (selection == null ? "World selection is unavailable." : null);
+                    var acts = new Act[3];
+                    for (var role = 0; role < 3; role++) {
+                        var roleIndex = role;
+                        var roleName = CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]);
+                        acts[role] = Slot(roleName, "Click a track in the world and confirm it to fill this role's segment.", pickBlock,
+                            () => BeginSelection(SelectionKind.TrackSegment, selected, roleIndex), "Choose a segment for " + roleName);
+                    }
+                    return acts;
+                }
+                var replaceBlock = selection == null ? "World selection is unavailable." : ChoiceBlock;
+                return new[] {
+                    Slot("Object", "Choose a replacement object in the world and confirm its identity.", replaceBlock, () => BeginSelection(SelectionKind.SceneObject, selected), "Replacement object"),
+                    Slot("Node", "Choose a replacement track node in the world and confirm its identity.", replaceBlock, () => BeginSelection(SelectionKind.TrackNode, selected), "Replacement node") };
+            }
+            var pad = selected.Identity.Structure == CrossingPadScene.Structure;
+            var marker = pad || selected.Identity.Structure == TrackMarkerScene.Structure || selected.Identity.Structure == MilepostScene.Structure;
+            var pickUnavailable = !marker ? "Replacement targets serve a track binding or a crossing's coverage." : selection == null ? "World selection is unavailable." : ChoiceBlock;
+            var setUnavailable = marker ? block : BindingUnavailable();
+            var list = new List<Act> {
+                Slot("Object", "Choose a replacement object in the world and confirm its identity.", pickUnavailable, () => BeginSelection(SelectionKind.SceneObject, selected), "Replacement object"),
+                Slot("Segment", "Choose a track segment in the world and confirm its identity.", pickUnavailable, () => BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: marker), "Replacement segment"),
+                Slot("Node", "Choose a track node in the world and confirm its identity.", pickUnavailable, () => BeginSelection(SelectionKind.TrackNode, selected), "Replacement node"),
+                Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding"),
+                    () => CommandBand.FieldReason(setUnavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds))
+            };
+            if (HasPickedBinding) list.Add(Slot("Cancel", "Restore the current binding in the fields.", null, CancelPickedBinding));
+            return list.ToArray();
+        }
+
+        Act[] PrototypeChangesActs() {
+            var acts = new List<Act>(TabActs(ChangesTab));
+            var footer = FooterActs();
+            // Keep Recheck and Guide from the full footer; destructive Remove modification stays in the full window.
+            for (var i = 1; i < footer.Length; i++) acts.Add(footer[i]);
+            return acts.ToArray();
+        }
+
+        // Filter-status bar with Reset filter and Hide/Show list toggle, above the collapsible outliner rows.
+        void PrototypeOutlinerSection(UIPanelBuilder builder) {
+            builder.AddHRule();
+            var filtered = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
+            var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
+            var filterParts = new List<string>();
+            if (outlinerFilter != OutlinerFilter.All) filterParts.Add(PrototypeFilterName(outlinerFilter));
+            if (!String.IsNullOrEmpty(filter)) filterParts.Add("\"" + filter + "\"");
+            var labelMarkup = filtered
+                ? "<style=Footnote><color=" + Amber + ">" + Literal(summary) + "</color> (" + Literal(String.Join(", ", filterParts)) + ")</style>"
+                : "<style=Footnote>" + Literal(summary) + "</style>";
+            var labelTip = filtered
+                ? summary + ". Active outliner filter: " + String.Join(", ", filterParts) + ". Click Reset filter to show all objects."
+                : summary + ". Inactive loaded objects are included.";
+            TMP_Text measure = null;
+            builder.HStack(row => {
+                row.ConfigureLayout(4f);
+                var summaryRect = Line(row, labelMarkup, "Object list", labelTip, RowHeight).EqualFlexibleWidth(0);
+                measure = summaryRect.GetComponent<TMP_Text>() ?? summaryRect.GetComponentInChildren<TMP_Text>(true);
+                Button(row, "Reset filter", () => { filter = ""; outlinerFilter = OutlinerFilter.All; }).Inactive(!filtered)
+                    .Tooltip("Reset filter", CommandBand.Tooltip("Clear the outliner search text and filter to show all objects.", filtered ? null : "No outliner search or filter is active."));
+                var listToggle = Button(row, presentation.PrototypeListOpen ? "Hide list" : "Show list", () => presentation.PrototypeToggleList());
+                FitButton(listToggle, "Hide list", "Show list");
+                listToggle.Tooltip("Object list", presentation.PrototypeListOpen ? "Collapse the object list to leave more of the world in view." : "Show the object list in this rail.");
+            }).ChildrenKeepHeight().Height(RowHeight);
+            if (!presentation.PrototypeListOpen) return;
+            var outliner = builder.VStack(column => DrawOutliner(column, true, measure)).gameObject.AddComponent<LayoutElement>();
+            outliner.flexibleHeight = 10000; outliner.flexibleWidth = 10000;
+        }
+
+        static string PrototypeFilterName(OutlinerFilter value) =>
+            value == OutlinerFilter.Changed ? CommandBand.ChangedFilter
+            : value == OutlinerFilter.Disabled ? CommandBand.DisabledFilter
+            : value == OutlinerFilter.Problems ? CommandBand.ProblemsFilter
+            : CommandBand.AllFilter;
 
         static string PrototypeTabTitle(string id) => id == PlacementTab ? "Placement" : id == ConnectionsTab ? "Connections" : id == ChangesTab ? "Changes" : "Object";
 
         void PrototypeLog(string state) {
             var pending = selection?.Pending;
-            context?.Log.Info("Compact prototype: " + state + "; inspected=" + (selected == null ? "none" : selected.DisplayName + " (" + selected.Identity.Path + ")") +
+            var contextName = guided.Enabled ? "Guided (" + (guided.Kind == null ? "Target" : GuidedName(guided.Kind.Value) + "/" + guided.Step) + ")" : PrototypeTabTitle(inspectorTab.Value);
+            context?.Log.Info("Compact prototype: " + state + "; tab=" + contextName +
+                "; inspected=" + (selected == null ? "none" : selected.DisplayName + " (" + selected.Identity.Path + ")") +
                 "; pending world choice=" + (pending == null ? "no" : "yes (" + pending.Kind + ", candidate " + (selection.Find(pending.Candidate) == null ? "none" : "clicked") + ")"));
         }
     }

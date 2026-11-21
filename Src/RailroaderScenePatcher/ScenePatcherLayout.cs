@@ -188,8 +188,8 @@ namespace RailroaderScenePatcher {
         const string GuideRoot = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/";
 
         void DrawWindow(UIPanelBuilder builder) {
-            // PROTOTYPE hook: the compact window draws its own content.
-            if (presentation.PrototypeCompact) { DrawCompactPrototype(builder); return; }
+            // PROTOTYPE hook: the compact window draws its own content unless the file panel locks the window.
+            if (presentation.PrototypeCompact && !FileLocked) { DrawCompactPrototype(builder); return; }
             typed.Clear();
             builder.ConfigureLayout(4f);
             // The command band is split at the column divider: each column starts with its own band, so the left band is
@@ -363,10 +363,10 @@ namespace RailroaderScenePatcher {
         FailureKind? FailureOf(SceneObservation entry) {
             try { return attachment == null || entry == null ? null : CommandBand.ShownFailure(attachment.Session.IsChanged(entry.Identity), attachment.Session.NotApplied(entry.Identity)?.Kind); } catch { return null; }
         }
-        // PROTOTYPE hook: compactPrototype leaves out the search row, the filters and the reminders.
-        void DrawOutliner(UIPanelBuilder builder, bool compactPrototype = false) {
+        // PROTOTYPE hook: compactPrototype draws only the outliner rows (without left band, search, filters or reminders).
+        void DrawOutliner(UIPanelBuilder builder, bool compactPrototype = false, TMP_Text compactMeasure = null) {
             builder.ConfigureLayout(4f);
-            DrawLeftBand(builder);
+            if (!compactPrototype) DrawLeftBand(builder);
             UIPanel results = null;
             if (!compactPrototype) builder.HStack(row => {
                 // The search field takes the width the two buttons leave, whatever it holds: its own least and
@@ -398,7 +398,7 @@ namespace RailroaderScenePatcher {
                 items.ConfigureLayout(4f);
                 var shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged);
                 var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
-                var measure = Line(items, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.").GetComponent<TMP_Text>();
+                var measure = compactMeasure ?? Line(items, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.").GetComponent<TMP_Text>();
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
                 string selectedKey = null;

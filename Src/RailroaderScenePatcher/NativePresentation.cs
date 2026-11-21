@@ -105,12 +105,14 @@ namespace RailroaderScenePatcher {
         bool repairMode => lockReason != null;
         internal void SetFileLock(string reason) {
             lockReason = reason;
+            // PROTOTYPE hook: leave compact mode when a file decision locks the window.
+            if (reason != null && PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=file lock"); }
             if (reason != null && HelpRegion != WindowHelpRegion) CloseHelp();
             if (divider != null) divider.enabled = reason == null;
             SetTitleRepairControls();
         }
         void SetTitleRepairControls() {
-            foreach (var rect in new[] { titleReset, titleClose }) {
+            foreach (var rect in new[] { titleReset, titleClose, titleCompactPrototype }) {
                 var button = rect == null ? null : rect.GetComponent<Button>();
                 if (button != null) button.interactable = !repairMode;
             }
@@ -625,6 +627,7 @@ namespace RailroaderScenePatcher {
         // Forgets the saved bounds and places the window at its default position again.
         internal void ResetLayout() {
             if (PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=reset layout"); }
+            PrototypeForgetLayout();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
             // The request comes from a button press, and layout moves nothing while a button is down: the next layout
             // after the release places the window.
@@ -919,6 +922,8 @@ namespace RailroaderScenePatcher {
                 Place((RectTransform)entry.transform, entryRect);
             }
             if (!IsOpen) return;
+            // PROTOTYPE hook: keep a compact window inside the screen without overwriting saved full bounds.
+            if (PrototypeCompact) { PrototypeClampLayout(); return; }
             var current = PanelBounds;
             var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
             // A placed window stays where it is, as native windows do: native UI that opens over it, chrome rebuilds and

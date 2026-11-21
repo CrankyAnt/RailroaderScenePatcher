@@ -5,20 +5,22 @@ using UI.Windows;
 using UnityEngine;
 
 namespace RailroaderScenePatcher {
-    // PROTOTYPE (throwaway): compact mode of the scene patch window. Not production code. It answers what a compact
-    // mode should look like and what the game's window allows. Mode and variant live in memory only; the native
-    // window's saved bounds are kept at the full window's while compact.
+    // PROTOTYPE (throwaway): compact mode of the scene patch window. Not production code. A single context-aware
+    // side rail at the right edge of the screen keeps the active edit, world choice and object list accessible while
+    // leaving the view's center free. Mode, list state and dragged placement live in memory only; the native window's
+    // saved bounds are kept at the full window's while compact.
     internal sealed partial class NativePresentation {
-        internal enum PrototypeCompactVariant { SelectionToolbar, PlacementStrip, SideRail }
-        internal static readonly string[] PrototypeVariantNames = { "A: Selection toolbar", "B: Placement strip", "C: Side rail" };
-        internal const int PrototypeVariantCount = 3;
-        // Where the user left each variant's compact window, in screen pixels, for this session only. A variant the user
-        // has not moved or resized opens at its own place.
-        readonly Rect[] prototypeVariantRects = new Rect[PrototypeVariantCount];
-        Rect prototypePlacedRect;
+        // Content dimensions in canvas units: 356 matches InspectorMinimumWidth (350) with padding so the four
+        // right-band commands (335), every footer and tab action row (budget 340) and all five title-bar icons fit.
+        internal const float PrototypeRailContent = 356, PrototypePlacementBody = 196, PrototypeMessageHeight = 56,
+            PrototypeExpandedMinContent = 560, PrototypeCollapsedContent = 420;
+        const float PrototypeResizerMinWidth = PrototypeRailContent + 24, PrototypeResizerMinHeight = 300;
+        // Where the user left the compact rail, in screen pixels, for this session only.
+        Rect prototypeCompactRect, prototypePlacedRect;
+        float prototypeExpandedHeight, prototypeCollapsedHeight;
         internal bool PrototypeCompact { get; private set; }
-        internal PrototypeCompactVariant PrototypeVariant { get; private set; }
-        // Called after each mode or variant switch with the presentation's part of the log line.
+        internal bool PrototypeListOpen { get; private set; } = true;
+        // Called after each mode or list switch with the presentation's part of the log line.
         internal Action<string> PrototypeSwitched;
         RectTransform titleCompactPrototype;
         Sprite prototypeDownSprite, prototypeUpSprite;
@@ -33,7 +35,8 @@ namespace RailroaderScenePatcher {
         void AddPrototypeCompactIcon(WindowManager manager, Transform parent) {
             try {
                 titleCompactPrototype = TitleIcon(manager, parent, "CrankyAnt Scene Patcher compact prototype", PrototypeArrow(true), PrototypeToggleCompact,
-                    () => new TooltipInfo(PrototypeCompact ? "Full window" : "Compact window", PrototypeCompact ? "Show the full window again." : "Switch to a smaller window that leaves more of the world in view."), out prototypeCompactGlyph);
+                    () => new TooltipInfo(PrototypeCompact ? "Full window" : "Compact window",
+                        CommandBand.Tooltip(PrototypeCompact ? "Show the full window again." : "Switch to a compact side rail that leaves more of the world in view.", lockReason)), out prototypeCompactGlyph);
             } catch (Exception e) {
                 if (titleCompactPrototype != null) UnityEngine.Object.Destroy(titleCompactPrototype.gameObject);
                 titleCompactPrototype = null; prototypeCompactGlyph = null;
@@ -58,28 +61,48 @@ namespace RailroaderScenePatcher {
         }
 
         void PrototypeToggleCompact() {
-            if (disposed || !IsOpen) return;
+            if (disposed || !IsOpen || repairMode) return;
             if (PrototypeCompact) PrototypeExitCompact(); else PrototypeEnterCompact();
             PrototypeSwitched?.Invoke(PrototypeState());
         }
 
-        internal void PrototypeCycleVariant(int step) {
-            if (disposed || !PrototypeCompact) return;
+        // Collapses or expands the outliner inside the compact rail, keeping the user's dragged X and width.
+        internal void PrototypeToggleList() {
+            if (disposed || !PrototypeCompact || !IsOpen) return;
+            var current = PanelBounds;
             PrototypeRememberRect();
-            PrototypeVariant = (PrototypeCompactVariant)(((int)PrototypeVariant + step + PrototypeVariantCount) % PrototypeVariantCount);
-            PrototypePlace();
-            dirty = true;
-            PrototypeSwitched?.Invoke(PrototypeState());
+            if (current.height > 0) {
+                if (PrototypeListOpen) prototypeExpandedHeight = current.height;
+                else prototypeCollapsedHeight = current.height;
+            }
+            PrototypeListOpen = !PrototypeListOpen;
+            var frame = PrototypeFrame();
+            var targetHeight = PrototypeListOpen
+                ? (prototypeExpandedHeight > 0 ? prototypeExpandedHeight : PrototypeDefaultExpandedHeight(frame.y))
+                : (prototypeCollapsedHeight > 0 ? prototypeCollapsedHeight : (PrototypeCollapsedContent + frame.y) * scale);
+            targetHeight = Mathf.Clamp(targetHeight, PrototypeResizerMinHeight * scale, Screen.height);
+            var width = current.width > 0 ? Mathf.Min(current.width, Screen.width) : Mathf.Min((PrototypeRailContent + frame.x) * scale, Screen.width);
+            var x = current.width > 0 ? Mathf.Clamp(current.x, 0, Mathf.Max(0, Screen.width - width)) : Mathf.Max(0, Screen.width - width);
+            // Keep the bottom edge steady when docked low, or the top edge when dragged to the upper half.
+            var anchorBottom = current.height <= 0 || current.yMax >= Screen.height * 0.5f;
+            var y = anchorBottom ? current.yMax - targetHeight : current.y;
+            y = Mathf.Clamp(y, 0, Mathf.Max(0, Screen.height - targetHeight));
+            prototypePlacedRect = new Rect(x, y, width, targetHeight);
+            if (prototypeCompactRect.width > 0) prototypeCompactRect = prototypePlacedRect;
+            Place((RectTransform)window.transform, prototypePlacedRect);
+            boundsFrame = -1; dirty = true;
+            PrototypeSwitched?.Invoke(PrototypeState() + "; reason=" + (PrototypeListOpen ? "show list" : "hide list"));
         }
 
         void PrototypeEnterCompact() {
+            ClearFocus();
             prototypeFullRect = PanelBounds;
             try { prototypeSavedRecord = Game.GlobalPreferences.GetString("window." + ScenePatchWindow.WindowIdentifier); } catch { prototypeSavedRecord = null; }
-            // The native minimum size applies only to the user's resize drag (PanelResizer.minSize); Window.SetContentSize
-            // and a direct size do not clamp to it. It is lowered while compact so the compact window can be resized.
+            // The native minimum size applies only to the user's resize drag (PanelResizer.minSize). Lower it to the
+            // rail's own minimum so the rail can be resized without crushing the title bar or action rows.
             try {
                 prototypeResizer = window.GetComponentInChildren<UI.Common.PanelResizer>(true);
-                if (prototypeResizer != null) { prototypeResizerMinimum = prototypeResizer.minSize; prototypeResizer.minSize = new Vector2(200, 60); }
+                if (prototypeResizer != null) { prototypeResizerMinimum = prototypeResizer.minSize; prototypeResizer.minSize = new Vector2(PrototypeResizerMinWidth, PrototypeResizerMinHeight); }
             } catch { prototypeResizer = null; }
             PrototypeCompact = true;
             CloseHelp();
@@ -88,23 +111,49 @@ namespace RailroaderScenePatcher {
             dirty = true;
         }
 
-        // A compact window the user dragged or resized keeps that rectangle for its variant; it never snaps back.
+        // A compact window the user dragged or resized keeps that rectangle for this session; it never snaps back.
         void PrototypeRememberRect() {
             var current = PanelBounds;
             if (current.width <= 0) return;
             if (Mathf.Abs(current.x - prototypePlacedRect.x) > 1 || Mathf.Abs(current.y - prototypePlacedRect.y) > 1 ||
-                Mathf.Abs(current.width - prototypePlacedRect.width) > 1 || Mathf.Abs(current.height - prototypePlacedRect.height) > 1)
-                prototypeVariantRects[(int)PrototypeVariant] = current;
+                Mathf.Abs(current.width - prototypePlacedRect.width) > 1 || Mathf.Abs(current.height - prototypePlacedRect.height) > 1) {
+                prototypeCompactRect = current;
+                if (PrototypeListOpen) prototypeExpandedHeight = current.height;
+                else prototypeCollapsedHeight = current.height;
+            }
         }
 
         void PrototypeExitCompact() {
             PrototypeRememberRect();
+            ClearFocus();
             PrototypeCompact = false;
             if (prototypeResizer != null) { try { prototypeResizer.minSize = prototypeResizerMinimum; } catch { } prototypeResizer = null; }
             if (prototypeFullRect.width > 0 && prototypeFullRect.height > 0) Place((RectTransform)window.transform, prototypeFullRect);
             PrototypeRestoreRecord();
             if (prototypeCompactGlyph != null) prototypeCompactGlyph.sprite = PrototypeArrow(true);
             boundsFrame = -1; dirty = true;
+        }
+
+        void PrototypeForgetLayout() {
+            prototypeCompactRect = Rect.zero;
+            prototypeExpandedHeight = 0;
+            prototypeCollapsedHeight = 0;
+            PrototypeListOpen = true;
+        }
+
+        // Keeps a compact window inside the screen after a resolution or scale change without writing saved full bounds.
+        void PrototypeClampLayout() {
+            var current = PanelBounds;
+            if (current.width <= 0 || current.height <= 0) return;
+            var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
+            if (within == null) { PrototypePlace(); return; }
+            var inside = within.Value;
+            if (Mathf.Abs(inside.X - current.x) <= 0.5f && Mathf.Abs(inside.Y - current.y) <= 0.5f &&
+                Mathf.Abs(inside.Width - current.width) <= 0.5f && Mathf.Abs(inside.Height - current.height) <= 0.5f) return;
+            prototypePlacedRect = new Rect(inside.X, inside.Y, inside.Width, inside.Height);
+            if (prototypeCompactRect.width > 0) prototypeCompactRect = prototypePlacedRect;
+            Place((RectTransform)window.transform, prototypePlacedRect);
+            boundsFrame = -1;
         }
 
         // The native persistence saves position and content size whenever the user drags or resizes the window. While
@@ -124,49 +173,42 @@ namespace RailroaderScenePatcher {
             PrototypeRestoreRecord();
         }
 
-        // The compact window's rectangle in screen pixels for the current variant. The frame is what the native window
-        // adds around its content: the title bar and the padding.
+        Vector2 PrototypeFrame() {
+            var native = window.NativeWindow;
+            return ((RectTransform)native.transform).rect.size - native.GetContentSize();
+        }
+
+        float PrototypeDefaultExpandedHeight(float frameY) =>
+            Mathf.Min(Screen.height, Mathf.Max(Mathf.Round(Screen.height * 0.65f), (PrototypeExpandedMinContent + frameY) * scale));
+
+        // The compact rail's rectangle in screen pixels. Right-aligned and bottom-aligned by default; restores the
+        // dragged rectangle for the session once moved or resized.
         void PrototypePlace() {
-            var remembered = prototypeVariantRects[(int)PrototypeVariant];
-            if (remembered.width > 0 && remembered.height > 0) {
-                Place((RectTransform)window.transform, remembered);
-                prototypePlacedRect = remembered; boundsFrame = -1;
+            if (prototypeCompactRect.width > 0 && prototypeCompactRect.height > 0) {
+                var width = Mathf.Min(prototypeCompactRect.width, Screen.width);
+                var height = Mathf.Min(prototypeCompactRect.height, Screen.height);
+                var x = Mathf.Clamp(prototypeCompactRect.x, 0, Mathf.Max(0, Screen.width - width));
+                var y = Mathf.Clamp(prototypeCompactRect.y, 0, Mathf.Max(0, Screen.height - height));
+                prototypePlacedRect = new Rect(x, y, width, height);
+                Place((RectTransform)window.transform, prototypePlacedRect);
+                boundsFrame = -1;
                 return;
             }
-            var native = window.NativeWindow;
-            var frame = ((RectTransform)native.transform).rect.size - native.GetContentSize();
-            float width, height, x, y;
-            switch (PrototypeVariant) {
-                case PrototypeCompactVariant.PlacementStrip:
-                    width = prototypeFullRect.width;
-                    height = (PrototypePlacementContent + frame.y) * scale;
-                    x = (Screen.width - width) * 0.5f; y = Screen.height - height;
-                    break;
-                case PrototypeCompactVariant.SideRail:
-                    width = (PrototypeRailContent + frame.x) * scale;
-                    height = Mathf.Round(Screen.height * 0.6f);
-                    x = Screen.width - width; y = Screen.height - height;
-                    break;
-                default:
-                    width = prototypeFullRect.width;
-                    height = (PrototypeToolbarContent + frame.y) * scale;
-                    x = (Screen.width - width) * 0.5f; y = Screen.height - height;
-                    break;
-            }
-            width = Mathf.Min(width, Screen.width); height = Mathf.Min(height, Screen.height);
-            prototypePlacedRect = new Rect(Mathf.Max(0, x), Mathf.Max(0, y), width, height);
+            var frame = PrototypeFrame();
+            var defaultWidth = Mathf.Min((PrototypeRailContent + frame.x) * scale, Screen.width);
+            var defaultHeight = PrototypeListOpen
+                ? PrototypeDefaultExpandedHeight(frame.y)
+                : Mathf.Min((PrototypeCollapsedContent + frame.y) * scale, Screen.height);
+            var defaultX = Mathf.Max(0, Screen.width - defaultWidth);
+            var defaultY = Mathf.Max(0, Screen.height - defaultHeight);
+            prototypePlacedRect = new Rect(defaultX, defaultY, defaultWidth, defaultHeight);
             Place((RectTransform)window.transform, prototypePlacedRect);
             boundsFrame = -1;
         }
 
-        // Content heights and the rail's content width, in canvas units: rows of 24 with 4 between them and 12 of the
-        // window's own padding. The toolbar has seven rows; the placement strip has six rows and a mode body that holds
-        // the mode switch and Numeric's two groups of fields.
-        internal const float PrototypePlacementBody = 150, PrototypeToolbarContent = 7 * 24 + 6 * 4 + 12, PrototypePlacementContent = 6 * 24 + PrototypePlacementBody + 6 * 4 + 12, PrototypeRailContent = 300;
-
         string PrototypeState() {
             var bounds = PanelBounds;
-            return "mode=" + (PrototypeCompact ? "compact" : "full") + "; variant=" + PrototypeVariantNames[(int)PrototypeVariant] +
+            return "mode=" + (PrototypeCompact ? "compact" : "full") + "; layout=side rail; list=" + (PrototypeListOpen ? "open" : "collapsed") +
                 "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + scale;
         }
 
