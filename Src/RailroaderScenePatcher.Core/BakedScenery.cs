@@ -426,14 +426,14 @@ namespace RailroaderScenePatcher.Core {
         public static bool CullingContainer(IHierarchyNode node) =>
             node != null && !Present(node) && node.Children.Count != 0 && node.Components.Contains(SimpleCuller);
         // Why a modification cannot edit the object at a path the part rule did not list, or null for a listed part.
-        public const string CullingContainerRefusal = "This path names a culling container, which only groups parts for the game's culling; it is not an object. Edit its parts instead";
+        public const string CullingContainerRefusal = "This path names a culling container. It holds parts for the game's culling. Edit those parts directly.";
         // Whether a path resolves to the object the part rule decided this for: a listed part, and a culling container,
         // so that its modification fails with the container's reason instead of finding nothing.
         public static bool Resolves(PartVerdict verdict) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict) != null;
         public static string PartRefusal(PartVerdict verdict) => verdict?.Reason == CullingContainers ? CullingContainerRefusal : null;
         // Why a modification cannot edit, as a group, the object at a path the group rule did not list, or null: the
         // category table marks the path as a container object, such as Bryson Yard.
-        public const string ContainerRefusal = "This path names a container object. Edit the groups it holds.";
+        public const string ContainerRefusal = "This path names a container object. A container object isn't a group. Edit the groups it holds.";
         public static string GroupRefusal(string path) => BakedSceneryCategories.IsContainerObject(path) ? ContainerRefusal : null;
         // Why a modification cannot edit the object at a path as a group, from the group rule's verdict for it, or null:
         // a container object, which has no verdict, and a group with a car loader, which the Car loaders rule keeps out.

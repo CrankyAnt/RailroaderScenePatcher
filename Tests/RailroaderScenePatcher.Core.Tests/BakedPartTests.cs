@@ -187,7 +187,7 @@ static class BakedPartTests {
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard", Post = Yard + "/Tall Post Shade";
         var f = new Fixture();
         var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()))))));
-        Assert(BakedSceneryRules.GroupRefusal(Yard) == "This path names a container object. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a container object in the category table is refused with the container object message");
+        Assert(BakedSceneryRules.GroupRefusal(Yard) == "This path names a container object. A container object isn't a group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a container object in the category table is refused with the container object message");
         var lamp = verdicts.Single(v => v.Path == Post);
         Assert(BakedSceneryRules.PartRefusal(null, lamp) == BakedSceneryRules.GroupRootRefusal && BakedSceneryRules.PartRefusal(null, null) == null, "A group root is refused as a part with its own reason");
         Assert(BakedSceneryRules.ResolvesGroup(null, Yard) && BakedSceneryRules.ResolvesGroup(lamp, Post) && !BakedSceneryRules.ResolvesGroup(null, Post + "/Bulb"), "A container object resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
@@ -223,7 +223,7 @@ static class BakedPartTests {
         var before = f.World.Mutations;
         var result = f.Engine.Apply(Doc(Part("container", "Culled", JettyTarget), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
         var failure = result.Outcomes["container"];
-        Assert(!failure.Applied && (failure.Error ?? "").Contains("culling container"), "A path that names a culling container fails that modification with the reason: " + failure.Error);
+        Assert(!failure.Applied && (failure.Error ?? "").Contains("This path names a culling container. It holds parts for the game's culling. Edit those parts directly."), "A path that names a culling container fails that modification with the reason: " + failure.Error);
         Assert(result.Outcomes["move-jetty"].Applied && f.World.Mutations == before + 1 && Near(f.MapOf(f.Jetty).Position, JettyTarget), "The other modification still applies, and the refused one mutates nothing");
     }
 
