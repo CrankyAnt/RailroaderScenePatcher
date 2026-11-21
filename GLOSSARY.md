@@ -245,7 +245,7 @@ Physical placement fixed in map coordinates, independent of any track. It is dis
 State that a supplying mod's coherent operation constructs or registers, such as an owned span or an added object. Cleanup removes only owned state.
 
 **Refusal**:
-An edit that the patcher refuses before it changes anything, with the reason stated. Nothing needs restoring after a refusal.
+An edit or a modification that the patcher refuses before it changes anything, with the reason stated. Nothing needs restoring after a refusal.
 _Avoid_: Rejection
 
 **Restored failure**:
@@ -275,7 +275,7 @@ The development reference, outside scene patch editing, that names each rule kee
 A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. The outliner groups inventory scene objects by family.
 
 **Native map data**:
-Map data that the native map editor edits, such as Props, masks, Builtins, spawns, turntables, tracks, industries, track spans and passenger stops. The inventory lists no native map data.
+Map data that the native map editor edits, such as Props, native masks, Builtins, spawns, turntables, tracks, industries, track spans and passenger stops. The inventory lists no native map data.
 
 **Baked scenery group**:
 A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces or bridge constructions, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery. It is a group by hierarchy: one scene object and the scene objects below it. Railroader has no term for it. Compare game-defined group, a group by a game component.
@@ -290,6 +290,15 @@ A scene object inside a baked scenery group, other than its group root, that can
 A scene object that only holds other scene objects and has nothing visible of its own, such as `Bryson Signs` or a place's object under `World/Large Scenery`. A container object is not a group: the scene objects it holds are listed and edited by their own family or group. The native map editor's Folder is a folder of map data, not a container object.
 _Avoid_: Folder
 
+**Game culler**:
+A game component that culls the objects it covers: the object it stands on, the renderers below it, or the objects on its list. Its three kinds are the simple culler, the renderer culler and the game-object culler.
+
+**Culling sphere**:
+A sphere, with a centre and a radius, that the game keeps for culling the objects it covers. A game culler holds one for its group or part, and a part that a move takes out of the sphere of a culler above it gets a culling sphere of its own.
+
+**Culling container**:
+A container object below a baked scenery group root that carries a simple culler and has no renderer, collider, light, storage pile or log pond of its own. It is not an object to edit: its parts stay listed and edited under their group.
+
 **Scene spawn point**:
 A scene object that marks a player spawn location used for starting, teleporting and rescue. It is distinct from a spawn in native map data.
 
@@ -300,8 +309,30 @@ A scene object that shows a station on the map.
 The invisible part of a station's baked scenery group that opens the station window.
 _Avoid_: Click volume
 
+**Milepost**:
+A scene object that the game shows as a mile marker, with a prefix, a mile value and displayed text. A milepost with the origin flag is the origin of its prefix, and the game caches that origin.
+
 **Industry storage display**:
 The storage piles or log pond whose fill shows one industry's storage.
+
+**Scene ground mask**:
+A mask component that the game holds on a scene object and that registers a shape in the game's terrain system where the object stands, shaping the ground and the vegetation there. A native mask, which the native map editor edits, is a different thing.
+_Avoid_: Scene mask, scene terrain mask
+
+**Lake surface**:
+A water mesh that the scene saves for a lake and that the game draws where its scene object stands. The lake's native mask and river are native map data.
+_Avoid_: Water surface
+
+**Log pond**:
+The game's bulk scenery component for an industry's logs on water, part of an industry storage display beside its lake surface.
+
+**Construction segment**:
+A track segment that the construction controller of a rail bridge construction reads to show or hide the construction's parts. A rail bridge construction needs its construction segments.
+_Avoid_: Construction scenery segment
+
+**Construction controller**:
+The game's controller on the root of a rail bridge construction. It sets the activity of the objects its entries name whenever the construction state of its segments changes.
+_Avoid_: Track construction controller
 
 **Scene marker**:
 A scene object, such as a track marker, that the game registers under a marker id.
@@ -333,6 +364,9 @@ The place on a track that a track binding names, as a segment, an end and a dist
 **Track point**:
 The map position on the loaded track where a track location lies. A track location that does not resolve on the loaded track has no track point. For a starter placement marker, it is where the front of the car cut stands, not the marker's object position.
 
+**Binding slot**:
+The place on a scene marker, a crossing pad included, where the marker's track binding is held and edited on the Connections tab. Crossing coverage and construction segments are not binding slots.
+
 **Wreck setting**:
 The setting of a new-game car placement that decides whether its cars start derailed as a wreck.
 
@@ -347,6 +381,9 @@ A road crossing without a crossing controller, whose root holds one or more cros
 
 **Crossbuck**:
 The X-shaped road sign beside an unprotected crossing.
+
+**Bell definition**:
+A definition in the game's content library of the kind Bell, which holds a bell's audio and is named by its identifier. The bell's supported source pattern takes a bell definition as its equipment source.
 
 ### Editor terminology
 
