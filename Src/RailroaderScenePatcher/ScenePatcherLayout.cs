@@ -384,27 +384,6 @@ namespace RailroaderScenePatcher {
                 fit = Button(row, "Fit", () => FitOutliner(fit.RectTransform.GetComponentInChildren<TMP_Text>(true)));
                 fit.Tooltip("Fit names", "Size this column to most names shown. Drag the divider for another width.");
             }).Height(30);
-            #region Prototype outliner grouping
-            // PROTOTYPE: the list's top level, by category or by place. Under the current outliner (0) a place view
-            // switches to variant A.
-            builder.AddSegmentedControlCompact(segments => {
-                segments.AddSegment("By category", !PrototypeOutlinerGrouping.ByPlace, presentation.Action(() => { PrototypeOutlinerGrouping.ByPlace = false; PrototypeOutlinerGrouping.LogPending = true; }))
-                    .Tooltip("By category", "List objects by what they are: categories, then kinds, then places.");
-                segments.AddSegment("By place", PrototypeOutlinerGrouping.ByPlace, presentation.Action(() => { PrototypeOutlinerGrouping.ByPlace = true; if (PrototypeOutlinerGrouping.Variant == 0) PrototypeOutlinerGrouping.Variant = 1; PrototypeOutlinerGrouping.LogPending = true; }))
-                    .Tooltip("By place", "List objects by place, with the same categories and kinds under each place.");
-            });
-            // PROTOTYPE switcher, magenta so it is never mistaken for a product control.
-            builder.AddSegmentedControlCompact(segments => {
-                for (var v = 0; v < PrototypeOutlinerGrouping.VariantKeys.Length; v++) {
-                    var variant = v;
-                    var label = "<color=#FF4FD8>" + PrototypeOutlinerGrouping.VariantKeys[v] + " " + PrototypeOutlinerGrouping.VariantShort[v] + "</color>";
-                    segments.AddSegment(label, PrototypeOutlinerGrouping.Variant == v, presentation.Action(() => {
-                        PrototypeOutlinerGrouping.Variant = variant; if (variant == 0) PrototypeOutlinerGrouping.ByPlace = false; PrototypeOutlinerGrouping.LogPending = true;
-                    })).Tooltip("PROTOTYPE " + PrototypeOutlinerGrouping.VariantKeys[v], PrototypeOutlinerGrouping.VariantKeys[v] + ": " + PrototypeOutlinerGrouping.VariantNames[v]
-                        + ". Kind folder from " + PrototypeOutlinerGrouping.KindThreshold + " objects, place folder from " + PrototypeOutlinerGrouping.PlaceThreshold + " objects of one kind in one place, in a list of more than " + PrototypeOutlinerGrouping.PlaceListMinimum + ".");
-                }
-            });
-            #endregion
             builder.AddSegmentedControlCompact(segments => {
                 // All first, then the rest by name.
                 segments.AddSegment(CommandBand.AllFilter, outlinerFilter == OutlinerFilter.All, presentation.Action(() => outlinerFilter = OutlinerFilter.All)).Tooltip(CommandBand.AllFilter, "Show all objects.");
@@ -416,7 +395,16 @@ namespace RailroaderScenePatcher {
                 items.ConfigureLayout(4f);
                 var shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged);
                 var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
-                var measure = Line(items, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.").GetComponent<TMP_Text>();
+                // PROTOTYPE: the view icons stand right-aligned on the line with the object count.
+                TMP_Text measure = null;
+                items.HStack(countRow => {
+                    countRow.ConfigureLayout(4f);
+                    var countLine = Line(countRow, "<style=Footnote>" + Literal(summary) + "</style>", "Objects", "Inactive loaded objects are included.");
+                    measure = countLine.GetComponent<TMP_Text>();
+                    var grow = countLine.GetComponent<LayoutElement>() ?? countLine.gameObject.AddComponent<LayoutElement>();
+                    grow.flexibleWidth = 1; grow.minWidth = 0;
+                    PrototypeViewIcons(countRow);
+                }).Height(RowHeight);
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
                 string selectedKey = null;
@@ -424,23 +412,21 @@ namespace RailroaderScenePatcher {
                 var state = narrowed ? filteredOutline : inventoryOutline;
                 var indices = new Dictionary<SceneObservation, int>();
                 if (inventory != null) for (var i = 0; i < inventory.Entries.Count; i++) indices[inventory.Entries[i]] = i;
-                // PROTOTYPE: under variant A or B, the top-level nodes come from the prototype grouping.
+                // PROTOTYPE: the top-level nodes come from the one-tree grouping.
                 PrototypeOutlinerGrouping.Result proto = null;
-                if (PrototypeOutlinerGrouping.Variant != 0)
-                    try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter); }
-                    catch (Exception e) { Debug.LogWarning("Scene Patcher PROTOTYPE outliner failed, showing the current outliner: " + e); }
+                try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter); }
+                catch (Exception e) { Debug.LogWarning("Scene Patcher PROTOTYPE outliner failed, showing the current outliner: " + e); }
                 var protoTops = proto == null ? null : proto.Tops.ToDictionary(top => top.Key);
                 var drawn = proto == null ? InventoryPresentationState.Groups(shown)
                     : (IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>>)proto.Tops.Select(top => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(top.Key, Array.Empty<SceneObservation>())).ToList();
                 if (PrototypeOutlinerGrouping.LogPending) {
                     PrototypeOutlinerGrouping.LogPending = false;
                     if (proto != null) PrototypeOutlinerGrouping.Log(proto, shown.Count, filter, outlinerFilter.ToString());
-                    else PrototypeOutlinerGrouping.LogCurrent(drawn.Count, shown.Count);
                 }
                 foreach (var group in drawn) {
                     var protoTop = protoTops?[group.Key];
                     // The Inspection only group stands after the families and has a key no family can have.
-                    var groupKey = protoTop != null ? "proto:" + PrototypeOutlinerGrouping.VariantKeys[PrototypeOutlinerGrouping.Variant] + (PrototypeOutlinerGrouping.ByPlace ? "p:" : "c:") + group.Key
+                    var groupKey = protoTop != null ? "proto:" + (PrototypeOutlinerGrouping.ByPlace ? "p:" : "c:") + group.Key
                         : (ReferenceEquals(group.Key, InventoryPresentationState.InspectionOnlyGroup) ? "group:" : "family:") + group.Key;
                     // The count stands first, so a narrow column cuts the family name and never the count; the name
                     // follows it directly.
