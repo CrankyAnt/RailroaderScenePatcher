@@ -6,21 +6,24 @@ using UnityEngine;
 
 namespace RailroaderScenePatcher {
     // PROTOTYPE (throwaway): compact mode of the scene patch window. Not production code. A single context-aware
-    // side rail at the right edge of the screen keeps the active edit, world choice and object list accessible while
-    // leaving the view's center free. Mode, list state and dragged placement live in memory only; the native window's
+    // side rail at the right edge of the screen keeps the active edit, world choice and outliner accessible while
+    // leaving the view's center free. Mode, outliner state and dragged placement live in memory only; the native window's
     // saved bounds are kept at the full window's while compact.
     internal sealed partial class NativePresentation {
         // Content dimensions in canvas units: 356 matches InspectorMinimumWidth (350) with padding so the four
         // right-band commands (335), every footer and tab action row (budget 340) and all five title-bar icons fit.
-        internal const float PrototypeRailContent = 356, PrototypePlacementBody = 196, PrototypeMessageHeight = 56,
-            PrototypeExpandedMinContent = 560, PrototypeCollapsedContent = 420;
-        const float PrototypeResizerMinWidth = PrototypeRailContent + 24, PrototypeResizerMinHeight = 300;
+        // The collapsed content holds the tallest context section, the Placement body at its collapsed least height
+        // of 140, with the bands, heading, messages, action row, outliner header and grip clearance. The expanded
+        // content adds the Placement body's full 196 and the outliner rows' least height of 120 with their spacing.
+        // Each is the least content size the resize grip allows in its state, so a resize cannot crush a row.
+        internal const float PrototypeRailContent = 356, PrototypePlacementBody = 196, PrototypePlacementCollapsedBody = 140, PrototypeMessageHeight = 56,
+            PrototypeCollapsedContent = 420, PrototypeExpandedMinContent = PrototypeCollapsedContent + (PrototypePlacementBody - PrototypePlacementCollapsedBody) + 120 + 4;
         // Where the user left the compact rail, in screen pixels, for this session only.
         Rect prototypeCompactRect, prototypePlacedRect;
         float prototypeExpandedHeight, prototypeCollapsedHeight;
         internal bool PrototypeCompact { get; private set; }
-        internal bool PrototypeListOpen { get; private set; } = true;
-        // Called after each mode or list switch with the presentation's part of the log line.
+        internal bool PrototypeOutlinerOpen { get; private set; } = true;
+        // Called after each mode or outliner switch with the presentation's part of the log line.
         internal Action<string> PrototypeSwitched;
         RectTransform titleCompactPrototype;
         Sprite prototypeDownSprite, prototypeUpSprite;
@@ -44,17 +47,16 @@ namespace RailroaderScenePatcher {
             }
         }
 
-        // An arrow 13 units high: a shaft of 2 units and a head. down points to the bottom of the screen.
+        // A solid triangle as wide as the close cross, 13 units, and 11 units high: it points down to compact the
+        // window and up to restore it. Rows count from the bottom; the drawing is made pointing down and mirrored for up.
         Sprite PrototypeArrow(bool down) {
             if (down && prototypeDownSprite != null) return prototypeDownSprite;
             if (!down && prototypeUpSprite != null) return prototypeUpSprite;
+            const float baseY = 52, tipY = 4, halfWidth = 28, middle = 28;
             Func<Vector2, bool> covers = point => {
-                // Rows count from the bottom; the drawing is made pointing down and mirrored for up.
                 float x = point.x, y = down ? point.y : 56 - point.y;
-                if (x >= 24 && x <= 32 && y >= 22 && y <= 56) return true;
-                // The head: a triangle from (4, 30) and (52, 30) to the tip (28, 0).
-                var half = (y / 30f) * 24f;
-                return y >= 0 && y <= 30 && Mathf.Abs(x - 28) <= half;
+                if (y < tipY || y > baseY) return false;
+                return Mathf.Abs(x - middle) <= halfWidth * (y - tipY) / (baseY - tipY);
             };
             if (down) return prototypeDownSprite = Glyph("CrankyAnt Scene Patcher prototype arrow down", covers, out prototypeDownTexture);
             return prototypeUpSprite = Glyph("CrankyAnt Scene Patcher prototype arrow up", covers, out prototypeUpTexture);
@@ -67,20 +69,21 @@ namespace RailroaderScenePatcher {
         }
 
         // Collapses or expands the outliner inside the compact rail, keeping the user's dragged X and width.
-        internal void PrototypeToggleList() {
+        internal void PrototypeToggleOutliner() {
             if (disposed || !PrototypeCompact || !IsOpen) return;
             var current = PanelBounds;
             PrototypeRememberRect();
             if (current.height > 0) {
-                if (PrototypeListOpen) prototypeExpandedHeight = current.height;
+                if (PrototypeOutlinerOpen) prototypeExpandedHeight = current.height;
                 else prototypeCollapsedHeight = current.height;
             }
-            PrototypeListOpen = !PrototypeListOpen;
+            PrototypeOutlinerOpen = !PrototypeOutlinerOpen;
+            if (prototypeResizer != null) { try { prototypeResizer.minSize = PrototypeMinimumSize(); } catch { } }
             var frame = PrototypeFrame();
-            var targetHeight = PrototypeListOpen
+            var targetHeight = PrototypeOutlinerOpen
                 ? (prototypeExpandedHeight > 0 ? prototypeExpandedHeight : PrototypeDefaultExpandedHeight(frame.y))
                 : (prototypeCollapsedHeight > 0 ? prototypeCollapsedHeight : (PrototypeCollapsedContent + frame.y) * scale);
-            targetHeight = Mathf.Clamp(targetHeight, PrototypeResizerMinHeight * scale, Screen.height);
+            targetHeight = Mathf.Clamp(targetHeight, PrototypeMinimumSize().y * scale, Screen.height);
             var width = current.width > 0 ? Mathf.Min(current.width, Screen.width) : Mathf.Min((PrototypeRailContent + frame.x) * scale, Screen.width);
             var x = current.width > 0 ? Mathf.Clamp(current.x, 0, Mathf.Max(0, Screen.width - width)) : Mathf.Max(0, Screen.width - width);
             // Keep the bottom edge steady when docked low, or the top edge when dragged to the upper half.
@@ -91,18 +94,18 @@ namespace RailroaderScenePatcher {
             if (prototypeCompactRect.width > 0) prototypeCompactRect = prototypePlacedRect;
             Place((RectTransform)window.transform, prototypePlacedRect);
             boundsFrame = -1; dirty = true;
-            PrototypeSwitched?.Invoke(PrototypeState() + "; reason=" + (PrototypeListOpen ? "show list" : "hide list"));
+            PrototypeSwitched?.Invoke(PrototypeState() + "; reason=" + (PrototypeOutlinerOpen ? "show outliner" : "hide outliner"));
         }
 
         void PrototypeEnterCompact() {
             ClearFocus();
             prototypeFullRect = PanelBounds;
             try { prototypeSavedRecord = Game.GlobalPreferences.GetString("window." + ScenePatchWindow.WindowIdentifier); } catch { prototypeSavedRecord = null; }
-            // The native minimum size applies only to the user's resize drag (PanelResizer.minSize). Lower it to the
-            // rail's own minimum so the rail can be resized without crushing the title bar or action rows.
+            // The native minimum size applies only to the user's resize drag (PanelResizer.minSize). Set it to the
+            // rail's content in its outliner state and the window frame, so a resize never crushes a row.
             try {
                 prototypeResizer = window.GetComponentInChildren<UI.Common.PanelResizer>(true);
-                if (prototypeResizer != null) { prototypeResizerMinimum = prototypeResizer.minSize; prototypeResizer.minSize = new Vector2(PrototypeResizerMinWidth, PrototypeResizerMinHeight); }
+                if (prototypeResizer != null) { prototypeResizerMinimum = prototypeResizer.minSize; prototypeResizer.minSize = PrototypeMinimumSize(); }
             } catch { prototypeResizer = null; }
             PrototypeCompact = true;
             CloseHelp();
@@ -118,7 +121,7 @@ namespace RailroaderScenePatcher {
             if (Mathf.Abs(current.x - prototypePlacedRect.x) > 1 || Mathf.Abs(current.y - prototypePlacedRect.y) > 1 ||
                 Mathf.Abs(current.width - prototypePlacedRect.width) > 1 || Mathf.Abs(current.height - prototypePlacedRect.height) > 1) {
                 prototypeCompactRect = current;
-                if (PrototypeListOpen) prototypeExpandedHeight = current.height;
+                if (PrototypeOutlinerOpen) prototypeExpandedHeight = current.height;
                 else prototypeCollapsedHeight = current.height;
             }
         }
@@ -138,7 +141,7 @@ namespace RailroaderScenePatcher {
             prototypeCompactRect = Rect.zero;
             prototypeExpandedHeight = 0;
             prototypeCollapsedHeight = 0;
-            PrototypeListOpen = true;
+            PrototypeOutlinerOpen = true;
         }
 
         // Keeps a compact window inside the screen after a resolution or scale change without writing saved full bounds.
@@ -173,6 +176,9 @@ namespace RailroaderScenePatcher {
             PrototypeRestoreRecord();
         }
 
+        // The least window size in canvas units: the rail's content with the outliner shown or hidden, and the frame.
+        Vector2 PrototypeMinimumSize() => new Vector2(PrototypeRailContent, PrototypeOutlinerOpen ? PrototypeExpandedMinContent : PrototypeCollapsedContent) + PrototypeFrame();
+
         Vector2 PrototypeFrame() {
             var native = window.NativeWindow;
             return ((RectTransform)native.transform).rect.size - native.GetContentSize();
@@ -196,7 +202,7 @@ namespace RailroaderScenePatcher {
             }
             var frame = PrototypeFrame();
             var defaultWidth = Mathf.Min((PrototypeRailContent + frame.x) * scale, Screen.width);
-            var defaultHeight = PrototypeListOpen
+            var defaultHeight = PrototypeOutlinerOpen
                 ? PrototypeDefaultExpandedHeight(frame.y)
                 : Mathf.Min((PrototypeCollapsedContent + frame.y) * scale, Screen.height);
             var defaultX = Mathf.Max(0, Screen.width - defaultWidth);
@@ -208,7 +214,7 @@ namespace RailroaderScenePatcher {
 
         string PrototypeState() {
             var bounds = PanelBounds;
-            return "mode=" + (PrototypeCompact ? "compact" : "full") + "; layout=side rail; list=" + (PrototypeListOpen ? "open" : "collapsed") +
+            return "mode=" + (PrototypeCompact ? "compact" : "full") + "; layout=side rail; outliner=" + (PrototypeOutlinerOpen ? "shown" : "hidden") +
                 "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + scale;
         }
 

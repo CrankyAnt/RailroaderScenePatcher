@@ -305,18 +305,24 @@ namespace RailroaderScenePatcher {
             if (guided.Step == GuidedTaskStep.Values) {
                 var back = Slot("Back", "Discard the entered values and return to Target.", wait, GuidedTarget);
                 var next = Typed(Slot("Next", "Review your changes without applying them.", wait, ReviewGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? GuidedValuesBlock());
-                if (guided.Kind == GuidedTaskKind.Snap) return new[] { back,
-                    Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
-                    Slot("Node", "Choose the endpoint to snap to.", wait, () => BeginSnap(SelectionKind.TrackNode)), next };
-                if (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement) return new[] { back,
-                    Slot("Segment", "Choose a track segment in the world.", wait, () => { inspectorTab.Value = ConnectionsTab; BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: guided.Kind == GuidedTaskKind.Binding); }),
-                    Slot("Picked", "Fill the fields from the confirmed track location.", wait ?? (GuidedPickedTarget() != null ? null : "Choose and confirm a track segment first."), GuidedPicked), next };
-                return new[] { back, next };
+                return new[] { back }.Concat(GuidedWorldActs(wait)).Concat(new[] { next }).ToArray();
             }
             return new[] {
                 Slot("Back", "Return to Values and keep the draft.", wait, () => { guided.Back(); feedback.View(GuidedFeedbackView()); guidedFields = guided.Draft; if (guided.Kind == GuidedTaskKind.Snap) preparedSnap = guidedSnap; }),
                 Typed(Slot("Apply", "Apply the reviewed changes.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? guided.ApplyBlock ?? GuidedValuesBlock()),
                 Slot("Target", "Discard the entered values and return to Target.", wait, GuidedTarget) };
+        }
+        // The Values step's actions that start or use a world choice: Track and Node for a snap, Segment and Picked for a
+        // track location; none for another task. Segment opens the Connections tab unless keepTab is set.
+        Act[] GuidedWorldActs(string wait, bool keepTab = false) {
+            if (guided.Step != GuidedTaskStep.Values) return new Act[0];
+            if (guided.Kind == GuidedTaskKind.Snap) return new[] {
+                Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
+                Slot("Node", "Choose the endpoint to snap to.", wait, () => BeginSnap(SelectionKind.TrackNode)) };
+            if (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement) return new[] {
+                Slot("Segment", "Choose a track segment in the world.", wait, () => { if (!keepTab) inspectorTab.Value = ConnectionsTab; BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: guided.Kind == GuidedTaskKind.Binding); }),
+                Slot("Picked", "Fill the fields from the confirmed track location.", wait ?? (GuidedPickedTarget() != null ? null : "Choose and confirm a track segment first."), GuidedPicked) };
+            return new Act[0];
         }
         Outcome GuidedOperation(PatchEditingSession session) {
             var identity = guided.Target.Identity;
