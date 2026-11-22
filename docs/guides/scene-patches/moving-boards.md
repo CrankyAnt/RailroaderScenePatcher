@@ -12,7 +12,7 @@ An independent board is a scene object with these parts:
 - exactly one `Map.Runtime.MaskComponents.CircleMapMask` on the same object, which keeps generated trees and other masked terrain output away from it,
 - no track relationship: no `Track.*` component anywhere in its hierarchy.
 
-In the native map editor, open **Scene patches**, click **Refresh** in the command band, and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** starts with **Not editable:**, it names the reason after that. The patcher refuses a board in these cases:
+In the native map editor, open **Scene Patcher**, click **Refresh** in the command band, and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** starts with **Not editable:**, it names the reason after that. The patcher refuses a board in these cases:
 
 - its culler or mask is disabled, or it carries more than one circle mask,
 - a parent object is inactive (the board itself may be disabled),
@@ -23,7 +23,7 @@ A board placement holds a position and a rotation only. It never names a track, 
 
 ## Move or rotate the board
 
-1. Inspect the board in **Scene patches**.
+1. Inspect the board in **Scene Patcher**.
 2. On the **Placement** tab, in **Numeric** mode, enter the position in map coordinates and the rotation in degrees.
 3. Click **Apply** at the bottom of the tab.
 

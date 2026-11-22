@@ -29,7 +29,7 @@ The check uses the track groups and switch positions currently set in the native
 
 ## Place the marker in the native map editor
 
-1. Open **Scene patches**, click **Refresh** in the command band, and select the marker under **Starter placement**. A gold point marks the front of its cut. A gold ribbon extends back along the track to show where the cut stands and which way it extends.
+1. Open **Scene Patcher**, click **Refresh** in the command band, and select the marker under **Starter placement**. A gold point marks the front of its cut. A gold ribbon extends back along the track to show where the cut stands and which way it extends.
 2. Open the **Connections** tab. Under **Place on the track**, click **Segment** and click where the front of the cut should stand. Check the candidate in the footer and click **Confirm**. This fills the **Track location (m)** fields with the segment, end `a`, and the distance of the click from end `a`.
 3. To reverse the cut's direction, change **End** to `b` and adjust **Distance** as needed. The distance now counts from end `b`. You can also enter all three fields without clicking the track.
 4. Click **Set** at the bottom of the tab.

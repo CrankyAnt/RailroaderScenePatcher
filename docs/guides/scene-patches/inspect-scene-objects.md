@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Inspect scene objects
 
-Open **Scene patches** from the **Scene Patcher** icon in the top-right icon strip of the native map editor. The icon appears only in the native map editor. If the strip has no room for it, a floating **Scene Patcher** button replaces it. **Diagnostics** in the session details explains why.
+To open the **Scene Patcher** window, click the **Scene Patcher** icon in the top-right icon strip of the native map editor. The icon appears only in the native map editor. If the strip has no room for it, a floating **Scene Patcher** button replaces it. **Diagnostics** in the session details explains why.
 
 The window opens flush with the left screen edge, directly below the native Map Editor window, and extends to the bottom of the screen. Its default width is 734 units, or the Map Editor window's width if that's greater. On shorter displays, such as a 1080-high screen, it opens at the top right below the button strip and status readout. The default side stays the same across UI scales as long as the minimum window height fits there.
 
@@ -107,9 +107,11 @@ Mouse actions inside the product button or panel belong to that UI. Scrolling an
 
 When the inventory hasn't been scanned or has changed, the first status lamp turns amber and reads **Stale** instead of **Current**. It also reads **Stale** when the edited mod's scene patch file changes outside scene patch editing while the native map editor runs. Saving from the native map editor doesn't make it stale. Neither does reordering or re-spacing a file's members, because the content is equal.
 
-The lamp's tooltip, session details and log give the reason. This can be the first observation that changed or disappeared, a changed number of observations, a changed map context, or a failed check. Stale means the observations differ from the scene or the check couldn't complete. Using the panel alone doesn't make the inventory stale. You can still inspect rows and use **Focus** while it is stale. Only edits are refused.
+The lamp's tooltip, session details and log give the reason. This can be the first observation that changed or disappeared, a changed number of observations, a changed map context, or a failed check. Stale means the observations differ from the scene or the check couldn't complete. Using the panel alone doesn't make the inventory stale. You can still inspect rows and use **Focus** while it is stale. Only edits are refused. The **Detected problems** section on the **Object** tab says that its problems might be out of date: they're the problems of the last refresh.
 
 Runtime references, such as culling or audio lists, are held in fields the game doesn't serialize. These references and enabled flags the game switches while it runs, such as a crossing bell's audio player, appear under **Runtime state** on the **Object** tab. They don't make the inventory stale.
+
+**Dependencies** and **Runtime state** on the **Object** tab show a short form by default. Each object of the inspected hierarchy gets one line: its path relative to the inspected object, or **This object**, followed by its components. For example, `Gate: CrossingGate, MeshRenderer`. Lines about anything else come first, unchanged. Click the triangle right after a heading, or the heading itself, to switch that section to the full lines, with each component's scene, full path, and full type name. Click it again to return to the short form.
 
 While the panel is open, it compares the scene with the snapshot in the background, a small part in each frame. It starts again two seconds after a comparison ends. A scene change therefore takes longer to appear as stale when more objects are loaded. Supplied scene patch file changes are checked every two seconds. These checks don't replace the displayed snapshot.
 
