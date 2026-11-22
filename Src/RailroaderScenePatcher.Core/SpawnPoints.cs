@@ -16,8 +16,10 @@ namespace RailroaderScenePatcher.Core {
     // when the game applies the setup to a company with no cars and no balance, it reads that spawn point's transform
     // for the start, whatever its activity (StateManager.ApplyNewGameSetup). Whether that start or the native spawns
     // win when both exist is not settled by the source. Both new-game reads run before the mods' OnWorldLoad, so the
-    // patcher applies the spawn point modifications first (PatchEngine.BeforeNewGameStart). None of this is observed in
-    // Railroader yet, so the Object tab states it as expected behaviour.
+    // patcher applies the spawn point modifications first (PatchEngine.BeforeNewGameStart). Railroader 0.6.3 showed a
+    // new company game start at the moved spawn point its setup names on a map without native spawns, and /tp use a
+    // moved spawn point. The default start without a setup, the rescue and the precedence of native spawns are not
+    // observed, so the Object tab states every use as expected behaviour.
     // A stuck player is moved to the closest active spawn point, and to a native spawn only when there is none
     // (PlayerController, SpawnPoint.TryClosestTo). The /tp console command lists the active spawn points by name and
     // jumps to where each stands (TeleportCommand). Each reads the transform when it runs, so a moved spawn point is
