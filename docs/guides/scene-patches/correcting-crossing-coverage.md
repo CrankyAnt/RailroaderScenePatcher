@@ -10,7 +10,7 @@ Coverage edits apply only to existing crossings. They don't create crossings or 
 
 ## How a crossing detects trains
 
-A crossing controller evaluates one or more circuits. Each circuit has three detection spans: approach A, the island, and approach B. A train in an approach span starts the warning; a train on the island keeps the gates down. The patcher names a circuit by the ID of the map's own island span, such as `Pipr`, because that ID identifies the circuit in the map.
+A crossing controller evaluates one or more circuits. Each circuit has three detection spans: approach A, the island, and approach B. A train in an approach span starts the warning. A train on the island keeps the gates down. The patcher names each circuit by the ID of the map's own island span, such as `Pipr`, which identifies that circuit in the map.
 
 Each circuit has one of three coverage settings:
 
@@ -31,7 +31,7 @@ The patcher never assigns coverage by proximity. The crossing detects a nearby t
 
 ## Edit coverage in the native map editor
 
-1. Open the Scene Patcher panel and inspect the crossing controller, either from the outliner (folder **Crossing controller**) or with **Select in world**.
+1. Open the Scene Patcher panel and inspect the crossing controller. Select it in the outliner's **Crossing controller** family or click **Select in world** to select it in the world.
 2. On the **Connections** tab, under **Crossing coverage**, read each circuit's current coverage, then click **Edit circuit** for the circuit to change.
 3. For each of **Approach A**, **Island**, and **Approach B**, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the **From** and **To** distances in meters. To fill a role's segment from the world, click **Segment** next to the role, click the track, then click **Confirm**. The role's current starting segment is excluded from its choice list. You can pick segments used by other roles. **From** is the end next to the island for each approach, and the island's lower end for the island.
 4. Click **Preview** at the bottom of the tab. The panel shows the intended relationship for every circuit, including the selected tracks, which of the map's detection spans stop triggering the crossing, and which circuits are retained. Nothing changes yet.
@@ -41,13 +41,17 @@ To detach a circuit, click **Detach** at the bottom of the tab and apply it. To 
 
 Save writes the coverage to `Data/scene-patches.json` and raises the patcher dependency in `Info.json` to `>=0.5.0`. The game does not save the patcher's spans in map data; the patcher rebuilds them from the scene patch file on every load, so a reload never duplicates them.
 
-A crossing controller reports a problem if one of its circuit spans refers to a track segment that no longer exists, for example after track is removed or rebuilt. The message identifies the circuit by its name on the **Connections** tab, the span by its role and ID, such as `Circuit Pipr Approach A span Pdlh`, and the missing segment. To repair it, open the controller's **Connections** tab and select tracks for the circuit or detach it, as described above. If the span belongs to a [detection addition](adding-crossing-detection.md), such as `Detection addition siding Island span …`, select other tracks for the addition or delete it. If the track graph cannot be read, the controller shows a single inspection note beginning `Circuit span validity unknown` instead of reporting a problem with the track.
+A crossing controller reports a problem if one of its circuit spans refers to a track segment that no longer exists, for example after track is removed or rebuilt. The message names the missing segment and identifies the circuit by its name on the **Connections** tab and the span by its role and ID, such as `Circuit Pipr Approach A span Pdlh`.
+
+To repair the problem, open the controller's **Connections** tab and select tracks for the circuit or detach it, as described above. If the span belongs to a [detection addition](adding-crossing-detection.md), such as `Detection addition siding Island span …`, select other tracks for the addition or delete it.
+
+If the patcher can't read the track graph, the controller shows one inspection note beginning `Circuit span validity unknown`. It doesn't report a problem with the track.
 
 If an edit fails, the panel reports whether the prior coverage was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
 ## Write coverage in the scene patch file
 
-Target the crossing controller with `component` `Track.Crossings.GradeCrossingController` and `structure` `crossing-coverage-v1`. In the `circuits` object of `relationships.crossingCoverage`, use the ID of the map's own island span as the key for each circuit you set. Put the modification itself under its ID in `modifications`:
+Target the crossing controller with `component` set to `Track.Crossings.GradeCrossingController` and `structure` set to `crossing-coverage-v1`. In `relationships.crossingCoverage.circuits`, key each circuit you set by the ID of the map's own island span. Put the modification itself under its ID in `modifications`:
 
 ```json
 "cover-bryson-everett": {
@@ -87,5 +91,5 @@ These statements are based on the patcher's automated tests and the code of Rail
 - The patcher does not check whether trains occupy the affected spans, and it applies coverage while a train is parked on them. Coverage edits were validated with the affected spans clear of trains; make edits in scene patch editing with those spans clear.
 - A circuit named in the scene patch file must exist on the crossing in the loaded map. A circuit that does not exist, a missing segment, a segment ID that matches more than one segment, and a distance outside its segment are refused before anything changes; other modifications still apply.
 - A crossing whose circuits were changed by something other than this patcher, or whose detection spans from the map are no longer registered, is refused until the world reloads.
-- The scene patch editing fields take one segment per span. A span that crosses segment boundaries can be written in the scene patch file with `from` and `to` on different segments.
+- The editor fields accept one segment per span. To define a span across segment boundaries, write it in the scene patch file with `from` and `to` on different segments.
 - Detection was demonstrated on one crossing and build in research; the patcher checks span registration and crossing coverage, not warning time.

@@ -11,7 +11,7 @@ Use world markings to inspect a supported inventory object or choose a target fo
 3. Click an object's square marker, object frame, or identity label to make it the candidate.
 4. Check the candidate, then click **Confirm** in the footer to inspect it.
 
-Each square marker is at its object's position, and you can click its `+`. If you click inside object frames without hitting a `+`, the patcher chooses the object whose `+` is nearest on screen. The candidate appears blue, with a more saturated blue under the pointer. After you click, it stays plain blue. Confirming it turns its object frame and square marker gold. If the object is editable, **Numeric** mode on the **Placement** tab shows its inspected placement.
+Each square marker is at its object's position. Click its `+` to choose the object. If you click inside object frames without hitting a `+`, the patcher chooses the object whose `+` is nearest on screen. The candidate is blue and becomes a more saturated blue under the pointer. After you click, it stays plain blue. Click **Confirm** to turn its object frame and square marker gold. For an editable object, **Numeric** mode on the **Placement** tab shows the inspected placement.
 
 The footer's first message slot, **World choice**, tells you what to choose, for example `Choose an object in the world.` The native map editor can still respond to world clicks while **Select in world** is open.
 
@@ -19,7 +19,7 @@ After you click a candidate, the footer shows it on a blue `Object <n>: …` lin
 
 ## Choose between overlapping markings
 
-A numbered choice list opens beside the pointer when two or more `+` markers are closer than half a marker and a click can't distinguish them. The footer says `N objects. Select a row from the list next to the pointer.` Each row starts with a name that distinguishes its candidate. Select a row to make that object the candidate.
+A numbered choice list opens beside the pointer when a click can't distinguish two or more `+` markers that are closer than half a marker. The footer says `N objects. Select a row from the list next to the pointer.` Each row starts with a name that distinguishes the object. Select a row to make that object the candidate.
 
 The row under the pointer has a blue background. Hover over a row or the candidate's `+` to see its blue world marking. A track shows a ribbon; an object shows a box. Press **Escape** to close the choice list and leave the world choice open so you can click elsewhere. You can navigate the world while the list is open.
 
@@ -41,13 +41,17 @@ Labels are centered below their markers. If a label would cover another marker o
 
 The patcher determines the object's bounds from its renderers. It excludes effects such as smoke, water spray, and lamp beams, invisible shadow casters, and lower levels of detail. A renderer hidden by the game's distance culling still counts. A static-batched building part counts once it has appeared with the patcher's markings since the map loaded. The frame's size and shape therefore stay stable as you zoom or the game culls the object. Switched-off renderers and objects don't count.
 
-The square marker sits at the middle of the framed box, at a point on the object. It stays on the object as you zoom and turn the camera, also when that point is outside the view, as for an object larger than the view. A crossing pad is framed along its whole length on the track, including where its ends meet the road. A crossing controller stands for the whole crossing: its frame surrounds the masts with their gates, the bell, and the pads of its grade-crossing setup. Whistle signs and detection spans are outside that frame. At US19 Gov Island, the frame grew to include a mast after it moved about 300 m. Each mast, bell, and pad keeps its own frame too.
+The square marker sits at the middle of the framed box, on the object. It stays there as you zoom and turn the camera, even if that point is outside the view because the object is larger than the view. A crossing pad's frame covers its whole length on the track, including where its ends meet the road.
+
+A crossing controller's frame surrounds the masts with their gates, the bell, and the pads of its grade-crossing setup. It excludes whistle signs and detection spans. At US19 Gov Island, the frame grew to include a mast after it moved about 300 m. Each mast, bell, and pad also keeps its own frame.
 
 An object frame includes the part at the square marker and nearby parts. It leaves out a part that is far away or much larger. A baked scenery group, such as a station building with its platform and lamps, counts as one object and has an object frame around all its parts. An object with several parts has one object frame around them.
 
 The object frame outlines a box that turns with the object. For an object angled to the view, the frame follows that angle rather than enclosing it in a screen-aligned rectangle. Clicking beside the object, inside that rectangle but outside the frame, doesn't select it.
 
-Bridge construction scenery is framed around the objects it shows and hides that have no inventory entry of their own. If there are none, it shows a [helper marker](#helper-markers-for-invisible-objects) on its own pivot. It therefore never uses the bridge's object frame. Close up, the object frame remains visible even when the object fills the view. Every object frame is at least slightly larger than its square marker, so a small or distant object still has a visible outline around its `+`.
+Bridge construction scenery has a frame around the objects it shows and hides, excluding objects with their own inventory entries. If no objects remain, it shows a [helper marker](#helper-markers-for-invisible-objects) on its own pivot. It never uses the bridge's object frame.
+
+An object frame remains visible close up, even when the object fills the view. Every object frame is at least slightly larger than its square marker, so a small or distant object still has a visible outline around its `+`.
 
 The box stops where the object, including its wider parts, meets the terrain or ballast. It remains a single box:
 
@@ -71,7 +75,7 @@ The collider frame follows the rules of an object frame: it includes the collide
 
 Without colliders, a helper marker has a small object frame around its `+` within 500 meters of the camera. Beyond 500 meters, only the `+` shows, except on the inspected object, which keeps its frame at every distance.
 
-A helper marker shows wherever the object's marking shows, in the same colors: blue as the candidate, gold as the inspected object, and green as a confirmed target. During **Select in world** it has its `+` like every other object. To select an invisible object, click its `+` or inside its frame, as for any other object. **Focus** moves the camera to the object's pivot. The gizmo stands on the pivot, and the helper marker moves with the object during a drag, after the drag, and after native **Undo** and **Redo**.
+A helper marker appears wherever the object's marking would appear. It uses the same colors: blue for the candidate, gold for the inspected object, and green for a confirmed target. During **Select in world**, click its `+` or inside its frame to select the invisible object. **Focus** moves the camera to the object's pivot. The gizmo also stands on the pivot. The helper marker follows the object during and after a drag and after native **Undo** and **Redo**.
 
 The patcher draws the helper marker on screen only during scene patch editing. It isn't part of the scene and is never saved in the scene patch file.
 
@@ -86,7 +90,7 @@ A group contains scene objects that the game handles together. Some follow a sha
 
 The inventory lists the objects in a container object by their own family or group. Bryson Yard holds 13 yard lamp posts. Each lamp post is its own group. Proximity alone doesn't group objects. An object outside every group appears on its own. Whistle signs remain separate objects at every distance.
 
-Grouping changes only the objects' appearance in the world. Each object keeps its inventory entry, outliner row, and edits. A grade-crossing setup's controller manages its invisible detection spans. These spans are excluded from the group's object frame and choice list but remain in the outliner under their controller in the **Crossing controller** family. To change detection, use the controller's **Connections** tab.
+Grouping changes only how objects appear in the world. Each object keeps its inventory entry, outliner row, and edits. A grade-crossing setup's invisible detection spans remain under their controller in the outliner's **Crossing controller** family. They don't appear in the group's object frame or choice list. To change detection, use the controller's **Connections** tab.
 
 ### Select at different distances
 
@@ -128,7 +132,7 @@ Replacements, snaps, and track-following placement use the same candidate markin
 
 Use **Focus** in the footer to check the location. You can navigate outside the panel and inspect other inventory entries while the choice stays open for its original source object.
 
-Check the candidate, then click **Confirm**. The patcher records its confirmed identity in the loaded map context. While you inspect the object the target was chosen for, the footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line. Inspecting another inventory entry ends the confirmation, even if that entry belongs to the same object. A choice made through **Select in world** alone has no source object and doesn't show that line.
+Check the candidate, then click **Confirm** to record its identity in the loaded map context. The footer's first message slot, **World choice**, shows a green `Confirmed choice: …` line while you inspect the object you chose the target for. Inspecting another inventory entry ends the confirmation, even if that entry belongs to the same object. A choice made through **Select in world** alone has no source object, so it doesn't show that line.
 
 If the candidate is missing, ambiguous, or has changed since you selected it, check the world and select it again. If the source object or loaded map context has changed, cancel the choice and start again.
 

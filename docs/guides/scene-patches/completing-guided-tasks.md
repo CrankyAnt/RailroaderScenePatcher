@@ -6,23 +6,27 @@ Open **Scene Patcher** in the native map editor, inspect the object you want to 
 
 You can also start from a detected problem on the **Object** tab. For a track binding problem, click **Repair with guided task**. For a duplicate marker ID on a generic track marker, click **Repair duplicate ID**, or click **Set ID on the Connections tab** beside it to make the same repair in the inspector. For a construction segment that no longer exists on a rail bridge, **Repair construction segments** opens the **Connections** tab. Set the segments there. No guided task sets them.
 
-1. In **Target**, choose a task. It starts with the inspected object's values and keeps that object as its target until you finish or cancel the task.
-2. In **Values**, enter your changes. For a snap, click **Track** or **Node** in the footer, click in the world, and click **Confirm**. For a binding or starter placement, enter the segment, end, and distance. For a replacement ID, enter a new ID that you make up and that nothing in the world uses yet, not another marker's ID or a segment ID. For **Start derailed**, click **Yes** or **No**; choosing the setting the starting cars have without this mod removes the mod's value. You can also click **Segment** in the footer, click a track, confirm it, and click **Picked** to fill in the values. The click supplies the segment, end, and distance for both tasks.
+1. In **Target**, choose a task. The task starts with the inspected object's values. That object remains the target until you finish or cancel.
+2. In **Values**, enter your changes for the chosen task:
+   - For a snap, click **Track** or **Node** in the footer, click in the world, and click **Confirm**.
+   - For a binding or starter placement, enter the segment, end, and distance. You can also click **Segment** in the footer, click a track, confirm it, and click **Picked**. For either task, this fills in the segment, end, and distance from your click.
+   - For a replacement ID, make up a new ID that nothing in the world uses yet. Don't use another marker's ID or a segment ID.
+   - For **Start derailed**, click **Yes** or **No**. Choosing the setting the starting cars have without this mod removes the mod value.
 3. Click **Next** to open **Review**. It shows the inspected values beside your proposed changes and lists the settings the task will leave unchanged. If you try to select another object during **Values** or **Review**, a message explains why you cannot. The target and your draft stay in place.
 4. Click **Apply** in the footer. Guided tasks use the same operations as **Inspector**, with the same requirements and reasons for refusing an edit. Starter placement checks the whole car cut. Changing a crossing pad's binding regenerates the pad along the track at its marker's new location.
 5. When the edit succeeds, click **Back to inspector** to inspect the same object, or **Another guided task** to return to the task list. Use the native **Undo**, **Redo**, and **Save** controls as you would after an Inspector edit. After **Undo** reverses the edit, the **Apply** step says so; after **Redo**, it says the edit is complete again.
 
-You can't apply a numeric placement, activity, binding, or **Start derailed** draft that matches the inspected values. The button's tooltip explains why.
+If your numeric placement, activity, binding, or **Start derailed** draft matches the inspected values, **Apply** is unavailable. Its tooltip explains why.
 
 ## Go back or cancel
 
 From **Review**, click **Back** to return to **Values** and keep your draft. Click **Target** to discard the draft and return to the task list. In **Values**, **Back** also discards the draft and returns to the task list.
 
-Clicking **Inspector** cancels an unfinished task without applying the draft and restores the previous inspector tab. Closing the window also discards the task.
+Click **Inspector** to cancel an unfinished task and return to the previous inspector tab without applying the draft. Closing the window also discards the task.
 
 During **Values** and **Review**, **Clear** or a click on the target object's row cancels a pending world choice while keeping the target and draft. Without a pending world choice, neither action is allowed, and the draft stays in place.
 
-With the pointer over the window, Escape closes an open choice list first. Further presses cancel a drag or a pending world choice, gizmo, or snap, one action per press. Escape never ends the inspection or the guided task.
+With the pointer over the window, press Escape to close an open choice list first. Each further press cancels one action: a drag, a pending world choice, a gizmo, or a snap. Escape never ends the inspection or the guided task.
 
 ## Recover from a refused or failed edit
 
@@ -32,6 +36,6 @@ If the target is stale or the edit is refused or fails, the task stays in **Revi
 - For a refused operation, click **Back** to correct the values or click **Target** to restart.
 - If cleanup is incomplete, the footer tells you to return to **Inspector** and click **Recheck** before trying again. **Refresh** applies no changes and does not verify cleanup.
 
-Recovery options for the scene patch file are in Session details.
+Open **Session details** for scene patch file recovery options.
 
 For operation-specific rules, see [numeric placement and native history](editing-placement-in-the-map-editor.md), [snapping](snapping-to-track.md), [track binding](repairing-track-bindings.md), [replacement ID](repairing-duplicate-marker-ids.md), and [starter placement](placing-starter-markers.md).

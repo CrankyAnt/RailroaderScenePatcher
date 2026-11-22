@@ -2,15 +2,19 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Reposition or rebind a milepost
 
-This guide explains how to move, rotate, or disable a milepost and how to set, replace, or detach its track binding. A milepost is a post beside the track that displays a mile value. Its object holds a `Helpers.MilePost` with a prefix, an origin flag, and a mile value, a `Track.TrackMarker`, and a `Helpers.TextSynchronizer` with the displayed text.
+Move, rotate, or disable a milepost, or set, replace, or detach its track binding. A milepost displays a mile value beside the track. Its scene object holds these components:
+
+- `Helpers.MilePost`, with a prefix, an origin flag, and a mile value.
+- `Track.TrackMarker`, with the track binding.
+- `Helpers.TextSynchronizer`, with the displayed text.
 
 Physical placement and track binding are separate settings. Moving the post leaves its binding unchanged; changing the binding does not move the post. The post's track marker stores the binding as a segment ID, the end of the segment from which the distance is measured, and the distance in metres. The track graph registers the marker under that segment.
 
-Edits do not change the milepost's model, mile value, prefix, origin flag, or displayed text. The patcher never recalculates a mile value. Once something looks up the origin for a prefix, the game caches the origin milepost. The cache holds the post itself, not its location, so an edit leaves it unchanged. A scene patch file with a milepost modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
+Edits don't change the milepost's model, mile value, prefix, origin flag, or displayed text. The patcher never recalculates a mile value. The first time the game looks up a prefix's origin milepost, it caches the post itself. Editing the post's location leaves that cache unchanged. A scene patch file with a milepost modification needs patcher version 0.5.0 or later. The native map editor's Save writes that dependency.
 
 ## What qualifies
 
-The patcher edits a milepost when all of these hold:
+To edit a milepost, all of these conditions must hold:
 
 - The object holds exactly one `Helpers.MilePost`, exactly one `Track.TrackMarker` of type `Generic` with a non-empty marker ID, and a `Helpers.TextSynchronizer`.
 - The object has no missing script and no `Track.TrackCurveMeshBuilder`.
@@ -33,7 +37,7 @@ The inventory lists an object that meets these conditions in the `Milepost` fami
 2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in metres in **Distance**. To pick the segment in the world, click **Segment** under **Replacement targets**, click the track, and click **Confirm** in the footer. The **Segment** field takes the confirmed segment.
 3. Click **Set**. **Detach** removes the post from the track, and **Clear binding** returns it to its underlying binding.
 
-The patcher refuses a missing or ambiguous segment or a distance beyond the segment's length before changing anything. Native Undo and Redo reverse and repeat each edit. **Remove modification** returns the post to its underlying placement, activity, and binding.
+Before changing anything, the patcher refuses the edit if the segment is missing or ambiguous, or the distance exceeds its length. Native Undo and Redo reverse and repeat each edit. **Remove modification** returns the post to its underlying placement, activity, and binding.
 
 ## Write the modification by hand
 

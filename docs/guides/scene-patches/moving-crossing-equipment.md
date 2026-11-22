@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move or disable an existing crossing mast or bell
 
-You can move, rotate, disable, or enable a mast of an existing crossing. You can also move, disable, or enable its bell. The equipment keeps responding to its crossing controller after these edits. This guide also explains how the game hides a moved mast at a distance.
+Use the patcher to move, rotate, disable, or enable a mast of an existing crossing, or to move, disable, or enable its bell. The equipment continues to respond to its crossing controller. This guide also explains how culling works after you move a mast.
 
 To add equipment, see [add lights and gates to an existing crossing](adding-crossing-equipment.md) and [add a bell to an existing crossing](adding-crossing-bells.md). For the native map editor workflow, including Save, Undo, and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md#existing-crossing-mast-and-bell).
 
@@ -10,7 +10,7 @@ To add equipment, see [add lights and gates to an existing crossing](adding-cros
 
 In the native map editor, open **Scene Patcher** and click **Refresh** in the command band.
 
-- Each crossing mast has one row in the **Crossing mast** family, named for the mast and its crossing, such as `Signal 1 at Bryson Everett`. The row represents the mast's light object, for example `Grade Crossing - Bryson Everett/Signal 1/Signal 1`. Its gate is on a child of the light object and is part of the same row; the gate has no row of its own. The **Connections** tab lists each light and gate, the key each observes, and the crossing controller that drives them.
+- Each crossing mast has one row in the **Crossing mast** family, named for the mast and its crossing, such as `Signal 1 at Bryson Everett`. The row represents the mast's light object, for example `Grade Crossing - Bryson Everett/Signal 1/Signal 1`, and includes the gate on a child of that object. The gate has no separate row. The **Connections** tab lists each light and gate, the key each observes, and the crossing controller that drives them.
 - The bell that a crossing controller creates has one row in the **Crossing bell** family, such as `Crossing Bell at Bryson Everett`.
 - Each detection span appears under its controller in the **Crossing controller** family. The **Object** tab starts with **Detection span of:** and the controller's name. You cannot set a span's placement because its track locations determine its position. To change which tracks the crossing detects, select the span and click **Select controller** on the **Object** tab. Then use the controller's **Connections** tab, as described in [correct the detection coverage of an existing crossing](correcting-crossing-coverage.md).
 
@@ -29,13 +29,15 @@ The mast's light and gate move and rotate together. The crossing controller, the
 
 Existing crossing equipment uses fixed placement. It cannot use track-following placement, so **Follow** is unavailable.
 
-A bell's sound has no direction, so rotating a bell has no effect. The **Rotation** values remain visible as text, and the gizmo's **Rotate** tool is disabled. Both explain why you can't edit the rotation. **Snap** sets the bell's position and writes a rotation, but that rotation has no effect.
+A bell's sound has no direction, so rotation has no effect. The **Rotation** values remain visible as text, and the gizmo's **Rotate** tool is disabled. Both explain why rotation isn't editable. **Snap** sets the bell's position and writes a rotation, but that rotation has no effect.
 
 ### Culling of a moved mast
 
 The game hides a crossing's masts when the camera is far from the crossing. If you move a mast outside the crossing's culling sphere, the patcher gives the mast its own sphere. This keeps it visible when the camera sees it at its new position. The crossing's culler keeps its radius and continues to hide and show the other mast. Moving the mast back, undoing the move, or removing the modification returns the mast to the crossing's culler.
 
-**Runtime state** on the **Object** tab shows the culling state from the last **Refresh** or edit. It names the object in the crossing's culler list and shows whether that object left the list to let the mast use its own culling sphere. It gives the center and radius of each separate sphere. The section also lists every reference set in the scene to an object above the mast, including references in a map feature's or progression's switch list. Switching any of those objects also switches the mast.
+**Runtime state** on the **Object** tab shows the culling state recorded by the last **Refresh** or edit. It names the object in the crossing's culler list and shows whether that object was removed from the list so the mast could use its own culling sphere. It gives each separate sphere's center and radius.
+
+The section also lists every reference set in the scene that points to an object above the mast, including references in a map feature's or progression's switch list. Switching any of those objects also switches the mast.
 
 ## Disable or enable a mast or bell
 
@@ -76,7 +78,9 @@ A modification of a mast or bell records a fixed placement, an Enabled value, or
 
 ## Refusal reasons
 
-The patcher edits only masts and bells that match their supported source pattern. Equipment that doesn't match stays in the outliner for inspection. All placement modes, including **Numeric**, are disabled, as are the position and rotation fields and the **Enable** and **Disable** buttons. **Numeric** still shows physical placement as text. The tooltips show `Unavailable: <reason>`, with the same reason as **Supported edits**. Click **Why this equipment cannot be edited** on the **Object** tab to open this section. A modification that names such equipment fails before changing anything. The other modifications in the scene patch file still apply.
+The patcher edits only masts and bells that match their supported source pattern. Other equipment stays in the outliner for inspection. Its placement modes, including **Numeric**, position and rotation fields, and **Enable** and **Disable** buttons are disabled. **Numeric** still shows physical placement as text. The tooltips show `Unavailable: <reason>`, using the reason in **Supported edits**.
+
+Click **Why this equipment cannot be edited** on the **Object** tab to open this section. A modification targeting unsupported equipment fails before anything changes. The other modifications in the scene patch file still apply.
 
 A mast matches `existing-crossing-mast-v1` when it meets every requirement below:
 

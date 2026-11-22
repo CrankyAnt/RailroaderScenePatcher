@@ -8,7 +8,7 @@ Adding equipment doesn't create a crossing or edit a model. Bells use a differen
 
 ## Which devices qualify
 
-A device qualifies if it responds to the crossing controller's keys and meets the requirements below. This is the `crossing-light-gate-v1` pattern:
+To qualify for the `crossing-light-gate-v1` pattern, a device must respond to the crossing controller's keys and meet all these requirements:
 
 - Each lamp is a `Track.KeyValueLampMaterialController` that observes the controller's `lights` or `gates` key. Its lamp targets are inside the device. At least one renderer under those targets uses the lamp's material.
 - Each gate is a `RollingStock.Controls.KeyValueBoolAnimator` that observes the `lights` or `gates` key. It has an `Animator` on its own object and an animation clip.
@@ -17,9 +17,9 @@ A device qualifies if it responds to the crossing controller's keys and meets th
 - The device is in the same scene as the destination crossing, so its assets stay loaded as long as the copy exists.
 - The destination crossing controller has exactly one key-value object, on the controller's own object, and at most one culler.
 
-Within these requirements, the model, materials, colours, and animation don't matter. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
+The model, materials, colours, and animation can vary as long as the device meets these requirements. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
 
-The source must already be loaded in the map you're editing. The patcher doesn't load another scene to find it, or substitute another device if the named source is missing or ambiguous.
+The source must already be loaded in the map you're editing. The patcher doesn't load another scene to find it. If the named source is missing or ambiguous, it doesn't substitute another device.
 
 ### Ineligible sources
 
@@ -57,7 +57,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 
 1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a light or gate** lists the devices, with a reason for each one that does not qualify. **Why a device isn't eligible** opens the table above.
-3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab. It proposes an unused **Equipment ID**, adding a numeric suffix if the name is taken. The proposed placement uses the device's position relative to its own crossing at the inspected crossing, offset by five metres. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
+3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab with an unused **Equipment ID**. If the name is taken, the proposed ID has a numeric suffix. The proposed placement puts the copy at the same position relative to the inspected crossing as the source has relative to its own crossing, with a five-metre offset. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
 
@@ -67,9 +67,11 @@ To move an addition, click **Edit** under its name, change the fields, preview, 
 
 **Lights, gates, and bells** lists the added equipment by name. It shows whether each light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher can't build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason.
 
-The additions of one crossing are built together. One refused addition stops the others, which each appear as **Not built** and name the refused addition. **Recheck** is refused for the same reason and changes nothing. Click **Edit** to correct or remove each refused addition. To correct its source, keep its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+The patcher builds all additions for a crossing together. If one addition is refused, none are built. Each of the others appears as **Not built** and names the refused addition. **Recheck** is refused for the same reason and changes nothing.
 
-Correcting or removing one refused addition changes only the scene patch file while another refused addition remains. A correction is refused before anything changes if the modification would still be refused without the other refused additions, for example because of the correction's own source or the crossing's detection. The additions are built once no refused addition remains.
+Click **Edit** to correct or remove each refused addition. To change its source, leave its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+
+While another refused addition remains, correcting or removing an addition changes only the scene patch file. The patcher checks each correction as though the other refused additions were absent. If the modification would still be refused, for example because of the correction's own source or the crossing's detection, the patcher refuses the correction before anything changes. Once no refused additions remain, the patcher builds the additions.
 
 If incomplete cleanup blocks the crossing, you can't edit or remove the refused addition, and **Recheck** stays refused. Reload the native map editor to clear the block, then correct or remove the addition.
 
@@ -108,7 +110,7 @@ The scene, paths, and coordinates are placeholders. Use the values the editor sh
 
 Each player's game builds the copy beneath its own crossing controller when its world loads. The copy's lamps and gates follow that controller, and the crossing's culler shows and hides the copy in that game.
 
-A player who joins later or reconnects loads the map again. The patcher builds each addition once in the newly loaded world, under the same equipment ID. The copies of the earlier session went with the map when it unloaded. If an addition fails in one player's game, for example because its source is missing there, that game reports it, and the other players keep their equipment. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
+A player who joins later or reconnects loads the map again. The patcher builds each addition once in the newly loaded world, under the same equipment ID. The earlier session's copies were removed when its map unloaded. If an addition fails in one player's game, for example because its source is missing there, that game reports it. The other players keep their equipment. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 
 These statements are based on the patcher's automated tests and the code of Railroader 0.6.3. They haven't been tested in a multiplayer session.
 

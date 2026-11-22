@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move a board with its terrain effects
 
-This guide shows how to move, rotate, disable, or restore an independent board, such as a location sign, and what happens to its culling, terrain mask, and the generated terrain around it. For the general native map editor workflow, Save, Undo, and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md).
+Move, rotate, disable, or restore an independent board, such as a location sign, together with its culling and terrain mask. The game then regenerates the affected terrain around it. For the general native map editor workflow, including Save, Undo, and Redo, see [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md). For the JSON fields, see [scene patch file v1](scene-patch-file-v1.md).
 
 ## Check that the object is an independent board
 
@@ -12,7 +12,7 @@ An independent board is a scene object with these parts:
 - exactly one `Map.Runtime.MaskComponents.CircleMapMask` on the same object, which keeps generated trees and other masked terrain output away from it,
 - no track relationship: no `Track.*` component anywhere in its hierarchy.
 
-In the native map editor, open **Scene Patcher**, click **Refresh** in the command band, and search for the board in the outliner. Its row sits under the **Independent board** folder. The **Identity** section of the **Object** tab shows the structure `independent-board-v1`, and **Supported edits** in the **State** section shows **Fixed placement and activity**. If **Supported edits** starts with **Not editable:**, it names the reason after that. The patcher refuses a board in these cases:
+In the native map editor, open **Scene Patcher**, click **Refresh** in the command band, and search for the board under **Independent board** in the outliner. On the **Object** tab, **Identity** shows the structure `independent-board-v1`. In the **State** section, **Supported edits** shows **Fixed placement and activity**. If it starts with **Not editable:**, the reason follows. The patcher refuses a board in these cases:
 
 - its culler or mask is disabled, or it carries more than one circle mask,
 - a parent object is inactive (the board itself may be disabled),
@@ -29,7 +29,9 @@ A board placement holds a position and a rotation only. It never names a track, 
 
 The patcher moves the board, asks the culler to update its culling position, and rebuilds the circle mask. It then checks that the culling sphere and every mask registration sit at the new position. If they do not, the edit fails and the board returns to its previous state.
 
-The game then regenerates the terrain at the old and the new position: trees return where the board stood and disappear where it now stands. This takes a moment. The **Terrain** section of the **Changes** tab shows **Terrain output outstanding**, with the affected positions, until the game has rebuilt each loaded terrain tile and its terrain work is idle. While the board is inspected, the message area reports each change under the source **Terrain output**: outstanding, then complete, or stopped when the game does not finish in time. It then shows **Terrain output complete**. A position whose tile is not built needs no rebuild; the game builds that tile from the board's current mask when it loads, and the section counts that position as complete.
+The game then regenerates the terrain at both positions. Trees return where the board stood and disappear where it now stands. This takes a moment. On the **Changes** tab, the **Terrain** section lists the affected positions as **Terrain output outstanding** until the game has rebuilt each loaded terrain tile and its terrain work is idle. It then shows **Terrain output complete**.
+
+While you inspect the board, the message area reports changes under **Terrain output** as outstanding, complete, or stopped if the game takes too long. A tile that hasn't been built needs no rebuild, so its position counts as complete. The game will build it from the board's current mask when it loads.
 
 ## Disable or enable the board
 
@@ -39,7 +41,7 @@ An explicit `"active": false` in the scene patch file is applied on every load, 
 
 ## Undo, Redo, and removal
 
-The native map editor's **Undo** and **Redo** return the board to the earlier or later placement and activity, with its culling and mask registrations, and the terrain regenerates again. **Remove modification** in the footer returns the board to its effective underlying state: its position in the loaded map, with any other modifications in your scene patch file still applied. None of these steps leaves an extra culling sphere or mask registration behind.
+The native map editor's **Undo** and **Redo** restore the board's earlier or later placement, activity, and culling and mask registrations. The terrain regenerates again. **Remove modification** in the footer returns the board to its effective underlying state, including its position in the loaded map with any other modifications in your scene patch file still applied. None of these steps leaves an extra culling sphere or mask registration behind.
 
 ## Save and reload
 
@@ -59,7 +61,9 @@ In ordinary play, a terrain output that does not complete produces a warning in 
 
 ## When an edit fails
 
-A failed edit restores the board's previous placement, activity, culling sphere, and mask registration. The restored terrain then regenerates. Until it has, the patcher refuses further edits of that board and says so; the next edit is accepted once the restored terrain output completes. If the patcher cannot verify the restoration, or the restored terrain output stops, it blocks the board until you click **Recheck** in the footer and the check succeeds. Recheck applies the scene patch file's state again if the board differs, requests the stopped terrain output again, and accepts edits once that output completes. Reloading the native map editor also clears the block.
+A failed edit restores the board's previous placement, activity, culling sphere, and mask registration. The restored terrain then regenerates. The patcher refuses further edits to that board until the restored terrain output completes and explains the wait.
+
+If the patcher can't verify restoration, or the restored terrain output stops, click **Recheck** in the footer. Further edits stay blocked until the check succeeds. Recheck reapplies the scene patch file's state if the board differs and requests any stopped terrain output again. Edits become available once that output completes. Reloading the native map editor also clears the block.
 
 ## Limits
 

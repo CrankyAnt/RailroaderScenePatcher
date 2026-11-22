@@ -2,20 +2,22 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Rebind a crossing pad and regenerate its geometry
 
-This guide shows how to set or replace the track location of a crossing pad, and what changes with it. The binding is the only way to move a pad in the native map editor: the **Placement** tab shows the pad's placement, and its modes **Numeric**, **Gizmo**, **Snap**, and **Follow** are inactive for a pad, because none of them changes the binding the pad's geometry is generated along. A crossing pad is the road surface laid across the rails at a grade crossing. Its object holds a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding decides where the pad lies on the track.
+A crossing pad is the road surface laid across the rails at a grade crossing. To move it in the native map editor, set or replace its track binding. This guide explains how to change that binding and what happens to the pad's geometry.
+
+The pad object holds a `Track.TrackMarker` and a `Track.TrackCurveMeshBuilder`. The builder generates the pad mesh along the track curves around the marker's location, so the binding determines where the pad lies. The **Placement** tab shows the object's placement, but **Numeric**, **Gizmo**, **Snap**, and **Follow** are inactive for pads. None of these modes changes the binding used to generate the geometry.
 
 The game generates a pad once, when the pad first comes into view or close to the camera, and does not generate it again by itself. Writing a new location alone leaves the old mesh where it was. The patcher therefore runs the game's own pad generation after every binding change, so the visible pad and its culling follow the mod's location. A scene patch file with a crossing-pad modification needs patcher version 0.5.0 or later; the native map editor's Save writes that dependency.
 
 ## What qualifies
 
-The patcher rebinds a pad when all of these hold:
+The patcher can rebind a pad only when it meets all these requirements:
 
-- the object holds exactly one `Track.TrackMarker`, of type `Crossing` or `Generic`, with a non-empty marker ID, and exactly one `Track.TrackCurveMeshBuilder` with a mesh container and a mesh profile,
-- the object holds no `Helpers.MilePost` and no missing script,
-- no other component listens to the marker's location changes,
-- a `Track.TrackRelativePosition` on the object, if present, does not make the object's activity follow a track group,
-- no loaded component other than that `Track.TrackRelativePosition` and the pad builder holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check,
-- while the pad is enabled and active, the marker has exactly one named location and it matches the stored track location. Otherwise the marker has no named location.
+- The object holds exactly one `Track.TrackMarker`, of type `Crossing` or `Generic`, with a non-empty marker ID, and exactly one `Track.TrackCurveMeshBuilder` with a mesh container and a mesh profile.
+- The object holds no `Helpers.MilePost` and has no missing script.
+- No other component listens to the marker's location changes.
+- If the object has a `Track.TrackRelativePosition`, that component doesn't make the object's activity follow a track group.
+- No loaded component other than that `Track.TrackRelativePosition` and the pad builder holds a direct reference to the marker, and no new-game car placement uses it. If the patcher can't read every field that could hold a marker, it refuses every marker until the next check.
+- While the pad is enabled and active, the marker has exactly one named location, which matches its stored track location. Otherwise, the marker has no named location.
 
 A pad inside a protected crossing qualifies too, because the crossing controller does not read the pad's marker. The crossing's own track spans and circuits are a separate operation.
 
@@ -25,7 +27,7 @@ The inventory shows such an object in the `Crossing pad marker` family with the 
 
 1. Open **Scene Patcher** and select the pad's row in the outliner, in the folder **Crossing pad marker**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
 2. On the **Connections** tab, check the stored segment, end, and distance under **Current binding** in **Crossing pad binding**. Each **Named location** entry shows a location registered under this marker ID and tells you if it belongs to another object.
-3. Enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in metres in **Distance**, on the row **Track location (m)**. To take the segment from the world, click **Segment** in the **Replacement targets** section, click the track and click **Confirm** in the footer: the **Segment** field takes the confirmed segment.
+3. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in metres in **Distance**. To select the segment in the world, click **Segment** in **Replacement targets**, click the track, then click **Confirm** in the footer. The confirmed segment fills the **Segment** field.
 4. Click **Set** at the bottom of the tab.
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment, or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration, and geometry.
@@ -36,13 +38,19 @@ The patcher checks the stored track location and that the game has exactly one n
 
 ## Detaching is refused
 
-A pad without a track location has no geometry, and the game logs an error each time it tries to generate one. **Detach** at the bottom of the tab is unavailable for pads, and its tooltip says why, and a scene patch file that detaches a pad fails before any change. To hide a pad, disable it.
+A pad without a track location has no geometry. The game logs an error each time it tries to generate one. **Detach** at the bottom of the tab is unavailable for pads, with a tooltip explaining why. A scene patch file that detaches a pad fails before anything changes. To hide a pad, disable it.
 
 ## Placement and activity
 
 Placement and activity are separate settings of the same modification. The pad mesh follows the track, not the pad object. After a placement change the patcher generates the pad again, so the mesh stays on the track at the bound location while the object moves. A disabled pad keeps its binding without a registration and without a culling sphere; enabling it registers it again.
 
-A pad can also follow a track, as described in [follow a track](following-track.md). The game does not regenerate a pad after a track edit, and a track edit can change the track's curve near the pad without moving the anchor, for example when an endpoint node moves along the track. For a pad that follows a track, the patcher records the track curves the pad was generated from: the segment curves within half the pad width on either side of the marker location, which the game's pad generation reads. When those curves differ, the patcher generates the pad again, even if the pad's placement is unchanged. Scene patch editing checks this a few times a second and regenerates once the changed curves have held still between two checks, about half a second, so one track edit, including a drag, regenerates the pad once, and a track edit and its native Undo or Redo both leave the pad on the current track. While the track does not change, the check compares a short summary of the nearby track and builds no curves. A pad that is only rebound and does not follow a track keeps the game's behavior: a later track edit leaves its mesh as it was until the pad is generated again. Any edit of a pad that the patcher applies, including native Undo, Redo, clearing the binding, and Remove modification, generates the pad again when the track curves it was generated from have changed, so removal returns a pad to the loaded map's binding with a mesh built from the current track.
+A pad can also follow a track, as described in [follow a track](following-track.md). The game doesn't regenerate a pad after a track edit. An edit can change the curve near the pad without moving its anchor, for example when an endpoint node moves along the track.
+
+For a pad that follows a track, the patcher records the curves used to generate it. These are the segment curves within half the pad width on either side of the marker location, which the game's pad generation reads. If those curves change, the patcher generates the pad again, even if its placement hasn't changed.
+
+While you edit, the patcher checks the curves a few times a second. It regenerates the pad once the changed curves stay still between two checks, about half a second. A single track edit, including a drag, therefore regenerates the pad once. Both the track edit and its native Undo or Redo leave the pad on the current track. While the track is unchanged, the check compares a short summary of the nearby track without building curves.
+
+A pad that is only rebound, without following a track, keeps the game's behavior. A later track edit leaves its mesh unchanged until the pad is generated again. Whenever the patcher applies a pad edit, including native Undo, Redo, clearing the binding, or Remove modification, it regenerates the pad if the curves used to generate it have changed. Removing the modification therefore restores the loaded map's binding with a mesh built from the current track.
 
 ## Undo, clear and remove
 

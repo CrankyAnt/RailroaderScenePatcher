@@ -8,11 +8,13 @@ For other operations, see the [modder manual](modder-manual.md). To make changes
 
 ## Before you start
 
-Open your mod's map definition from the Editor menu. The patcher reads and writes `Data/scene-patches.json` and `Info.json` only in the edited mod. It doesn't access those files in mods that supply map layers or terrain tile sets. Save creates the scene patch file and declares the patcher dependency when needed.
+Open your mod's map definition from the Editor menu. The patcher reads and writes `Data/scene-patches.json` and `Info.json` in the edited mod only. It doesn't access those files in mods that supply map layers or terrain tile sets. Save creates the scene patch file and declares the patcher dependency when needed.
 
 A new scene patch file names the map definition's bottom map layer as its scene target map. If the definition has no map layers, the file names the definition itself. When the bottom map layer is the base-game map, the file also applies to a save of that map, where your map-changing script or map patch supplies your native changes. An existing scene patch file keeps its scene target map. See [the scene patch file reference](scene-patch-file-v1.md#scene-patch-file-fields).
 
-Open **Scene Patcher**, then click the page icon for session details. Under **Editing**, look for **Editing ready for** and the scene patch file path. These mean you can begin. A problem there means the scene patch file is protected. The patcher never overwrites an unreadable file, a file in a newer format, or one for another map. The **Scene patch file** section identifies the problem. Correct the file and read it again, or back it up and make a fresh start. See [Recover a protected scene patch file](recover-scene-patch-files.md).
+Open **Scene Patcher**, then click the page icon to open the session details. Under **Editing**, **Editing ready for** followed by the scene patch file path means you can begin.
+
+If this section reports a problem, the scene patch file is protected. The patcher never overwrites an unreadable file, a file in a newer format, or one for another map. The **Scene patch file** section identifies the problem. Correct the file and read it again, or back it up and make a fresh start. See [Recover a protected scene patch file](recover-scene-patch-files.md).
 
 ## Choose a scene patch file version
 
@@ -24,9 +26,15 @@ Until you choose a version, only **Refresh** and the session details remain avai
 
 Choose how to handle the changed file:
 
-- Click **Use file version** to apply the changed file in the current session and discard unsaved scene patch edits. **Scene Patcher** explains this loss before confirmation. Discarded steps remain in native Undo and Redo with their original action names and menu titles, but have no effect. Undo or Redo of these steps, or of any scene patch edit recorded before the choice, cannot change the scene patch file. Unsaved native map work is unaffected. The scene patch status becomes **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs. If the patcher refuses a modification of the file, such as a construction segment detach, the footer counts the applied and refused modifications and names each refused one with its reason. The refused modification stays in the scene patch file, and its **Changes** tab reads `Refused.` with the reason instead of listing changes. A modification that the world load refused shows the same way. The outliner marks such an object with × instead of `*`, and its state line shows `× REFUSED` instead of `* CHANGED`. The **Problems** filter does not list it: a problem is a defect of the object itself, while the refusal belongs to the scene patch file and is also reported in the native log. If you remove it there, native **Undo** puts it back in the scene patch file without applying it.
-- Click **Keep editor version** to retain the session's scene patch file and edits. Save is allowed again. The next Save replaces the changed file with the editor version.
-- Click **Import** to bring the file's changes into the session. See [Import outside changes](#import-outside-changes).
+- **Use file version** applies the changed file in the current session and discards unsaved scene patch edits. **Scene Patcher** explains this loss before confirmation. Unsaved native map work is unaffected.
+- **Keep editor version** retains the session's scene patch file and edits. Save becomes available again. The next Save replaces the changed file with the editor version.
+- **Import** brings the file's changes into the session. See [Import outside changes](#import-outside-changes).
+
+After **Use file version**, discarded steps remain in native Undo and Redo under their original action names and menu titles, but have no effect. Neither these steps nor any scene patch edit recorded before the choice can change the scene patch file through Undo or Redo. The scene patch status becomes **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs.
+
+If the patcher refuses a modification in the file, such as a construction segment detach, the footer counts the applied and refused modifications. It names each refused modification and gives its reason. The refused modification stays in the scene patch file. Its **Changes** tab shows `Refused.` and the reason instead of listing changes. Modifications refused during world load appear the same way.
+
+The outliner marks the object with × instead of `*`, and its state line shows `× REFUSED` instead of `* CHANGED`. The **Problems** filter doesn't list it because a problem is a defect of the object itself. The refusal concerns the scene patch file and also appears in the native log. If you remove the refused modification in the editor, native **Undo** returns it to the scene patch file without applying it.
 
 None of these choices requires a reload. The version choice remains visible after the action that detected the change. Undo, Redo, and **Remove modification** update reload feedback to reflect the current session. If the file changed while the game was closed, the next native map editor load reads it without asking you to choose a version.
 
@@ -66,13 +74,13 @@ For an edit that keeps the same object selected and lets you review changes befo
 2. On the **Placement** tab, use **Numeric** mode to enter the values. Use a decimal point.
 3. Click **Apply**.
 
-For an object that supports fixed placement, six fields show its inspected position in map coordinates and rotation in degrees. The **Position (m)** and **Rotation (deg)** rows each have **X**, **Y**, and **Z** fields. Objects that can't be edited show the values as two lines of text instead, such as `X 4361.091  Y 528.405  Z 5380.431 (m)`. The amber **Editing** message explains why editing is unavailable.
+For an object that supports fixed placement, six fields show the position and rotation you inspected. Position uses map coordinates, and rotation uses degrees. The **Position (m)** and **Rotation (deg)** rows each have **X**, **Y**, and **Z** fields. For objects that can't be edited, two lines of text show the values instead, such as `X 4361.091  Y 528.405  Z 5380.431 (m)`. The amber **Editing** message explains why editing is unavailable.
 
 Fields display three decimal places and never use scientific notation. An unchanged field keeps the object's exact value. Changing X alone therefore leaves the other axes and rotation unchanged.
 
 **Apply** is disabled while the fields match the current placement. **Supported edits** on the **Object** tab explains why it is unavailable. As soon as a keystroke changes a value, **Apply** becomes available without requiring Enter or leaving the field. It becomes disabled again if the value matches the current one. Applying the object's placement without this mod removes the placement from the modification.
 
-Applying moves the object and creates or updates its modification in the scene patch file. The modification stores the fixed position and rotation as a quaternion. An axis whose stored value is unchanged keeps its text in the file. For example, changing only Z doesn't replace X with a longer number read back from the game. Applying again replaces the values in the same modification. It doesn't add a second modification or accumulate movement. Click **Read** to refill the fields from the inspected observation.
+Applying moves the object and creates or updates its modification in the scene patch file. The modification stores the fixed position and stores rotation as a quaternion. If an axis's stored value hasn't changed, its text in the file stays the same. For example, changing only Z doesn't replace X with a longer number read back from the game. Applying again replaces the values in the same modification. It doesn't add a second modification or accumulate movement. Click **Read** to refill the fields from the inspected observation.
 
 ### Check the result and refresh
 
@@ -94,7 +102,7 @@ After a board edit, the **Terrain** section on the **Changes** tab shows the sta
 
 ## Undo and redo
 
-Each completed edit adds one entry to the native map editor's history, alongside your other edits in the native map editor. Use the native map editor's **Undo** and **Redo** to reverse and reapply the object's state and the scene patch file together. Reloading ends this history. The patcher does not preserve Undo or Redo across a reload.
+Each completed edit adds one entry to the native map editor's history alongside your other map edits. Use the native map editor's **Undo** and **Redo** to reverse and reapply the object's state and the scene patch file together. Reloading ends the history. The patcher doesn't preserve Undo or Redo across a reload.
 
 If the native map editor's Undo or Redo stops on an error, the session details show **Incomplete operation**. The history can no longer be trusted to record edits. Save still writes the current state. Until you reload the native map editor, however, the title star, Save button tint and tooltip, and exit confirmation continue to report unsaved native map data.
 
@@ -128,7 +136,7 @@ A refused Save writes nothing, for example while you need to choose a file versi
 
 If a write fails, the native map editor shows **Save Failed**, the cause, and the completed and outstanding writes. The session details repeat this under **Last Save failed**. Completed writes stay on disk. Your edits remain in memory and the native map editor stays unsaved.
 
-A failed write never damages the file it was replacing. The patcher writes the complete new content for `Data/scene-patches.json` or `Info.json` to a neighboring file ending in `.saving`, then replaces the original with that file. If writing stops midway, the previous file stays unchanged. If this was the first Save, no file exists yet. The patcher removes the unfinished `.saving` file. If an interruption such as a crash leaves one behind, the next Save replaces it.
+A failed write leaves the file it was replacing intact. The patcher first writes the complete new content for `Data/scene-patches.json` or `Info.json` to a neighboring file ending in `.saving`, then replaces the original. If writing stops midway, the previous file stays unchanged. On a first Save, no original file exists yet. The patcher removes the unfinished `.saving` file. If an interruption such as a crash leaves one behind, the next Save replaces it.
 
 If another program, such as a virus scanner or sync client, briefly holds the file open, Save retries for up to half a second before reporting failure.
 
@@ -173,6 +181,6 @@ If Save fails, the native map editor stays open and reports the completed and ou
 
 While a file version choice is pending or the file needs repair, reload and exit offer only discard or cancel. Save becomes available after you click **Use file version** or **Keep editor version**. In repair state, the backup must also succeed. After an unrecovered native history error, the native map editor might be unable to prove that native map data is clean. The confirmation identifies the outstanding work so you can cancel or discard it.
 
-Reload reopens the requested map definition. For the same map, the patcher records the camera's ground location in map coordinates and requests a return when the native map editor and camera are ready. This request survives mod replacement in the same process. It expires after five minutes and is discarded if another map opens. Before reporting arrival, the patcher checks the settled horizontal ground position. Reload does not preserve selection, camera angle, or native history.
+Reload reopens the requested map definition. When reloading the same map, the patcher records the camera's ground location in map coordinates. It requests a return to that location once the native map editor and camera are ready. The request survives mod replacement in the same process, expires after five minutes, and is discarded if another map opens. Before reporting arrival, the patcher checks the settled horizontal ground position. Reload doesn't preserve selection, camera angle, or native history.
 
 Reload does not replace an installed DLL. Installing or replacing one requires restarting the process. A journey in Railroader is still needed to verify the rendered prompts, reload and discard behavior, and return to the working location for the tested build and layout.

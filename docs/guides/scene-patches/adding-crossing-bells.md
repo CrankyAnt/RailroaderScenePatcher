@@ -8,7 +8,7 @@ Adding a bell doesn't create a crossing, change the crossing's own bell, or edit
 
 ## Which bell definitions qualify
 
-A bell definition qualifies if the patcher can use the game's mechanism for creating crossing bells and locomotive bells. This is the `crossing-bell-v1` pattern, with these requirements:
+The patcher uses the game's mechanism for creating crossing bells and locomotive bells. A bell definition qualifies for this `crossing-bell-v1` pattern when it meets these requirements:
 
 - The game's content library contains the definition, with kind `Bell`. The definition can come from the game or a loaded mod.
 - It names an audio asset, and that asset resolves in the content library.
@@ -16,15 +16,15 @@ A bell definition qualifies if the patcher can use the game's mechanism for crea
 - The destination crossing controller has exactly one key-value object, on the controller's own object, and publishes its bell key there.
 - The destination crossing controller is active.
 
-The player splits the audio clip at its indexes. Each resulting part must contain at least one sample. The patcher can check this only after the audio loads, which happens after you apply the bell. If the clip does not fit its indexes or the audio fails to load, the bell exists but stays silent. Its state shows the reason. The game's log records one warning for the bell, attributed to your mod's `Data/scene-patches.json`, with the bell's ID, crossing controller, and reason. Remove the bell or replace its definition.
+The player splits the audio clip at its indexes. Each part must contain at least one sample. The audio loads after you apply the bell, so the patcher can check the parts only then. If the clip doesn't fit its indexes or the audio fails to load, the bell exists but stays silent. Its state explains why. The game's log records one warning for the bell, attributed to your mod's `Data/scene-patches.json`. The warning names the bell's ID, crossing controller, and reason. Remove the bell or replace its definition.
 
-Within these requirements, you can use any sound, clip, number of indexes, or volume. An unfamiliar bell definition qualifies if it uses this definition and loading mechanism. A definition of another kind, such as a horn or whistle, does not qualify, even if its name resembles a bell's.
+You can use any sound, clip, number of indexes, or volume that meets these requirements. An unfamiliar bell definition qualifies if it uses this definition and loading mechanism. A definition of another kind, such as a horn or whistle, doesn't qualify, even if its name resembles a bell's.
 
-The definition must already be in the content library. The patcher doesn't load a scene or another mod to find it, or substitute another sound if the named definition is missing.
+The definition must already be in the content library. The patcher doesn't load a scene or another mod to find it. If the named definition is missing, it doesn't substitute another sound.
 
 ### Ineligible bell definitions
 
-The editor lists every bell definition in the content library and explains why a definition doesn't qualify. You might also see these reasons when applying a bell. The last rows apply only when you apply a bell or after its audio loads:
+The editor lists every bell definition in the content library and explains why any are ineligible. These reasons can also appear when you apply a bell. The last rows apply only during application or after the audio loads:
 
 | Reason | Meaning |
 | --- | --- |
@@ -65,9 +65,11 @@ To move a bell, click **Edit** under its name, change the fields, preview, and a
 
 **Lights, gates, and bells** shows whether each bell's audio is loading, has loaded, or has failed. It also shows whether the added bell and the crossing's own bell are ringing or quiet. If the patcher can't build a bell from your scene patch file, for example because its definition is missing, the bell appears as **Not built** with a reason.
 
-The additions of one crossing are built together. One refused addition stops the others, which each appear as **Not built** and name the refused addition. **Recheck** is refused for the same reason and changes nothing. Click **Edit** to correct or remove each refused addition. To correct its source, keep its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+The patcher builds all additions for a crossing together. If one addition is refused, none are built. Each of the others appears as **Not built** and names the refused addition. **Recheck** is refused for the same reason and changes nothing.
 
-Correcting or removing one refused addition changes only the scene patch file while another refused addition remains. A correction is refused before anything changes if the modification would still be refused without the other refused additions, for example because of the correction's own source or the crossing's detection. The additions are built once no refused addition remains.
+Click **Edit** to correct or remove each refused addition. To change its source, leave its **Edit** form open and click **Use** for an eligible device or bell definition. The addition keeps its equipment ID and placement. Then click **Preview** and **Apply**.
+
+While another refused addition remains, correcting or removing an addition changes only the scene patch file. The patcher checks each correction as though the other refused additions were absent. If the modification would still be refused, for example because of the correction's own source or the crossing's detection, the patcher refuses the correction before anything changes. Once no refused additions remain, the patcher builds the additions.
 
 If incomplete cleanup blocks the crossing, you can't edit or remove the refused addition, and **Recheck** stays refused. Reload the native map editor to clear the block, then correct or remove the addition.
 
@@ -104,7 +106,7 @@ The scene, path, and coordinates are placeholders. Use the values the editor sho
 
 ## Multiplayer, later joins and reconnects
 
-Each player's game builds the bell beneath its own crossing controller when its world loads, and loads the bell's audio there. In Railroader 0.6.3, a crossing controller computes its detection in each player's own game and sets its bell key from it. The added bell follows the bell key of the controller in its own game. Whether that key also reaches other players hasn't been determined.
+When a player's world loads, their game builds the bell beneath its own crossing controller and loads the audio. In Railroader 0.6.3, each player's crossing controller computes detection locally and sets its bell key from that detection. The added bell follows that local controller's bell key. Whether the key also reaches other players hasn't been determined.
 
 A player who joins later or reconnects loads the map again. The patcher builds each bell once in the newly loaded world, under the same equipment ID. The bell of the earlier session released its audio when the map unloaded. If a bell fails in one player's game, for example because its bell definition is missing there, that game reports it, and the other players keep their bell. See [application on each peer](scene-patch-file-v1.md#application-on-each-peer).
 

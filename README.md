@@ -1,6 +1,6 @@
 # Railroader Scene Patcher
 
-Railroader Scene Patcher is a Railroader mod that lets map modders repair or move supported scene objects, such as misplaced signs or bridges and track markers with broken bindings. If a mod you use requires the patcher, install it so Railroader can apply that mod's changes when you load a map.
+Railroader Scene Patcher lets map modders move or repair supported scene objects in Railroader, including misplaced signs and bridges, and track markers with broken bindings. Install the patcher if a mod you use requires it. Railroader then applies that mod's scene changes when you load a map.
 
 > **Status.** Under development. There is no official release or mod package yet.
 
@@ -10,10 +10,10 @@ Author: CrankyAnt
 
 1. Install the mod you want to use and the version of Railroader Scene Patcher it requires. Extract each mod if it came in a ZIP file. Put each mod folder, with `Info.json` at its root, in `Documents\Railroader\Mods`.
 2. In Railroader, go to **Preferences > Features > Experimental** and turn on **Allow DLL Mods**. This setting lets Railroader run DLL mods on your computer. Only install DLL mods from authors you trust.
-3. Quit and reopen Railroader after installing the files, changing DLL permission, or replacing the patcher's DLL. A full restart lets Railroader pick up the files and the permission setting.
+3. Quit and reopen Railroader after installing the files, changing DLL permission, or replacing the patcher's DLL. Railroader needs a full restart to pick up those changes.
 4. On the main menu, click **Mods** to open **Manage Mods**. Enable the mod that requires the patcher and click **Apply**. Railroader enables its installed dependency automatically. If the dependency is missing, incompatible, or blocked by DLL permission, check the reason shown in **Manage Mods**.
 
-Install and update mods and manage DLL permission on your own computer. In multiplayer, the host and each client need the required mod versions installed and DLL permission enabled locally. The patcher applies scene changes on each computer when the map loads.
+In multiplayer, the host and each client must install the required mod versions and enable DLL permission on their own computer. The patcher applies scene changes on each computer when the map loads.
 
 See Railroader's [mod installation guide](https://docs.railroadergame.com/modding/installing-mods/) and [DLL mod settings](https://docs.railroadergame.com/modding/dll-mods/).
 
@@ -29,7 +29,7 @@ If multiple mods try to change the same existing scene object, an informational 
 
 ## Tested maps
 
-The patcher has been tested on the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and on maps that inherit it as a map layer. Maps with a different terrain tile set, such as a whole new map, are untested. The patcher doesn't disable itself on these maps.
+Testing covers the base-game map (`rr/bushnell-whittier`, terrain `rr/nc-bryson`) and maps that inherit it as a map layer. Maps with a different terrain tile set, such as a whole new map, are untested. The patcher still runs on these maps.
 
 ## For map modders
 
@@ -37,9 +37,8 @@ See the [modder manual](docs/guides/scene-patches/modder-manual.md) for editing 
 
 ## License
 
-This repository assigns licenses per file according to the REUSE
-specification. [REUSE.toml](REUSE.toml) is the authoritative machine-readable
-record.
+This repository records each file's license in [REUSE.toml](REUSE.toml),
+the authoritative machine-readable record under the REUSE specification.
 
 Every file is licensed under the [MIT License](LICENSE.md), free to use,
 modify, and redistribute. If you copy or build on this project, retain the

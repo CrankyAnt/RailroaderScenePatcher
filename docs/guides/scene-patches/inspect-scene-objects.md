@@ -6,7 +6,9 @@ To open the **Scene Patcher** window, click the **Scene Patcher** icon in the to
 
 The window opens flush with the left screen edge, directly below the native Map Editor window, and extends to the bottom of the screen. Its default width is 734 units, or the Map Editor window's width if that's greater. On shorter displays, such as a 1080-high screen, it opens at the top right below the button strip and status readout. The default side stays the same across UI scales as long as the minimum window height fits there.
 
-Drag the title to move the window. Close it with its close control or the entry. Closing cancels a pending world choice. Like a native window, it keeps the position and size you give it, even when a native window or menu opens over it. Only a screen or UI-scale change that leaves it partly off screen repositions it. Its minimum size is 704 by 470 units, which keeps the outliner, command band, and a tab body in view. At that size, you can scroll the tab body and message area independently. If the panel was open when you left the native map editor, it opens again when you enter it.
+Drag the title to move the window. Use its close control or click its entry again to close it and cancel any pending world choice. The window keeps the position and size you choose, even when a native window or menu opens over it. It moves automatically only if a screen or UI-scale change leaves it partly off screen.
+
+The minimum size is 704 by 470 units. This leaves the outliner, command band, and a tab body in view, with independent scrolling for the tab body and message area. If the panel was open when you left the native map editor, it opens again when you return.
 
 The title bar has three glyphs to the left of the close control. Each has a tooltip with its name:
 
@@ -14,7 +16,7 @@ The title bar has three glyphs to the left of the close control. Each has a tool
 - **Reset layout**, a round arrow, restores the window's default position and the outliner width.
 - **Session details**, a page, opens or closes a separate window with the edited mod's scene patch file, supplied definitions, diagnostics and, during a world choice, its candidates. You can move and resize this window. It keeps its position and closes with the panel.
 
-Click **Refresh** in the command band. Refresh reads the loaded scene and the edited mod's supplied definitions and verifies stored target identities. It doesn't apply patches, save files, change object activity, repair bindings, or regenerate dependent output. Objects need no patch or warning to appear.
+Click **Refresh** in the command band to read the loaded scene and the edited mod's supplied definitions and verify stored target identities. Refresh doesn't apply scene patches, save files, change object activity, repair bindings, or regenerate dependent output. An object can appear without a scene patch or warning.
 
 The command band across the top is split by the divider between the two columns. Above the outliner are **Refresh** and two status lamps: a dot for the object list and a dot for saving. **Current** and **Saved** are green. **Stale**, **Paused**, **Unsaved**, and **Blocked** are amber. Resolve the file issue when inspection is paused. Hover over **Blocked** for the reason you cannot save. The lamps are informational, not buttons, and their tooltips give the reason.
 
@@ -26,15 +28,24 @@ Commands that cannot run remain in place, unavailable. **Select in world** is un
 
 Each **?** opens a separate help window beside the panel, at the height of that **?**, with an introduction, short explanations, and links to the guides. Only one help window can be open at a time, and it never covers the panel's content. A tab's help closes when you open another tab. Click the same **?** again or use the help window's close button to close it.
 
-Below the band, the outliner on the left contains a search field with a **?** for outliner help, object rows, and a count in the form `N of M objects`. Its filters are **All**, **Changed** for objects the edited mod changes, **Disabled** for objects that are switched off, whatever their parents are, and **Problems** for objects with a detected problem. **Fit**, at the right end of the outliner's top row beside the divider, sizes the outliner to fit most names. You can also drag the divider between the outliner and inspector. If the column would need more than 40 percent of the window, **Fit** stops at that width and a message with the source **Fit** says how wide the names are. Three notes at the bottom explain that Undo, Redo, and Save are the Map Editor's own, when to refresh after native edits, and that a reload clears the Undo history.
+Below the command band, the outliner on the left has a search field, a **?** for outliner help, object rows, and a count in the form `N of M objects`. Use its filters to choose what appears:
+
+- **All** shows all objects.
+- **Changed** shows objects the edited mod changes.
+- **Disabled** shows objects that are switched off, regardless of their parents' state.
+- **Problems** shows objects with a detected problem.
+
+Click **Fit** at the right end of the outliner's top row, beside the divider, to fit most names. You can also drag the divider between the outliner and inspector. **Fit** limits the column to 40 percent of the window. If the names need more room, a message with the source **Fit** reports their width. Three notes at the bottom explain that Undo, Redo, and Save are the Map Editor's own, when to refresh after native edits, and that reloading clears the Undo history.
 
 An object opens in **Follow** placement mode if it follows a track, or **Numeric** otherwise. The **Inspector** and **Guided** segments at the right end of the state line switch between inspection and guided tasks. See [complete a guided task](completing-guided-tasks.md).
 
 The inspector on the right shows the object's own name. Its tooltip gives the full path, or the full display name for added equipment. The state line shows `* CHANGED`, or `× REFUSED` or `× NOT APPLIED` for a modification that doesn't apply. It lists the problem count first, followed by the family and **Inactive**. Below it are four tabs, **Object**, **Placement**, **Connections**, and **Changes**. Each starts with a one-line description and a **?** at the right end of the row for the tab's help. Actions sit in one row at the bottom, below the scrolling content. Each tab body scrolls independently. The window itself doesn't scroll.
 
-The footer is the same on every tab. Its message area sits above a row with **Remove modification** and **Recheck**, which act on the inspected object whichever tab is open. The message area keeps its height when messages appear or disappear. Scroll it to read messages that extend below its bottom edge. The first message says what the window is waiting for, such as a world choice, gizmo, or snap, or why the open tab cannot edit the object now. Below it is the result or refusal of the last action, with its action group as the bold source. Above that is a consequence that arrived by itself afterwards, such as terrain output.
+Every tab has the same footer. Its message area sits above **Remove modification** and **Recheck**, which act on the inspected object from any tab. The message area keeps its height as messages appear and disappear. Scroll to read messages below its bottom edge.
 
-A result disappears when it no longer describes what you see: on a new action, native Undo or Redo, or inspection of another object. A Gizmo result keeps the earlier Copy ID result below it. A tab action's result also disappears when you change the tab or placement mode; results from **Remove modification** or **Recheck** remain through those changes. While a world choice is pending, the footer row instead holds **Confirm**, **Cancel**, **Focus**, and **Details**, and the tab controls are unavailable until the choice ends. While a gizmo is active, the row holds its **Cancel**.
+The first message explains what the window is waiting for, such as a world choice, gizmo, or snap, or why the current tab can't edit the object. Below it is the last action's result or refusal, with the action group in bold as its source. If that action later produces a result such as terrain output without another command, the new message appears above the action result.
+
+A result disappears when you start another action, use native Undo or Redo, or inspect another object. A Gizmo result keeps the earlier Copy ID result below it. Changing the tab or placement mode also clears that tab action's result, but keeps results from **Remove modification** and **Recheck**. During a pending world choice, the footer row holds **Confirm**, **Cancel**, **Focus**, and **Details** instead, and the tab controls stay unavailable until the choice ends. An active gizmo puts its **Cancel** button in that row.
 
 Detected problems depend on how the game uses an object. Except for starter placement markers, an object that is switched off itself has no problem of any kind. The game ignores it until someone enables it. Find these objects under **Disabled**. An object hidden by a culler while the camera is far away isn't switched off. The rules differ by kind:
 
@@ -85,7 +96,7 @@ Supplied definitions remain visible under **Supplied definitions** in the sessio
 
 ## Starter placement markers
 
-A new company game starts with cars that a setup places on the track. Each car placement reads the track location of its starter placement marker. The front of the cut stands at that point, and the rest extends towards the named end of the segment. The marker's own object position plays no part. It can be hundreds of metres from where the cars appear.
+A setup places the starting cars on the track in a new company game. Each car placement reads its starter placement marker's track location. The front of the cut stands at that point, and the rest extends toward the named end of the segment. The marker's object position doesn't affect this placement and can be hundreds of meters from where the cars appear.
 
 The outliner lists these markers in their own **Starter placement** family, once each:
 
@@ -95,7 +106,11 @@ The outliner lists these markers in their own **Starter placement** family, once
 
 The **Object** tab lists under **Used by** every setup and car placement that reads the marker, with the cars of each cut and whether the placement is a wreck. A listed marker needs a usable binding whether it is enabled or not: an empty binding, or a stored track location whose segment no longer exists, is a problem. A binding on an existing segment shows no problem.
 
-While a starter placement marker is inspected, the world marks its track point in gold, on the track, with the label **Front of the car cut**, and the track the cut stands on as a gold ribbon from that point back, so the direction the cut extends shows. When the cut's length cannot be read, only the point shows, labelled **Track point**. The **Placement** tab shows that point in map coordinates under **Track point**. **Focus** moves the camera to the track point. When the marker's track location does not resolve on the loaded track, **Focus** is unavailable and its tooltip gives the reason. A stored distance beyond the end of its segment has no track point either: **Focus** is unavailable, and the marker shows no problem, because the binding check only asks whether the segment exists. If the new-game setups cannot be read, no marker is listed as a starter placement marker; every marker then shows an inspection note that says so, and **Diagnostics** in the session details reports it after **Refresh**.
+Inspecting a starter placement marker marks its track point in gold with the label **Front of the car cut**. A gold ribbon extends back along the track to show the cut's direction. If the cut's length can't be read, only the point appears, labeled **Track point**. The **Placement** tab shows its map coordinates under **Track point**.
+
+Click **Focus** to move the camera to the track point. If the marker's track location doesn't resolve on the loaded track, **Focus** is unavailable and its tooltip explains why. A stored distance beyond the segment's end also has no track point, so **Focus** is unavailable. In that case, the marker shows no problem because the binding check only asks whether the segment exists.
+
+If the new-game setups can't be read, no markers appear as starter placement markers. Every marker then has an inspection note explaining this limit, and **Diagnostics** in the session details reports it after **Refresh**.
 
 Use the **Connections** tab to choose where the starting cars appear and whether they start as a wreck, as described in [place a starter placement marker on the track](placing-starter-markers.md). The marker object's placement, gizmo, and activity controls stay unavailable, because the object's placement and activity do not change where the cars start; their tooltips say so.
 
@@ -113,9 +128,9 @@ Runtime references, such as culling or audio lists, are held in fields the game 
 
 **Dependencies** and **Runtime state** on the **Object** tab show a short form by default. Each object of the inspected hierarchy gets one line: its path relative to the inspected object, or **This object**, followed by its components. For example, `Gate: CrossingGate, MeshRenderer`. Lines about anything else come first, unchanged. Click the triangle right after a heading, or the heading itself, to switch that section to the full lines, with each component's scene, full path, and full type name. Click it again to return to the short form.
 
-While the panel is open, it compares the scene with the snapshot in the background, a small part in each frame. It starts again two seconds after a comparison ends. A scene change therefore takes longer to appear as stale when more objects are loaded. Supplied scene patch file changes are checked every two seconds. These checks don't replace the displayed snapshot.
+While open, the panel compares a small part of the scene with its snapshot each frame. It starts the next comparison two seconds after finishing the last one. With more objects loaded, a scene change takes longer to make the inventory stale. The panel also checks supplied scene patch files for changes every two seconds. Neither check replaces the displayed snapshot.
 
-At the moment of an edit, the patcher compares the whole scene again and refuses the edit if anything differs. It doesn't rely on the background comparison. Refresh replaces the observations and keeps the inspected object if its handle and component still exist. Refresh after native edits, Undo/Redo, activity changes, or scene patch file changes. Supplied scene patch file observations update only on explicit refresh.
+Before an edit, the patcher compares the whole scene again and refuses the edit if anything differs. This check is independent of the background comparison. Refresh replaces the observations and keeps the inspected object if its handle and component still exist. Refresh after native edits, Undo/Redo, activity changes, or scene patch file changes. Observations of supplied scene patch files update only when you explicitly refresh.
 
 Focus uses the inspected object itself, not a fresh inventory, so it never jumps to another object that has the same path. Before a complete scene patch file placement, the engine repeats unique resolution and preflight immediately before mutation and checks that the map context has not changed. Scene patch editing integrations can additionally pass an inspected-target token to reject changes in observed placement, bindings, or dependencies. Refresh cannot substitute another object with the same path for a completed edit.
 
@@ -140,7 +155,7 @@ Focus uses the inspected object itself, not a fresh inventory, so it never jumps
 | Missing object configurations or industry definitions | The original Sylva diesel-stand and Bryson textile cases concern native configuration/definition data, with no identified scene-object repair. |
 | Signals, CTC, and interlocking | Their relationships appeared in the historical inventory but the first-version operation boundary excludes their edits. A span's presence in the inventory does not enable these operations. |
 
-Discovery reads loaded objects, including inactive ones. It doesn't load absent scenes. Dependencies include child components, serialized marker/span/controller relationships, and direct references from loaded scene component fields and lists. Consumers that use identifiers or indirect references can remain unknown. An unavailable field or graph is reported as an inspection limit, so it doesn't prove that a binding is valid. Names and proximity never create a functional relationship.
+Discovery reads loaded objects, including inactive ones, without loading absent scenes. Dependencies include child components, serialized relationships between markers, spans, and controllers, and direct references in loaded scene components' fields and lists. Consumers that use identifiers or indirect references can remain unknown. If a field or graph is unavailable, the patcher reports an inspection limit. That limit doesn't establish whether a binding is valid. Names and proximity never create a functional relationship.
 
 All newly inventoried patterns are inspection-only unless an operation adapter explicitly supports them. The table accounts for the applicable families and ownership cases in the original inventory. It does not promise discovery of arbitrary custom scene hierarchies, require a separate bridge model whitelist, or establish native rendering or gameplay behavior. An unidentified timber object in an earlier bridge image remains unattributed; the two sampled native trestles do not identify that object.
 
