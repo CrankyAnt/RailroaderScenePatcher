@@ -6,7 +6,7 @@ Use world markings to inspect a supported inventory object or choose a target fo
 
 ## Select an object for inspection
 
-1. Open **Scene patches** in the native map editor.
+1. Open **Scene Patcher** in the native map editor.
 2. Click **Select in world** in the command band.
 3. Click an object's square marker, object frame, or identity label to make it the candidate.
 4. Check the candidate, then click **Confirm** in the footer to inspect it.
@@ -142,10 +142,10 @@ Click **Cancel** in the footer to close a pending choice. Pending choices don't 
 
 ## Apply the edit
 
-Confirm or cancel a pending choice before applying placement or activity changes in **Scene patches**. Completed edits use the native map editor's **Undo**, **Redo**, and **Save** controls. See [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md).
+Confirm or cancel a pending choice before applying placement or activity changes in **Scene Patcher**. Completed edits use the native map editor's **Undo**, **Redo**, and **Save** controls. See [edit and save fixed placement in the native map editor](editing-placement-in-the-map-editor.md).
 
 For a one-time physical placement, use **Track** or **Node** in **Snap** mode on the **Placement** tab. Confirmation prepares the result; **Apply** makes the edit. See [snap an object's position to a track](snapping-to-track.md).
 
-Editing actions on the **Placement** and **Connections** tabs pause native map editor world clicks, including right-click. You can still rotate and pan the camera with the right and middle mouse buttons, use **Scene patches**, make world choices, and use gizmo handles.
+Editing actions on the **Placement** and **Connections** tabs pause native map editor world clicks, including right-click. You can still rotate and pan the camera with the right and middle mouse buttons, use **Scene Patcher**, make world choices, and use gizmo handles.
 
 The block ends when the corresponding action ends through **Apply**, **Discard**, **Start**, **Set**, **Confirm**, or **Cancel**. **Read** also ends it, as does leaving a **Numeric** field without a change. In **Gizmo** mode, the block ends when you switch mode or tab, clear the inspection, or close the window.

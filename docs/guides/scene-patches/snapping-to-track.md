@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Snap an object's position to a track
 
-Use this route in the native map editor for an object with a supported fixed-placement adapter. Open **Scene patches**, click **Refresh** in the command band, inspect the object, and click **Snap** on the **Placement** tab. Check its current physical placement and logical relationships before starting.
+Use this route in the native map editor for an object with a supported fixed-placement adapter. Open **Scene Patcher**, click **Refresh** in the command band, inspect the object, and click **Snap** on the **Placement** tab. Check its current physical placement and logical relationships before starting.
 
 1. Click **Track** at the bottom of the tab to pick a track segment, or **Node** to pick a track node. Click the track ribbon or node marking in the world. Navigate with the camera as needed.
 2. Check the candidate's ID. A segment also shows both endpoint IDs; a node shows its map position. If candidates overlap, choose one explicitly in the session details (the page icon in the title bar). Until you confirm, **Target** on the **Placement** tab shows it as a candidate, and a **Next** line names the step that follows. Use **Focus** in the footer to inspect it.

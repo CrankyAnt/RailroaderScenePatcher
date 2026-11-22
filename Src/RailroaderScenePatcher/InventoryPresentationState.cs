@@ -42,6 +42,47 @@ namespace RailroaderScenePatcher {
         internal static string Summary(SceneInventory inventory, string search, OutlinerFilter filter, Func<SceneObservation, bool> changed) =>
             Rows(inventory, search, filter, changed).Count + " of " + (inventory?.Entries.Count ?? 0) + " objects";
 
+        const string MarkerIdKey = "ID";
+        internal const string MarkerIdLine = "Marker " + MarkerIdKey + "=";
+
+        // The named values of a binding line of the form "Marker ID=Mlm1; type=Generic": the words before the first key
+        // name the group ("Marker", "Track-relative", "Circuit 0"), and each "key=value" part follows in order. A part
+        // without a key continues the value before it. Null for a line without a key, such as "Graph registration: none".
+        internal static (string Group, IReadOnlyList<KeyValuePair<string, string>> Values)? BindingValues(string line) {
+            var first = line?.IndexOf('=') ?? -1;
+            if (first < 0) return null;
+            var space = line.LastIndexOf(' ', first);
+            var group = space < 0 ? "" : line.Substring(0, space);
+            var values = new List<KeyValuePair<string, string>>();
+            string key = null, value = null;
+            foreach (var part in line.Substring(space + 1).Split(new[] { "; " }, StringSplitOptions.None)) {
+                var equals = part.IndexOf('=');
+                if (equals <= 0) { if (key != null) value += "; " + part; continue; }
+                if (key != null) values.Add(new KeyValuePair<string, string>(key, value));
+                key = part.Substring(0, equals); value = part.Substring(equals + 1);
+            }
+            if (key != null) values.Add(new KeyValuePair<string, string>(key, value));
+            return (group, values);
+        }
+        // The marker ID an entry was observed with: the ID value of its Marker binding line (BindingValues), or null for
+        // an entry without one.
+        internal static string MarkerIdOf(SceneObservation entry) {
+            foreach (var line in entry?.Bindings ?? Enumerable.Empty<string>()) {
+                var values = BindingValues(line);
+                if (values?.Group != "Marker") continue;
+                var id = values.Value.Values.FirstOrDefault(pair => pair.Key == MarkerIdKey).Value?.Trim();
+                if (!String.IsNullOrEmpty(id)) return id;
+            }
+            return null;
+        }
+        // The other entries that hold the marker ID an object had before an edit, its Undo or its Redo, or the one it has
+        // after it: their duplicate marker ID problem and explanation change with the edit, so they are observed again.
+        internal static IReadOnlyList<SceneObservation> OtherMarkerIdHolders(IEnumerable<SceneObservation> entries, SceneObservation before, SceneObservation after) {
+            var ids = new HashSet<string>(new[] { MarkerIdOf(before), MarkerIdOf(after) }.Where(id => id != null), StringComparer.Ordinal);
+            var self = after?.Handle ?? before?.Handle;
+            if (ids.Count == 0) return Array.Empty<SceneObservation>();
+            return (entries ?? Enumerable.Empty<SceneObservation>()).Where(e => e != null && !ReferenceEquals(e.Handle, self) && MarkerIdOf(e) is string id && ids.Contains(id)).ToArray();
+        }
         // Baked scenery parts include their group; other objects use their observed visible name.
         internal static string Name(SceneObservation entry) => entry.GroupPath != null ? BakedSceneryRules.PartName(entry.GroupPath, entry.Identity.Path) : entry.DisplayName;
 
@@ -254,8 +295,6 @@ namespace RailroaderScenePatcher {
         // The Object tab's line that names a part's group, or null for any object that is no part.
         internal static string PartOf(SceneObservation entry) =>
             entry?.GroupPath == null ? null : "Part of: " + entry.GroupPath.Substring(entry.GroupPath.LastIndexOf('/') + 1);
-
-        internal const string MarkerIdLine = "Marker ID=";
 
         // What the game itself tells apart inside a family, or null: for a track marker its marker type
         // (Track.TrackMarkerType), read from the observation's marker line. Never a name: a station sign and a whistle

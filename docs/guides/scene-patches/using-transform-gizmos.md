@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Move and rotate with a transform gizmo
 
-Use **Scene patches** in the native map editor to place an existing target supported by the fixed-placement adapters. Independent boards, supported bridges, and supported Generic track markers each have their own dependency checks. Other inventory entries have no placement edit in Scene Patcher.
+Use **Scene Patcher** in the native map editor to place an existing target supported by the fixed-placement adapters. Independent boards, supported bridges, and supported Generic track markers each have their own dependency checks. Other inventory entries have no placement edit in Scene Patcher.
 
 1. Refresh the inventory and inspect the object, or confirm it through world selection. Use **Focus** in the command band to bring it into view.
 2. On the **Placement** tab, click **Gizmo**. The native map editor's Move gizmo appears on the object immediately. On the switch, click **Rotate** for rotation rings or **Move** to return to movement. The gizmo changes immediately and stays on the object while **Gizmo** mode is open. The six read-only position and rotation fields update as you drag.

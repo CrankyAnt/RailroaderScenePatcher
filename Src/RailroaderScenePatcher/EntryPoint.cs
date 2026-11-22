@@ -666,6 +666,17 @@ namespace RailroaderScenePatcher {
             if (comparedKey != null && comparedKey == idleKey) comparedKey = now;
             idleKey = now;
         }
+        // A marker ID edit, its Undo or its Redo changes the duplicate marker ID of every other holder of the old and the
+        // new ID: those entries are observed again at once, so their problems agree with the edit and with the
+        // availability of the replacement ID, which reads the scene.
+        void ReobserveMarkerIdHolders(SceneObservation before, SceneObservation after) {
+            if (inventory == null) return;
+            foreach (var holder in InventoryPresentationState.OtherMarkerIdHolders(inventory.Entries, before, after)) {
+                if (!inventory.Entries.Any(e => ReferenceEquals(e, holder))) continue;
+                var updated = inventory.ReobserveRelated(holder);
+                if (updated != null) KeepSelection(holder, updated);
+            }
+        }
         // The entry of the inspected object after related observations were replaced.
         void KeepSelection(SceneObservation before, SceneObservation updated) {
             if (ReferenceEquals(selected, before)) selected = updated;
@@ -752,7 +763,7 @@ namespace RailroaderScenePatcher {
                 var edited = refreshTarget; refreshTarget = null;
                 var updated = fullRefresh || inventory == null || edited == null ? null : inventory.ReobserveRelated(edited);
                 fullRefresh = false;
-                if (updated != null) KeepSelection(edited, updated); else Inspect();
+                if (updated != null) { KeepSelection(edited, updated); ReobserveMarkerIdHolders(edited, updated); } else Inspect();
                 ReadPlacement(); presentation?.RequestRefresh();
             }
             // Undo and Redo of this patcher's own steps changed their objects: observe those again, so they do not read
@@ -769,7 +780,7 @@ namespace RailroaderScenePatcher {
                     var entry = inventory.Entries.FirstOrDefault(e => TargetIdentity.SameObject(e.Identity, identity));
                     var updated = entry == null ? null : inventory.ReobserveRelated(entry);
                     // An Undo or Redo of this patcher's step: the fields show the object, and an open equipment form its addition, as they are now.
-                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) { ReadPlacement(); ReadOpenEquipment(); } }
+                    if (updated != null) { var inspected = ReferenceEquals(selected, entry); KeepSelection(entry, updated); if (inspected) { ReadPlacement(); ReadOpenEquipment(); } ReobserveMarkerIdHolders(entry, updated); }
                 }
                 // Objects a follow update moved: every entry of the object takes its new observation, and the fields of
                 // the inspected one take its new placement.
@@ -826,8 +837,8 @@ namespace RailroaderScenePatcher {
                 reloadRequirement = attachment.Session.ReloadRequirement;
                 nextReloadCheck = Time.unscaledTime + 1f;
             }
-            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene patches" : "Scene patches: reload",
-                reloadRequirement ?? "Open the Scene patches window.");
+            presentation?.SetEntryStatus(reloadRequirement == null ? "Scene Patcher" : "Scene Patcher: reload",
+                reloadRequirement ?? "Open the Scene Patcher window.");
             bool open = presentation != null && presentation.IsOpen;
             if (!open) CancelGizmo();
             SyncInputRegions();

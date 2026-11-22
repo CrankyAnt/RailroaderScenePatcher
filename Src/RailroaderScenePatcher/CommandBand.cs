@@ -106,12 +106,12 @@ namespace RailroaderScenePatcher {
         // the form of an addition that is built or that the scene patch file no longer holds.
         internal static string CorrectedAddition(string editedId, IEnumerable<EquipmentEntry> entries) =>
             editedId == null ? null : (entries ?? Enumerable.Empty<EquipmentEntry>()).Any(e => e?.Addition?.Id == editedId && e.Problem != null) ? editedId : null;
-        // The native alert for a refused Save while the Scene patches window is closed, or null while it is open, where the
+        // The native alert for a refused Save while the Scene Patcher window is closed, or null while it is open, where the
         // message area shows the refusal. The Map Editor's Save button stays enabled, so a refusal must never look like an
         // ignored click.
         internal static (string Title, string Message)? SaveRefusalAlert(bool windowOpen, string reason, bool versionChoice = false) =>
             windowOpen ? ((string Title, string Message)?)null : ("Save refused", versionChoice
-                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene patches to choose which version to keep."
+                ? "Nothing was saved. The scene patch file changed outside the Map Editor. Open Scene Patcher to choose which version to keep."
                 : "Nothing was saved. " + Sentence(reason));
         // The three controls that take something back are named by what they take back. Object: this mod's activity
         // value. Placement, Snap: the snap that was prepared and not applied. Changes: the whole modification.
@@ -166,9 +166,6 @@ namespace RailroaderScenePatcher {
             foreach (var name in tabs) if (name == openRegion) return true;
             return false;
         }
-        // How far the footer's row stands above the window's lower edge beyond its own padding, so that it clears the
-        // native resize grip in the lower right corner: the grip's height less the padding below the row.
-        internal static float GripClearance(float gripHeight, float paddingBelowRow) => Math.Max(0, gripHeight - paddingBelowRow);
         // One padding rule for every button of the panel: the band, a tab's row, the footer's row and the buttons inside
         // a tab. A button is as wide as its label and the native compact padding on both sides, 6 units each (measured
         // on the band: "Refresh" is 62.15 wide in a button of 74.15). A button whose label changes in place, such as
@@ -569,6 +566,20 @@ namespace RailroaderScenePatcher {
         // inspected marker, or null when it is offered: only a generic track marker whose native id another scene marker
         // shares takes one, and a marker that already has one keeps the row to change or clear it.
         internal const string SetMarkerId = "Set ID", ClearMarkerId = "Clear ID", RepairDuplicateId = "Repair duplicate ID";
+        // The Inspector route of the same repair, beside Repair duplicate ID: the Marker ID section of the Connections tab.
+        internal const string SetIdOnConnections = "Set ID on the Connections tab";
+        internal const string SetIdOnConnectionsTip = "Open the Connections tab. In its Marker ID section, enter a replacement ID and click Set ID.";
+        // Whether the Object tab shows Repair duplicate ID and Set ID on the Connections tab: on a generic track marker
+        // that holds a duplicate marker ID (offersRepair), or that has this mod's replacement ID, the repaired state, where
+        // they stay visible with their reasons. A marker that never shared its ID shows neither.
+        internal static bool ShowsDuplicateRepairs(string structure, bool offersRepair, bool hasReplacementId) =>
+            structure == TrackMarkerScene.Structure && (offersRepair || hasReplacementId);
+        // Why Repair duplicate ID is unavailable, or null. With a duplicate marker ID it follows replacementIdReason, the
+        // reason the replacement ID can't be set now. Without one the marker already has its replacement ID, named when
+        // it could be read. Set ID on the Connections tab follows the Marker ID section's own reason instead.
+        internal static string DuplicateRepairReason(bool offersRepair, string replacementIdReason, string currentId) =>
+            offersRepair ? replacementIdReason
+            : String.IsNullOrWhiteSpace(currentId) ? "This marker already has a replacement ID." : "This marker already has replacement ID " + currentId + ".";
         // Whether the Object tab offers Repair duplicate ID: for a generic track marker whose explanation names a
         // duplicate marker ID, active or not.
         internal static bool OffersDuplicateRepair(string structure, IEnumerable<string> dependencies) =>
@@ -578,6 +589,30 @@ namespace RailroaderScenePatcher {
         internal static string NoDetectedProblems(bool offersDuplicateRepair) => offersDuplicateRepair
             ? "None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired."
             : "None detected";
+        // The tooltip of the disclosure triangle after the Dependencies and Runtime state headings.
+        internal static string DisclosureTip(bool longForm) => longForm
+            ? "Show the short form, with paths relative to this object and grouped per object."
+            : "Show the full lines, with each component's scene and full path.";
+        // The Detected problems section of a stale object list: its problems are those of the last refresh.
+        internal const string StaleProblems = "The object list is stale, so these problems might be out of date. Click Refresh to check them again.";
+        // A detected problem as the Object tab shows it. On a marker whose replacement ID repaired a duplicate marker ID,
+        // the binding rule's own problem for a bound segment that doesn't resolve, a missing segment or an empty binding
+        // (BindingRules.Problem with resolves false for the marker's need, activity and bound segment), is told in plain
+        // words instead of the rule text: first that the duplicate is repaired, then what is wrong with the binding,
+        // named by the bound segment, then the two routes that repair it. Every other problem keeps its text, also a
+        // track location problem whose segment exists. repairedId is the duplicate marker ID the replacement ID
+        // repaired, or null; segment is the marker's bound segment, empty when it has none.
+        internal static string ProblemText(string problem, string repairedId, string segment, bool enabled, BindingNeed need) {
+            if (repairedId == null || problem == null || problem != BindingRules.Problem(need, enabled, "Marker", segment, false)) return problem;
+            return "Duplicate marker ID " + repairedId + " is repaired, but this is a different problem: "
+                + (String.IsNullOrWhiteSpace(segment) ? "the marker has no track binding." : "the track binding names segment " + segment + ", which doesn't exist.")
+                + " Click Repair with guided task, or set an existing track on the Connections tab.";
+        }
+        // What to enter in a Replacement ID field, on the Connections tab and in the guided task, shown as text beside the
+        // field: a new ID that the modder makes up, which is neither an existing marker ID nor a segment ID.
+        internal const string ReplacementIdInstruction = "Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.";
+        // The tooltip of a Replacement ID field: what the ID does, beside the instruction that stands below the field.
+        internal const string ReplacementIdTip = "The game registers this marker's track location under this ID. A replacement ID repairs a duplicate marker ID. The patcher doesn't check Lua scripts or other mods that look up markers by ID.";
         internal static string MarkerIdUnavailable(string family, bool generic, string underlying, int sharers, bool hasValue) =>
             !generic ? ReplacementMarkerIds.NotSupportedFor(family)
             : hasValue ? null
