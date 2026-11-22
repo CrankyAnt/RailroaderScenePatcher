@@ -3,7 +3,6 @@
 // PROTOTYPE: throwaway view switch and layout helpers of the outliner grouping prototype.
 using System;
 using System.Linq;
-using RailroaderScenePatcher.Core;
 using TMPro;
 using UI.Builder;
 using UnityEngine;
@@ -23,15 +22,6 @@ namespace RailroaderScenePatcher {
             PrototypeOutlinerGrouping.LogPending = true;
             // Reveal the currently inspected object in the new view's hierarchy.
             revealed = null;
-        }
-
-        // Reuses TrackPoints and FocusTarget.Point so starter placements and unheld spans place by track location.
-        double[] PrototypeTrackPoint(SceneObservation entry) {
-            if (entry == null || (entry.Family != StarterPlacements.Family && entry.Family != FocusTarget.Span)) return null;
-            try {
-                var point = FocusTarget.Point(entry.Family, null, TrackPoints(entry), out _);
-                return point != null && point.Length >= 3 ? new[] { point[0], point[2] } : null;
-            } catch { return null; }
         }
 
         // Two compact native segments on the object count line: native segmentSelected / segment styling marks the

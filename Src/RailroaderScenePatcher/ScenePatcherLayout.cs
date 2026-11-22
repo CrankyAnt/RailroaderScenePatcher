@@ -406,9 +406,7 @@ namespace RailroaderScenePatcher {
             results = builder.AddRebuildableSection(items => {
                 items.ConfigureLayout(4f);
                 // PROTOTYPE: search also matches computed place, kind and crossing name.
-                IReadOnlyList<SceneObservation> shown;
-                try { shown = PrototypeOutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, PrototypeTrackPoint); }
-                catch { shown = InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged); }
+                var shown = PrototypeRows();
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
                 string selectedKey = null;
