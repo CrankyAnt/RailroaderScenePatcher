@@ -353,7 +353,7 @@ To appear in this family, a root must meet all these conditions:
 
 A candidate without one of those components isn't listed at all. A collider built by the game while the camera is near doesn't count. For a storage pile, the pile itself counts, but its generated collider doesn't.
 
-A group root that holds a car loader (`RollingStock.CarContentSwapper`) at any depth is not listed, and neither is anything below it. The game loads Robinson Gap coal by teleport between the industry's track spans, not at `World/Large Scenery/Robinson Gap Mine/Coal Loader`, so moving that loader would not move loading. A group or part modification whose path names such a group root fails before any change, with that reason, and the other modifications still apply.
+`World/Large Scenery/Robinson Gap Mine/Coal Loader`, which holds a car loader (`RollingStock.CarContentSwapper`), is a decorative group under Other. Target it and its parts with `baked-scenery-group-v1` and `baked-scenery-part-v1`, as any group and part. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so neither `placement` nor `active` changes where loading happens.
 
 The family leaves out a group holding any of the following at any depth: a track marker, station click spot, spawn point, or map icon. It also leaves out a group that holds a track construction controller (`Game.Mow.TrackConstructionScenery`) but is no rail bridge construction. Those objects are inspection only. A group with a spawn point is not moved as a whole, because its spawn points are edited one by one in the [Spawn point](#spawn-point) family.
 
