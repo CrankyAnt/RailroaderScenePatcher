@@ -831,15 +831,27 @@ namespace RailroaderScenePatcher {
         // What the Supported edits of a detection span says: no placement of its own, and where its one supported
         // edit, crossing coverage, is made.
         internal const string DetectionSpanOperations = NotEditablePrefix + "A span's track locations determine its position, so you cannot set its placement. To change which tracks the crossing detects, use its controller's Connections tab.";
-        // Whether the Track binding section shows location fields: only for an object that holds a marker, or one that
-        // reports a binding. Another object shows the reason it has no binding as one line instead, so the section
-        // stays visible with its reason and is never an empty block of fields and a current binding of None.
-        internal static bool ShowsBindingFields(bool marker, int currentBindings) => marker || currentBindings > 0;
-        // Why an object that holds no marker has no track binding: a detection span's tracks are its controller's
-        // crossing coverage; any other object names the families that have one.
-        internal const string DetectionSpanNoBinding = "A detection span has no track binding. To change which tracks it detects, edit the crossing coverage on its controller's Connections tab.";
-        internal const string NoTrackBinding = "Only track markers, mileposts, and crossing pads have track bindings.";
-        internal static string NoBindingReason(string operations) => operations == DetectionSpanOperations ? DetectionSpanNoBinding : NoTrackBinding;
+        // The families whose objects hold a track marker, and so a track binding, whether or not the adapter accepts
+        // the object: a refused one keeps its binding fields, disabled with its own reason.
+        internal static bool HoldsMarker(string family) =>
+            family == StarterPlacements.Family || family == "Track marker" || family == "Crossing pad marker" || family == "Milepost";
+        // The label of a track location registered under a marker's ID, as the inventory lists it.
+        internal const string ListedTrackLocation = "Named location:";
+        // The binding lines of an inventory entry that the Track binding section shows as its current binding.
+        internal static string[] CurrentBindings(SceneObservation entry) =>
+            (entry?.Bindings ?? (IReadOnlyList<string>)Array.Empty<string>()).Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith(ListedTrackLocation, StringComparison.Ordinal)).ToArray();
+        // Whether the Track binding section shows location fields: for an object the marker adapter edits, an object of
+        // a family that holds a marker, or one that reports a current binding. Another object shows the reason it has
+        // no binding as one line instead, so the section stays visible with its reason and is never an empty block of
+        // fields and a current binding of None.
+        internal static bool ShowsBindingFields(SceneObservation entry, bool editableMarker) =>
+            editableMarker || HoldsMarker(entry?.Family) || CurrentBindings(entry).Length > 0;
+        // Why an object that holds no marker has no editable track binding. A detection span, the one object a crossing
+        // controller holds (its inventory entry names that holder), takes its tracks from the controller's crossing
+        // coverage; any other object names the families whose binding the patcher edits.
+        internal const string DetectionSpanNoBinding = "A detection span's tracks come from its controller's crossing coverage. To change which tracks it detects, edit the coverage on its controller's Connections tab.";
+        internal const string NoTrackBinding = "Only track markers, mileposts, and crossing pads have editable track bindings.";
+        internal static string NoBindingReason(SceneObservation entry) => entry?.HolderPath != null ? DetectionSpanNoBinding : NoTrackBinding;
         // The guide link offered for a mast or bell that does not conform to its pattern: its label and the guide page
         // with the anchor of the refusal reasons.
         internal static readonly string[] EquipmentGuide = { "Why this equipment cannot be edited", "moving-crossing-equipment.md#refusal-reasons" };

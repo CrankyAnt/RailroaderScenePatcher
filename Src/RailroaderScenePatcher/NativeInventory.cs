@@ -769,7 +769,7 @@ namespace RailroaderScenePatcher {
             // Existence is not proof that the binding names the intended track.
         }
         // The track graph's named-location entries under the marker's ID: the registration that ID lookups find.
-        internal const string ListedTrackLocation = "Named location:";
+        internal const string ListedTrackLocation = CommandBand.ListedTrackLocation;
         static void Registrations(Component marker, List<string> bindings) {
             var id = Text(Field(marker, "id"));
             var graph = Native.Read(Native.Type("Track.Graph"), "Shared") ?? throw new InvalidOperationException("Track graph unavailable");
