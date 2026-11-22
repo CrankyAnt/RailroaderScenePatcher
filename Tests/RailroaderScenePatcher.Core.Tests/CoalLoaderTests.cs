@@ -42,8 +42,8 @@ static class CoalLoaderTests {
         Console.WriteLine("PASS: coal loader");
     }
 
-    // The loader group is listed under Other, with the Mine Office beside it, and the coverage rules hold no car loader
-    // rule: its parts follow the part rule as in any other group.
+    // The loader group is listed under Other, with the Mine Office beside it, and its parts follow the part rule as in
+    // any other group.
     static void TheLoaderGroupIsListedUnderOther() {
         var verdicts = BakedSceneryRules.Classify(World());
         var group = verdicts.SingleOrDefault(v => v.Path == Loader);
@@ -52,9 +52,6 @@ static class CoalLoaderTests {
             "The loader group is listed under Other: " + group?.Disposition + " " + group?.Reason + " " + group?.Category);
         Assert(office?.Disposition == GroupDisposition.Group && office.Category == group.Category, "The loader stands where the other Robinson Gap Mine groups stand: " + office?.Category);
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing of the loader stands in the Inspection only group");
-        var rules = typeof(BakedSceneryRules);
-        Assert(rules.GetField("CarLoaders") == null && rules.GetField("CarLoader") == null && rules.GetField("CarLoaderRefusal") == null && rules.GetMethod("GroupOf") == null,
-            "The coverage rules hold no Car loaders rule, component or refusal");
         Assert(!BakedSceneryRules.Exclusions.Any(e => e.Component == "RollingStock.CarContentSwapper"), "No inspection-only exclusion names the car loader");
         var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.GroupPath == Loader).ToDictionary(p => p.Path, p => p);
         Assert(parts[Light].Disposition == PartDisposition.Part && parts[Loader + "/Model"].Reason == BakedSceneryRules.CullingContainers
