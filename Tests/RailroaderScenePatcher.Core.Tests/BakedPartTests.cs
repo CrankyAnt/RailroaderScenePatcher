@@ -196,7 +196,19 @@ static class BakedPartTests {
         var post = new FakeGroup();
         f.World.Objects[Yard] = new List<object> { new FakeGroup() }; f.World.Objects[Post] = new List<object> { post };
         var before = f.World.Mutations;
-        var result = f.Engine.Apply(Doc(Mod("yard", Yard, BakedSceneryGroups.Structure, GroupTarget, null), Mod("post-as-part", Post, BakedSceneryParts.Structure, GroupTarget, null), Part("move-jetty", "Jetty", JettyTarget, JettyTurn)));
+        var json = Doc(Mod("yard", Yard, BakedSceneryGroups.Structure, active: false),
+            Mod("post-as-part", Post, BakedSceneryParts.Structure, GroupTarget, null), Part("move-jetty", "Jetty", JettyTarget, JettyTurn));
+        var diagnostics = new Diagnostics();
+        var runtime = new PatchRuntime(f.Engine, diagnostics, "0.5.0", "0.6.3");
+        var mod = new LoadedMod(new PatchSource("example/map", "Example Map", "1.0.0", "Example author"), json, null, editTarget: true);
+        var result = runtime.ApplyLoaded(new[] { mod }, null).Single().Result;
+        var warning = diagnostics.Failures.Single(failure => failure.Operation == "yard");
+        const string expectedWarning = "Example Map [example/map; version 1.0.0]. Definition Data/scene-patches.json; operation yard; object " +
+            "BushnellWhittier-MapManager/World/Large Scenery/Bryson/Bryson Yard [UnityEngine.Transform]. " +
+            "This path names a container object. A container object isn't a group. Edit the groups it holds. " +
+            "Patcher 0.5.0; game 0.6.3. Report to the mod author. Mod author: Example author.";
+        Assert(warning.Message == expectedWarning, "The native warning gives the author the reason to correct the file entry: " + warning.Message);
+        Assert(warning.Cause == FailureCause.InvalidDefinition, "The container path is an invalid definition.");
         var yard = result.Outcomes["yard"]; var part = result.Outcomes["post-as-part"];
         Assert(!yard.Applied && (yard.Error ?? "").Contains(BakedSceneryRules.ContainerRefusal), "A group modification that names a container object fails with the container object's reason: " + yard.Error);
         Assert(!part.Applied && (part.Error ?? "").Contains(BakedSceneryRules.GroupRootRefusal), "A part modification that names a group root fails with the group root's reason: " + part.Error);

@@ -888,6 +888,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public void Preflight(object target) {
             var refusal = world.Refusal(target);
+            if (refusal == BakedSceneryRules.ContainerRefusal) throw new InvalidPatchDefinitionException(refusal);
             if (refusal != null) throw new InvalidOperationException(refusal);
             if (!GroupChecks.Finite(world.Observe(target).Root.Placement)) throw new InvalidOperationException("The group's map coordinates are unavailable");
         }
