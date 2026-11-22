@@ -235,7 +235,7 @@ namespace RailroaderScenePatcher.Core {
         public static readonly IReadOnlyList<Exclusion> Exclusions = Array.AsReadOnly(new[] {
             new Exclusion("Track.TrackMarker", "track marker", null, reason: TrackMarkerReason),
             new Exclusion("Model.StationAgent", "station click spot", null, reason: StationAgentReason),
-            new Exclusion(ConstructionController, "track construction controller", null, reason: ConstructionOutsideBridge),
+            new Exclusion(ConstructionController, "construction controller", null, reason: ConstructionOutsideBridge),
             new Exclusion(SpawnPoints.Component, "spawn point", null, reason: SpawnPointReason),
             new Exclusion("UI.Map.MapIcon", "map icon", null, reason: MapIconReason),
         });
@@ -270,7 +270,7 @@ namespace RailroaderScenePatcher.Core {
         // its entries on and off by the construction state of the track segments it names, wherever it stands.
         public const string ConstructionController = "Game.Mow.TrackConstructionScenery";
         // Why a group that holds a construction controller but is no supported rail bridge construction is left out.
-        public const string ConstructionOutsideBridge = "This group contains a track construction controller but isn't a supported rail bridge. You can't edit it as a group.";
+        public const string ConstructionOutsideBridge = "This group contains a construction controller but isn't a supported rail bridge. You can't edit it as a group.";
         // Why a rail bridge or a part of one takes no track-following placement: its track is native map
         // data, and the bridge is placed onto the moved track with fixed placement.
         public const string RailBridgeNoFollowing = "Rail bridges use fixed placement. They don't support track-following placement.";

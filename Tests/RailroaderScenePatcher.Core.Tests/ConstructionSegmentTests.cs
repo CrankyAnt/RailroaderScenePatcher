@@ -335,10 +335,10 @@ static class ConstructionSegmentTests {
     // of the Ela controller's Supported edits, Placement and Enabled.
     static void ConnectionsTabTexts() {
         // While the Connections tab is open the world marks each current binding green and offers none of them as a
-        // candidate: a marker's segment, a span's two segments and each construction segment, of a group root or part
-        // (inventory line "Construction segment=") and of the Ela controller ("Construction scenery segment=").
+        // candidate. This includes a marker's segment, a span's two segments, and each construction segment of a group root, part,
+        // or the Ela controller. All construction segment lines use the "Construction segment=" prefix.
         var bound = CommandBand.BoundSegments(new[] { "Marker segment=S1; end=a; distance=2", "Lower segment=S2", "Upper segment=S3; end=b",
-            CommandBand.SegmentBinding("S4", true), CommandBand.SegmentBinding("S5", false), "Construction scenery segment=S6", "Storage piles=0", "Construction target World/Steel" });
+            CommandBand.SegmentBinding("S4", true), CommandBand.SegmentBinding("S5", false), "Construction segment=S6", "Storage piles=0", "Construction target World/Steel" });
         Assert(bound.SequenceEqual(new[] { "S1", "S2", "S3", "S4", "S5", "S6" }), "Every current binding is a bound segment, construction segments included: " + String.Join(",", bound));
         // Segment on a construction's Connections tab offers no current construction segment as a candidate.
         SelectionCandidate Track(string id) => new SelectionCandidate(new object(), SelectionIdentity.Graph(SelectionKind.TrackSegment, id), id);

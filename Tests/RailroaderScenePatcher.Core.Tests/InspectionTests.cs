@@ -1137,13 +1137,13 @@ static class InspectionTests {
         var twin = new object();
         SceneObservation Twin(string binding) => new SceneObservation(twin, new TargetIdentity("scene", "CTC/Module/BC-E/BC-E", "Track.TrackSpan"), "Track span", true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { binding }, none, none, reason, null, null, null, reason);
-        var twins = new Fixture(); twins.Objects.Add(Twin("Span id=A")); twins.Objects.Add(Twin("Span id=B"));
+        var twins = new Fixture(); twins.Objects.Add(Twin("Span ID=A")); twins.Objects.Add(Twin("Span ID=B"));
         var doubled = new SceneInventory(twins); doubled.Refresh();
         var state = new RailroaderScenePatcher.InventoryPresentationState();
         var first = doubled.Entries[0]; var second = doubled.Entries[1];
         Check(state.CanSelect(doubled, first) && state.CanSelect(doubled, second), "Both rows of a shared identity can be selected");
         Check(ReferenceEquals(state.CurrentSelection(doubled, first), first) && ReferenceEquals(state.CurrentSelection(doubled, second), second), "A row of a shared identity selects itself, not nothing");
-        twins.Objects[0] = Twin("Span id=A"); twins.Objects[1] = Twin("Span id=B");
+        twins.Objects[0] = Twin("Span ID=A"); twins.Objects[1] = Twin("Span ID=B");
         doubled.Refresh();
         Check(ReferenceEquals(state.CurrentSelection(doubled, second), doubled.Entries[1]) && ReferenceEquals(state.CurrentSelection(doubled, first), doubled.Entries[0]), "After a refresh the inspected one of the two is found again by what it reads");
         // The state is part of what an inspection pins and of the stale reason.

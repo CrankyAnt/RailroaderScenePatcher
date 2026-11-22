@@ -455,7 +455,7 @@ namespace RailroaderScenePatcher {
                 }
             });
             if (TypeName(c) == Span) Read(() => {
-                bindings.Add("Span id=" + Text(Field(c, "id")));
+                bindings.Add("Span ID=" + Text(Field(c, "id")));
                 Location(Field(c, "_lower"), "Lower", bindings, problems, segmentIds, graphError); Location(Field(c, "_upper"), "Upper", bindings, problems, segmentIds, graphError);
                 dependencies.Add("Track graph span registration and occupancy consumers.");
             });
@@ -476,8 +476,8 @@ namespace RailroaderScenePatcher {
             });
             if (TypeName(c) == ConstructionScenery) Read(() => {
                 var ids = Field(c, "segmentIds") as string[];
-                if (ids == null) throw new InvalidOperationException("Construction scenery segment IDs unavailable");
-                foreach (var id in ids) bindings.Add("Construction scenery segment=" + id);
+                if (ids == null) throw new InvalidOperationException("Construction segment IDs unavailable");
+                foreach (var id in ids) bindings.Add(CommandBand.SegmentBinding(id, null));
                 constructionIds = ids;
                 var entries = Field(c, "entries") as IEnumerable;
                 if (entries == null) throw new InvalidOperationException("Construction scenery entries unavailable");

@@ -486,7 +486,7 @@ namespace RailroaderScenePatcher {
         // the Connections tab is open: a marker's segment, a span's lower and upper, and each construction segment of a
         // rail bridge construction or of the Ela controller, its remark left off. A binding slot does not offer its own
         // current binding as a candidate (BindingSlotSegments, a coverage role's segment, a construction's segments).
-        static readonly string[] BoundPrefixes = { "Marker segment=", "Lower segment=", "Upper segment=", SegmentPrefix, "Construction scenery segment=" };
+        static readonly string[] BoundPrefixes = { "Marker segment=", "Lower segment=", "Upper segment=", SegmentPrefix };
         // The current binding of a marker's binding slot, a crossing pad's included: its marker segment, or nothing for
         // a detached marker. Segment on the slot does not offer it; a new distance on it is typed.
         internal static IReadOnlyList<string> BindingSlotSegments(IEnumerable<string> bindings) =>

@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
         static readonly FieldInfo ids = controller?.GetField("segmentIds", Native.Flags), cache = controller?.GetField("_cachedSegments", Native.Flags);
         static readonly MethodInfo update = controller?.GetMethod("UpdateVisibility", Native.Flags, null, Type.EmptyTypes, null);
         // Why the construction segments cannot be read or set on this game build, or null.
-        internal static string Problem => controller == null ? "The game's track construction controller is unavailable."
+        internal static string Problem => controller == null ? "The game's construction controller is unavailable."
             : ids?.FieldType != typeof(string[]) || cache == null || update == null || graph == null ? "The game's track construction members are unavailable, so you can't set construction segments." : null;
         // The segment ids each controller named when the patcher first read it in this load, by controller.
         static readonly Dictionary<Component, string[]> native = new Dictionary<Component, string[]>();

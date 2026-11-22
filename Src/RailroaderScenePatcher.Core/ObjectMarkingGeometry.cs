@@ -475,7 +475,7 @@ namespace RailroaderScenePatcher.Core {
         }
 
         // One piece of a box: its eight corners, the height of the surface under its centre when one is known, and
-        // whether anything of it stands above that surface. Whole marks the box's undivided box.
+        // whether anything of it stands above that surface. Whole marks the original, undivided box.
         // Range holds where a piece lies along the whole box's three axes, as fractions: from and to for each axis.
         sealed class Piece { internal WorldPoint[] Corners; internal double? Height; internal bool Above; internal bool Whole; internal double[] Range; }
         // The pieces of a box along its own axes, read from its corners: corner 0 and the corners that differ from it
@@ -554,9 +554,9 @@ namespace RailroaderScenePatcher.Core {
         static readonly int[][] Edges = {
             new[] { 0, 1 }, new[] { 2, 3 }, new[] { 4, 5 }, new[] { 6, 7 }, new[] { 0, 2 }, new[] { 1, 3 }, new[] { 4, 6 }, new[] { 5, 7 }, new[] { 0, 4 }, new[] { 1, 5 }, new[] { 2, 6 }, new[] { 3, 7 }
         };
-        // The screen points of pieces above their surface and inside the view. With cut set, each piece is cut off
-        // at the height of its surface; the whole box of a box is never cut. Null when nothing is left, or, with
-        // finite false, when the projection is not finite.
+        // Project the pieces into the view. When cut is set, clip each piece at its surface height.
+        // Leave the original, undivided box intact. Return null when no points remain.
+        // A non-finite projection also returns null and sets finite to false.
         //
         // A piece is a convex box, and so is what is left of it above a level surface: its corners above the surface
         // and the points where its edges cross it. While all of those lie inside the view volume, they are the
