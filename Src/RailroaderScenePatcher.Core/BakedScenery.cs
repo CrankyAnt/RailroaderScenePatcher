@@ -427,12 +427,9 @@ namespace RailroaderScenePatcher.Core {
         // category table marks the path as a folder, such as Bryson Yard.
         public const string FolderRefusal = "This path names a folder, which only holds groups; it is not a group. Edit its groups instead";
         public static string GroupRefusal(string path) => BakedSceneryCategories.IsFolder(path) ? FolderRefusal : null;
-        // Why a modification cannot edit the object at a path as a group, from the group rule's verdict for it, or null:
-        // a folder, which has no verdict.
-        public static string GroupRefusal(GroupRootVerdict verdict, string path) => verdict == null ? GroupRefusal(path) : null;
-        // Whether a path resolves as a group target: a listed group root and a folder, so that a folder's modification
-        // fails with its reason instead of finding nothing.
-        public static bool ResolvesGroup(GroupRootVerdict verdict, string path) => verdict?.Disposition == GroupDisposition.Group || GroupRefusal(verdict, path) != null;
+        // Whether a path resolves as a group target: a listed group root and a folder, which has no verdict, so that a
+        // folder's modification fails with its reason instead of finding nothing.
+        public static bool ResolvesGroup(GroupRootVerdict verdict, string path) => verdict?.Disposition == GroupDisposition.Group || (verdict == null && GroupRefusal(path) != null);
         // Why a modification cannot edit, as a part, the object at a path: a listed group root, such as a yard lamp
         // post of Bryson Yard, is edited as a group; otherwise the part rule's own reason, or null for a listed part.
         public const string GroupRootRefusal = "This path names a group root, not a part. Edit it as a baked scenery group";
