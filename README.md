@@ -13,7 +13,7 @@ Author: CrankyAnt
 3. Quit and reopen Railroader after installing the files, changing DLL permission, or replacing the patcher's DLL. Railroader needs a full restart to pick up those changes.
 4. On the main menu, click **Mods** to open **Manage Mods**. Enable the mod that requires the patcher and click **Apply**. Railroader enables its installed dependency automatically. If the dependency is missing, incompatible, or blocked by DLL permission, check the reason shown in **Manage Mods**.
 
-In multiplayer, the host and each client must install the required mod versions and enable DLL permission on their own computer. The patcher applies scene changes on each computer when the map loads.
+You are responsible for installing and updating mods and managing DLL permission on your own computer. In multiplayer, the host and each client must install the required mod versions and enable DLL permission locally. The patcher applies scene changes on each computer when the map loads.
 
 See Railroader's [mod installation guide](https://docs.railroadergame.com/modding/installing-mods/) and [DLL mod settings](https://docs.railroadergame.com/modding/dll-mods/).
 

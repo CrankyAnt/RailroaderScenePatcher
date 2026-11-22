@@ -78,7 +78,7 @@ A modification of a mast or bell records a fixed placement, an Enabled value, or
 
 ## Refusal reasons
 
-The patcher edits only masts and bells that match their supported source pattern. Other equipment stays in the outliner for inspection. Its placement modes, including **Numeric**, position and rotation fields, and **Enable** and **Disable** buttons are disabled. **Numeric** still shows physical placement as text. The tooltips show `Unavailable: <reason>`, using the reason in **Supported edits**.
+The patcher edits only masts and bells that match their supported source pattern. Other equipment stays in the outliner for inspection. All its placement modes, including **Numeric**, are disabled. Its position and rotation fields are disabled too, as are the **Enable** and **Disable** buttons. **Numeric** still shows physical placement as text. The tooltips show `Unavailable: <reason>`, using the reason in **Supported edits**.
 
 Click **Why this equipment cannot be edited** on the **Object** tab to open this section. A modification targeting unsupported equipment fails before anything changes. The other modifications in the scene patch file still apply.
 

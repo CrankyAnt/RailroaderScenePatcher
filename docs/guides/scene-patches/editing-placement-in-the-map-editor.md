@@ -27,14 +27,14 @@ Until you choose a version, only **Refresh** and the session details remain avai
 Choose how to handle the changed file:
 
 - **Use file version** applies the changed file in the current session and discards unsaved scene patch edits. **Scene Patcher** explains this loss before confirmation. Unsaved native map work is unaffected.
-- **Keep editor version** retains the session's scene patch file and edits. Save becomes available again. The next Save replaces the changed file with the editor version.
+- **Keep editor version** retains the session's scene patch file and edits. Save can write again. The next Save replaces the changed file with the editor version.
 - **Import** brings the file's changes into the session. See [Import outside changes](#import-outside-changes).
 
 After **Use file version**, discarded steps remain in native Undo and Redo under their original action names and menu titles, but have no effect. Neither these steps nor any scene patch edit recorded before the choice can change the scene patch file through Undo or Redo. The scene patch status becomes **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs.
 
-If the patcher refuses a modification in the file, such as a construction segment detach, the footer counts the applied and refused modifications. It names each refused modification and gives its reason. The refused modification stays in the scene patch file. Its **Changes** tab shows `Refused.` and the reason instead of listing changes. Modifications refused during world load appear the same way.
+When you use **Use file version**, the footer counts the applied and refused modifications. If the patcher refuses a modification, such as a construction segment detach, it names that modification and gives its reason. The refused modification stays in the scene patch file. Its **Changes** tab shows `Refused.` and the reason instead of listing changes. Modifications refused during world load appear the same way.
 
-The outliner marks the object with × instead of `*`, and its state line shows `× REFUSED` instead of `* CHANGED`. The **Problems** filter doesn't list it because a problem is a defect of the object itself. The refusal concerns the scene patch file and also appears in the native log. If you remove the refused modification in the editor, native **Undo** returns it to the scene patch file without applying it.
+For a modification refused by **Use file version**, the outliner marks the object with × instead of `*`, and its state line shows `× REFUSED` instead of `* CHANGED`. The **Problems** filter doesn't list it because a problem is a defect of the object itself. The refusal concerns the scene patch file and also appears in the native log. If you remove that refused modification in the editor, native **Undo** returns it to the scene patch file without applying it.
 
 None of these choices requires a reload. The version choice remains visible after the action that detected the change. Undo, Redo, and **Remove modification** update reload feedback to reflect the current session. If the file changed while the game was closed, the next native map editor load reads it without asking you to choose a version.
 

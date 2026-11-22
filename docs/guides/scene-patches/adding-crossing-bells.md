@@ -8,7 +8,7 @@ Adding a bell doesn't create a crossing, change the crossing's own bell, or edit
 
 ## Which bell definitions qualify
 
-The patcher uses the game's mechanism for creating crossing bells and locomotive bells. A bell definition qualifies for this `crossing-bell-v1` pattern when it meets these requirements:
+A bell definition qualifies for the `crossing-bell-v1` pattern only if the patcher can use the game's mechanism for creating crossing bells and locomotive bells with that definition. It must meet these requirements:
 
 - The game's content library contains the definition, with kind `Bell`. The definition can come from the game or a loaded mod.
 - It names an audio asset, and that asset resolves in the content library.
@@ -55,7 +55,7 @@ The editor lists every bell definition in the content library and explains why a
 
 1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a bell** lists the bell definitions, with a reason for each one that does not qualify. **Why a bell definition isn't eligible** opens the table above.
-3. Click **Use** for an eligible definition. Each button shows its display name, such as **Use US&S Teardrop Crossing Bell**. A form opens at the top of the tab with an unused **Equipment ID** and a position five metres beside the inspected crossing. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
+3. Click **Use** for an eligible definition. Each button shows its display name, such as **Use US&S Teardrop Crossing Bell**. A form opens at the top of the tab with an unused **Equipment ID** and a position five meters beside the inspected crossing. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab.
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Place a starter placement marker on the track
 
-Use a starter placement marker to choose where a car cut appears in a new company game on your map. Each new-game car placement reads one marker's track location. The front of the cut starts at that track point. The rest extends towards the segment end from which the distance is measured. The marker object's position has no effect. To find these markers in the inventory, see [starter placement markers](inspect-scene-objects.md#starter-placement-markers).
+Use a starter placement marker to choose where a car cut appears in a new company game on your map. Each new-game car placement reads one marker's track location. The front of the cut starts at that track point. The rest extends toward the segment end from which the distance is measured. The marker object's position has no effect. To find these markers in the inventory, see [starter placement markers](inspect-scene-objects.md#starter-placement-markers).
 
 You can change the track location, choose whether the cars start as a wreck, or do both. These edits require patcher 0.5.0 or later. The cars and loads remain those chosen by the map. The marker object's physical placement and activity also stay unchanged.
 
@@ -17,9 +17,9 @@ At the start of a new company game, the setup places its car cuts in order. If o
 - The edit would detach the marker's track location. The game needs that location to place the cut.
 - Another scene marker has the same marker ID. Removing a registration by marker ID removes it for every marker with that ID. The message names the duplicate ID and all its holders. See [repair, replace, or detach a track-marker binding](repairing-track-bindings.md).
 
-The game's placement rule checks the front of the cut, then points at 1.5-metre intervals towards the back, and finally the back end. The cut's length includes the gaps between cars and a steam locomotive's tender. If the length is an exact multiple of 1.5 metres, the game checks the last step twice instead of checking the back end. The patcher follows the same rule.
+The game's placement rule checks the front of the cut, then points at 1.5-meter intervals toward the back, and finally the back end. The cut's length includes the gaps between cars and a steam locomotive's tender. If the length is an exact multiple of 1.5 meters, the game checks the last step twice instead of checking the back end. The patcher follows the same rule.
 
-Every checked point must be on available track, with no car from an earlier cut within 0.75 metres. The track must continue to the back of the cut, with no switch lined against it.
+Every checked point must be on available track, with no car from an earlier cut within 0.75 meters. The track must continue to the back of the cut, with no switch lined against it.
 
 Both during editing and when the file loads, the check uses the other cuts' locations from the same scene patch file. If another starter placement moves a cut, the check uses its new location. Two cuts can therefore swap places. In the native map editor, first move one cut out of the way, then move the other into its old place.
 

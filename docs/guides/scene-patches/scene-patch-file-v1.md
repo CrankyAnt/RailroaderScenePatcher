@@ -122,10 +122,10 @@ A track-following placement accepts only these members:
 | --- | --- | --- |
 | `mode` | string | `trackFollowing`. |
 | `track` | object | Required. A segment location with exactly `segment`, `end`, and `distance`, with the same rules as a `trackMarker` reference, or an endpoint with exactly `node`, a non-empty track-node ID. |
-| `offset` | array | Required. Three finite numbers in metres, in the track's frame. |
+| `offset` | array | Required. Three finite numbers in meters, in the track's frame. |
 | `rotation` | array | Required. Four finite numbers, a nonzero quaternion applied after the track's rotation. |
 
-When it applies the modification, the engine reads the track's native position and rotation in map coordinates. For a segment location, it reads them from the track graph at `distance` metres from the named end. The frame's forward axis (+z) points along the segment away from that end. For `end` `a`, it points towards end `b`; for `end` `b`, it points towards end `a`. For an endpoint, the frame uses the node's native position and rotation.
+When it applies the modification, the engine reads the track's native position and rotation in map coordinates. For a segment location, it reads them from the track graph at `distance` meters from the named end. The frame's forward axis (+z) points along the segment away from that end. For `end` `a`, it points toward end `b`; for `end` `b`, it points toward end `a`. For an endpoint, the frame uses the node's native position and rotation.
 
 The object's position is the track position plus `offset` rotated by the track rotation. Its rotation is the track rotation followed by `rotation`. Applying the same scene patch file again produces the same placement. Offsets don't accumulate.
 
@@ -151,7 +151,7 @@ A `trackMarker` reference is an object with exactly these members:
 | --- | --- | --- |
 | `segment` | string | Required and non-empty. The ID of a track segment in the loaded track graph. |
 | `end` | string | Required. `a` or `b`: the segment end the distance is measured from. |
-| `distance` | number | Required. Finite, not negative, and at most the segment's length, in metres. |
+| `distance` | number | Required. Finite, not negative, and at most the segment's length, in meters. |
 
 A detach object contains only `detach` with the value `true`. `null`, `{}`, `false`, and a detach mixed with reference fields are invalid. Unknown relationship kinds and unknown fields inside `trackMarker` make the modification unsupported; the engine preserves and does not execute it. The target must resolve to an object whose adapter supports the relationship. The patcher refuses a relationship on any other object instead of ignoring it.
 
@@ -193,7 +193,7 @@ The ID is the addition's persistent identity. The patcher combines it with the s
 
 The three spans define the addition's tracks and detection area. The named segments are the tracks that get detection, and the distances bound the area. The engine does not infer either from track near the crossing. An entry under `additions` never contains `detach`. The addition exists while the scene patch file lists it; removing the entry deletes it.
 
-Before changing anything, the engine checks an addition's selected tracks. Each segment must exist exactly once, each distance must lie inside its segment, and no span may have zero length. An addition counts towards the requirement that a crossing keep at least one detecting circuit. The engine refuses a scene patch file result that leaves no detecting circuit or addition.
+Before changing anything, the engine checks an addition's selected tracks. Each segment must exist exactly once, each distance must lie inside its segment, and no span may have zero length. An addition counts toward the requirement that a crossing keep at least one detecting circuit. The engine refuses a scene patch file result that leaves no detecting circuit or addition.
 
 For each addition, the engine builds one circuit with three owned spans, registers the spans in the track graph, and adds the circuit after the controller's native circuits. Added circuits are ordered by their scoped identity. Within one mod, this is the ordinal order of their IDs, regardless of their order in the file. A repeated application reuses the circuit and every span whose tracks are unchanged. It replaces the spans for any role whose tracks changed. Deleting an addition removes its circuit from the controller, unregisters its spans, and destroys them. Native circuits and other additions keep their state.
 
@@ -250,7 +250,7 @@ The object accepts only the fields below. It must contain `track`, `wreck`, or b
 | `track` | object | Optional. The marker's track location. Must contain exactly `segment`, `end`, and `distance`, following the rules for a `trackMarker` reference. The parser accepts `{ "detach": true }`, but the engine refuses to apply it. |
 | `wreck` | boolean | Optional. `true` starts the cars derailed, using the game's own wreck behavior. `false` starts them on the track. All other values, including `null`, are invalid. |
 
-The cut extends from the track location towards the segment end from which `distance` is measured. With `end` set to `a`, it extends towards end `a`; with `end` set to `b`, it extends towards end `b`.
+The cut extends from the track location toward the segment end from which `distance` is measured. With `end` set to `a`, it extends toward end `a`; with `end` set to `b`, it extends toward end `b`.
 
 Omitting `track` leaves the marker's track location untouched by this mod. Omitting `wreck` keeps the car placement's native wreck setting. An explicit `wreck` value is reapplied every time, even if it equals the native setting. Omitting `starterPlacement` leaves both settings untouched by this mod.
 
@@ -335,7 +335,7 @@ The Current native targets section lists all supported object families. Families
 
 The patcher recognizes the Ela bridge root at `World/Large Scenery/Ela/Ela Bridge`, with target `component` `Helpers.Culling.RendererCuller`. Set `structure` to `bridge-colliders-v1`; the native map editor's Save writes it. Use the `scene` value from the inspected identity. A modification may set `placement`, `active`, or both, as for the board.
 
-The patcher moves the bridge root and enables or disables it. Its colliders and renderer cullers move with it. The patcher refreshes the culling position of every active culler in the hierarchy and synchronises the physics scene.
+The patcher moves the bridge root and enables or disables it. Its colliders and renderer cullers move with it. The patcher refreshes the culling position of every active culler in the hierarchy and synchronizes the physics scene.
 
 The parents of the root and its root culler must be active. The hierarchy must contain at least one collider, no rigidbody, and no track-owned component. No construction-scenery entry may switch the root. Before anything changes, the collider identities, shapes, enabled flags, and positions relative to the root must match their first observation in the load.
 
@@ -391,7 +391,7 @@ If the path uniquely identifies the crossbuck, the patcher refuses `padMarkerId`
 
 A path that names no listed group root, or more than one, fails the modification before changing anything. A modification may set `placement`, `active`, or both, and for Bryson Bridge 1 and the Almond Bridge also `relationships.constructionSegments`; see [construction segments](#construction-segments).
 
-The patcher sets the root's physical placement and activity. Everything below the root moves with it, and each part keeps its own activity. Placement uses map coordinates, converted through the current origin as for other objects below `World`. After a move, the patcher refreshes the culling sphere of every enabled renderer culler and game-object culler in the group, moves every simple culler's sphere, and synchronises the physics scene. A disabled group's renderer cullers release their spheres. A simple culler on the root stops switching the root while the group is disabled and resumes when it is enabled. The group must hold no missing script and no rigidbody.
+The patcher sets the root's physical placement and activity. Everything below the root moves with it, and each part keeps its own activity. Placement uses map coordinates, converted through the current origin as for other objects below `World`. After a move, the patcher refreshes the culling sphere of every enabled renderer culler and game-object culler in the group, moves every simple culler's sphere, and synchronizes the physics scene. A disabled group's renderer cullers release their spheres. A simple culler on the root stops switching the root while the group is disabled and resumes when it is enabled. The group must hold no missing script and no rigidbody.
 
 After a change, the patcher verifies the root's placement and activity. It also checks each part's placement relative to the root, or in map coordinates if the part has its own fixed placement, and each part's own activity unless a culler switches it. For a root or part that a construction controller switches, the patcher verifies its `active` value, not the activity the controller chose. Every enabled culler's sphere must stand at its culler. For a rail or road bridge, every collider must keep its shape and enabled state, and the physics bounds of a box, sphere, or capsule collider must follow its transform. For a rail bridge, the generated trestles within 250 m of the bridge must also stay unchanged. A rail bridge that holds a `Track.*` or `AutoTrestle.*` component is refused. A difference fails the modification and restores the captured group; an unverified restoration blocks further operations on the group for the load. See [move or disable a baked scenery group](moving-baked-scenery-groups.md) for editing instructions and limits.
 
@@ -549,7 +549,7 @@ For a pad with `placement.mode` `trackFollowing`, the patcher also records the t
 
 After a change the patcher verifies the track-marker rules. It also checks that the current mesh was generated from the mod's location and the pad's current position, and that the culling sphere encloses that mesh. A pad generated by the game before the patcher observed it is generated once more on the first application, to the same mesh; later applications leave current geometry alone. A difference fails the modification and restores the captured location, registration, placement, and activity, generates the pad again and requires the regenerated mesh to match the captured one; an unverified restoration blocks further operations on the pad for the load.
 
-One native journey on Railroader 0.6.2 with patcher commit `a282015` observed the pad Mg74 shift along the track after a rebinding, refusal of a missing segment and an out-of-range distance, native Undo and Redo, removal, and Save with a native map editor reload that reproduced one modification and one registration. A second journey with commit `ab2816f` measured that the rebinding changed the pad's vertex hash and moved its culling sphere 0.993 metres along the track while the sphere stayed aligned with the new bounds, and that native Undo and Remove modification restored the original vertex hash, bounds, and culling sphere exactly. A pad that holds a duplicate marker ID follows the rule under Markers with a duplicate marker ID. See [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md) for editing instructions and limits.
+One native journey on Railroader 0.6.2 with patcher commit `a282015` observed the pad Mg74 shift along the track after a rebinding, refusal of a missing segment and an out-of-range distance, native Undo and Redo, removal, and Save with a native map editor reload that reproduced one modification and one registration. A second journey with commit `ab2816f` measured that the rebinding changed the pad's vertex hash and moved its culling sphere 0.993 meters along the track while the sphere stayed aligned with the new bounds, and that native Undo and Remove modification restored the original vertex hash, bounds, and culling sphere exactly. A pad that holds a duplicate marker ID follows the rule under Markers with a duplicate marker ID. See [rebind a crossing pad and regenerate its geometry](rebinding-crossing-pads.md) for editing instructions and limits.
 
 ### Milepost
 

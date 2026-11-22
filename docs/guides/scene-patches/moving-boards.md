@@ -12,7 +12,7 @@ An independent board is a scene object with these parts:
 - exactly one `Map.Runtime.MaskComponents.CircleMapMask` on the same object, which keeps generated trees and other masked terrain output away from it,
 - no track relationship: no `Track.*` component anywhere in its hierarchy.
 
-In the native map editor, open **Scene Patcher**, click **Refresh** in the command band, and search for the board under **Independent board** in the outliner. On the **Object** tab, **Identity** shows the structure `independent-board-v1`. In the **State** section, **Supported edits** shows **Fixed placement and activity**. If it starts with **Not editable:**, the reason follows. The patcher refuses a board in these cases:
+In the native map editor, open **Scene Patcher**, click **Refresh** in the command band, and search for the board under **Independent board** in the outliner. On the **Object** tab, **Identity** shows the structure `independent-board-v1`, and **Supported edits** describes how you can move, rotate, enable, or disable the board. If it starts with **Not editable:**, the reason follows. The patcher refuses a board in these cases:
 
 - its culler or mask is disabled, or it carries more than one circle mask,
 - a parent object is inactive (the board itself may be disabled),
@@ -29,7 +29,7 @@ A board placement holds a position and a rotation only. It never names a track, 
 
 The patcher moves the board, asks the culler to update its culling position, and rebuilds the circle mask. It then checks that the culling sphere and every mask registration sit at the new position. If they do not, the edit fails and the board returns to its previous state.
 
-The game then regenerates the terrain at both positions. Trees return where the board stood and disappear where it now stands. This takes a moment. On the **Changes** tab, the **Terrain** section lists the affected positions as **Terrain output outstanding** until the game has rebuilt each loaded terrain tile and its terrain work is idle. It then shows **Terrain output complete**.
+The game then regenerates the terrain at both positions. Trees return where the board stood and disappear where it now stands. This takes a moment. On the **Changes** tab, the **Terrain** section shows a message beginning `Terrain pending:` until the game has rebuilt each loaded terrain tile and its terrain work is idle. It then shows `Terrain updated:` followed by the completed positions.
 
 While you inspect the board, the message area reports changes under **Terrain output** as outstanding, complete, or stopped if the game takes too long. A tile that hasn't been built needs no rebuild, so its position counts as complete. The game will build it from the board's current mask when it loads.
 
@@ -51,7 +51,7 @@ Independent-board pattern targets other than the legacy Sylva location sign requ
 
 ## When the terrain output does not complete
 
-If the game has not rebuilt an affected position within 30 seconds, the **Terrain output** section shows **Terrain output stopped**, with the positions that completed and the positions still outstanding. The board edit stays in the world and in the scene patch file; nothing is reversed. Save is not affected, because Save does not write the generated terrain output.
+If the game has not rebuilt an affected position within 30 seconds, the **Terrain** section shows a message beginning `Terrain update stopped:` with the positions that completed and the positions still outstanding. The board edit stays in the world and in the scene patch file; nothing is reversed. Save is not affected, because Save does not write the generated terrain output.
 
 1. Make sure the area is still loaded, for example by moving the camera back to the board.
 2. Click **Retry** on the **Changes** tab. The patcher asks the game to rebuild the outstanding tiles again. The section keeps the positions outstanding until the rebuild completes; it never reports them complete because of the retry alone.
@@ -61,7 +61,7 @@ In ordinary play, a terrain output that does not complete produces a warning in 
 
 ## When an edit fails
 
-A failed edit restores the board's previous placement, activity, culling sphere, and mask registration. The restored terrain then regenerates. The patcher refuses further edits to that board until the restored terrain output completes and explains the wait.
+A failed edit restores the board's previous placement, activity, culling sphere, and mask registration. The restored terrain then regenerates. Until that output completes, the patcher refuses further edits to the board and explains why you must wait.
 
 If the patcher can't verify restoration, or the restored terrain output stops, click **Recheck** in the footer. Further edits stay blocked until the check succeeds. Recheck reapplies the scene patch file's state if the board differs and requests any stopped terrain output again. Edits become available once that output completes. Reloading the native map editor also clears the block.
 

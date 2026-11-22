@@ -17,7 +17,7 @@ To qualify for the `crossing-light-gate-v1` pattern, a device must respond to th
 - The device is in the same scene as the destination crossing, so its assets stay loaded as long as the copy exists.
 - The destination crossing controller has exactly one key-value object, on the controller's own object, and at most one culler.
 
-The model, materials, colours, and animation can vary as long as the device meets these requirements. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
+The model, materials, colors, and animation can vary as long as the device meets these requirements. An unfamiliar device qualifies if it uses these mechanisms. A familiar name or appearance doesn't qualify a device that works differently.
 
 The source must already be loaded in the map you're editing. The patcher doesn't load another scene to find it. If the named source is missing or ambiguous, it doesn't substitute another device.
 
@@ -57,7 +57,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 
 1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a light or gate** lists the devices, with a reason for each one that does not qualify. **Why a device isn't eligible** opens the table above.
-3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab with an unused **Equipment ID**. If the name is taken, the proposed ID has a numeric suffix. The proposed placement puts the copy at the same position relative to the inspected crossing as the source has relative to its own crossing, with a five-metre offset. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
+3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab with an unused **Equipment ID**. If the name is taken, the proposed ID has a numeric suffix. The proposed placement puts the copy at the same position relative to the inspected crossing as the source has relative to its own crossing, with a five-meter offset. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
 5. Click **Apply** at the bottom of the tab. Apply uses the previewed change; preview again after you change a field.
 

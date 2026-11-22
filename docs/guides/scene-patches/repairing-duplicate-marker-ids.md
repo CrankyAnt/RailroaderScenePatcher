@@ -126,7 +126,7 @@ Copy the identity with **Copy ID** in the command band. Add a modification to th
 }
 ```
 
-The segment, end, and distance are examples. Use a track location on your map. Choose an ID that no other scene marker, graph registration of a non-marker object, or map object in the loaded map context uses.
+The segment, end, and distance are examples. Use a track location on your map. Choose an ID that no other scene marker, graph registration of an object that is not a scene marker, or map object in the loaded map context uses.
 
 Without `markerId`, the marker keeps its ID. A modification with `markerId` requires patcher 0.5.0 or later. The native map editor's **Save** writes the members in this order: `target`, `markerId`, `relationships`, `starterPlacement`, `placement`, `dependsOn`, `active`. It also sets the patcher dependency to 0.5.0 or later for such a file. For the dependent modifications, see [order a holder that keeps the shared ID](#order-a-holder-that-keeps-the-shared-id).
 

@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Write a scene patch file
 
-Create or correct `Data/scene-patches.json` in a text editor. This is the file that **Scene Patcher** reads and writes. Keep one copy in the supplying mod, and test your changes with a copy of the mod and a disposable save.
+Create or correct `Data/scene-patches.json` in a text editor. This is the file that **Scene Patcher** reads and writes. Keep one scene patch file in the supplying mod. Test your changes with a separate copy of the mod and a disposable save.
 
 ## Create the file
 
