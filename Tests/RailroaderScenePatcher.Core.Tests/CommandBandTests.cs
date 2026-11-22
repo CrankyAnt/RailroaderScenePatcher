@@ -102,9 +102,9 @@ static class CommandBandTests {
             Check(InventoryPresentationState.AddedEquipmentName(second, reopened) == "Signal 1 (added, 2 of 3)", "Two copies from the same mod are distinguishable by their names");
             Check(InventoryPresentationState.AddedEquipmentName(third, reopened) == "Signal 1 (added, 3 of 3)", "A copy from another mod at the same crossing is also numbered");
             Check(InventoryPresentationState.AddedEquipmentName(gate, reopened) == "Gate 1 (added)", "A unique device name has no ordinal");
-            Check(InventoryPresentationState.AddedEquipmentName(missing, reopened) == "Added light or gate: name unavailable (alpha/missing)", "A missing copy explains its unavailable name and identifies the addition");
-            Check(InventoryPresentationState.AddedEquipmentName(missingOther, reopened) == "Added light or gate: name unavailable (beta/missing)" &&
-                InventoryPresentationState.AddedEquipmentName(missingSecond, reopened) == "Added light or gate: name unavailable (alpha/missing-2)",
+            Check(InventoryPresentationState.AddedEquipmentName(missing, reopened) == "Added light or gate (type and name unavailable; mod: alpha; equipment ID: missing)", "A missing copy explains its unavailable type and name and labels the mod and equipment ID");
+            Check(InventoryPresentationState.AddedEquipmentName(missingOther, reopened) == "Added light or gate (type and name unavailable; mod: beta; equipment ID: missing)" &&
+                InventoryPresentationState.AddedEquipmentName(missingSecond, reopened) == "Added light or gate (type and name unavailable; mod: alpha; equipment ID: missing-2)",
                 "Missing copies remain distinguishable by supplying mod and equipment ID, even with a shared ID or mod");
         }
         Check(InventoryPresentationState.AddedEquipmentName(first, new[] { first }) == "Signal 1 (added)", "The same device name at a different crossing has its own count");

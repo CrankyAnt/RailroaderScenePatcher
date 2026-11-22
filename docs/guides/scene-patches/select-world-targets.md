@@ -102,7 +102,7 @@ Beyond 125 meters, only the group appears, with one square marker and one object
 
 Beyond 125 meters, click the group's square marker or object frame to open a choice list beside the pointer. The object frame turns blue wherever a click would select the group. The list contains the group's objects, excluding a grade-crossing setup's detection spans. If the group's square marker overlaps other markers at the pointer, those objects appear in the same list.
 
-When you select a single grade-crossing setup and the list contains only its objects, the footer says `N rows in the choice list for this crossing setup. Select an object from that list beside the pointer.`
+When you select a single grade-crossing setup and the list contains only its objects, the footer says `N objects from the crossing you clicked are listed beside the pointer. Select an object from that list.`
 
 Select a row to make that object the candidate, then click **Confirm** to inspect it. The candidate has its own blue square marker and object frame. The inspected object has its own gold square marker and object frame. The rest of the group keeps its shared marking. Opening, using or closing the choice list changes no scene objects, scene patch data, or completed edits. You can still navigate the world while it is open.
 
