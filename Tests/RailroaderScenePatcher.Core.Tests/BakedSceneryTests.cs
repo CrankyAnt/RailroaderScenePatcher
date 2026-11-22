@@ -476,10 +476,15 @@ static class BakedSceneryTests {
             Assert(!BakedSceneryRules.ListedBelow(root, false), "Objects below " + root + " are not listed");
         Assert(BakedSceneryRules.ListedBelow("World", false) && BakedSceneryRules.ListedBelow("Setups", true) && !BakedSceneryRules.ListedBelow("CTC", true),
             "Objects below World are listed, and starter placement markers in Setups keep their family; signal markers below CTC do not");
-        Assert(!BakedSceneryRules.SpanListed(serialized: false, patcherOwned: false, held: false), "A span the game builds while it runs is not listed");
-        Assert(!BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false, held: false), "A serialized span no crossing controller holds is a native track span and is not listed");
-        Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false, held: true), "A serialized span a crossing controller holds is a detection span and is listed");
-        Assert(BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true, held: true) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true, held: false), "The patcher's own spans are listed, held or not");
+        // Only a serialized span asks who holds it.
+        Assert(SpanOrigins.Of(serialized: false, patcherOwned: false, held: () => throw new Exception("asked")) == SpanOrigin.Runtime, "A span the game builds while it runs is a runtime span");
+        Assert(SpanOrigins.Of(serialized: false, patcherOwned: true, held: () => throw new Exception("asked")) == SpanOrigin.Owned, "A span the patcher added is owned, held or not");
+        Assert(SpanOrigins.Of(serialized: true, patcherOwned: false, held: () => true) == SpanOrigin.Held, "A serialized span a crossing controller holds is held");
+        Assert(SpanOrigins.Of(serialized: true, patcherOwned: false, held: () => false) == SpanOrigin.Unheld, "A serialized span no crossing controller holds is unheld");
+        Assert(!BakedSceneryRules.SpanListed(SpanOrigin.Runtime), "A span the game builds while it runs is not listed");
+        Assert(!BakedSceneryRules.SpanListed(SpanOrigin.Unheld), "A serialized span no crossing controller holds is a native track span and is not listed");
+        Assert(BakedSceneryRules.SpanListed(SpanOrigin.Held), "A serialized span a crossing controller holds is a detection span and is listed");
+        Assert(BakedSceneryRules.SpanListed(SpanOrigin.Owned), "The patcher's own spans are listed");
     }
     // A storage pile (Scenery.Pile) builds a "Pile Collider" child the scene does not save while its culling sphere is
     // near the camera and destroys it when the camera moves away, as at Sylva Paperboard and Connelly. The pile itself

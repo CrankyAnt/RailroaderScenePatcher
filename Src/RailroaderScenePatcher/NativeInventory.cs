@@ -217,13 +217,25 @@ namespace RailroaderScenePatcher {
         // The family of a component that is not a transform, for the baked scenery rule's check of existing families. A
         // native track span is not listed, but the native map editor owns it: its object stays out of the groups and parts
         // as an object of a listed family does.
-        internal static string FamilyOf(Component c) => c is Transform ? null : Family(c) ?? (TypeName(c) == Span && !Transient(c.transform, null) ? "Track span" : null);
-        // Whether a crossing controller holds the span in a circuit. When the holders cannot be read, the span stays
-        // listed, so a detection span never leaves the inventory unnoticed.
+        internal static string FamilyOf(Component c) {
+            if (c is Transform) return null;
+            var family = Family(c, out var span);
+            return family ?? (span == SpanOrigin.Unheld ? "Track span" : null);
+        }
+        // Whether a crossing controller holds the span in a circuit, or held it in the scene as authored. When the holders
+        // cannot be read, the span stays listed, so a detection span never leaves the inventory unnoticed; the log says
+        // so once.
+        static bool holdersUnreadLogged;
         static bool Held(Component span) {
-            if (CrossingDeviceWorld.Unavailable != null) return true;
-            try { return CrossingDeviceWorld.HolderOf(span) != null; }
-            catch { return true; }
+            string problem = CrossingDeviceWorld.Unavailable;
+            if (problem == null)
+                try { return CrossingDeviceWorld.HolderOf(span) != null; }
+                catch (Exception e) { problem = e.GetBaseException().Message; }
+            if (!holdersUnreadLogged) {
+                holdersUnreadLogged = true;
+                Debug.LogWarning("Scene Patcher inventory: the crossing controllers' detection spans couldn't be read, so every serialized track span stays listed: " + problem);
+            }
+            return true;
         }
         // The car placements of the loaded setups as the last discovery read them. A single object observed later is
         // classified by them, as it takes the reference scan of that discovery. Setups that could not be read classify
@@ -236,7 +248,10 @@ namespace RailroaderScenePatcher {
             catch (Exception e) { starters = StarterSetups.Unreadable(e.GetBaseException().Message); }
         }
         internal const string AddedEquipmentFamily = CommandBand.AddedEquipmentFamily;
-        static string Family(Component c) {
+        static string Family(Component c) => Family(c, out _);
+        // The family of the component and, for a track span that passed the scene root check, its origin.
+        static string Family(Component c, out SpanOrigin? span) {
+            span = null;
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
             if (c is OwnedEquipment owned) {
                 if (owned.Retired) return null;
@@ -262,8 +277,8 @@ namespace RailroaderScenePatcher {
             // A span the game builds from the map's operations data, and a serialized span no crossing controller holds,
             // stay with the native map editor; a detection span and the spans this patcher adds for a crossing are listed.
             if (type == Span) {
-                bool serialized = !Transient(c.transform, null), patcherOwned = c.transform.root.name == CrossingCoverageWorld.RootName;
-                return BakedSceneryRules.SpanListed(serialized, patcherOwned, serialized && !patcherOwned && Held(c)) ? "Track span" : null;
+                span = SpanOrigins.Of(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName, () => Held(c));
+                return BakedSceneryRules.SpanListed(span.Value) ? "Track span" : null;
             }
             if (type == Crossing) return "Crossing controller";
             // A crossing mast is one entry: its light object. The gate on a child of that object is a part of the

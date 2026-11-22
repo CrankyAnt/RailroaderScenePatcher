@@ -5,6 +5,22 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
+    // Where a track span comes from, which decides whether the inventory lists it (BakedSceneryRules.SpanListed).
+    public enum SpanOrigin {
+        // Built by the game from the map's operations data while it runs; the scene does not serialize it.
+        Runtime,
+        // Added by the patcher for a crossing.
+        Owned,
+        // Serialized in the scene and held by a crossing controller, now or in the scene as authored: a detection span.
+        Held,
+        // Serialized in the scene and held by no crossing controller, now or in the scene as authored: a native track span.
+        Unheld,
+    }
+    public static class SpanOrigins {
+        // The origin of a span. Only a serialized span the patcher did not add asks who holds it.
+        public static SpanOrigin Of(bool serialized, bool patcherOwned, Func<bool> held) =>
+            patcherOwned ? SpanOrigin.Owned : !serialized ? SpanOrigin.Runtime : held() ? SpanOrigin.Held : SpanOrigin.Unheld;
+    }
     // One loaded scene object as the baked scenery rule reads it: its name, the components on it, and its children.
     public interface IHierarchyNode {
         string Name { get; }
@@ -207,11 +223,9 @@ namespace RailroaderScenePatcher.Core {
         // Whether an object below a scene root of this name can be listed at all. A track marker below Setups is a starter
         // placement marker and keeps its family.
         public static bool ListedBelow(string sceneRoot, bool trackMarker) => !KeptOutRoots.Contains(sceneRoot) || (trackMarker && sceneRoot == Setups);
-        // A span the game builds from the map's operations data is not serialized and not listed. A serialized span that
-        // no crossing controller holds is a native track span, which the native map editor edits, and is not listed
-        // either. A detection span, which a crossing controller holds, and the spans the patcher adds for a crossing
-        // are listed.
-        public static bool SpanListed(bool serialized, bool patcherOwned, bool held) => patcherOwned || (serialized && held);
+        // A span the game builds from the map's operations data and a native track span are not listed; a detection span
+        // and the spans the patcher adds for a crossing are.
+        public static bool SpanListed(SpanOrigin origin) => origin == SpanOrigin.Owned || origin == SpanOrigin.Held;
         // The objects one level below a category folder, and below World/Large Scenery one level below a folder there, with
         // the name of that folder below World/Large Scenery.
         static IEnumerable<(string, IHierarchyNode, string)> Roots(IHierarchyNode category, string categoryPath) {
