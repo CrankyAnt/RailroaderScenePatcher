@@ -37,7 +37,7 @@ namespace RailroaderScenePatcher {
             internal readonly Dictionary<string, double[]> Fallback = new Dictionary<string, double[]>(StringComparer.Ordinal);
         }
         sealed class PlaceInfo { internal string Named, Near, Inside; internal double NamedDistance, NearDistance, InsideDistance; internal bool Positional; }
-        sealed class LocMarker { internal string Name, Path; internal int PresenceRenderers, ActiveRenderers; internal double[] At; internal bool Listed, Visible; }
+        sealed class LocMarker { internal string Name, Path; internal int ShowingRenderers, EnabledRenderers; internal double[] At; internal bool Listed, Visible; }
 
         // Per world load: the scene signature and the OpsController instance the places were read from.
         static string cachedSceneKey;
@@ -182,28 +182,22 @@ namespace RailroaderScenePatcher {
         }
 
         // ---- Loc: objects ----
-        // Whether a renderer's object and every parent up to root are switched on, so a board the modder disabled at its
-        // root keeps its verdict while an inactive child mesh does not count.
-        static bool ActiveBelow(UnityEngine.Transform t, UnityEngine.Transform root) {
-            for (var at = t; at != null && at != root; at = at.parent) if (!at.gameObject.activeSelf) return false;
-            return true;
+        // A renderer that shows something: a presence-giving type, and for a mesh renderer, a mesh. Whether it is enabled
+        // or active now is left out: a board's RendererCuller switches its renderers off with distance, so at any moment
+        // most boards render nothing.
+        static bool ShowsSomething(UnityEngine.Renderer r) {
+            if (r == null || !BakedSceneryRules.GivesPresence(r.GetType().FullName, true, false, false)) return false;
+            if (!(r is UnityEngine.MeshRenderer)) return true;
+            var filter = r.GetComponent<UnityEngine.MeshFilter>();
+            return filter != null && filter.sharedMesh != null;
         }
-        static bool PresenceRendererActive(UnityEngine.Renderer r, UnityEngine.Transform root) {
-            if (r == null || !r.enabled || !BakedSceneryRules.GivesPresence(r.GetType().FullName, true, false, false) || !ActiveBelow(r.transform, root)) return false;
-            if (r is UnityEngine.MeshRenderer) {
-                var filter = r.GetComponent<UnityEngine.MeshFilter>();
-                if (filter == null || filter.sharedMesh == null) return false;
-            }
-            return true;
-        }
-        static bool HasActivePresence(UnityEngine.GameObject go) =>
-            go != null && go.GetComponentsInChildren<UnityEngine.Renderer>(true).Any(r => PresenceRendererActive(r, go.transform));
-        // A listed Loc: track marker is a visible location board when it holds an active presence-giving renderer. The
-        // verdict is cached per observation, so an edit that switches the board off is seen at once.
+        static bool IsVisibleBoard(UnityEngine.GameObject go) => go != null && go.GetComponentsInChildren<UnityEngine.Renderer>(true).Any(ShowsSomething);
+        // A listed Loc: object is a visible location board when a renderer below it shows something, else an invisible
+        // marker. The verdict is cached per observation.
         static bool LocVisible(SceneObservation row) {
             if (locVisibility.TryGetValue(row, out var known)) return known;
             bool visible;
-            try { visible = HasActivePresence(row.Handle as UnityEngine.GameObject); }
+            try { visible = IsVisibleBoard(row.Handle as UnityEngine.GameObject); }
             catch (Exception e) when (!(e is OutOfMemoryException)) { WarnOnce("loc visibility", "a Loc: object's renderers could not be read, so it counts as an invisible marker: " + e.GetBaseException().Message); visible = false; }
             return locVisibility[row] = visible;
         }
@@ -223,11 +217,10 @@ namespace RailroaderScenePatcher {
                         if (String.IsNullOrEmpty(name)) continue;
                         var renderers = t.GetComponentsInChildren<UnityEngine.Renderer>(true);
                         var path = BoardScene.PathOf(t);
-                        var active = renderers.Count(r => PresenceRendererActive(r, t));
+                        var showing = renderers.Count(ShowsSomething);
                         found.Add(new LocMarker {
                             Name = name, Path = path, Listed = listed.Contains(path), At = MeasureBounds(t.gameObject),
-                            PresenceRenderers = renderers.Count(r => r != null && BakedSceneryRules.GivesPresence(r.GetType().FullName, true, false, false)),
-                            ActiveRenderers = active, Visible = active != 0
+                            ShowingRenderers = showing, EnabledRenderers = renderers.Count(r => r != null && r.enabled && ShowsSomething(r)), Visible = showing != 0
                         });
                     }
                 }
@@ -395,7 +388,7 @@ namespace RailroaderScenePatcher {
                 + String.Concat(p.Fallback.Select(f => " " + f.Key + "@" + Round(f.Value[0]) + "," + Round(f.Value[1])))))
                 + (placeNotes.Count == 0 ? "" : " NOTES: " + String.Join("; ", placeNotes));
             locLine = String.Join(" | ", locMarkers.OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select(m =>
-                m.Name + " (" + m.Path + ") presence=" + m.PresenceRenderers + " active=" + m.ActiveRenderers + " " + (m.Visible ? "visible board" : "invisible marker")
+                m.Name + " (" + m.Path + ") renderers=" + m.ShowingRenderers + " enabledNow=" + m.EnabledRenderers + " " + (m.Visible ? "visible board" : "invisible marker")
                 + " listed=" + (m.Listed ? "yes" : "no") + (m.At == null ? "" : " @" + Round(m.At[0]) + "," + Round(m.At[1]))));
         }
 

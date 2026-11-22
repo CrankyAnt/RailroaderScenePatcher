@@ -26,10 +26,12 @@ namespace RailroaderScenePatcher {
             internal readonly List<Unit> Members = new List<Unit>();
         }
 
-        static bool IsLocMarker(SceneObservation r) => r.Family == TrackMarkerFamily && Last(r.Identity.Path).StartsWith(LocPrefix, StringComparison.Ordinal);
+        // A Loc: object, whatever family lists it: a track marker, or an independent board (a culler and a mask, no
+        // track marker), as the base map's Loc: boards are.
+        static bool IsLocObject(SceneObservation r) => Last(r.Identity.Path).StartsWith(LocPrefix, StringComparison.Ordinal);
         static bool IsCrossbuck(SceneObservation r) => r.Family == BakedSceneryRules.Family && r.GroupPath == null && r.Category == BakedSceneryCategories.GradeCrossing;
         // A track marker of a crossing, such as Crossing Pad (1): no sign and no Loc: object.
-        static bool IsCrossingTrackMarker(SceneObservation r) => r.Family == TrackMarkerFamily && !IsLocMarker(r) && SignKind(Last(r.Identity.Path)) == null;
+        static bool IsCrossingTrackMarker(SceneObservation r) => r.Family == TrackMarkerFamily && !IsLocObject(r) && SignKind(Last(r.Identity.Path)) == null;
         static bool CanJoinCrossing(SceneObservation r) =>
             r != null && (CrossingEquipmentFamilies.Contains(r.Family) || IsCrossbuck(r) || IsCrossingTrackMarker(r));
 

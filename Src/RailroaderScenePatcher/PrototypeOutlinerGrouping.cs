@@ -156,6 +156,13 @@ namespace RailroaderScenePatcher {
                 else if (category != BakedSceneryCategories.GradeCrossing) levels.Add(Level.Kind(Stem(label)));
                 return levels;
             }
+            // A Loc: object: a visible board under Sign / Location signs, an invisible marker under Track marker /
+            // Location markers, whichever family lists it.
+            if (IsLocObject(r)) {
+                var visible = LocVisible(r);
+                levels.Add(Level.Category(visible ? BakedSceneryCategories.Sign : TrackMarkerCategory)); levels.Add(Level.Kind(visible ? LocationSignsKind : LocationMarkersKind));
+                return levels;
+            }
             // The bridge and construction controller of a rail bridge construction, should the inventory give no category.
             if (BakedSceneryCategories.OfFamily(r.Family) is IReadOnlyList<string> byFamily) {
                 levels.Add(Level.Category(byFamily[0])); levels.Add(Level.Kind(byFamily[1])); return levels;
@@ -166,10 +173,7 @@ namespace RailroaderScenePatcher {
                     levels.Add(Level.Category(BakedSceneryCategories.GradeCrossing)); return levels;
                 case MilepostFamily: levels.Add(Level.Category(BakedSceneryCategories.Sign)); levels.Add(Level.Kind(MilepostsKind)); return levels;
                 case TrackMarkerFamily:
-                    if (IsLocMarker(r)) {
-                        var visible = LocVisible(r);
-                        levels.Add(Level.Category(visible ? BakedSceneryCategories.Sign : TrackMarkerCategory)); levels.Add(Level.Kind(visible ? LocationSignsKind : LocationMarkersKind));
-                    } else if (SignKind(name) is string sign) { levels.Add(Level.Category(BakedSceneryCategories.Sign)); levels.Add(Level.Kind(sign)); }
+                    if (SignKind(name) is string sign) { levels.Add(Level.Category(BakedSceneryCategories.Sign)); levels.Add(Level.Kind(sign)); }
                     else if (CrossingMarkerName.IsMatch(name)) levels.Add(Level.Category(BakedSceneryCategories.GradeCrossing));
                     else { levels.Add(Level.Category(TrackMarkerCategory)); levels.Add(Level.Kind(InventoryPresentationState.Subgroup(r) ?? "Other markers")); }
                     return levels;
@@ -359,17 +363,33 @@ namespace RailroaderScenePatcher {
         static List<OutlineNode> PlaceTops(BuildContext b) {
             var tops = new List<OutlineNode>();
             var byPlace = b.Units.GroupBy(u => u.Place ?? NoPlace, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
-            var names = places.Keys.Where(n => !b.Narrowed || byPlace.ContainsKey(n)).Concat(byPlace.Keys).Distinct(StringComparer.OrdinalIgnoreCase);
+            // A sub-location stands under its parent place, never at the top level.
+            var names = places.Values.Where(p => p.IsPrimary && (!b.Narrowed || byPlace.ContainsKey(p.Name))).Select(p => p.Name)
+                .Concat(byPlace.Keys.Where(k => !(places.TryGetValue(k, out var sub) && !sub.IsPrimary))).Distinct(StringComparer.OrdinalIgnoreCase);
             foreach (var name in names.OrderBy(n => n == NoPlace ? 1 : 0).ThenBy(n => n, StringComparer.OrdinalIgnoreCase)) {
                 var top = new OutlineNode { Key = "@" + (places.TryGetValue(name, out var known) ? known.Name : name), Label = known?.Name ?? name };
                 byPlace.TryGetValue(name, out var members);
                 if (members != null) Fill(b, top, members, 0, false);
+                AddSubLocations(b, top, byPlace);
                 tops.Add(top);
                 if (name != NoPlace || members == null) continue;
                 b.Result.Unplaced += top.Count;
                 if (b.Diagnostics) b.Result.CatchAll.AddRange(members.Select(Describe));
             }
             return tops;
+        }
+
+        // The sub-locations of a place, after its categories: each a node of its own, also when empty (unfiltered), with
+        // any objects placed in it. Positional objects go to primary places only, so these are normally empty.
+        static void AddSubLocations(BuildContext b, OutlineNode top, Dictionary<string, List<Unit>> byPlace) {
+            foreach (var sub in places.Values.Where(p => !p.IsPrimary && top.Label.Equals(p.SubOf, StringComparison.OrdinalIgnoreCase)).OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)) {
+                byPlace.TryGetValue(sub.Name, out var members);
+                if (members == null && b.Narrowed) continue;
+                var node = new OutlineNode { Key = top.Key + "/@" + sub.Name, Label = sub.Name };
+                if (members != null) Fill(b, node, members, 0, false);
+                top.Children.Add(node);
+                top.Count += node.Count;
+            }
         }
 
         // Widths of the visible prototype rows including their nesting indent and place text, for Fit.
