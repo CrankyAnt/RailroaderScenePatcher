@@ -100,7 +100,7 @@ class FakeGroup {
     // A construction controller switches the root itself, or the game switch Switch names does.
     public bool Constructed;
     public GameSwitch Switch = GameSwitch.Construction;
-    // A rail bridge construction: it and its parts take no track-following placement, and its separate track-owned
+    // A rail bridge and its parts take no track-following placement, and its separate track-owned
     // scenery is described by Scenery.
     public bool RailBridge;
     public string Scenery;
@@ -189,7 +189,7 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     public Dictionary<string, GroupRootVerdict> GroupVerdicts;
     GroupRootVerdict GroupVerdict(string path) => GroupVerdicts != null && path != null && GroupVerdicts.TryGetValue(path, out var verdict) ? verdict : null;
     string PathOf(object handle) => Objects.FirstOrDefault(pair => pair.Value.Contains(handle)).Key;
-    // The listed crossbucks at a hierarchy path, each with the marker id of its crossing's pad, as GroupWorld.CrossbucksAt
+    // The listed crossbucks at a hierarchy path, each with the marker ID of its crossing's pad, as GroupWorld.CrossbucksAt
     // reads them.
     public Dictionary<string, List<KeyValuePair<object, string>>> CrossbuckIds = new Dictionary<string, List<KeyValuePair<object, string>>>();
     public IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path) =>
@@ -730,12 +730,12 @@ static class BakedSceneryTests {
             new Node("Roads Sylva", new Node("Sylva Road Bridge 20m", new Node("Deck").Solid()).With("Map.Runtime.MaskComponents.RectangleMapMask", "Helpers.Culling.RendererCuller")),
             new Node("POIs", new Node("Alarka").With("Character.SpawnPoint"), new Node("Bryson").With("Character.SpawnPoint")),
             new Node("Map Labels", new Node("Station Icons", new Node("Bryson").With("UI.Map.MapIcon", "UnityEngine.UI.Image", "UnityEngine.BoxCollider").Solid().Family()))));
-        // The rail bridge constructions outside Ela are groups of the family: the Almond Bridge group root, which carries
+        // The rail bridges outside Ela are groups of the family: the Almond Bridge group root, which carries
         // the construction's controller and culler, each plate girder bridge and Bryson Bridge 1.
         foreach (var path in new[] { "World/Large Scenery/Almond Bridge", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge",
             "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge (1)", "World/Large Scenery/Plate Girder Bridge/Plate Girder Bridge End", "World/Large Scenery/Bryson/Bridge 1" }) {
             var verdict = At(verdicts, path);
-            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges, path + " is a rail bridge construction outside Ela: " + verdict?.Disposition + " " + verdict?.Reason);
+            Assert(verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges, path + " is a rail bridge outside Ela: " + verdict?.Disposition + " " + verdict?.Reason);
         }
         foreach (var path in new[] { "World/Large Scenery/Almond/Almond Road Bridge", "World/Roads Sylva/Sylva Road Bridge 20m" })
             Assert(At(verdicts, path)?.Disposition == GroupDisposition.Group && At(verdicts, path).Subcategory == BakedSceneryCategories.RoadBridges, path + " is a road bridge: " + At(verdicts, path)?.Disposition);

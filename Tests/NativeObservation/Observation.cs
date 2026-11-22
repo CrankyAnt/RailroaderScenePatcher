@@ -72,7 +72,7 @@ public sealed class Observation : MonoBehaviour {
     static JObject BoundsValue(Bounds b) => new JObject { ["center"] = V(b.center), ["size"] = V(b.size), ["min"] = V(b.min), ["max"] = V(b.max) };
     static string PathOf(Transform t) => t.parent == null ? t.name : PathOf(t.parent) + "/" + t.name;
     static Transform One(string path, string scene = null) { var a = Resources.FindObjectsOfTypeAll<Transform>().Where(t => t != null && t.gameObject.scene.IsValid() && t.gameObject.scene.isLoaded && (scene == null || t.gameObject.scene.name == scene) && PathOf(t) == path).ToArray(); if (a.Length != 1) throw new InvalidOperationException(path + " match count=" + a.Length); return a[0]; }
-    // The one loaded object at a path whose crossbuck target carries this pad marker id, as the patcher gives it to a
+    // The one loaded object at a path whose crossbuck target carries this pad marker ID, as the patcher gives it to a
     // crossbuck that shares its path with other crossbucks, such as the three below World/Roads Bryson/Old River Rd.
     static Transform OneCrossbuck(string path, string padMarkerId) {
         var world = TypeNamed("RailroaderScenePatcher.GroupWorld");

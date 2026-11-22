@@ -61,7 +61,7 @@ static class CrossingJoinTests {
             Coverage.SceneUnloaded();
             Local.Unload();
         }
-        // The peer joins: the game loads the map scenes, which builds new crossings and native spans, and calls the
+        // The peer joins: the game loads the map scenes, which builds new crossings and the map's own detection spans, and calls the
         // world-load callback once with the new track graph.
         public ScenePatchFileResult Join(string file = null) { Build(); return Callback(Graph = new object(), file); }
         public object Graph;
@@ -86,13 +86,13 @@ static class CrossingJoinTests {
         public string DetectionProblem => !Both("Snew") ? "the selected track does not detect" : !Both("Sspur") ? "the added track does not detect" : !new[] { 300.0, 195, 100 }.All(d => Coverage.Detects(Crossing, "Sother", d)) ? "the retained circuit does not detect"
             : !Nowhere("Sold") ? "the old route still detects" : null;
         // Exactly one set: three circuits on the crossing, six owned spans, one light or gate in the crossing's culler and one
-        // bell with one observer and one loaded audio reference, and every native span registered.
+        // bell with one observer and one loaded audio reference, and every detection span from the map registered.
         public string SetProblem {
             get {
                 if (Crossing.Circuits.Count != 3 || Crossing.Circuits.Count(c => c.Addition != null) != 1) return "the crossing evaluates " + Crossing.Circuits.Count + " circuits";
                 if (OwnedSpans.Count != 6 || OwnedSpans.Any(s => s.Destroyed)) return OwnedSpans.Count + " owned spans are registered: " + OwnedIds;
                 if (OwnedSpans.Any(s => s.Id.EndsWith(".2", StringComparison.Ordinal))) return "an owned span has a suffixed ID: " + OwnedIds;
-                if (!NativeSpanIds.All(id => Coverage.Graph.TryGetValue(id, out var s) && !s.Owned && !s.Destroyed)) return "a native span is not registered";
+                if (!NativeSpanIds.All(id => Coverage.Graph.TryGetValue(id, out var s) && !s.Owned && !s.Destroyed)) return "a detection span from the map is not registered";
                 if (Other.Circuits.Count != 1 || Equipment.Live(Other).Any()) return "the other crossing changed";
                 var lights = Live.Where(a => a.Bell == null).ToList(); var bells = Live.Where(a => a.Bell != null).ToList();
                 if (lights.Count != 1 || !lights[0].InCuller || lights[0].Record.Id != "west" || lights[0].Record.Scope != Pack) return lights.Count + " lights or gates stand at the crossing";

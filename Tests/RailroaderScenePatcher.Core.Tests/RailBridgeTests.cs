@@ -471,7 +471,7 @@ static class RailBridgeTests {
         Assert(!retry.Applied && retry.Error.Contains("Cleanup") && stuck.World.Mutations == mutations, "The retry on the affected bridge is blocked: " + retry.Error);
     }
 
-    // Each rail bridge construction root outside Ela is listed once as a group of the family under Bridge / Rail bridges:
+    // Each rail bridge root outside Ela is listed once as a group of the family under Bridge / Rail bridges:
     // Bryson Bridge 1 and the Almond Bridge, whose group root carries its controller and culler, each with
     // its parts, and every plate girder bridge on its own. Road bridges stand under Road bridges.
     static void InventoryListsEachConstructionOnceWithItsParts() {

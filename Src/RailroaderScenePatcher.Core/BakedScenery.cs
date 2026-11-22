@@ -63,7 +63,7 @@ namespace RailroaderScenePatcher.Core {
         public string Subcategory { get; internal set; }
         // A crossbuck of an unprotected crossing: a group of its own under Grade crossing, whose models are no parts.
         public bool Crossbuck { get; internal set; }
-        // For a crossbuck, the marker id of its crossing's pad, or null when the crossing has no pad with one id.
+        // For a crossbuck, the marker ID of its crossing's pad, or null when the crossing has no pad with one id.
         public string PadMarkerId { get; internal set; }
     }
     // The categories of the Baked scenery group family and the category table of the Railroader 0.6.3 Large Scenery
@@ -257,12 +257,12 @@ namespace RailroaderScenePatcher.Core {
         public const string CarLoaderRefusal = "This group isn't listed because it contains a car loader. The game loads Robinson Gap coal by teleport between the industry's track spans. It doesn't use the loader, so moving the loader wouldn't change where loading happens.";
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
         public const string SpawnPointReason = "You can't move this group as a whole. Edit its spawn points individually in the Spawn point family.";
-        // Names of the objects below World/Large Scenery that hold rail bridge constructions outside Ela.
+        // Names of the objects below World/Large Scenery that hold rail bridges outside Ela.
         public static readonly IReadOnlyList<string> RailBridgeLocationNames = Array.AsReadOnly(new[] { "Almond Bridge", "Plate Girder Bridge" });
-        // A road bridge construction, wherever it stands: a root whose name contains Road Bridge. Its road is native
+        // A road bridge, wherever it stands: a root whose name contains Road Bridge. Its road is native
         // map data; the bridge carries a renderer culler and its own scene ground mask.
         public static bool RoadBridge(string name) => name != null && name.IndexOf("Road Bridge", StringComparison.Ordinal) >= 0;
-        // A rail bridge construction outside Ela: its root is at or below its own scene object under World/Large Scenery, or
+        // A rail bridge outside Ela: its root is at or below its own scene object under World/Large Scenery, or
         // is named as a Bryson or plate girder bridge. town is the name of that scene object, or null outside it.
         public static bool RailBridge(string town, string name) =>
             name != null && !RoadBridge(name) && (RailBridgeLocationNames.Contains(town) || name == "Bridge 1" || name.StartsWith("Plate Girder", StringComparison.Ordinal));
@@ -271,18 +271,18 @@ namespace RailroaderScenePatcher.Core {
         public const string ConstructionController = "Game.Mow.TrackConstructionScenery";
         // Why a group that holds a construction controller but is no supported rail bridge construction is left out.
         public const string ConstructionOutsideBridge = "This group contains a track construction controller but isn't a supported rail bridge. You can't edit it as a group.";
-        // Why a rail bridge construction or a part of one takes no track-following placement: its track is native map
-        // data, and the construction is placed onto the moved track with fixed placement.
+        // Why a rail bridge or a part of one takes no track-following placement: its track is native map
+        // data, and the bridge is placed onto the moved track with fixed placement.
         public const string RailBridgeNoFollowing = "Rail bridges use fixed placement. They don't support track-following placement.";
-        // Why a road bridge construction or a part of one takes no track-following placement: it stands where its road
+        // Why a road bridge or a part of one takes no track-following placement: it stands where its road
         // goes, which is native map data, and track following follows track.
         public const string RoadBridgeNoFollowing = "Road bridges use fixed placement. They don't support track-following placement.";
         // Why a group of the subgroup, or a part of one, takes no track-following placement, or null: a bridge of
         // either subgroup is placed onto its moved track or road with fixed placement.
         public static string FollowingRefusal(string subcategory) =>
             subcategory == BakedSceneryCategories.RailBridges ? RailBridgeNoFollowing : subcategory == BakedSceneryCategories.RoadBridges ? RoadBridgeNoFollowing : null;
-        // Why a rail bridge construction with track-owned components in its hierarchy cannot be edited: the track and
-        // what the game builds for it belong to the native map data, which a construction move must leave in place.
+        // Why a rail bridge with track-owned components in its hierarchy cannot be edited: the track and
+        // what the game builds for it belong to the native map data, which a bridge move must leave in place.
         public static string TrackOwnedRefusal(IEnumerable<string> types) {
             var owned = (types ?? Enumerable.Empty<string>()).FirstOrDefault(type => type != null && (type.StartsWith("Track.", StringComparison.Ordinal) || type.StartsWith("AutoTrestle.", StringComparison.Ordinal)));
             return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled, or disabled.";
@@ -295,7 +295,7 @@ namespace RailroaderScenePatcher.Core {
         // The name of a crossbuck's entry: the crossbuck's own name at its crossing, as a crossing mast is named, so the
         // crossbucks of the base map read apart and a search finds them by crossing name. Where crossings at other paths
         // share the crossing's name, such as the two Crossing Unprotected - Robbinsville crossings, the name adds the
-        // place the crossing stands at (CrossingEquipment.Place). A crossbuck that the pad marker id identifies names
+        // place the crossing stands at (CrossingEquipment.Place). A crossbuck that the pad marker ID identifies names
         // that id. The full path stays in the tooltip.
         public static string CrossbuckName(string path, string padMarkerId = null, ISet<string> sharedCrossingNames = null) {
             if (path == null) return null;
@@ -308,13 +308,13 @@ namespace RailroaderScenePatcher.Core {
             return path.Substring(last + 1) + " at " + name + place + (padMarkerId == null ? "" : " (pad marker " + padMarkerId + ")");
         }
         // The crossing names that crossings at two or more hierarchy paths hold, from the paths of the listed crossbucks.
-        // The crossings that share one path, as below Old River Rd, are told apart by their pad marker id instead.
+        // The crossings that share one path, as below Old River Rd, are told apart by their pad marker ID instead.
         public static ISet<string> SharedCrossingNames(IEnumerable<string> crossbuckPaths) {
             var crossings = (crossbuckPaths ?? Enumerable.Empty<string>()).Where(path => path != null && path.LastIndexOf('/') > 0)
                 .Select(path => path.Substring(0, path.LastIndexOf('/'))).Distinct(StringComparer.Ordinal);
             return new HashSet<string>(crossings.GroupBy(crossing => crossing.Substring(crossing.LastIndexOf('/') + 1), StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key), StringComparer.Ordinal);
         }
-        // Why a target with a pad marker id cannot name a crossbuck, from the crossbucks listed at its path, or null. The
+        // Why a target with a pad marker ID cannot name a crossbuck, from the crossbucks listed at its path, or null. The
         // id identifies a crossbuck only where several crossbucks share the path: a crossbuck with a path of its own is
         // named by its path alone, so the identity holds one identifier, never two.
         public const string PadMarkerUnshared = "This crossbuck's path identifies it uniquely, so its target doesn't accept padMarkerId. Remove padMarkerId from this target.";
@@ -329,7 +329,7 @@ namespace RailroaderScenePatcher.Core {
         static bool Unprotected(IHierarchyNode node) =>
             node.Children.Any(Pad) && node.Children.All(child => Pad(child) || MarkerObject(child) || Crossbuck(child));
         static bool Crossing(IHierarchyNode node) => Protected(node) || Unprotected(node);
-        // The marker id of the crossing's pad: the one id its pads hold, or null.
+        // The marker ID of the crossing's pad: the one id its pads hold, or null.
         static string PadMarkerId(IHierarchyNode crossing) {
             var ids = crossing.Children.Where(Pad).Select(pad => pad.MarkerId).Where(id => !String.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal).ToArray();
             return ids.Length == 1 ? ids[0] : null;
@@ -597,11 +597,11 @@ namespace RailroaderScenePatcher.Core {
             Root = root ?? throw new ArgumentNullException(nameof(root)); Parts = parts.ToArray(); Cullers = cullers.ToArray(); Parent = parent; RootCulling = rootCulling;
             Colliders = (colliders ?? Enumerable.Empty<ColliderState>()).ToArray(); SeparateScenery = separateScenery;
         }
-        // For a rail bridge construction, a description of the separate track-owned scenery beside it, such as the
+        // For a rail bridge, a description of the separate track-owned scenery beside it, such as the
         // generated trestles of its track, which no edit may change; null for any other group.
         public string SeparateScenery { get; }
         // The colliders the scene saves at and below the root, for a group whose collider state every edit verifies: a
-        // rail or road bridge construction. Empty for any other group. Their placement is the parts' placement.
+        // rail or road bridge. Empty for any other group. Their placement is the parts' placement.
         public IReadOnlyList<ColliderState> Colliders { get; }
         // Whether the simple culler on the root switches the root by camera distance; null without one. It pauses while
         // the group is disabled.
@@ -650,7 +650,7 @@ namespace RailroaderScenePatcher.Core {
         // Why the part's activity cannot be set, or null: a game-object culler switches it by camera distance and would
         // override a stored setting. The patcher then never sets that part's activity.
         string ActivityRefusal(object part);
-        // Why the group root or part takes no track-following placement, or null: a rail or road bridge construction
+        // Why the group root or part takes no track-following placement, or null: a rail or road bridge
         // and its parts use fixed placement. Refused before any mutation.
         string FollowingRefusal(object target);
         // Why the placement of the group root or part cannot be set, or null: a lake surface at or below it whose water
@@ -849,7 +849,7 @@ namespace RailroaderScenePatcher.Core {
     // physical placement only: the activity of the parts stays theirs, and a part with its own fixed placement keeps it.
     // The root of a rail bridge construction that carries its construction controller, such as Bryson Bridge 1 and the
     // Almond Bridge, also holds the construction-segment relationship.
-    // The crossbucks a world lists at a hierarchy path, with the marker id of each one's crossing pad, for the identity
+    // The crossbucks a world lists at a hierarchy path, with the marker ID of each one's crossing pad, for the identity
     // of crossbucks whose crossings share one path.
     public interface ICrossbuckWorld {
         IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path);
@@ -875,7 +875,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {
             if (identity.Component != ComponentType || (identity.Structure != null && identity.Structure != Structure)) return Array.Empty<object>();
             if (identity.PadMarkerId == null) return world.Find(identity.Scene, identity.Path) ?? Array.Empty<object>();
-            // A pad marker id names the crossbucks at the shared path whose crossing's pad holds it.
+            // A pad marker ID names the crossbucks at the shared path whose crossing's pad holds it.
             var crossbucks = Crossbucks(identity);
             return crossbucks.Count < 2 ? Array.Empty<object>() : crossbucks.Where(pair => pair.Value == identity.PadMarkerId).Select(pair => pair.Key).ToArray();
         }

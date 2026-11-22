@@ -1537,7 +1537,7 @@ namespace RailroaderScenePatcher {
             else { var q = Quaternion.Euler((float)angles[0], (float)angles[1], (float)angles[2]); rotation = new double[] { q.x, q.y, q.z, q.w }; }
             return new EquipmentAddition(id, equipmentSource.IsDefinition ? EquipmentAddition.BellPattern : EquipmentAddition.LightGatePattern, equipmentSource, new Placement(position, rotation));
         }
-        // Fills the fields from the selected tracks of a circuit or addition; a circuit with native spans or detached, and a new
+        // Fills the fields from the selected tracks of a circuit or addition; a circuit using the map's own detection spans or detached, and a new
         // addition, start empty.
         void ReadCoverage(CircuitCoverage value) {
             for (var role = 0; role < 3; role++) {

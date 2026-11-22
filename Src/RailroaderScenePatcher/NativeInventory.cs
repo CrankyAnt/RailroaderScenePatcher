@@ -429,7 +429,7 @@ namespace RailroaderScenePatcher {
             MarkerIdHolders markerHolders = null;
             if (marker != null) Read(() => {
                 var kind = Text(Field(marker, "type"));
-                bindings.Add("Marker id=" + Text(Field(marker, "id")) + "; type=" + kind);
+                bindings.Add(InventoryPresentationState.MarkerIdLine + Text(Field(marker, "id")) + "; type=" + kind);
                 // What the game needs from this kind's binding decides whether its state is a problem; the setups say
                 // whether a new-game car placement reads it whatever its activity, and which ones do.
                 var reading = starters.Reading(marker, kind, family == "Crossing pad marker");
@@ -711,7 +711,7 @@ namespace RailroaderScenePatcher {
             // A patch names its target by scene, path and component. Where more than one loaded object holds those, an
             // edit would be refused as not resolving uniquely: the object says so under Supported edits and offers none.
             if (only == null && structure != null) Read(() => {
-                // A crossbuck that a pad marker id identifies counts the crossbucks at its path that hold that id.
+                // A crossbuck that a pad marker ID identifies counts the crossbucks at its path that hold that id.
                 var holders = padMarkerId != null ? GroupWorld.Crossbucks(go.scene.name, BoardScene.PathOf(go.transform)).Count(pair => pair.Value == padMarkerId)
                     : BoardScene.LoadedAt(go.scene.name, BoardScene.PathOf(go.transform)).Count(held => held != null && Get(held, TypeName(c)) != null);
                 var shared = CommandBand.SharedPath(holders);
@@ -765,7 +765,7 @@ namespace RailroaderScenePatcher {
             // Existence is not proof that the binding names the intended track.
         }
         // The track graph's named-location entries under the marker's ID: the registration that ID lookups find.
-        internal const string ListedTrackLocation = "Track location listed by the game:";
+        internal const string ListedTrackLocation = "Named location:";
         static void Registrations(Component marker, List<string> bindings) {
             var id = Text(Field(marker, "id"));
             var graph = Native.Read(Native.Type("Track.Graph"), "Shared") ?? throw new InvalidOperationException("Track graph unavailable");

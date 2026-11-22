@@ -270,7 +270,7 @@ Wilmot | Wilmot Station | Group | Station building";
             Check(verdict?.Disposition == GroupDisposition.Group && verdict.Category == "Bridge" && verdict.Subcategory == "Road bridges", path + " is a road bridge the table does not name: it stands under Bridge / Road bridges (got " + verdict?.Category + ")");
         }
         var span = At(verdicts, "World/Large Scenery/Newtown/Plate Girder Span");
-        Check(span?.Category == "Bridge" && span.Subcategory == "Rail bridges", "a rail bridge construction the table does not name stands under Bridge / Rail bridges");
+        Check(span?.Category == "Bridge" && span.Subcategory == "Rail bridges", "a rail bridge the table does not name stands under Bridge / Rail bridges");
         Check(BakedSceneryCategories.OfFamily("Bridge").SequenceEqual(new[] { "Bridge", "Rail bridges" }) && BakedSceneryCategories.OfFamily("Bridge construction scenery").SequenceEqual(new[] { "Bridge", "Rail bridges" })
             && BakedSceneryCategories.OfFamily("Track marker") == null && BakedSceneryCategories.OfFamily(null) == null, "the bridge and the construction controller of a rail bridge construction stand under Bridge / Rail bridges; no other family has a category");
         // In the outliner both stand in the Baked scenery group family, under Bridge / Rail bridges, as groups of their own.

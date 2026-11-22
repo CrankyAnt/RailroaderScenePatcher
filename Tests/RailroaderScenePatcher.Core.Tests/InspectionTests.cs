@@ -920,7 +920,7 @@ static class InspectionTests {
         SceneObservation Of(object handle, string path, string binding) => new SceneObservation(handle, new TargetIdentity("scene", path, "Component"), "Family", true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { binding }, new string[0], new string[0], "Inspection only");
         var scene = new RelatedScene();
-        scene.All.AddRange(new[] { Of(crossing, "crossing", "native spans"), Of(bell, "crossing/bell", "native spans"), Of(other, "other", "none") });
+        scene.All.AddRange(new[] { Of(crossing, "crossing", "detection spans"), Of(bell, "crossing/bell", "detection spans"), Of(other, "other", "none") });
         scene.Related = handle => scene.All.Where(o => !ReferenceEquals(o.Handle, other)).ToArray();
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var unrelated = inventory.Entries[2];
@@ -934,7 +934,7 @@ static class InspectionTests {
         while (inventory.CompletedPasses == 0 && !inventory.IsStale) inventory.AdvanceFreshnessCheck(() => false);
         Check(!inventory.IsStale, "A stepped pass agrees as well: " + inventory.StaleReason);
         // Clearing removes the owned span and returns the bindings.
-        scene.All.RemoveAt(3); scene.All[0] = Of(crossing, "crossing", "native spans"); scene.All[1] = Of(bell, "crossing/bell", "native spans");
+        scene.All.RemoveAt(3); scene.All[0] = Of(crossing, "crossing", "detection spans"); scene.All[1] = Of(bell, "crossing/bell", "detection spans");
         updated = inventory.ReobserveRelated(updated);
         Check(updated != null && inventory.Entries.Count == 3 && inventory.Entries.Any(e => ReferenceEquals(e, unrelated)), "An object the change removed leaves the inventory: " + inventory.Entries.Count);
         inventory.CheckFreshness();
@@ -1156,10 +1156,10 @@ static class InspectionTests {
     static void SubgroupsFollowTheGame() {
         SceneObservation Row(string family, string path, params string[] bindings) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Marker"), family, true,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "Track binding");
-        var station = Row("Track marker", "World/Bryson Station Sign", "Marker id=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
-        var whistle = Row("Track marker", "World/Whistle Sign E", "Marker id=M2; type=Generic");
-        var stop = Row("Track marker", "World/Stop", "Marker id=M3; type=PassengerStop");
-        var starter = Row("Track marker", "World/Setups/starter-ewh-coaling", "Marker id=M4; type=Generic");
+        var station = Row("Track marker", "World/Bryson Station Sign", "Marker ID=M1; type=Generic", "Marker segment=S1; end=a; distance=2");
+        var whistle = Row("Track marker", "World/Whistle Sign E", "Marker ID=M2; type=Generic");
+        var stop = Row("Track marker", "World/Stop", "Marker ID=M3; type=PassengerStop");
+        var starter = Row("Track marker", "World/Setups/starter-ewh-coaling", "Marker ID=M4; type=Generic");
         var board = Row("Board", "World/Board", "Culler");
         var bare = Row("Track marker", "World/Bare");
         foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { stop, "Type PassengerStop" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })

@@ -74,7 +74,7 @@ namespace RailroaderScenePatcher.Core {
         // The stem of the IDs of the spans the patcher owns for the addition.
         internal static string SpanStem(string key) { TryRead(key, out var owner, out var id); return "added." + (owner.Length == 0 ? "" : owner + ".") + id; }
     }
-    // The coverage of one circuit of a crossing: its native spans, explicitly selected tracks, detached from the crossing, or
+    // The coverage of one circuit of a crossing: the map's own detection spans, explicitly selected tracks, detached from the crossing, or
     // a detection addition with its own tracks.
     public sealed class CircuitCoverage {
         public static readonly string[] Roles = { "approachA", "island", "approachB" };
@@ -110,12 +110,12 @@ namespace RailroaderScenePatcher.Core {
         public override string ToString() {
             switch (Kind) {
                 case CircuitKind.Detached: return "detached; it does not trigger the crossing";
-                case CircuitKind.Native: return "native spans approach A " + spans[0] + ", island " + spans[1] + ", approach B " + spans[2];
+                case CircuitKind.Native: return "the map's own detection spans: approach A " + spans[0] + ", island " + spans[1] + ", approach B " + spans[2];
                 default: return (Kind == CircuitKind.Added ? "added for tracks approach A " : "selected tracks approach A ") + ranges[0] + "; island " + ranges[1] + "; approach B " + ranges[2];
             }
         }
     }
-    // The detection coverage of a crossing by circuit. A circuit is named by the ID of its native island span, which identifies
+    // The detection coverage of a crossing by circuit. A circuit is named by the ID of the map's own island span, which identifies
     // it in the map. A mod's coverage lists only explicitly selected or detached circuits; an omitted circuit keeps its
     // effective coverage. An observed coverage lists every circuit of the crossing in its native order, followed by every
     // addition. An addition is named by its DetectionAddition key and exists only while a coverage lists it.
@@ -171,7 +171,7 @@ namespace RailroaderScenePatcher.Core {
                     continue;
                 }
                 var line = name + ": " + (now == null ? "unknown" : now.ToString()) + " -> " + next + ".";
-                if (now?.Kind == CircuitKind.Native) line += " Its native spans " + String.Join(", ", now.SpanIds) + " stay registered and stop triggering this crossing.";
+                if (now?.Kind == CircuitKind.Native) line += " The map's own detection spans " + String.Join(", ", now.SpanIds) + " stay registered and stop triggering this crossing.";
                 if (now?.Kind == CircuitKind.Tracks) line += " The spans the patcher owns for its previous tracks are removed.";
                 lines.Add(line);
             }
@@ -222,9 +222,9 @@ namespace RailroaderScenePatcher.Core {
         double[] Rotation(object controller);
         bool Active(object controller);
     }
-    // Corrects and extends the detection coverage of an existing grade crossing. A circuit keeps its native spans, uses explicitly
+    // Corrects and extends the detection coverage of an existing grade crossing. A circuit keeps the map's own detection spans, uses explicitly
     // selected tracks covered by spans the patcher owns, or is detached from the crossing. A detection addition is a further
-    // circuit the patcher owns, with owned spans for explicitly selected extra tracks, evaluated after the native circuits. The native spans stay registered
+    // circuit the patcher owns, with owned spans for explicitly selected extra tracks, evaluated after the native circuits. The map's own detection spans stay registered
     // and unchanged, so another consumer keeps them; the crossing simply stops evaluating them. Proximity never assigns
     // coverage, and the crossing object itself is never moved or disabled by this capability.
     public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene, IDisposable, ICrossingEquipmentScene {
@@ -316,7 +316,7 @@ namespace RailroaderScenePatcher.Core {
             return baseline;
         }
         // Removes the spans and equipment the patcher owns for a crossing that no longer stands under its identity, and forgets the crossing.
-        // Native spans and circuits are never touched. Spans that stay registered remain owned, so the next release retries them.
+        // The map's own detection spans and circuits stay in place. The next release retries any owned spans still registered.
         public void Release(object target) {
             if (!baselines.TryGetValue(target, out var baseline)) return;
             string problem = null;
@@ -330,7 +330,7 @@ namespace RailroaderScenePatcher.Core {
         }
         public bool Unsettled(object target) => world.Unsettled(target);
         // Ends this state while the scene may stay, as a mod reload or unload without a scene unload would: every crossing it changed returns to
-        // its native circuits and spans, and the spans the patcher owns are removed, so a later state records the true native
+        // the map's own circuits and detection spans for that crossing, and the spans the patcher owns are removed, so a later state records the true native
         // coverage. A crossing that is gone or no longer conforms has nothing to return to; its owned spans are still removed.
         // Nothing here throws: what cannot be restored stays, and a later state refuses to take it for native coverage.
         public void Dispose() {
@@ -378,11 +378,11 @@ namespace RailroaderScenePatcher.Core {
             }
             if (state.Starter != null) throw new InvalidPatchDefinitionException(StarterPlacements.NotAStarter);
             if (state.Coverage == null) return;
-            // A complete coverage is an effective state, which may hold circuits on their native spans.
+            // A complete coverage is an effective state, which may hold circuits on the map's own detection spans.
             Validate(target, BaselineOf(target), state.Coverage, state.Coverage.Complete);
         }
         // This mod's coverage names circuits of this crossing with selected tracks or a detach, and additions with their tracks; an
-        // applied coverage may also return a circuit to its native spans. At least one circuit or addition must keep detection.
+        // applied coverage may also return a circuit to the map's own detection spans. At least one circuit or addition must keep detection.
         void Validate(object target, Baseline baseline, CrossingCoverage coverage, bool allowNative) {
             foreach (var circuit in coverage.Circuits) {
                 var own = baseline.Circuits.FirstOrDefault(c => c.Key == circuit.Key);
@@ -433,7 +433,7 @@ namespace RailroaderScenePatcher.Core {
             if (circuit.Original == null) return owned ? CircuitCoverage.Added(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2])) : throw new InvalidOperationException(DetectionAddition.Name(circuit.Key) + " holds spans this patcher does not own");
             if (spans.Length == 3 && spans.Zip(circuit.Original, ReferenceEquals).All(x => x)) return CircuitCoverage.Native(circuit.Original.Select(world.SpanId).ToArray());
             if (owned) return CircuitCoverage.Tracks(world.Range(spans[0]), world.Range(spans[1]), world.Range(spans[2]));
-            throw new InvalidOperationException("Circuit " + circuit.Key + " holds spans that are neither its native spans nor spans this patcher owns");
+            throw new InvalidOperationException("Circuit " + circuit.Key + " holds spans other than the map's own detection spans for this circuit or spans this patcher owns");
         }
         public void Apply(object target, ObjectState state) {
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
@@ -554,8 +554,8 @@ namespace RailroaderScenePatcher.Core {
             if (left.Key != null) return DetectionAddition.Name(left.Key) + " remains on the crossing";
             return Coherence(target, baseline, true);
         }
-        // Null when the controller evaluates only its own circuits in native order, each holding its native spans or owned
-        // spans, followed by the additions the patcher owns in key order, every native span stays registered, and exactly the
+        // Null when the controller evaluates only its own circuits in native order, each holding the map's own detection spans or owned
+        // spans, followed by the additions the patcher owns in key order, every one of the map's own detection spans stays registered, and exactly the
         // owned spans in use are registered and cover track.
         // Residue left by an incomplete cleanup does not refuse an edit: the next application removes it, and until then the
         // observed coverage differs from any scene patch file so a recheck applies it.
@@ -573,7 +573,7 @@ namespace RailroaderScenePatcher.Core {
                 try { Classify(circuit, members, baseline); } catch (InvalidOperationException e) { return e.Message; }
                 if (member) inUse.AddRange((world.Spans(circuit.Set) ?? Array.Empty<object>()).Where(s => baseline.Owned.Any(o => ReferenceEquals(o, s))));
                 var lost = circuit.Original?.FirstOrDefault(s => !world.Registered(s));
-                if (lost != null) return "native span " + world.SpanId(lost) + " is no longer registered";
+                if (lost != null) return "detection span " + world.SpanId(lost) + " from the map is no longer registered";
             }
             foreach (var span in baseline.Owned) {
                 if (!inUse.Any(u => ReferenceEquals(u, span))) { if (residue) return "owned span " + world.SpanId(span) + " remains without a circuit"; continue; }

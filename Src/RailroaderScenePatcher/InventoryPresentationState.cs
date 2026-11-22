@@ -162,7 +162,7 @@ namespace RailroaderScenePatcher {
         internal static IReadOnlyList<OutlineNode> Categories(IReadOnlyList<SceneObservation> rows, IEnumerable<SceneObservation> inventory, string search) {
             rows = rows ?? Array.Empty<SceneObservation>();
             var all = (inventory ?? rows).Where(entry => entry.GroupPath == null && entry.Family == BakedSceneryRules.Family).ToArray();
-            // The crossbucks of crossings that share one path differ by their crossing's pad marker id.
+            // The crossbucks of crossings that share one path differ by their crossing's pad marker ID.
             string GroupKey(string scene, string path, string padMarkerId = null) => scene + "\n" + path + (padMarkerId == null ? "" : "\n" + padMarkerId);
             var groups = new Dictionary<string, OutlineNode>(StringComparer.Ordinal);
             var order = new List<OutlineNode>();
@@ -255,13 +255,15 @@ namespace RailroaderScenePatcher {
         internal static string PartOf(SceneObservation entry) =>
             entry?.GroupPath == null ? null : "Part of: " + entry.GroupPath.Substring(entry.GroupPath.LastIndexOf('/') + 1);
 
+        internal const string MarkerIdLine = "Marker ID=";
+
         // What the game itself tells apart inside a family, or null: for a track marker its marker type
         // (Track.TrackMarkerType), read from the observation's marker line. Never a name: a station sign and a whistle
         // sign are both Generic markers to the game. A starter marker has no subgroup here.
         internal static string Subgroup(SceneObservation entry) {
             if (entry == null || entry.Family != "Track marker") return null;
             foreach (var line in entry.Bindings) {
-                if (!line.StartsWith("Marker id=", StringComparison.Ordinal)) continue;
+                if (!line.StartsWith(MarkerIdLine, StringComparison.Ordinal)) continue;
                 var at = line.IndexOf("; type=", StringComparison.Ordinal);
                 if (at < 0) return null;
                 var type = line.Substring(at + 7); var end = type.IndexOf(';');

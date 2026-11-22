@@ -84,7 +84,7 @@ namespace RailroaderScenePatcher {
             if (divider) builder.AddHRule();
             return builder.AddLabel("<b>" + Literal(title) + "</b>");
         }
-        // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
+        // A line of the form "Marker ID=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.
         void BindingFields(UIPanelBuilder builder, string line) {
             var first = line.IndexOf('=');
@@ -628,7 +628,7 @@ namespace RailroaderScenePatcher {
             builder.Spacer(TabGap);
         }
 
-        // A rail bridge construction outside Ela or a road bridge construction, or a part of one: it takes no
+        // A rail bridge outside Ela or a road bridge, or a part of one: it takes no
         // track-following placement.
         string BridgeSubgroup => selected == null || selected.Family != BakedSceneryRules.Family ? null
             : selected.GroupPath == null ? selected.Subcategory : InventoryPresentationState.GroupOf(inventory, selected)?.Subcategory;
@@ -734,7 +734,7 @@ namespace RailroaderScenePatcher {
             Field(builder, "Structure", selected.Identity.Structure ?? "none");
             FieldLabel(builder, "Path");
             PlainLabel(builder, Breakable(selected.Identity.Path));
-            // A crossbuck whose path other crossbucks share is named by its crossing's pad marker id beside the path.
+            // A crossbuck whose path other crossbucks share is named by its crossing's pad marker ID beside the path.
             if (selected.Identity.PadMarkerId != null)
                 Field(builder, "Pad marker ID", selected.Identity.PadMarkerId)
                     .Tooltip("Pad marker ID", "The marker ID of this crossing's pad. Other crossbucks share this path, so the scene patch file names this crossbuck by its path and this ID.");

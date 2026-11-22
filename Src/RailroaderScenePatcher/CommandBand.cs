@@ -417,14 +417,14 @@ namespace RailroaderScenePatcher {
             var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings);
             return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Subcategory : selected.Subcategory) == BakedSceneryCategories.RoadBridges);
         }
-        // A road bridge construction is decorative, and its road is native map data: moving the bridge does not move
+        // A road bridge is decorative, and its road is native map data: moving the bridge does not move
         // the road.
         internal const string RoadBridgeDecorative = "The bridge is decorative. Its road is native map data that the Map Editor edits.";
         // An object with a scene ground mask at or below it is not only decorative: the mask shapes the terrain where it
         // stands. The part that holds the mask says what the mask does; an object above it adds that to its own text.
         // An object whose mask flattens the terrain height cannot be moved, so its text names disabling alone.
         internal const string GroundMaskHolderUse = "Ground mask: it shapes the ground and the vegetation where this part stands. Moving or disabling this part changes the terrain there.";
-        // roadBridge: the object is a road bridge construction or a part of one; the group root then names the bridge
+        // roadBridge: the object is a road bridge or a part of one; the group root then names the bridge
         // and its native road.
         internal static string GroundMaskUse(string use, bool part, IEnumerable<string> dependencies, bool roadBridge = false) {
             var line = dependencies?.FirstOrDefault(dependency => dependency != null && dependency.StartsWith(GroundMaskPrefix, StringComparison.Ordinal));
@@ -776,9 +776,9 @@ namespace RailroaderScenePatcher {
             controller ? (mode == NumericMode ? null : ControllerNoPlacement) : pad ? PadModeBlock(mode) : !editable && (mode != NumericMode || equipment) ? EditReason(operations) : moveBlock != null && mode != NumericMode ? moveBlock
             : milepost && mode == FollowMode ? MilepostNoFollow : equipment && mode == FollowMode ? EquipmentNoFollow
             : railBridge && mode == FollowMode ? RailBridgeNoFollow : roadBridge && mode == FollowMode ? RoadBridgeNoFollow : null;
-        // A road bridge construction does not follow track: move the road natively, then the bridge onto it.
+        // A road bridge does not follow track: move the road natively, then the bridge onto it.
         internal const string RoadBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RoadBridgeNoFollowing + " Move the road in the native map editor, then move the bridge onto it.";
-        // A rail bridge construction does not follow its track: move the track natively, then the construction onto it.
+        // A rail bridge uses fixed placement. Move the track in the native map editor, then move the bridge onto it.
         internal const string RailBridgeNoFollow = RailroaderScenePatcher.Core.BakedSceneryRules.RailBridgeNoFollowing + " Move the track in the native map editor, then move the bridge onto it.";
         // Why Follow is inactive for an existing crossing mast or bell: the capability covers fixed placement and activity.
         internal const string EquipmentNoFollow = ExistingEquipmentScene.NoFollowing + ".";

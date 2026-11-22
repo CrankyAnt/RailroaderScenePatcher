@@ -28,19 +28,19 @@ namespace RailroaderScenePatcher.Core {
         public string Path { get; internal set; }
         public string Component { get; internal set; }
         public string Structure { get; internal set; }
-        // The marker id of the crossing pad beside a crossbuck whose hierarchy path several crossbucks share, as the
+        // The marker ID of the crossing pad beside a crossbuck whose hierarchy path several crossbucks share, as the
         // crossbucks of the three crossings below World/Roads Bryson/Old River Rd do; null for every other target. It
         // stands beside the path, which stays the raw hierarchy path.
         public string PadMarkerId { get; internal set; }
         public const string PadMarkerMember = "padMarkerId";
-        // Why a scene refuses a target with a pad marker id, when it names no crossbuck at a shared path.
+        // Why a scene refuses a target with a pad marker ID, when it names no crossbuck at a shared path.
         public const string PadMarkerNotAccepted = "padMarkerId only identifies a crossbuck at an unprotected crossing when other crossbucks share its path. Remove padMarkerId from this target.";
         // Whether a target object of a scene patch file names this identity's object: the same scene, path, component
-        // and pad marker id. The structure is compared by the caller.
+        // and pad marker ID. The structure is compared by the caller.
         internal static bool SameObject(JObject target, TargetIdentity identity) =>
             target != null && identity != null && (string)target["scene"] == identity.Scene && (string)target["path"] == identity.Path && (string)target["component"] == identity.Component
             && (target[PadMarkerMember]?.Type == JTokenType.String ? (string)target[PadMarkerMember] : null) == identity.PadMarkerId;
-        // The identity for a message: scene and path, the pad marker id where it has one, and the component.
+        // The identity for a message: scene and path, the pad marker ID where it has one, and the component.
         public string Label => Scene + "/" + Path + (PadMarkerId == null ? "" : " (pad marker " + PadMarkerId + ")") + " [" + Component + "]";
         public static bool SameObject(TargetIdentity a, TargetIdentity b) =>
             a != null && b != null && a.Scene == b.Scene && a.Path == b.Path && a.Component == b.Component && a.PadMarkerId == b.PadMarkerId;
@@ -52,7 +52,7 @@ namespace RailroaderScenePatcher.Core {
             return value;
         }
     }
-    // A scene that accepts a pad marker id beside a target's path: it says why it refuses the identity, or null.
+    // A scene that accepts a pad marker ID beside a target's path: it says why it refuses the identity, or null.
     public interface IPadMarkerIdentityScene {
         string PadMarkerRefusal(TargetIdentity identity);
     }
@@ -521,7 +521,7 @@ namespace RailroaderScenePatcher.Core {
         // Set for the duration of a reconciliation that resolves the same targets several times a second.
         internal Func<TargetIdentity, object> ResolveOverride;
         internal object ResolveUnique(TargetIdentity identity) { return ResolveOverride != null ? ResolveOverride(identity) : ResolveFresh(identity); }
-        // The objects the identity names. A pad marker id names a crossbuck at a shared path; every other target refuses
+        // The objects the identity names. A pad marker ID names a crossbuck at a shared path; every other target refuses
         // it with the reason, before anything is resolved.
         IReadOnlyList<object> Matches(TargetIdentity identity) {
             if (identity.PadMarkerId != null) {
@@ -870,7 +870,7 @@ namespace RailroaderScenePatcher.Core {
             }
             return new StarterSetting((string)starter["setup"], MarkerBinding.At(ParseLocation(track, "starter placement")), wreck);
         }
-        // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by its native island span, with selected
+        // Explicit crossing coverage: circuits holds each circuit this mod sets, keyed by the ID of the map's own island span, with selected
         // tracks or an explicit detach. An omitted circuit keeps its coverage; an omitted crossingCoverage leaves every
         // circuit untouched. additions holds the detection additions keyed by their IDs: circuits the patcher adds for their
         // selected tracks, which exist only while the scene patch file lists them. Neither the order of the two objects nor the

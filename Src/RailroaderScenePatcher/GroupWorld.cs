@@ -288,13 +288,13 @@ namespace RailroaderScenePatcher {
             if (verdict.Disposition == GroupDisposition.Group) return BakedSceneryRules.Family;
             return verdict.Disposition == GroupDisposition.InspectionOnly ? BakedSceneryRules.Family : null;
         }
-        // The listed crossbucks at a hierarchy path, each with the marker id of its crossing's pad. Several stand at one
+        // The listed crossbucks at a hierarchy path, each with the marker ID of its crossing's pad. Several stand at one
         // path where crossings share it, as the three crossings below World/Roads Bryson/Old River Rd do.
         internal static IReadOnlyList<KeyValuePair<object, string>> Crossbucks(string scene, string path) =>
             BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && VerdictOf(g) is GroupRootVerdict v && v.Disposition == GroupDisposition.Group && v.Crossbuck)
                 .Select(g => new KeyValuePair<object, string>(g, VerdictOf(g).PadMarkerId)).ToArray();
         public IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path) => Crossbucks(scene, path);
-        // The pad marker id a crossbuck's target carries: only where other crossbucks share its path, so its path alone
+        // The pad marker ID a crossbuck's target carries: only where other crossbucks share its path, so its path alone
         // does not name it. Null for every other object.
         internal static string TargetPadMarkerId(GameObject go) {
             var verdict = VerdictOf(go);
@@ -400,7 +400,7 @@ namespace RailroaderScenePatcher {
         // camera distance. An object a construction controller switches takes an explicit disable, which holds.
         internal static string ActivityProblem(GameObject go) => go == null ? null : SwitchedPart(go);
         public string FollowingRefusal(object target) => FollowingProblem(target as GameObject);
-        // Why the group root or part takes no track-following placement, or null: a rail or road bridge construction and its parts.
+        // Why the group root or part takes no track-following placement, or null: a rail or road bridge and its parts.
         internal static string FollowingProblem(GameObject go) {
             if (go == null) return null;
             var verdict = VerdictOf(go);
@@ -663,7 +663,7 @@ namespace RailroaderScenePatcher {
             if (!trestles.TryGetValue(root, out var selected)) trestles[root] = selected = BridgeWorld.TrestlesNear(trestle, root.transform.position);
             return BridgeWorld.DescribeTrestles(selected);
         }
-        // The colliders the scene saves at and below a rail or road bridge construction's root, with copied values, as the Ela
+        // The colliders the scene saves at and below a rail or road bridge's root, with copied values, as the Ela
         // bridge observes its colliders. What the game builds while it runs does not count.
         static IEnumerable<ColliderState> Colliders(Transform root) {
             var found = new List<ColliderState>();

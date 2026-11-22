@@ -274,7 +274,7 @@ namespace RailroaderScenePatcher.Core {
                 if (scenePatchFile == null) return minimum;
                 foreach (var item in scenePatchFile.Items) {
                     if (item["active"] != null) minimum = Max(minimum, "0.2.0");
-                    // A crossbuck that its crossing's pad marker id names needs the crossbuck identity.
+                    // A crossbuck that its crossing's pad marker ID names needs the crossbuck identity.
                     if ((item["target"] as JObject)?[TargetIdentity.PadMarkerMember] != null) minimum = Max(minimum, BakedSceneryGroups.RequiredVersion);
                     // Activity of a track-marker object may be the explicit disable of a group follower, which needs the group capability.
                     if (item["active"] != null && (item["target"] as JObject)?["structure"]?.Type == JTokenType.String && (string)item["target"]["structure"] == TrackMarkerScene.Structure) minimum = Max(minimum, TrackFollowingVersion);
@@ -825,7 +825,7 @@ namespace RailroaderScenePatcher.Core {
         // names a native circuit by its island span, or a detection addition by its ID.
         JObject CoverageValue(TargetIdentity target, JObject existing, string circuit, CircuitCoverage coverage, bool addition) {
             if (String.IsNullOrWhiteSpace(circuit)) throw new InvalidOperationException(addition ? "Give the addition an ID" : "Choose a circuit of the crossing");
-            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to its native spans");
+            if (coverage != null && coverage.Kind == CircuitKind.Native) throw new InvalidOperationException("Clear the coverage set by this mod for the circuit to return it to the map's own detection spans.");
             if (coverage != null && (coverage.Kind == CircuitKind.Added) != addition) throw new InvalidOperationException(addition ? "An addition needs its own selected tracks" : "Add detection for extra tracks as an addition; a native circuit takes selected tracks or a detach");
             if (existing != null) PatchEngine.Parse(existing);
             if (addition && coverage != null && scenePatchFile.Items.Any(m => !ReferenceEquals(m, existing) && PatchEngine.AdditionIds(m).Contains(circuit, StringComparer.Ordinal)))

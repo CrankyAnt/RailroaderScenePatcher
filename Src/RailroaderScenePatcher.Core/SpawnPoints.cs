@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace RailroaderScenePatcher.Core {
     // The scene spawn points (Character.SpawnPoint), such as those under World/POIs: what the game uses them for, how
-    // the inventory lists them and the Object tab names their uses. Spawns in native map data (Map.json) are another
+    // the inventory lists them and the Object tab names their uses. Native spawns (Map.json) are another
     // kind: the native map editor edits them in its Spawns category, and the inventory does not list them.
     //
     // What the game reads (Railroader 0.6.3): SpawnPoint.All finds the active spawn points and sorts them by priority,
