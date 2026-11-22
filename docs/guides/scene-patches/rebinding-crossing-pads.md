@@ -15,7 +15,7 @@ The patcher rebinds a pad when all of these hold:
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object, if present, does not make the object's activity follow a track group,
 - no loaded component other than that `Track.TrackRelativePosition` and the pad builder holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check,
-- the game lists one track location for the marker, at its current location, while the pad is enabled and active, and none otherwise.
+- while the pad is enabled and active, the marker has exactly one named location and it matches the stored track location. Otherwise the marker has no named location.
 
 A pad inside a protected crossing qualifies too, because the crossing controller does not read the pad's marker. The crossing's own track spans and circuits are a separate operation.
 

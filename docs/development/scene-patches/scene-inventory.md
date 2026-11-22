@@ -79,7 +79,7 @@ Every scene object below World that has a renderer, collider, light, storage pil
 | --- | --- | --- |
 | Track marker | A `Track.TrackMarker` at or below the root. The group is not moved as a whole | Each marker in the Track marker family |
 | Station click spot | A `Model.StationAgent` at or below the root. In Railroader 0.6.3 station click spots are native map data | In the native map editor |
-| Track construction controller outside a rail bridge | A `Game.Mow.TrackConstructionScenery` at or below a root that is no rail bridge construction | Nowhere: in Railroader 0.6.3 only rail bridge constructions hold one |
+| Construction controller outside a rail bridge | A `Game.Mow.TrackConstructionScenery` at or below a root that is no rail bridge construction | Nowhere: in Railroader 0.6.3 only rail bridge constructions hold one |
 | Spawn point | A `Character.SpawnPoint` at or below the root. The group is not moved as a whole | Each spawn point in the Spawn point family |
 | Map icon | A `UI.Map.MapIcon` at or below the root. Such a map icon is in no family and has no edit; station map icons have their own container object and family | Nowhere |
 

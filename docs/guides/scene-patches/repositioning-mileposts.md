@@ -17,7 +17,7 @@ The patcher edits a milepost when all of these hold:
 - No component other than the milepost itself listens to the marker's location changes.
 - If a `Track.TrackRelativePosition` on the object makes its activity follow a track group, it activates this object itself. No other component has replaced its activation callback.
 - No loaded component other than the milepost and that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it refuses every marker until the next check.
-- The game lists one track location for the marker, at its current location, while the post is enabled and active, and none otherwise.
+- While the post is enabled and active, the marker has exactly one named location and it matches the stored track location. Otherwise the marker has no named location.
 
 The inventory lists an object that meets these conditions in the `Milepost` family with the structure `milepost-v1`. For any other milepost, **Supported edits** on the **Object** tab reads **Not editable:** and gives the reason.
 

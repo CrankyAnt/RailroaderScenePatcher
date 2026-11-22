@@ -15,7 +15,7 @@ The patcher can edit a marker only when all these conditions hold:
 - no other component listens to the marker's location changes,
 - a `Track.TrackRelativePosition` on the object whose activity follows a track group activates this object itself, and no other component has replaced its activation callback,
 - no loaded component other than that `Track.TrackRelativePosition` holds a direct reference to the marker, and no new-game car placement uses it. If the patcher cannot read every field that could hold a marker, it does not know the holders and refuses every marker until the next check,
-- the game lists one track location for the marker, at its current location, while the marker is enabled and active, and none otherwise. A track location listed for another scene marker with the same marker ID does not count for this marker.
+- while the marker is enabled and active, it has exactly one named location and it matches the stored track location. Otherwise the marker has no named location. A named location for another scene marker with the same marker ID does not count for this marker.
 
 A Generic marker inside a grade-crossing setup, such as a whistle sign under a `Track.Crossings.GradeCrossingController`, qualifies like any other: the crossing controller reads its circuits and spans, and the auto engineer's crossing horn reads the crossing pad's `Crossing` marker, not the sign. The crossing pad and the crossing's own `Crossing` markers keep their own operations.
 
