@@ -274,7 +274,8 @@ static class SpawnPointTests {
         var one = SpawnPoints.Uses(bindings.Concat(new[] { SpawnPoints.SetupBinding("alarka-jct-start") }), 1);
         Assert(one.Any(line => line.Contains("declares 1 native spawn,")) && !one.Any(line => line.Contains("1 native spawns")), "One native spawn reads singular: " + String.Join(" | ", one));
         var tie = SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 3, 0, 0));
-        Assert(tie.Any(line => line.Contains("This spawn point shares its priority with 3 other active spawn points") && line.Contains("isn't fixed")), "Equal priorities name this spawn point and say the choice among them is not fixed: " + String.Join(" | ", tie));
+        Assert(tie.Any(line => line.Contains("one of the 4 active spawn points with the highest priority (0), this one among them") && line.Contains("isn't fixed")),
+            "Equal priorities count this spawn point among them and say the choice is not fixed: " + String.Join(" | ", tie));
         Assert(!SpawnPoints.Uses(bindings, 0).Any(line => line.Contains("isn't fixed")), "A unique priority names no tie");
         Assert(SpawnPoints.Priority(bindings) == 0 && SpawnPoints.Priority(new[] { SpawnPoints.NameBinding("x") }) == null, "The priority reads back from the bindings");
     }
@@ -310,8 +311,20 @@ static class SpawnPointTests {
         Assert(Start(SpawnPoints.Uses(bindings, 3)) == null, "With native spawns no scene spawn point names the default start");
         Assert(Start(SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka") }, 0)) == null, "Without a priority the game's choice can't be told, so no default start is named");
         var tie = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 2, 0, 0)));
-        Assert(tie != null && tie.Contains("shares its priority with 2 other active spawn points") && tie.Contains("isn't fixed") && !tie.Contains("start here"),
-            "A shared top priority names the start without claiming it starts here: " + tie);
+        // In a tie the game starts at one of the tied spawn points, and which one isn't fixed: no tied point is named as the start.
+        Assert(tie == "New game: the map declares no native spawns, so a new game without a start setup is expected to start at one of the 3 active spawn points with the highest priority (5), this one among them. Which one isn't fixed.",
+            "A shared top priority gives one hedged line that claims no start here: " + tie);
+        // An active spawn point whose priority couldn't be read might come first, so the start here is hedged.
+        var hidden = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 0, 0, 1)));
+        Assert(hidden == "New game: the map declares no native spawns, so a new game without a start setup is expected to start here, at the active spawn point with the highest priority (5), unless the other active spawn point whose priority couldn't be read has a higher one.",
+            "One unread priority hedges the start here: " + hidden);
+        var hiddenTwo = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 0, 0, 2)));
+        Assert(hiddenTwo != null && hiddenTwo.EndsWith(", unless one of the 2 other active spawn points whose priority couldn't be read has a higher one.", StringComparison.Ordinal),
+            "Several unread priorities hedge the start here: " + hiddenTwo);
+        var tieHidden = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 2, 0, 1)));
+        Assert(tieHidden != null && tieHidden.Contains("one of the 3 active spawn points") && !tieHidden.Contains("start here")
+            && tieHidden.EndsWith(" The priority of 1 other active spawn point couldn't be read, so the game might start there instead.", StringComparison.Ordinal),
+            "A tie with an unread priority hedges both: " + tieHidden);
         var unread = Start(SpawnPoints.Uses(bindings, null));
         Assert(unread == "New game: the map's native spawns couldn't be read. If the map declares none, a new game without a start setup is expected to start here, at the active spawn point with the highest priority (5).",
             "Unread native spawns make the default start conditional: " + unread);

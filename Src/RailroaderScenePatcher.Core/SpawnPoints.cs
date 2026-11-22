@@ -64,17 +64,22 @@ namespace RailroaderScenePatcher.Core {
         // the game starts at this spawn point.
         public static IReadOnlyList<string> Uses(IEnumerable<string> bindings, int? nativeSpawns, SpawnRank rank = null) {
             rank = rank ?? SpawnRank.Alone;
-            var active = rank.Active; var samePriority = rank.SamePriority; var higherPriority = rank.HigherPriority;
+            var active = rank.Active;
             var lines = bindings?.ToArray() ?? new string[0];
             var name = After(lines, NamePrefix).FirstOrDefault() ?? "its object name";
             var priority = After(lines, PriorityPrefix).FirstOrDefault();
             var uses = new List<string>();
-            // The default start is the first of SpawnPoint.All, read only when the map declares no native spawns.
-            if (active && priority != null && higherPriority == 0 && nativeSpawns.GetValueOrDefault() == 0) {
-                var start = samePriority > 0
-                    ? "a new game without a start setup is expected to start at the active spawn point with the highest priority (this one: " + priority + "). This spawn point shares its priority with "
-                        + Count(samePriority, "other active spawn point") + ", and the choice among them isn't fixed."
-                    : "a new game without a start setup is expected to start here, at the active spawn point with the highest priority (" + priority + ").";
+            // The default start is the first of SpawnPoint.All, read only when the map declares no native spawns. In a
+            // tie the game starts at one of the tied spawn points, so none of them is named as the start; an active spawn
+            // point whose priority could not be read might come first, so the start here is hedged.
+            if (active && priority != null && rank.HigherPriority == 0 && nativeSpawns.GetValueOrDefault() == 0) {
+                var hidden = rank.UnreadPriority;
+                var start = rank.SamePriority > 0
+                    ? "a new game without a start setup is expected to start at one of the " + Count(rank.SamePriority + 1, "active spawn point") + " with the highest priority (" + priority + "), this one among them. Which one isn't fixed."
+                        + (hidden > 0 ? " The priority of " + Count(hidden, "other active spawn point") + " couldn't be read, so the game might start there instead." : "")
+                    : "a new game without a start setup is expected to start here, at the active spawn point with the highest priority (" + priority + ")"
+                        + (hidden == 0 ? "." : hidden == 1 ? ", unless the other active spawn point whose priority couldn't be read has a higher one."
+                            : ", unless one of the " + Count(hidden, "other active spawn point") + " whose priority couldn't be read has a higher one.");
                 uses.Add(nativeSpawns == null ? "New game: the map's native spawns couldn't be read. If the map declares none, " + start
                     : "New game: the map declares no native spawns, so " + start);
             }
