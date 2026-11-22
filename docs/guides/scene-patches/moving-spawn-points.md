@@ -12,12 +12,12 @@ A native spawn is an entry in the `spawns` section of a map's `Map.json`. The na
 
 ## What the game uses a spawn point for
 
-The **Use in the game** section of the **Object** tab lists the uses of the inspected spawn point. Use the list below to choose what to check in a test save.
+The **Use in the game** section of the **Object** tab lists the uses of the inspected spawn point. It names a new game start only for a spawn point where the game is expected to start. Use the list below to choose what to check in a test save.
 
-- **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. If several active spawn points share that priority, the game doesn't specify which it chooses, and the tab says so. If the map has native spawns, the new game is expected to use those instead.
+- **New game:** when the map declares no native spawns, a new game without a start setup is expected to start at the active spawn point with the highest priority. The tab shows this use only on that spawn point. If several active spawn points share that priority, the game doesn't specify which it chooses: each of them says that a new game starts at one of them, and none is named as the start. If the priority of another active spawn point can't be read, the tab says that the game might start there instead. If the map has native spawns, the new game is expected to use those instead, and no spawn point shows this use. A disabled spawn point never shows it.
 - **Rescue:** a stuck player is expected to be moved to the closest active spawn point.
-- **Teleport:** the `/tp` console command is expected to offer each active spawn point by its object name and jump to where it stands. Quick search also lists active spawn points, but only in a game version that opens it. Railroader 0.6.3 doesn't open quick search.
-- **Start setup:** when the game applies an active start setup to a company with no cars and no balance yet, the new company game is expected to start at the spawn point that setup names, even if the point is disabled. The tab names each such setup by its identifier, or by its object name if it has no identifier. It hasn't been established whether a start setup or the map's native spawns take precedence when both exist.
+- **Teleport:** the `/tp` console command is expected to offer each active spawn point by its object name and jump to where it stands.
+- **Start setup:** when the game applies an active start setup to a company with no cars and no balance yet, the new company game is expected to start at the spawn point that setup names, even if the point is disabled. The tab names each such setup by its identifier, or by its object name if it has no identifier. It hasn't been established whether a start setup or the map's native spawns take precedence when both exist, so if the map has native spawns, the tab names the setup without saying that the game starts at the spawn point.
 
 The game reads a spawn point's transform each time it uses it. In Railroader 0.6.3, `/tp alarka` took the player to the moved Alarka point. A new East Whittier company game without native spawns used the moved spawn point named by its start setup. Removing the modification returned the new company's start to its authored position.
 

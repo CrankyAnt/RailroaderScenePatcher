@@ -353,7 +353,7 @@ To appear in this family, a root must meet all these conditions:
 
 A candidate without one of those components isn't listed at all. A collider built by the game while the camera is near doesn't count. For a storage pile, the pile itself counts, but its generated collider doesn't.
 
-A group root that holds a car loader (`RollingStock.CarContentSwapper`) at any depth is not listed, and neither is anything below it. The game loads Robinson Gap coal by teleport between the industry's track spans, not at `World/Large Scenery/Robinson Gap Mine/Coal Loader`, so moving that loader would not move loading. A group or part modification whose path names such a group root fails before any change, with that reason, and the other modifications still apply.
+`World/Large Scenery/Robinson Gap Mine/Coal Loader`, which holds a car loader (`RollingStock.CarContentSwapper`), is a decorative group under Other. Target it and its parts with `baked-scenery-group-v1` and `baked-scenery-part-v1`, as any group and part. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so neither `placement` nor `active` changes where loading happens.
 
 The family leaves out a group holding any of the following at any depth: a track marker, station click spot, spawn point, or map icon. It also leaves out a group that holds a construction controller (`Game.Mow.TrackConstructionScenery`) but is no rail bridge construction. Those objects are inspection only. A group with a spawn point is not moved as a whole, because its spawn points are edited one by one in the [Spawn point](#spawn-point) family.
 
@@ -444,7 +444,7 @@ In the game code, a toggle is picked through a collider at or below its object a
 
 The patcher recognizes every scene object with a `Character.SpawnPoint` component, such as the spawn points under `World/POIs`. Set the target `component` to `Character.SpawnPoint` and `structure` to `spawn-point-v1`; the native map editor's Save writes the structure. Use the `scene` value from the inspected identity. A path that names no loaded spawn point, or more than one, fails the modification before changing anything. A modification may set `placement`, `active`, or both.
 
-The patcher moves the spawn point's transform and sets its activity. A spawn point has no renderer, collider, or culler. In Railroader 0.6.3, a new East Whittier company game started at its moved spawn point when the map had no native spawns. The `/tp` command used the moved Alarka point. Which takes precedence between native spawns and a company start setup remains unverified, as does rescue. Quick search lists active spawn points, but Railroader 0.6.3 doesn't open quick search.
+The patcher moves the spawn point's transform and sets its activity. A spawn point has no renderer, collider, or culler. In Railroader 0.6.3, a new East Whittier company game started at its moved spawn point when the map had no native spawns. The `/tp` command used the moved Alarka point. Which takes precedence between native spawns and a company start setup remains unverified, as does rescue.
 
 The patcher applies eligible spawn point modifications before the new game reads the start point. Modifications with `dependsOn` entries or a `trackFollowing` placement wait for the normal world load. After a change, the patcher verifies placement and activity. If verification fails, it restores the captured state.
 

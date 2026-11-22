@@ -18,7 +18,6 @@ To be listed, a group must be saved in the scene, have a renderer, collider, lig
 - Visual effects, such as the fireflies under `World/Environment Effects`.
 - Container objects, such as `World/Large Scenery/Bryson/Bryson Yard`. Each of the 13 yard lamp posts below that container object is its own group.
 - `Almond/Cube` and `Bryson/Bryson Appalachian Hardwoods`, which have no model or game function.
-- Groups excluded by the Car loaders rule, such as the `Coal Loader` at Robinson Gap Mine, and everything below their roots. The game loads Robinson Gap coal by teleport between the industry's track spans, not at the loader, so moving the loader wouldn't move loading. A scene patch file modification targeting the loader or one of its parts fails with that reason.
 
 A group contains only the objects saved below its root in the scene. Nearby Props, tanks, conveyors, and terrain masks in the map's `Map.json` are native map data. Move those in the native map editor. Moving the group leaves them in place. Examples include the coal and oil tanks beside the lamp post `Bryson Oil` and the conveyor beside the coal pile `Coal & Oil` at Andrews. These are Props.
 
@@ -77,6 +76,8 @@ You can move or disable an industry's decorative buildings and its storage piles
 On a pile's **Object** tab, **Use in the game** names the storage it shows, such as its industry's pulpwood storage. Moving or disabling the pile doesn't change that storage. The pile still fills and empties at its new position because the game links it to the storage by ID. The pile's logs, collider, and culling move with it. Disabling the pile hides it and leaves the storage unchanged.
 
 The industry itself is native map data. Its position, its track spans, and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
+
+The `Coal Loader` at Robinson Gap Mine is a decorative group under **Other**, like the other Robinson Gap Mine groups, and you move or disable it like any other group. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so moving or disabling the loader doesn't change where loading happens. On its **Object** tab, **Use in the game** shows the same decorative text as the other groups under **Other**.
 
 ## Lake surfaces
 

@@ -66,6 +66,8 @@ static class SpawnPointTests {
         GroupsWithSpawnPointsPointToTheFamily();
         DisabledSpawnPointIsNotOffered();
         UsesStateConditionsAndCounts();
+        RankCountsTheOtherActiveSpawnPoints();
+        NewGameStartIsNamedOnlyWhereTheGameStartsThere();
         UnreadSetupsAreNamedAsUnread();
         RelationshipsAreRefusedBeforeMutation();
         MinimumHoldsWithoutTheCapability();
@@ -216,27 +218,27 @@ static class SpawnPointTests {
         var uses = SpawnPoints.Uses(bindings, 0);
         foreach (var expected in new[] { "rescue", "/tp", "new game", "alarka-jct-start", "Alarka" })
             Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0), "The uses name " + expected + ": " + String.Join(" | ", uses));
-        // Quick search lists spawn points, but Railroader 0.6.3 never opens it (QuickSearchController.Show is empty), so
-        // only teleport is an expected use, and quick search is named only where the game offers it.
+        // Quick search never opens in Railroader 0.6.3 (QuickSearchController.Show is empty), so it is no use of a spawn
+        // point, and neither the uses nor the dependency name it.
         var teleport = uses.Single(line => line.Contains("/tp"));
-        Assert(teleport.StartsWith("Teleport: the /tp console command is expected to list this spawn point as Alarka and teleport you to its position.", StringComparison.Ordinal)
-            && teleport.Contains("in game versions that open it. Railroader 0.6.3 doesn't open quick search."), "The teleport use names /tp and quick search only where the game offers it: " + teleport);
-        Assert(!uses.Any(line => line.Contains("quick search are expected") || line.Contains("quick search is expected")) && !SpawnPoints.Dependency.Contains("quick search"),
-            "No use or dependency says quick search is expected to offer the spawn point: " + String.Join(" | ", uses) + " | " + SpawnPoints.Dependency);
+        Assert(teleport == "Teleport: the /tp console command is expected to list this spawn point as Alarka and teleport you to its position.",
+            "The teleport use names /tp alone: " + teleport);
+        Assert(!uses.Any(line => line.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) >= 0) && SpawnPoints.Dependency.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) < 0,
+            "No use or dependency names quick search: " + String.Join(" | ", uses) + " | " + SpawnPoints.Dependency);
         Assert(uses.Any(line => line.Contains("no native spawns")), "Without native spawns the default start says so: " + String.Join(" | ", uses));
         var native = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) }, 2);
-        Assert(native.Any(line => line.Contains("2 native spawns") && line.Contains("Spawns")) && native.Any(line => line.Contains("No start setup")),
-            "With native spawns the uses name them and their Map Editor category, and a spawn point without a setup says so: " + String.Join(" | ", native));
-        var unknown = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka") }, null);
+        Assert(!native.Any(line => line.StartsWith("New game:", StringComparison.Ordinal)) && native.Any(line => line.Contains("No start setup")),
+            "With native spawns a new game doesn't start at a scene spawn point, and a spawn point without a setup says so: " + String.Join(" | ", native));
+        var unknown = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) }, null);
         Assert(unknown.Any(line => line.Contains("couldn't be read")), "Unknown native spawns are named as unread: " + String.Join(" | ", unknown));
         var setup = uses.Single(line => line.Contains("alarka-jct-start"));
         Assert(setup.Contains("expected") && setup.Contains("no cars") && setup.Contains("balance"),
             "The start setup use names its condition and stays expected behaviour: " + setup);
         Assert(SpawnPoints.Operations.StartsWith("Move, rotate, enable, or disable", StringComparison.Ordinal), "The supported edits name placement and Enabled: " + SpawnPoints.Operations);
     }
-    static SceneObservation Row(string name, bool enabled) =>
-        new SceneObservation(name, new TargetIdentity("level4", "World/POIs/" + name, SpawnPoints.Component, SpawnPoints.Structure), SpawnPoints.Family, enabled,
-            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new[] { SpawnPoints.NameBinding(name) }, new[] { SpawnPoints.Dependency }, BindingRules.Problems(enabled, new string[0], new string[0]),
+    static SceneObservation Row(string name, bool enabled, int? priority = null, string family = SpawnPoints.Family) =>
+        new SceneObservation(name, new TargetIdentity("level4", "World/POIs/" + name, SpawnPoints.Component, SpawnPoints.Structure), family, enabled,
+            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, priority == null ? new[] { SpawnPoints.NameBinding(name) } : new[] { SpawnPoints.NameBinding(name), SpawnPoints.PriorityBinding(priority.Value) }, new[] { SpawnPoints.Dependency }, BindingRules.Problems(enabled, new string[0], new string[0]),
             SpawnPoints.Operations, new string[0], enabled, new string[0], null);
     static void InventoryListsEachSpawnPointOnceWithoutProblems() {
         Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, "World") == SpawnPoints.Family, "A spawn point below World is listed in the Spawn point family");
@@ -259,21 +261,84 @@ static class SpawnPointTests {
     // a start setup that names it still reads it.
     static void DisabledSpawnPointIsNotOffered() {
         var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0), SpawnPoints.SetupBinding("alarka-jct-start") };
-        var uses = SpawnPoints.Uses(bindings, 0, active: false);
+        var uses = SpawnPoints.Uses(bindings, 0, SpawnRank.Inactive);
         Assert(!uses.Any(line => line.Contains("list this spawn point as")), "A disabled spawn point is not said to be offered: " + String.Join(" | ", uses));
-        Assert(!uses.Any(line => line.Contains("quick search")), "A disabled spawn point's uses leave quick search out: " + String.Join(" | ", uses));
-        foreach (var expected in new[] { "rescue", "/tp", "new game" })
+        Assert(!uses.Any(line => line.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) >= 0), "A disabled spawn point's uses leave quick search out: " + String.Join(" | ", uses));
+        foreach (var expected in new[] { "rescue", "/tp" })
             Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0 && line.Contains("disabled")), "The disabled spawn point says " + expected + " passes it by: " + String.Join(" | ", uses));
+        Assert(!uses.Any(line => line.StartsWith("New game:", StringComparison.Ordinal)), "A new game without a start setup passes a disabled spawn point by, so no default start is named: " + String.Join(" | ", uses));
         Assert(uses.Any(line => line.Contains("alarka-jct-start") && line.Contains("This also applies when this spawn point is disabled")), "A start setup still names it: " + String.Join(" | ", uses));
     }
     static void UsesStateConditionsAndCounts() {
         var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) };
-        var one = SpawnPoints.Uses(bindings, 1);
+        var one = SpawnPoints.Uses(bindings.Concat(new[] { SpawnPoints.SetupBinding("alarka-jct-start") }), 1);
         Assert(one.Any(line => line.Contains("declares 1 native spawn,")) && !one.Any(line => line.Contains("1 native spawns")), "One native spawn reads singular: " + String.Join(" | ", one));
-        var tie = SpawnPoints.Uses(bindings, 0, samePriority: 3);
-        Assert(tie.Any(line => line.Contains("This spawn point shares its priority with 3 other active spawn points") && line.Contains("isn't fixed")), "Equal priorities name this spawn point and say the choice among them is not fixed: " + String.Join(" | ", tie));
+        var tie = SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 3, 0, 0));
+        Assert(tie.Any(line => line.Contains("one of the 4 active spawn points with the highest priority (0), this one among them") && line.Contains("isn't fixed")),
+            "Equal priorities count this spawn point among them and say the choice is not fixed: " + String.Join(" | ", tie));
         Assert(!SpawnPoints.Uses(bindings, 0).Any(line => line.Contains("isn't fixed")), "A unique priority names no tie");
         Assert(SpawnPoints.Priority(bindings) == 0 && SpawnPoints.Priority(new[] { SpawnPoints.NameBinding("x") }) == null, "The priority reads back from the bindings");
+    }
+    // The game offers only active spawn points, highest priority first, with no fixed order among equal priorities, so
+    // the rank of a spawn point counts the other active ones that share, exceed or hide their priority.
+    static void RankCountsTheOtherActiveSpawnPoints() {
+        var alarka = Row("Alarka", true, 5);
+        var rows = new[] { alarka, Row("Bryson", true, 5), Row("Cochran", true, 3), Row("Dillsboro", false, 9), Row("Ela", true),
+            Row("Almond", true, 9, StarterPlacements.Family), Row("Alarka", true, 7) };
+        var rank = SpawnPoints.Rank(alarka, rows);
+        Assert(rank.Active && rank.SamePriority == 1 && rank.HigherPriority == 0 && rank.UnreadPriority == 1,
+            "Alarka shares its priority with Bryson, has no active spawn point above it and one whose priority is unread; inactive points, other families and its own path don't count: "
+            + rank.SamePriority + "/" + rank.HigherPriority + "/" + rank.UnreadPriority);
+        var cochran = SpawnPoints.Rank(rows[2], rows);
+        Assert(cochran.HigherPriority == 3 && cochran.SamePriority == 0, "Cochran has three active spawn points above it, both Alarka rows among them: " + cochran.HigherPriority);
+        Assert(!SpawnPoints.Rank(rows[3], rows).Active, "A disabled spawn point ranks as inactive");
+        var unread = SpawnPoints.Rank(rows[4], rows);
+        Assert(unread.Active && unread.SamePriority == 0 && unread.HigherPriority == 0 && unread.UnreadPriority == 0, "A spawn point without a priority counts nothing it could compare");
+        var alone = SpawnPoints.Rank(alarka, null);
+        Assert(alone.Active && alone.SamePriority == 0 && alone.HigherPriority == 0 && alone.UnreadPriority == 0, "Without an inventory the rank counts no others");
+    }
+    // SpawnPoint.Default is the first of SpawnPoint.All: active spawn points only, highest priority first. A new game
+    // without a start setup reads it only when the map declares no native spawns (InitializeDefaultSpawnIfNeeded). The
+    // Object tab names that start only for the spawn point the game starts at.
+    static void NewGameStartIsNamedOnlyWhereTheGameStartsThere() {
+        var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(5) };
+        string Start(IReadOnlyList<string> lines) => lines.SingleOrDefault(line => line.StartsWith("New game:", StringComparison.Ordinal));
+        var first = Start(SpawnPoints.Uses(bindings, 0));
+        Assert(first == "New game: the map declares no native spawns, so a new game without a start setup is expected to start here, at the active spawn point with the highest priority (5).",
+            "The active spawn point with the highest priority names the default start here: " + first);
+        Assert(Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 0, 1, 0))) == null, "A spawn point below another active one's priority names no default start");
+        Assert(Start(SpawnPoints.Uses(bindings, 0, SpawnRank.Inactive)) == null, "A disabled spawn point names no default start");
+        Assert(Start(SpawnPoints.Uses(bindings, 3)) == null, "With native spawns no scene spawn point names the default start");
+        Assert(Start(SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka") }, 0)) == null, "Without a priority the game's choice can't be told, so no default start is named");
+        var tie = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 2, 0, 0)));
+        // In a tie the game starts at one of the tied spawn points, and which one isn't fixed: no tied point is named as the start.
+        Assert(tie == "New game: the map declares no native spawns, so a new game without a start setup is expected to start at one of the 3 active spawn points with the highest priority (5), this one among them. Which one isn't fixed.",
+            "A shared top priority gives one hedged line that claims no start here: " + tie);
+        // An active spawn point whose priority couldn't be read might come first, so the start here is hedged.
+        var hidden = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 0, 0, 1)));
+        Assert(hidden == "New game: the map declares no native spawns, so a new game without a start setup is expected to start here, at the active spawn point with the highest priority (5), unless the other active spawn point whose priority couldn't be read has a higher one.",
+            "One unread priority hedges the start here: " + hidden);
+        var hiddenTwo = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 0, 0, 2)));
+        Assert(hiddenTwo != null && hiddenTwo.EndsWith(", unless one of the 2 other active spawn points whose priority couldn't be read has a higher one.", StringComparison.Ordinal),
+            "Several unread priorities hedge the start here: " + hiddenTwo);
+        var tieHidden = Start(SpawnPoints.Uses(bindings, 0, new SpawnRank(true, 2, 0, 1)));
+        Assert(tieHidden != null && tieHidden.Contains("one of the 3 active spawn points") && !tieHidden.Contains("start here")
+            && tieHidden.EndsWith(" The priority of 1 other active spawn point couldn't be read, so the game might start there instead.", StringComparison.Ordinal),
+            "A tie with an unread priority hedges both: " + tieHidden);
+        var unread = Start(SpawnPoints.Uses(bindings, null));
+        Assert(unread == "New game: the map's native spawns couldn't be read. If the map declares none, a new game without a start setup is expected to start here, at the active spawn point with the highest priority (5).",
+            "Unread native spawns make the default start conditional: " + unread);
+        Assert(Start(SpawnPoints.Uses(bindings, null, new SpawnRank(true, 0, 2, 0))) == null, "Unread native spawns name no start for a lower priority");
+        // A start setup reads its spawn point whatever its activity or priority, but whether the map's native spawns
+        // take its place is not settled, so with native spawns the setup line claims no start here.
+        var withSetup = bindings.Concat(new[] { SpawnPoints.SetupBinding("ewh-steam") }).ToArray();
+        var setup = SpawnPoints.Uses(withSetup, 0, SpawnRank.Inactive).Single(line => line.Contains("ewh-steam"));
+        Assert(setup.StartsWith("Start setup: a new company game using ewh-steam is expected to start here", StringComparison.Ordinal), "Without native spawns the setup starts here: " + setup);
+        var nativeSetup = SpawnPoints.Uses(withSetup, 2).Single(line => line.Contains("ewh-steam"));
+        Assert(nativeSetup == "Start setup: named by ewh-steam. The map declares 2 native spawns, so it isn't known whether a new company game using this setup starts here or at a native spawn.",
+            "With native spawns the setup line claims no start here: " + nativeSetup);
+        var unreadSetup = SpawnPoints.Uses(withSetup, null).Single(line => line.Contains("ewh-steam"));
+        Assert(unreadSetup.Contains("is expected to start here") && unreadSetup.Contains("native spawns couldn't be read"), "Unread native spawns make the setup start conditional: " + unreadSetup);
     }
     static void UnreadSetupsAreNamedAsUnread() {
         var uses = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.SetupsUnreadBinding("SetupDescriptor.spawnPoint is missing") }, 0);
