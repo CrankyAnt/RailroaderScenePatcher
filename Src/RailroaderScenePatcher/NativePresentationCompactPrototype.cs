@@ -228,7 +228,7 @@ namespace RailroaderScenePatcher {
         string PrototypeState() {
             var bounds = PanelBounds;
             return "mode=" + (PrototypeCompact ? "compact" : "full") + "; layout=side rail; outliner=" + (PrototypeOutlinerOpen ? "shown" : "hidden") +
-                "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + scale;
+                "; rect=(" + Mathf.RoundToInt(bounds.x) + ", " + Mathf.RoundToInt(bounds.y) + ", " + Mathf.RoundToInt(bounds.width) + " x " + Mathf.RoundToInt(bounds.height) + ") px; scale=" + scale.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         void PrototypeDispose() {

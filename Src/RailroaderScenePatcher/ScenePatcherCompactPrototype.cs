@@ -212,9 +212,9 @@ namespace RailroaderScenePatcher {
         }
 
         void PrototypeGuidedContext(UIPanelBuilder builder) {
-            var summary = guided.Kind == null
-                ? "Guided mode: select a task in the full window."
-                : "Guided: " + GuidedName(guided.Kind.Value) + " (" + guided.Step + ")";
+            // The name's row already says Guided, so the line names only the task and its step; the longest,
+            // "Snap to track or endpoint (Review)", fits the rail's width.
+            var summary = guided.Kind == null ? "No task chosen yet" : GuidedName(guided.Kind.Value) + " (" + guided.Step + ")";
             Line(builder, "<b>" + Literal(summary) + "</b>", "Guided task", summary, LineHeight);
             if (selected != null) PrototypeHonestPlacement(builder);
             if (PrototypeGuidedSnap) {
@@ -224,7 +224,7 @@ namespace RailroaderScenePatcher {
                 var draft = PrototypeLocationText(guidedFields, "None entered");
                 Line(builder, "<style=FieldLabel>DRAFT LOCATION</style> " + Literal(draft), "Draft track location", draft, LineHeight);
             }
-            Line(builder, "<style=Footnote>Switch to the full window to finish this guided task.</style>", null, null, LineHeight);
+            Line(builder, "<style=Footnote>" + (guided.Kind == null ? "Choose a task in the full window." : "Switch to the full window to finish this guided task.") + "</style>", null, null, LineHeight);
         }
 
         // ---- Placement readouts ----
