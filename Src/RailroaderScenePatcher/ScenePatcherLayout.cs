@@ -715,12 +715,15 @@ namespace RailroaderScenePatcher {
             // and the start setups that name it.
             if (selected.Family == SpawnPoints.Family) {
                 Section(builder, "Use in the game");
-                // The game offers only spawn points active in the hierarchy; among those with the same priority its sort
-                // keeps no fixed order, so the other active ones that share it are counted from the object list.
+                // The game offers only spawn points active in the hierarchy, highest priority first; among those with the
+                // same priority its sort keeps no fixed order. The other active ones that share or exceed this spawn
+                // point's priority are counted from the object list.
                 var priority = SpawnPoints.Priority(selected.Bindings);
-                var same = priority == null || inventory == null ? 0 : inventory.Entries.Count(entry => entry.Family == SpawnPoints.Family && entry.Active && !ReferenceEquals(entry, selected)
-                    && entry.Identity.Path != selected.Identity.Path && SpawnPoints.Priority(entry.Bindings) == priority);
-                foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), selected.Active, same)) PlainLabel(builder, use);
+                var others = priority == null || inventory == null ? new int?[0] : inventory.Entries.Where(entry => entry.Family == SpawnPoints.Family && entry.Active && !ReferenceEquals(entry, selected)
+                    && entry.Identity.Path != selected.Identity.Path).Select(entry => SpawnPoints.Priority(entry.Bindings)).ToArray();
+                var same = others.Count(other => other == priority);
+                var higher = others.Count(other => other > priority);
+                foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), selected.Active, same, higher)) PlainLabel(builder, use);
             }
             Section(builder, "State");
             if (HoldWarning is string warning) builder.AddLabel(Tint(Amber, warning));
