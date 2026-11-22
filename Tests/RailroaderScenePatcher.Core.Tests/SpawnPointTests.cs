@@ -216,13 +216,13 @@ static class SpawnPointTests {
         var uses = SpawnPoints.Uses(bindings, 0);
         foreach (var expected in new[] { "rescue", "/tp", "new game", "alarka-jct-start", "Alarka" })
             Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0), "The uses name " + expected + ": " + String.Join(" | ", uses));
-        // Quick search lists spawn points, but Railroader 0.6.3 never opens it (QuickSearchController.Show is empty), so
-        // only teleport is an expected use, and quick search is named only where the game offers it.
+        // Quick search never opens in Railroader 0.6.3 (QuickSearchController.Show is empty), so it is no use of a spawn
+        // point, and neither the uses nor the dependency name it.
         var teleport = uses.Single(line => line.Contains("/tp"));
-        Assert(teleport.StartsWith("Teleport: the /tp console command is expected to list this spawn point as Alarka and teleport you to its position.", StringComparison.Ordinal)
-            && teleport.Contains("in game versions that open it. Railroader 0.6.3 doesn't open quick search."), "The teleport use names /tp and quick search only where the game offers it: " + teleport);
-        Assert(!uses.Any(line => line.Contains("quick search are expected") || line.Contains("quick search is expected")) && !SpawnPoints.Dependency.Contains("quick search"),
-            "No use or dependency says quick search is expected to offer the spawn point: " + String.Join(" | ", uses) + " | " + SpawnPoints.Dependency);
+        Assert(teleport == "Teleport: the /tp console command is expected to list this spawn point as Alarka and teleport you to its position.",
+            "The teleport use names /tp alone: " + teleport);
+        Assert(!uses.Any(line => line.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) >= 0) && SpawnPoints.Dependency.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) < 0,
+            "No use or dependency names quick search: " + String.Join(" | ", uses) + " | " + SpawnPoints.Dependency);
         Assert(uses.Any(line => line.Contains("no native spawns")), "Without native spawns the default start says so: " + String.Join(" | ", uses));
         var native = SpawnPoints.Uses(new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0) }, 2);
         Assert(native.Any(line => line.Contains("2 native spawns") && line.Contains("Spawns")) && native.Any(line => line.Contains("No start setup")),
@@ -261,7 +261,7 @@ static class SpawnPointTests {
         var bindings = new[] { SpawnPoints.NameBinding("Alarka"), SpawnPoints.PriorityBinding(0), SpawnPoints.SetupBinding("alarka-jct-start") };
         var uses = SpawnPoints.Uses(bindings, 0, active: false);
         Assert(!uses.Any(line => line.Contains("list this spawn point as")), "A disabled spawn point is not said to be offered: " + String.Join(" | ", uses));
-        Assert(!uses.Any(line => line.Contains("quick search")), "A disabled spawn point's uses leave quick search out: " + String.Join(" | ", uses));
+        Assert(!uses.Any(line => line.IndexOf("quick search", StringComparison.OrdinalIgnoreCase) >= 0), "A disabled spawn point's uses leave quick search out: " + String.Join(" | ", uses));
         foreach (var expected in new[] { "rescue", "/tp", "new game" })
             Assert(uses.Any(line => line.IndexOf(expected, StringComparison.OrdinalIgnoreCase) >= 0 && line.Contains("disabled")), "The disabled spawn point says " + expected + " passes it by: " + String.Join(" | ", uses));
         Assert(uses.Any(line => line.Contains("alarka-jct-start") && line.Contains("This also applies when this spawn point is disabled")), "A start setup still names it: " + String.Join(" | ", uses));

@@ -696,7 +696,7 @@ namespace RailroaderScenePatcher {
                 Section(builder, "Use in the game");
                 PlainLabel(builder, CommandBand.UseInGame(selected, selected.GroupPath != null ? InventoryPresentationState.GroupOf(inventory, selected) : null));
             }
-            // A spawn point names each use the game has for it: the default start, rescue, teleport, quick search where the game offers it,
+            // A spawn point names each use the game has for it: the default start, rescue, teleport,
             // and the start setups that name it.
             if (selected.Family == SpawnPoints.Family) {
                 Section(builder, "Use in the game");

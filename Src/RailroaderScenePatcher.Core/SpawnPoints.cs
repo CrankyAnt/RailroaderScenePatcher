@@ -20,9 +20,8 @@ namespace RailroaderScenePatcher.Core {
     // Railroader yet, so the Object tab states it as expected behaviour.
     // A stuck player is moved to the closest active spawn point, and to a native spawn only when there is none
     // (PlayerController, SpawnPoint.TryClosestTo). The /tp console command lists the active spawn points by name and
-    // jumps to where each stands (TeleportCommand). Quick search lists them too (QuickSearchController.AllItems), but
-    // its Show() is empty in Railroader 0.6.3, so it never opens there. Each reads the transform when it runs, so a
-    // moved spawn point is used at its new place.
+    // jumps to where each stands (TeleportCommand). Each reads the transform when it runs, so a moved spawn point is
+    // used at its new place.
     public static class SpawnPoints {
         public const string Family = "Spawn point", Component = "Character.SpawnPoint", Structure = "spawn-point-v1", RequiredVersion = "0.5.0";
         public const string Operations = "Move, rotate, enable, or disable this spawn point. Edit native spawns in the map data under Spawns in the Map Editor.";
@@ -65,7 +64,7 @@ namespace RailroaderScenePatcher.Core {
                 : "New game: the map declares " + Count(nativeSpawns.Value, "native spawn") + ", so a new game without a start setup is expected to start there. Edit these under Spawns in the Map Editor.");
             uses.Add(active ? "Rescue: a stuck player is expected to be moved to the closest active spawn point."
                 : "Rescue: a stuck player is expected to be moved to the closest active spawn point. This spawn point is disabled, so the game is expected to skip it.");
-            uses.Add(active ? "Teleport: the /tp console command is expected to list this spawn point as " + name + " and teleport you to its position. Quick search also lists active spawn points in game versions that open it. Railroader 0.6.3 doesn't open quick search."
+            uses.Add(active ? "Teleport: the /tp console command is expected to list this spawn point as " + name + " and teleport you to its position."
                 : "Teleport: the /tp console command lists only active spawn points. This spawn point is disabled, so the command isn't expected to list it.");
             var unread = After(lines, SetupsUnreadPrefix).FirstOrDefault();
             var setups = After(lines, SetupPrefix).ToArray();

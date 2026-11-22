@@ -444,7 +444,7 @@ In the game code, a toggle is picked through a collider at or below its object a
 
 The patcher recognizes every scene object with a `Character.SpawnPoint` component, such as the spawn points under `World/POIs`. Set the target `component` to `Character.SpawnPoint` and `structure` to `spawn-point-v1`; the native map editor's Save writes the structure. Use the `scene` value from the inspected identity. A path that names no loaded spawn point, or more than one, fails the modification before changing anything. A modification may set `placement`, `active`, or both.
 
-The patcher moves the spawn point's transform and sets its activity. A spawn point has no renderer, collider, or culler. In Railroader 0.6.3, a new East Whittier company game started at its moved spawn point when the map had no native spawns. The `/tp` command used the moved Alarka point. Which takes precedence between native spawns and a company start setup remains unverified, as does rescue. Quick search lists active spawn points, but Railroader 0.6.3 doesn't open quick search.
+The patcher moves the spawn point's transform and sets its activity. A spawn point has no renderer, collider, or culler. In Railroader 0.6.3, a new East Whittier company game started at its moved spawn point when the map had no native spawns. The `/tp` command used the moved Alarka point. Which takes precedence between native spawns and a company start setup remains unverified, as does rescue.
 
 The patcher applies eligible spawn point modifications before the new game reads the start point. Modifications with `dependsOn` entries or a `trackFollowing` placement wait for the normal world load. After a change, the patcher verifies placement and activity. If verification fails, it restores the captured state.
 
