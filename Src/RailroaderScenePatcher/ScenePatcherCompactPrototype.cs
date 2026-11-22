@@ -68,29 +68,26 @@ namespace RailroaderScenePatcher {
             try { DrawLeftBand(builder); } finally { leftBandWidth = fullWidth; }
         }
 
-        // Heading and state line with a read-only mode label instead of the live Inspector/Guided switch.
+        // The name with a read-only mode label at its right, instead of the live Inspector/Guided switch, then the state
+        // line across the rail's whole width: a state line beside the label lost its family name to the ellipsis.
         void PrototypeHeading(UIPanelBuilder builder, PrototypeView view) {
-            if (selected == null) {
-                builder.HStack(row => {
-                    Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
-                    PrototypeModeLabel(row, view);
-                }).ChildrenKeepHeight().Height(RowHeight);
-                Line(builder, StateLine(out _), null, null, RowHeight);
-                return;
-            }
-            var name = selected.DisplayName;
-            var added = IsAdded(selected);
-            var heading = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path).Height(RowHeight);
-            if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
-            var state = StateLine(out var states);
             builder.HStack(row => {
-                Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
+                if (selected == null) Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
+                else {
+                    var name = selected.DisplayName;
+                    var added = IsAdded(selected);
+                    var heading = Heading(row, Literal(name), "Object", added ? name : selected.Identity.Path).EqualFlexibleWidth(0);
+                    if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
+                }
                 PrototypeModeLabel(row, view);
             }).ChildrenKeepHeight().Height(RowHeight);
+            var state = StateLine(out var states);
+            if (selected == null) Line(builder, state, null, null, RowHeight);
+            else Line(builder, state, "State", states, RowHeight);
         }
 
         void PrototypeModeLabel(UIPanelBuilder row, PrototypeView view) {
-            var text = guided.Enabled ? "<color=" + Blue + "><b>Guided</b></color>" : "<alpha=#99>" + Literal(view.Title) + "</alpha>";
+            var text = guided.Enabled ? "<color=" + Blue + "><b>Guided</b></color>" : "<alpha=#99>" + Literal(view.Title) + "<alpha=#FF>";
             var title = guided.Enabled ? "Guided mode" : "Active tab";
             var tip = guided.Enabled
                 ? "Guided mode is active. Switch to the full window to finish or leave the guided task."
@@ -110,6 +107,7 @@ namespace RailroaderScenePatcher {
                 content.ConfigureLayout(4f);
                 DrawPlacement(content);
             });
+            PrototypeWrapLines(body);
             var fill = body.GetComponent<LayoutElement>();
             if (fill != null) {
                 fill.minHeight = minHeight;
@@ -118,6 +116,19 @@ namespace RailroaderScenePatcher {
             }
             var viewport = body.GetComponent<ScrollRect>().viewport;
             if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null) viewport.gameObject.AddComponent<RectMask2D>();
+        }
+
+        // The Placement body's lines, such as the Snap and Follow hints, are one line high with an ellipsis, sized for the
+        // full window's inspector. In the rail's narrower body they wrap instead and take the height they need; the body
+        // scrolls. Only the rail's copy of the body changes.
+        static void PrototypeWrapLines(RectTransform body) {
+            foreach (var text in body.GetComponentsInChildren<TMP_Text>(true)) {
+                if (text.overflowMode != TextOverflowModes.Ellipsis || text.textWrappingMode != TextWrappingModes.NoWrap) continue;
+                if (text.GetComponentInParent<TMP_InputField>() != null) continue;
+                text.overflowMode = TextOverflowModes.Overflow; text.textWrappingMode = TextWrappingModes.Normal;
+                var layout = text.GetComponent<LayoutElement>();
+                if (layout != null) { layout.minHeight = -1; layout.preferredHeight = -1; }
+            }
         }
 
         void PrototypeObjectContext(UIPanelBuilder builder) {
@@ -151,7 +162,8 @@ namespace RailroaderScenePatcher {
                     var segment = coverageFields[role * PrototypeCoverageFieldsPerRole];
                     return CircuitCoverage.RoleCaption(CircuitCoverage.Roles[role]) + ": " + (String.IsNullOrWhiteSpace(segment) ? "none" : segment);
                 }).ToArray();
-                Line(builder, Literal(String.Join("   ", roles)), "Role segments", String.Join("\n", roles), LineHeight);
+                // One line per role: the three on one line cut off the last role.
+                foreach (var role in roles) Line(builder, Literal(role), "Role segments", String.Join("\n", roles), LineHeight);
             } else if (equipmentSource != null) {
                 Line(builder, "<b>Equipment form</b> " + Literal(equipmentLabel ?? EquipmentKind), "Equipment form", "Switch to the full window to preview or apply this equipment form.", LineHeight);
                 PrototypePositionOnlyLine(builder);
@@ -330,11 +342,12 @@ namespace RailroaderScenePatcher {
             var labelTip = filtered
                 ? summary + ". Active outliner filter: " + String.Join(", ", filterParts) + ". Click Reset filter to show all objects."
                 : summary + ". Inactive loaded objects are included.";
-            TMP_Text measure = null;
+            // The summary has a line of its own: beside the two buttons a filtered summary lost its filter to the ellipsis.
+            var summaryRect = Line(builder, labelMarkup, "Outliner", labelTip, LineHeight);
+            var measure = summaryRect.GetComponent<TMP_Text>() ?? summaryRect.GetComponentInChildren<TMP_Text>(true);
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                var summaryRect = Line(row, labelMarkup, "Outliner", labelTip, RowHeight).EqualFlexibleWidth(0);
-                measure = summaryRect.GetComponent<TMP_Text>() ?? summaryRect.GetComponentInChildren<TMP_Text>(true);
+                row.Spacer();
                 Button(row, "Reset filter", () => { filter = ""; outlinerFilter = OutlinerFilter.All; }).Inactive(!filtered)
                     .Tooltip("Reset filter", CommandBand.Tooltip("Clear the outliner search text and filter to show all objects.", filtered ? null : "No outliner search or filter is active."));
                 var open = presentation.PrototypeOutlinerOpen;

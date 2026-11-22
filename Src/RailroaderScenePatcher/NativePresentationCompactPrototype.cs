@@ -13,11 +13,11 @@ namespace RailroaderScenePatcher {
         // Content dimensions in canvas units: 356 matches InspectorMinimumWidth (350) with padding so the four
         // right-band commands (335), every footer and tab action row (budget 340) and all five title-bar icons fit.
         // The collapsed content holds the tallest context section, the Placement body at its collapsed least height
-        // of 140, with the bands, heading, messages, action row, outliner header and grip clearance. The expanded
+        // of 140, with the bands, heading, messages, action row, outliner summary line and buttons, and grip clearance. The expanded
         // content adds the Placement body's full 196 and the outliner rows' least height of 120 with their spacing.
         // Each is the least content size the resize grip allows in its state, so a resize cannot crush a row.
         internal const float PrototypeRailContent = 356, PrototypePlacementBody = 196, PrototypePlacementCollapsedBody = 140, PrototypeMessageHeight = 56,
-            PrototypeCollapsedContent = 420, PrototypeExpandedMinContent = PrototypeCollapsedContent + (PrototypePlacementBody - PrototypePlacementCollapsedBody) + 120 + 4;
+            PrototypeCollapsedContent = 444, PrototypeExpandedMinContent = PrototypeCollapsedContent + (PrototypePlacementBody - PrototypePlacementCollapsedBody) + 120 + 4;
         // Where the user left the compact rail, in screen pixels, for this session only.
         Rect prototypeCompactRect, prototypePlacedRect;
         float prototypeExpandedHeight, prototypeCollapsedHeight;
@@ -144,8 +144,20 @@ namespace RailroaderScenePatcher {
             PrototypeOutlinerOpen = true;
         }
 
-        // Keeps a compact window inside the screen after a resolution or scale change without writing saved full bounds.
+        // The UI scale the rail was last placed at. Its rectangles are screen pixels, which a scale change makes wrong.
+        float prototypeScale;
+
+        // Keeps a compact window inside the screen after a resolution change without writing saved full bounds. A UI
+        // scale change places the rail again at its default place, the right screen edge, bottom-aligned: the window
+        // keeps its top-left corner while its size follows the scale, so it drifted off the edge. A dragged place and
+        // the remembered heights are pixels of the old scale and are dropped; the outliner stays shown or hidden.
         void PrototypeClampLayout() {
+            if (prototypeScale != scale) {
+                prototypeCompactRect = Rect.zero; prototypeExpandedHeight = 0; prototypeCollapsedHeight = 0;
+                PrototypePlace();
+                PrototypeSwitched?.Invoke(PrototypeState() + "; reason=ui scale");
+                return;
+            }
             var current = PanelBounds;
             if (current.width <= 0 || current.height <= 0) return;
             var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
@@ -190,6 +202,7 @@ namespace RailroaderScenePatcher {
         // The compact rail's rectangle in screen pixels. Right-aligned and bottom-aligned by default; restores the
         // dragged rectangle for the session once moved or resized.
         void PrototypePlace() {
+            prototypeScale = scale;
             if (prototypeCompactRect.width > 0 && prototypeCompactRect.height > 0) {
                 var width = Mathf.Min(prototypeCompactRect.width, Screen.width);
                 var height = Mathf.Min(prototypeCompactRect.height, Screen.height);
