@@ -20,15 +20,15 @@ Use this guide when either of these is true:
 - An active generic track marker shows the detected problem `Duplicate marker ID <id> is shared with <N> other scene markers. Give one of them a replacement ID to repair it.`
 - An edit of a holder is refused, such as **Enable**, a new track location, or **Follow**. The refusal starts with `Duplicate marker ID <id> is held by <N> scene markers`, and it names each holder with its activity. For a generic track marker it ends with `Give one of them a replacement ID to repair it.`
 
-The explanation under **Dependencies** on the **Object** tab lists every holder of the duplicate marker ID. Only an active generic track marker that can receive a replacement ID has the detected problem. An inactive holder has no detected problem, but its explanation still ends with `Give one of them a replacement ID to repair it.`, and the **Object** tab offers **Repair duplicate ID** for it. Its **Detected problems** section then reads `None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired.` A crossing pad, a milepost, a starter placement marker, or a generic marker that the patcher does not support shows the explanation without the problem and without the repair.
+The explanation under **Dependencies** on the **Object** tab lists every holder of the duplicate marker ID. Only an active generic track marker that can receive a replacement ID has the detected problem. An inactive holder has no detected problem, but its explanation still ends with `Give one of them a replacement ID to repair it.`, and the **Object** tab offers **Repair duplicate ID** and **Set ID on the Connections tab** for it. Its **Detected problems** section then reads `None while this marker is inactive. The patcher refuses changes to its activity, binding, and track-following placement until its duplicate marker ID is repaired.` A crossing pad, a milepost, a starter placement marker, or a generic marker that the patcher does not support shows the explanation without the problem and without the repair.
 
 Each repair changes one holder, and each replacement ID belongs to one marker. A group therefore needs a separate replacement ID for each holder being repaired. A holder that keeps the shared ID still has its edits refused while another holder keeps that ID too. See [order a holder that keeps the shared ID](#order-a-holder-that-keeps-the-shared-id) for how to write the file for this case.
 
 ## Give a replacement ID in the inspector
 
-1. Open **Scene patches**, click **Refresh** in the command band, and select the row of the marker you want to change in the outliner.
-1. On the **Connections** tab, find the **Marker ID** section. Under the caption **Also holding**, the section lists the other scene markers that hold the underlying ID. To give the replacement ID to one of them instead, click **Select** beside its name. The patcher inspects that marker and opens its **Connections** tab. **Select** also closes an open coverage or equipment form.
-1. Enter the new ID in the **Replacement ID** field.
+1. Open **Scene Patcher**, click **Refresh** in the command band, and select the row of the marker you want to change in the outliner.
+1. On the **Connections** tab, find the **Marker ID** section. From the **Object** tab, click **Set ID on the Connections tab** below the **Detected problems** section to open it. Under the caption **Also holding**, the section lists the other scene markers that hold the underlying ID. To give the replacement ID to one of them instead, click **Select** beside its name. The patcher inspects that marker and opens its **Connections** tab. **Select** also closes an open coverage or equipment form.
+1. Enter the new ID in the **Replacement ID** field. Make up an ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The text below the field reads `Make up a new ID that nothing in the world uses yet. Don't enter another marker's ID or a segment ID. The ID can't be empty, have a space at either end, or begin with passengerStop: or flare:.`
 1. Click **Set ID**. The result appears in the footer's message area under **Marker ID**.
 1. Set the activity or the track location of the marker. Click **Enable** or **Disable** on the **Object** tab, or enter the location and click **Set** at the bottom of the **Connections** tab. The repaired marker accepts these edits. The other holders do not change.
 
@@ -36,13 +36,17 @@ Each repair changes one holder, and each replacement ID belongs to one marker. A
 
 After **Set ID**, the caption above the other holders changes from **Also holding** to **Still holding** and includes the underlying ID, for example `Still holding Mg6m, the underlying ID`. The list names the holders that keep that ID. The selected marker now has a unique replacement ID, so its detected problem disappears. The other holders keep sharing the underlying ID until each has its own.
 
+The patcher checks the other holders of the old and the new ID again right after **Set ID**, and after native **Undo** or **Redo** of it. A holder that no longer shares its ID loses its duplicate problem at once, without **Refresh**.
+
+The replacement ID doesn't change the marker's track binding. If that binding names a segment that doesn't exist, the marker shows that problem once it's enabled, as a different problem from the duplicate, for example `Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab.` For a marker without a track binding, the message says `the marker has no track binding` instead. See [repairing track bindings](repairing-track-bindings.md).
+
 ## Give a replacement ID with a guided task
 
 Use this route to have every step of the change checked in a single guided task.
 
-1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section for a generic track marker whose explanation names a duplicate marker ID, active or inactive.
+1. Click **Guided** beside the object's name. Or, on the **Object** tab, click **Repair duplicate ID**. The button appears below the **Detected problems** section, beside **Set ID on the Connections tab**, on a generic track marker whose explanation names a duplicate marker ID, active or inactive. After the repair, both buttons stay on the repaired marker. **Repair duplicate ID** is then unavailable, and its tooltip reads `Unavailable: This marker already has replacement ID <id>.` **Set ID on the Connections tab** stays available to change or clear the ID. It's unavailable only when the **Marker ID** section is, with that section's reason. A marker that never shared its ID shows neither button.
 1. In **Target**, select **Set replacement ID** in the task list.
-1. In **Values**, enter the ID in the **Replacement ID** field. The same checks as **Set ID** apply.
+1. In **Values**, enter a new ID that you make up in the **Replacement ID** field. The same text as on the **Connections** tab stands below the field, and the same checks as **Set ID** apply.
 1. Click **Next**. **Review** checks the ID against the scene markers and map objects, as **Apply** does. An ID that's already in use is refused in **Review**, with the marker or map object that uses it. **Review** shows the proposed **Marker ID**. It lists the settings that stay unchanged: placement, activity, and track binding. Every other holder keeps its registration.
 1. Click **Apply** in the footer. Then click **Back to inspector**, or **Another guided task** to repair the next holder.
 

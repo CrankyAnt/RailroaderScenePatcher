@@ -41,7 +41,7 @@ Some objects below a group root are not listed as parts:
 
 ## Move a group in the native map editor
 
-1. Open **Scene patches** and click **Refresh** in the command band. Search for the group, for example `Bryson House Track`, and select its row under **Baked scenery group**. You can also use **Select in world** to select it by its marking, as described in [select world targets](select-world-targets.md). On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-group-v1`. **Use in the game** identifies the group as decorative.
+1. Open **Scene Patcher** and click **Refresh** in the command band. Search for the group, for example `Bryson House Track`, and select its row under **Baked scenery group**. You can also use **Select in world** to select it by its marking, as described in [select world targets](select-world-targets.md). On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-group-v1`. **Use in the game** identifies the group as decorative.
 2. Click **Focus** in the command band to see the group.
 3. On the **Placement** tab, change the six **Numeric** fields for position in map coordinates and rotation in degrees. Click **Apply** at the bottom of the tab. You can also use **Gizmo** or **Snap**, as for other objects, unless a ground mask refuses the move; see [buildings with ground masks](#buildings-with-ground-masks). See [using transform gizmos](using-transform-gizmos.md) and [snapping to track](snapping-to-track.md).
 
@@ -153,7 +153,7 @@ The construction moves with its colliders and culling. After every edit, the pat
 Move the track in the native map editor. It remains native map data and keeps its own trestle or steel flags. A rail bridge doesn't follow its track. **Follow** is unavailable for a rail bridge and its parts, and the patcher refuses a hand-written track-following placement. Move the track first, then move the construction onto it:
 
 1. In the native map editor, move the track that the bridge carries.
-1. In **Scene patches**, select the construction under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
+1. In **Scene Patcher**, select the construction under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
 1. Click **Save** in the native map editor.
 
 ### Construction segments
@@ -182,7 +182,7 @@ You can move, rotate or disable a road bridge construction so that it stands whe
 The road remains native map data. Move it in the native map editor; moving the bridge leaves it in place. A road bridge doesn't follow track. **Follow** is unavailable for a road bridge and its parts, with the reason `Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it.` The patcher also refuses a hand-written track-following placement before changing anything. Move the road first, then move the bridge onto it:
 
 1. In the native map editor, move the road that the bridge carries.
-1. In **Scene patches**, select the bridge under **Baked scenery group** > **Bridge** > **Road bridges** and move it onto the moved road, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only one object of the bridge, select that part instead.
+1. In **Scene Patcher**, select the bridge under **Baked scenery group** > **Bridge** > **Road bridges** and move it onto the moved road, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only one object of the bridge, select that part instead.
 1. Click **Save** in the native map editor.
 
 The bridge moves with its colliders and its culling. Each road bridge carries a renderer culler on its root; the patcher moves the culler's sphere to the bridge and keeps its radius. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere, or capsule collider follow the bridge.

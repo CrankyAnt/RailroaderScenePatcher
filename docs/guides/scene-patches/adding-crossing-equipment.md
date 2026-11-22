@@ -55,7 +55,7 @@ The editor lists every device beneath a loaded crossing controller, including th
 
 ## Add equipment in the native map editor
 
-1. Open the Scene patches window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
+1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a light or gate** lists the devices, with a reason for each one that does not qualify. **Why a device isn't eligible** opens the table above.
 3. Click **Use** for an eligible device. Each button names the device and its crossing, such as **Use Signal 1 at Allen**. A form opens at the top of the tab. It proposes an unused **Equipment ID**, adding a numeric suffix if the name is taken. The proposed placement uses the device's position relative to its own crossing at the inspected crossing, offset by five metres. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.

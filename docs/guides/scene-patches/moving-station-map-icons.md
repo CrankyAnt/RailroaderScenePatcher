@@ -12,14 +12,14 @@ Native map data and scene objects need separate edits. The patcher doesn't move 
 
 1. In the native map editor, move the station's track span, its depot house, and its station agent. The depot houses, such as `br-depot`, `an-newport-depot`, and `db-depot-asset`, are native Props.
 2. Save in the native map editor.
-3. In **Scene patches**, move the station map icon to the station's new place, as described in the next section.
+3. In **Scene Patcher**, move the station map icon to the station's new place, as described in the next section.
 4. Save again.
 
 If the station's building group is a scene object, move it in the **Baked scenery group** family, as described in [move baked scenery groups](moving-baked-scenery-groups.md).
 
 ## Move the icon in the native map editor
 
-1. Open **Scene patches**, click **Refresh** in the command band, search for the station's name, and select its row under **Station map icon** in the outliner. **Select in world** with a click on the icon's marking also selects it, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `station-map-icon-v1`. If **Supported edits** on the **Object** tab starts with **Not editable:**, the reason follows.
+1. Open **Scene Patcher**, click **Refresh** in the command band, search for the station's name, and select its row under **Station map icon** in the outliner. **Select in world** with a click on the icon's marking also selects it, as described in [select world targets](select-world-targets.md). The **Identity** section of the **Object** tab shows the structure `station-map-icon-v1`. If **Supported edits** on the **Object** tab starts with **Not editable:**, the reason follows.
 2. Click **Focus** in the command band to see the icon.
 3. On the **Placement** tab, in **Numeric** mode, change the position in map coordinates and, if needed, the rotation in degrees. Click **Apply** at the bottom of the tab. You can also drag the icon with the transform gizmo, as described in [use transform gizmos](using-transform-gizmos.md).
 4. Open the map window and check that the icon stands at the station's new place.

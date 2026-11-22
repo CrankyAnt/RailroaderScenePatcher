@@ -64,6 +64,8 @@ static class ReplacementMarkerIdTests {
         ParseRefusesEmptyAndReservedIdsBeforeMutation();
         UniquenessNamesTheMarkerOrMapObjectThatUsesTheId();
         YardLimitRepairAppliesBeforeEnableAndRebind();
+        ARepairedHolderShowsItsMissingSegmentAsAnotherProblem();
+        AnIdEditReobservesTheHoldersOfBothIds();
         WhistleRepairLetsOneHolderBeDisabled();
         LoadOrderCollisionFailsTheLaterModification();
         TheSameIdInTwoModificationsFailsBoth();
@@ -128,6 +130,74 @@ static class ReplacementMarkerIdTests {
         var refused = new World();
         var enable = refused.Engine.Apply(Doc(Item("yard", YardPath, "\"active\":true"))).Outcomes["yard"];
         Assert(!enable.Applied && enable.Error.Contains("Mg6m"), "Enable alone stays refused: " + enable.Error);
+    }
+    // An active holder A and an inactive holder B of Mg6m, B bound to a segment that does not exist. A shows the duplicate
+    // problem and B none. After a replacement ID on B and a refresh A shows none; enabling B shows the missing segment as
+    // a problem of its own that says the duplicate is repaired; binding B to an existing segment clears it. The problems
+    // are composed as the inventory composes them for a generic track marker.
+    static void ARepairedHolderShowsItsMissingSegmentAsAnotherProblem() {
+        var w = new World();
+        w.Yard.Segment = "z5w8si";
+        var yard = Marker(YardPath);
+        string[] Problems(FakeMarker m, string path) {
+            var all = new List<string>();
+            var holders = w.Markers.IdHolders(m).With(w.Markers.Registrations(m));
+            if (holders.Problem(m, true) is string duplicate) all.Add(duplicate);
+            if (BindingRules.Problem(BindingNeed.Optional, m.Active, "Marker", m.Segment, w.Markers.Segments.ContainsKey(m.Segment)) is string binding) all.Add(binding);
+            var repaired = w.Session.RepairedMarkerId(Marker(path));
+            return BindingRules.Problems(m.Active, all, null).Select(problem => CommandBand.ProblemText(problem, repaired, m.Segment, m.Active, BindingNeed.Optional)).ToArray();
+        }
+        Assert(Problems(w.Speed, SpeedPath).SequenceEqual(new[] { "Duplicate marker ID Mg6m is shared with 1 other scene marker. Give one of them a replacement ID to repair it." }), "A shows the duplicate problem: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
+        Assert(Problems(w.Yard, YardPath).Length == 0, "The inactive B shows none: " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        Assert(w.Session.SetMarkerId(yard, "Mg6m-yard", null).Applied, "B takes a replacement ID");
+        Assert(Problems(w.Speed, SpeedPath).Length == 0, "After a refresh A shows none: " + String.Join(" | ", Problems(w.Speed, SpeedPath)));
+        Assert(w.Session.RepairedMarkerId(Marker(SpeedPath)) == null && w.Session.RepairedMarkerId(Marker(UnrelatedPath)) == null, "Only the holder that took a replacement ID has a repaired duplicate");
+        Assert(w.Session.RepairedMarkerId(yard) == "Mg6m", "B repaired duplicate marker ID Mg6m");
+        var enable = w.Session.Edit(yard, null, true);
+        Assert(enable.Applied && w.Yard.Active, "B is enabled: " + enable.Error);
+        Assert(Problems(w.Yard, YardPath).SequenceEqual(new[] { "Duplicate marker ID Mg6m is repaired, but this is a different problem: the track binding names segment z5w8si, which doesn't exist. Click Repair with guided task, or set an existing track on the Connections tab." }),
+            "Enabled B shows the missing segment as another problem: " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        var rebind = w.Session.Bind(yard, MarkerBinding.At(new TrackLocation("pi3pzp", "a", 3)));
+        Assert(rebind.Applied && Problems(w.Yard, YardPath).Length == 0, "Binding B to an existing segment clears it: " + rebind.Error + " " + String.Join(" | ", Problems(w.Yard, YardPath)));
+        // Without a repaired duplicate, a problem reads as before.
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", null, "z5w8si", true, BindingNeed.Optional) == "Marker broken binding: missing segment z5w8si", "A problem without a repaired duplicate is unchanged");
+        // The rewrite follows the binding rule's own missing-segment and empty-binding problems for the marker's bound
+        // segment, not the wording of a problem.
+        Assert(CommandBand.ProblemText("Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Mg6m", "Sjdl", true, BindingNeed.Optional) == "Duplicate marker ID Mg6m is shared with 1 other scene marker.", "Another kind of problem keeps its text");
+        Assert(CommandBand.ProblemText("Marker broken binding: missing segment z5w8si", "Mg6m", "pi3pzp", true, BindingNeed.Optional) == "Marker broken binding: missing segment z5w8si", "A problem that isn't the rule's missing-segment problem for the bound segment keeps its text");
+        Assert(CommandBand.ProblemText("Marker binding validity unknown: graph unavailable", "Mg6m", "z5w8si", true, BindingNeed.Optional) == "Marker binding validity unknown: graph unavailable", "A line about a segment that couldn't be checked keeps its text");
+        Assert(CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "", true, BindingNeed.Required) == "Duplicate marker ID Mg6m is repaired, but this is a different problem: the marker has no track binding. Click Repair with guided task, or set an existing track on the Connections tab.",
+            "The rule's empty-binding problem says so in plain words: " + CommandBand.ProblemText("Marker has an empty segment binding", "Mg6m", "", true, BindingNeed.Required));
+        // The two repairs on the Object tab stand where they mean something: on a generic track marker that holds a
+        // duplicate marker ID, or that has a replacement ID. With a duplicate both follow the replacement ID's reason. A
+        // marker that already has its replacement ID can't start the repair again, and says so with its ID; Set ID on
+        // the Connections tab stays available there, because its Marker ID section changes or clears the ID.
+        Assert(CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure, true, false) && CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure, false, true), "A holder of a duplicate and a marker with a replacement ID show the repairs");
+        Assert(!CommandBand.ShowsDuplicateRepairs(TrackMarkerScene.Structure, false, false) && !CommandBand.ShowsDuplicateRepairs(CrossingPadScene.Structure, true, true) && !CommandBand.ShowsDuplicateRepairs(null, true, false), "A marker that never shared its ID, and any other kind, shows none");
+        Assert(CommandBand.DuplicateRepairReason(true, null, "Mg6m") == null && CommandBand.DuplicateRepairReason(true, "Confirm or cancel the pending world choice first.", "Mg6m") == "Confirm or cancel the pending world choice first.", "With a duplicate the repair follows the replacement ID's reason");
+        Assert(CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard") == "This marker already has replacement ID Mg6m-yard.", "The repaired marker says that it has its replacement ID: " + CommandBand.DuplicateRepairReason(false, null, "Mg6m-yard"));
+        Assert(CommandBand.DuplicateRepairReason(false, null, "") == "This marker already has a replacement ID." && CommandBand.DuplicateRepairReason(false, null, null) == "This marker already has a replacement ID.", "An ID that could not be read is never printed empty");
+    }
+    // After a marker ID edit, its Undo or its Redo, the inventory observes again every other entry that holds the
+    // edited marker's old or new ID, so their problems agree with the edit at once. Entries of other IDs, the edited
+    // object itself and objects without a marker ID stay as they were.
+    static void AnIdEditReobservesTheHoldersOfBothIds() {
+        SceneObservation Entry(object handle, string path, params string[] bindings) =>
+            new SceneObservation(handle, Marker(path), "Track marker", true, new double[] { 0, 0, 0 }, new double[] { 0, 0, 0, 1 }, bindings, new string[0], new string[0], "");
+        object yard = new object(), speed = new object(), other = new object(), sign = new object();
+        var before = Entry(yard, YardPath, "Marker id=Mg6m; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
+        var after = Entry(yard, YardPath, "Marker id=Mg6m-yard; type=Generic", "Marker segment=z5w8si; end=b; distance=78.7");
+        var entries = new[] { after, Entry(speed, SpeedPath, "Marker id=Mg6m; type=Generic"), Entry(other, UnrelatedPath, "Marker id=Mown; type=Generic"), Entry(sign, "World/Sign", "Board") };
+        Assert(InventoryPresentationState.MarkerIdOf(before) == "Mg6m" && InventoryPresentationState.MarkerIdOf(entries[3]) == null, "The observed marker ID is read from the entry's marker line");
+        var parsed = InventoryPresentationState.BindingValues("Circuit 0 lower=Sa; upper=Sb; note=a; b");
+        Assert(parsed?.Group == "Circuit 0" && String.Join("|", parsed.Value.Values.Select(v => v.Key + "=" + v.Value)) == "lower=Sa|upper=Sb|note=a; b" && InventoryPresentationState.BindingValues("Graph registration: none") == null,
+            "One parser reads a binding line's group and named values, the Object tab's fields and the marker ID alike");
+        var holders = InventoryPresentationState.OtherMarkerIdHolders(entries, before, after);
+        Assert(holders.Count == 1 && ReferenceEquals(holders[0].Handle, speed), "Only the speed sign, which holds the old ID, is observed again: " + String.Join(", ", holders.Select(h => h.Identity.Path)));
+        // Undo: the yard limit returns from Mg6m-yard to Mg6m; the speed sign is again the other holder.
+        var undone = InventoryPresentationState.OtherMarkerIdHolders(new[] { before, entries[1], entries[2] }, after, before);
+        Assert(undone.Count == 1 && ReferenceEquals(undone[0].Handle, speed), "Undo observes the speed sign again too");
+        Assert(InventoryPresentationState.OtherMarkerIdHolders(entries, entries[3], entries[3]).Count == 0 && InventoryPresentationState.OtherMarkerIdHolders(entries, null, null).Count == 0, "An object without a marker ID observes nothing else");
     }
     static void WhistleRepairLetsOneHolderBeDisabled() {
         var w = new World();

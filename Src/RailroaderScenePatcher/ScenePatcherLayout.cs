@@ -12,7 +12,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 namespace RailroaderScenePatcher {
-    // Inspector mode of the Scene patches window: a command band, the outliner beside the inspector, four tabs and a
+    // Inspector mode of the Scene Patcher window: a command band, the outliner beside the inspector, four tabs and a
     // fixed footer. A control sits where its scope is: a tab's own actions in a pinned row at the bottom of its tab
     // body, the actions on the inspected object that are the same on every tab in the footer below the messages.
     // The tab body takes the height left by the fixed message area and the action rows.
@@ -26,8 +26,11 @@ namespace RailroaderScenePatcher {
         // (CommandBand.FilterSegments), which is also more than its band needs: Refresh and both status lamps with
         // their words, 251.
         // The inspector's minimum holds the four footer slots, their spacing and the resize grip.
-        const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 100, TabGap = 8,
-            RowHeight = 24, LineHeight = 20, TabStripHeight = 30, InspectorMessageHeight = 104, FilePanelMessageHeight = 64,
+        const float OutlinerDefaultWidth = CommandBand.OutlinerWidth, OutlinerMinimumWidth = CommandBand.OutlinerWidth, InspectorMinimumWidth = 350, TabBodyMinimumHeight = 100,
+            RowHeight = 24, LineHeight = 20, TabStripHeight = 30,
+            // The message areas' fixed heights: 124 units in the inspector and 84 beside the file panel. The tab's own
+            // row stands just above the footer's divider, and the footer's row at the window's lower edge.
+            InspectorMessageHeight = 124, FilePanelMessageHeight = 84,
             // What a row adds to its name: the folder and child indent, the two markers and the scroll bar.
             RowDecoration = 80;
         // The changed state reads the same in the state line and on the Changes tab: the native map editor's badge.
@@ -58,6 +61,8 @@ namespace RailroaderScenePatcher {
         bool candidateDetails;
         static readonly string[] PlacementModes = { "Numeric", "Gizmo", "Snap", "Follow" };
         OutlinerFilter outlinerFilter;
+        // Whether the Object tab's Dependencies and Runtime state show their long form instead of the short form.
+        bool dependenciesLong, runtimeLong;
         float outlinerWidth = OutlinerDefaultWidth;
         int placementMode;
         object revealed;
@@ -84,27 +89,31 @@ namespace RailroaderScenePatcher {
             if (divider) builder.AddHRule();
             return builder.AddLabel("<b>" + Literal(title) + "</b>");
         }
+        // A section heading with the native disclosure triangle (NativePresentation.DisclosureTriangle) right after its
+        // title. The triangle switches the section between its short form, collapsed, and its long form, expanded; the
+        // section's lines stay in view either way.
+        void DisclosureSection(UIPanelBuilder builder, string title, bool longForm, Action toggle) {
+            builder.AddHRule();
+            builder.HStack(row => {
+                var heading = row.AddLabel("<b>" + Literal(title) + "</b>");
+                var headingLayout = heading.GetComponent<LayoutElement>() ?? heading.gameObject.AddComponent<LayoutElement>();
+                headingLayout.flexibleWidth = 0;
+                foreach (var text in heading.GetComponentsInChildren<TMP_Text>(true)) text.textWrappingMode = TextWrappingModes.NoWrap;
+                var headingText = heading.GetComponentInChildren<TMP_Text>(true);
+                presentation.DisclosureTriangle(heading.parent, longForm, headingText != null ? headingText.color : Color.white, toggle, heading, new TooltipInfo(title, CommandBand.DisclosureTip(longForm)));
+                row.Spacer();
+            }).Height(NativePresentation.DisclosureHitSize);
+        }
         // A line of the form "Marker id=Mlm1; type=Generic" or "Graph registration: none" as named values. A line of
         // another form stays text.
         void BindingFields(UIPanelBuilder builder, string line) {
-            var first = line.IndexOf('=');
-            if (first < 0) {
+            var values = InventoryPresentationState.BindingValues(line);
+            if (values == null) {
                 var colon = line.IndexOf(": ", StringComparison.Ordinal);
                 if (colon > 0) Field(builder, line.Substring(0, colon), Breakable(line.Substring(colon + 2))); else PlainLabel(builder, Breakable(line));
                 return;
             }
-            // The words before the first key name the group: "Marker", "Track-relative", "Circuit 0".
-            var space = line.LastIndexOf(' ', first);
-            var group = space < 0 ? "" : line.Substring(0, space);
-            string key = null, value = null;
-            foreach (var part in line.Substring(space + 1).Split(new[] { "; " }, StringSplitOptions.None)) {
-                var equals = part.IndexOf('=');
-                // A part without a key continues the value before it.
-                if (equals <= 0) { if (key != null) value += "; " + part; continue; }
-                if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(CommandBand.Shown(key, value)));
-                key = part.Substring(0, equals); value = part.Substring(equals + 1);
-            }
-            if (key != null) Field(builder, (group + " " + key).Trim(), Breakable(CommandBand.Shown(key, value)));
+            foreach (var pair in values.Value.Values) Field(builder, (values.Value.Group + " " + pair.Key).Trim(), Breakable(CommandBand.Shown(pair.Key, pair.Value)));
         }
         // A group of named values in the native inspector's form (DtoInspectorPanel.AddStackedField with AddAxisField):
         // the group's caption above the row, then each short label in front of its input box, the boxes sharing the
@@ -558,7 +567,7 @@ namespace RailroaderScenePatcher {
                 // Give the tab container a fixed preferred height so the body, through its flexible height,
                 // takes the remainder after the pinned rows and fixed footer.
                 var tabsLayout = tabView.GetComponent<LayoutElement>() ?? tabView.gameObject.AddComponent<LayoutElement>();
-                tabsLayout.minHeight = tabsLayout.preferredHeight = TabStripHeight + TabBodyMinimumHeight + RowHeight + TabGap;
+                tabsLayout.minHeight = tabsLayout.preferredHeight = TabStripHeight + TabBodyMinimumHeight + RowHeight;
                 tabsLayout.flexibleHeight = 10000;
             }
             if (tabView != null) foreach (var toggle in tabView.GetComponentsInChildren<Toggle>(true)) {
@@ -603,8 +612,9 @@ namespace RailroaderScenePatcher {
         // A tab body scrolls inside its own rectangle. Its first row names what the tab is for and holds the tab's own
         // "?", so that help visibly belongs to the tab; the help opens in its own window. Below the scrolling part
         // the tab's own actions stand in a pinned row of fixed height, inside the tab, so that their place says they
-        // belong to the tab; a gap sets the row apart from the footer, whose row is the same on every tab. The
-        // native map editor puts a tool's actions directly under its fields; here they stay in view while the fields scroll.
+        // belong to the tab; the row stands just above the footer's divider, which sets it apart from the footer, whose
+        // row is the same on every tab. The native map editor puts a tool's actions directly under its fields; here they
+        // stay in view while the fields scroll.
         void Tab(UIPanelBuilder builder, string id, Action<UIPanelBuilder> body) {
             var view = presentation.Scroll(builder, TabBodyMinimumHeight, content => {
                 content.ConfigureLayout(4f);
@@ -625,7 +635,6 @@ namespace RailroaderScenePatcher {
             if (viewport.GetComponent<RectMask2D>() == null && viewport.GetComponent<Mask>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
             ActionRow(builder, TabActs(id), ChoiceBlock);
-            builder.Spacer(TabGap);
         }
 
         // A rail bridge construction outside Ela or a road bridge construction, or a part of one: it takes no
@@ -675,12 +684,18 @@ namespace RailroaderScenePatcher {
             }
             // Problems first: the red count in the state line points at text that is in view.
             Section(builder, "Detected problems");
+            // A stale object list keeps the problems of its last refresh, also those another object's edit has solved.
+            if (inventory == null || inventory.IsStale || definitionsStale) builder.AddLabel(Tint(Amber, CommandBand.StaleProblems));
             // Beside Repair duplicate ID, an inactive holder says why it has no problem, in a sentence that wraps.
             if (selected.Problems.Count == 0) {
                 var offersRepair = CommandBand.OffersDuplicateRepair(selected.Identity.Structure, selected.Dependencies);
                 if (offersRepair) PlainLabel(builder, CommandBand.NoDetectedProblems(true)); else Line(builder, CommandBand.NoDetectedProblems(false), null, null);
             }
-            foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, problem));
+            // After a replacement ID, a track binding problem that remains says that it is another problem.
+            var repaired = selected.Problems.Count != 0 ? RepairedMarkerId() : null;
+            var boundSegment = CommandBand.BindingSlotSegments(selected.Bindings).FirstOrDefault();
+            // A generic track marker's binding is optional (BindingRules.Need), the one need a repaired marker has.
+            foreach (var problem in selected.Problems) builder.AddLabel(Tint(Red, CommandBand.ProblemText(problem, repaired, boundSegment, selected.Enabled, BindingNeed.Optional)));
             if (selected.Problems.Count != 0) DrawProblemTasks(builder);
             // An inactive holder of a duplicate marker ID has no problem, and its explanation still offers the repair here.
             DrawDuplicateIdTasks(builder);
@@ -738,12 +753,14 @@ namespace RailroaderScenePatcher {
             if (selected.Identity.PadMarkerId != null)
                 Field(builder, "Pad marker ID", selected.Identity.PadMarkerId)
                     .Tooltip("Pad marker ID", "The marker ID of this crossing's pad. Other crossbucks share this path, so the scene patch file names this crossbuck by its path and this ID.");
-            Section(builder, "Dependencies");
+            // Each section shows its short form, paths relative to this object and grouped per object, until its
+            // triangle switches it to the long form.
+            DisclosureSection(builder, "Dependencies", dependenciesLong, () => dependenciesLong = !dependenciesLong);
             if (selected.Dependencies.Count == 0) Line(builder, "None observed", null, null);
-            foreach (var line in selected.Dependencies) PlainLabel(builder, Breakable(line));
-            Section(builder, "Runtime state");
+            foreach (var line in dependenciesLong ? selected.Dependencies : HierarchyDependencies.ShortForm(selected.Identity.Scene, selected.Identity.Path, selected.Dependencies)) PlainLabel(builder, Breakable(line));
+            DisclosureSection(builder, "Runtime state", runtimeLong, () => runtimeLong = !runtimeLong);
             if (selected.RuntimeState.Count == 0) Line(builder, "None observed", null, null);
-            foreach (var line in selected.RuntimeState) PlainLabel(builder, Breakable(line));
+            foreach (var line in runtimeLong ? selected.RuntimeState : HierarchyDependencies.ShortForm(selected.Identity.Scene, selected.Identity.Path, selected.RuntimeState)) PlainLabel(builder, Breakable(line));
         }
         static bool IsReader(string line) => line.StartsWith(StarterPlacements.ReaderPrefix, StringComparison.Ordinal);
         // A path wraps after a separator instead of in the middle of a name.
@@ -1302,13 +1319,11 @@ namespace RailroaderScenePatcher {
             area.preferredHeight = messageHeight;
             area.flexibleHeight = 0;
             // While the file panel is open, the footer's row waits for it with the panel's reason.
+            // The row is the window's last: it stands at the lower edge, on the native padding below the last row. Its
+            // buttons start at the left, so the native resize grip in the lower right corner covers only the row's
+            // empty end.
             ActionRow(builder, guided.Enabled && !FileLocked && selection?.Pending == null ? GuidedActs() : FooterActs(), FileLockReason);
-            // The native resize grip takes the window's lower right corner, 22 units high, and the row would reach 12
-            // units into its height: the row stands that much higher, so the footer and the grip do not overlap.
-            builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
         }
-        // The native resize grip's height, and the window's padding below its last row, in canvas units.
-        const float GripHeight = 22, RowPadding = 10;
         // One padding rule for every button of the panel (CommandBand.ButtonWidth): a button is as wide as its label
         // and the native compact padding on both sides. The native compact button does that by itself for one label.
         // A button whose label changes in place gets the width of its widest label here, so the change moves no
@@ -1781,8 +1796,8 @@ namespace RailroaderScenePatcher {
                     new[] { "Inspection notes", "What the inspection could not read or check. Nothing here can be repaired with the patcher, so it is not listed as a problem." },
                     new[] { "Enabled", "Whether the object is active. Disable holds it inactive; Clear activity returns it to its underlying activity." },
                     new[] { "Track group", "Some markers switch with their track group. Disable holds the marker inactive. Click Clear activity to let the group control it again." },
-                    new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links." },
-                    new[] { "Runtime state", "Whether the game switches parts of the object on or off while it runs. These values don't make the object list stale." },
+                    new[] { "Dependencies", "Shows what else uses this object or changes with it, such as track locations, terrain masks, and visibility. The patcher checks direct links. The short form lists each object of this hierarchy by its relative path with its components; click the triangle after the heading for the full lines." },
+                    new[] { "Runtime state", "Whether the game switches parts of the object on or off while it runs. These values don't make the object list stale. Its triangle switches between the short form and the full lines, as for Dependencies." },
                     new[] { "Copy ID", "Copies the object's ID, placement, and the map ID needed by the scene patch file." } },
                 Guides = new[] { new[] { "Inspecting objects", "inspect-scene-objects.md" }, new[] { "Following a track and group activity", "following-track.md" } } },
             [PlacementTab] = new HelpText { Title = "Placement", Intro = "Move or rotate the object without changing its logical binding.",
