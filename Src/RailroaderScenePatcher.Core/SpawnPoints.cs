@@ -44,14 +44,27 @@ namespace RailroaderScenePatcher.Core {
         // The priority from the bindings, or null when they hold none.
         public static int? Priority(IEnumerable<string> bindings) =>
             Int32.TryParse(After(bindings, PriorityPrefix).FirstOrDefault(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : (int?)null;
+        // Where a spawn point stands in the game's order (SpawnPoint.All): its own activity and the other active spawn
+        // points, by path, that share or exceed its priority or whose priority could not be read. A spawn point without a
+        // priority of its own has nothing to compare, so it counts none.
+        public static SpawnRank Rank(SceneObservation selected, IEnumerable<SceneObservation> entries) {
+            if (selected == null) throw new ArgumentNullException(nameof(selected));
+            if (!selected.Active) return SpawnRank.Inactive;
+            var priority = Priority(selected.Bindings);
+            if (priority == null || entries == null) return SpawnRank.Alone;
+            var others = entries.Where(entry => entry != null && entry.Family == Family && entry.Active && !ReferenceEquals(entry, selected) && entry.Identity.Path != selected.Identity.Path)
+                .Select(entry => Priority(entry.Bindings)).ToArray();
+            return new SpawnRank(true, others.Count(other => other == priority), others.Count(other => other > priority), others.Count(other => other == null));
+        }
         static string Count(int count, string one) => count.ToString(CultureInfo.InvariantCulture) + " " + one + (count == 1 ? "" : "s");
         // What the Object tab says under Use in the game, one line per use, from the spawn point's bindings: what the game
         // is expected to do with it, from the decompiled game, until a journey has observed it. nativeSpawns is how many
-        // spawns the map data declares, or null when they could not be read; active is the spawn point's own activity;
-        // samePriority counts the other active spawn points with the same priority, among which the game's sort keeps no
-        // fixed order; higherPriority counts the active spawn points with a higher priority. A new game start is named
-        // only where the game starts at this spawn point.
-        public static IReadOnlyList<string> Uses(IEnumerable<string> bindings, int? nativeSpawns, bool active = true, int samePriority = 0, int higherPriority = 0) {
+        // spawns the map data declares, or null when they could not be read; rank is the spawn point's place in the
+        // game's order (Rank), or null for an active spawn point with no others. A new game start is named only where
+        // the game starts at this spawn point.
+        public static IReadOnlyList<string> Uses(IEnumerable<string> bindings, int? nativeSpawns, SpawnRank rank = null) {
+            rank = rank ?? SpawnRank.Alone;
+            var active = rank.Active; var samePriority = rank.SamePriority; var higherPriority = rank.HigherPriority;
             var lines = bindings?.ToArray() ?? new string[0];
             var name = After(lines, NamePrefix).FirstOrDefault() ?? "its object name";
             var priority = After(lines, PriorityPrefix).FirstOrDefault();
@@ -81,6 +94,18 @@ namespace RailroaderScenePatcher.Core {
                 : setupStart + "." + disabledToo);
             return uses;
         }
+    }
+    // A spawn point's place in the game's order of active spawn points; see SpawnPoints.Rank.
+    public sealed class SpawnRank {
+        public static readonly SpawnRank Alone = new SpawnRank(true, 0, 0, 0), Inactive = new SpawnRank(false, 0, 0, 0);
+        public SpawnRank(bool active, int samePriority, int higherPriority, int unreadPriority) {
+            Active = active; SamePriority = samePriority; HigherPriority = higherPriority; UnreadPriority = unreadPriority;
+        }
+        public bool Active { get; }
+        // The other active spawn points with the same priority, a higher one, or one that could not be read.
+        public int SamePriority { get; }
+        public int HigherPriority { get; }
+        public int UnreadPriority { get; }
     }
     // The game-facing operations of the spawn point capability. Positions are map coordinates.
     public interface ISpawnPointWorld {
