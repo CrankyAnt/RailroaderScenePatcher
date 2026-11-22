@@ -291,12 +291,6 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     // The part rule's verdicts by path, when set: a path resolves and is refused as GroupWorld resolves and refuses it
     // (BakedSceneryRules.Resolves, BakedSceneryRules.PartRefusal).
     public Dictionary<string, PartVerdict> Verdicts;
-    // The group verdict a part modification at the path is judged by, as GroupWorld.HolderOf reads it from the objects above.
-    GroupRootVerdict Holder(string path) {
-        var above = new List<GroupRootVerdict>();
-        for (var cut = path?.LastIndexOf('/') ?? -1; cut > 0; cut = path.LastIndexOf('/', cut - 1)) above.Add(GroupVerdict(path.Substring(0, cut)));
-        return BakedSceneryRules.GroupOf(GroupVerdict(path), above);
-    }
     public IReadOnlyList<object> FindParts(string scene, string path) {
         if (GroupVerdicts != null && BakedSceneryRules.Resolves(null, GroupVerdict(path)) && Objects.TryGetValue(path, out var root)) return root;
         if (Verdicts != null && Verdicts.TryGetValue(path, out var verdict) && !BakedSceneryRules.Resolves(verdict)) return new List<object>();
@@ -304,10 +298,6 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     }
     public string PartRefusal(object part) {
         if (part is FakeGroup) return BakedSceneryRules.PartRefusal(null, GroupVerdict(PathOf(part))) ?? "This object is not listed as a baked scenery part";
-        if (GroupVerdicts != null) {
-            var held = BakedSceneryRules.PartRefusal(null, Holder(PartsAt.FirstOrDefault(pair => pair.Value.Contains(part)).Key));
-            if (held != null) return held;
-        }
         if (Verdicts != null) {
             var path = PartsAt.FirstOrDefault(pair => pair.Value.Contains(part)).Key;
             if (path != null && Verdicts.TryGetValue(path, out var verdict) && BakedSceneryRules.PartRefusal(verdict) != null) return BakedSceneryRules.PartRefusal(verdict);

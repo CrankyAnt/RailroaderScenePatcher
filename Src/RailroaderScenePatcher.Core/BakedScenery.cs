@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher.Core {
         // The coverage rules that keep a candidate out, by the name of their row in the coverage statement.
         public const string NoPhysicalPresence = "Objects without physical presence", RuntimeObject = "Objects the game creates while running",
             NativeMapData = "Track spans, passenger stops, industries, spawns, turntables, and other native map data", MapLabel = "Map labels",
-            BuilderPhotoRig = "Builder photo rig", NoFunction = "Objects without a model or function in the game", CarLoaders = "Car loaders";
+            BuilderPhotoRig = "Builder photo rig", NoFunction = "Objects without a model or function in the game";
         // The renderers of visual effects, which draw particles that nothing can run into: a particle system and a VFX
         // Graph effect, such as the fireflies under World/Environment Effects.
         public static readonly IReadOnlyList<string> EffectRenderers = Array.AsReadOnly(new[] { "UnityEngine.ParticleSystemRenderer", "UnityEngine.VFX.VFXRenderer" });
@@ -248,13 +248,6 @@ namespace RailroaderScenePatcher.Core {
         // Why a group with track markers is left out: it is not moved as a whole, and its markers are edited one by one in
         // their own family. No ticket is needed.
         public const string TrackMarkerReason = "You can't move this group as a whole. Edit its track markers individually in the Track marker family.";
-        // A group with a car loader (RollingStock.CarContentSwapper) at any depth is not listed (CarLoaders). Railroader
-        // 0.6.3 has one, the Robinson Gap Mine Coal Loader, and it loads nothing: the base map loads Robinson Gap coal by
-        // teleport between the spans of its industry (a TeleportLoadingIndustry in Map.json), and no component references
-        // the loader, so moving it would not move loading. No ticket.
-        public const string CarLoader = "RollingStock.CarContentSwapper";
-        // Why a modification that names a group with a car loader fails.
-        public const string CarLoaderRefusal = "This group isn't listed because it contains a car loader. The game loads Robinson Gap coal by teleport between the industry's track spans. It doesn't use the loader, so moving the loader wouldn't change where loading happens.";
         // Why a group with a spawn point is left out: its spawn points are edited one by one in their own family.
         public const string SpawnPointReason = "You can't move this group as a whole. Edit its spawn points individually in the Spawn point family.";
         // The folders below World/Large Scenery that hold the parts of a rail bridge construction outside Ela.
@@ -359,7 +352,6 @@ namespace RailroaderScenePatcher.Core {
             }
             // Physical presence comes first: an object without a renderer, collider or light is not listed, whatever it holds.
             if (!Physical(node)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
-            if (Holds(node, CarLoader)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, CarLoaders)); return; }
             // A bridge takes its category from this rule wherever it stands, also outside the category table, as
             // the road bridges below the World/Roads folders do.
             var road = RoadBridge(node.Name);
@@ -436,23 +428,17 @@ namespace RailroaderScenePatcher.Core {
         public const string FolderRefusal = "This path names a folder, which only holds groups; it is not a group. Edit its groups instead";
         public static string GroupRefusal(string path) => BakedSceneryCategories.IsFolder(path) ? FolderRefusal : null;
         // Why a modification cannot edit the object at a path as a group, from the group rule's verdict for it, or null:
-        // a folder, which has no verdict, and a group with a car loader, which the Car loaders rule keeps out.
-        public static string GroupRefusal(GroupRootVerdict verdict, string path) =>
-            verdict == null ? GroupRefusal(path) : verdict.Reason == CarLoaders ? CarLoaderRefusal : null;
-        // Whether a path resolves as a group target: a listed group root, a folder and a group with a car loader, so
-        // that their modification fails with the reason instead of finding nothing.
+        // a folder, which has no verdict.
+        public static string GroupRefusal(GroupRootVerdict verdict, string path) => verdict == null ? GroupRefusal(path) : null;
+        // Whether a path resolves as a group target: a listed group root and a folder, so that a folder's modification
+        // fails with its reason instead of finding nothing.
         public static bool ResolvesGroup(GroupRootVerdict verdict, string path) => verdict?.Disposition == GroupDisposition.Group || GroupRefusal(verdict, path) != null;
         // Why a modification cannot edit, as a part, the object at a path: a listed group root, such as a yard lamp
         // post of Bryson Yard, is edited as a group; otherwise the part rule's own reason, or null for a listed part.
         public const string GroupRootRefusal = "This path names a group root, not a part. Edit it as a baked scenery group";
         public static string PartRefusal(PartVerdict verdict, GroupRootVerdict group) =>
-            group?.Disposition == GroupDisposition.Group ? GroupRootRefusal : group?.Reason == CarLoaders ? CarLoaderRefusal : PartRefusal(verdict);
+            group?.Disposition == GroupDisposition.Group ? GroupRootRefusal : PartRefusal(verdict);
         public static bool Resolves(PartVerdict verdict, GroupRootVerdict group) => verdict?.Disposition == PartDisposition.Part || PartRefusal(verdict, group) != null;
-        // The group verdict a part modification is judged by: the object's own, or else the verdict of a group with a car
-        // loader above it, nearest first. An object below the loader then fails with the loader's reason, not as a path
-        // that resolves to nothing.
-        public static GroupRootVerdict GroupOf(GroupRootVerdict own, IEnumerable<GroupRootVerdict> above) =>
-            own ?? above?.FirstOrDefault(verdict => verdict?.Reason == CarLoaders);
         // Every scene object below the roots of the listed groups, at any depth, with what the part rule decided for it.
         // A part is one scene object, not a renderer or a component. An inspection-only group has no part entries.
         public static IReadOnlyList<PartVerdict> Parts(IEnumerable<GroupRootVerdict> verdicts) {
@@ -524,12 +510,6 @@ namespace RailroaderScenePatcher.Core {
         // The masks of other marker objects, such as a sign's, stay as that family leaves them.
         public static readonly IReadOnlyList<string> MaskedMarkers = Array.AsReadOnly(new[] { "World/Large Scenery/Hemingway/Hemingway flagstopstation" });
         public static bool MaskedMarker(string path) => path != null && MaskedMarkers.Contains(path);
-        // Whether a component of the type stands at or below the node.
-        static bool Holds(IHierarchyNode node, string type) {
-            var types = new HashSet<string>(StringComparer.Ordinal);
-            Collect(node, types);
-            return types.Contains(type);
-        }
         // The first exclusion, in the order of the list, that a component at or below the node matches.
         static Exclusion FirstExclusion(IHierarchyNode node, string allowed = null) {
             var types = new HashSet<string>(StringComparer.Ordinal);
