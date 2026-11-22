@@ -463,19 +463,43 @@ static class ExistingEquipmentTests {
     }
 
     // Connections holds Track binding for every object, and an unsupported operation stays visible with its reason.
-    // An object that holds no track binding, such as a detection span, a crossing controller, a mast or a bell,
-    // shows that reason as a running line instead of empty location fields and a current binding of None. An object
-    // that holds a marker keeps its fields, editable or disabled.
+    // The section's decision runs on inventory entries as the inventory builds them: an object that holds no marker
+    // and reports no current binding, such as a detection span, a crossing controller, a mast, a bell or a board,
+    // shows its reason as one line instead of empty location fields and a current binding of None. An object of a
+    // family that holds a marker keeps its fields, editable or disabled with its own reason, and so does any object
+    // that reports a current binding. A detection span is told apart by its holder, not by a message text.
     static void TrackBindingWithoutBindingShowsItsReason() {
-        Assert(!CommandBand.ShowsBindingFields(false, 0), "An object without a track binding gets no empty location fields");
-        Assert(CommandBand.ShowsBindingFields(true, 0) && CommandBand.ShowsBindingFields(false, 1), "A marker, or an object that reports a binding, keeps its fields");
-        var span = CommandBand.NoBindingReason(CommandBand.DetectionSpanOperations);
-        Assert(span == CommandBand.DetectionSpanNoBinding && span.Contains("crossing coverage") && span.Contains("controller's Connections tab") && span.EndsWith(".", StringComparison.Ordinal),
-            "A detection span says where its tracks are set: " + span);
-        foreach (var operations in new[] { CommandBand.MastOperations, CommandBand.BellOperations, null })
-            Assert(CommandBand.NoBindingReason(operations) == CommandBand.NoTrackBinding && CommandBand.NoTrackBinding.EndsWith(".", StringComparison.Ordinal),
-                "Another object without a binding names the families that have one: " + CommandBand.NoBindingReason(operations));
-        Assert(CommandBand.Sentence(span) == span && CommandBand.Sentence(CommandBand.NoTrackBinding) == CommandBand.NoTrackBinding, "Each reason is one plain sentence");
+        SceneObservation Row(string path, string family, string holder = null, string operations = "x", params string[] bindings) =>
+            new SceneObservation(new object(), new TargetIdentity(SceneName, path, "C", null), family, true, new double[] { 1, 2, 3 }, Identity, bindings, new string[0], new string[0], operations, holderPath: holder);
+        var span = Row(Crossing + "/Track 1 East", "Track span", Crossing, "x", "Span ID: Pcyi", "Lower segment: S8rj", "Upper segment: Sx88");
+        var looseSpan = Row("World/Loose Span", "Track span");
+        var controller = Row(Crossing, "Crossing controller");
+        var mast = Row(Mast1Path, ExistingEquipmentScene.MastFamily, operations: CommandBand.MastOperations);
+        var bell = Row(BellPath, ExistingEquipmentScene.BellFamily, operations: CommandBand.BellOperations);
+        var board = Row("World/Board", "Board");
+        foreach (var row in new[] { span, looseSpan, controller, mast, bell, board })
+            Assert(!CommandBand.ShowsBindingFields(row, false) && CommandBand.CurrentBindings(row).Length == 0, "A " + row.Family + " without a marker gets no empty location fields");
+        // The span's own track locations are observed bindings, not a current binding.
+        Assert(CommandBand.CurrentBindings(span).Length == 0, "A detection span's track locations stay out of Current binding");
+        var refusedMarker = Row("World/Marker", "Track marker", operations: CommandBand.NotEditable("type Siding"));
+        var refusedPad = Row("World/Pad", "Crossing pad marker", operations: CommandBand.NotEditable("refused"));
+        var refusedMilepost = Row("World/Milepost", "Milepost", operations: CommandBand.NotEditable("refused"));
+        foreach (var row in new[] { refusedMarker, refusedPad, refusedMilepost })
+            Assert(CommandBand.ShowsBindingFields(row, false), "A refused " + row.Family + " keeps its binding fields, disabled with its own reason");
+        Assert(CommandBand.ShowsBindingFields(board, true), "An object the marker adapter edits keeps its fields");
+        var carrier = Row("World/Carrier", "Station", bindings: new[] { "Marker segment: Abc", "Other: x" });
+        var named = Row("World/Named", "Station", bindings: new[] { CommandBand.ListedTrackLocation + " Abc a 1.0" });
+        Assert(CommandBand.ShowsBindingFields(carrier, false) && CommandBand.CurrentBindings(carrier).Length == 1 && CommandBand.ShowsBindingFields(named, false),
+            "An object that reports a current binding keeps its fields, and only its marker lines are its current binding");
+        Assert(CommandBand.NoBindingReason(span) == CommandBand.DetectionSpanNoBinding && CommandBand.DetectionSpanNoBinding.Contains("crossing coverage")
+            && CommandBand.DetectionSpanNoBinding.Contains("controller's Connections tab"), "A detection span says where its tracks are set: " + CommandBand.NoBindingReason(span));
+        // A span whose operations text differs still gets the span reason; a span no controller holds does not.
+        Assert(CommandBand.NoBindingReason(Row(span.Identity.Path, "Track span", Crossing, "changed")) == CommandBand.DetectionSpanNoBinding, "The holder, not the message text, decides");
+        foreach (var row in new[] { looseSpan, controller, mast, bell, board, null })
+            Assert(CommandBand.NoBindingReason(row) == CommandBand.NoTrackBinding, "Another object without a binding names the families whose binding the patcher edits");
+        Assert(CommandBand.NoTrackBinding.Contains("editable track bindings"), "The reason claims only editable bindings, since other objects hold track locations too");
+        Assert(CommandBand.Sentence(CommandBand.DetectionSpanNoBinding) == CommandBand.DetectionSpanNoBinding && CommandBand.Sentence(CommandBand.NoTrackBinding) == CommandBand.NoTrackBinding, "Each reason is plain sentences");
+        Assert(CommandBand.HoldsMarker(StarterPlacements.Family) && !CommandBand.HoldsMarker("Track span") && !CommandBand.HoldsMarker(null), "The marker families are one list");
     }
 
     // A mast or bell that does not conform to its pattern is listed in its family, not left out and not inspection only.
