@@ -459,6 +459,23 @@ static class ExistingEquipmentTests {
         Assert(CommandBand.RotationBlock(ExistingEquipmentScene.BellStructure) == CommandBand.BellNoRotation && CommandBand.BellNoRotation.Contains("no direction") && CommandBand.RotationBlock(ExistingEquipmentScene.MastStructure) == null && CommandBand.RotationBlock(null) == null,
             "Rotation does not apply to a bell and applies to a mast");
         Assert(CommandBand.EquipmentGuide[1] == "moving-crossing-equipment.md#refusal-reasons" && CommandBand.EquipmentGuide[0].Length != 0, "The refusal links to the operation guidance");
+        TrackBindingWithoutBindingShowsItsReason();
+    }
+
+    // Connections holds Track binding for every object, and an unsupported operation stays visible with its reason.
+    // An object that holds no track binding, such as a detection span, a crossing controller, a mast or a bell,
+    // shows that reason as a running line instead of empty location fields and a current binding of None. An object
+    // that holds a marker keeps its fields, editable or disabled.
+    static void TrackBindingWithoutBindingShowsItsReason() {
+        Assert(!CommandBand.ShowsBindingFields(false, 0), "An object without a track binding gets no empty location fields");
+        Assert(CommandBand.ShowsBindingFields(true, 0) && CommandBand.ShowsBindingFields(false, 1), "A marker, or an object that reports a binding, keeps its fields");
+        var span = CommandBand.NoBindingReason(CommandBand.DetectionSpanOperations);
+        Assert(span == CommandBand.DetectionSpanNoBinding && span.Contains("crossing coverage") && span.Contains("controller's Connections tab") && span.EndsWith(".", StringComparison.Ordinal),
+            "A detection span says where its tracks are set: " + span);
+        foreach (var operations in new[] { CommandBand.MastOperations, CommandBand.BellOperations, null })
+            Assert(CommandBand.NoBindingReason(operations) == CommandBand.NoTrackBinding && CommandBand.NoTrackBinding.EndsWith(".", StringComparison.Ordinal),
+                "Another object without a binding names the families that have one: " + CommandBand.NoBindingReason(operations));
+        Assert(CommandBand.Sentence(span) == span && CommandBand.Sentence(CommandBand.NoTrackBinding) == CommandBand.NoTrackBinding, "Each reason is one plain sentence");
     }
 
     // A mast or bell that does not conform to its pattern is listed in its family, not left out and not inspection only.

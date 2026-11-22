@@ -1072,7 +1072,7 @@ namespace RailroaderScenePatcher {
                     if (refusal != null) return CommandBand.Sentence(refusal);
                 }
             } catch { }
-            return "Only track markers, mileposts, and crossing pads have editable track bindings.";
+            return CommandBand.NoBindingReason(selected?.Operations);
         }
         void CloseCoverageForm() { OpenedForm(null); coverageCircuit = coverageAddition = null; preparedCoverage = null; newAddition = ""; for (var i = 0; i < coverageFields.Length; i++) coverageFields[i] = ""; }
         // The message that says a form is open. It leaves when the form closes or another one opens.
@@ -1104,11 +1104,17 @@ namespace RailroaderScenePatcher {
             }).Height(RowHeight);
             if (coverage) { DrawCoverage(builder); DrawEquipment(builder); }
             Section(builder, pad ? "Crossing pad binding" : "Track binding");
-            ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, (pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.") + " End is a or b.", column => column == 2);
             var current = selected.Bindings.Where(b => b.StartsWith("Marker", StringComparison.Ordinal) || b.StartsWith(NativeInventory.ListedTrackLocation, StringComparison.Ordinal)).ToArray();
-            FieldLabel(builder, "Current binding");
-            if (current.Length == 0) Line(builder, "None", null, null);
-            foreach (var line in current) BindingFields(builder, line);
+            // An object without a track binding, such as a detection span, says why in one line rather than with empty fields.
+            // A marker of a supported family that the adapter refuses keeps its fields, disabled with its own reason.
+            var holdsMarker = marker || selected.Family == "Track marker" || selected.Family == "Crossing pad marker" || selected.Family == "Milepost";
+            if (!CommandBand.ShowsBindingFields(holdsMarker, current.Length)) PlainLabel(builder, block);
+            else {
+                ValueRow(builder, "Track location", "m", new[] { "Segment", "End", "Distance" }, binding, 0, block, (pad ? "The track location this pad's marker is registered at. Setting it regenerates the pad along the track there; the pad object does not move." : "The track location this marker is registered at. A binding edit does not move the object.") + " End is a or b.", column => column == 2);
+                FieldLabel(builder, "Current binding");
+                if (current.Length == 0) Line(builder, "None", null, null);
+                foreach (var line in current) BindingFields(builder, line);
+            }
             if (marker) DrawMarkerId(builder);
             Section(builder, "Observed bindings");
             var others = selected.Bindings.Where(line => !current.Contains(line) && !IsReader(line)).ToArray();
