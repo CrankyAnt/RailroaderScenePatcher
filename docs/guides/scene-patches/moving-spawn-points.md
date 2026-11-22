@@ -25,7 +25,7 @@ A new game reads its start spawn point while the map loads, before the patcher a
 
 ## Move a spawn point
 
-1. Open **Scene patches**, click **Refresh** in the command band, open the **Spawn point** family, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
+1. Open **Scene Patcher**, click **Refresh** in the command band, open the **Spawn point** family, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
 2. Click **Focus** in the command band. A spawn point has no model, so it shows a [helper marker](select-world-targets.md#helper-markers-for-invisible-objects): a `+` on its pivot.
 3. On the **Placement** tab, enter the position in map coordinates and the rotation in degrees in **Numeric** mode and click **Apply**, or drag the [transform gizmo](using-transform-gizmos.md).
 

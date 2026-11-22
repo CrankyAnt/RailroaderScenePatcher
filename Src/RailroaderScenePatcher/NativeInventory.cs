@@ -345,11 +345,15 @@ namespace RailroaderScenePatcher {
                     ReadStarters();
                     LastReferrers = referrerError == null ? markerReferrers : null;
                     setups = TrackMarkerWorld.SetupHolders();
-                    Dictionary<string, List<Component>> ids = null; string idsError = null;
+                    // The index is the discovery's until the patcher writes a marker ID; an observation after that reads
+                    // it again, so the other holders of an edited marker's old and new ID are named by their IDs now.
+                    Dictionary<string, List<Component>> ids = null; string idsError = null; var idsAt = -1;
                     markerIds = () => {
-                        if (ids != null) return ids;
+                        // TrackMarkerWorld.IdWrites counts every SetMarkerId, by an edit, Undo, Redo or restoration, so
+                        // the cached index lives only until the next marker ID write.
+                        if (ids != null && idsAt == TrackMarkerWorld.IdWrites) return ids;
                         if (idsError == null) {
-                            try { return ids = TrackMarkerWorld.MarkerIds(); }
+                            try { idsAt = TrackMarkerWorld.IdWrites; return ids = TrackMarkerWorld.MarkerIds(); }
                             catch (Exception e) { idsError = "The scene's marker IDs couldn't be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
                         }
                         throw new InvalidOperationException(idsError);

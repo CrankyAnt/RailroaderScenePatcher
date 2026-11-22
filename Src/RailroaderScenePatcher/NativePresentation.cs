@@ -20,7 +20,7 @@ namespace RailroaderScenePatcher {
         internal const string WindowIdentifier = "crankyant/scene-patcher/inspector";
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(NativePresentation.DefaultWidth, NativePresentation.DefaultHeight), new Vector2Int(NativePresentation.MinimumWidth, NativePresentation.MinimumHeight), Window.Position.UpperLeft);
-        protected override string Title { get; set; } = "Scene patches";
+        protected override string Title { get; set; } = "Scene Patcher";
         internal Window NativeWindow => Window;
         protected override void BuildContent(UIPanelBuilder builder) { Build?.Invoke(builder); }
         internal void Refresh() { RebuildPanel(); }
@@ -50,7 +50,7 @@ namespace RailroaderScenePatcher {
         internal const int Width = 340, DefaultHeight = 300, MinimumHeight = 120;
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(Width, DefaultHeight), new Vector2Int(260, MinimumHeight), Window.Position.UpperLeft);
-        protected override string Title { get; set; } = "Scene patches help";
+        protected override string Title { get; set; } = "Scene Patcher help";
         internal Window NativeWindow => Window;
         protected override void BuildContent(UIPanelBuilder builder) { Build?.Invoke(builder); }
         internal void Refresh() { RebuildPanel(); }
@@ -148,6 +148,46 @@ namespace RailroaderScenePatcher {
             hit.sprite = null; hit.color = Color.clear; hit.raycastTarget = true; hit.enabled = true;
             var button = rect.GetComponent<Button>();
             if (button != null) { button.transition = Selectable.Transition.None; button.targetGraphic = hit; }
+            return rect;
+        }
+        // The native disclosure triangle, with the sprites AddExpandable draws (UIBuilderAssets.disclosureCollapsed and
+        // disclosureExpanded), as a button of its own in a builder row: the 10-unit triangle in the given colour stands
+        // in a clear square as large as a native compact button, 24 units, that takes the click. label, the heading the
+        // triangle follows, takes the same click and tooltip, so the heading and the triangle form one target. A click
+        // runs click and rebuilds the panel. The game's tooltip raycast reads only objects on the UI layer, so every
+        // object made here takes the UI layer: that of the heading, a native prefab, or the named layer without one. The
+        // row itself does not have it, because the builder makes its containers on the default layer.
+        internal const float DisclosureHitSize = 24;
+        internal RectTransform DisclosureTriangle(Transform parent, bool expanded, Color color, Action click, RectTransform label, TooltipInfo tooltip) {
+            var layer = label != null ? label.gameObject.layer : LayerMask.NameToLayer("UI");
+            if (layer < 0) layer = parent.gameObject.layer;
+            var hit = new GameObject("Disclosure", typeof(RectTransform)) { hideFlags = HideFlags.DontSave, layer = layer };
+            var rect = (RectTransform)hit.transform;
+            rect.SetParent(parent, false);
+            var layout = hit.AddComponent<LayoutElement>();
+            layout.minWidth = layout.preferredWidth = DisclosureHitSize; layout.minHeight = layout.preferredHeight = DisclosureHitSize; layout.flexibleWidth = 0;
+            var area = hit.AddComponent<Image>(); area.color = Color.clear;
+            var icon = new GameObject("Triangle", typeof(RectTransform)) { hideFlags = HideFlags.DontSave, layer = layer };
+            var iconRect = (RectTransform)icon.transform;
+            iconRect.SetParent(rect, false);
+            iconRect.anchorMin = iconRect.anchorMax = new Vector2(.5f, .5f); iconRect.sizeDelta = new Vector2(10, 10); iconRect.anchoredPosition = Vector2.zero;
+            var image = icon.AddComponent<Image>();
+            var assets = UIBuilderAssets.Shared;
+            image.sprite = assets == null ? null : expanded ? assets.disclosureExpanded : assets.disclosureCollapsed;
+            image.preserveAspect = true; image.raycastTarget = false; image.color = color;
+            var button = hit.AddComponent<Button>();
+            button.targetGraphic = area; button.transition = Selectable.Transition.None;
+            var run = Action(click);
+            button.onClick.AddListener(() => run());
+            rect.Tooltip(tooltip.Title, tooltip.Text);
+            if (label != null) {
+                var text = label.GetComponentInChildren<TMP_Text>(true);
+                if (text != null) text.raycastTarget = true;
+                var labelButton = label.GetComponent<Button>() ?? label.gameObject.AddComponent<Button>();
+                labelButton.targetGraphic = text; labelButton.transition = Selectable.Transition.None;
+                labelButton.onClick.AddListener(() => run());
+                label.Tooltip(tooltip.Title, tooltip.Text);
+            }
             return rect;
         }
         // Every title-bar glyph is one size and one stroke weight, those of the native close cross beside them, which

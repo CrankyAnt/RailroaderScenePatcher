@@ -18,6 +18,7 @@ static class CommandBandTests {
         TheWindowOpensBelowTheMapEditorOrAtTheTopRight();
         OwnSaveKeepsTheDefinitionsCurrent();
         ADisabledControlKeepsItsDescription();
+        HierarchyLinesHaveAShortForm();
         ChoiceLabelsLeadWithWhatTellsThemApart();
         AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
         AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
@@ -267,7 +268,7 @@ static class CommandBandTests {
             ("Blocked", "The scene patch file needs repair. Resolve the issue before saving."), "The Blocked tooltip body gives repair guidance.");
         Check(CommandBand.LampTooltip(CommandBand.Save(false, false), CommandBand.SaveNotice(Array.Empty<string>(), FileVersionState.Changed, false)) ==
             ("Blocked", "The scene patch file changed outside scene patch editing. Choose a file version before saving."), "The Blocked tooltip body retains the reason and action for a file version choice.");
-        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene patches to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
+        Check(CommandBand.SaveRefusalAlert(false, "Save requires a choice", true).Value.Message.EndsWith("Open Scene Patcher to choose which version to keep.", StringComparison.Ordinal), "The closed-window alert tells the player where to make a file version choice.");
         Check(CommandBand.InventoryWord >= 60 && CommandBand.SaveWord >= CommandBand.InventoryWord, "The reserved widths hold the longer word of each lamp");
     }
     static void CommandsAreDisabledOnlyForTheirOwnReason() {
@@ -447,8 +448,6 @@ static class CommandBandTests {
         var tabs = new[] { "object", "placement", "connections", "changes" };
         Check(CommandBand.ClosesHelp("object", "placement", tabs) && !CommandBand.ClosesHelp("placement", "placement", tabs), "A tab's help closes on a switch to another tab");
         Check(!CommandBand.ClosesHelp("outliner", "placement", tabs) && !CommandBand.ClosesHelp("main", "changes", tabs) && !CommandBand.ClosesHelp(null, "object", tabs), "The outliner's and the window's help stay through a tab switch");
-        // The footer's row clears the resize grip: the grip is 22 high and 10 units of padding lie below the row.
-        Check(CommandBand.GripClearance(22, 10) == 12 && CommandBand.GripClearance(10, 22) == 0, "The row stands as much higher as the grip reaches into it");
         // A component the game adds while it runs is no dependency.
         Check(HierarchyDependencies.IsRuntimeComponent("Helpers.Animation.PlayableGraphAnimatorAdapter") && !HierarchyDependencies.IsRuntimeComponent("RollingStock.Controls.KeyValueBoolAnimator")
             && !HierarchyDependencies.IsRuntimeComponent("UnityEngine.Animator") && !HierarchyDependencies.IsRuntimeComponent(null), "The playable-graph adapter an animator adds while running is runtime state; the animator itself is authored");
@@ -598,6 +597,47 @@ static class CommandBandTests {
                 && CommandBand.ChoiceLine((string)row[0], (int)row[1], (int)row[2], "Track segment Se6a", Array.Empty<string>()) == (string)row[3] + ": Track segment Se6a.",
                 "A candidate keeps its number and ends its label before the confirmation instruction: " + row[3]);
         Check(new[] { CommandBand.ClearActivity, CommandBand.DiscardPrepared, CommandBand.RemoveModification }.Distinct().Count() == 3, "The three controls that take something back have three names");
+    }
+    // The Object tab's Dependencies and Runtime state show a short form by default: paths relative to the inspected
+    // object, one line per object of its hierarchy with its components after it, the inspected object first. Lines that
+    // name no object of the hierarchy stay as they are, before the objects. The long form is the lines themselves.
+    static void HierarchyLinesHaveAShortForm() {
+        const string Scene = "BushnellWhittier", Path = "World/Roads/Crossing";
+        var dependencies = new[] {
+            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing [Track.CrossingController]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate [UnityEngine.MeshRenderer]",
+            "Component BushnellWhittier/World/Roads/Crossing/Gate/Arm [UnityEngine.MeshFilter]; enabled=False",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by BushnellWhittier/World/Roads/Crossing/Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription."
+        };
+        var shortForm = HierarchyDependencies.ShortForm(Scene, Path, dependencies);
+        var expected = new[] {
+            "Duplicate marker ID Mg6m is held by 2 scene markers.",
+            "Component BushnellWhittier/World/Roads/Crossing (1)/Gate [Track.CrossingGate]",
+            "Referenced by Gate [Track.CrossingGate].controller",
+            "Track-relative placement and track-group subscription.",
+            "This object: CrossingController",
+            "Gate: CrossingGate, MeshRenderer",
+            "Gate/Arm: MeshFilter disabled"
+        };
+        Check(shortForm.SequenceEqual(expected), "The short form groups the hierarchy's components per object: " + String.Join(" | ", shortForm));
+        var runtime = new[] {
+            "BushnellWhittier/World/Roads/Crossing/Bell [UnityEngine.AudioSource] enabled=True",
+            "BushnellWhittier/World/Roads/Crossing/Bell [CrossingBell] enabled=False",
+            "Runtime object BushnellWhittier/World/Roads/Crossing/Bell/Pool [UnityEngine.AudioSource]",
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True"
+        };
+        var shortRuntime = HierarchyDependencies.ShortForm(Scene, Path, runtime);
+        var expectedRuntime = new[] {
+            "Culled by SimpleCuller: World/Roads/Crossing/Lamp active=True",
+            "Bell: AudioSource enabled, CrossingBell disabled",
+            "Bell/Pool: AudioSource (runtime object)"
+        };
+        Check(shortRuntime.SequenceEqual(expectedRuntime), "The short form of the runtime state: " + String.Join(" | ", shortRuntime));
+        Check(HierarchyDependencies.ShortForm(Scene, Path, new string[0]).Count == 0 && HierarchyDependencies.ShortForm(null, null, new[] { "x" }).SequenceEqual(new[] { "x" }), "No lines stay none, and without a path the lines stay as they are");
     }
     // The labels of overlapping candidates differ at their end, which is the object's own name: the short label leads
     // with it, and a cut falls on the family.

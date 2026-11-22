@@ -16,7 +16,7 @@ Save the scene patch file as strict UTF-8 JSON. For `mapId`, use the selected ma
 
 ## Describe a fixed placement
 
-In the native map editor, open **Scene patches** and click **Refresh**. Find the board under **Independent board** in the outliner and select its row. The **Object** tab shows its identity and dependencies. Click **Copy ID** to copy that JSON. **Focus** moves the native map editor camera without changing the inspected selection. Refresh only inspects; it does not apply scene patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
+In the native map editor, open **Scene Patcher** and click **Refresh**. Find the board under **Independent board** in the outliner and select its row. The **Object** tab shows its identity and dependencies. Click **Copy ID** to copy that JSON. **Focus** moves the native map editor camera without changing the inspected selection. Refresh only inspects; it does not apply scene patches. Add a unique modification ID and dependencies to the copied identity fields. See [scene inspection](inspect-scene-objects.md) for stale observations, dependency limits and the wider inspection-only inventory.
 
 Add one member to the `modifications` object for each desired placement. The member's key is the modification ID. This example shows the v1 fields and the supported target identity. Replace the sample map ID and coordinates with values for the selected map.
 
