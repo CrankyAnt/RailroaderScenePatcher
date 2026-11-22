@@ -715,15 +715,8 @@ namespace RailroaderScenePatcher {
             // and the start setups that name it.
             if (selected.Family == SpawnPoints.Family) {
                 Section(builder, "Use in the game");
-                // The game offers only spawn points active in the hierarchy, highest priority first; among those with the
-                // same priority its sort keeps no fixed order. The other active ones that share or exceed this spawn
-                // point's priority are counted from the object list.
-                var priority = SpawnPoints.Priority(selected.Bindings);
-                var others = priority == null || inventory == null ? new int?[0] : inventory.Entries.Where(entry => entry.Family == SpawnPoints.Family && entry.Active && !ReferenceEquals(entry, selected)
-                    && entry.Identity.Path != selected.Identity.Path).Select(entry => SpawnPoints.Priority(entry.Bindings)).ToArray();
-                var same = others.Count(other => other == priority);
-                var higher = others.Count(other => other > priority);
-                foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), selected.Active, same, higher)) PlainLabel(builder, use);
+                // The game's order of active spawn points comes from the object list.
+                foreach (var use in SpawnPoints.Uses(selected.Bindings, SpawnPointWorld.NativeSpawnCount(), SpawnPoints.Rank(selected, inventory?.Entries))) PlainLabel(builder, use);
             }
             Section(builder, "State");
             if (HoldWarning is string warning) builder.AddLabel(Tint(Amber, warning));
