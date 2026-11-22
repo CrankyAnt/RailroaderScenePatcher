@@ -4,7 +4,7 @@
 
 Use this guide to set a rail bridge's construction segments after splitting or replacing its track in the native map editor. The bridge's construction controller (`Game.Mow.TrackConstructionScenery`) uses these segments' construction state to show or hide parts of the bridge. It identifies the segments by ID. Construction segments require patcher 0.5.0 or later.
 
-Three rail bridge constructions have a construction controller:
+You can set construction segments for three rail bridge constructions:
 
 - `Bridge 1` at Bryson, with the controller on its group root.
 - The `Almond Bridge`, with the controller on its group root.

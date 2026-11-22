@@ -24,15 +24,15 @@ The inventory shows such an object in the `Crossing pad marker` family with the 
 ## Set or replace the binding in the native map editor
 
 1. Open **Scene patches** and select the pad's row in the outliner, in the folder **Crossing pad marker**. **Select in world** also selects it, as described in [select world targets](select-world-targets.md).
-2. On the **Connections** tab, check the stored segment, end, and distance under **Current binding** in **Crossing pad binding**. Each **Track location listed by the game** entry shows a location the game lists for this marker ID and tells you if it belongs to another object.
+2. On the **Connections** tab, check the stored segment, end, and distance under **Current binding** in **Crossing pad binding**. Each **Named location** entry shows a location registered under this marker ID and tells you if it belongs to another object.
 3. Enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in metres in **Distance**, on the row **Track location (m)**. To take the segment from the world, click **Segment** in the **Replacement targets** section, click the track and click **Confirm** in the footer: the **Segment** field takes the confirmed segment.
 4. Click **Set** at the bottom of the tab.
 
 The patcher checks the target before it changes anything: the segment must exist in the loaded track graph and contain the distance. A missing segment, a distance beyond the segment, or an end other than `a` or `b` refuses the edit; the pad keeps its binding, registration, and geometry.
 
-After the check, the patcher changes the track location the game lists for the marker to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
+After the check, the patcher changes the marker's named location to the new location, as for a Generic marker, and then runs the game's pad generation. Generation replaces the pad mesh with one built along the track at the new location and moves the pad's culling sphere to the new mesh bounds. The game's culling then decides on the next frame whether the new mesh is shown. The pad object itself does not move.
 
-The patcher checks the stored track location and that the game lists exactly one track location for the marker. It also verifies that the current mesh was generated from the mod's location and the pad's current position, and that the culling sphere encloses the new mesh. Any difference fails the edit: the patcher writes the earlier location back, generates the pad again, and checks that the regenerated mesh matches the mesh it captured before the edit.
+The patcher checks the stored track location and that the game has exactly one named location for the marker. It also verifies that the current mesh was generated from the mod's location and the pad's current position, and that the culling sphere encloses the new mesh. Any difference fails the edit: the patcher writes the earlier location back, generates the pad again, and checks that the regenerated mesh matches the mesh it captured before the edit.
 
 ## Detaching is refused
 

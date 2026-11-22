@@ -62,7 +62,7 @@ Changing the wreck setting keeps the marker's track location. Moving the marker 
 - **Remove modification** in the footer removes the entire modification. It restores the track location and wreck setting the marker and car placement have without this mod, recalculated from the loaded map and other mods' values.
 - Returning the marker to the map's track location removes that setting. If nothing else remains, the patcher removes the modification from the file.
 
-If an edit fails after changes begin, the patcher restores the previous wreck setting, the stored track location, and the track location the game lists for the marker. If it can't verify restoration, it reports incomplete cleanup and blocks further edits to the marker until **Recheck** in the footer succeeds or the world reloads. For **Recheck** to succeed, the game's listed track location must match the stored track location.
+If an edit fails after changes begin, the patcher restores the previous wreck setting, the stored track location, and the marker's named location. If it can't verify restoration, it reports incomplete cleanup and blocks further edits to the marker until **Recheck** in the footer succeeds or the world reloads. For **Recheck** to succeed, the named location must match the stored track location.
 
 ## Save and play
 

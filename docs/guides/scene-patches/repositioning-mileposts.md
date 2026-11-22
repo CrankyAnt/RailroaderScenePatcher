@@ -29,7 +29,7 @@ The inventory lists an object that meets these conditions in the `Milepost` fami
 
 ## Set, replace, or detach the binding in the native map editor
 
-1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end, and distance, and each track location the game lists under the marker ID, each in a **Track location listed by the game** row; a location that belongs to another object says so.
+1. On the **Connections** tab, check **Current binding**. It shows the stored segment, end, and distance, and one **Named location** row per track location registered under the marker ID. The row says when the location belongs to another object.
 2. In the **Track location (m)** row, enter the target segment ID in **Segment**, the end (`a` or `b`) in **End**, and the distance in metres in **Distance**. To pick the segment in the world, click **Segment** under **Replacement targets**, click the track, and click **Confirm** in the footer. The **Segment** field takes the confirmed segment.
 3. Click **Set**. **Detach** removes the post from the track, and **Clear binding** returns it to its underlying binding.
 

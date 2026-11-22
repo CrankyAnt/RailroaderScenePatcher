@@ -141,35 +141,35 @@ The object that animates a stall's doors, such as `Stall (2) / Roundhouse Modula
 
 ## Rail bridges outside Ela
 
-You can move, rotate, or disable a rail bridge construction outside Ela so that it stands where you moved its track in the native map editor. Each construction is a group under **Bridge** > **Rail bridges**, beside `Ela Bridge`:
+You can move, rotate, or disable a rail bridge outside Ela so that it stands where you moved its track in the native map editor. Each bridge is a group under **Bridge** > **Rail bridges**, beside `Ela Bridge`:
 
 - `Bridge 1` at Bryson, with its parts `Bridge 1 / Abutments` and `Bridge 1 / Steel` and the objects below them.
 - `Almond Bridge`, the group root at `World/Large Scenery/Almond Bridge`, with its parts `Almond Bridge / Abutments` and `Almond Bridge / Steel`. The group root carries the bridge's construction controller and culler, so the abutments and steel are parts of one group.
 - Each of the seven plate girder bridges below `World/Large Scenery/Plate Girder Bridge`, such as `Plate Girder Bridge (1)`. Each one is one object without parts.
 
-The construction moves with its colliders and culling. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere, or capsule collider follow the construction. The patcher does not compare the bounds of mesh colliders. It also checks that the generated trestles near the bridge stay unchanged. The patcher refuses a construction that holds a track component or a generated trestle.
+The bridge moves with its colliders and culling. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere, or capsule collider follow the bridge. The patcher does not compare the bounds of mesh colliders. It also checks that the generated trestles near the bridge stay unchanged. The patcher refuses a bridge that holds a track component or a generated trestle.
 
-Move the track in the native map editor. It remains native map data and keeps its own trestle or steel flags. A rail bridge doesn't follow its track. **Follow** is unavailable for a rail bridge and its parts, and the patcher refuses a hand-written track-following placement. Move the track first, then move the construction onto it:
+Move the track in the native map editor. It remains native map data and keeps its own trestle or steel flags. A rail bridge doesn't follow its track. **Follow** is unavailable for a rail bridge and its parts, and the patcher refuses a hand-written track-following placement. Move the track first, then move the bridge onto it:
 
 1. In the native map editor, move the track that the bridge carries.
-1. In **Scene patches**, select the construction under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
+1. In **Scene patches**, select the bridge under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
 1. Click **Save** in the native map editor.
 
 ### Construction segments
 
-Bryson Bridge 1 and the Almond Bridge each have a construction controller. On the **Object** tab of the construction and its parts, **Use in the game** names the construction segments. The controller reads their construction state by ID. In Railroader 0.6.3, changing the construction state of a replacement segment at Bryson Bridge 1 hid and restored its bridge parts. A plate girder bridge has no construction controller, and its **Use in the game** reads as decorative.
+Bryson Bridge 1 and the Almond Bridge are rail bridge constructions. Each has a construction controller. On the **Object** tab of the construction and its parts, **Use in the game** names the construction segments. The controller reads their construction state by ID. In Railroader 0.6.3, changing the construction state of a replacement segment at Bryson Bridge 1 hid and restored its bridge parts. A plate girder bridge has no construction controller, and its **Use in the game** reads as decorative.
 
 The **Connections** tab lists each construction segment under **Observed bindings**, such as `Construction segment: <segment ID>`. If you split or replace the track natively, a segment can stop existing. The tab then shows its ID followed by `no longer exists`, and the construction's group root shows it as a problem, marked **!** in the outliner. In Railroader, a deleted construction segment of `Bridge 1` at Bryson left the bridge's parts visible and made the game report an error when the world loaded. The problem names the segment. Click **Repair construction segments** under **Detected problems** to open the **Connections** tab, and see [repair the construction segments of a rail bridge](repairing-construction-segments.md). The problem disappears after the repair.
 
 ### Disable an object that the construction switches
 
-You can disable the construction root, a part, or a plate girder bridge. It stays disabled even when the controller would switch it on. The **Object** tab and footer show an amber warning. **Enable** or **Clear activity** returns the object to the state the controller currently sets. In Railroader 0.6.3, disabled steel on Almond Bridge stayed off when its segment reached Complete.
+You can disable a rail bridge root or part. If a construction controller would switch it on, it stays disabled and the **Object** tab and footer show an amber warning. For an object the controller switches, **Enable** or **Clear activity** returns it to the state the controller currently sets. In Railroader 0.6.3, disabled steel on Almond Bridge stayed off when its segment reached Complete.
 
 A part moved outside its culler's sphere gets its own culling sphere, as described in [what the patcher checks](#what-the-patcher-checks). For a part that the controller switches, its own sphere shows the part only while the controller shows it.
 
 ## Road bridges
 
-You can move, rotate or disable a road bridge construction so that it stands where you moved its road in the native map editor. Each road bridge is a group under **Bridge** > **Road bridges**, with its deck, abutments, and other objects as parts:
+You can move, rotate or disable a road bridge so that it stands where you moved its road in the native map editor. Each road bridge is a group under **Bridge** > **Road bridges**, with its deck, abutments, and other objects as parts:
 
 - `Almond Road Bridge` and `Whittier Haywood Road Bridge` below `World/Large Scenery`.
 - `Concrete Road Bridge - 20m` below `World/Roads Bryson`, and `Concrete Road Bridge - 60m` under the container object `World/Roads Bryson/US19 Gov Island`.
