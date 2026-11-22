@@ -136,7 +136,7 @@ namespace RailroaderScenePatcher {
         // The supplying scope and addition ID keep the order independent of the scene and outliner order.
         internal static string AddedEquipmentName((string Scope, string Id, string CopyName, bool IsBell) equipment,
             IEnumerable<(string Scope, string Id, string CopyName, bool IsBell)> crossingEquipment) {
-            if (equipment.CopyName == null) return equipment.IsBell ? "Added bell" : "Added light or gate";
+            if (equipment.CopyName == null) return equipment.IsBell ? "Added bell" : $"Added light or gate: name unavailable ({equipment.Scope}/{equipment.Id})";
             var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.CopyName == equipment.CopyName)
                 .OrderBy(item => item.Scope, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray();
             var ordinal = Array.IndexOf(matches, equipment) + 1;

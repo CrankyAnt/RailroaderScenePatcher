@@ -594,7 +594,7 @@ namespace RailroaderScenePatcher {
         // colors. The line ends in an ellipsis beside the Inspector and Guided switch, so what is cut off is the family's end,
         // never a badge (CommandBand.StateParts).
         string StateLine(out string plain) {
-            if (selected == null) { plain = "Select a row or click Select in world."; return plain; }
+            if (selected == null) { plain = "Select an outliner object or click Select in world."; return plain; }
             var text = new List<string> { selected.Family };
             if (!selected.Active) text.Add("Inactive");
             // The native map editor's badges, as its inspector shows them beside the row marker.

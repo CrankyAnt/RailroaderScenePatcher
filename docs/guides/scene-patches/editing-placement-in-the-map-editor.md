@@ -56,7 +56,7 @@ Click **Cancel** to close the panel without changes and discard the conflict cho
 
 Import adds no native Undo or Redo step. After an import without conflicts, one Undo reverses your own last action before the import. Undo or Redo of an earlier step never overwrites a value applied by the import. If any change fails, the patcher restores the state from before the import and explains the failure in the message area.
 
-While the **Import** panel is open, clicking **Save** writes nothing and shows `Save refused.` followed by `Click Import to finish the import before saving. After Cancel, choose a version in the Version choice panel before saving.` After import, the scene patch status is **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs. A file that needs repair cannot be imported.
+While the **Import** panel is open, clicking **Save** writes nothing and shows `Save refused.` followed by `Before saving, click Import to apply the import, or click Cancel to discard the import choices. Cancel returns to the Version choice panel in Scene Patcher, where you must choose a file version before saving.` After import, the scene patch status is **Saved** if the session's scene patch content equals the file on disk, or **Unsaved** if it differs. A file that needs repair cannot be imported.
 
 ### Repair the scene patch file
 

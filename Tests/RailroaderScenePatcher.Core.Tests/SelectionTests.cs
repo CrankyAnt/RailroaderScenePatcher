@@ -287,7 +287,7 @@ static class SelectionTests {
         Check(choices.Pending.ListOpen && choices.Pending.Offers.SequenceEqual(members) && choices.Pending.Candidate == null && Unchanged(),
             "A click that picks a group opens the choice list of the group's objects and changes nothing");
         Check(choices.Pending.OfferCountText + " " + choices.Pending.OfferListInstruction ==
-            "3 objects in this crossing setup. Select a row from the list next to the pointer.", "The footer identifies the crossing setup and directs selection to its rows");
+            "3 rows in the choice list for this crossing setup. Select an object from that list beside the pointer.", "The footer counts the choice list's rows and identifies the crossing setup");
         choices.Pending.Highlight = members[2];
         choices.Pending.Choose(members[1]);
         Check(ReferenceEquals(choices.Pending.Candidate, members[1]) && choices.Pending.IsPending && Unchanged(), "Choosing an entry makes that object the candidate and changes nothing");
