@@ -171,8 +171,11 @@ namespace RailroaderScenePatcher {
         }
         // The crossing controller that holds each loaded detection span in a circuit, read once per frame for every
         // span an inspection asks about in it. A coverage edit changes who holds what within a frame: the
-        // re-observation after an edit, and every discovery, read the controllers again (InvalidateHolders).
+        // re-observation after an edit, and every discovery, read the controllers again (InvalidateHolders). A span
+        // that a coverage edit detached keeps the controller that held it in the scene as authored (AuthoredSpans).
         static Dictionary<Component, GameObject> holders;
+        // Each controller's detection spans as the crossing coverage capability first read them, before any edit.
+        internal static Func<IEnumerable<KeyValuePair<object, object>>> AuthoredSpans;
         static int holdersFrame = -1;
         internal static void InvalidateHolders() { holders = null; }
         internal static GameObject HolderOf(Component heldSpan) {
@@ -188,6 +191,8 @@ namespace RailroaderScenePatcher {
                             if (member != null && !found.ContainsKey(member)) found[member] = owner.gameObject;
                         }
                 }
+                foreach (var pair in AuthoredSpans?.Invoke() ?? Enumerable.Empty<KeyValuePair<object, object>>())
+                    if (pair.Value is Component member && member != null && pair.Key is GameObject owner && owner != null && Loaded(owner) && !found.ContainsKey(member)) found[member] = owner;
                 holders = found; holdersFrame = Time.frameCount;
             }
             return holders.TryGetValue(heldSpan, out var holder) ? holder : null;

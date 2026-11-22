@@ -327,7 +327,10 @@ namespace RailroaderScenePatcher {
                 CrossingEquipmentWorld equipmentWorld = null;
                 try { equipmentWorld = new CrossingEquipmentWorld { Warn = Report }; }
                 catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": crossing-equipment capability incompatible or unavailable: " + e.GetBaseException().Message); }
-                try { capabilities.Add(crossingCoverageScene = new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld)); }
+                try {
+                    capabilities.Add(crossingCoverageScene = new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld));
+                    CrossingDeviceWorld.AuthoredSpans = crossingCoverageScene.AuthoredSpans;
+                }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
                     context.Log.Info("Scene Patcher " + Version + ": crossing-coverage capability incompatible or unavailable: " + e.GetBaseException().Message);

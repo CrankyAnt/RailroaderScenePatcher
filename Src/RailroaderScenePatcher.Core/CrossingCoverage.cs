@@ -266,6 +266,11 @@ namespace RailroaderScenePatcher.Core {
             return world.Resolve(identity) ?? Array.Empty<object>();
         }
         public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == ComponentType) ? RequiredVersion : null;
+        // The native spans of every circuit of every controller as the patcher first read them in this load, before any
+        // coverage edit, each with its controller. A detached circuit leaves the controller's list, but its spans stay
+        // detection spans of that controller, so the inventory keeps listing them under it.
+        public IReadOnlyList<KeyValuePair<object, object>> AuthoredSpans() =>
+            baselines.SelectMany(b => b.Value.Circuits.SelectMany(c => c.Original.Select(span => new KeyValuePair<object, object>(b.Key, span)))).ToArray();
         // Spans the patcher owns for the controller in this load, for inspection.
         public IReadOnlyList<object> OwnedSpans(object target) => baselines.TryGetValue(target, out var b) ? b.Owned.ToArray() : Array.Empty<object>();
         public IReadOnlyList<string> CoveredSegments(object target) {

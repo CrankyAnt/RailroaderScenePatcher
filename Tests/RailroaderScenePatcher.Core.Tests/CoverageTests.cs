@@ -304,6 +304,10 @@ static partial class CoverageTests {
         Assert(result.Outcomes["detach"].Applied && f.Crossing.Circuits.Count == 1 && ReferenceEquals(f.Crossing.Circuits[0], f.Retained), "A detached circuit leaves the crossing's evaluation: " + result.Outcomes["detach"].Error);
         Assert(!f.OldRouteDetects && f.OldRouteStillOccupied && f.RetainedDetectsBothWays, "The detached route stops triggering; its spans stay registered and the other circuit works");
         Assert(f.Spans(f.Rerouted) == "Pcyi,Pipr,Pws9" && f.OwnedRegistered == 0, "Detach creates nothing and keeps the native span references");
+        // A detached circuit's spans stay detection spans of the controller that held them in the scene as authored, so the
+        // inventory keeps listing them under it and they can be attached again.
+        var authored = f.Scene.AuthoredSpans().Where(pair => ReferenceEquals(pair.Key, f.Crossing)).Select(pair => ((FakeSpan)pair.Value).Id).ToArray();
+        Assert(authored.SequenceEqual(new[] { "Pcyi", "Pipr", "Pws9", "Pdlh", "P6id", "P1db" }), "The controller keeps its authored spans after a detach: " + String.Join(",", authored));
         f = new Fixture();
         var all = new PatchEngine(f.Scene).Apply(Doc(Cover("all", Detached("Pipr") + "," + Detached("P6id"))));
         Assert(!all.Outcomes["all"].Applied && all.Outcomes["all"].Error.Contains("without detection") && f.World.Mutations == 0 && f.Native, "Detaching every circuit is refused before mutation");
