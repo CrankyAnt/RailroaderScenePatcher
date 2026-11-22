@@ -469,14 +469,17 @@ static class BakedSceneryTests {
         Console.WriteLine("PASS: baked scenery group rule, coverage rules, group placement and activity, refusal, restoration and scene patch editing");
     }
     // Every object below CTC and CTC Auxiliary is kept out, and a span the game builds from operations data is not
-    // serialized; the patcher's own spans are listed.
+    // serialized. A serialized span that no crossing controller holds is a native track span and stays out; a detection
+    // span and the patcher's own spans are listed.
     static void SceneRootsAndBuiltSpansStayOut() {
         foreach (var root in new[] { "CTC", "CTC Auxiliary", "Setups", "Ops", "MapFeatures", "Progressions", "MapManager", "Editor Directional Light" })
             Assert(!BakedSceneryRules.ListedBelow(root, false), "Objects below " + root + " are not listed");
         Assert(BakedSceneryRules.ListedBelow("World", false) && BakedSceneryRules.ListedBelow("Setups", true) && !BakedSceneryRules.ListedBelow("CTC", true),
             "Objects below World are listed, and starter placement markers in Setups keep their family; signal markers below CTC do not");
-        Assert(!BakedSceneryRules.SpanListed(serialized: false, patcherOwned: false), "A span the game builds while it runs is not listed");
-        Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true), "A scene span and the patcher's own spans are listed");
+        Assert(!BakedSceneryRules.SpanListed(serialized: false, patcherOwned: false, held: false), "A span the game builds while it runs is not listed");
+        Assert(!BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false, held: false), "A serialized span no crossing controller holds is a native track span and is not listed");
+        Assert(BakedSceneryRules.SpanListed(serialized: true, patcherOwned: false, held: true), "A serialized span a crossing controller holds is a detection span and is listed");
+        Assert(BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true, held: true) && BakedSceneryRules.SpanListed(serialized: false, patcherOwned: true, held: false), "The patcher's own spans are listed, held or not");
     }
     // A storage pile (Scenery.Pile) builds a "Pile Collider" child the scene does not save while its culling sphere is
     // near the camera and destroys it when the camera moves away, as at Sylva Paperboard and Connelly. The pile itself

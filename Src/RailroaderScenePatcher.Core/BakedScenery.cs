@@ -207,9 +207,11 @@ namespace RailroaderScenePatcher.Core {
         // Whether an object below a scene root of this name can be listed at all. A track marker below Setups is a starter
         // placement marker and keeps its family.
         public static bool ListedBelow(string sceneRoot, bool trackMarker) => !KeptOutRoots.Contains(sceneRoot) || (trackMarker && sceneRoot == Setups);
-        // A span the game builds from the map's operations data is not serialized and not listed; the spans the patcher
-        // adds for a crossing are listed.
-        public static bool SpanListed(bool serialized, bool patcherOwned) => serialized || patcherOwned;
+        // A span the game builds from the map's operations data is not serialized and not listed. A serialized span that
+        // no crossing controller holds is a native track span, which the native map editor edits, and is not listed
+        // either. A detection span, which a crossing controller holds, and the spans the patcher adds for a crossing
+        // are listed.
+        public static bool SpanListed(bool serialized, bool patcherOwned, bool held) => patcherOwned || (serialized && held);
         // The objects one level below a category folder, and below World/Large Scenery one level below a folder there, with
         // the name of that folder below World/Large Scenery.
         static IEnumerable<(string, IHierarchyNode, string)> Roots(IHierarchyNode category, string categoryPath) {

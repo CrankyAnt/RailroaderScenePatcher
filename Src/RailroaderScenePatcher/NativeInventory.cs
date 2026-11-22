@@ -214,8 +214,17 @@ namespace RailroaderScenePatcher {
             } catch { }
             return photoMarkers = found;
         }
-        // The family of a component that is not a transform, for the baked scenery rule's check of existing families.
-        internal static string FamilyOf(Component c) => c is Transform ? null : Family(c);
+        // The family of a component that is not a transform, for the baked scenery rule's check of existing families. A
+        // native track span is not listed, but the native map editor owns it: its object stays out of the groups and parts
+        // as an object of a listed family does.
+        internal static string FamilyOf(Component c) => c is Transform ? null : Family(c) ?? (TypeName(c) == Span && !Transient(c.transform, null) ? "Track span" : null);
+        // Whether a crossing controller holds the span in a circuit. When the holders cannot be read, the span stays
+        // listed, so a detection span never leaves the inventory unnoticed.
+        static bool Held(Component span) {
+            if (CrossingDeviceWorld.Unavailable != null) return true;
+            try { return CrossingDeviceWorld.HolderOf(span) != null; }
+            catch { return true; }
+        }
         // The car placements of the loaded setups as the last discovery read them. A single object observed later is
         // classified by them, as it takes the reference scan of that discovery. Setups that could not be read classify
         // no marker as a starter placement marker; every marker then carries a note that says so.
@@ -250,9 +259,12 @@ namespace RailroaderScenePatcher {
                 return starters.Family(c, Get(go, "Track.TrackCurveMeshBuilder") != null ? "Crossing pad marker" : "Track marker");
             }
             if (type == Relative && Get(go, Marker) == null) return "Track-relative scene object";
-            // A span the game builds from the map's operations data is not serialized and stays with the native map
-            // editor; the spans this patcher adds for a crossing are listed.
-            if (type == Span) return BakedSceneryRules.SpanListed(!Transient(c.transform, null), c.transform.root.name == CrossingCoverageWorld.RootName) ? "Track span" : null;
+            // A span the game builds from the map's operations data, and a serialized span no crossing controller holds,
+            // stay with the native map editor; a detection span and the spans this patcher adds for a crossing are listed.
+            if (type == Span) {
+                bool serialized = !Transient(c.transform, null), patcherOwned = c.transform.root.name == CrossingCoverageWorld.RootName;
+                return BakedSceneryRules.SpanListed(serialized, patcherOwned, serialized && !patcherOwned && Held(c)) ? "Track span" : null;
+            }
             if (type == Crossing) return "Crossing controller";
             // A crossing mast is one entry: its light object. The gate on a child of that object is a part of the
             // entry and gets no row. A gate that stands on no light object stays visible as a mast that does not
