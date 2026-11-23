@@ -107,14 +107,16 @@ static class CoalLoaderTests {
             scene.Add(new BakedSceneryGroups(World, holds: holds)); scene.Add(new BakedSceneryParts(World, holds));
             Engine = new PatchEngine(scene);
         }
-        public bool LoaderUnedited => Near(Group.Position, Home) && Near(Spotlight.Offset, LightOffset) && Near(ChutePart.Offset, ChuteOffset)
-            && Group.Active && Spotlight.Active && ChutePart.Active;
-        // Whether the object is active in the hierarchy: it, every part above it and the group root are active.
-        public static bool InHierarchy(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!p.Active) return false; return part.Group.Active; }
         public bool MineUnmoved => Near(Mine.Offset, MineOffset) && Near(Mine.Rotation, MineRotation) && Near(ChutePart.Offset, ChuteOffset);
-        public string State => "group " + String.Join(",", Group.Position) + " active " + Group.Active + ", light " + String.Join(",", Spotlight.Offset) + ", chute " + String.Join(",", ChutePart.Offset);
+        public bool LoaderUnedited => Near(Group.Position, Home) && Near(Spotlight.Offset, LightOffset) && MineUnmoved
+            && Group.Active && Spotlight.Active && Mine.Active && ChutePart.Active;
+        public string State => "group " + String.Join(",", Group.Position) + " active " + Group.Active + ", light " + String.Join(",", Spotlight.Offset)
+            + ", mine loader " + String.Join(",", Mine.Offset) + " rotation " + String.Join(",", Mine.Rotation) + " active " + Mine.Active + " in hierarchy " + InHierarchy(Mine)
+            + ", chute " + String.Join(",", ChutePart.Offset);
     }
     static bool Near(double[] a, double[] b) => a.Length == b.Length && a.Zip(b, (x, y) => Math.Abs(x - y) < 1e-6).All(close => close);
+    // Whether the object is active in the hierarchy: it, every part above it and the group root are active.
+    static bool InHierarchy(FakePart part) { for (var p = part; p != null; p = p.Parent) if (!p.Active) return false; return part.Group.Active; }
     static string Mod(string id, string path, string structure, double x, string extra = "") =>
         "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}" +
         ",\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", new[] { x, 602.86, 2178.55 }.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "],\"rotation\":[0,0,0,1]}" + extra + ",\"dependsOn\":[]}";
@@ -201,30 +203,35 @@ static class CoalLoaderTests {
     // hierarchy, and Undo brings it back. The patcher never writes its own activity, also when the game left it
     // inactive by itself, as Railroader 0.6.3 does.
     static void TheMineLoaderGoesWithTheGroup() {
+        bool AtOrBelowMineLoader(string path) => path == MineLoader || path.StartsWith(MineLoader + "/", StringComparison.Ordinal);
         var verdicts = BakedSceneryRules.Classify(World());
-        var unlisted = BakedSceneryRules.Parts(verdicts).Where(p => p.Path == MineLoader || p.Path.StartsWith(MineLoader + "/", StringComparison.Ordinal)).ToList();
+        var unlisted = BakedSceneryRules.Parts(verdicts).Where(p => AtOrBelowMineLoader(p.Path)).ToList();
         Assert(unlisted.Count == 1 + MineLoaderRenderers.Length && unlisted.All(p => p.Disposition == PartDisposition.NotListed && p.Reason == BakedSceneryRules.AnimatedParts),
             "MineLoader and its renderers are unlisted animated parts: " + String.Join("; ", unlisted.Select(p => p.Path + " " + p.Disposition + " " + p.Reason)));
-        Assert(!verdicts.Any(v => v.Path == MineLoader || v.Path.StartsWith(MineLoader + "/", StringComparison.Ordinal)), "MineLoader is no group of its own");
+        Assert(!verdicts.Any(v => AtOrBelowMineLoader(v.Path)), "MineLoader is no group of its own");
 
         var f = new LoaderWorld();
         Assert(f.World.FindParts(SceneName, MineLoader).Count == 0, "MineLoader resolves as no part");
-        var refused = f.Engine.Apply(Doc(Mod("mine", MineLoader, BakedSceneryParts.Structure, 1337.85), Mod("mineOff", MineLoader, BakedSceneryParts.Structure, 1317.85, ",\"active\":false")));
-        Assert(refused.Outcomes.Values.All(o => !o.Applied) && f.LoaderUnedited && f.MineUnmoved && f.Mine.Active,
-            "A move and a disable of MineLoader on its own are refused: " + Outcomes(refused));
+        // Each in its own document and world, so that only the part rule can refuse it: the path finds no part.
+        foreach (var mod in new[] { Mod("mine", MineLoader, BakedSceneryParts.Structure, 1337.85), Mod("mine", MineLoader, BakedSceneryParts.Structure, 1317.85, ",\"active\":false") }) {
+            var alone = new LoaderWorld();
+            var refused = alone.Engine.Apply(Doc(mod));
+            Assert(refused.Outcomes.Count == 1 && !refused.Outcomes["mine"].Applied && refused.Outcomes["mine"].Error == "Target must resolve uniquely" && alone.LoaderUnedited,
+                "A move or a disable of MineLoader on its own is refused: " + Outcomes(refused) + " | " + alone.State);
+        }
 
         var store = new Store(); var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(f.Engine, mapEditor, store); mapEditor.Session = session;
         var identity = new TargetIdentity(SceneName, Loader, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
         var moved = new Placement(new[] { 1337.85, 604.86, 2178.55 }, Turn.Yaw(90));
         Assert(session.Edit(identity, moved, null).Applied && Math.Abs(f.Group.Position[0] - 337.85) < 1e-9, "The group moves: " + f.State);
-        Assert(f.MineUnmoved && LoaderWorld.InHierarchy(f.Mine) && LoaderWorld.InHierarchy(f.ChutePart),
-            "MineLoader keeps its place relative to the group root: offset " + String.Join(",", f.Mine.Offset) + " rotation " + String.Join(",", f.Mine.Rotation));
-        Assert(session.Edit(identity, null, false).Applied && !LoaderWorld.InHierarchy(f.Mine) && !LoaderWorld.InHierarchy(f.ChutePart) && f.Mine.Active && f.MineUnmoved,
-            "After Disable of the group MineLoader is inactive in the hierarchy, its own activity untouched");
+        Assert(f.MineUnmoved && InHierarchy(f.Mine) && InHierarchy(f.ChutePart),
+            "MineLoader keeps its place relative to the group root: " + f.State);
+        Assert(session.Edit(identity, null, false).Applied && !InHierarchy(f.Mine) && !InHierarchy(f.ChutePart) && f.Mine.Active && f.MineUnmoved,
+            "After Disable of the group MineLoader is inactive in the hierarchy, its own activity untouched: " + f.State);
         mapEditor.Undo();
-        Assert(LoaderWorld.InHierarchy(f.Mine) && f.MineUnmoved, "Undo of Disable brings MineLoader back with the group");
-        Assert(session.Remove(identity).Applied && f.LoaderUnedited && f.MineUnmoved && f.Mine.Active, "Remove modification leaves MineLoader at its unedited place: " + f.State);
+        Assert(InHierarchy(f.Mine) && f.MineUnmoved, "Undo of Disable brings MineLoader back with the group: " + f.State);
+        Assert(session.Remove(identity).Applied && f.LoaderUnedited, "Remove modification leaves MineLoader at its unedited place: " + f.State);
 
         var dormant = new LoaderWorld();
         dormant.Mine.Active = false;
