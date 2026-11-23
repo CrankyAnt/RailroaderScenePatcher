@@ -183,6 +183,7 @@ static class EquipmentTests {
         TheEditingProposesADistinctIdAndAPlacementAtTheCrossing();
         EditingKeepsAnotherModsEquipment();
         AFailedAdditionIsListedAndRemovable();
+        AdditionsInSeparateModificationsAreAllListed();
         AnAdditionWithoutItsCopyIsRebuiltFromItsSource();
         AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded();
         AnAdditionWithoutItsCopyCanBeRemoved();
@@ -585,6 +586,24 @@ static class EquipmentTests {
         var removed = session.RemoveEquipment(Crossing, "lost");
         Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.ScenePatchFileText.Contains("lost"), "The failed addition is removed from the scene patch file: " + removed.Error);
         Assert(session.AddEquipment(Crossing, West()).Applied && f.Live.Count == 1, "Afterwards the crossing takes equipment again");
+    }
+    // A scene patch file may hold the crossing's coverage and each of its additions in a modification of its own, as the
+    // CrossingReroute62 fixture does. The crossing lists every addition of this mod, not only those of its first modification.
+    static void AdditionsInSeparateModificationsAreAllListed() {
+        var f = new Fixture();
+        f.World.Bell("rr/bell", b => b.Name = "Teardrop bell"); f.World.LoadsPending = false;
+        var engine = new PatchEngine(f.Scene);
+        string Loc(double d) => "{\"segment\":\"Snew\",\"end\":\"a\",\"distance\":" + N(d) + "}";
+        string Range(double a, double b) => "{\"from\":" + Loc(a) + ",\"to\":" + Loc(b) + "}";
+        var coverage = "\"cover\":{" + Target() + ",\"relationships\":{\"crossingCoverage\":{\"circuits\":{\"Pipr\":{\"approachA\":" + Range(308, 550) + ",\"island\":" + Range(292, 308) + ",\"approachB\":" + Range(292, 50) + "}}}},\"dependsOn\":[]}";
+        var scenePatchFile = Doc(coverage + "," + Equip("equip-signal-copy", Addition("west")) + "," + Equip("equip-bell-added", BellAddition("ring")));
+        var load = engine.Apply(scenePatchFile, "author/pack");
+        Assert(load.Outcomes.Values.All(o => o.Applied) && f.Live.Count == 2, "The coverage and both additions apply at load: " + String.Join("; ", load.Outcomes.Where(o => !o.Value.Applied).Select(o => o.Key + " " + o.Value.Error)));
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var entries = session.EquipmentEntries(Crossing);
+        Assert(entries.Select(e => e.Addition.Id).SequenceEqual(new[] { "ring", "west" }) && entries.All(e => e.Built != null && e.Problem == null),
+            "Both additions are listed as built, in the ordinal order of their IDs: " + String.Join(", ", entries.Select(e => e.Addition.Id + " " + e.Problem)));
     }
     // An added light, gate or bell whose copy is gone while its wrapper stays counts as not built: the editing lists it with
     // its reason, and Recheck rebuilds it from its source like a fresh construction, without a refusal or a reload.

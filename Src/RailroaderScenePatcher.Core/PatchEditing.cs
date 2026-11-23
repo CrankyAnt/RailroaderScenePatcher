@@ -906,16 +906,23 @@ namespace RailroaderScenePatcher.Core {
         // An equipment ID from the stem that no modification of the scene patch file uses yet, with a numeric suffix when it is
         // taken, as a new modification key gets one. An invalid stem falls back to "equipment".
         // This mod's additions of the crossing as the scene patch file holds them, each with its built state in the scene or why it
-        // was not built. The scene patch file's own order is the ordinal order of the IDs.
+        // was not built. The scene patch file may hold them in several modifications of the crossing, beside its coverage; all
+        // are listed, in the ordinal order of their IDs.
         public IReadOnlyList<EquipmentEntry> EquipmentEntries(TargetIdentity target) {
             var resolved = engine.ResolveUnique(target);
-            var existing = Own(resolved).FirstOrDefault();
-            if (existing == null) return Array.Empty<EquipmentEntry>();
+            var own = Own(resolved);
+            if (own.Count == 0) return Array.Empty<EquipmentEntry>();
+            CrossingEquipment observed = null;
+            try { observed = scene.Read(resolved).Equipment; } catch (InvalidOperationException) { }
+            var entries = new List<EquipmentEntry>();
+            foreach (var existing in own) entries.AddRange(EquipmentEntries(resolved, existing, observed));
+            return entries.OrderBy(e => e.Addition.Id, StringComparer.Ordinal).ToList();
+        }
+        // The additions of one modification of the crossing, each with its built state or why it was not built.
+        IEnumerable<EquipmentEntry> EquipmentEntries(object resolved, JObject existing, CrossingEquipment observed) {
             CrossingEquipment modEquipment;
             try { modEquipment = PatchEngine.Parse(existing, scenePatchFileKey).State.Equipment; } catch (InvalidOperationException) { return Array.Empty<EquipmentEntry>(); }
             if (modEquipment == null) return Array.Empty<EquipmentEntry>();
-            CrossingEquipment observed = null;
-            try { observed = scene.Read(resolved).Equipment; } catch (InvalidOperationException) { }
             // Why each addition on its own is refused, or null. The additions of one modification are one coherent operation:
             // a refused addition stops the others, so a valid addition that is not built names the refused ones rather than
             // offering a Recheck that refuses the same way.
