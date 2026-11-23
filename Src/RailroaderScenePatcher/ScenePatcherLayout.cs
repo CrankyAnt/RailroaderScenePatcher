@@ -1279,7 +1279,7 @@ namespace RailroaderScenePatcher {
             // A confirmed target belongs to the object it was chosen for; another object does not show it.
             else if (primary == EditFeedback.PrimaryMessage.ConfirmedChoice) {
                 source = "World choice"; state = Tint(Green, "Confirmed choice: " + (selection.ConfirmedName ?? confirmation.Identity.ToString()));
-            } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, block); }
+            } else if (!guided.Enabled && selected != null && EditBlock() is string block) { source = "Editing"; state = Tint(Amber, CommandBand.EditingLine(block)); }
             else if (feedback.Recovery?.Kind != FailureKind.IncompleteCleanup && feedback.Recovery?.Kind != FailureKind.Blocked && CleanupState() is string cleanup) { source = "Editing"; state = Tint(Amber, cleanup); }
             else if (!guided.Enabled && HoldWarning is string warning) { source = ActivityPlace; state = Tint(Amber, warning); }
             // Entries in the area stack from the top without gaps:

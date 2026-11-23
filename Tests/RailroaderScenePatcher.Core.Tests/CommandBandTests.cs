@@ -33,6 +33,7 @@ static class CommandBandTests {
         SharedRulesHoldAtEveryCallSite();
         NumericPlacementLeavesWorldInputBlockedOnlyDuringAnEdit();
         ReasonsReadAsOnePlainSentence();
+        EditingLinesEndWithAFullStop();
         GroupVerdictsSayNotYetOnlyWithATicket();
         ARefusedAdditionTakesItsCorrectionFromUse();
         Console.WriteLine("PASS: status lamps, band commands, row markers, state badges and default window placement");
@@ -214,6 +215,17 @@ static class CommandBandTests {
     }
     // A tooltip of a control that cannot be used carries one label, Unavailable:, and the reason after it as one plain
     // sentence: a reason's own label, such as Not editable: or Track binding unavailable:, is not repeated after it.
+    // The footer's amber Editing line ends each edit block with a full stop, as its tooltip does, and keeps the text as it
+    // stands: a block that already ends a sentence keeps its ending, and a label is not stripped.
+    static void EditingLinesEndWithAFullStop() {
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications) == PatchEditingSession.SeveralModifications + ".",
+            "The several-modifications block ends with a full stop: " + CommandBand.EditingLine(PatchEditingSession.SeveralModifications));
+        Check(CommandBand.EditingLine(PatchEditingSession.SeveralModifications).EndsWith(CommandBand.Tooltip("x", PatchEditingSession.SeveralModifications).Substring("Unavailable: ".Length), StringComparison.Ordinal),
+            "The footer line ends as the tooltip does");
+        Check(CommandBand.EditingLine("Confirm or cancel the world selection to edit.") == "Confirm or cancel the world selection to edit.", "A block that ends a sentence keeps one full stop");
+        Check(CommandBand.EditingLine("Ready?") == "Ready?" && CommandBand.EditingLine(" Stop! ") == "Stop!", "A question or exclamation keeps its mark");
+        Check(CommandBand.EditingLine(CommandBand.NotEditable("this object")) == CommandBand.NotEditable("this object").TrimEnd('.') + ".", "A labelled block keeps its label: " + CommandBand.EditingLine(CommandBand.NotEditable("this object")));
+    }
     static void ReasonsReadAsOnePlainSentence() {
         Check(CommandBand.WreckReason(null, new[] { StarterPlacements.ReaderPrefix + "ewh-steam, car placement 3 of 3: cars rr/gb-gondola3; wreck: no" }) == null && CommandBand.WreckAction(true) == "Start derailed: Yes" && CommandBand.WreckAction(false) == "Start derailed: No", "The Wreck checkbox is usable for one reader and names its edit by the new state");
         // The Inspection only line of a tooltip or state line carries one label, with the reason as one plain sentence.

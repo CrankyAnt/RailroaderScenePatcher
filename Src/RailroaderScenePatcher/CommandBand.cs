@@ -92,8 +92,15 @@ namespace RailroaderScenePatcher {
                     if (text.StartsWith(label, StringComparison.Ordinal)) { text = text.Substring(label.Length).TrimStart(); stripped = true; }
             }
             if (text.Length == 0) return text;
-            text = Char.ToUpperInvariant(text[0]) + text.Substring(1);
-            return text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
+            return FullStop(Char.ToUpperInvariant(text[0]) + text.Substring(1));
+        }
+        // The text with a full stop at its end unless it already ends a sentence.
+        static string FullStop(string text) =>
+            text.EndsWith(".", StringComparison.Ordinal) || text.EndsWith("?", StringComparison.Ordinal) || text.EndsWith("!", StringComparison.Ordinal) ? text : text + ".";
+        // The footer's amber Editing line for an edit block: the block as it stands, ending in a full stop as its tooltip does.
+        internal static string EditingLine(string block) {
+            var text = (block ?? "").Trim();
+            return text.Length == 0 ? text : FullStop(text);
         }
         // The footer report of a completed preview: the preview's own lines, as the form shows them, then the click that
         // applies it. A removal or correction that builds nothing says so here too, wherever the form stands in the tab.
