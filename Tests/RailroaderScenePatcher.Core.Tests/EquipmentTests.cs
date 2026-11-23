@@ -186,6 +186,9 @@ static class EquipmentTests {
         AnAdditionWithoutItsCopyIsRebuiltFromItsSource();
         AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded();
         AnAdditionWithoutItsCopyCanBeRemoved();
+        AnotherModsLostCopyNeitherRebuildsNorRefusesThisModsEdits();
+        AFailedRebuildLeavesTheLostCopyAsItWas();
+        AnUnverifiedRebuildCleanupGuardsUntilRecheck();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
@@ -618,11 +621,12 @@ static class EquipmentTests {
         f.World.Devices.RemoveAll(d => d.Path == SignalPath);
         var mutations = f.World.Mutations;
         var recheck = session.Recheck(Crossing);
-        Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("source BushnellWhittier/" + SignalPath) && recheck.Error.Contains("not loaded"),
-            "Recheck refuses the rebuild and names the source: " + recheck.Failure + " " + recheck.Error);
+        const string Refusal = "Equipment west: its copy is missing, and its source Signal 1 is not loaded in this map, so it cannot be built again. The patcher will not substitute another source or load another scene";
+        Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains(Refusal),
+            "Recheck refuses the rebuild and names the source by its name, with the standard tail: " + recheck.Failure + " " + recheck.Error);
         Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
         var entry = session.EquipmentEntries(Crossing).Single();
-        Assert(entry.Built == null && entry.Problem.Contains("source BushnellWhittier/" + SignalPath), "The listed addition gives the refusal that names its source: " + entry.Problem);
+        Assert(entry.Built == null && entry.Problem.Contains(Refusal), "The listed addition gives the refusal that names its source: " + entry.Problem);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
         var f = new Fixture();
@@ -635,6 +639,68 @@ static class EquipmentTests {
         var removed = session.RemoveEquipment(Crossing, "west");
         Assert(removed.Applied && lost.Destroyed && f.Live.Count == 1 && f.Live[0].Record.Id == "east" && !session.ScenePatchFileText.Contains("\"west\""),
             "Removing an addition without its copy removes its wrapper and its entry: " + removed.Error);
+    }
+    // A lost copy belongs to its own mod: another mod's equipment write neither rebuilds it nor is refused because of it,
+    // with its source loaded or not. Its own mod's Recheck rebuilds it, or refuses with its own error.
+    static void AnotherModsLostCopyNeitherRebuildsNorRefusesThisModsEdits() {
+        foreach (var loaded in new[] { true, false }) {
+            var f = new Fixture();
+            var engine = new PatchEngine(f.Scene);
+            var theirsFile = Doc(Equip("signals", Addition("theirs", CrossingPath + "/Signal 2", 40)));
+            Assert(engine.Apply(theirsFile, "other/pack").Outcomes["signals"].Applied, "The other mod's addition is built at load");
+            var store = new Store(); var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            var theirs = f.Live.Single(); theirs.CopyLost = true;
+            if (!loaded) f.World.Devices.RemoveAll(d => d.Path == CrossingPath + "/Signal 2");
+            var constructed = f.World.Constructed;
+            var added = session.AddEquipment(Crossing, West());
+            Assert(added.Applied, "This mod's addition applies beside the other mod's lost copy (source loaded: " + loaded + "): " + added.Error);
+            Assert(f.World.Constructed == constructed + 1 && !theirs.Destroyed && theirs.CopyLost, "This mod's write leaves the other mod's lost copy as it is");
+            Assert(session.AddEquipment(Crossing, West(12)).Applied && !theirs.Destroyed && theirs.CopyLost, "A move of this mod's addition leaves it too");
+            Assert(session.Recheck(Crossing).Applied && !theirs.Destroyed && theirs.CopyLost, "This mod's Recheck leaves it too");
+            var otherStore = new Store { Patch = theirsFile }; var otherEditor = new NativeMapEditor();
+            var other = new PatchEditingSession(engine, otherEditor, otherStore, scenePatchFileKey: "other/pack"); otherEditor.Session = other;
+            var recheck = other.Recheck(Crossing);
+            if (loaded) Assert(recheck.Applied && theirs.Destroyed && f.Live.Count(a => a.Record.Scope == "other/pack" && !a.CopyLost) == 1, "Its own mod's Recheck rebuilds it: " + recheck.Error);
+            else Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("Equipment theirs: its copy is missing, and its source Signal 2 is not loaded") && !theirs.Destroyed,
+                "Its own mod's Recheck refuses with its own error: " + recheck.Error);
+        }
+    }
+    // A rebuild that fails, in construction or in verification, leaves the lost copy present and not built, with its entry and
+    // placement, and removes what the attempt built.
+    static void AFailedRebuildLeavesTheLostCopyAsItWas() {
+        foreach (var verification in new[] { false, true }) {
+            var f = new Fixture();
+            var engine = new PatchEngine(f.Scene);
+            engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
+            var lost = f.Live.Single(); lost.CopyLost = true;
+            if (verification) f.World.ConstructOffset = 0.125; else f.World.FailConstructAfter = 0;
+            var moved = engine.Apply(Doc(Equip("signals", Addition("west", x: 12))), "author/pack");
+            Assert(!moved.Outcomes["signals"].Applied && moved.Outcomes["signals"].Error.StartsWith("The change failed. The object is back as it was.", StringComparison.Ordinal),
+                "A failed rebuild is restored (verification: " + verification + "): " + moved.Outcomes["signals"].Error);
+            Assert(f.Live.Count == 1 && ReferenceEquals(f.Live[0], lost) && lost.CopyLost && lost.Position[0] == 10, "The lost copy is back as it was and the attempt's copy is gone");
+            var observed = f.Scene.Read(f.Crossing).Equipment.Additions.Single();
+            Assert(observed.Id == "west" && observed.Placement.Position[0] == 10, "The crossing still holds the same entry");
+        }
+    }
+    // When cleanup after a failed rebuild cannot be verified, the crossing is guarded; Recheck then rebuilds the lost copy
+    // and lifts the guard.
+    static void AnUnverifiedRebuildCleanupGuardsUntilRecheck() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("signals", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live.Single(); lost.CopyLost = true;
+        f.World.ConstructOffset = 0.125; f.World.StickyDestroy = true;
+        var failed = session.Recheck(Crossing);
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing), "An unverified cleanup guards the crossing: " + failed.Failure + " " + failed.Error);
+        Assert(!session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east")).Applied, "Another edit is blocked while it is guarded");
+        f.World.ConstructOffset = 0; f.World.StickyDestroy = false;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && !session.CleanupUnverified(Crossing) && lost.Destroyed && f.Live.Count == 1 && !f.Live[0].CopyLost && f.Live[0].Position[0] == 10,
+            "Recheck rebuilds the lost copy at its placement and lifts the guard: " + recheck.Error);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the
     // world load refuses it. Recheck refuses it the same way before any change: nothing was mutated, so no cleanup is

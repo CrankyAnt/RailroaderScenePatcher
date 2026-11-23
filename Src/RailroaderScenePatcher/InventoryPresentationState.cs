@@ -111,14 +111,14 @@ namespace RailroaderScenePatcher {
 
         // A source by its visible name, or by the stored-name rule from its recorded source when it has none.
         internal static string EquipmentSourceName(SourceCandidate candidate) {
-            var name = String.IsNullOrWhiteSpace(candidate.Name) ? StoredSourceName(candidate.Source, null) : candidate.Name;
+            var name = String.IsNullOrWhiteSpace(candidate.Name) ? candidate.Source.StoredName() : candidate.Name;
             return String.IsNullOrEmpty(candidate.Crossing) ? name : name + " at " + candidate.Crossing;
         }
 
         internal static string EquipmentSourceName(EquipmentSource source, IEnumerable<SourceCandidate> candidates) {
             var match = candidates?.FirstOrDefault(candidate => candidate.Source.Scene == source.Scene && candidate.Source.Path == source.Path
                 && candidate.Source.Definition == source.Definition);
-            return match == null ? StoredSourceName(source, null) : EquipmentSourceName(match);
+            return match == null ? source.StoredName() : EquipmentSourceName(match);
         }
 
         internal static string UnbuiltEquipmentName(EquipmentAddition item, IEnumerable<SourceCandidate> candidates) =>
@@ -132,13 +132,6 @@ namespace RailroaderScenePatcher {
                 + (failure != null ? "\n" + CommandBand.FailureTooltipLine(failure.Value) : changed ? "\nChanged by this mod" : "")
                 + (item.Problems.Count == 0 ? "" : equipment ? "\nDetected problems: " + item.Problems.Count : "\n" + String.Join("\n", item.Problems)))
                 .Replace("<", "\\u003c").Replace(">", "\\u003e");
-        }
-
-        // The name an added light, gate or bell keeps from the source it was built from: a light or gate the source device's
-        // name, the last element of its path; a bell its definition's name, or the last part of its identifier without one.
-        internal static string StoredSourceName(EquipmentSource source, string definitionName) {
-            if (!source.IsDefinition) return source.Path.Substring(source.Path.LastIndexOf('/') + 1);
-            return String.IsNullOrWhiteSpace(definitionName) ? source.Definition.Substring(source.Definition.LastIndexOf('/') + 1) : definitionName;
         }
 
         // An added light, gate or bell by the source name stored with it, numbered among the additions of its crossing with the

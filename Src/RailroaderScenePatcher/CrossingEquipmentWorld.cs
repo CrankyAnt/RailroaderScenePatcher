@@ -217,7 +217,7 @@ namespace RailroaderScenePatcher {
             IList list = null; GameObject copy = null;
             try {
                 wrapper.transform.SetParent(destination.transform, false);
-                var owned = OwnedEquipment.Mark(wrapper, destination, addition, InventoryPresentationState.StoredSourceName(addition.Source, null));
+                var owned = OwnedEquipment.Mark(wrapper, destination, addition, addition.Source.StoredName());
                 // The wrapper stands at the addition's placement and the copy at the wrapper's origin, so the wrapper, which the
                 // inventory lists as the added object, is where the light or gate is.
                 Place(wrapper, addition.Placement);
@@ -257,7 +257,7 @@ namespace RailroaderScenePatcher {
             GameObject player = null;
             try {
                 wrapper.transform.SetParent(destination.transform, false);
-                var owned = OwnedEquipment.Mark(wrapper, destination, addition, InventoryPresentationState.StoredSourceName(addition.Source, bell.Name));
+                var owned = OwnedEquipment.Mark(wrapper, destination, addition, addition.Source.StoredName(bell.Name));
                 Place(wrapper, addition.Placement);
                 player = bells.Construct(wrapper, destination, bell, addition.Scope, addition.Id);
                 owned.Copy = player;

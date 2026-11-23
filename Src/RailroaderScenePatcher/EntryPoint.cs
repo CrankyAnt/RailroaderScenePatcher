@@ -1516,8 +1516,7 @@ namespace RailroaderScenePatcher {
                 var copies = EquipmentCopies();
                 IReadOnlyList<SourceCandidate> candidates = null;
                 if (entry.Built == null) try { candidates = attachment.Session.EquipmentSources(selected.Identity); } catch { }
-                equipmentLabel = entry.Built == null ? InventoryPresentationState.UnbuiltEquipmentName(entry.Addition, candidates)
-                    : EquipmentDisplayName(entry.Built, copies, candidates);
+                equipmentLabel = EquipmentEntryName(entry, copies, candidates);
                 if (entry.Addition.Placement?.Position != null && entry.Addition.Placement.Rotation != null) FillEquipment(entry.Addition.Placement);
             } catch (Exception) { }
         }

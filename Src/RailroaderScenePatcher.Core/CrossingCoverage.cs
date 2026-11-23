@@ -356,14 +356,13 @@ namespace RailroaderScenePatcher.Core {
         }
         // The equipment an application converges on, or null when it leaves the additions as they are. An operation that leaves
         // them alone neither checks nor touches them, so a faulty addition does not block coverage edits of the same crossing.
-        // An addition whose copy is gone is present but not built: a mod's set keeps it, so the write rebuilds it, and a
-        // complete set without it removes it.
+        // A lost copy is observed as lost: a set that names it, its own mod's or a Recheck's, differs and builds it again, and
+        // a set laid over the observation, as another mod's is, keeps it as it is.
         CrossingEquipment EquipmentChange(object target, Baseline baseline, CrossingEquipment state) {
             if (state == null) return null;
-            var built = equipment.Observed(target, baseline.Equipment);
-            var present = equipment.Observed(target, baseline.Equipment, unbuilt: true);
-            var desired = state.Complete ? state : CrossingEquipment.Overlay(present, state);
-            return CrossingEquipment.Same(desired, built) && CrossingEquipment.Same(present, built) ? null : desired;
+            var observed = equipment.Observed(target, baseline.Equipment);
+            var desired = state.Complete ? state : CrossingEquipment.Overlay(observed, state);
+            return CrossingEquipment.Same(desired, observed) ? null : desired;
         }
         public void CheckRelationships(object target, ObjectState state) {
             if (state == null) return;
@@ -371,11 +370,11 @@ namespace RailroaderScenePatcher.Core {
             if (state.Marker != null) throw new InvalidOperationException("This object has no supported track-marker relationship");
             if (state.Equipment != null) {
                 if (equipment == null) throw new InvalidOperationException("Crossing equipment editing is unavailable");
-                equipment.Check(target, state.Equipment);
                 var baseline = BaselineOf(target);
+                equipment.Check(target, state.Equipment, baseline.Equipment);
                 var change = EquipmentChange(target, baseline, state.Equipment);
                 if (change != null) {
-                    var refusal = equipment.Refusal(target, baseline.Equipment, change);
+                    var refusal = equipment.Refusal(baseline.Equipment, change);
                     if (refusal != null) throw new InvalidOperationException(refusal);
                 }
             }
@@ -458,6 +457,7 @@ namespace RailroaderScenePatcher.Core {
                 equipment.Write(target, baseline.Equipment, desired);
                 var difference = equipment.Verify(target, baseline.Equipment, desired);
                 if (difference != null) throw new InvalidOperationException("Applied crossing equipment did not verify: " + difference);
+                equipment.Settle(baseline.Equipment);
             }
         }
         public bool Restore(object target, object snapshot) {
@@ -467,9 +467,9 @@ namespace RailroaderScenePatcher.Core {
                 var restored = true;
                 // Equipment first: an addition rebuilt from its source does not depend on the coverage, and a failure of one
                 // part still lets the other restore.
-                // The captured equipment lists the built additions only; one whose copy was already gone stays as it is
-                // unless the failed attempt changed the built set.
-                if (captured.Equipment != null && equipment != null && !CrossingEquipment.Same(captured.Equipment, equipment.Observed(target, baseline.Equipment))) {
+                // The captured equipment marks a lost copy as lost, so the restoration keeps its wrapper and retires a copy the
+                // failed attempt built for it.
+                if (captured.Equipment != null && equipment != null && EquipmentChange(target, baseline, captured.Equipment) != null) {
                     try { equipment.Write(target, baseline.Equipment, captured.Equipment); restored = equipment.Verify(target, baseline.Equipment, captured.Equipment) == null; }
                     catch { restored = false; }
                 }

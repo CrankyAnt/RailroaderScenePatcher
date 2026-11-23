@@ -121,9 +121,9 @@ static class CommandBandTests {
     // A light or gate is named after the source device, a bell after its definition's name; the stored kind, not the shape
     // of the source, separates a bell from a light or gate.
     static void AddedEquipmentIsNamedFromItsStoredSource() {
-        var light = (Scope: "alpha", Id: "west", Name: InventoryPresentationState.StoredSourceName(new EquipmentSource("scene", "World/Crossings/Signal 1"), null), IsBell: false);
-        var bell = (Scope: "alpha", Id: "ring", Name: InventoryPresentationState.StoredSourceName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), "US&S Teardrop Crossing Bell"), IsBell: true);
-        var unnamedBell = (Scope: "alpha", Id: "ring-2", Name: InventoryPresentationState.StoredSourceName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), " "), IsBell: true);
+        var light = (Scope: "alpha", Id: "west", Name: new EquipmentSource("scene", "World/Crossings/Signal 1").StoredName(), IsBell: false);
+        var bell = (Scope: "alpha", Id: "ring", Name: EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName("US&S Teardrop Crossing Bell"), IsBell: true);
+        var unnamedBell = (Scope: "alpha", Id: "ring-2", Name: EquipmentSource.ForDefinition("rr/bell-uss-teardrop").StoredName(" "), IsBell: true);
         var crossing = new[] { light, bell, unnamedBell };
         Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added)", "A light or gate is named after its source device");
         Check(InventoryPresentationState.AddedEquipmentName(bell, crossing) == "US&S Teardrop Crossing Bell (added)", "A bell is named after its definition's name");

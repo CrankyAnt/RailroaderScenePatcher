@@ -167,7 +167,7 @@ namespace RailroaderScenePatcher {
         internal GameObject Construct(GameObject wrapper, GameObject destination, BellSource source, string scope, string id) {
             var facts = Facts(source, destination);
             // The player is named after its source, as a light or gate copy keeps its device's name.
-            var go = new GameObject(InventoryPresentationState.StoredSourceName(EquipmentSource.ForDefinition(source.Identifier), source.Name)) { hideFlags = HideFlags.DontSave };
+            var go = new GameObject(EquipmentSource.ForDefinition(source.Identifier).StoredName(source.Name)) { hideFlags = HideFlags.DontSave };
             go.transform.SetParent(wrapper.transform, false);
             var bell = go.AddComponent<OwnedBell>();
             try {

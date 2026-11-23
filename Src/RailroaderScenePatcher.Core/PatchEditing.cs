@@ -932,7 +932,8 @@ namespace RailroaderScenePatcher.Core {
                     + " refused, so none of this crossing's additions are built";
             var entries = new List<EquipmentEntry>();
             foreach (var addition in modEquipment.Additions) {
-                var built = observed?.Find(addition.Key);
+                // A lost copy stands but is not built: its row offers Recheck.
+                var built = observed?.Find(addition.Key) is EquipmentAddition found && !found.CopyLost ? found : null;
                 var problem = built != null ? null : refusals[addition.Key] ?? stopped ?? "it is not built in this world; Recheck builds it";
                 entries.Add(new EquipmentEntry(addition, built, problem));
             }
