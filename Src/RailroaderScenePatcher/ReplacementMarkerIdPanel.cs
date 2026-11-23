@@ -50,7 +50,7 @@ namespace RailroaderScenePatcher {
         }
         // Why the replacement ID is unavailable for the inspected object now, or null when it is offered.
         string MarkerIdBlock() {
-            var block = IsStarter ? StarterBlock() : EditBlock();
+            var block = IsStarter ? StarterEditBlock() : EditBlock();
             if (block != null) return block;
             var reading = ReadSharers();
             return CommandBand.MarkerIdUnavailable(selected?.Family, IsGenericMarker, reading.Underlying, reading.Sharers.Count, HasMarkerIdValue(selected?.Identity));
@@ -74,7 +74,7 @@ namespace RailroaderScenePatcher {
                 var provider = set.RectTransform.GetComponent<UI.Tooltips.UITooltipProvider>() ?? set.RectTransform.gameObject.AddComponent<UI.Tooltips.UITooltipProvider>();
                 provider.DynamicTooltipInfo = () => new TooltipInfo("Set marker ID", CommandBand.Tooltip("Give this marker the ID in the field. Its registration moves to the new ID. Every other holder of the old ID keeps its registration.", setReason()));
                 typed.Add(() => { if (set.RectTransform != null) set.Inactive(setReason() != null); });
-                var clear = CommandBand.ClearMarkerIdReason(IsStarter ? StarterBlock() : EditBlock(), HasMarkerIdValue(identity));
+                var clear = CommandBand.ClearMarkerIdReason(IsStarter ? StarterEditBlock() : EditBlock(), HasMarkerIdValue(identity));
                 Button(row, CommandBand.ClearMarkerId, () => Edit(MarkerIdPlace, "Clearing the marker ID value", (edit, inspection) => edit.SetMarkerId(identity, null, inspection)))
                     .Inactive(clear != null).Tooltip("Clear marker ID", CommandBand.Tooltip("Clear this mod's replacement ID to return the marker to its underlying ID.", clear));
                 row.Spacer();

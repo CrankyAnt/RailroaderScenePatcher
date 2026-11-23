@@ -170,8 +170,9 @@ namespace RailroaderScenePatcher {
             if (text != null) text.alignment = TextAlignmentOptions.Right;
         }
         // Reserve a full native H3 line for the name. The tooltip gives the full text supplied by the caller.
-        RectTransform Heading(UIPanelBuilder builder, string markup, string title, string full) {
-            var line = builder.AddLabel("<style=H3>" + markup + "</style>").TextWrap(TextOverflowModes.Ellipsis, TextWrappingModes.NoWrap);
+        // With wrap, the text wraps at the heading's size and takes the height its lines need, so it is shown in full.
+        RectTransform Heading(UIPanelBuilder builder, string markup, string title, string full, bool wrap = false) {
+            var line = builder.AddLabel("<style=H3>" + markup + "</style>").TextWrap(wrap ? TextOverflowModes.Overflow : TextOverflowModes.Ellipsis, wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap);
             if (!String.IsNullOrEmpty(full)) line.Tooltip(title, full);
             return line;
         }
@@ -525,6 +526,7 @@ namespace RailroaderScenePatcher {
 
         void DrawInspector(UIPanelBuilder builder) {
             builder.ConfigureLayout(4f);
+            severalModifications = SeveralModifications(selected?.Identity);
             LockControls(DrawRightBand(builder), windowHelpButton);
             // While the file panel waits for a decision and nothing is inspected, its own heading is the first heading:
             // the empty inspector's heading and instruction would only stand above it.
@@ -546,7 +548,7 @@ namespace RailroaderScenePatcher {
             var state = StateLine(out var states);
             // The instruction while nothing is inspected wraps at the heading's size and takes the height its lines need, so it
             // is shown in full at any inspector width: one H3 line holds only part of it at the default window width.
-            if (selected == null) builder.AddLabel("<style=H3>" + state + "</style>").TextWrap(TextOverflowModes.Overflow, TextWrappingModes.Normal);
+            if (selected == null) Heading(builder, state, null, null, wrap: true);
             else LockControls(builder.HStack(row => {
                 Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
                 DrawModeSwitch(row);
@@ -876,7 +878,7 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var block = EditBlock();
             // A button in the tab waits for a pending world choice; the fields stay as they are.
-            var wait = ChoiceBlock ?? block ?? SeveralBlock(identity);
+            var wait = ChoiceBlock ?? block;
             // The open form keeps all three role pickers above the list of circuits.
             if (coverageCircuit != null) {
                 Section(builder, coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition);
@@ -966,18 +968,11 @@ namespace RailroaderScenePatcher {
                 else foreach (var line in preparedEquipment.Preview.Lines) PlainLabel(builder, Breakable(line));
             }
         }
-        // Why every coverage and equipment edit of the crossing refuses before any change, or null: several modifications of
-        // the scene patch file target it. Its controls show inactive with this reason; the edit itself still refuses.
-        string SeveralBlock(TargetIdentity identity) {
-            if (attachment == null || identity == null) return null;
-            try { return attachment.Session.SeveralModificationsBlock(identity); } catch (Exception) { return null; }
-        }
         // The crossing's lights, gates and bells and the sources offered for them, below its coverage.
         void DrawEquipment(UIPanelBuilder builder) {
             var identity = selected.Identity;
             var block = EditBlock();
-            // Several modifications of the crossing in the scene patch file: every edit refuses, so Edit and Use are inactive with the reason.
-            var wait = ChoiceBlock ?? block ?? SeveralBlock(identity);
+            var wait = ChoiceBlock ?? block;
             Section(builder, "Lights, gates, and bells");
             CrossingEquipment current = null;
             IReadOnlyList<EquipmentEntry> mine = Array.Empty<EquipmentEntry>();
@@ -1439,10 +1434,10 @@ namespace RailroaderScenePatcher {
             // The gizmo owns the row only during a drag, when Escape cancels; while it stands, the row is the general one.
             if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the drag and restore the placement.", null, () => gizmo?.Cancel(), "Cancel gizmo drag") };
             // A starter placement marker's modification is removed or rechecked from every tab.
-            var block = FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : EditBlock();
+            // Recheck does not meet the several-modifications refusal; Remove modification does.
+            var block = FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : ObjectEditBlock();
             var identity = selected?.Identity;
-            var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.")
-                ?? (identity?.Structure == CrossingCoverageScene.Structure ? SeveralBlock(identity) : null);
+            var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.") ?? severalModifications;
             return new[] {
                 // The whole modification goes: the control says so in full and takes two cells.
                 Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
@@ -1524,23 +1519,23 @@ namespace RailroaderScenePatcher {
                     }
                 case ConnectionsTab: {
                     var structure = identity?.Structure;
-                    if (block == null && structure == CrossingCoverageScene.Structure && coverageCircuit == null && equipmentSource != null) {
+                    // A crossing keeps its own row while an edit block holds; each control is inactive with the block.
+                    if (attachment != null && structure == CrossingCoverageScene.Structure && coverageCircuit == null && equipmentSource != null) {
                         var session = attachment.Session;
                         var equipmentId = (equipmentFields[0] ?? "").Trim();
                         IReadOnlyList<EquipmentEntry> entries = Array.Empty<EquipmentEntry>();
                         try { entries = session.EquipmentEntries(identity); } catch { }
                         // Removal applies to an addition the scene patch file holds, whether or not it was built.
                         var inScenePatchFile = entries.Any(e => e.Addition.Id == equipmentId);
-                        var several = SeveralBlock(identity);
                         var prepared = preparedEquipment != null && preparedEquipment.Preview.Error == null ? preparedEquipment : null;
                         return new[] {
-                            Slot("Preview", "Preview this " + EquipmentKind + ".", several, () => {
+                            Slot("Preview", "Preview this " + EquipmentKind + ".", block, () => {
                                 var value = ParseEquipment(out var problem);
                                 if (value == null) feedback.Refuse(EquipmentPlace, "Equipment preview", problem); else PrepareEquipment(session, identity, value, null);
                             }),
-                            Slot("Remove", "Preview removing this " + EquipmentKind + ".", inScenePatchFile ? several : "This " + EquipmentKind + " is not in the scene patch file yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
+                            Slot("Remove", "Preview removing this " + EquipmentKind + ".", block ?? (inScenePatchFile ? null : "This " + EquipmentKind + " is not in the scene patch file yet."), () => PrepareEquipment(session, identity, null, equipmentId)),
                             Empty,
-                            Slot("Apply", "Apply the previewed change.", several ?? (prepared == null ? "Click Preview first." : null), () => Edit(EquipmentPlace, EquipmentPlace, (edit, inspection) => {
+                            Slot("Apply", "Apply the previewed change.", block ?? (prepared == null ? "Click Preview first." : null), () => Edit(EquipmentPlace, EquipmentPlace, (edit, inspection) => {
                                 var done = prepared.Addition != null ? edit.AddEquipment(identity, prepared.Addition, inspection) : edit.RemoveEquipment(identity, prepared.RemoveId, inspection);
                                 if (done?.Applied == true && prepared.Addition == null) CloseEquipmentForm();
                                 // An applied addition is the one the open form now edits, so a later Undo or Redo refills the form from it.
@@ -1548,11 +1543,10 @@ namespace RailroaderScenePatcher {
                                 return done;
                             }, true)) };
                     }
-                    if (block == null && structure == CrossingCoverageScene.Structure) {
+                    if (attachment != null && structure == CrossingCoverageScene.Structure) {
                         var session = attachment.Session;
                         var circuitKey = coverageCircuit; var additionId = coverageAddition;
-                        var several = SeveralBlock(identity);
-                        var none = several ?? (circuitKey == null ? "Click Edit circuit or Add detection first." : null);
+                        var none = block ?? (circuitKey == null ? "Click Edit circuit or Add detection first." : null);
                         CrossingCoverage current = null;
                         try { current = session.Coverage(identity); } catch { }
                         // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach too.
@@ -1574,9 +1568,9 @@ namespace RailroaderScenePatcher {
                             // Deleting applies to an addition the scene patch file holds; a crossing keeps at least one detection.
                             var inScenePatchFile = current != null && current.Circuits.Any(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == additionId);
                             return new[] { preview,
-                                Slot("Delete", "Preview deleting this detection addition.", several ?? (!inScenePatchFile ? "This addition is not in the scene patch file yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null), () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
+                                Slot("Delete", "Preview deleting this detection addition.", block ?? (!inScenePatchFile ? "This addition is not in the scene patch file yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null), () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
                                 Empty,
-                                Slot("Apply", "Apply the previewed coverage.", several ?? (prepared == null ? "Click Preview first." : null), apply) };
+                                Slot("Apply", "Apply the previewed coverage.", block ?? (prepared == null ? "Click Preview first." : null), apply) };
                         }
                         return new[] { preview,
                             Slot("Detach", "Preview detaching this circuit.", none ?? (last ? "This is the crossing's last covered circuit; detaching it would leave the crossing without detection." : null), () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null), null, 1, 72),

@@ -79,7 +79,7 @@ namespace RailroaderScenePatcher {
         }
         string GuidedBlock(GuidedTaskKind kind) {
             if (selected == null) return "Inspect an object first.";
-            var block = (IsStarter ? StarterBlock() : EditBlock()) ?? GuidedTaskState.TargetBlock(kind, selected.Identity);
+            var block = (IsStarter ? StarterEditBlock() : EditBlock()) ?? GuidedTaskState.TargetBlock(kind, selected.Identity);
             if (block != null) return block;
             switch (kind) {
                 case GuidedTaskKind.Placement: return PadBlock ?? (IsStarter ? StarterPlacements.ObjectSettings : null);

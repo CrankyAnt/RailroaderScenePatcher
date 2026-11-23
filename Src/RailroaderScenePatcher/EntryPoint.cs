@@ -1284,8 +1284,20 @@ namespace RailroaderScenePatcher {
         bool IsEquipment => selected != null && (selected.Identity.Structure == ExistingEquipmentScene.MastStructure || selected.Identity.Structure == ExistingEquipmentScene.BellStructure);
         // Why the inspected object cannot be edited now, or null. The band holds the pending selection and the active gizmo.
         // A starter placement marker is edited on the Connections tab only, where it is placed on the track; on every other
-        // tab its object's placement and activity stay disabled with the reason.
-        string EditBlock() =>
+        // tab its object's placement and activity stay disabled with the reason. Every edit of an object that several
+        // modifications of the scene patch file target refuses, so its edit controls are inactive with that reason too.
+        string EditBlock() => ObjectEditBlock() ?? severalModifications;
+        // The starter placement marker's own block, and the several-modifications block that every edit of it meets.
+        string StarterEditBlock() => StarterBlock() ?? severalModifications;
+        // Why scene patch editing refuses every edit of the inspected object, or null: several modifications of the scene
+        // patch file target it. Read once per rebuild of the inspector; the edit itself still refuses.
+        string severalModifications;
+        string SeveralModifications(TargetIdentity identity) {
+            if (attachment == null || identity == null) return null;
+            try { return attachment.Session.SeveralModificationsBlock(identity); } catch (InvalidOperationException) { return null; }
+        }
+        // EditBlock without the several-modifications block: Recheck does not meet that refusal.
+        string ObjectEditBlock() =>
             attachment == null ? (String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)
             : FileLockReason != null ? FileLockReason
             : attachment.Session.Blocked != null ? attachment.Session.Blocked + " The recovery choices are in the session details."
