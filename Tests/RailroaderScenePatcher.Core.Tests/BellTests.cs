@@ -137,7 +137,7 @@ static class BellTests {
             var result = new PatchEngine(f.Scene).Apply(Doc(Equip("bad", addition)));
             var error = result.Outcomes["bad"].Error ?? "";
             Assert(!result.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Unchanged, c.Key + " bell source is refused before any change: " + error);
-            if (c.Key == "missing") Assert(error.Contains("not available in the content library") && error.Contains("will not substitute another sound"), "A missing definition substitutes no other sound: " + error);
+            if (c.Key == "missing") Assert(error.Contains("is unavailable from the game or loaded mods") && error.Contains("will not choose a replacement"), "A missing definition substitutes no other sound: " + error);
             if (c.Key == "ambiguous") Assert(error.Contains("ambiguous"), "An ambiguous definition is named: " + error);
             if (c.Key == "nonconforming") Assert(error.Contains("does not conform to " + EquipmentAddition.BellPattern) && error.Contains("not a bell definition"), "A nonconforming definition gives its reason: " + error);
             if (c.Key == "unavailable audio") Assert(error.Contains("cannot be found in the content library"), "Unavailable audio gives its reason: " + error);
@@ -237,7 +237,7 @@ static class BellTests {
         var light = session.AddEquipment(Crossing, new EquipmentAddition("lamp", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", SignalPath), new Placement(new double[] { 20, 0, 7 }, new double[] { 0, 0, 0, 1 })));
         Assert(!light.Applied && light.Error.Contains("its audio failed to load"), "An edit that keeps the failed bell is refused: " + light.Error);
         var replaced = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-replacement"));
-        Assert(!replaced.Applied && replaced.Error.Contains("not available in the content library"), "A replacement needs an available definition: " + replaced.Error);
+        Assert(!replaced.Applied && replaced.Error.Contains("is unavailable from the game or loaded mods"), "A replacement needs an available definition: " + replaced.Error);
         h.World.Bell("rr/bell-replacement");
         replaced = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-replacement"));
         h.World.FinishLoads();
@@ -288,7 +288,7 @@ static class BellTests {
         Assert(session.Remove(Crossing).Applied && f.Bells.Count == 0 && f.World.AudioReferences == 0, "Removing the modification releases the bell");
         mapEditor.Undo(); Assert(f.Bells.Count == 1 && f.Observers == 1, "Undo of the modification's removal restores the bell");
         var refused = session.AddEquipment(Crossing, NewBell(definition: "rr/bell-not-installed", id: "other"));
-        Assert(!refused.Applied && refused.Error.Contains("not available in the content library") && f.Bells.Count == 1, "A missing definition is refused without a change: " + refused.Error);
+        Assert(!refused.Applied && refused.Error.Contains("is unavailable from the game or loaded mods") && f.Bells.Count == 1, "A missing definition is refused without a change: " + refused.Error);
         Assert(!f.World.Live(f.Other).Any(), "No edit touched the other crossing");
     }
     static void SaveAndReloadReproduceOneBell() {

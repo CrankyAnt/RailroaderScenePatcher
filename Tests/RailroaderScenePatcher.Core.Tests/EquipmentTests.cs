@@ -314,7 +314,7 @@ static class EquipmentTests {
             var error = result.Outcomes["bad"].Error ?? "";
             Assert(!result.Outcomes["bad"].Applied && f.World.Mutations == 0 && f.Live.Count == before, c.Key + " source is refused before any change: " + error);
             Assert(!f.World.Live(f.Crossing).Any(a => a.Record.Id == "west"), c.Key + " source is not replaced by another device");
-            if (c.Key == "missing" || c.Key == "absent scene") Assert(error.Contains("not loaded in this map") && error.Contains("will not substitute another source or load another scene"), "A missing source neither substitutes nor loads a scene: " + error);
+            if (c.Key == "missing" || c.Key == "absent scene") Assert(error.Contains("is not present in the loaded map") && error.Contains("only copies devices already in this map and will not choose a replacement"), "A missing source neither substitutes nor loads a scene: " + error);
             if (c.Key == "ambiguous") Assert(error.Contains("ambiguous"), "An ambiguous source is named: " + error);
             if (c.Key == "nonconforming") Assert(error.Contains("does not conform to " + EquipmentAddition.LightGatePattern) && error.Contains("bell"), "A nonconforming source gives its reason: " + error);
         }
@@ -447,8 +447,8 @@ static class EquipmentTests {
     static void EditingRefusalAndFailureRestore() {
         var (f, session, mapEditor, store) = Session();
         var refused = session.AddEquipment(Crossing, West(path: CrossingPath + "/Missing"));
-        Assert(!refused.Applied && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && refused.Error.Contains("not loaded"), "A missing source is refused without a change or history entry: " + refused.Error);
-        Assert(session.PreviewEquipment(Crossing, West(path: CrossingPath + "/Missing"), null).Error.Contains("not loaded"), "The preview names the refusal");
+        Assert(!refused.Applied && f.World.Mutations == 0 && mapEditor.UndoGroups.Count == 0 && refused.Error.Contains("not present in the loaded map"), "A missing source is refused without a change or history entry: " + refused.Error);
+        Assert(session.PreviewEquipment(Crossing, West(path: CrossingPath + "/Missing"), null).Error.Contains("not present in the loaded map"), "The preview names the refusal");
         session.AddEquipment(Crossing, West());
         f.World.FailConstructAfter = 0;
         var failed = session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east"));
@@ -581,7 +581,7 @@ static class EquipmentTests {
         var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
         var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
         var entries = session.EquipmentEntries(Crossing);
-        Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Addition.Id == "lost" && entries[0].Problem.Contains("not loaded"), "The failed addition is listed from the scene patch file with its reason: " + entries.FirstOrDefault()?.Problem);
+        Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Addition.Id == "lost" && entries[0].Problem.Contains("not present in the loaded map"), "The failed addition is listed from the scene patch file with its reason: " + entries.FirstOrDefault()?.Problem);
         var removed = session.RemoveEquipment(Crossing, "lost");
         Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.ScenePatchFileText.Contains("lost"), "The failed addition is removed from the scene patch file: " + removed.Error);
         Assert(session.AddEquipment(Crossing, West()).Applied && f.Live.Count == 1, "Afterwards the crossing takes equipment again");
@@ -626,7 +626,7 @@ static class EquipmentTests {
         f.World.Devices.RemoveAll(d => d.Path == SignalPath);
         var mutations = f.World.Mutations;
         var recheck = session.Recheck(Crossing);
-        const string Refusal = "Equipment west: its copy is missing, and its source Signal 1 is not loaded in this map, so it cannot be built again. The patcher will not substitute another source or load another scene. Make its source available or remove the addition";
+        const string Refusal = "Equipment west: the added equipment is missing, and source device Signal 1 is not present in the loaded map, so the equipment cannot be rebuilt. The patcher only copies devices already in this map and will not choose a replacement. Select a device present in this map or remove the addition";
         Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains(Refusal),
             "Recheck refuses the rebuild and names the source by its name, with the standard tail: " + recheck.Failure + " " + recheck.Error);
         Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
@@ -642,7 +642,7 @@ static class EquipmentTests {
         b.Live.Single().CopyLost = true;
         b.World.Bells.Clear();
         var bellRecheck = bellSession.Recheck(Crossing);
-        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: its copy is missing, and its source bell is not available in the content library, so it cannot be built again. The patcher will not substitute another sound or load a scene to find it. Make its source available or remove the addition"),
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable from the game or loaded mods, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"),
             "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
@@ -679,7 +679,7 @@ static class EquipmentTests {
             var other = new PatchEditingSession(engine, otherEditor, otherStore, scenePatchFileKey: "other/pack"); otherEditor.Session = other;
             var recheck = other.Recheck(Crossing);
             if (loaded) Assert(recheck.Applied && theirs.Destroyed && f.Live.Count(a => a.Record.Scope == "other/pack" && !a.CopyLost) == 1, "Its own mod's Recheck rebuilds it: " + recheck.Error);
-            else Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("Equipment theirs: its copy is missing, and its source Signal 2 is not loaded") && !theirs.Destroyed,
+            else Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("Equipment theirs: the added equipment is missing, and source device Signal 2 is not present in the loaded map") && !theirs.Destroyed,
                 "Its own mod's Recheck refuses with its own error: " + recheck.Error);
         }
     }
@@ -758,7 +758,7 @@ static class EquipmentTests {
         var lost = f.Live.Single(); lost.CopyLost = true;
         f.World.StickyDestroy = true;
         var failed = session.Recheck(Crossing);
-        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("equipment west"),
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("Equipment west could not be fully removed. Reload the native map editor before editing this crossing's equipment"),
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
@@ -821,7 +821,7 @@ static class EquipmentTests {
         var device = new EquipmentSource("BushnellWhittier", SignalPath);
         var cases = new[] {
             (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported. Use pattern crossing-light-gate-v1 or crossing-bell-v1. Otherwise remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), ". Select a source of that kind or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate needs a device in the map as its source, but this addition names a definition. Change its source or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 loaded objects share that source. Select another source or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), ". Select an eligible source or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x needs a fixed placement. Give it a position and rotation or remove the addition"),

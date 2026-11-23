@@ -47,8 +47,8 @@ namespace RailroaderScenePatcher.Core {
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
             if (source == null) return "it needs a source";
-            if (pattern == BellPattern && !source.IsDefinition) return "pattern " + BellPattern + " requires a bell definition as its source; a loaded device cannot be used";
-            if (pattern == LightGatePattern && source.IsDefinition) return "pattern " + LightGatePattern + " requires a loaded device as its source; a definition cannot be used";
+            if (pattern == BellPattern && !source.IsDefinition) return "a bell needs a bell definition as its source, but this addition names a device in the map";
+            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate needs a device in the map as its source, but this addition names a definition";
             return null;
         }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement) : this(id, pattern, source, placement, "") { }
@@ -402,14 +402,14 @@ namespace RailroaderScenePatcher.Core {
             var name = addition.Source.StoredName();
             if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Select a source of that kind or remove the addition");
+            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Change its source or remove the addition");
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
             if (matches.Count == 0) {
-                var what = "Equipment " + addition.Id + ": " + (stale ? "its copy is missing, and its source " : "source ") + name;
-                var rebuilt = stale ? ", so it cannot be built again" : "";
+                var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
+                var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
                 throw new InvalidOperationException(addition.Source.IsDefinition
-                    ? what + " is not available in the content library" + rebuilt + ". The patcher will not substitute another sound or load a scene to find it. Make its source available or remove the addition"
-                    : what + " is not loaded in this map" + rebuilt + ". The patcher will not substitute another source or load another scene. Make its source available or remove the addition");
+                    ? what + "bell definition " + name + " is unavailable from the game or loaded mods" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"
+                    : what + "source device " + name + " is not present in the loaded map" + rebuilt + ". The patcher only copies devices already in this map and will not choose a replacement. Select a device present in this map or remove the addition");
             }
             if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share its identifier" : " loaded objects share that source") + ". Select another source or remove the addition");
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
@@ -492,7 +492,7 @@ namespace RailroaderScenePatcher.Core {
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
             // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
             var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "equipment " + record.Id + " still stands without its copy"; }
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "Equipment " + record.Id + " could not be fully removed. Reload the native map editor before editing this crossing's equipment"; }
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
