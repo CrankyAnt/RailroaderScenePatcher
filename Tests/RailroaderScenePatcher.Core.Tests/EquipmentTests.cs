@@ -604,10 +604,26 @@ static class EquipmentTests {
         var entries = session.EquipmentEntries(Crossing);
         Assert(entries.Select(e => e.Addition.Id).SequenceEqual(new[] { "ring", "west" }) && entries.All(e => e.Built != null && e.Problem == null),
             "Both additions are listed as built, in the ordinal order of their IDs: " + String.Join(", ", entries.Select(e => e.Addition.Id + " " + e.Problem)));
-        // Their Edit and Remove controls are inactive ahead of time with the reason; the edit itself still refuses with it.
+        // The crossing's edit controls are inactive ahead of time with the reason.
         Assert(session.SeveralModificationsBlock(Crossing) == PatchEditingSession.SeveralModifications, "The crossing's edits are blocked ahead of time: " + session.SeveralModificationsBlock(Crossing));
-        var removed = session.RemoveEquipment(Crossing, "west");
-        Assert(!removed.Applied && removed.Error.Contains(PatchEditingSession.SeveralModifications) && f.Live.Count == 2, "The removal still refuses with the same reason: " + removed.Error);
+        // Every edit those controls start still refuses with the same reason before any change: Edit and Remove of an addition,
+        // Use for a new light, gate or bell, the coverage and detection edits, and the removal of the modification.
+        var mutations = f.World.Mutations;
+        SpanRange Span(double a, double b) => new SpanRange(new TrackLocation("Snew", "a", a), new TrackLocation("Snew", "a", b));
+        var tracks = CircuitCoverage.Tracks(Span(300, 540), Span(292, 300), Span(292, 60));
+        var refusals = new (string Control, string Error)[] {
+            ("Remove", session.RemoveEquipment(Crossing, "west").Error),
+            ("Edit", session.AddEquipment(Crossing, West(12)).Error),
+            ("Use", session.AddEquipment(Crossing, West(14, id: "new")).Error),
+            ("Equipment preview", session.PreviewEquipment(Crossing, West(12), null).Error),
+            ("Coverage preview", session.PreviewCoverage(Crossing, "Pipr", tracks).Error),
+            ("Coverage", session.Cover(Crossing, "Pipr", tracks).Error),
+            ("Add detection", session.AddDetection(Crossing, "extra", tracks).Error),
+            ("Remove modification", session.Remove(Crossing).Error),
+        };
+        foreach (var refusal in refusals)
+            Assert(refusal.Error != null && refusal.Error.Contains(PatchEditingSession.SeveralModifications), refusal.Control + " still refuses with the same reason: " + refusal.Error);
+        Assert(f.World.Mutations == mutations && f.Live.Count == 2, "The refusals change nothing");
         var single = Session(Doc(Equip("equip-crossing", Addition("west"))));
         Assert(single.session.SeveralModificationsBlock(Crossing) == null, "One modification of the crossing blocks nothing");
     }

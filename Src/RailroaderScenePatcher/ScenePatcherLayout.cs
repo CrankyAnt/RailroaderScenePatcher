@@ -876,7 +876,7 @@ namespace RailroaderScenePatcher {
             var identity = selected.Identity;
             var block = EditBlock();
             // A button in the tab waits for a pending world choice; the fields stay as they are.
-            var wait = ChoiceBlock ?? block;
+            var wait = ChoiceBlock ?? block ?? SeveralBlock(identity);
             // The open form keeps all three role pickers above the list of circuits.
             if (coverageCircuit != null) {
                 Section(builder, coverageAddition == null ? "Circuit " + coverageCircuit : "Detection addition " + coverageAddition);
@@ -966,11 +966,18 @@ namespace RailroaderScenePatcher {
                 else foreach (var line in preparedEquipment.Preview.Lines) PlainLabel(builder, Breakable(line));
             }
         }
+        // Why every coverage and equipment edit of the crossing refuses before any change, or null: several modifications of
+        // the scene patch file target it. Its controls show inactive with this reason; the edit itself still refuses.
+        string SeveralBlock(TargetIdentity identity) {
+            if (attachment == null || identity == null) return null;
+            try { return attachment.Session.SeveralModificationsBlock(identity); } catch (Exception) { return null; }
+        }
         // The crossing's lights, gates and bells and the sources offered for them, below its coverage.
         void DrawEquipment(UIPanelBuilder builder) {
             var identity = selected.Identity;
             var block = EditBlock();
-            var wait = ChoiceBlock ?? block;
+            // Several modifications of the crossing in the scene patch file: every edit refuses, so Edit and Use are inactive with the reason.
+            var wait = ChoiceBlock ?? block ?? SeveralBlock(identity);
             Section(builder, "Lights, gates, and bells");
             CrossingEquipment current = null;
             IReadOnlyList<EquipmentEntry> mine = Array.Empty<EquipmentEntry>();
@@ -982,10 +989,6 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) { sourcesUnavailable = e.GetBaseException().Message; }
             if (current != null) {
                 var copies = EquipmentCopies();
-                // Several modifications of the crossing in the scene patch file: every edit refuses, so Edit is inactive with the reason.
-                string several = null;
-                try { several = attachment.Session.SeveralModificationsBlock(identity); } catch (Exception) { }
-                var editWait = wait ?? several;
                 var others = current.Additions.Where(a => a.Scope != attachment.Session.ScenePatchFileKey).ToArray();
                 if (mine.Count == 0 && others.Length == 0) Line(builder, "None added", null, null);
                 // This mod's additions come from its scene patch file, so one whose build failed is listed with its reason and can
@@ -1006,8 +1009,8 @@ namespace RailroaderScenePatcher {
                     if (entry.Problem != null) builder.AddLabel(Tint(Red, "Not built: " + CommandBand.Sentence(entry.Problem)));
                     else if (state != null) builder.AddLabel(Literal(CommandBand.Sentence(state)));
                     var scenePatchFile = entry.Addition;
-                    var edit = Button(builder, "Edit " + name, () => ReadEquipment(scenePatchFile, name)).Inactive(editWait != null)
-                        .Tooltip("Edit " + name, CommandBand.Tooltip(entry.Problem == null ? (item.Source.IsDefinition ? "Change this bell's placement or remove it." : "Change this copy's placement or remove it.") : "Correct this " + kind + " or remove it.", editWait));
+                    var edit = Button(builder, "Edit " + name, () => ReadEquipment(scenePatchFile, name)).Inactive(wait != null)
+                        .Tooltip("Edit " + name, CommandBand.Tooltip(entry.Problem == null ? (item.Source.IsDefinition ? "Change this bell's placement or remove it." : "Change this copy's placement or remove it.") : "Correct this " + kind + " or remove it.", wait));
                     FitEquipmentText(edit.RectTransform.GetComponentInChildren<TMP_Text>(true), AddedEquipmentFamily(item.Source), name, value => "Edit " + value,
                         () => ((RectTransform)edit.RectTransform.parent).rect.width - 2 * CommandBand.ButtonPadding);
                 }
@@ -1438,7 +1441,8 @@ namespace RailroaderScenePatcher {
             // A starter placement marker's modification is removed or rechecked from every tab.
             var block = FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : EditBlock();
             var identity = selected?.Identity;
-            var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.");
+            var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.")
+                ?? (identity?.Structure == CrossingCoverageScene.Structure ? SeveralBlock(identity) : null);
             return new[] {
                 // The whole modification goes: the control says so in full and takes two cells.
                 Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
@@ -1527,17 +1531,16 @@ namespace RailroaderScenePatcher {
                         try { entries = session.EquipmentEntries(identity); } catch { }
                         // Removal applies to an addition the scene patch file holds, whether or not it was built.
                         var inScenePatchFile = entries.Any(e => e.Addition.Id == equipmentId);
-                        string several = null;
-                        try { several = session.SeveralModificationsBlock(identity); } catch { }
+                        var several = SeveralBlock(identity);
                         var prepared = preparedEquipment != null && preparedEquipment.Preview.Error == null ? preparedEquipment : null;
                         return new[] {
-                            Slot("Preview", "Preview this " + EquipmentKind + ".", null, () => {
+                            Slot("Preview", "Preview this " + EquipmentKind + ".", several, () => {
                                 var value = ParseEquipment(out var problem);
                                 if (value == null) feedback.Refuse(EquipmentPlace, "Equipment preview", problem); else PrepareEquipment(session, identity, value, null);
                             }),
                             Slot("Remove", "Preview removing this " + EquipmentKind + ".", inScenePatchFile ? several : "This " + EquipmentKind + " is not in the scene patch file yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
                             Empty,
-                            Slot("Apply", "Apply the previewed change.", prepared == null ? "Click Preview first." : null, () => Edit(EquipmentPlace, EquipmentPlace, (edit, inspection) => {
+                            Slot("Apply", "Apply the previewed change.", several ?? (prepared == null ? "Click Preview first." : null), () => Edit(EquipmentPlace, EquipmentPlace, (edit, inspection) => {
                                 var done = prepared.Addition != null ? edit.AddEquipment(identity, prepared.Addition, inspection) : edit.RemoveEquipment(identity, prepared.RemoveId, inspection);
                                 if (done?.Applied == true && prepared.Addition == null) CloseEquipmentForm();
                                 // An applied addition is the one the open form now edits, so a later Undo or Redo refills the form from it.
@@ -1548,7 +1551,8 @@ namespace RailroaderScenePatcher {
                     if (block == null && structure == CrossingCoverageScene.Structure) {
                         var session = attachment.Session;
                         var circuitKey = coverageCircuit; var additionId = coverageAddition;
-                        var none = circuitKey == null ? "Click Edit circuit or Add detection first." : null;
+                        var several = SeveralBlock(identity);
+                        var none = several ?? (circuitKey == null ? "Click Edit circuit or Add detection first." : null);
                         CrossingCoverage current = null;
                         try { current = session.Coverage(identity); } catch { }
                         // A crossing keeps at least one covered circuit; the preview and the edit refuse the last detach too.
@@ -1570,9 +1574,9 @@ namespace RailroaderScenePatcher {
                             // Deleting applies to an addition the scene patch file holds; a crossing keeps at least one detection.
                             var inScenePatchFile = current != null && current.Circuits.Any(c => c.Value.Kind == CircuitKind.Added && DetectionAddition.Id(c.Key) == additionId);
                             return new[] { preview,
-                                Slot("Delete", "Preview deleting this detection addition.", !inScenePatchFile ? "This addition is not in the scene patch file yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null, () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
+                                Slot("Delete", "Preview deleting this detection addition.", several ?? (!inScenePatchFile ? "This addition is not in the scene patch file yet." : last ? "This is the crossing's last detection; return a native circuit to its coverage first." : null), () => PrepareCoverage(session, identity, circuitKey, null, additionId)),
                                 Empty,
-                                Slot("Apply", "Apply the previewed coverage.", prepared == null ? "Click Preview first." : null, apply) };
+                                Slot("Apply", "Apply the previewed coverage.", several ?? (prepared == null ? "Click Preview first." : null), apply) };
                         }
                         return new[] { preview,
                             Slot("Detach", "Preview detaching this circuit.", none ?? (last ? "This is the crossing's last covered circuit; detaching it would leave the crossing without detection." : null), () => PrepareCoverage(session, identity, circuitKey, CircuitCoverage.Detached, null), null, 1, 72),
