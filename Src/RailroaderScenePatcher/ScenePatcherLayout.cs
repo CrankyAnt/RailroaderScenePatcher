@@ -544,7 +544,9 @@ namespace RailroaderScenePatcher {
             }
             LockControls(headingRow);
             var state = StateLine(out var states);
-            if (selected == null) Heading(builder, state, null, null).Height(RowHeight);
+            // The instruction while nothing is inspected wraps at the heading's size and takes the height its lines need, so it
+            // is shown in full at any inspector width: one H3 line holds only part of it at the default window width.
+            if (selected == null) builder.AddLabel("<style=H3>" + state + "</style>").TextWrap(TextOverflowModes.Overflow, TextWrappingModes.Normal);
             else LockControls(builder.HStack(row => {
                 Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
                 DrawModeSwitch(row);
