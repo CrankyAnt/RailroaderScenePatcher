@@ -21,10 +21,11 @@ namespace RailroaderScenePatcher {
         internal string DisplayName {
             get {
                 var equipment = NameParts;
+                var source = SourceDefinition != null ? EquipmentSource.ForDefinition(SourceDefinition) : new EquipmentSource(SourceScene, SourcePath);
                 if (Controller == null)
-                    return InventoryPresentationState.AddedEquipmentName(equipment, Array.Empty<(string, string, string, bool)>());
+                    return InventoryPresentationState.AddedEquipmentName(equipment, Array.Empty<(string, string, string, bool)>(), source);
                 var siblings = At(Controller).Select(item => item.NameParts);
-                return InventoryPresentationState.AddedEquipmentName(equipment, siblings);
+                return InventoryPresentationState.AddedEquipmentName(equipment, siblings, source);
             }
         }
         internal static IEnumerable<OwnedEquipment> At(GameObject controller) => Enumerable.Range(0, controller.transform.childCount)
