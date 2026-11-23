@@ -127,7 +127,6 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public string Status(object addition) {
         var a = (Added)addition;
         if (a.CopyLost) return "copy missing";
-        if (a.CopyLost) return "its copy is missing";
         if (a.Bell != null) return a.LoadProblem != null ? "audio failed to load" : !a.AudioLoaded ? "audio loading" : "audio loaded; observing the controller's bell key";
         return a.Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
     }
@@ -763,6 +762,9 @@ static class EquipmentTests {
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
+        var again = session.Recheck(Crossing);
+        Assert(!again.Applied && again.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && !lost.Destroyed && f.Live.Count(a => !a.CopyLost) == 1,
+            "A second Recheck while the destroy is still stuck stays guarded and builds no extra copy: " + again.Failure + " " + again.Error);
         f.World.StickyDestroy = false;
         var recheck = session.Recheck(Crossing);
         Assert(recheck.Applied && lost.Destroyed && !session.CleanupUnverified(Crossing) && f.Live.Count == 1, "Recheck removes the stale wrapper and lifts the guard: " + recheck.Error);
@@ -797,6 +799,10 @@ static class EquipmentTests {
         var imported = session.ApplyImport();
         Assert(imported.Applied && Untouched(), "Import leaves it: " + imported.Error);
         Assert(session.AddEquipment(Crossing, West(16)).Applied && Untouched(), "An edit leaves it");
+        var constructed = f.World.Constructed; var mutations = f.World.Mutations;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && Untouched() && f.World.Constructed == constructed && f.World.Mutations == mutations,
+            "This mod's Recheck leaves it and applies nothing for it: " + recheck.Error);
         mapEditor.Undo();
         Assert(Untouched() && f.Live.Single(a => a.Record.Scope == "author/pack").Position[0] == 14, "Undo leaves it");
         mapEditor.Redo();
