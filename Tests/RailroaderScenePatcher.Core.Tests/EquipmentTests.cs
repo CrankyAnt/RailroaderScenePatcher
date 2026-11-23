@@ -193,7 +193,7 @@ static class EquipmentTests {
         AStaleWrapperThatStaysAfterItsRebuildGuardsTheCrossing();
         RecheckRemovesAStaleWrapperItsFileNoLongerNames();
         AnotherModsLostCopyStaysThroughFileVersionImportAndHistory();
-        SourceRefusalsEndWithANextStep();
+        SourceRefusalsExplainTheProblem();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
@@ -642,7 +642,7 @@ static class EquipmentTests {
         b.Live.Single().CopyLost = true;
         b.World.Bells.Clear();
         var bellRecheck = bellSession.Recheck(Crossing);
-        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable from the game or loaded mods, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"),
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"),
             "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
@@ -758,7 +758,7 @@ static class EquipmentTests {
         var lost = f.Live.Single(); lost.CopyLost = true;
         f.World.StickyDestroy = true;
         var failed = session.Recheck(Crossing);
-        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("Equipment west left an empty object at this crossing that the patcher could not remove. Clicking Recheck retries cleanup without discarding your unsaved edits. Save your work before reloading the Map Editor"),
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("equipment west left an empty object at this crossing that the patcher could not remove"),
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
@@ -808,8 +808,8 @@ static class EquipmentTests {
         mapEditor.Redo();
         Assert(Untouched() && f.Live.Single(a => a.Record.Scope == "author/pack").Position[0] == 16, "Redo leaves it");
     }
-    // Each source refusal names the source and ends with what the modder can do.
-    static void SourceRefusalsEndWithANextStep() {
+    // Source refusals explain the problem; content refusals also say what the modder can do.
+    static void SourceRefusalsExplainTheProblem() {
         var f = new Fixture();
         f.World.Device(SignalPath + " twin"); f.World.Device(CrossingPath + "/Twin"); f.World.Device(CrossingPath + "/Twin");
         f.World.Device(CrossingPath + "/Bell", d => d.Facts.Bells = 1);
@@ -821,12 +821,13 @@ static class EquipmentTests {
         var device = new EquipmentSource("BushnellWhittier", SignalPath);
         var cases = new[] {
             (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported. Use pattern crossing-light-gate-v1 or crossing-bell-v1. Otherwise remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate must copy a light or gate already in the map, but this addition supplies only an identifier. In your mod's Data/scene-patches.json, replace this addition's source.definition with source.scene and source.path for the light or gate you want to copy"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate needs an object in the map as its source, not a definition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 loaded objects share that source. Select another source or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), ". Select an eligible source or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x needs a fixed placement. Give it a position and rotation or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack")), "Equipment x: a bell needs a bell definition as its source, not an object in the map"),
         };
-        foreach (var (error, tail) in cases) Assert(error != null && error.EndsWith(tail, StringComparison.Ordinal), "The refusal ends with its next step: " + error);
+        foreach (var (error, tail) in cases) Assert(error != null && error.EndsWith(tail, StringComparison.Ordinal), "The refusal gives its reason and any next step: " + error);
         Assert(cases[3].Item1.StartsWith("Equipment x: source Bell does not conform to " + EquipmentAddition.LightGatePattern, StringComparison.Ordinal), "A non-conforming source is named: " + cases[3].Item1);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the

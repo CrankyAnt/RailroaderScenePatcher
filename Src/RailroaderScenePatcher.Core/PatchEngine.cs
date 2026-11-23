@@ -941,10 +941,10 @@ namespace RailroaderScenePatcher.Core {
                 EquipmentSource from;
                 // A bell loads the audio of a bell definition; a light or gate copies a loaded device.
                 if (pattern == EquipmentAddition.BellPattern) {
-                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with the identifier of a bell definition under definition");
+                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with the identifier of a bell definition under definition. In your mod's Data/scene-patches.json, set this addition's source.definition to the chosen bell's identifier and remove any other source members");
                     from = EquipmentSource.ForDefinition((string)source["definition"]);
                 } else {
-                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path");
+                    if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a source with scene and path. In your mod's Data/scene-patches.json, set this addition's source.scene and source.path to identify the light or gate you want to copy and remove any other source members");
                     from = new EquipmentSource((string)source["scene"], (string)source["path"]);
                 }
                 var placement = addition["placement"] as JObject;

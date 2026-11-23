@@ -47,8 +47,8 @@ namespace RailroaderScenePatcher.Core {
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
             if (source == null) return "it needs a source";
-            if (pattern == BellPattern && !source.IsDefinition) return "a bell must use an eligible bell listed under Add a bell, but this addition points to an object in the map. In your mod's Data/scene-patches.json, put the chosen bell's identifier in this addition's source.definition and remove source.scene and source.path";
-            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate must copy a light or gate already in the map, but this addition supplies only an identifier. In your mod's Data/scene-patches.json, replace this addition's source.definition with source.scene and source.path for the light or gate you want to copy";
+            if (pattern == BellPattern && !source.IsDefinition) return "a bell needs a bell definition as its source, not an object in the map";
+            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate needs an object in the map as its source, not a definition";
             return null;
         }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement) : this(id, pattern, source, placement, "") { }
@@ -408,7 +408,7 @@ namespace RailroaderScenePatcher.Core {
                 var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
                 var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
                 throw new InvalidOperationException(addition.Source.IsDefinition
-                    ? what + "bell definition " + name + " is unavailable from the game or loaded mods" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"
+                    ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"
                     : what + "source device " + name + " is not present in the loaded map" + rebuilt + ". The patcher only copies devices already in this map and will not choose a replacement. Select a device present in this map or remove the addition");
             }
             if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share its identifier" : " loaded objects share that source") + ". Select another source or remove the addition");
@@ -492,7 +492,7 @@ namespace RailroaderScenePatcher.Core {
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
             // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
             var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "Equipment " + record.Id + " left an empty object at this crossing that the patcher could not remove. Clicking Recheck retries cleanup without discarding your unsaved edits. Save your work before reloading the Map Editor"; }
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "equipment " + record.Id + " left an empty object at this crossing that the patcher could not remove"; }
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
