@@ -604,6 +604,12 @@ static class EquipmentTests {
         var entries = session.EquipmentEntries(Crossing);
         Assert(entries.Select(e => e.Addition.Id).SequenceEqual(new[] { "ring", "west" }) && entries.All(e => e.Built != null && e.Problem == null),
             "Both additions are listed as built, in the ordinal order of their IDs: " + String.Join(", ", entries.Select(e => e.Addition.Id + " " + e.Problem)));
+        // Their Edit and Remove controls are inactive ahead of time with the reason; the edit itself still refuses with it.
+        Assert(session.SeveralModificationsBlock(Crossing) == PatchEditingSession.SeveralModifications, "The crossing's edits are blocked ahead of time: " + session.SeveralModificationsBlock(Crossing));
+        var removed = session.RemoveEquipment(Crossing, "west");
+        Assert(!removed.Applied && removed.Error.Contains(PatchEditingSession.SeveralModifications) && f.Live.Count == 2, "The removal still refuses with the same reason: " + removed.Error);
+        var single = Session(Doc(Equip("equip-crossing", Addition("west"))));
+        Assert(single.session.SeveralModificationsBlock(Crossing) == null, "One modification of the crossing blocks nothing");
     }
     // An added light, gate or bell whose copy is gone while its wrapper stays counts as not built: the editing lists it with
     // its reason, and Recheck rebuilds it from its source like a fresh construction, without a refusal or a reload.

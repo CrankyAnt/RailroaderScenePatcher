@@ -810,7 +810,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
+                if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
                 var value = CoverageValue(target, existing, circuit, coverage, addition);
                 if (value != null) engine.CheckRelationships(resolved, PatchEngine.Parse(value, scenePatchFileKey).State);
@@ -982,7 +982,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw new InvalidOperationException("Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again.");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
+                if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
                 var value = EquipmentValue(target, existing, addition, id);
                 var key = existing == null ? NewId(target, "equip-") : ScenePatchFile.Key(existing);
@@ -1146,7 +1146,7 @@ namespace RailroaderScenePatcher.Core {
                 if (engine.IsUnsafe(resolved)) throw engine.Guarded(resolved, "Cleanup for this object could not be verified. Click Recheck or reload the Map Editor before editing it again");
                 scene.Preflight(resolved);
                 var own = Own(resolved);
-                if (own.Count > 1) throw new InvalidOperationException("Several modifications in the scene patch file target this object; combine them outside scene patch editing first");
+                if (own.Count > 1) throw new InvalidOperationException(SeveralModifications);
                 var existing = own.FirstOrDefault();
                 var ineffective = existing == null ? null : engine.IneffectiveReason(scenePatchFile.Modifications, ScenePatchFile.Key(existing), scenePatchFileKey);
                 JObject value;
@@ -1544,6 +1544,11 @@ namespace RailroaderScenePatcher.Core {
                 .Where(p => p.Name != key && (p.Value as JObject)?["dependsOn"] is JArray dependencies && dependencies.Any(d => d.Type == JTokenType.String && (string)d == key))
                 .Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
         }
+        // Why scene patch editing refuses every edit of an object before any change: several modifications of the scene patch
+        // file target it. The panel shows the controls of such an object inactive with this reason; the edit still refuses.
+        public const string SeveralModifications = "Several modifications in the scene patch file target this object; combine them outside scene patch editing first";
+        // SeveralModifications when more than one modification of the scene patch file targets the object, or null.
+        public string SeveralModificationsBlock(TargetIdentity target) => Own(engine.ResolveUnique(target)).Count > 1 ? SeveralModifications : null;
         List<JObject> Own(object target) {
             var own = new List<JObject>();
             foreach (var item in scenePatchFile.Items) {

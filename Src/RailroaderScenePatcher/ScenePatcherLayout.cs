@@ -982,6 +982,10 @@ namespace RailroaderScenePatcher {
                 catch (Exception e) { sourcesUnavailable = e.GetBaseException().Message; }
             if (current != null) {
                 var copies = EquipmentCopies();
+                // Several modifications of the crossing in the scene patch file: every edit refuses, so Edit is inactive with the reason.
+                string several = null;
+                try { several = attachment.Session.SeveralModificationsBlock(identity); } catch (Exception) { }
+                var editWait = wait ?? several;
                 var others = current.Additions.Where(a => a.Scope != attachment.Session.ScenePatchFileKey).ToArray();
                 if (mine.Count == 0 && others.Length == 0) Line(builder, "None added", null, null);
                 // This mod's additions come from its scene patch file, so one whose build failed is listed with its reason and can
@@ -1002,8 +1006,8 @@ namespace RailroaderScenePatcher {
                     if (entry.Problem != null) builder.AddLabel(Tint(Red, "Not built: " + CommandBand.Sentence(entry.Problem)));
                     else if (state != null) builder.AddLabel(Literal(CommandBand.Sentence(state)));
                     var scenePatchFile = entry.Addition;
-                    var edit = Button(builder, "Edit " + name, () => ReadEquipment(scenePatchFile, name)).Inactive(wait != null)
-                        .Tooltip("Edit " + name, CommandBand.Tooltip(entry.Problem == null ? (item.Source.IsDefinition ? "Change this bell's placement or remove it." : "Change this copy's placement or remove it.") : "Correct this " + kind + " or remove it.", wait));
+                    var edit = Button(builder, "Edit " + name, () => ReadEquipment(scenePatchFile, name)).Inactive(editWait != null)
+                        .Tooltip("Edit " + name, CommandBand.Tooltip(entry.Problem == null ? (item.Source.IsDefinition ? "Change this bell's placement or remove it." : "Change this copy's placement or remove it.") : "Correct this " + kind + " or remove it.", editWait));
                     FitEquipmentText(edit.RectTransform.GetComponentInChildren<TMP_Text>(true), AddedEquipmentFamily(item.Source), name, value => "Edit " + value,
                         () => ((RectTransform)edit.RectTransform.parent).rect.width - 2 * CommandBand.ButtonPadding);
                 }
@@ -1523,13 +1527,15 @@ namespace RailroaderScenePatcher {
                         try { entries = session.EquipmentEntries(identity); } catch { }
                         // Removal applies to an addition the scene patch file holds, whether or not it was built.
                         var inScenePatchFile = entries.Any(e => e.Addition.Id == equipmentId);
+                        string several = null;
+                        try { several = session.SeveralModificationsBlock(identity); } catch { }
                         var prepared = preparedEquipment != null && preparedEquipment.Preview.Error == null ? preparedEquipment : null;
                         return new[] {
                             Slot("Preview", "Preview this " + EquipmentKind + ".", null, () => {
                                 var value = ParseEquipment(out var problem);
                                 if (value == null) feedback.Refuse(EquipmentPlace, "Equipment preview", problem); else PrepareEquipment(session, identity, value, null);
                             }),
-                            Slot("Remove", "Preview removing this " + EquipmentKind + ".", inScenePatchFile ? null : "This " + EquipmentKind + " is not in the scene patch file yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
+                            Slot("Remove", "Preview removing this " + EquipmentKind + ".", inScenePatchFile ? several : "This " + EquipmentKind + " is not in the scene patch file yet.", () => PrepareEquipment(session, identity, null, equipmentId)),
                             Empty,
                             Slot("Apply", "Apply the previewed change.", prepared == null ? "Click Preview first." : null, () => Edit(EquipmentPlace, EquipmentPlace, (edit, inspection) => {
                                 var done = prepared.Addition != null ? edit.AddEquipment(identity, prepared.Addition, inspection) : edit.RemoveEquipment(identity, prepared.RemoveId, inspection);
