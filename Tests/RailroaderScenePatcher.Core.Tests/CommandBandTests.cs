@@ -159,8 +159,18 @@ static class CommandBandTests {
         var unbuiltName = InventoryPresentationState.UnbuiltEquipmentName(addition, new[] { source });
         Check(InventoryPresentationState.NarrowName(CommandBand.AddedEquipmentFamily, unbuiltName, 27, value => ("Edit " + value).Length)
             == "signal-1-added: Signa…", "A narrow Edit button can shorten an unbuilt name without losing its Equipment ID");
-        Check(InventoryPresentationState.EquipmentSourceName(EquipmentSource.ForDefinition("rr/missing-bell"), Array.Empty<SourceCandidate>()) == "Bell",
-            "An unavailable definition falls back to the equipment kind without showing its identifier");
+        Check(InventoryPresentationState.EquipmentSourceName(EquipmentSource.ForDefinition("rr/missing-bell"), Array.Empty<SourceCandidate>()) == "missing-bell",
+            "An unavailable bell definition is named after the last part of its identifier, not its kind");
+        var unloaded = new EquipmentAddition("west", EquipmentAddition.LightGatePattern, new EquipmentSource("scene", "World/Crossings/Gone/Signal 3"), null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unloaded, Array.Empty<SourceCandidate>()) == "west: Signal 3",
+            "An unbuilt light or gate whose source is not loaded is named after the last element of its source path");
+        var unavailableBell = new EquipmentAddition("ring", EquipmentAddition.BellPattern, EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), null);
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unavailableBell, null) == "ring: bell-uss-teardrop",
+            "An unbuilt bell whose definition is unavailable is named after its identifier's last part");
+        Check(InventoryPresentationState.UnbuiltEquipmentName(unavailableBell, new[] { SourceCandidate.Bell("rr/bell-uss-teardrop", "US&S Teardrop Crossing Bell", "refused") }) == "ring: US&S Teardrop Crossing Bell",
+            "An unbuilt bell whose definition is available uses its metadata name");
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.Bell("rr/bell-plain", null, null)) == "bell-plain",
+            "A bell definition without a name is offered under its identifier's last part");
         var identity = new TargetIdentity("scene", "World/Crossings/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "OwnedEquipment");
         var added = new SceneObservation(new object(), identity, CommandBand.AddedEquipmentFamily, true, Array.Empty<double>(), Array.Empty<double>(),
             Array.Empty<string>(), Array.Empty<string>(), new[] { "Missing object at " + identity.Path }, null, displayName: "Signal 1 (added, 1 of 2)");

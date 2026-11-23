@@ -65,7 +65,7 @@ To move an addition, click **Edit** under its name, change the fields, preview, 
 
 **Remove modification** in the footer removes all of your mod's coverage, detection additions, lights, gates, and bells for this crossing. Native Undo and Redo reverse and repeat each applied change, including rebuilding a removed addition.
 
-**Lights, gates, and bells** lists the added equipment by name. It shows whether each light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher can't build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason. An addition whose copy is gone also appears as **Not built**, under its own name. **Recheck** or your next equipment change builds it again from its source.
+**Lights, gates, and bells** lists the added equipment by name. It shows whether each light or gate is connected to the crossing, waiting to connect, or hidden with the crossing. If the patcher can't build an addition from your scene patch file, for example because its source is missing, it appears as **Not built** with a reason. Its name is its equipment ID followed by the source device's name, the last part of the source path, such as `west: Signal 3`. When the source is loaded, the crossing follows, such as `west: Signal 3 at Allen`. An addition whose copy is gone also appears as **Not built**, under its own name. **Recheck** or your next equipment change builds it again from its source.
 
 The patcher builds all additions for a crossing together. If one addition is refused, none are built. Each of the others appears as **Not built** and names the refused addition. **Recheck** is refused for the same reason and changes nothing.
 
