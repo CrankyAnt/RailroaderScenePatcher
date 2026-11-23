@@ -145,9 +145,9 @@ static class BellTests {
         // A bell whose source names a scene object is no definition: it is invalid, so no scene is resolved or loaded for it.
         var g = new Fixture();
         var scene = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("bell", source: "{\"scene\":\"UnloadedScene\",\"path\":\"World/Bell\"}"))));
-        Assert(!scene.Outcomes["bad"].Applied && scene.Outcomes["bad"].Error.Contains("Invalid relationship: equipment bell needs a source with the identifier of a bell definition under definition. In your mod's Data/scene-patches.json, set this addition's source.definition to the chosen bell's identifier and remove any other source members") && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
+        Assert(!scene.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment bell needs a bell definition as its source", "scene patch file (Data/scene-patches.json)", "only a definition" }.All(scene.Outcomes["bad"].Error.Contains) && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
         var light = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("lamp", pattern: EquipmentAddition.LightGatePattern))));
-        Assert(!light.Outcomes["bad"].Applied && light.Outcomes["bad"].Error.Contains("Invalid relationship: equipment lamp needs a source with scene and path. In your mod's Data/scene-patches.json, set this addition's source.scene and source.path to identify the light or gate you want to copy and remove any other source members") && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
+        Assert(!light.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment lamp needs a light or gate in the map as its source", "scene patch file (Data/scene-patches.json)", "only a scene and a path" }.All(light.Outcomes["bad"].Error.Contains) && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
     }
     static void InvalidBellContentIsRefused() {
         foreach (var invalid in new[] { Bell("bell", source: "{}"), Bell("bell", source: "{\"definition\":\"\"}"), Bell("bell", source: "{\"definition\":5}"),

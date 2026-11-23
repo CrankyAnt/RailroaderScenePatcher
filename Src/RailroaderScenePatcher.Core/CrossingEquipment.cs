@@ -47,8 +47,8 @@ namespace RailroaderScenePatcher.Core {
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
             if (source == null) return "it needs a source";
-            if (pattern == BellPattern && !source.IsDefinition) return "a bell needs a bell definition as its source, not an object in the map";
-            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate needs an object in the map as its source, not a definition";
+            if (pattern == BellPattern && !source.IsDefinition) return "a bell needs a bell definition as its source, not a light or gate in the map";
+            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate needs a light or gate in the map as its source, not a bell definition";
             return null;
         }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement) : this(id, pattern, source, placement, "") { }
@@ -402,16 +402,16 @@ namespace RailroaderScenePatcher.Core {
             var name = addition.Source.StoredName();
             if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind);
+            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Change its source in your scene patch file or remove the addition");
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
             if (matches.Count == 0) {
                 var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
                 var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
                 throw new InvalidOperationException(addition.Source.IsDefinition
                     ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"
-                    : what + "source device " + name + " is not present in the loaded map" + rebuilt + ". The patcher only copies devices already in this map and will not choose a replacement. Select a device present in this map or remove the addition");
+                    : what + "light or gate " + name + " is not in the map" + rebuilt + ". The patcher only copies lights and gates already in the map and will not choose a replacement. Select a light or gate in the map or remove the addition");
             }
-            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share its identifier" : " loaded objects share that source") + ". Select another source or remove the addition");
+            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Select another bell definition" : " objects in the map share its scene and path. Select another light or gate") + " or remove the addition");
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
             if (problem != null) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition");
             return matches[0];
