@@ -271,6 +271,9 @@ namespace RailroaderScenePatcher.Core {
         // A bell definition the content library holds, with its definition name when it has one.
         public static SourceCandidate Bell(string identifier, string name, string problem) =>
             new SourceCandidate(EquipmentSource.ForDefinition(identifier), identifier, problem, null, null, String.IsNullOrWhiteSpace(name) ? null : name, null, null, null);
+        // The one rejected row that stands for bell definitions this build cannot offer, with why. It is no addition and has
+        // no recorded source, so it is named Bell.
+        public static SourceCandidate UnavailableBells(string problem) => Bell("bell definitions", "Bell", problem);
         // The pattern an addition from this source is built with.
         public string Pattern { get; }
         // The source's map placement, or null when it is unknown.

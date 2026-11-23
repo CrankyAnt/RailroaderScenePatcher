@@ -176,13 +176,13 @@ namespace RailroaderScenePatcher {
             }
             // Every bell definition of the content library, eligible or with its reason, for the inspected controller.
             // A failure to read them leaves the devices listed and names the reason in one rejected entry.
-            if (bells == null) result.Add(SourceCandidate.Bell("bell definitions", null, "crossing bells are unavailable on this game build: " + bellsUnavailable));
+            if (bells == null) result.Add(SourceCandidate.UnavailableBells("crossing bells are unavailable on this game build: " + bellsUnavailable));
             else if (target is GameObject destination && Loaded(destination)) {
                 try {
                     var found = new List<SourceCandidate>();
                     foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
                     result.AddRange(found);
-                } catch (Exception e) { result.Add(SourceCandidate.Bell("bell definitions", null, "cannot read bell definitions from the content library: " + e.GetBaseException().Message)); }
+                } catch (Exception e) { result.Add(SourceCandidate.UnavailableBells("cannot read bell definitions from the content library: " + e.GetBaseException().Message)); }
             }
             return result;
         }
