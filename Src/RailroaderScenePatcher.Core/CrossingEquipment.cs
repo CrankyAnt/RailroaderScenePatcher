@@ -47,8 +47,8 @@ namespace RailroaderScenePatcher.Core {
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
             if (source == null) return "it needs a source";
-            if (pattern == BellPattern && !source.IsDefinition) return "a bell needs a bell definition as its source, but this addition names a device in the map";
-            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate needs a device in the map as its source, but this addition names a definition";
+            if (pattern == BellPattern && !source.IsDefinition) return "a bell must use an eligible bell listed under Add a bell, but this addition points to an object in the map. In your mod's Data/scene-patches.json, put the chosen bell's identifier in this addition's source.definition and remove source.scene and source.path";
+            if (pattern == LightGatePattern && source.IsDefinition) return "a light or gate must copy a light or gate already in the map, but this addition supplies only an identifier. In your mod's Data/scene-patches.json, replace this addition's source.definition with source.scene and source.path for the light or gate you want to copy";
             return null;
         }
         public EquipmentAddition(string id, string pattern, EquipmentSource source, Placement placement) : this(id, pattern, source, placement, "") { }
@@ -402,7 +402,7 @@ namespace RailroaderScenePatcher.Core {
             var name = addition.Source.StoredName();
             if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Change its source or remove the addition");
+            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind);
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
             if (matches.Count == 0) {
                 var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
@@ -492,7 +492,7 @@ namespace RailroaderScenePatcher.Core {
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
             // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
             var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "Equipment " + record.Id + " could not be fully removed. Reload the native map editor before editing this crossing's equipment"; }
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "Equipment " + record.Id + " left an empty object at this crossing that the patcher could not remove. Clicking Recheck retries cleanup without discarding your unsaved edits. Save your work before reloading the Map Editor"; }
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
