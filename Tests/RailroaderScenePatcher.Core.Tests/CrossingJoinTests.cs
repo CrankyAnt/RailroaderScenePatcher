@@ -200,7 +200,7 @@ static class CrossingJoinTests {
         var hostState = host.Counters;
         var noBell = new World(); noBell.Equipment.Bells.Clear();
         var result = noBell.Join();
-        Assert(!result.Outcomes["equip"].Applied && result.Outcomes["equip"].Error.Contains("not available in the content library") && noBell.Equipment.Mutations == 0 && noBell.Live.Count == 0, "A bell definition this peer lacks refuses the equipment before any change, without a substitute: " + result.Outcomes["equip"].Error);
+        Assert(!result.Outcomes["equip"].Applied && result.Outcomes["equip"].Error.Contains("is unavailable in the content library") && noBell.Equipment.Mutations == 0 && noBell.Live.Count == 0, "A bell definition this peer lacks refuses the equipment before any change, without a substitute: " + result.Outcomes["equip"].Error);
         Assert(result.Outcomes["reroute"].Applied && result.Outcomes["siding"].Applied && noBell.DetectionProblem == null, "Detection is reconstructed on that peer all the same: " + Errors(result) + " " + noBell.DetectionProblem);
         var noTrack = new World(); noTrack.Coverage.Segments.Remove("Sspur");
         result = noTrack.Join();
