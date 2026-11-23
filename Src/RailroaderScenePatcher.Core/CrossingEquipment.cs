@@ -43,6 +43,9 @@ namespace RailroaderScenePatcher.Core {
         // The audio priority of an added bell's player: the native crossing bell's own, so the game sorts both alike.
         // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer.
         public const int BellPriority = 9;
+        // The start of the reason a bell source is refused when this game build cannot provide crossing bells. Unlike the
+        // other source refusals, it is no problem of the mod author's scene patch file.
+        public const string BellsUnavailable = "crossing bells are unavailable on this game build: ";
         // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
@@ -397,28 +400,33 @@ namespace RailroaderScenePatcher.Core {
         }
         // Rechecks each addition's source: unique, loaded and conforming to its pattern for this controller. A refusal names the
         // source as the addition's row does and ends with what the modder can do. stale says that the addition's wrapper stands
-        // without its copy.
+        // without its copy. A refusal is a problem of the mod author's scene patch file (InvalidPatchDefinitionException), so the
+        // world load's warning names the mod author; only crossing bells this game build cannot provide stay a patcher problem.
         internal object Source(object controller, EquipmentAddition addition, bool stale = false) {
             var name = addition.Source.StoredName();
-            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
+            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Change its source in your scene patch file or remove the addition");
+            if (kind != null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": " + kind + ". Change its source in your scene patch file or remove the addition");
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
             if (matches.Count == 0) {
                 var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
                 var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
-                throw new InvalidOperationException(addition.Source.IsDefinition
+                throw new InvalidPatchDefinitionException(addition.Source.IsDefinition
                     ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"
                     : what + "light or gate " + name + " is not in the map" + rebuilt + ". The patcher only copies lights and gates already in the map and will not choose a replacement. Select a light or gate in the map or remove the addition");
             }
-            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Select another bell definition" : " objects in the map share its scene and path. Select another light or gate") + " or remove the addition");
+            if (matches.Count > 1) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Select another bell definition" : " objects in the map share its scene and path. Select another light or gate") + " or remove the addition");
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
-            if (problem != null) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition");
+            if (problem != null) {
+                var message = "Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition";
+                if (problem.StartsWith(EquipmentAddition.BellsUnavailable, StringComparison.Ordinal)) throw new InvalidOperationException(message);
+                throw new InvalidPatchDefinitionException(message);
+            }
             return matches[0];
         }
         internal void Check(object controller, CrossingEquipment equipment, List<object> owned) {
             foreach (var addition in equipment.Additions) {
-                if (addition.Placement?.Position == null || addition.Placement.Rotation == null) throw new InvalidOperationException("Equipment " + addition.Id + " needs a fixed placement. Give it a position and rotation or remove the addition");
+                if (addition.Placement?.Position == null || addition.Placement.Rotation == null) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + " needs a fixed placement. Give it a position and rotation or remove the addition");
                 Source(controller, addition, StaleAt(owned, addition));
             }
         }

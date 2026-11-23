@@ -111,7 +111,7 @@ namespace RailroaderScenePatcher {
             return found.Where(g => OwnedEquipment.Of(g) == null).Cast<object>().ToArray();
         }
         public string SourceProblem(object source, object target, string pattern) {
-            if (source is UnavailableBell) return "crossing bells are unavailable on this game build: " + bellsUnavailable;
+            if (source is UnavailableBell) return EquipmentAddition.BellsUnavailable + bellsUnavailable;
             if (source is BellSource bell) {
                 if (pattern != EquipmentAddition.BellPattern) return "pattern " + pattern + " cannot use a definition as its source";
                 var controllerObject = target as GameObject;
@@ -176,7 +176,7 @@ namespace RailroaderScenePatcher {
             }
             // Every bell definition of the content library, eligible or with its reason, for the inspected controller.
             // A failure to read them leaves the devices listed and names the reason in one rejected entry.
-            if (bells == null) result.Add(SourceCandidate.UnavailableBells("crossing bells are unavailable on this game build: " + bellsUnavailable));
+            if (bells == null) result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellsUnavailable + bellsUnavailable));
             else if (target is GameObject destination && Loaded(destination)) {
                 try {
                     var found = new List<SourceCandidate>();
@@ -325,7 +325,7 @@ namespace RailroaderScenePatcher {
             var copy = owned.Copy;
             if (!Built(owned)) return "its copy is missing";
             if (!owned.gameObject.activeSelf) return "it is disabled";
-            if (owned.Pattern == EquipmentAddition.BellPattern) return bells == null ? "crossing bells are unavailable on this game build: " + bellsUnavailable : bells.Problem(copy.GetComponent<OwnedBell>(), owned.Controller);
+            if (owned.Pattern == EquipmentAddition.BellPattern) return bells == null ? EquipmentAddition.BellsUnavailable + bellsUnavailable : bells.Problem(copy.GetComponent<OwnedBell>(), owned.Controller);
             var device = LightGatePattern.Problem(Facts(copy, owned.Controller, false), keys);
             if (device != null) return "the copy " + device;
             var nearest = NearestOwner(copy.transform);

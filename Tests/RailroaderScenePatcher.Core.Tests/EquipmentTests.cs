@@ -24,6 +24,8 @@ class FakeBell {
     public string Identifier = "rr/bell-uss-teardrop-crossing-rh", Name = "Crossing Bell";
     public BellFacts Facts = new BellFacts { Audio = "rr/bell-crossing", Indexes = new double[] { 0.4, 1.2 }, Volume = 0.8 };
     public double ClipSeconds = 3;
+    // The reason crossing bells are unavailable on this game build, or null: the source then resolves to a placeholder.
+    public string BuildUnavailable;
 }
 // Controlled equipment world: devices by scene and path, bell definitions by identifier, and additions the patcher owns
 // beneath each crossing controller.
@@ -68,6 +70,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public IReadOnlyList<object> ResolveSource(EquipmentSource source) => source.IsDefinition ? Bells.Where(b => b.Identifier == source.Definition).Cast<object>().ToArray()
         : Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
     public string SourceProblem(object source, object controller, string pattern) {
+        if (source is FakeBell unavailable && unavailable.BuildUnavailable != null) return EquipmentAddition.BellsUnavailable + unavailable.BuildUnavailable;
         if (source is FakeBell bell) return pattern != EquipmentAddition.BellPattern ? "the pattern " + pattern + " is not supported for a definition" : BellPattern.Problem(bell.Facts);
         if (pattern == EquipmentAddition.BellPattern) return "a loaded device is no bell definition";
         var d = (FakeDevice)source;
@@ -195,6 +198,7 @@ static class EquipmentTests {
         RecheckRemovesAStaleWrapperItsFileNoLongerNames();
         AnotherModsLostCopyStaysThroughFileVersionImportAndHistory();
         SourceRefusalsExplainTheProblem();
+        SourceRefusalsAreReportedToTheModAuthor();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
@@ -870,6 +874,42 @@ static class EquipmentTests {
         };
         foreach (var (error, tail) in cases) Assert(error != null && error.EndsWith(tail, StringComparison.Ordinal), "The refusal gives its reason and any next step: " + error);
         Assert(cases[3].Item1.StartsWith("Equipment x: source Bell does not conform to " + EquipmentAddition.LightGatePattern, StringComparison.Ordinal), "A non-conforming source is named: " + cases[3].Item1);
+    }
+    // A refused source is a problem of the mod author's scene patch file, as an invalid source shape is: the world load's
+    // warning names the mod author. A source that is missing, unavailable, ambiguous or nonconforming, of the wrong kind,
+    // or an addition without a fixed placement is such a problem. Crossing bells that this game build cannot provide are not.
+    static void SourceRefusalsAreReportedToTheModAuthor() {
+        var loads = new (string Case, Action<FakeEquipmentWorld> Setup, string Addition)[] {
+            ("missing light or gate", w => { }, Addition("west", CrossingPath + "/Missing")),
+            ("unavailable bell definition", w => { }, BellAddition("ring", "rr/bell-does-not-exist")),
+            ("ambiguous light or gate", w => { w.Device(CrossingPath + "/Twin"); w.Device(CrossingPath + "/Twin"); }, Addition("west", CrossingPath + "/Twin")),
+            ("nonconforming light or gate", w => w.Device(CrossingPath + "/Bell", d => d.Facts.Bells = 1), Addition("west", CrossingPath + "/Bell")),
+        };
+        foreach (var (name, setup, addition) in loads) {
+            var f = new Fixture();
+            setup(f.World);
+            var outcome = new PatchEngine(f.Scene).Apply(Doc(Equip("bad", addition)), "author/pack").Outcomes["bad"];
+            Assert(!outcome.Applied && outcome.Cause == FailureCause.InvalidDefinition && f.World.Mutations == 0,
+                "A " + name + " is the mod author's problem: " + outcome.Cause + " " + outcome.Error);
+        }
+        var g = new Fixture();
+        var at = new Placement(new[] { 10.0, 0, 7 }, new[] { 0.0, 0, 0, 1 });
+        Exception Refusal(EquipmentAddition addition) {
+            try { g.Scene.CheckRelationships(g.Crossing, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false))); return null; }
+            catch (InvalidOperationException e) { return e; }
+        }
+        var device = new EquipmentSource("BushnellWhittier", SignalPath);
+        foreach (var (name, refusal) in new[] {
+            ("wrong source kind for a light or gate", Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack"))),
+            ("wrong source kind for a bell", Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack"))),
+            ("unsupported pattern", Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack"))),
+            ("missing placement", Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack"))) })
+            Assert(refusal is InvalidPatchDefinitionException, "A " + name + " is the mod author's problem: " + refusal?.GetType().Name + " " + refusal?.Message);
+        var h = new Fixture();
+        h.World.Bell("rr/bell", b => b.BuildUnavailable = "the bell player type is missing"); h.World.LoadsPending = false;
+        var build = new PatchEngine(h.Scene).Apply(Doc(Equip("bad", BellAddition("ring"))), "author/pack").Outcomes["bad"];
+        Assert(!build.Applied && build.Error.Contains(EquipmentAddition.BellsUnavailable) && build.Cause != FailureCause.InvalidDefinition,
+            "Bells this game build cannot provide stay a patcher problem: " + build.Cause + " " + build.Error);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the
     // world load refuses it. Recheck refuses it the same way before any change: nothing was mutated, so no cleanup is
