@@ -356,13 +356,12 @@ namespace RailroaderScenePatcher.Core {
         }
         // The equipment an application converges on, or null when it leaves the additions as they are. An operation that leaves
         // them alone neither checks nor touches them, so a faulty addition does not block coverage edits of the same crossing.
-        // A lost copy is observed as lost: a set that names it, its own mod's or a Recheck's, differs and builds it again, and
-        // a set laid over the observation, as another mod's is, keeps it as it is.
+        // A wrapper whose copy is gone is not built, so it is not observed: its own mod's set builds it fresh or removes it.
         CrossingEquipment EquipmentChange(object target, Baseline baseline, CrossingEquipment state) {
             if (state == null) return null;
             var observed = equipment.Observed(target, baseline.Equipment);
             var desired = state.Complete ? state : CrossingEquipment.Overlay(observed, state);
-            return CrossingEquipment.Same(desired, observed) ? null : desired;
+            return CrossingEquipment.Same(desired, observed) && !equipment.Clears(baseline.Equipment, desired) ? null : desired;
         }
         public void CheckRelationships(object target, ObjectState state) {
             if (state == null) return;
@@ -457,7 +456,6 @@ namespace RailroaderScenePatcher.Core {
                 equipment.Write(target, baseline.Equipment, desired);
                 var difference = equipment.Verify(target, baseline.Equipment, desired);
                 if (difference != null) throw new InvalidOperationException("Applied crossing equipment did not verify: " + difference);
-                equipment.Settle(baseline.Equipment);
             }
         }
         public bool Restore(object target, object snapshot) {
@@ -467,8 +465,8 @@ namespace RailroaderScenePatcher.Core {
                 var restored = true;
                 // Equipment first: an addition rebuilt from its source does not depend on the coverage, and a failure of one
                 // part still lets the other restore.
-                // The captured equipment marks a lost copy as lost, so the restoration keeps its wrapper and retires a copy the
-                // failed attempt built for it.
+                // The captured equipment holds the built additions. An addition whose copy was already gone ends not built: a
+                // copy the failed attempt built for it is retired, and a wrapper the attempt left stays.
                 if (captured.Equipment != null && equipment != null && EquipmentChange(target, baseline, captured.Equipment) != null) {
                     try { equipment.Write(target, baseline.Equipment, captured.Equipment); restored = equipment.Verify(target, baseline.Equipment, captured.Equipment) == null; }
                     catch { restored = false; }

@@ -187,7 +187,8 @@ static class EquipmentTests {
         AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded();
         AnAdditionWithoutItsCopyCanBeRemoved();
         AnotherModsLostCopyNeitherRebuildsNorRefusesThisModsEdits();
-        AFailedRebuildLeavesTheLostCopyAsItWas();
+        AFailedRebuildLeavesTheAdditionNotBuilt();
+        AnImportRollbackAfterAVerifiedRebuildEndsCoherent();
         AnUnverifiedRebuildCleanupGuardsUntilRecheck();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
@@ -621,12 +622,24 @@ static class EquipmentTests {
         f.World.Devices.RemoveAll(d => d.Path == SignalPath);
         var mutations = f.World.Mutations;
         var recheck = session.Recheck(Crossing);
-        const string Refusal = "Equipment west: its copy is missing, and its source Signal 1 is not loaded in this map, so it cannot be built again. The patcher will not substitute another source or load another scene";
+        const string Refusal = "Equipment west: its copy is missing, and its source Signal 1 is not loaded in this map, so it cannot be built again. The patcher will not substitute another source or load another scene. Make its source available or remove the addition";
         Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains(Refusal),
             "Recheck refuses the rebuild and names the source by its name, with the standard tail: " + recheck.Failure + " " + recheck.Error);
         Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
         var entry = session.EquipmentEntries(Crossing).Single();
         Assert(entry.Built == null && entry.Problem.Contains(Refusal), "The listed addition gives the refusal that names its source: " + entry.Problem);
+        var b = new Fixture();
+        b.World.Bell("rr/bell", d => d.Name = "Teardrop bell"); b.World.LoadsPending = false;
+        var bellEngine = new PatchEngine(b.Scene);
+        var bellFile = Doc(Equip("equip-crossing", BellAddition("ring")));
+        bellEngine.Apply(bellFile, "author/pack");
+        var bellStore = new Store { Patch = bellFile }; var bellEditor = new NativeMapEditor();
+        var bellSession = new PatchEditingSession(bellEngine, bellEditor, bellStore, scenePatchFileKey: "author/pack"); bellEditor.Session = bellSession;
+        b.Live.Single().CopyLost = true;
+        b.World.Bells.Clear();
+        var bellRecheck = bellSession.Recheck(Crossing);
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: its copy is missing, and its source bell is not available in the content library, so it cannot be built again. The patcher will not substitute another sound or load a scene to find it. Make its source available or remove the addition"),
+            "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
         var f = new Fixture();
@@ -666,22 +679,49 @@ static class EquipmentTests {
                 "Its own mod's Recheck refuses with its own error: " + recheck.Error);
         }
     }
-    // A rebuild that fails, in construction or in verification, leaves the lost copy present and not built, with its entry and
-    // placement, and removes what the attempt built.
-    static void AFailedRebuildLeavesTheLostCopyAsItWas() {
+    // A rebuild that fails, in construction or in verification, is restored to "not built": the scene patch file keeps the
+    // addition, its row offers Recheck, and nothing reports an incomplete cleanup.
+    static void AFailedRebuildLeavesTheAdditionNotBuilt() {
         foreach (var verification in new[] { false, true }) {
             var f = new Fixture();
             var engine = new PatchEngine(f.Scene);
-            engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
-            var lost = f.Live.Single(); lost.CopyLost = true;
+            var scenePatchFile = Doc(Equip("signals", Addition("west")));
+            engine.Apply(scenePatchFile, "author/pack");
+            var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            f.Live.Single().CopyLost = true;
             if (verification) f.World.ConstructOffset = 0.125; else f.World.FailConstructAfter = 0;
-            var moved = engine.Apply(Doc(Equip("signals", Addition("west", x: 12))), "author/pack");
-            Assert(!moved.Outcomes["signals"].Applied && moved.Outcomes["signals"].Error.StartsWith("The change failed. The object is back as it was.", StringComparison.Ordinal),
-                "A failed rebuild is restored (verification: " + verification + "): " + moved.Outcomes["signals"].Error);
-            Assert(f.Live.Count == 1 && ReferenceEquals(f.Live[0], lost) && lost.CopyLost && lost.Position[0] == 10, "The lost copy is back as it was and the attempt's copy is gone");
-            var observed = f.Scene.Read(f.Crossing).Equipment.Additions.Single();
-            Assert(observed.Id == "west" && observed.Placement.Position[0] == 10, "The crossing still holds the same entry");
+            var moved = session.AddEquipment(Crossing, West(12));
+            Assert(!moved.Applied && moved.Failure == FailureKind.Restored, "A failed rebuild is restored (verification: " + verification + "): " + moved.Failure + " " + moved.Error);
+            Assert(!f.Live.Any(a => !a.CopyLost) && !session.CleanupUnverified(Crossing), "Nothing built stays and no cleanup is unverified");
+            var entry = session.EquipmentEntries(Crossing).Single();
+            Assert(entry.Built == null && entry.Problem == "it is not built in this world; Recheck builds it", "The addition stays in the scene patch file as not built: " + entry.Problem);
+            f.World.ConstructOffset = 0;
+            Assert(session.Recheck(Crossing).Applied && f.Live.Count(a => !a.CopyLost) == 1, "Recheck builds it afterwards");
         }
+    }
+    // A rebuild that verified is rolled back with the rest of an Import when a later target fails. The crossing ends with the
+    // addition not built and coherent: no incomplete cleanup is reported and nothing is guarded.
+    static void AnImportRollbackAfterAVerifiedRebuildEndsCoherent() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("a-crossing", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        f.Live.Single().CopyLost = true;
+        store.Patch = Doc(Equip("a-crossing", Addition("west", x: 12)) + "," + Equip("b-other", Addition("north", x: 30), OtherPath));
+        session.CheckFileVersion();
+        Assert(session.OpenImport().Applied, "The Import overview opens");
+        f.World.FailConstructAfter = 1;
+        var import = session.ApplyImport();
+        Assert(!import.Applied && import.Error.StartsWith("Scene patch editing is back as it was before Import.", StringComparison.Ordinal) && !import.Error.Contains("could not be verified"),
+            "The Import is rolled back without an incomplete cleanup: " + import.Error);
+        Assert(f.World.Constructed >= 2 && !session.CleanupUnverified(Crossing) && !session.CleanupUnverified(new TargetIdentity("BushnellWhittier", OtherPath, CrossingCoverageScene.ComponentType, CrossingCoverageScene.Structure)),
+            "The rebuild happened and nothing is guarded after the rollback");
+        Assert(!f.World.Live(f.Crossing).Any(a => !a.CopyLost) && !f.World.Live(f.Other).Any(), "The rebuilt copy and the failed addition are gone");
+        var entry = session.EquipmentEntries(Crossing).Single();
+        Assert(entry.Built == null && entry.Problem == "it is not built in this world; Recheck builds it", "The addition is listed as not built: " + entry.Problem);
     }
     // When cleanup after a failed rebuild cannot be verified, the crossing is guarded; Recheck then rebuilds the lost copy
     // and lifts the guard.
