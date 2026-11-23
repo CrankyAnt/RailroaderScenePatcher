@@ -122,6 +122,7 @@ namespace RailroaderScenePatcher.Core {
         // Equipment sources and additions belong to the adapter that resolved the object.
         public IReadOnlyList<SourceCandidate> EquipmentCandidates(object target) => Owner(target) is ICrossingEquipmentScene equipment ? equipment.EquipmentCandidates(target) : throw new InvalidOperationException("This object has no supported crossing-equipment relationship");
         public string EquipmentStatus(object target, string scope, string id) => Owner(target) is ICrossingEquipmentScene equipment ? equipment.EquipmentStatus(target, scope, id) : null;
+        public bool EquipmentLeftover(object target, ObjectState desired) => Owner(target) is ICrossingEquipmentScene equipment && equipment.EquipmentLeftover(target, desired);
         // Only the adapter that resolved the object can confirm it; an object no adapter resolved is not confirmed.
         public bool StillIdentifies(object target, TargetIdentity identity) =>
             target != null && owners.TryGetValue(target, out var owner) && owner.Capability != Capability.Incompatible && owner is ITargetConfirmation confirmation && confirmation.StillIdentifies(target, identity);

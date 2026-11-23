@@ -378,6 +378,9 @@ namespace RailroaderScenePatcher.Core {
     public interface ICrossingEquipmentScene {
         IReadOnlyList<SourceCandidate> EquipmentCandidates(object target);
         string EquipmentStatus(object target, string scope, string id);
+        // Whether the desired state would remove a wrapper without its copy that the read state does not show, so a
+        // Recheck that finds both states equal still applies it.
+        bool EquipmentLeftover(object target, ObjectState desired);
     }
     // The equipment part of a crossing: converges the additions a controller owns on a complete set.
     internal sealed class CrossingEquipmentPart {
@@ -393,23 +396,24 @@ namespace RailroaderScenePatcher.Core {
             foreach (var addition in world.Owned(controller) ?? Array.Empty<object>()) if (!owned.Any(o => ReferenceEquals(o, addition))) owned.Add(addition);
         }
         // Rechecks each addition's source: unique, loaded and conforming to its pattern for this controller. A refusal names the
-        // source as the addition's row does and ends with what the modder can do. lost says that the addition's copy is gone.
-        internal object Source(object controller, EquipmentAddition addition, bool lost = false) {
+        // source as the addition's row does and ends with what the modder can do. stale says that the addition's wrapper stands
+        // without its copy.
+        internal object Source(object controller, EquipmentAddition addition, bool stale = false) {
             var name = addition.Source.StoredName();
-            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use " + String.Join(" or ", EquipmentAddition.Patterns) + ", or remove the addition");
+            if (!EquipmentAddition.Patterns.Contains(addition.Pattern)) throw new InvalidOperationException("Equipment " + addition.Id + ": pattern " + addition.Pattern + " is not supported. Use pattern " + String.Join(" or ", EquipmentAddition.Patterns) + ". Otherwise remove the addition");
             var kind = EquipmentAddition.SourceKindProblem(addition.Pattern, addition.Source);
-            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Choose a source of that kind or remove the addition");
+            if (kind != null) throw new InvalidOperationException("Equipment " + addition.Id + ": " + kind + ". Select a source of that kind or remove the addition");
             var matches = world.ResolveSource(addition.Source) ?? Array.Empty<object>();
             if (matches.Count == 0) {
-                var what = "Equipment " + addition.Id + ": " + (lost ? "its copy is missing, and its source " : "source ") + name;
-                var rebuilt = lost ? ", so it cannot be built again" : "";
+                var what = "Equipment " + addition.Id + ": " + (stale ? "its copy is missing, and its source " : "source ") + name;
+                var rebuilt = stale ? ", so it cannot be built again" : "";
                 throw new InvalidOperationException(addition.Source.IsDefinition
                     ? what + " is not available in the content library" + rebuilt + ". The patcher will not substitute another sound or load a scene to find it. Make its source available or remove the addition"
                     : what + " is not loaded in this map" + rebuilt + ". The patcher will not substitute another source or load another scene. Make its source available or remove the addition");
             }
-            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share that identifier" : " loaded objects share that path") + ". Choose another source or remove the addition");
+            if (matches.Count > 1) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " definitions share its identifier" : " loaded objects share that source") + ". Select another source or remove the addition");
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
-            if (problem != null) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Choose an eligible source or remove the addition");
+            if (problem != null) throw new InvalidOperationException("Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition");
             return matches[0];
         }
         internal void Check(object controller, CrossingEquipment equipment, List<object> owned) {
@@ -486,6 +490,9 @@ namespace RailroaderScenePatcher.Core {
             if (!world.Present(addition)) owned.Remove(addition);
         }
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
+            // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
+            var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "equipment " + record.Id + " still stands without its copy"; }
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
@@ -515,7 +522,9 @@ namespace RailroaderScenePatcher.Core {
         }
         internal IReadOnlyList<SourceCandidate> Candidates(object controller) => world.Candidates(controller) ?? Array.Empty<SourceCandidate>();
         internal string Status(List<object> owned, string scope, string id) {
-            var addition = owned.Where(world.Present).FirstOrDefault(a => { var r = world.Describe(a); return r.Scope == scope && r.Id == id; });
+            // The built addition of the ID, before a stale wrapper of the same ID that a failed cleanup left.
+            var addition = owned.Where(world.Present).Where(a => { var r = world.Describe(a); return r.Scope == scope && r.Id == id; })
+                .OrderBy(a => world.Built(a) ? 0 : 1).FirstOrDefault();
             return addition == null ? null : world.Status(addition);
         }
     }

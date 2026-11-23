@@ -259,6 +259,12 @@ namespace RailroaderScenePatcher.Core {
         }
         // The initialization and culling state of one addition, or null when it is not present.
         public string EquipmentStatus(object target, string scope, string id) => equipment?.Status(BaselineOf(target).Equipment, scope ?? "", id);
+        public bool EquipmentLeftover(object target, ObjectState desired) {
+            if (equipment == null || desired?.Equipment == null) return false;
+            var baseline = BaselineOf(target);
+            var state = desired.Equipment.Complete ? desired.Equipment : CrossingEquipment.Overlay(equipment.Observed(target, baseline.Equipment), desired.Equipment);
+            return equipment.Clears(baseline.Equipment, state);
+        }
         public IEnumerable<string> MapIds => world.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) {

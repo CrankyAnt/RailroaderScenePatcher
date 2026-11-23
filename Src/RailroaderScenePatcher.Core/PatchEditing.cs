@@ -1509,7 +1509,8 @@ namespace RailroaderScenePatcher.Core {
                 // misses a dependency or is not executed, are left out here too.
                 foreach (var own in engine.EffectiveFor(scenePatchFile.Modifications, resolved, scenePatchFileKey))
                     engine.CheckRelationships(resolved, engine.Evaluate(own.State.LeavingActivity()));
-                if (!Same(scene.Read(resolved), desired)) {
+                // A wrapper without its copy is not read, so the desired state can equal the read one while it still removes it.
+                if (!Same(scene.Read(resolved), desired) || (scene is ICrossingEquipmentScene equipment && equipment.EquipmentLeftover(resolved, desired))) {
                     engine.GuardMutation(target, resolved, mapContext, inspected);
                     try {
                         scene.Apply(resolved, desired);

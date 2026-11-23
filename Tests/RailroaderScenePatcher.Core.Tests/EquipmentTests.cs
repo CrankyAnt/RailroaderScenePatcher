@@ -126,6 +126,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     }
     public string Status(object addition) {
         var a = (Added)addition;
+        if (a.CopyLost) return "copy missing";
         if (a.CopyLost) return "its copy is missing";
         if (a.Bell != null) return a.LoadProblem != null ? "audio failed to load" : !a.AudioLoaded ? "audio loading" : "audio loaded; observing the controller's bell key";
         return a.Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
@@ -190,6 +191,10 @@ static class EquipmentTests {
         AFailedRebuildLeavesTheAdditionNotBuilt();
         AnImportRollbackAfterAVerifiedRebuildEndsCoherent();
         AnUnverifiedRebuildCleanupGuardsUntilRecheck();
+        AStaleWrapperThatStaysAfterItsRebuildGuardsTheCrossing();
+        RecheckRemovesAStaleWrapperItsFileNoLongerNames();
+        AnotherModsLostCopyStaysThroughFileVersionImportAndHistory();
+        SourceRefusalsEndWithANextStep();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
@@ -741,6 +746,82 @@ static class EquipmentTests {
         var recheck = session.Recheck(Crossing);
         Assert(recheck.Applied && !session.CleanupUnverified(Crossing) && lost.Destroyed && f.Live.Count == 1 && !f.Live[0].CopyLost && f.Live[0].Position[0] == 10,
             "Recheck rebuilds the lost copy at its placement and lifts the guard: " + recheck.Error);
+    }
+    // A cleared wrapper that a destroy leaves standing fails verification, so the rebuild guards the crossing instead of
+    // verifying. Status reads the rebuilt addition, not the stale wrapper of the same ID.
+    static void AStaleWrapperThatStaysAfterItsRebuildGuardsTheCrossing() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("signals", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live.Single(); lost.CopyLost = true;
+        f.World.StickyDestroy = true;
+        var failed = session.Recheck(Crossing);
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("equipment west"),
+            "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
+        Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
+            "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
+        f.World.StickyDestroy = false;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && lost.Destroyed && !session.CleanupUnverified(Crossing) && f.Live.Count == 1, "Recheck removes the stale wrapper and lifts the guard: " + recheck.Error);
+    }
+    // Recheck removes owned state its scene patch file no longer names, a stale wrapper included, although the observation
+    // without it equals the desired state.
+    static void RecheckRemovesAStaleWrapperItsFileNoLongerNames() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        engine.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
+        var lost = f.Live.Single(); lost.CopyLost = true;
+        var store = new Store { Patch = Doc(Equip("other", Addition("north", x: 30), OtherPath)) }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var recheck = session.Recheck(Crossing);
+        Assert(recheck.Applied && lost.Destroyed && !f.World.Live(f.Crossing).Any(), "Recheck removes the stale wrapper the file no longer names: " + recheck.Error);
+    }
+    // Another mod's lost copy stays as it is through this mod's Use file version, Import, and native Undo and Redo.
+    static void AnotherModsLostCopyStaysThroughFileVersionImportAndHistory() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        Assert(engine.Apply(Doc(Equip("signals", Addition("theirs", CrossingPath + "/Signal 2", 40))), "other/pack").Outcomes["signals"].Applied, "The other mod's addition is built at load");
+        var store = new Store { Patch = Doc(Equip("equip-crossing", Addition("west"))) }; var mapEditor = new NativeMapEditor();
+        engine.Apply(store.Patch, "author/pack");
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var theirs = f.Live.Single(a => a.Record.Scope == "other/pack"); theirs.CopyLost = true;
+        bool Untouched() => !theirs.Destroyed && theirs.CopyLost && f.Live.Count(a => a.Record.Scope == "other/pack") == 1;
+        store.Patch = Doc(Equip("equip-crossing", Addition("west", x: 12))); session.CheckFileVersion();
+        var used = session.UseFileVersion();
+        Assert(used.Applied && Untouched(), "Use file version leaves the other mod's lost copy: " + used.Error);
+        store.Patch = Doc(Equip("equip-crossing", Addition("west", x: 14))); session.CheckFileVersion();
+        Assert(session.OpenImport().Applied, "The Import overview opens");
+        var imported = session.ApplyImport();
+        Assert(imported.Applied && Untouched(), "Import leaves it: " + imported.Error);
+        Assert(session.AddEquipment(Crossing, West(16)).Applied && Untouched(), "An edit leaves it");
+        mapEditor.Undo();
+        Assert(Untouched() && f.Live.Single(a => a.Record.Scope == "author/pack").Position[0] == 14, "Undo leaves it");
+        mapEditor.Redo();
+        Assert(Untouched() && f.Live.Single(a => a.Record.Scope == "author/pack").Position[0] == 16, "Redo leaves it");
+    }
+    // Each source refusal names the source and ends with what the modder can do.
+    static void SourceRefusalsEndWithANextStep() {
+        var f = new Fixture();
+        f.World.Device(SignalPath + " twin"); f.World.Device(CrossingPath + "/Twin"); f.World.Device(CrossingPath + "/Twin");
+        f.World.Device(CrossingPath + "/Bell", d => d.Facts.Bells = 1);
+        var at = new Placement(new[] { 10.0, 0, 7 }, new[] { 0.0, 0, 0, 1 });
+        string Refusal(EquipmentAddition addition) {
+            try { f.Scene.CheckRelationships(f.Crossing, new ObjectState(null, null, null, null, new CrossingEquipment(new[] { addition }, false))); return null; }
+            catch (InvalidOperationException e) { return e.Message; }
+        }
+        var device = new EquipmentSource("BushnellWhittier", SignalPath);
+        var cases = new[] {
+            (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported. Use pattern crossing-light-gate-v1 or crossing-bell-v1. Otherwise remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), ". Select a source of that kind or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 loaded objects share that source. Select another source or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), ". Select an eligible source or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x needs a fixed placement. Give it a position and rotation or remove the addition"),
+        };
+        foreach (var (error, tail) in cases) Assert(error != null && error.EndsWith(tail, StringComparison.Ordinal), "The refusal ends with its next step: " + error);
+        Assert(cases[3].Item1.StartsWith("Equipment x: source Bell does not conform to " + EquipmentAddition.LightGatePattern, StringComparison.Ordinal), "A non-conforming source is named: " + cases[3].Item1);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the
     // world load refuses it. Recheck refuses it the same way before any change: nothing was mutated, so no cleanup is
