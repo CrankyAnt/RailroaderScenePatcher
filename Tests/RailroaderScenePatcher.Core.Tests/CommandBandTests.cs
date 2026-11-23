@@ -22,6 +22,7 @@ static class CommandBandTests {
         ChoiceLabelsLeadWithWhatTellsThemApart();
         AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing();
         AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates();
+        AddedEquipmentIsNamedFromItsStoredSource();
         EquipmentCopyNumbersSurviveNarrowLabels();
         EquipmentDisplayHidesInternalIdentities();
         WorldChoicesKeepAddedOrdinals();
@@ -88,43 +89,48 @@ static class CommandBandTests {
         Check(!CommandBand.ClearsConnectionsPreviewOnQueue(CommandBand.GizmoPlace), "Queuing gizmo setup must preserve a prepared Connections preview");
         Check(CommandBand.ClearsConnectionsPreviewOnQueue("Placement"), "Queuing a placement edit invalidates a prepared Connections preview");
     }
+    // The name comes from the source the addition was built from, stored with it, so it reads the same whether or not its copy
+    // object still exists; the inventory passes every live addition of the crossing, with or without its copy, as a sibling.
     static void AddedLightsAndGatesWithTheSameNameAreNumberedWithinOneCrossing() {
-        var source = new EquipmentSource("scene", "World/Crossings/Signal 1");
-        var first = (Scope: "alpha", Id: "signal-1", CopyName: "Signal 1", IsBell: false);
-        var second = (Scope: "alpha", Id: "signal-2", CopyName: "Signal 1", IsBell: false);
-        var third = (Scope: "beta", Id: "signal-1", CopyName: "Signal 1", IsBell: false);
-        var gate = (Scope: "alpha", Id: "gate", CopyName: "Gate 1", IsBell: false);
-        var missing = (Scope: "alpha", Id: "missing", CopyName: (string)null, IsBell: false);
-        var missingOther = (Scope: "beta", Id: "missing", CopyName: (string)null, IsBell: false);
-        var missingSecond = (Scope: "alpha", Id: "missing-2", CopyName: (string)null, IsBell: false);
-        var crossing = new[] { third, gate, second, missing, first };
+        var first = (Scope: "alpha", Id: "signal-1", Name: "Signal 1", IsBell: false);
+        var second = (Scope: "alpha", Id: "signal-2", Name: "Signal 1", IsBell: false);
+        var third = (Scope: "beta", Id: "signal-1", Name: "Signal 1", IsBell: false);
+        var gate = (Scope: "alpha", Id: "gate", Name: "Gate 1", IsBell: false);
+        var crossing = new[] { third, gate, second, first };
         foreach (var reopened in new[] { crossing, crossing.Reverse().ToArray() }) {
-            Check(InventoryPresentationState.AddedEquipmentName(first, reopened, source) == "Signal 1 (added, 1 of 3)", "The first copy keeps its ordinal when the list reopens");
-            Check(InventoryPresentationState.AddedEquipmentName(second, reopened, source) == "Signal 1 (added, 2 of 3)", "Two copies from the same mod are distinguishable by their names");
-            Check(InventoryPresentationState.AddedEquipmentName(third, reopened, source) == "Signal 1 (added, 3 of 3)", "A copy from another mod at the same crossing is also numbered");
-            Check(InventoryPresentationState.AddedEquipmentName(gate, reopened, source) == "Gate 1 (added)", "A unique device name has no ordinal");
-            Check(InventoryPresentationState.AddedEquipmentName(missing, reopened, source) == "missing: Light or gate", "A missing copy shows its equipment ID and source kind");
-            Check(InventoryPresentationState.AddedEquipmentName(missingOther, reopened, source) == "missing: Light or gate" &&
-                InventoryPresentationState.AddedEquipmentName(missingSecond, reopened, source) == "missing-2: Light or gate",
-                "Missing copies show their equipment IDs and source kind, with the same name for a shared ID across mods");
+            Check(InventoryPresentationState.AddedEquipmentName(first, reopened) == "Signal 1 (added, 1 of 3)", "The first copy keeps its ordinal when the list reopens");
+            Check(InventoryPresentationState.AddedEquipmentName(second, reopened) == "Signal 1 (added, 2 of 3)", "Two copies from the same mod are distinguishable by their names");
+            Check(InventoryPresentationState.AddedEquipmentName(third, reopened) == "Signal 1 (added, 3 of 3)", "A copy from another mod at the same crossing is also numbered");
+            Check(InventoryPresentationState.AddedEquipmentName(gate, reopened) == "Gate 1 (added)", "A unique device name has no ordinal");
         }
-        Check(InventoryPresentationState.AddedEquipmentName(first, new[] { first }, source) == "Signal 1 (added)", "The same device name at a different crossing has its own count");
-        Check(InventoryPresentationState.AddedEquipmentName(second, new[] { second, first }, source) == "Signal 1 (added, 2 of 2)", "Removing a copy updates the remaining ordinals");
+        Check(InventoryPresentationState.AddedEquipmentName(first, new[] { first }) == "Signal 1 (added)", "The same device name at a different crossing has its own count");
+        Check(InventoryPresentationState.AddedEquipmentName(second, new[] { second, first }) == "Signal 1 (added, 2 of 2)", "Removing a copy updates the remaining ordinals");
     }
     static void AddedBellsWithTheSameNameAreNumberedSeparatelyFromLightsAndGates() {
-        var source = EquipmentSource.ForDefinition("rr/bell");
-        var firstBell = (Scope: "alpha", Id: "bell", CopyName: "Signal 1", IsBell: true);
-        var secondBell = (Scope: "beta", Id: "bell", CopyName: "Signal 1", IsBell: true);
-        var missingBell = (Scope: "alpha", Id: "missing-bell", CopyName: (string)null, IsBell: true);
-        var light = (Scope: "alpha", Id: "light", CopyName: "Signal 1", IsBell: false);
-        var gate = (Scope: "beta", Id: "gate", CopyName: "Signal 1", IsBell: false);
-        var crossing = new[] { gate, secondBell, light, firstBell, missingBell };
-        Check(InventoryPresentationState.AddedEquipmentName(firstBell, crossing, source) == "Signal 1 (added, 1 of 2)", "The first bell counts only the matching bells");
-        Check(InventoryPresentationState.AddedEquipmentName(secondBell, crossing, source) == "Signal 1 (added, 2 of 2)", "The second bell keeps its ordinal among matching bells");
-        Check(InventoryPresentationState.AddedEquipmentName(light, crossing, source) == "Signal 1 (added, 1 of 2)", "The light counts the matching gate");
-        Check(InventoryPresentationState.AddedEquipmentName(gate, crossing, source) == "Signal 1 (added, 2 of 2)", "The gate counts the matching light");
-        Check(InventoryPresentationState.AddedEquipmentName(missingBell, crossing, source) == "missing-bell: Bell", "A missing bell shows its equipment ID and source kind");
-        Check(InventoryPresentationState.AddedEquipmentName(firstBell, new[] { light, gate, firstBell }, source) == "Signal 1 (added)", "A single bell with this name has no ordinal");
+        var firstBell = (Scope: "alpha", Id: "bell", Name: "Signal 1", IsBell: true);
+        var secondBell = (Scope: "beta", Id: "bell", Name: "Signal 1", IsBell: true);
+        var light = (Scope: "alpha", Id: "light", Name: "Signal 1", IsBell: false);
+        var gate = (Scope: "beta", Id: "gate", Name: "Signal 1", IsBell: false);
+        var crossing = new[] { gate, secondBell, light, firstBell };
+        Check(InventoryPresentationState.AddedEquipmentName(firstBell, crossing) == "Signal 1 (added, 1 of 2)", "The first bell counts only the matching bells");
+        Check(InventoryPresentationState.AddedEquipmentName(secondBell, crossing) == "Signal 1 (added, 2 of 2)", "The second bell keeps its ordinal among matching bells");
+        Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added, 1 of 2)", "The light counts the matching gate");
+        Check(InventoryPresentationState.AddedEquipmentName(gate, crossing) == "Signal 1 (added, 2 of 2)", "The gate counts the matching light");
+        Check(InventoryPresentationState.AddedEquipmentName(firstBell, new[] { light, gate, firstBell }) == "Signal 1 (added)", "A single bell with this name has no ordinal");
+    }
+    // A light or gate is named after the source device, a bell after its definition's name; the stored kind, not the shape
+    // of the source, separates a bell from a light or gate.
+    static void AddedEquipmentIsNamedFromItsStoredSource() {
+        var light = (Scope: "alpha", Id: "west", Name: InventoryPresentationState.StoredSourceName(new EquipmentSource("scene", "World/Crossings/Signal 1"), null), IsBell: false);
+        var bell = (Scope: "alpha", Id: "ring", Name: InventoryPresentationState.StoredSourceName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), "US&S Teardrop Crossing Bell"), IsBell: true);
+        var unnamedBell = (Scope: "alpha", Id: "ring-2", Name: InventoryPresentationState.StoredSourceName(EquipmentSource.ForDefinition("rr/bell-uss-teardrop"), " "), IsBell: true);
+        var crossing = new[] { light, bell, unnamedBell };
+        Check(InventoryPresentationState.AddedEquipmentName(light, crossing) == "Signal 1 (added)", "A light or gate is named after its source device");
+        Check(InventoryPresentationState.AddedEquipmentName(bell, crossing) == "US&S Teardrop Crossing Bell (added)", "A bell is named after its definition's name");
+        Check(InventoryPresentationState.AddedEquipmentName(unnamedBell, crossing) == "bell-uss-teardrop (added)", "A bell definition without a name is named after its identifier, as its player is");
+        var asLight = (Scope: "alpha", Id: "x", Name: "Signal 1", IsBell: false);
+        var asBell = (Scope: "alpha", Id: "y", Name: "Signal 1", IsBell: true);
+        Check(InventoryPresentationState.AddedEquipmentName(asLight, new[] { asLight, asBell }) == "Signal 1 (added)", "The stored kind keeps a bell out of a light or gate's count");
     }
     static void EquipmentCopyNumbersSurviveNarrowLabels() {
         const string name = "US&S Teardrop Crossing Bell (added, 2 of 2)";

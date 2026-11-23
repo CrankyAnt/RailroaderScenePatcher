@@ -32,6 +32,8 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public sealed class Added {
         public FakeCrossing Controller; public FakeDevice Copy; public EquipmentAddition Record;
         public double[] Position, Rotation; public bool Destroyed, Culled, InCuller = true;
+        // The wrapper stays while its copy or player is gone, as when something else destroys the copy object.
+        public bool CopyLost;
         // A bell: its definition, whether its audio is loaded or failed to load, and the observers it holds on its
         // controller's bell key.
         public FakeBell Bell; public bool AudioLoaded; public string LoadProblem; public int Observers;
@@ -109,6 +111,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     // patcher. A bell gives up its observer and audio as it does when the patcher removes it.
     public void SceneUnloaded(FakeCrossing crossing) { foreach (var a in Live(crossing).ToList()) Gone(a); }
     public bool Present(object addition) => !((Added)addition).Destroyed;
+    public bool Built(object addition) => !((Added)addition).CopyLost;
     public Placement Placement(object addition) { var a = (Added)addition; return new Placement((double[])a.Position.Clone(), (double[])a.Rotation.Clone()); }
     public void SetPlacement(object addition, Placement placement) {
         Mutations++; var a = (Added)addition;
@@ -117,11 +120,13 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     }
     public string Problem(object addition) {
         var a = (Added)addition;
+        if (a.CopyLost) return "its copy is missing";
         if (a.Bell != null) return a.LoadProblem != null ? "its audio failed to load: " + a.LoadProblem : a.Observers != 1 ? "it observes its controller's bell key " + a.Observers + " times" : null;
         return a.InCuller ? null : "the copy is not in the controller's culler";
     }
     public string Status(object addition) {
         var a = (Added)addition;
+        if (a.CopyLost) return "its copy is missing";
         if (a.Bell != null) return a.LoadProblem != null ? "audio failed to load" : !a.AudioLoaded ? "audio loading" : "audio loaded; observing the controller's bell key";
         return a.Culled ? "culled; it initializes when visible" : "lamp and gate observers registered";
     }
@@ -136,6 +141,8 @@ static class EquipmentTests {
     static string N(double value) => value.ToString(CultureInfo.InvariantCulture);
     static string Addition(string id, string source = SignalPath, double x = 10, string pattern = EquipmentAddition.LightGatePattern, string extra = "", double[] position = null) =>
         "\"" + id + "\":{\"pattern\":\"" + pattern + "\",\"source\":{\"scene\":\"BushnellWhittier\",\"path\":\"" + source + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[" + String.Join(",", (position ?? new[] { x, 0, 7 }).Select(N)) + "],\"rotation\":[0,0,0,1]}" + extra + "}";
+    static string BellAddition(string id, string definition = "rr/bell") =>
+        "\"" + id + "\":{\"pattern\":\"" + EquipmentAddition.BellPattern + "\",\"source\":{\"definition\":\"" + definition + "\"},\"placement\":{\"mode\":\"fixed\",\"position\":[30,0,7],\"rotation\":[0,0,0,1]}}";
     static string Equip(string id, string additions, string path = CrossingPath, string deps = "[]") => EquipRaw(id, "{" + additions + "}", path, deps);
     // A modification whose crossingEquipment value is the given JSON text, keyed by equipment ID when it is valid.
     static string EquipRaw(string id, string equipment, string path = CrossingPath, string deps = "[]") =>
@@ -176,6 +183,9 @@ static class EquipmentTests {
         TheEditingProposesADistinctIdAndAPlacementAtTheCrossing();
         EditingKeepsAnotherModsEquipment();
         AFailedAdditionIsListedAndRemovable();
+        AnAdditionWithoutItsCopyIsRebuiltFromItsSource();
+        AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded();
+        AnAdditionWithoutItsCopyCanBeRemoved();
         RecheckRefusesARefusedAdditionWithoutMutation();
         RecheckChecksOnlyTheModificationsThatTakeEffect();
         RecheckRefusalKeepsAnIndependentModificationOfTheObject();
@@ -567,6 +577,64 @@ static class EquipmentTests {
         var removed = session.RemoveEquipment(Crossing, "lost");
         Assert(removed.Applied && session.EquipmentEntries(Crossing).Count == 0 && !session.ScenePatchFileText.Contains("lost"), "The failed addition is removed from the scene patch file: " + removed.Error);
         Assert(session.AddEquipment(Crossing, West()).Applied && f.Live.Count == 1, "Afterwards the crossing takes equipment again");
+    }
+    // An added light, gate or bell whose copy is gone while its wrapper stays counts as not built: the editing lists it with
+    // its reason, and Recheck rebuilds it from its source like a fresh construction, without a refusal or a reload.
+    static void AnAdditionWithoutItsCopyIsRebuiltFromItsSource() {
+        foreach (var bell in new[] { false, true }) {
+            var f = new Fixture();
+            if (bell) { f.World.Bell("rr/bell", b => b.Name = "Teardrop bell"); f.World.LoadsPending = false; }
+            var engine = new PatchEngine(f.Scene);
+            var scenePatchFile = Doc(Equip("equip-crossing", bell ? BellAddition("ring") : Addition("west")));
+            Assert(engine.Apply(scenePatchFile, "author/pack").Outcomes["equip-crossing"].Applied && f.Live.Count == 1, "The addition is built at load");
+            var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+            var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+            var lost = f.Live[0]; lost.CopyLost = true;
+            var entries = session.EquipmentEntries(Crossing);
+            Assert(entries.Count == 1 && entries[0].Built == null && entries[0].Problem == "it is not built in this world; Recheck builds it",
+                "An addition without its copy is listed as not built with what to do: " + entries.FirstOrDefault()?.Problem);
+            var recheck = session.Recheck(Crossing);
+            Assert(recheck.Applied && lost.Destroyed && f.Live.Count == 1 && !f.Live[0].CopyLost && f.World.Constructed == 2,
+                "Recheck replaces the wrapper without its copy by a fresh construction from its source: " + recheck.Error);
+            Assert(session.EquipmentEntries(Crossing).Single().Built != null && !session.CleanupUnverified(Crossing), "Afterwards the addition is built and the crossing stays editable");
+        }
+        var next = new Fixture();
+        var write = new PatchEngine(next.Scene);
+        write.Apply(Doc(Equip("signals", Addition("west"))), "author/pack");
+        next.Live[0].CopyLost = true;
+        var moved = write.Apply(Doc(Equip("signals", Addition("west", x: 12))), "author/pack");
+        Assert(moved.Outcomes["signals"].Applied && next.Live.Count == 1 && !next.Live[0].CopyLost && next.Live[0].Position[0] == 12 && next.World.Constructed == 2,
+            "The next write rebuilds an addition without its copy at its placement: " + moved.Outcomes["signals"].Error);
+    }
+    // Without its source loaded, the addition cannot be rebuilt: Recheck refuses before any change and names the source.
+    static void AnAdditionWithoutItsCopyIsRefusedWhileItsSourceIsNotLoaded() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("west")));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live[0]; lost.CopyLost = true;
+        f.World.Devices.RemoveAll(d => d.Path == SignalPath);
+        var mutations = f.World.Mutations;
+        var recheck = session.Recheck(Crossing);
+        Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains("source BushnellWhittier/" + SignalPath) && recheck.Error.Contains("not loaded"),
+            "Recheck refuses the rebuild and names the source: " + recheck.Failure + " " + recheck.Error);
+        Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
+        var entry = session.EquipmentEntries(Crossing).Single();
+        Assert(entry.Built == null && entry.Problem.Contains("source BushnellWhittier/" + SignalPath), "The listed addition gives the refusal that names its source: " + entry.Problem);
+    }
+    static void AnAdditionWithoutItsCopyCanBeRemoved() {
+        var f = new Fixture();
+        var engine = new PatchEngine(f.Scene);
+        var scenePatchFile = Doc(Equip("equip-crossing", Addition("west") + "," + Addition("east", CrossingPath + "/Signal 2", 20)));
+        engine.Apply(scenePatchFile, "author/pack");
+        var store = new Store { Patch = scenePatchFile }; var mapEditor = new NativeMapEditor();
+        var session = new PatchEditingSession(engine, mapEditor, store, scenePatchFileKey: "author/pack"); mapEditor.Session = session;
+        var lost = f.Live.Single(a => a.Record.Id == "west"); lost.CopyLost = true;
+        var removed = session.RemoveEquipment(Crossing, "west");
+        Assert(removed.Applied && lost.Destroyed && f.Live.Count == 1 && f.Live[0].Record.Id == "east" && !session.ScenePatchFileText.Contains("\"west\""),
+            "Removing an addition without its copy removes its wrapper and its entry: " + removed.Error);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the
     // world load refuses it. Recheck refuses it the same way before any change: nothing was mutated, so no cleanup is

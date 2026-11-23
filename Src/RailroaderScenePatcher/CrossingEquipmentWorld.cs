@@ -11,22 +11,24 @@ using UnityEngine.SceneManagement;
 
 namespace RailroaderScenePatcher {
     // Marks the patcher's own wrapper of one equipment addition beneath a crossing controller and records what it was built
-    // from, so a later application in the same world reconciles it instead of building another.
+    // from, so a later application in the same world reconciles it instead of building another. The source's name and kind
+    // are stored at construction, so the addition keeps its name while its copy object is gone.
     internal sealed class OwnedEquipment : MonoBehaviour {
-        internal string Scope, Id, Pattern, SourceScene, SourcePath, SourceDefinition;
+        internal string Scope, Id, Pattern, SourceScene, SourcePath, SourceDefinition, SourceName;
+        internal bool IsBell;
         internal GameObject Controller, Copy;
         internal bool Retired;
-        (string Scope, string Id, string CopyName, bool IsBell) NameParts =>
-            (Scope, Id, Copy != null ? Copy.name : null, Pattern == EquipmentAddition.BellPattern);
-        internal string DisplayName {
-            get {
-                var equipment = NameParts;
-                var source = SourceDefinition != null ? EquipmentSource.ForDefinition(SourceDefinition) : new EquipmentSource(SourceScene, SourcePath);
-                if (Controller == null)
-                    return InventoryPresentationState.AddedEquipmentName(equipment, Array.Empty<(string, string, string, bool)>(), source);
-                var siblings = At(Controller).Select(item => item.NameParts);
-                return InventoryPresentationState.AddedEquipmentName(equipment, siblings, source);
-            }
+        internal EquipmentSource Source => SourceDefinition != null ? EquipmentSource.ForDefinition(SourceDefinition) : new EquipmentSource(SourceScene, SourcePath);
+        (string Scope, string Id, string Name, bool IsBell) NameParts => (Scope, Id, SourceName, IsBell);
+        internal string DisplayName => InventoryPresentationState.AddedEquipmentName(NameParts,
+            Controller == null ? new[] { NameParts } : At(Controller).Select(item => item.NameParts));
+        // Records the addition and the source it is built from on a new wrapper beneath its controller.
+        internal static OwnedEquipment Mark(GameObject wrapper, GameObject controller, EquipmentAddition addition, string sourceName) {
+            var owned = wrapper.AddComponent<OwnedEquipment>();
+            owned.Scope = addition.Scope; owned.Id = addition.Id; owned.Pattern = addition.Pattern; owned.Controller = controller;
+            owned.SourceScene = addition.Source.Scene; owned.SourcePath = addition.Source.Path; owned.SourceDefinition = addition.Source.Definition;
+            owned.IsBell = addition.Pattern == EquipmentAddition.BellPattern; owned.SourceName = sourceName;
+            return owned;
         }
         internal static IEnumerable<OwnedEquipment> At(GameObject controller) => Enumerable.Range(0, controller.transform.childCount)
             .Select(i => controller.transform.GetChild(i).GetComponent<OwnedEquipment>()).Where(owned => owned != null && !owned.Retired);
@@ -194,8 +196,7 @@ namespace RailroaderScenePatcher {
         public IReadOnlyList<object> Owned(object target) => OwnedEquipment.At((GameObject)target).Cast<object>().ToArray();
         public EquipmentAddition Describe(object addition) {
             var owned = (OwnedEquipment)addition;
-            var source = owned.SourceDefinition != null ? EquipmentSource.ForDefinition(owned.SourceDefinition) : new EquipmentSource(owned.SourceScene, owned.SourcePath);
-            return new EquipmentAddition(owned.Id, owned.Pattern, source, null, owned.Scope);
+            return new EquipmentAddition(owned.Id, owned.Pattern, owned.Source, null, owned.Scope);
         }
         static string Safe(string text) => new string(text.Select(c => c == '/' ? ':' : c).ToArray());
         Component CullerOf(GameObject target) {
@@ -216,8 +217,7 @@ namespace RailroaderScenePatcher {
             IList list = null; GameObject copy = null;
             try {
                 wrapper.transform.SetParent(destination.transform, false);
-                var owned = wrapper.AddComponent<OwnedEquipment>();
-                owned.Scope = addition.Scope; owned.Id = addition.Id; owned.Pattern = addition.Pattern; owned.SourceScene = addition.Source.Scene; owned.SourcePath = addition.Source.Path; owned.Controller = destination;
+                var owned = OwnedEquipment.Mark(wrapper, destination, addition, InventoryPresentationState.StoredSourceName(addition.Source, null));
                 // The wrapper stands at the addition's placement and the copy at the wrapper's origin, so the wrapper, which the
                 // inventory lists as the added object, is where the light or gate is.
                 Place(wrapper, addition.Placement);
@@ -257,8 +257,7 @@ namespace RailroaderScenePatcher {
             GameObject player = null;
             try {
                 wrapper.transform.SetParent(destination.transform, false);
-                var owned = wrapper.AddComponent<OwnedEquipment>();
-                owned.Scope = addition.Scope; owned.Id = addition.Id; owned.Pattern = addition.Pattern; owned.SourceDefinition = bell.Identifier; owned.Controller = destination;
+                var owned = OwnedEquipment.Mark(wrapper, destination, addition, InventoryPresentationState.StoredSourceName(addition.Source, bell.Name));
                 Place(wrapper, addition.Placement);
                 player = bells.Construct(wrapper, destination, bell, addition.Scope, addition.Id);
                 owned.Copy = player;
@@ -301,6 +300,7 @@ namespace RailroaderScenePatcher {
             wrapper.SetActive(false);
             UnityEngine.Object.Destroy(wrapper);
         }
+        public bool Built(object addition) { var owned = (OwnedEquipment)addition; return owned.Copy != null && owned.Copy.transform.parent == owned.transform; }
         public bool Present(object addition) { var owned = (OwnedEquipment)addition; return owned != null && !owned.Retired && owned.Controller != null && owned.transform.parent == owned.Controller.transform; }
         public Placement Placement(object addition) {
             var copy = ((OwnedEquipment)addition).gameObject;
@@ -323,7 +323,7 @@ namespace RailroaderScenePatcher {
         public string Problem(object addition) {
             var owned = (OwnedEquipment)addition;
             var copy = owned.Copy;
-            if (copy == null || copy.transform.parent != owned.transform) return "its copy is missing";
+            if (!Built(owned)) return "its copy is missing";
             if (!owned.gameObject.activeSelf) return "it is disabled";
             if (owned.Pattern == EquipmentAddition.BellPattern) return bells == null ? "crossing bells are unavailable on this game build: " + bellsUnavailable : bells.Problem(copy.GetComponent<OwnedBell>(), owned.Controller);
             var device = LightGatePattern.Problem(Facts(copy, owned.Controller, false), keys);

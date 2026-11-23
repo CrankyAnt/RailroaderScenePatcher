@@ -987,7 +987,8 @@ namespace RailroaderScenePatcher {
                 foreach (var entry in mine) {
                     var item = entry.Built ?? entry.Addition;
                     var kind = InventoryPresentationState.EquipmentKind(item.Source).ToLowerInvariant();
-                    var name = entry.Built == null ? InventoryPresentationState.UnbuiltEquipmentName(item, candidates) : EquipmentDisplayName(item, copies, candidates);
+                    // An addition whose copy is gone is not built but keeps its wrapper, and with it its name.
+                    var name = entry.Built == null && AddedWrapper(item, copies) == null ? InventoryPresentationState.UnbuiltEquipmentName(item, candidates) : EquipmentDisplayName(item, copies, candidates);
                     string state = null;
                     if (entry.Built != null) {
                         try { state = attachment.Session.EquipmentStatus(identity, item.Id); }
@@ -1053,10 +1054,11 @@ namespace RailroaderScenePatcher {
         OwnedEquipment[] EquipmentCopies() => selected?.Handle is GameObject crossing && crossing != null
             ? OwnedEquipment.At(crossing).ToArray() : Array.Empty<OwnedEquipment>();
 
-        static string EquipmentDisplayName(EquipmentAddition item, IEnumerable<OwnedEquipment> copies, IEnumerable<SourceCandidate> candidates) =>
+        static OwnedEquipment AddedWrapper(EquipmentAddition item, IEnumerable<OwnedEquipment> copies) =>
             copies.FirstOrDefault(copy => copy.Scope == item.Scope && copy.Id == item.Id && copy.SourceScene == item.Source.Scene
-                && copy.SourcePath == item.Source.Path && copy.SourceDefinition == item.Source.Definition)?.DisplayName
-            ?? InventoryPresentationState.EquipmentSourceName(item.Source, candidates);
+                && copy.SourcePath == item.Source.Path && copy.SourceDefinition == item.Source.Definition);
+        static string EquipmentDisplayName(EquipmentAddition item, IEnumerable<OwnedEquipment> copies, IEnumerable<SourceCandidate> candidates) =>
+            AddedWrapper(item, copies)?.DisplayName ?? InventoryPresentationState.EquipmentSourceName(item.Source, candidates);
         // Why the inspected object has no editable track binding: its own detected reason when it holds a marker the
         // adapter refuses, or that the operation is for markers, mileposts and pads. It is one plain sentence
         // (CommandBand.Sentence): the tooltip's Unavailable: and the section it stands in name what is unavailable.

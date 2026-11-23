@@ -31,7 +31,7 @@ The patcher moves the board, asks the culler to update its culling position, and
 
 The game then regenerates the terrain at both positions. Trees return where the board stood and disappear where it now stands. This takes a moment. On the **Changes** tab, the **Terrain** section shows a message beginning `Terrain pending:` until the game has rebuilt each loaded terrain tile and its terrain work is idle. It then shows `Terrain updated:` followed by the completed positions.
 
-While you inspect the board, the message area reports changes under **Terrain output** as pending, updated, or update stopped if the game takes too long. A tile that hasn't been built needs no rebuild, so its position counts as complete. The game will build it from the board's current mask when it loads.
+While you inspect the board, the message area reports changes under **Terrain output** as pending, updated, or update stopped if the game takes too long. A tile that hasn't been built needs no rebuild, so its position counts as updated. The game will build it from the board's current mask when it loads.
 
 ## Disable or enable the board
 

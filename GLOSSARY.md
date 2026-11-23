@@ -465,7 +465,7 @@ The camera distance beyond which a scene object or a game-defined group shows on
 The scene object that a click or a choice from the choice list proposes, framed in blue, before Confirm makes it the inspected object. A candidate in a game-defined group beyond 125 metres shows its own square marker and object frame. No operation uses a candidate.
 
 **Choice list**:
-The native dropdown beside the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a game-defined group's objects in place of its square marker, or the objects of a game-defined group that the click picks. A choice from it makes the candidate.
+The native dropdown next to the pointer that lists the scene objects of one click: those of square markers that overlap at the pointer, with a game-defined group's objects in place of its square marker, or the objects of a game-defined group that the click picks. A choice from it makes the candidate.
 _Avoid_: Picker, popup
 
 **Game-defined group**:

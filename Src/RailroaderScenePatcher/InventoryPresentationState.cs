@@ -133,16 +133,23 @@ namespace RailroaderScenePatcher {
                 .Replace("<", "\\u003c").Replace(">", "\\u003e");
         }
 
-        // The supplying scope and addition ID keep the order independent of the scene and outliner order.
-        internal static string AddedEquipmentName((string Scope, string Id, string CopyName, bool IsBell) equipment,
-            IEnumerable<(string Scope, string Id, string CopyName, bool IsBell)> crossingEquipment, EquipmentSource source) {
-            if (equipment.CopyName == null) return equipment.Id + ": " + EquipmentSourceName(source, null);
-            var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.CopyName == equipment.CopyName)
+        // The name an added light, gate or bell keeps from the source it was built from: a light or gate the source device's
+        // name, the last element of its path; a bell its definition's name, or the last part of its identifier without one.
+        internal static string StoredSourceName(EquipmentSource source, string definitionName) {
+            if (!source.IsDefinition) return source.Path.Substring(source.Path.LastIndexOf('/') + 1);
+            return String.IsNullOrWhiteSpace(definitionName) ? source.Definition.Substring(source.Definition.LastIndexOf('/') + 1) : definitionName;
+        }
+
+        // An added light, gate or bell by the source name stored with it, numbered among the additions of its crossing with the
+        // same name and kind. The supplying scope and addition ID keep the order independent of the scene and outliner order.
+        internal static string AddedEquipmentName((string Scope, string Id, string Name, bool IsBell) equipment,
+            IEnumerable<(string Scope, string Id, string Name, bool IsBell)> crossingEquipment) {
+            var matches = crossingEquipment.Where(item => item.IsBell == equipment.IsBell && item.Name == equipment.Name)
                 .OrderBy(item => item.Scope, StringComparer.Ordinal).ThenBy(item => item.Id, StringComparer.Ordinal).ToArray();
             var ordinal = Array.IndexOf(matches, equipment) + 1;
             return matches.Length > 1 && ordinal > 0
-                ? FormattableString.Invariant($"{equipment.CopyName} (added, {ordinal} of {matches.Length})")
-                : equipment.CopyName + " (added)";
+                ? FormattableString.Invariant($"{equipment.Name} (added, {ordinal} of {matches.Length})")
+                : equipment.Name + " (added)";
         }
 
         // The group of the objects that are inspection only: outside the family groups, after them, and absent while

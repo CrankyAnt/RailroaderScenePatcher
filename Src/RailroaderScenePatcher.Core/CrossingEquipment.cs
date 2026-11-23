@@ -348,6 +348,9 @@ namespace RailroaderScenePatcher.Core {
         // Releases the addition from the controller, its culling and the scene.
         void Destroy(object addition);
         bool Present(object addition);
+        // Whether a present addition still holds the copy or player it was built with. One without it counts as not built and
+        // is rebuilt from its source, as a missing addition is built.
+        bool Built(object addition);
         Placement Placement(object addition);
         void SetPlacement(object addition, Placement placement);
         // Why a present addition is not addressed, culled and built as the pattern requires, or null.
@@ -368,9 +371,10 @@ namespace RailroaderScenePatcher.Core {
     internal sealed class CrossingEquipmentPart {
         readonly ICrossingEquipmentWorld world;
         internal CrossingEquipmentPart(ICrossingEquipmentWorld world) { this.world = world; }
-        internal CrossingEquipment Observed(object controller, List<object> owned) {
-            var present = owned.Where(world.Present).ToList();
-            return new CrossingEquipment(present.Select(a => world.Describe(a).At(world.Placement(a))), true);
+        // The built additions, or with unbuilt every present one, including those whose copy is gone.
+        internal CrossingEquipment Observed(object controller, List<object> owned, bool unbuilt = false) {
+            var listed = owned.Where(a => world.Present(a) && (unbuilt || world.Built(a))).ToList();
+            return new CrossingEquipment(listed.Select(a => world.Describe(a).At(world.Placement(a))), true);
         }
         internal void Adopt(object controller, List<object> owned) {
             foreach (var addition in world.Owned(controller) ?? Array.Empty<object>()) if (!owned.Any(o => ReferenceEquals(o, addition))) owned.Add(addition);
@@ -398,20 +402,29 @@ namespace RailroaderScenePatcher.Core {
         // Null when every present addition is built, addressed and culled as its pattern requires. With a desired set, an
         // addition that the change removes or rebuilds is not judged, so a faulty addition, such as a bell whose audio
         // failed to load, can still be removed or replaced.
-        internal string Coherence(List<object> owned, CrossingEquipment desired = null) => Faulty(owned, desired, out _);
+        internal string Coherence(List<object> owned, CrossingEquipment desired = null) => Faulty(null, owned, desired, out _);
         // Why an equipment change is refused before any change, with what the modder can do, or null. A faulty bell, such as
-        // one whose audio failed to load, can be removed or replaced; another fault needs a reload.
-        internal string Refusal(List<object> owned, CrossingEquipment desired) {
-            var difference = Faulty(owned, desired, out var pattern);
+        // one whose audio failed to load, can be removed or replaced; another fault needs a reload. An addition without its copy
+        // that the change keeps is rebuilt, so only a source that cannot be used refuses it, with the reason that names it.
+        internal string Refusal(object controller, List<object> owned, CrossingEquipment desired) {
+            var difference = Faulty(controller, owned, desired, out var pattern);
             if (difference == null) return null;
+            if (pattern == null) return difference;
             return "The crossing's added equipment does not meet its pattern's requirements: " + difference + (pattern == EquipmentAddition.BellPattern
                 ? ". Remove or replace that bell. You can still edit crossing coverage" : ". Reload before editing the crossing's equipment. You can still edit crossing coverage");
         }
-        string Faulty(List<object> owned, CrossingEquipment desired, out string pattern) {
+        string Faulty(object controller, List<object> owned, CrossingEquipment desired, out string pattern) {
             pattern = null;
             foreach (var addition in owned.Where(world.Present)) {
                 var record = world.Describe(addition);
-                if (desired != null) { var want = desired.Find(record.Key); if (want == null || !EquipmentAddition.SameBuild(record, want)) continue; }
+                if (desired != null) {
+                    var want = desired.Find(record.Key);
+                    if (want == null || !EquipmentAddition.SameBuild(record, want)) continue;
+                    if (!world.Built(addition)) {
+                        try { Source(controller, want); } catch (InvalidOperationException e) { return e.Message; }
+                        continue;
+                    }
+                }
                 var problem = world.Problem(addition);
                 if (problem != null) { pattern = record.Pattern; return "added equipment " + record.Id + ": " + problem; }
             }
@@ -424,7 +437,7 @@ namespace RailroaderScenePatcher.Core {
             foreach (var addition in owned.Where(world.Present).ToList()) {
                 var record = world.Describe(addition);
                 var want = desired.Find(record.Key);
-                if (want == null || kept.Contains(record.Key) || !EquipmentAddition.SameBuild(record, want)) { Retire(owned, addition); continue; }
+                if (want == null || kept.Contains(record.Key) || !EquipmentAddition.SameBuild(record, want) || !world.Built(addition)) { Retire(owned, addition); continue; }
                 if (!EquipmentAddition.SamePlacement(world.Placement(addition), want.Placement)) world.SetPlacement(addition, want.Placement);
                 kept.Add(record.Key);
             }

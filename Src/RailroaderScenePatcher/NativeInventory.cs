@@ -231,7 +231,7 @@ namespace RailroaderScenePatcher {
             // Each light or gate the patcher added is one added object: its wrapper, not the parts of its copy.
             if (c is OwnedEquipment owned) {
                 if (owned.Retired) return null;
-                return owned.Pattern == EquipmentAddition.BellPattern ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
+                return owned.IsBell ? CommandBand.AddedBellFamily : AddedEquipmentFamily;
             }
             var type = TypeName(c); var go = c.gameObject;
             // Every object below a scene root that holds signals, CTC and interlocking, game logic, native operations data or
