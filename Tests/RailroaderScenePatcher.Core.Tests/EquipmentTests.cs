@@ -671,7 +671,7 @@ static class EquipmentTests {
         f.World.Devices.RemoveAll(d => d.Path == SignalPath);
         var mutations = f.World.Mutations;
         var recheck = session.Recheck(Crossing);
-        const string Refusal = "Equipment west: the added equipment is missing, and light or gate Signal 1 is not in the map, so the equipment cannot be rebuilt. The patcher only copies lights and gates already in the map and will not choose a replacement. Select a light or gate in the map or remove the addition";
+        const string Refusal = "Equipment west: the added equipment is missing, and light or gate Signal 1 is not in the map, so the equipment cannot be rebuilt. The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition";
         Assert(!recheck.Applied && recheck.Failure == FailureKind.Refused && recheck.Error.Contains(Refusal),
             "Recheck refuses the rebuild and names the source by its name, with the standard tail: " + recheck.Failure + " " + recheck.Error);
         Assert(f.World.Mutations == mutations && !lost.Destroyed && !session.CleanupUnverified(Crossing), "The refusal changes nothing");
@@ -687,7 +687,7 @@ static class EquipmentTests {
         b.Live.Single().CopyLost = true;
         b.World.Bells.Clear();
         var bellRecheck = bellSession.Recheck(Crossing);
-        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"),
+        Assert(!bellRecheck.Applied && bellRecheck.Failure == FailureKind.Refused && bellRecheck.Error.Contains("Equipment ring: the added equipment is missing, and bell definition bell is unavailable in the content library, so the equipment cannot be rebuilt. The patcher only uses bell definitions already available and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition"),
             "A lost bell whose definition is unavailable is refused with its recorded name and a next step: " + bellRecheck.Error);
     }
     static void AnAdditionWithoutItsCopyCanBeRemoved() {
@@ -803,8 +803,11 @@ static class EquipmentTests {
         var lost = f.Live.Single(); lost.CopyLost = true;
         f.World.StickyDestroy = true;
         var failed = session.Recheck(Crossing);
-        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("equipment west left an empty object at this crossing that the patcher could not remove"),
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("The patcher could not remove the empty object that held equipment west at this crossing"),
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
+        var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
+        Assert(recovery.Contains("The patcher could not remove the empty object that held equipment west at this crossing.") && recovery.EndsWith("Click Recheck or reload the Map Editor.", StringComparison.Ordinal),
+            "The cleanup reason composes with the recovery action: " + recovery);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
         var again = session.Recheck(Crossing);
@@ -867,7 +870,7 @@ static class EquipmentTests {
         var cases = new[] {
             (Refusal(new EquipmentAddition("x", "crossing-custom-v1", device, at, "author/pack")), "Equipment x: pattern crossing-custom-v1 is not supported. Use pattern crossing-light-gate-v1 or crossing-bell-v1. Otherwise remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, EquipmentSource.ForDefinition("rr/bell"), at, "author/pack")), "Equipment x: a light or gate needs a light or gate in the map as its source, not a bell definition. Change its source in your scene patch file or remove the addition"),
-            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 objects in the map share its scene and path. Select another light or gate or remove the addition"),
+            (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Twin"), at, "author/pack")), "Equipment x: source Twin is ambiguous; 2 objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, new EquipmentSource("BushnellWhittier", CrossingPath + "/Bell"), at, "author/pack")), ". Select an eligible source or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.LightGatePattern, device, null, "author/pack")), "Equipment x needs a fixed placement. Give it a position and rotation or remove the addition"),
             (Refusal(new EquipmentAddition("x", EquipmentAddition.BellPattern, device, at, "author/pack")), "Equipment x: a bell needs a bell definition as its source, not a light or gate in the map. Change its source in your scene patch file or remove the addition"),

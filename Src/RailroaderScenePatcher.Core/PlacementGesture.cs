@@ -37,7 +37,7 @@ namespace RailroaderScenePatcher.Core {
                 try { return ReferenceEquals(engine.ResolveUnique(PatchEngine.ParseTarget(item["target"] as JObject)), target); }
                 catch (InvalidOperationException) { return false; }
             }).ToArray();
-            if (own.Length > 1) throw new InvalidOperationException("Several modifications target this object; combine them outside scene patch editing first");
+            if (own.Length > 1) throw new InvalidOperationException(PatchEditingSession.SeveralModifications);
             foreach (var item in own) PatchEngine.Parse(item);
             before = scene.Read(target);
             // A placement the scene refuses, such as the move of a lake surface drawn from a static batch, refuses the

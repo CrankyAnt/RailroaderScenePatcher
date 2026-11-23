@@ -412,10 +412,10 @@ namespace RailroaderScenePatcher.Core {
                 var what = "Equipment " + addition.Id + ": " + (stale ? "the added equipment is missing, and " : "");
                 var rebuilt = stale ? ", so the equipment cannot be rebuilt" : "";
                 throw new InvalidPatchDefinitionException(addition.Source.IsDefinition
-                    ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Select an available bell definition or remove the addition"
-                    : what + "light or gate " + name + " is not in the map" + rebuilt + ". The patcher only copies lights and gates already in the map and will not choose a replacement. Select a light or gate in the map or remove the addition");
+                    ? what + "bell definition " + name + " is unavailable in the content library" + rebuilt + ". The patcher only uses bell definitions already available and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition"
+                    : what + "light or gate " + name + " is not in the map" + rebuilt + ". The patcher only copies lights and gates already in the map and will not choose a replacement. Edit this addition on the crossing's Connections tab to select another light or gate, or remove the addition");
             }
-            if (matches.Count > 1) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Select another bell definition" : " objects in the map share its scene and path. Select another light or gate") + " or remove the addition");
+            if (matches.Count > 1) throw new InvalidPatchDefinitionException("Equipment " + addition.Id + ": source " + name + " is ambiguous; " + matches.Count + (addition.Source.IsDefinition ? " bell definitions share its identifier. Edit this addition on the crossing's Connections tab to select another bell definition" : " objects in the map share its scene and path. Edit this addition on the crossing's Connections tab to select another light or gate") + ", or remove the addition");
             var problem = world.SourceProblem(matches[0], controller, addition.Pattern);
             if (problem != null) {
                 var message = "Equipment " + addition.Id + ": source " + name + " does not conform to " + addition.Pattern + ": " + problem + ". Select an eligible source or remove the addition";
@@ -500,7 +500,7 @@ namespace RailroaderScenePatcher.Core {
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
             // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
             var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "equipment " + record.Id + " left an empty object at this crossing that the patcher could not remove"; }
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "The patcher could not remove the empty object that held equipment " + record.Id + " at this crossing"; }
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);

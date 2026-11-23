@@ -185,6 +185,8 @@ static class PatchEditingTests {
     // it and changes nothing; an object with one modification is not blocked.
     static void SeveralModificationsBlockEveryEditOfAnyObject() {
         var w = new World(Doc(Mod("move-p", "p", Fixed(112)) + "," + Mod("move-p-again", "p", Fixed(120)) + "," + Mod("move-q", "q", Fixed(5))));
+        Assert(PatchEditingSession.SeveralModifications == "Several modifications in the scene patch file target this object. Combine those modifications into one in the scene patch file",
+            "The shared refusal names the modifications and the file to correct");
         Assert(w.Session.SeveralModificationsBlock(P) == PatchEditingSession.SeveralModifications, "The object with two modifications is blocked: " + w.Session.SeveralModificationsBlock(P));
         Assert(w.Session.SeveralModificationsBlock(Q) == null, "The object with one modification is not blocked");
         var text = w.Store.Patch;
