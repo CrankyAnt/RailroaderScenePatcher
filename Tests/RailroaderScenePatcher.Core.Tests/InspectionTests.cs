@@ -104,7 +104,7 @@ static class InspectionTests {
         StaleNoticePromisesOnlyWhatPinRefuses();
         ProblemsFilterLimitsTheOutliner();
         BindingProblemsFollowTheGame();
-        InspectionOnlyObjectsHaveTheirOwnGroup();
+        InspectionOnlyObjectsAreNotProblems();
         ChangesReadOneLinePerSetting();
         SubgroupsFollowTheGame();
         RuntimeStateDoesNotMarkStale();
@@ -529,7 +529,6 @@ static class InspectionTests {
         Check(RailroaderScenePatcher.InventoryPresentationState.Rows(flags, "", RailroaderScenePatcher.OutlinerFilter.Disabled, null).Select(e => e.Identity.Path).SequenceEqual(new[] { "World/Off", "World/Own off" }),
             "The Disabled filter lists objects that are switched off themselves");
         Check(flags.Entries[0].Enabled && !flags.Entries[1].Enabled && flags.Entries[2].Enabled && !flags.Entries[2].Active, "Without a value the own flag is the activity; an object can be enabled under an inactive parent");
-        Check(RailroaderScenePatcher.InventoryPresentationState.Summary(flags, "", RailroaderScenePatcher.OutlinerFilter.Disabled, null) == "2 of 4 objects", "The count line counts the disabled objects");
         Check(Flagged("World/X", false, true).Difference(Flagged("World/X", false, false)) == "identity",
             "The own flag is no part of what an inspection pins: for a culler-listed object its reading follows the camera");
         Check(RailroaderScenePatcher.CommandBand.AllFilter == "All" && RailroaderScenePatcher.CommandBand.ChangedFilter == "Changed" && RailroaderScenePatcher.CommandBand.DisabledFilter == "Disabled"
@@ -556,12 +555,6 @@ static class InspectionTests {
         Check(AuthoredActivity.Enabled(false, true, false), "Off while its culler hides its objects: camera culling does not disable an object");
         Check(!AuthoredActivity.Enabled(false, true, true), "Off while its culler shows its objects: authored off or disabled by a patch");
         Check(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", modified, null).Count == 0, "Without a scene patch file nothing is changed");
-        Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed) == "2 of 4 objects", "The count line names how many objects the filters show: " + RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", problems, changed));
-        Check(RailroaderScenePatcher.InventoryPresentationState.Summary(inventory, "", all, changed) == "4 of 4 objects", "The unfiltered outliner counts every entry");
-        var groups = RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", all, changed));
-        Check(groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))).SequenceEqual(new[] { "Bridge:Ela", "Independent board:Board", "Track marker:Added Alpha,Added Zulu" })
-            && groups.Last().Value.Select(row => row.Identity.Path).SequenceEqual(new[] { "World/Sign", "World/Post" }),
-            "Rows sort by their visible names within each family while retaining their original identity paths");
         var presentation = new RailroaderScenePatcher.InventoryPresentationState();
         Check(presentation.Observe(inventory, null, "", all, "1") && !presentation.Observe(inventory, null, "", all, "1"), "A settled outliner does not rebuild");
         Check(presentation.Observe(inventory, null, "", problems, "1"), "Switching a filter rebuilds the outliner");
@@ -1089,10 +1082,9 @@ static class InspectionTests {
             && RailroaderScenePatcher.CommandBand.Refusal(null) == null, "The refusal is read from the supported-edits text");
     }
 
-    // An object of a kind no supported family covers is listed in one Inspection only group after the family groups,
-    // without a problem marker. Problems are only defects the modder can repair with the patcher: what the inspection
-    // could not read or check is a note.
-    static void InspectionOnlyObjectsHaveTheirOwnGroup() {
+    // An object of a kind no supported family covers is inspection only, without a problem marker. Problems are only defects
+    // the modder can repair with the patcher: what the inspection could not read or check is a note.
+    static void InspectionOnlyObjectsAreNotProblems() {
         SceneObservation Entry(string path, string family, string[] problems, string only = null, bool active = true, string[] notes = null) => new SceneObservation(new object(), new TargetIdentity("scene", path, "Component"), family, active,
             new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], problems, only ?? "Track binding", null, null, notes, only);
         var none = new string[0];
@@ -1105,21 +1097,10 @@ static class InspectionTests {
         fixture.Objects.Add(Entry("World/Refused", "Track marker", none));
         var inventory = new SceneInventory(fixture); inventory.Refresh();
         string[] Paths(RailroaderScenePatcher.OutlinerFilter filter, string search = "") => RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, null).Select(e => e.Identity.Path).ToArray();
-        string Shape(RailroaderScenePatcher.OutlinerFilter filter, string search = "") => String.Join(" | ", RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, search, filter, null))
-            .Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))));
         var all = RailroaderScenePatcher.OutlinerFilter.All;
-        // One group, after the family groups, whatever the families of its entries.
-        Check(Shape(all) == "Independent board:Board | Track marker:Refused,Sign | Inspection only:Post 1,Span", "Inspection only entries leave their families for one group after the family groups, rows in name order: " + Shape(all));
-        Check(RailroaderScenePatcher.InventoryPresentationState.InspectionOnlyGroup == "Inspection only", "The group is named Inspection only");
-        // The group is not shown while it holds no entry.
-        Check(Shape(all, "sign") == "Track marker:Sign" && Shape(RailroaderScenePatcher.OutlinerFilter.Problems) == "Track marker:Sign", "The group is absent while it holds no entry: " + Shape(all, "sign"));
-        var empty = new Fixture(); empty.Objects.Add(Entry("World/Sign", "Track marker", none));
-        var plain = new SceneInventory(empty); plain.Refresh();
-        Check(RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(plain, "", all, null)).Select(g => g.Key).SequenceEqual(new[] { "Track marker" }), "An inventory without such objects has no Inspection only group");
-        // Search and the All and Disabled filters apply to the group.
-        Check(Shape(all, "span") == "Inspection only:Span" && Shape(all, "not yet supported") == "Inspection only:Post 1,Span", "Search finds the group's entries, also by their reason: " + Shape(all, "not yet supported"));
-        Check(Paths(RailroaderScenePatcher.OutlinerFilter.Disabled).SequenceEqual(new[] { "World/Span" }) && Shape(RailroaderScenePatcher.OutlinerFilter.Disabled) == "Inspection only:Span", "The Disabled filter lists a disabled Inspection only object, in its group");
-        Check(Paths(all).Length == 5, "All lists the group's entries with the rest");
+        // The All and Disabled filters apply to these entries.
+        Check(Paths(RailroaderScenePatcher.OutlinerFilter.Disabled).SequenceEqual(new[] { "World/Span" }), "The Disabled filter lists a disabled Inspection only object");
+        Check(Paths(all).Length == 5, "All lists the inspection only entries with the rest");
         // No problem and no problem marker on an Inspection only entry: what would be a problem is a note.
         var post = inventory.Entries.Single(e => e.Identity.Path == "World/Post 1");
         Check(post.InspectionOnly == reason && post.Problems.Count == 0 && post.Notes.SequenceEqual(new[] { "Marker broken binding: missing segment S9" }), "An Inspection only entry has no problem; what was found is kept as a note");
@@ -1134,7 +1115,7 @@ static class InspectionTests {
         foreach (var line in new[] { "Marker broken binding: missing segment Sgone", "Marker has an empty segment binding", "Lower broken binding: missing segment S9", "Missing circuit 0 island", "Construction segment S4 no longer exists. On the Connections tab, select the segments of the bridge's track and click Set.", "Missing construction-scenery target" })
             Check(!BindingRules.IsNote(line), "A defect of the object is a problem: " + line);
         Check(!BindingRules.IsNote(null), "No line is no note");
-        // A refused object of a supported family stays in its family, with its reason and without a problem.
+        // A refused object of a supported family is not inspection only and has no problem.
         var refused = inventory.Entries.Single(e => e.Identity.Path == "World/Refused");
         Check(refused.InspectionOnly == null && refused.Problems.Count == 0, "A refused object of a supported family is not inspection only and has no problem");
         // Two observations of one object with the same identity, as an object with two components of one type gives:
@@ -1169,10 +1150,6 @@ static class InspectionTests {
         var bare = Row("Track marker", "World/Bare");
         foreach (var row in new[] { new object[] { station, "Type Generic" }, new object[] { whistle, "Type Generic" }, new object[] { starter, "Type Generic" }, new object[] { stop, "Type PassengerStop" }, new object[] { board, null }, new object[] { bare, null }, new object[] { null, null } })
             Check(RailroaderScenePatcher.InventoryPresentationState.Subgroup((SceneObservation)row[0]) == (string)row[1], "The subgroup of a row is its marker type or none: " + row[1]);
-        Check(RailroaderScenePatcher.InventoryPresentationState.Subgroups(new[] { station, whistle, starter }).Count == 0, "Markers of one type form no subgroups: a station sign, a whistle sign and a starter marker are one kind to the game");
-        var two = RailroaderScenePatcher.InventoryPresentationState.Subgroups(new[] { stop, station, whistle });
-        Check(two.Count == 2 && two[0].Key == "Type Generic" && two[0].Value.SequenceEqual(new[] { station, whistle }) && two[1].Key == "Type PassengerStop" && two[1].Value.Single() == stop, "Markers of two types stand under their types, in name order, rows in the order given");
-        Check(RailroaderScenePatcher.InventoryPresentationState.Subgroups(new[] { board, Row("Board", "World/Other") }).Count == 0, "A family the game does not divide has no subgroups");
     }
     static void ChangesReadOneLinePerSetting() {
         var before = new ObjectState(new Placement(new[] { 10.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }), true, MarkerBinding.At(new TrackLocation("S377", "a", 7.5116)));

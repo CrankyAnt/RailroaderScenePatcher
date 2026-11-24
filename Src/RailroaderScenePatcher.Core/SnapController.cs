@@ -54,7 +54,7 @@ namespace RailroaderScenePatcher.Core {
             if (confirmedCandidate == null || !confirmedCandidate.Matches(geometry.Candidate))
                 throw new InvalidOperationException("Snap target changed after confirmation; select it again");
             var resolved = scene.Resolve(target);
-            if (resolved == null || resolved.Count != 1) throw new InvalidOperationException("The object must resolve uniquely");
+            if (resolved == null || resolved.Count != 1) throw new InvalidOperationException(resolved == null || resolved.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
             inspected.Validate(scene, target, resolved[0]);
             var prior = scene.Read(resolved[0]).Placement;
             PatchEngine.CheckPlacement(prior.Position, prior.Rotation);

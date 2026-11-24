@@ -28,7 +28,7 @@ You must specify the tracks and area. The patcher doesn't choose them from nearb
 
 ## Add detection in the native map editor
 
-1. Open the Scene Patcher panel and inspect the crossing controller. Select it in the outliner's **Crossing controller** family or click **Select in world** to select it in the world.
+1. Open the Scene Patcher panel and inspect the crossing controller. Select it under **Grade crossing** in the outliner or click **Select in world** to select it in the world.
 2. On the **Connections** tab, under **Add detection**, enter an ID for the addition in **Detection addition ID** and click **Add detection** beside it.
 3. For each of **Approach A**, **Island**, and **Approach B**, enter a segment ID, the end (`a` or `b`) the distances are measured from, and the **From** and **To** distances in meters. To fill a role's segment from the world, click **Segment** next to the role, click the track, then click **Confirm**. When editing an existing addition, the role's current starting segment is excluded from its choice list. You can pick segments used by other roles. **From** is the end next to the island for each approach, and the island's lower end for the island.
 4. Click **Preview** at the bottom of the tab. The **Preview** section lists every native circuit as retained and the addition as new with its tracks and area. Nothing changes yet.

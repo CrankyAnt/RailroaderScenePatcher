@@ -316,7 +316,11 @@ class Program {
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
+        BakedSceneryCheckTests.Run();
         BakedCategoryTests.Run();
+        SceneClassificationTests.Run();
+        OutlineTreeTests.Run();
+        OutlinerGroupingTests.Run();
         BakedPartTests.Run();
         CrossbuckTests.Run();
         IndustryObjectTests.Run();

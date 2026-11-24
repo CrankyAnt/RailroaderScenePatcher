@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
     // retained world still tells it from the native sets.
     internal sealed class CrossingCoverageWorld : ICrossingCoverageWorld {
         const string GraphType = "Track.Graph", SpanType = "Track.TrackSpan", SegmentType = "Track.TrackSegment", LocationType = "Track.SerializableLocation";
-        internal const string RootName = "CrankyAnt Scene Patcher crossing coverage";
+        internal const string RootName = InventoryPresentationState.CoverageRoot;
         readonly Type controller, span, graph, segment, end, location, circuitSet;
         // The addition key of every circuit set the patcher created in this process, held only while the set itself lives.
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, string> additions = new System.Runtime.CompilerServices.ConditionalWeakTable<object, string>();

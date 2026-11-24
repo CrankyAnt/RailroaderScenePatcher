@@ -69,6 +69,7 @@ static class RecoveryTests {
         FreshStartRefusesWhatItCannotSecure();
         DependedModificationsCannotLeaveTheScenePatchFile();
         EditsOfIneffectiveModificationsAreRefused();
+        TargetRefusalsGetTheirOwnGuidance();
         Console.WriteLine("PASS: unknown runtime content, format version first, diagnostics, confirmed re-reading, backup-protected fresh start and dependsOn refusals");
     }
 
@@ -325,12 +326,29 @@ static class RecoveryTests {
         Assert(w.Box.Active && w.Session.ScenePatchFileText.Contains("\"modifications\": {}"), "The removals return the objects to their underlying state");
     }
 
+    // An edit whose target matches no object asks for a refresh; one whose target matches several objects asks for a target
+    // that names one object. Neither repeats the refusal.
+    static void TargetRefusalsGetTheirOwnGuidance() {
+        var gone = new World(Doc(""));
+        gone.Scene.Objects["p"] = new List<object>();
+        var missing = gone.Session.Edit(P, At(150), null);
+        var none = RecoveryGuidance.For(missing, "Placement", "Placement", null);
+        Assert(!missing.Applied && missing.Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal) && none.Correction == "Nothing changed. Refresh the object list, then inspect the object again.",
+            "A target without a match asks for a refresh: " + missing.Error + " | " + none?.Correction);
+        var twin = new World(Doc(""));
+        twin.Scene.Objects["p"].Add(new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } });
+        var ambiguous = twin.Session.Edit(P, At(150), null);
+        var several = RecoveryGuidance.For(ambiguous, "Placement", "Placement", null);
+        Assert(!ambiguous.Applied && ambiguous.Error.StartsWith(PatchEngine.TargetAmbiguous, StringComparison.Ordinal) && several.Correction == "Nothing changed. Use a more specific path or component so the target matches only one object.",
+            "A target with several matches asks for a target that names one object: " + ambiguous.Error + " | " + several?.Correction);
+    }
+
     // An edit of a modification that does not take effect because a dependency is missing, failed or cyclic is refused
     // with that reason instead of being reported as applied; removing it stays possible.
     static void EditsOfIneffectiveModificationsAreRefused() {
         var cases = new[] {
             ("missing", Mod("move", "p", Fixed(112), "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
-            ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (Target must resolve uniquely)"),
+            ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (This target doesn't match any object in the loaded map)"),
             ("failed deeper", Mod("move", "p", Fixed(112), "[\"middle\"]") + "," + Mod("middle", "q", "\"active\":true", "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
             ("cyclic", Mod("move", "p", Fixed(112), "[\"loop\"]") + "," + Mod("loop", "q", "\"active\":false", "[\"move\"]"), "its dependencies form the cycle move -> loop -> move"),
             ("self", Mod("move", "p", Fixed(112), "[\"move\"]"), "its dependencies form the cycle move -> move"),

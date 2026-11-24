@@ -59,9 +59,9 @@ static class RoadBridgeTests {
     // A road bridge stands where its road goes, and Follow follows track: a track-following placement of a road bridge
     // or of one of its parts is refused before any mutation, and the Follow placement mode is unavailable with the reason.
     static void RoadBridgesDoNotFollowTrack() {
-        Assert(BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RoadBridges) == "Road bridges use fixed placement. They don't support track-following placement."
-            && BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RailBridges) == BakedSceneryRules.RailBridgeNoFollowing && BakedSceneryRules.FollowingRefusal(null) == null,
-            "Bridges of both subgroups refuse track following, each with its reason; other groups do not: " + BakedSceneryRules.FollowingRefusal(BakedSceneryCategories.RoadBridges));
+        Assert(BakedSceneryRules.FollowingRefusal(BridgeKind.Road) == "Road bridges use fixed placement. They don't support track-following placement."
+            && BakedSceneryRules.FollowingRefusal(BridgeKind.Rail) == BakedSceneryRules.RailBridgeNoFollowing && BakedSceneryRules.FollowingRefusal(BridgeKind.None) == null,
+            "Bridges of both kinds refuse track following, each with its reason; other groups do not: " + BakedSceneryRules.FollowingRefusal(BridgeKind.Road));
         var f = new Span(); var scene = f.Scene(); scene.Tracks = new FixedTrack();
         string Follow(string id, string path, string structure) =>
             "\"" + id + "\":{\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"UnityEngine.Transform\",\"structure\":\"" + structure + "\"}," +
@@ -75,17 +75,21 @@ static class RoadBridgeTests {
     }
     sealed class FixedTrack : ITrackPoseScene { public TrackPose TrackPose(TrackAnchor anchor) => new TrackPose(new[] { 3000.0, 530, 4300 }, new[] { 0.0, 0, 0, 1 }); }
 
-    // The Object tab reads the Road bridges subgroup from the inventory: the bridge's own entry, and for a part the
+    // The Object tab reads from the inventory that a group is a road bridge: the bridge's own entry, and for a part the
     // entry of its group. A bridge without a mask line, as one whose mask component is disabled, names no terrain.
     static void UseInGameReadsTheRoadBridgeSubgroup() {
         SceneObservation Entry(string path, string[] dependencies, string groupPath = null, string subcategory = null) =>
             new SceneObservation(new object(), new TargetIdentity(SceneName, path, "UnityEngine.Transform"), BakedSceneryRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
-                new string[0], dependencies, new string[0], CommandBand.GroupOperations, groupPath: groupPath, category: groupPath == null ? BakedSceneryCategories.Bridge : null, subcategory: subcategory);
+                new string[0], dependencies, new string[0], CommandBand.GroupOperations, groupPath: groupPath, category: groupPath == null ? BakedSceneryCategories.Bridge : null, subcategory: subcategory, bridge: subcategory == BakedSceneryCategories.RoadBridges ? BridgeKind.Road : BridgeKind.None);
         var line = CommandBand.GroundMaskDependency(true, new[] { "Concrete Road Bridge - 60m" }, false, group: true);
         var bridge = Entry(GovBridge, new[] { "Culling", line }, subcategory: BakedSceneryCategories.RoadBridges);
         Assert(CommandBand.UseInGame(bridge, null) == "The bridge is decorative. Its road is native map data that the Map Editor edits. The bridge's ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "The road bridge's entry: " + CommandBand.UseInGame(bridge, null));
         Assert(CommandBand.UseInGame(Entry(GovBridge + "/Deck", new[] { "Culling" }, GovBridge), bridge) == CommandBand.PartDecorative, "A part of a road bridge keeps the part's text");
+        // The text follows what the group is for its edits, not where the outliner files it.
+        var filedOnly = new SceneObservation(new object(), new TargetIdentity(SceneName, GovBridge, "UnityEngine.Transform"), BakedSceneryRules.Family, true, new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 },
+            new string[0], new[] { "Culling", line }, new string[0], CommandBand.GroupOperations, category: BakedSceneryCategories.Bridge, subcategory: BakedSceneryCategories.RoadBridges);
+        Assert(!CommandBand.UseInGame(filedOnly, null).Contains("Its road is native map data"), "A group the outliner files under Road bridges that is no road bridge for its edits has no road bridge text: " + CommandBand.UseInGame(filedOnly, null));
         var unmasked = Entry(Whittier, new[] { "Culling" }, subcategory: BakedSceneryCategories.RoadBridges);
         Assert(CommandBand.UseInGame(unmasked, null) == "The bridge is decorative. Its road is native map data that the Map Editor edits. Moving or disabling this group changes no game function." && !CommandBand.HoldsGroundMask(unmasked.Dependencies),
             "A road bridge whose mask is disabled names no terrain and has no terrain output: " + CommandBand.UseInGame(unmasked, null));

@@ -789,59 +789,13 @@ namespace RailroaderScenePatcher {
             HelpRegion = null;
             closed();
         }
-        // ---- Outliner row tooltips ----
-
         // The outliner's scroll view, set each time the outliner builds its rows, in the full and the compact window.
         internal ScrollRect OutlinerView;
-
-        // The game shows a tooltip after the pointer rests half a second, but once one shows, the next one follows at
-        // once. In the outliner the rows touch, so scrolling or moving down the list showed a tooltip for every row.
-        // A row's tooltip waits until the pointer has rested on that row for nearly the game's half second, also
-        // while another tooltip shows; the rest of the game's grace period keeps it from waiting twice. Outside that
-        // mode the game's own half second applies. Buttons keep the game's timing.
-        const float RowTooltipDelay = 0.45f;
-        // The game's controller keeps the tooltip it shows in a private field; reading it is the only way to know that a
-        // tooltip already shows. Without the field the rows keep the game's own timing.
-        static readonly System.Reflection.FieldInfo lastShownTooltip = typeof(UI.Tooltips.UITooltipController).GetField("_lastShownTooltip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        // The row title the pointer rests on, since when, and the last frame its tooltip was asked for.
-        string dwellTitle;
-        float dwellSince;
-        int dwellFrame = -10;
-
-        // Rows are pooled and made as the list scrolls, so each tick gives any new row its waiting tooltip.
-        void DelayRowTooltips() {
-            var view = OutlinerView;
-            if (view == null || view.content == null) return;
-            var content = view.content;
-            for (var i = 0; i < content.childCount; i++) {
-                var provider = content.GetChild(i).GetComponent<UI.Tooltips.UITooltipProvider>();
-                if (provider == null || provider.DynamicTooltipInfo != null) continue;
-                var row = provider;
-                row.DynamicTooltipInfo = () => RowTooltipDwell(row.Title);
-            }
-        }
-
-        TooltipInfo RowTooltipDwell(string title) {
-            var now = Time.realtimeSinceStartup;
-            if (title != dwellTitle || Time.frameCount - dwellFrame > 1) { dwellTitle = title; dwellSince = now; }
-            dwellFrame = Time.frameCount;
-            var info = new TooltipInfo(title, "");
-            if (String.IsNullOrEmpty(title) || !TooltipShowing()) return info;
-            return now - dwellSince >= RowTooltipDelay ? info : TooltipInfo.Empty;
-        }
-
-        static bool TooltipShowing() {
-            try {
-                var controller = UI.Tooltips.UITooltipController.Shared;
-                return controller != null && lastShownTooltip != null && lastShownTooltip.GetValue(controller) is TooltipInfo shown && !shown.IsEmpty;
-            } catch { return false; }
-        }
 
         internal void Tick() {
             if (disposed) return;
             if (openOnTick) { openOnTick = false; if (!IsOpen) Toggle(); }
             Layout(false);
-            DelayRowTooltips();
             CompactTick();
             if (IsOpen) PlaceTitleHelp();
             RemoveClosedHelp();

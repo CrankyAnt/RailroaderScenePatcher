@@ -186,11 +186,12 @@ static class BakedPartTests {
     static void ContainerAndGroupRootPathsFailBeforeMutation() {
         const string Yard = "World/Large Scenery/Bryson/Bryson Yard", Post = Yard + "/Tall Post Shade";
         var f = new Fixture();
-        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()))))));
-        Assert(BakedSceneryRules.GroupRefusal(Yard) == "This path names a container object. A container object isn't a group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(Post) == null && BakedSceneryRules.GroupRefusal(Mill) == null, "Only a container object in the category table is refused with the container object message");
+        var verdicts = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Bryson", new Node("Bryson Yard", new Node("Tall Post Shade", new Node("Bulb").Solid()).With("Helpers.Culling.RendererCuller"))))));
+        var yardVerdict = verdicts.Single(v => v.Path == Yard);
         var lamp = verdicts.Single(v => v.Path == Post);
+        Assert(yardVerdict.Disposition == GroupDisposition.ContainerObject && BakedSceneryRules.GroupRefusal(yardVerdict) == "This path names a container object. A container object isn't a group. Edit the groups it holds." && BakedSceneryRules.GroupRefusal(lamp) == null && BakedSceneryRules.GroupRefusal(null) == null, "Only a container object is refused with the container object message");
         Assert(BakedSceneryRules.PartRefusal(null, lamp) == BakedSceneryRules.GroupRootRefusal && BakedSceneryRules.PartRefusal(null, null) == null, "A group root is refused as a part with its own reason");
-        Assert(BakedSceneryRules.ResolvesGroup(null, Yard) && BakedSceneryRules.ResolvesGroup(lamp, Post) && !BakedSceneryRules.ResolvesGroup(null, Post + "/Bulb"), "A container object resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
+        Assert(BakedSceneryRules.ResolvesGroup(yardVerdict) && BakedSceneryRules.ResolvesGroup(lamp) && !BakedSceneryRules.ResolvesGroup(null), "A container object resolves as a group target so that it fails with its reason; any other unlisted path does not resolve");
         f.World.GroupVerdicts = verdicts.ToDictionary(v => v.Path);
         f.World.GroupVerdicts[Mill] = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Whittier", new Node("Whittier Saw Mill", new Node("Platform").Solid()))))).Single();
         var post = new FakeGroup();

@@ -14,13 +14,18 @@ namespace RailroaderScenePatcher.Core {
     // that one, nearest first, and what its components say it is.
     public sealed class GroupObject {
         public GroupObject(object node, IEnumerable<object> above, bool crossingController = false, bool trackMarker = false, bool trackSpan = false, bool bakedGroupRoot = false,
-            bool bakedPart = false, object storage = null, bool constructionController = false, IEnumerable<object> targets = null, IEnumerable<IEnumerable<object>> targetsAbove = null) {
+            bool bakedPart = false, object storage = null, bool constructionController = false, IEnumerable<object> targets = null, IEnumerable<IEnumerable<object>> targetsAbove = null, object crossing = null) {
             Node = node ?? throw new ArgumentNullException(nameof(node));
             Above = above ?? Enumerable.Empty<object>();
             CrossingController = crossingController; TrackMarker = trackMarker; TrackSpan = trackSpan; BakedGroupRoot = bakedGroupRoot;
             BakedPart = bakedPart; Storage = storage; ConstructionController = constructionController; Targets = (targets ?? Enumerable.Empty<object>()).Where(target => target != null).ToArray();
             TargetsAbove = (targetsAbove ?? Enumerable.Empty<IEnumerable<object>>()).Select(above => (IReadOnlyList<object>)(above ?? Enumerable.Empty<object>()).ToArray()).ToArray();
+            Crossing = crossing;
         }
+        // The object is a crossbuck or a crossing pad of a crossing without a crossing controller: what stands for
+        // that crossing, the scene object that holds its crossbucks and pads. Where several crossings share that
+        // scene object, it is that object together with the marker ID of the crossing's pad. Null for every other object.
+        public object Crossing { get; }
         public object Node { get; }
         public IEnumerable<object> Above { get; }
         // The object is the root of a baked scenery group: its scene object is the root of the group, and the
@@ -69,7 +74,8 @@ namespace RailroaderScenePatcher.Core {
 
     public static class GameDefinedGroups {
         // The groups among inventory objects. A grade-crossing setup is a crossing controller with the inventory
-        // objects on and below its root, the controller's scene object, other than its whistle signs. A baked scenery
+        // objects on and below its root, the controller's scene object, other than its whistle signs. A crossing
+        // without a controller is the same kind of group: the crossbucks and pads its crossing object holds. A baked scenery
         // group is a group root with the inventory objects below it: its parts, whatever culling container they
         // stand in, and the objects of other families there, as a station building group holds its signs. An object
         // belongs to the outermost group that holds it. Two groups go by what a game component names, wherever
@@ -115,6 +121,10 @@ namespace RailroaderScenePatcher.Core {
                 // A pile that is a part of a baked scenery group belongs to that group, its outermost one, as the
                 // storage displays the Baked scenery group family lists are; any other filled object to its storage.
                 if (key == null && item.Storage != null && !item.BakedPart) key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.IndustryStorageDisplay, item.Storage);
+                // A crossbuck or pad of a crossing without a controller belongs to that crossing. Below a crossing
+                // controller it belongs to the controller's setup.
+                if (key == null && item.Crossing != null && !item.Above.Any(node => node != null && crossings.Contains(node)))
+                    key = new KeyValuePair<GameDefinedGroupKind, object>(GameDefinedGroupKind.GradeCrossingSetup, item.Crossing);
                 if (key == null) {
                     object root = crossings.Contains(item.Node) || baked.Contains(item.Node) ? item.Node : null;
                     var below = false;

@@ -315,7 +315,7 @@ namespace RailroaderScenePatcher {
             Enumerable.Range(0, 8).Select(i => Point(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)))).ToArray();
 
         internal void Release() {
-            observedBoxes.Clear(); writtenCameraLine = null;
+            frameChecks.Clear(); writtenCameraLine = null;
             keptBoxes.Clear();
             rendererBoxes?.Clear();
             if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
@@ -395,7 +395,7 @@ namespace RailroaderScenePatcher {
         // The component facts of a group, read from the family the inventory gave an object: a crossing controller
         // anchors a grade-crossing setup, a track marker that is no crossing pad is, below that controller's root, a
         // whistle sign, and a track span there is a detection span that the controller manages.
-        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery";
+        const string ControllerFamily = "Crossing controller", MarkerFamily = "Track marker", SpanFamily = "Track span", ConstructionFamily = "Bridge construction scenery", PadFamily = "Crossing pad marker";
         // The inventory snapshot, set by the owner: a group holds inventory objects, whatever a choice offers, so
         // Select in world and a choice for a scene patch file show one crossing the same way.
         internal Func<IReadOnlyList<SceneObservation>> Inventory;
@@ -439,15 +439,28 @@ namespace RailroaderScenePatcher {
                     if (o.Family != ConstructionFamily) return null;
                     try { return NativeInventory.ConstructionTargets(go); } catch (Exception e) { Skipped(go, "its construction targets could not be read: " + e.GetBaseException().Message); return null; }
                 }
-                if (all.Any(o => o.Family == ControllerFamily || o.Family == ConstructionFamily) || roots.Any(r => r) || storage.Count != 0) {
+                // A crossing without a controller: its crossbucks and pads stand in one scene object. Where crossings
+                // share that object, each crossbuck names its crossing's pad by marker ID, and so does the pad itself.
+                bool Crossbuck(SceneObservation o) => o.Family == BakedSceneryRules.Family && o.GroupPath == null && o.Category == BakedSceneryCategories.GradeCrossing;
+                var sharedPads = new HashSet<Tuple<GameObject, string>>(all.Where(o => Crossbuck(o) && o.Identity.PadMarkerId != null && o.Handle is GameObject go && go != null && go.transform.parent != null)
+                    .Select(o => Tuple.Create(((GameObject)o.Handle).transform.parent.gameObject, o.Identity.PadMarkerId)));
+                object CrossingOf(SceneObservation o, GameObject go) {
+                    var crossbuck = Crossbuck(o);
+                    if (!crossbuck && o.Family != PadFamily) return null;
+                    var holder = go.transform.parent == null ? null : go.transform.parent.gameObject;
+                    if (holder == null) return null;
+                    var id = crossbuck ? o.Identity.PadMarkerId : InventoryPresentationState.MarkerIdOf(o);
+                    return id != null && sharedPads.Contains(Tuple.Create(holder, id)) ? (object)Tuple.Create(holder, id) : holder;
+                }
+                if (all.Any(o => o.Family == ControllerFamily || o.Family == ConstructionFamily || Crossbuck(o)) || roots.Any(r => r) || storage.Count != 0) {
                     var found = new List<InventoryGroup>();
                     foreach (var group in GameDefinedGroups.Of(all.Select((o, i) => {
                             if (!(o.Handle is GameObject go) || go == null) return null;
                             var targets = Targets(o, go);
                             return new GroupObject(go, Above(go), o.Family == ControllerFamily, o.Family == MarkerFamily, o.Family == SpanFamily, roots[i], o.GroupPath != null,
-                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets, targets?.Select(Above));
+                                storage.TryGetValue(go, out var filledBy) ? filledBy : null, targets != null, targets, targets?.Select(Above), CrossingOf(o, go));
                         }).ToArray())) {
-                        var root = group.Anchor as GameObject;
+                        var root = group.Anchor as GameObject ?? (group.Anchor as Tuple<GameObject, string>)?.Item1;
                         var read = skips.Read(() => RootPath(root), () => {
                             var placed = group.Members.Select(i => new { Object = SpatialSelectionScene.Observe(all[i]), Listed = group.Listed.Contains(i), Stands = i == group.Root }).Where(m => m.Object.Points.Length != 0).ToArray();
                             if (placed.Length == 0) { skips.Skip(RootPath(root), "none of its objects has a usable position"); return null; }
@@ -925,7 +938,7 @@ namespace RailroaderScenePatcher {
                 if (trackRadius == 0) {
                     trackRadius = (float)Native.Read(Native.Type("Game.MapEditor.TrackClickPicker"), "SnapRadius");
                     if (Single.IsNaN(trackRadius) || Single.IsInfinity(trackRadius) || trackRadius <= 0)
-                        throw new InvalidOperationException("Native track pick radius unavailable");
+                        throw new InvalidOperationException("The patcher couldn't prepare track selection. Report this to the patcher maintainer and include the Player log. Details: invalid TrackClickPicker.SnapRadius.");
                 }
                 // Clip the physical corridor and its end geometry before perspective division.
                 // An offscreen projected width cannot become a screen-wide stroke or hit area.
@@ -1029,15 +1042,16 @@ namespace RailroaderScenePatcher {
             kinds[renderer] = kind;
             return kind;
         }
-        // Frame diagnostics, debug output: one block per candidate within range, written once and again only when the
-        // one box its frame outlines changes. The camera line goes before the first block written from a camera
-        // position, once per position. With debug off nothing is collected or built.
+        // Frame diagnostics, debug output: one block per candidate within range, written once per object and again only
+        // when the one box its frame outlines changes (LogOnChange, keyed by the object's path, label and instance ID).
+        // The camera line goes before the first block written from a camera position, once per position. With debug off
+        // nothing is collected or built.
         const double ObservationRange = 1500;
         bool observing;
         // The camera line of the pass, and the last one written.
         string cameraLine, writtenCameraLine;
-        // Per candidate, the box its last written block named.
-        readonly Dictionary<string, string> observedBoxes = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Per object, the box signature of its last written block.
+        readonly LogOnChange frameChecks = new LogOnChange();
         void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
             observing = PatcherLog.DebugEnabled && ((object)pending ?? source) != null;
             if (!observing) return;
@@ -1045,22 +1059,35 @@ namespace RailroaderScenePatcher {
                 camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
                 " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.";
         }
-        // The box a block names, to a centimetre, and how many renderers it lists: a block is written again only when
-        // that changes.
-        static string BoxSignature(ObjectMarkingFrame result, int renderers) {
-            if (result.Box == null) return "no box/" + renderers;
-            var text = new System.Text.StringBuilder();
-            foreach (var corner in result.Box) text.Append(Math.Round(corner.X, 2).ToString(CultureInfo.InvariantCulture)).Append(',').Append(Math.Round(corner.Y, 2).ToString(CultureInfo.InvariantCulture))
+        static void Corners(IEnumerable<WorldPoint> corners, System.Text.StringBuilder text) {
+            foreach (var corner in corners) text.Append(Math.Round(corner.X, 2).ToString(CultureInfo.InvariantCulture)).Append(',').Append(Math.Round(corner.Y, 2).ToString(CultureInfo.InvariantCulture))
                 .Append(',').Append(Math.Round(corner.Z, 2).ToString(CultureInfo.InvariantCulture)).Append(';');
-            return text.Append(renderers).ToString();
+        }
+        // The box a block names, to a centimetre, and how many renderers it lists: a block is written again only when
+        // that changes. A part the game moves while running, such as a clock hand, changes the frame box every second: an
+        // object with such a part is compared by the boxes of its other renderers instead, and the moving ones are left out.
+        static string BoxSignature(ObjectMarkingFrame result, Renderer[] renderers) {
+            var text = new System.Text.StringBuilder();
+            var moving = renderers.Where(r => r != null && GroupWorld.MovesWhileRunning(r.transform)).ToArray();
+            if (moving.Length == 0) {
+                if (result.Box == null) return "no box/" + renderers.Length;
+                Corners(result.Box, text);
+                return text.Append(renderers.Length).ToString();
+            }
+            text.Append("moving parts ").Append(moving.Length).Append('/');
+            foreach (var renderer in renderers.Where(r => r != null && !moving.Contains(r))) Corners(BoxCorners(renderer.bounds), text);
+            return text.Append(renderers.Length).ToString();
         }
         void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
             List<string> skipped, ObjectMarkingFrame result, Rect view, WorldBasis objectAxes) {
-            var key = candidate.Choice.Label + "|" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(candidate.Choice.Handle).ToString(CultureInfo.InvariantCulture);
-            var signature = BoxSignature(result, renderers.Length);
-            if (observedBoxes.TryGetValue(key, out var written) && written == signature) return;
-            if (observedBoxes.Count > 20000) observedBoxes.Clear();
-            observedBoxes[key] = signature;
+            // An object that the game moves while running as a whole has no stable box: it is left out of the frame log.
+            var go = candidate.Choice.Handle as GameObject;
+            if (go != null && GroupWorld.MovesWhileRunning(go.transform)) return;
+            // Objects can share a path and a label, such as the pads of crossings that share one: the instance ID keeps each
+            // on its own entry.
+            var key = LogOnChange.ObjectKey(go != null ? BoardScene.PathOf(go.transform) : "", candidate.Choice.Label,
+                go != null ? go.GetInstanceID() : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(candidate.Choice.Handle));
+            if (!frameChecks.Changed(key, BoxSignature(result, renderers))) return;
             if (cameraLine != null && cameraLine != writtenCameraLine) { PatcherLog.Debug(cameraLine); writtenCameraLine = cameraLine; }
             var text = new System.Text.StringBuilder();
             text.Append("Frame check for ").Append(candidate.Choice.Label).Append(". Distance: ").Append(Number(result.Distance)).Append(" m")

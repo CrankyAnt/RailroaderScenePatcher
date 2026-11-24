@@ -333,37 +333,38 @@ namespace RailroaderScenePatcher {
 
         // ---- Outliner ----
 
-        // The outliner's summary line with Hide outliner or Show outliner at its right, above the outliner rows. The
-        // filter cannot be changed or reset here: the compact window has no search field or filters, so filtering
-        // means switching to the full window.
+        // The outliner's object count with Hide outliner or Show outliner at its right, above the outliner rows. The
+        // filter cannot be changed or reset here: the compact window has no search field, filters or view switch, so
+        // these mean switching to the full window. The rows follow the view chosen there, by category or by place.
         void CompactOutlinerSection(UIPanelBuilder builder) {
             builder.AddHRule();
             var filtered = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
-            var summary = inventory == null ? "Inspection is unavailable" : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
             var filterParts = new List<string>();
             if (outlinerFilter != OutlinerFilter.All) filterParts.Add(CompactRail.FilterName(outlinerFilter));
             if (!String.IsNullOrEmpty(filter)) filterParts.Add("\"" + filter + "\"");
-            var labelMarkup = filtered
+            Func<string, string> countMarkup = summary => filtered
                 ? "<style=Footnote><color=" + Amber + ">" + Literal(summary) + "</color> (" + Literal(String.Join(", ", filterParts)) + ")</style>"
                 : "<style=Footnote>" + Literal(summary) + "</style>";
             var labelTip = filtered
-                ? summary + ". Active outliner filter: " + String.Join(", ", filterParts) + ". Switch to the full window to change or reset the filter."
-                : summary + ". Inactive loaded objects are included.";
-            TMP_Text measure = null;
+                ? "Active outliner filter: " + String.Join(", ", filterParts) + ". Switch to the full window to change or reset the filter."
+                : "Inactive loaded objects are included.";
+            var open = presentation.CompactOutlinerShown;
+            // With the outliner shown, its rows set the count as they build the tree; hidden, the count is built here.
+            var initial = open ? "" : countMarkup(OutlinerSummary(OutlinerTree(out _)));
+            TMP_Text countLine = null;
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                // A long filter ends in an ellipsis beside the button; the tooltip holds the whole summary.
-                var summaryRect = Line(row, labelMarkup, "Outliner", labelTip, RowHeight);
-                summaryRect.EqualFlexibleWidth(0);
-                measure = summaryRect.GetComponent<TMP_Text>() ?? summaryRect.GetComponentInChildren<TMP_Text>(true);
-                var open = presentation.CompactOutlinerShown;
+                // A long filter ends in an ellipsis beside the button; the tooltip names the whole filter.
+                var countRect = Line(row, initial, "Objects", labelTip, RowHeight);
+                countRect.EqualFlexibleWidth(0);
+                countLine = countRect.GetComponent<TMP_Text>() ?? countRect.GetComponentInChildren<TMP_Text>(true);
                 var toggle = Button(row, open ? "Hide outliner" : "Show outliner", () => presentation.ToggleCompactOutliner());
                 FitButton(toggle, "Hide outliner", "Show outliner");
                 toggle.Tooltip(open ? "Hide outliner" : "Show outliner", open ? "Hide the outliner to leave more of the world in view." : "Show the outliner in this rail.");
             }).ChildrenKeepHeight().Height(RowHeight);
-            if (!presentation.CompactOutlinerShown) return;
+            if (!open) return;
             // Exactly the presentation's whole rows: six at the default height, more when the user made the rail higher.
-            var outliner = builder.VStack(column => DrawOutlinerRows(column, measure)).gameObject.AddComponent<LayoutElement>();
+            var outliner = builder.VStack(column => DrawOutlinerRows(column, countLine, countMarkup)).gameObject.AddComponent<LayoutElement>();
             outliner.minHeight = outliner.preferredHeight = presentation.CompactOutlinerHeight;
             outliner.flexibleHeight = 0; outliner.flexibleWidth = 10000;
         }

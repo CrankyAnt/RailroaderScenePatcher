@@ -57,7 +57,7 @@ The ID of a modification is its key in `modifications`. A modification has no `i
 | `starterPlacement` | object | Optional. Sets a starter placement marker's track location, whether its starting cars are a wreck, or both. See Starter placement below. Requires patcher 0.5.0 or later. |
 | `dependsOn` | array of strings | Required. Each value names another modification in the same scene patch file. |
 
-The `target` object accepts only `scene`, `path`, `component`, and the optional members `structure` and `padMarkerId`. All required target strings must be non-empty, as must `padMarkerId` when present. `path` is always the object's hierarchy path. Use `padMarkerId` alongside it only for a crossbuck that shares its path with other crossbucks. For every other target, the patcher refuses `padMarkerId` before changing anything and gives the reason. The scene adapter must resolve the identity to exactly one object. If it finds no match or multiple matches, the modification fails.
+The `target` object accepts only `scene`, `path`, `component`, and the optional members `structure` and `padMarkerId`. All required target strings must be non-empty, as must `padMarkerId` when present. `path` is always the object's hierarchy path. Use `padMarkerId` alongside it only for a crossbuck that shares its path with other crossbucks. For every other target, the patcher refuses `padMarkerId` before changing anything and gives the reason. The scene adapter must resolve the identity to exactly one object. If it finds no match or multiple matches, the modification fails. With no match, the Log window row reads `This target doesn't match any object in the loaded map. Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.` With multiple matches, it reads `This target matches more than one object in the loaded map. Use a more specific path or component so the target matches only one object.`
 
 The order of keys in `modifications`, members of any object, and values of `dependsOn` does not affect application. The engine applies each modification after all modifications named in its `dependsOn`. Where `dependsOn` specifies no order, the engine uses the ordinal order of the modification keys, defined under Canonical order below. The result is therefore independent of the file's text order. A repeated `dependsOn` value counts once. If a dependency fails, the engine skips the modification that depends on it. Modifications that don't depend on it still apply.
 
@@ -365,7 +365,7 @@ To appear in this family, a root must meet all these conditions:
 
 A candidate without one of those components isn't listed at all. A collider built by the game while the camera is near doesn't count. For a storage pile, the pile itself counts, but its generated collider doesn't.
 
-`World/Large Scenery/Robinson Gap Mine/Coal Loader`, which holds a car loader (`RollingStock.CarContentSwapper`), is a decorative group under Other. Target it and its parts with `baked-scenery-group-v1` and `baked-scenery-part-v1`, as any group and part. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so neither `placement` nor `active` changes where loading happens.
+`World/Large Scenery/Robinson Gap Mine/Coal Loader`, which holds a car loader (`RollingStock.CarContentSwapper`), is a decorative group under Industry building. Target it and its parts with `baked-scenery-group-v1` and `baked-scenery-part-v1`, as any group and part. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so neither `placement` nor `active` changes where loading happens.
 
 The family excludes a group that holds a track marker, station click spot, spawn point, or map icon at any depth. It also excludes a group that holds a construction controller (`Game.Mow.TrackConstructionScenery`) but isn't a rail bridge construction. Those objects are inspection only. You can't move a group with a spawn point as a whole. Edit its spawn points individually in the [Spawn point](#spawn-point) family.
 
@@ -401,7 +401,7 @@ The patcher recognizes parts of groups in the Baked scenery group family. The ta
 
 A part is a scene object at any depth below a listed group root. It isn't a renderer or component. The scene must serialize it. It must have a renderer, collider, light, storage pile, or log pond at or below it, unless it holds a scene ground mask. See [scene ground masks](#scene-ground-masks). The following aren't parts:
 
-- Objects in groups listed in the Inspection only group.
+- Objects in groups listed as inspection only.
 - Siblings with the same name under the same parent, and objects below them.
 - An object with a `KeyValueBoolAnimator`, and everything below it, because the game animates it.
 - A culling container. This is an object below the group root with a simple culler (`Helpers.SimpleCuller`), no renderer, collider, light, storage pile, or log pond of its own, and other objects below it. The objects it contains are parts, and their paths include the container. A modification targeting the container fails before any change and gives that reason.

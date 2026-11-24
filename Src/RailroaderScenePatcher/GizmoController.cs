@@ -53,7 +53,7 @@ namespace RailroaderScenePatcher {
         internal void Rebind(InspectedTarget inspection) {
             if (!Shown || Active) throw new InvalidOperationException("The gizmo is not standing");
             var matches = scene.Resolve(identity);
-            if (matches.Count != 1) throw new InvalidOperationException("Target must resolve uniquely");
+            if (matches.Count != 1) throw new InvalidOperationException(matches.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
             inspection.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
             target = matches[0]; inspected = inspection;
             shown = scene.Read(target).Placement;
@@ -78,7 +78,7 @@ namespace RailroaderScenePatcher {
                 controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as Behaviour;
                 if (controller == null || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor)) throw new InvalidOperationException("The Map Editor changed");
                 var matches = scene.Resolve(identity);
-                if (matches.Count != 1) throw new InvalidOperationException("Target must resolve uniquely");
+                if (matches.Count != 1) throw new InvalidOperationException(matches.Count == 0 ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous);
                 inspected.Validate(scene, identity, matches[0]); scene.Preflight(matches[0]);
                 target = matches[0];
                 shown = scene.Read(matches[0]).Placement;

@@ -148,7 +148,7 @@ namespace RailroaderScenePatcher.Core {
         // problems: they are shown without the problem marker.
         public IReadOnlyList<string> Notes { get; }
         // Why this object is inspection only, or null: the inventory finds it, no supported family covers its kind and
-        // the native map editor does not edit it. Such an object is listed in the Inspection only group, shows no
+        // the native map editor does not edit it. Such an object is listed under its category, marked inspection only, shows no
         // problem and offers no edit; what would be a problem for a supported kind is a note here.
         public string InspectionOnly { get; }
         // For a part of a baked scenery group, the hierarchy path of its group root; null for every other object.
@@ -157,6 +157,8 @@ namespace RailroaderScenePatcher.Core {
         // every other object. Presentation metadata: the rule decides both from the identity path.
         public string Category { get; }
         public string Subcategory { get; }
+        // For a group root, whether it is a rail bridge or a road bridge for its edits (GroupRootVerdict.Bridge).
+        public BridgeKind Bridge { get; }
         // For an object that another object holds through a game component, the hierarchy path of that holder: a
         // detection span, a track span that a crossing controller holds in a circuit, names its controller. Null for every other
         // object. Presentation metadata: the outliner lists the object under its holder.
@@ -167,8 +169,8 @@ namespace RailroaderScenePatcher.Core {
         public string Storage { get; }
         public SceneObservation(object handle, TargetIdentity identity, string family, bool active, IEnumerable<double> position,
             IEnumerable<double> rotation, IEnumerable<string> bindings, IEnumerable<string> dependencies, IEnumerable<string> problems, string operations,
-            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null) {
-            Enabled = enabled ?? active; HolderPath = holderPath; Storage = storage; GroupPath = groupPath; Category = category; Subcategory = subcategory;
+            IEnumerable<string> runtimeState = null, bool? enabled = null, IEnumerable<string> notes = null, string inspectionOnly = null, string displayName = null, string groupPath = null, string category = null, string subcategory = null, string holderPath = null, string storage = null, BridgeKind bridge = BridgeKind.None) {
+            Enabled = enabled ?? active; HolderPath = holderPath; Storage = storage; GroupPath = groupPath; Category = category; Subcategory = subcategory; Bridge = bridge;
             InspectionOnly = inspectionOnly;
             var noted = (notes ?? Array.Empty<string>()).ToArray();
             if (inspectionOnly != null) { noted = noted.Concat(problems).ToArray(); problems = Array.Empty<string>(); }

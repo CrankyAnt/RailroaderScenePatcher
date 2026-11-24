@@ -32,6 +32,8 @@ Two classes in `Src/RailroaderScenePatcher/LogOutputs.cs` are the only places th
 - `PatcherLog.Debug(text)` writes a debug line, only while `PatcherLog.DebugEnabled` is set.
 - `PatcherLog.Debug(() => text)` does the same, but builds the text only while debug is on. Use it for text that costs work to build. A failure while the text is built drops the line.
 - `LogOnce` writes a repeated failure once per key. Its `Warning`, `Error` and `Debug` methods take a key. `Clear` starts over, for example at a new load attempt.
+- `LogOnChange` writes a debug diagnostic that is checked again and again, such as a frame check, the first time per key and again only when its text changes. `Changed(key, text)` answers whether to write it; `Debug(key, () => text)` writes it. `ObjectKey(path, label, identity)` keys one scene object; the identity keeps objects that share a path and a label apart. `Clear` starts over.
+- `BakedSceneryChecks.Summary` turns the baked scenery rule's verdicts of one load attempt into one debug block: a count per verdict, most frequent first, with the object paths only of a verdict that has at most 30 objects.
 - `NativeRows` (`Src/RailroaderScenePatcher.Core/NativeRows.cs`) delivers the patcher's Log window rows once per load attempt, when the Log window is ready. A row that cannot be delivered, because the Log window fails or the load attempt or the world ends first, is written once as a player warning: `The game's Log window didn't show this message: <originator>: <message>`.
 - `EditingFault` (`Src/RailroaderScenePatcher.Core/EditingFaults.cs`) holds the red line of the Scene Patcher window for one Map Editor. `Fail` takes one of the `EditingFailure` sites, such as a cancelled reload or a failed native Undo, stands in the window and is written once per text as a player error; a native Undo or Redo error reaches the log only. `Refuse` shows the refusal of an editing action, such as **Use file version**, and writes no player line: its edit feedback writes the debug line.
 
@@ -45,7 +47,7 @@ Two classes in `Src/RailroaderScenePatcher/LogOutputs.cs` are the only places th
 
 1. Decide whether the line is a warning or an error that a player or modder must see and that the game does not already show. If it is, write it with `PatcherLog.Warning` or `PatcherLog.Error`. Otherwise write it with `PatcherLog.Debug`.
 2. A failure that the game's Log window shows as a row goes through `NativeRows`, not `PatcherLog`. The patcher writes no line beside that row.
-3. Wrap text that costs work to build in a `Func<string>`.
+3. Wrap text that costs work to build in a `Func<string>`. A diagnostic that runs every frame or on every camera step goes through `LogOnChange` or a summary, so one session's debug log stays short enough for a player to post.
 4. Do not put an absolute path in a line. Use the object path or a path relative to the game's scene.
 5. Do not write to `Debug.Log`, the game's message log, the mod logger or the console directly. `LogSourceTests` rejects such writes outside `LogOutputs.cs`.
 6. Keep the text of `Attempt trace: ` and the JSON that follows it. `Tests/NativeObservation/Observation.cs` reads that debug line from the game's log, and a change to it breaks the observer. See [native observation](native-observation.md).

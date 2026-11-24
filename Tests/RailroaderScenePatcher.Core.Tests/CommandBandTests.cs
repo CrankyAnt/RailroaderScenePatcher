@@ -177,8 +177,6 @@ static class CommandBandTests {
         var identity = new TargetIdentity("scene", "World/Crossings/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "OwnedEquipment");
         var added = new SceneObservation(new object(), identity, CommandBand.AddedEquipmentFamily, true, Array.Empty<double>(), Array.Empty<double>(),
             Array.Empty<string>(), Array.Empty<string>(), new[] { "Missing object at " + identity.Path }, null, displayName: "Signal 1 (added, 1 of 2)");
-        Check(InventoryPresentationState.OutlinerTooltip(added, changed: false) == "Signal 1 (added, 1 of 2)\nAdded light or gate\nDetected problems: 1",
-            "The equipment tooltip gives the full visible label and reports detected problems without internal paths");
         var copied = JObject.Parse(PatchEditingSession.CopyId(new[] { "rr/test-map" }, added));
         var target = copied["target"];
         Check((string)target["scene"] == "scene" && (string)target["path"] == identity.Path && (string)target["component"] == "OwnedEquipment",
@@ -241,7 +239,7 @@ static class CommandBandTests {
             new[] { "Pad binding unavailable: the pad is part of a crossing", "The pad is part of a crossing." },
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
             new[] { CommandBand.ModeBlock(CommandBand.SnapMode, false, false, CommandBand.NotYetSupported("the Track span family")), "The Track span family cannot be edited." },
-            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects share this hierarchy path and component, so a patch cannot name one of them." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(3)), "3 objects have this hierarchy path, and a scene patch file names an object by its path." },
             new[] { StarterPlacements.NoTrackPoint, "The marker's track location does not resolve to a track point." },
             new[] { "Inspect an object first.", "Inspect an object first." },
             new[] { CommandBand.PadFollowsTrack, CommandBand.PadFollowsTrack.TrimEnd('.') + "." },
@@ -451,34 +449,30 @@ static class CommandBandTests {
         Check(CommandBand.CandidateDetailsReason(0) == "Click a marking or track in the world first." && CommandBand.CandidateDetailsReason(1) == null && CommandBand.CandidateDetailsReason(3) == null,
             "The details of a world choice open only once something was clicked");
         Check(CommandBand.NotEditable("the marker is inside a crossing") == "Not editable: the marker is inside a crossing", "An object of a supported family that cannot be edited keeps its own reason");
-        Check(!CommandBand.NotEditable("x").StartsWith(InventoryPresentationState.InspectionOnlyGroup, StringComparison.Ordinal), "The refusal's wording does not use the name of the Inspection only group");
-        // An added light or gate is a supported family: its edits are on its crossing's Connections tab, so it is listed
-        // under its own family, not Inspection only, and its object says where it is edited.
+        // An added light or gate is a supported family: its edits are on its crossing's Connections tab, so it is not inspection only.
         Check(CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false) == null && CommandBand.InspectionOnly("Crossing light", false).StartsWith("Not yet supported: ", StringComparison.Ordinal)
             && CommandBand.InspectionOnly("Crossing light", true) == null, "An added light or gate is not inspection only; another family without an edit is");
         var operations = CommandBand.AddedEquipmentOperations("Signal 1 (added)");
         Check(operations.Contains("Connections tab") && CommandBand.Refusal(operations) == null && !operations.StartsWith("Not yet supported", StringComparison.Ordinal), "Its supported edits name the crossing's Connections tab: " + operations);
-        var added = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "RailroaderScenePatcher.OwnedEquipment"), CommandBand.AddedEquipmentFamily, true,
-            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], operations, null, null, null, CommandBand.InspectionOnly(CommandBand.AddedEquipmentFamily, false));
-        var light = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/Signal 1", "Lamp"), "Crossing light", true,
-            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], "x", null, null, null, CommandBand.InspectionOnly("Crossing light", false));
-        var listed = InventoryPresentationState.Groups(new[] { added, light });
-        Check(listed.Count == 2 && listed[0].Key == CommandBand.AddedEquipmentFamily && listed[0].Value.Single() == added && listed[1].Key == InventoryPresentationState.InspectionOnlyGroup && listed[1].Value.Single() == light,
-            "The added light or gate has its own family folder; only the light without an edit is Inspection only: " + String.Join(", ", listed.Select(g => g.Key)));
         // An added bell is a supported family of its own, edited on its crossing's Connections tab as well.
         var bellOperations = CommandBand.AddedEquipmentOperations("Brass bell (added)");
         Check(CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false) == null && CommandBand.IsAddedFamily(CommandBand.AddedBellFamily) && !CommandBand.IsAddedFamily("Crossing bell")
             && bellOperations.StartsWith("Brass bell (added).", StringComparison.Ordinal) && bellOperations.Contains("Connections tab") && CommandBand.Refusal(bellOperations) == null,
             "An added bell is not inspection only and names where it is edited: " + bellOperations);
-        var bell = new SceneObservation(new object(), new TargetIdentity("scene", "crossing/CrankyAnt Scene Patcher equipment author:pack crossing-bell-added", "RailroaderScenePatcher.OwnedEquipment"), CommandBand.AddedBellFamily, true,
-            new double[] { 1, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new string[0], new string[0], bellOperations, null, null, null, CommandBand.InspectionOnly(CommandBand.AddedBellFamily, false));
-        var withBell = InventoryPresentationState.Groups(new[] { added, bell, light });
-        Check(withBell.Any(g => g.Key == CommandBand.AddedBellFamily && g.Value.Single() == bell) && withBell.Single(g => g.Key == InventoryPresentationState.InspectionOnlyGroup).Value.Single() == light,
-            "The added bell has its own family folder: " + String.Join(", ", withBell.Select(g => g.Key)));
         // A hierarchy path that more than one object holds: no edit, with the reason under Supported edits.
         Check(CommandBand.SharedPath(1) == null && CommandBand.SharedPath(0) == null, "A path one object holds can be edited");
-        Check(CommandBand.SharedPath(2) == "2 objects share this hierarchy path and component, so a patch cannot name one of them"
+        Check(CommandBand.SharedPath(2) == "2 objects have this hierarchy path, and a scene patch file names an object by its path"
             && CommandBand.Refusal(CommandBand.NotEditable(CommandBand.SharedPath(2))) == CommandBand.SharedPath(2), "A path two objects hold reads Not editable with its reason");
+        // Supported edits says this about the object; the footer says what it means for an edit now, in other words.
+        Check(CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))) == "This object can't be edited while another object has the same hierarchy path."
+            && CommandBand.InspectorEditBlock(false, CommandBand.NotEditable(CommandBand.SharedPath(3))) == CommandBand.SharedPathBlock && !CommandBand.SharedPathBlock.Contains(CommandBand.SharedPath(2)),
+            "The footer does not repeat the sentence of Supported edits for a shared path: " + CommandBand.EditReason(CommandBand.NotEditable(CommandBand.SharedPath(2))));
+        // A file path shows from the game folder, or from the mod's own folder when the mod lies elsewhere; never from the drive.
+        Check(CommandBand.ShownPath(@"D:\Games\Railroader\Mods\MyMap\Data\scene-patches.json", @"D:\Games\Railroader") == "Mods/MyMap/Data/scene-patches.json"
+            && CommandBand.ShownPath(@"C:\Work\ModDev\MyMap\Data\scene-patches.json", @"D:\Games\Railroader") == "MyMap/Data/scene-patches.json"
+            && CommandBand.ShownPath("/home/user/mods/MyMap/Data/scene-patches.json", null) == "MyMap/Data/scene-patches.json"
+            && CommandBand.ShownPath(@"C:\Work\scene-patches.json", @"D:\Games\Railroader") == "scene-patches.json" && CommandBand.ShownPath(null, null) == null,
+            "A shown path starts at the game folder or at the mod's folder: " + CommandBand.ShownPath(@"C:\Work\ModDev\MyMap\Data\scene-patches.json", @"D:\Games\Railroader"));
         // An object without edits is not told what Disable would do.
         Check(CommandBand.TrackGroup(false) == "Activity follows the track group." && CommandBand.TrackGroup(true).Contains("Disable holds it inactive"), "The track-group line names edits only where the object offers them");
         // The help of a tab closes when another tab opens; the outliner's and the window's stay.
@@ -537,7 +531,7 @@ static class CommandBandTests {
         foreach (var row in new[] {
             new[] { CommandBand.NotYetSupported("the Milepost family"), "The Milepost family cannot be edited." },
             new[] { CommandBand.NotEditable("the marker is inside a crossing"), "The marker is inside a crossing." },
-            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", "2 objects share this hierarchy path and component, so a patch cannot name one of them." },
+            new[] { CommandBand.NotEditable(CommandBand.SharedPath(2)) + ".", CommandBand.SharedPathBlock },
             new[] { "Fixed placement and activity", "This object cannot be edited here." }, new[] { null, "This object cannot be edited here." }, new[] { " ", "This object cannot be edited here." } })
             Check(CommandBand.EditReason(row[0]) == row[1], "The editing message gives the object's own reason: " + row[1] + " / " + CommandBand.EditReason(row[0]));
         Check(!CommandBand.EditReason(CommandBand.NotYetSupported("x")).Contains("Object tab"), "The editing message does not send the user to another tab");

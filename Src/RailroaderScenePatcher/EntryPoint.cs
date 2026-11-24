@@ -367,6 +367,7 @@ namespace RailroaderScenePatcher {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
+            OutlinerGrouping.Scene = new OutlinerScene();
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
@@ -543,7 +544,7 @@ namespace RailroaderScenePatcher {
                 ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
                 filled = false;
                 snap = new SnapController(attachment.Session, capabilities, new NativeSnapScene(native));
-                editingStatus = attachment.Session.Blocked ?? "Editing ready for " + attachment.PatchPath;
+                editingStatus = attachment.Session.Blocked ?? "Editing ready for " + CommandBand.ShownPath(attachment.PatchPath, GameFolder);
                 // The native map editor built its title before this session could account for the scene patch file.
                 attachment.RefreshChrome();
             } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
@@ -820,7 +821,7 @@ namespace RailroaderScenePatcher {
                 try { selection.Pick(pointer, presentation.WorldUiBounds()); selectionProblem = null; }
                 catch (Exception e) {
                     selection.Pending.Offer(Array.Empty<SelectionCandidate>());
-                    selectionProblem = "World selection unavailable: " + e.GetBaseException().Message;
+                    selectionProblem = "Couldn't process the world click. " + e.GetBaseException().Message.TrimEnd('.', ' ') + ".";
                 }
             }
             if (inMapEditor && open && inventory != null) {
@@ -1055,7 +1056,7 @@ namespace RailroaderScenePatcher {
                 // The refusal of an earlier action, such as a Set, does not stand beside the new choice.
                 if (selection.Pending != null) feedback.ChoiceStarted();
             }
-            catch (Exception e) { selectionProblem = "World selection unavailable: " + e.GetBaseException().Message; }
+            catch (Exception e) { selectionProblem = "Couldn't start world selection. " + e.GetBaseException().Message.TrimEnd('.', ' ') + "."; }
         }
         // Over the panel Escape can disarm a standing or queued tool as well as cancel a world choice or drag.
         bool EscapeGizmo() => PointerOverPanel() && (gizmo?.Shown == true || Requests.Place == GizmoPlace);
@@ -1617,16 +1618,15 @@ namespace RailroaderScenePatcher {
         // A crossing pad's geometry is generated along its track binding: a placement moves the pad object and nothing
         // the player sees, and its result says so.
         bool IsPad => selected != null && selected.Identity.Structure == CrossingPadScene.Structure;
-        // The baked scenery rule's verdicts, a debug line once per load attempt for the evidence of the listed and
-        // unlisted group roots.
+        // The baked scenery rule's verdicts, a debug summary once per load attempt for the evidence of the listed and
+        // unlisted group roots: a count per verdict, with the objects of a verdict that has few.
         string loggedVerdicts;
         void LogGroupVerdicts() {
             if (loggedVerdicts == loadId) return;
             loggedVerdicts = loadId;
             if (!PatcherLog.DebugEnabled) return;
             try {
-                var lines = GroupWorld.Report().ToArray();
-                PatcherLog.Debug("Baked scenery checks for " + lines.Length + " candidate objects:" + Environment.NewLine + String.Join(Environment.NewLine, lines));
+                PatcherLog.Debug(String.Join(Environment.NewLine, BakedSceneryChecks.Summary(GroupWorld.Report())));
             } catch (Exception e) { PatcherLog.Debug("The patcher couldn't report the baked scenery checks: " + e.GetBaseException().Message); }
         }
         void Inspect() {

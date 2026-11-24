@@ -219,7 +219,10 @@ namespace RailroaderScenePatcher.Core {
                 case FailureKind.DependencyFailed: return "First correct the modification that this one depends on.";
             }
             if (Mentions(problem, "Target changed", "inspected", "refresh", "Inspect")) return "Nothing changed. Refresh the object list, inspect the object again, and repeat the action.";
-            if (Mentions(problem, "resolve uniquely")) return "Nothing changed. The object is missing from the loaded scene, or more than one object matches. Refresh the object list and inspect it again.";
+            // A target refusal (PatchEngine.TargetMissing or TargetAmbiguous) already says what is wrong; the correction says
+            // only what to do.
+            if (Mentions(problem, PatchEngine.TargetAmbiguous)) return "Nothing changed. Use a more specific path or component so the target matches only one object.";
+            if (Mentions(problem, "resolve uniquely", PatchEngine.TargetMissing)) return "Nothing changed. Refresh the object list, then inspect the object again.";
             if (Mentions(problem, "protected from overwrite")) return "Nothing changed. This scene patch file cannot be overwritten.";
             if (Mentions(problem, "Reload before", "Reload the Map Editor before")) return "";
             // A replacement ID refusal (ReplacementMarkerIds) already says what to enter instead, so it needs no second

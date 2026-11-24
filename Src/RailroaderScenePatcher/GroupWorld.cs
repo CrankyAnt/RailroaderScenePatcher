@@ -252,7 +252,7 @@ namespace RailroaderScenePatcher {
         internal static bool HoldsToggles(GameObject root) { if (root == null) return false; Verdicts(); return toggleRoots.Contains(root); }
         internal static PartVerdict PartVerdictOf(GameObject go) { if (go == null) return null; Verdicts(); return partVerdicts.TryGetValue(go, out var verdict) ? verdict : null; }
         // Whether the object is the root of a baked scenery group for world marking: a listed group root, or an
-        // inspection-only one that the category table names. The inventory objects below it are the group's objects.
+        // inspection-only one that has a category. The inventory objects below it are the group's objects.
         internal static bool IsGroupRoot(GameObject go) {
             var verdict = VerdictOf(go);
             return verdict != null && (verdict.Disposition == GroupDisposition.Group || (verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Category != null));
@@ -276,16 +276,17 @@ namespace RailroaderScenePatcher {
             for (var i = 0; i < t.childCount; i++) Signature(t.GetChild(i), depth + 1, key, limit);
             key.Append('/');
         }
-        // One line per candidate of the rule and per scene object below a listed group root, for evidence that compares
-        // the listed and unlisted group roots and parts.
-        internal static IEnumerable<string> Report() =>
-            Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + ": " +
+        // Each candidate of the rule and each scene object below a listed group root, as its scene path with its verdict,
+        // for the debug summary (BakedSceneryChecks.Summary) that compares the listed and unlisted group roots and parts.
+        internal static IEnumerable<KeyValuePair<string, string>> Report() =>
+            Verdicts().Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
                 (p.Value.Disposition == GroupDisposition.Group ? "Listed as a scenery group" : p.Value.Disposition == GroupDisposition.InspectionOnly ? "Listed for inspection only" : p.Value.Disposition == GroupDisposition.ExistingFamily ? "Listed in another object family" : "Not listed") +
-                (p.Value.Reason == null ? "" : ". Reason: " + p.Value.Reason) + (p.Value.Category == null ? "" : ". Category: " + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory)))
-                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Key.scene.name + "/" + p.Value.Path + ": " +
+                Reason(p.Value.Reason) + (p.Value.Category == null ? "" : ". Category: " + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory))))
+                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
                     (p.Value.Disposition == PartDisposition.Part ? "Listed as a scenery part" : p.Value.Disposition == PartDisposition.ExistingFamily ? "Listed in another object family" : "Not listed as a scenery part") +
-                    (p.Value.Reason == null ? "" : ". Reason: " + p.Value.Reason)))
-                .OrderBy(line => line, StringComparer.Ordinal);
+                    Reason(p.Value.Reason))));
+        // A reason that is a sentence keeps one full stop before the clause that follows it.
+        static string Reason(string reason) => reason == null ? "" : ". Reason: " + reason.TrimEnd('.');
         internal static GroupRootVerdict VerdictOf(GameObject go) => go != null && Verdicts().TryGetValue(go, out var verdict) ? verdict : null;
         // The family an inspection-only candidate of the rule is listed under, or null when the rule lists none. A listed
         // part stands in the family of its group.
@@ -357,7 +358,7 @@ namespace RailroaderScenePatcher {
         static GameObject PartObject(object part) => part as GameObject ?? throw new InvalidOperationException("The part no longer exists");
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         public IReadOnlyList<object> Find(string scene, string path) =>
-            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g), path)).Cast<object>().ToArray();
+            BoardScene.LoadedAt(scene, path).Where(g => Loaded(g) && BakedSceneryRules.ResolvesGroup(VerdictOf(g))).Cast<object>().ToArray();
         public string Refusal(object group) => Problem(group as GameObject);
         // The construction segments of the controller on the group root itself, such as on Bryson Bridge 1 and the
         // Almond Bridge group root; a group without one has no construction-segment relationship.
@@ -369,9 +370,8 @@ namespace RailroaderScenePatcher {
         // Why a group root cannot be edited, or null. Shared with the inventory.
         internal static string Problem(GameObject root) {
             if (!Loaded(root)) return "The group's scene is not loaded";
-            // A container object in the category table, such as Bryson Yard, has no verdict and resolves so that it fails with this
-            // reason.
-            var refusal = VerdictOf(root) == null ? BakedSceneryRules.GroupRefusal(BoardScene.PathOf(root.transform)) : null;
+            // A container object, such as Bryson Yard, resolves so that it fails with this reason.
+            var refusal = BakedSceneryRules.GroupRefusal(VerdictOf(root));
             if (refusal != null) return refusal;
             if (VerdictOf(root)?.Disposition != GroupDisposition.Group) return "This object is not a group root of the Baked scenery group family";
             var components = root.GetComponentsInChildren<Component>(true);
@@ -409,9 +409,9 @@ namespace RailroaderScenePatcher {
             if (go == null) return null;
             var verdict = VerdictOf(go);
             if (verdict?.Disposition != GroupDisposition.Group) verdict = VerdictOf(GroupRootOf(go));
-            return verdict?.Disposition == GroupDisposition.Group ? BakedSceneryRules.FollowingRefusal(verdict.Subcategory) : null;
+            return verdict?.Disposition == GroupDisposition.Group ? BakedSceneryRules.FollowingRefusal(verdict.Bridge) : null;
         }
-        static bool RailBridgeRoot(GameObject go) { var verdict = VerdictOf(go); return verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges; }
+        static bool RailBridgeRoot(GameObject go) { var verdict = VerdictOf(go); return verdict?.Disposition == GroupDisposition.Group && verdict.Bridge == BridgeKind.Rail; }
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery): the track segment ids it reads and
         // the objects of its entries, which it switches on and off by the construction state of those segments. Read
         // lazily: a group without a controller needs none of these, and one with a controller is refused while one is
@@ -654,8 +654,8 @@ namespace RailroaderScenePatcher {
             var own = GroupOf(OwnSimple(root));
             var verdict = VerdictOf(root);
             // Every edit of a bridge construction verifies its colliders; a rail bridge also the track-owned scenery beside it.
-            var bridge = verdict?.Disposition == GroupDisposition.Group && verdict.Category == BakedSceneryCategories.Bridge;
-            var rail = bridge && verdict.Subcategory == BakedSceneryCategories.RailBridges;
+            var bridge = verdict?.Disposition == GroupDisposition.Group && verdict.Bridge != BridgeKind.None;
+            var rail = bridge && verdict.Bridge == BridgeKind.Rail;
             return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled, bridge ? Colliders(t) : null, rail ? TrackScenery(root) : null);
         }
         // The generated trestles near a rail bridge, as the Ela bridge describes them: selected at the first observation
@@ -785,6 +785,8 @@ namespace RailroaderScenePatcher {
                 foreach (var owner in world.GetComponentsInChildren(driven.Item1, true))
                     if (owner != null && driven.Item2.GetValue(owner) is Component target && target != null) found.Add(target.transform);
         }
+        // The object or one above it is a transform the game animates, as of the last classification.
+        internal static bool MovesWhileRunning(Transform t) => Animated(t, null);
         // The part or an object above it, below the root, is a transform the game animates.
         static bool Animated(Transform part, Transform root) {
             if (driven.Count == 0) return false;

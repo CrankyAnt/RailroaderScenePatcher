@@ -278,7 +278,17 @@ The scene objects of the map context that the patcher lists for inspection. Rule
 The development reference, outside scene patch editing, that names each rule keeping scene objects out of the inventory.
 
 **Family**:
-A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. The outliner groups inventory scene objects by family.
+A kind of scene object that the patcher supports under its own rules, such as track markers, scene spawn points or station map icons. An object's family decides what an edit of it may do.
+
+**Category**:
+What a scene object is to a modder, such as Station building, Platform, Lights, Sign, Grade crossing, Bridge, Industry building, Storage display, Railroad service building, Water or Road scenery. Spawn point, Starter placement, Station map icon and Track marker are categories too. An object that fits none of them is Unclassified.
+_Avoid_: Other, Group
+
+**Kind**:
+What tells the objects of one category apart, such as Rail bridges and Road bridges under Bridge, or Speed signs and Mileposts under Sign.
+
+**Place**:
+A place on the map that the game names, such as Alarka Jct or Connelly Creek, and at which a scene object stands.
 
 **Native map data**:
 Map data that the native map editor edits, such as Props, native masks, Builtins, native spawns, turntables, tracks, industries, native track spans and passenger stops. The inventory lists no native map data.
@@ -293,7 +303,7 @@ A track span in native map data, which the native map editor edits, such as indu
 A spawn in native map data, which the native map editor edits and calls Spawn. It is distinct from a scene spawn point.
 
 **Baked scenery group**:
-A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces, rail bridge constructions or road bridges, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery. It is a group by hierarchy: one scene object and the scene objects below it. Railroader has no term for it. Compare game-defined group, a group by a game component.
+A scene-serialized group of buildings, structures, fixtures, props, lamps, signs, click spots, lake surfaces, rail bridge constructions or road bridges, which receives physical placement and activity as a whole and per part. Trees and vegetation are terrain and bulk scenery, not baked scenery. It is a group by hierarchy: one scene object and the scene objects below it. Railroader has no term for it. Compare game-defined group, whose objects are placed one by one.
 
 **Group root**:
 The scene object at the top of a baked scenery group. The inventory lists a baked scenery group as one entry for its root.
@@ -418,12 +428,16 @@ The work of making and changing scene patches in the patcher, as distinct from a
 _Avoid_: Authoring, patch authoring
 
 **Outliner**:
-The searchable list of inventory scene objects beside the inspector in scene patch editing.
-_Avoid_: Object list, tree
+The searchable tree of inventory scene objects beside the inspector in scene patch editing. It has two views, By category and By place.
+_Avoid_: Object list
 
-**Inspection only group**:
-A group of the outliner that lists inventory scene objects that no supported family covers and that the native map editor does not edit, with the reason each is not yet supported.
-_Avoid_: Inspection only category
+**Outliner view**:
+One of the two arrangements of the outliner: By category, which lists category, kind, place and then the objects, or By place, which lists place, category, kind and then the objects. Both views hold the same rows.
+_Avoid_: Grouping, mode
+
+**Inspection only**:
+The state of an inventory scene object that no supported family covers and that the native map editor does not edit. The outliner lists it under its category, marked inspection only, and the Object tab gives the reason it is not yet supported.
+_Avoid_: Inspection only group, Inspection only category
 
 **Problems filter**:
 The outliner filter that limits the list to scene objects with a detected problem.
@@ -475,5 +489,5 @@ The native dropdown next to the pointer that lists the scene objects of one clic
 _Avoid_: Picker, popup
 
 **Game-defined group**:
-Scene objects that a game component holds together, which the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a station, a rail bridge construction or an industry storage display. Each of its objects keeps its own inventory entry and edits. It is a group by a game component, whose objects can stand apart in the scene hierarchy. Compare baked scenery group, a group by hierarchy.
+Scene objects that are one thing in the game and that the world shows as one square marker and one object frame beyond 125 metres: a grade-crossing setup, a crossing without a controller, a station, a rail bridge construction or an industry storage display. A game component holds most of them together, so their objects can stand apart in the scene hierarchy. A crossing without a controller has no such component: its crossing object holds its crossbucks and pads. Each object of a game-defined group keeps its own inventory entry and edits. Compare baked scenery group, which is placed as a whole.
 _Avoid_: Cluster, marker group
