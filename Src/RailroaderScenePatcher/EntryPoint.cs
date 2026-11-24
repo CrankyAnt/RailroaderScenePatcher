@@ -52,7 +52,7 @@ namespace RailroaderScenePatcher {
             var binding = Binding();
             binding.Enter(map, attempt);
             var state = binding.State;
-            if (state == null) { PatcherLog.Error("No scene patch file was applied in this load because the patcher couldn't prepare the world: " + binding.Error); return; }
+            if (state == null) { PatcherLog.Error("No scene patch file was applied in this load: " + binding.Error); return; }
             if (binding.ReentryError != null) state.ReportWorld(binding.ReentryError + ". The patcher started over for this world. Report to the patcher maintainer.");
             if (!state.Initialized) state.Initialize(context); else state.ApplyScenePatchFiles();
         }

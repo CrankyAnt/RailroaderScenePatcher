@@ -120,8 +120,8 @@ namespace RailroaderScenePatcher {
         public void Dispose() {
             if (disposed) return;
             disposed = true;
-            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't return control of when moved baked scenery parts are shown to the game. They may appear or disappear at the wrong distance", e); }
-            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't return control of moved baked scenery parts to the game's switches. The switches may no longer turn these parts on or off", e); }
+            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore the game's visibility checks for moved baked scenery parts. They may appear or disappear at the wrong distance", e); }
+            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't restore how progression, map features, and track construction turn objects on or off. Affected objects may stay on when they should turn off, or stay off when they should turn on", e); }
             if (ReferenceEquals(switches, ownSwitches)) { switches = null; switchHost = null; }
             ownHost.Dispose();
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
