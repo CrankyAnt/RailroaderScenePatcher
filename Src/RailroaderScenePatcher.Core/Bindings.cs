@@ -500,13 +500,13 @@ namespace RailroaderScenePatcher.Core {
         internal void PreflightPlacement(object target) {
             var problem = world is IPlacementPattern placement ? placement.PlacementProblem(target) : world.PatternProblem(target);
             if (problem != null) throw new InvalidOperationException(problem);
-            var difference = Coherence(target);
+            var difference = Coherence(target, true);
             if (difference != null) throw new InvalidOperationException(Incoherent(target, difference));
         }
         internal void Preflight(object target) {
             var problem = world.PatternProblem(target);
             if (problem != null) throw new InvalidOperationException(problem);
-            var difference = Coherence(target);
+            var difference = Coherence(target, true);
             if (difference != null) throw new InvalidOperationException(Incoherent(target, difference));
         }
         // The refusal of a registration that does not match the location and activity. A holder of a duplicate marker ID
@@ -678,10 +678,16 @@ namespace RailroaderScenePatcher.Core {
         }
         // The registration the native lifecycle holds for the current location and activity: one owned entry
         // at a resolvable location of an active marker, none otherwise. Null when it agrees.
-        string Coherence(object target) {
+        // leftBehind: the preflight of an edit leaves out this marker's own entries under a segment the track graph no
+        // longer has. A native track edit that removes a segment, such as Dissolve, leaves the entries of the markers
+        // on it in the graph until each marker is enabled again, which a Map Editor reload does. The game finds no
+        // track for them, and the edit's write removes them with the native unregistration step and registers the
+        // marker anew, as that reload would: the edit needs no reload first. Its verification counts every entry.
+        string Coherence(object target, bool leftBehind = false) {
             var location = world.Location(target);
             // Another holder's registration under the same marker ID is never a registration of this marker.
-            var entries = (world.Registrations(target) ?? Array.Empty<MarkerRegistration>()).Where(e => e.Owner == null || ReferenceEquals(e.Owner, target)).ToList();
+            var entries = (world.Registrations(target) ?? Array.Empty<MarkerRegistration>()).Where(e => e.Owner == null || ReferenceEquals(e.Owner, target))
+                .Where(e => !(leftBehind && e.HoldsMarker && (world.SegmentLengths(e.Bucket) ?? Array.Empty<double>()).Count == 0)).ToList();
             var expected = world.Registers(target) && Resolvable(location);
             if (!expected) return entries.Count == 0 ? null : entries.Count == 1 ? "The game still lists a track location for this marker." : "The game still lists " + entries.Count + " track locations for this marker.";
             if (entries.Count != 1) return "The game lists " + entries.Count + " track locations for this marker. It should list one.";

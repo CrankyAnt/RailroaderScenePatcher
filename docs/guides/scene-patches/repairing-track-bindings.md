@@ -32,6 +32,8 @@ The inventory lists an object that meets these conditions in the `Track marker` 
 
 Before changing anything, the patcher checks that the segment exists in the loaded track graph and contains the distance. It refuses a missing segment, a distance beyond the segment, or an end other than `a` or `b`. The marker keeps its binding and registration. The patcher never substitutes a nearby segment.
 
+A native track edit that removes the marker's segment, such as **Dissolve**, leaves the marker's named location under the removed segment until the Map Editor reloads. You don't need to reload before the repair: the edit removes that named location and registers the new one. If the game lists a named location for the marker on a segment that still exists and differs from the stored location, the edit is refused with `The game's track information for this marker is out of sync`. Reload the Map Editor, and then edit the marker.
+
 After the check, the patcher removes the marker's named location and writes the new stored location. If the marker is enabled and active, it registers the new named location. It also registers any map label below the marker with the map again, so the label's dimming follows the new location's track group.
 
 The patcher then checks that the stored location matches the mod's location. It verifies that the game has exactly one named location under the marker's ID, that it belongs to this marker at that location, and that every registered map label dims according to the new location's track group. Any difference fails the edit. The patcher restores the earlier stored location and named location.

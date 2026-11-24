@@ -276,6 +276,7 @@ static class BindingTests {
         ReferenceWalkPausesBetweenOwners();
         SetupPlacementsAreIndexedOncePerDiscovery();
         EditingSetReplaceDetachUndoRedo();
+        AnEntryLeftOnARemovedSegmentNeedsNoReload();
         EditingRemovalRecomputesUnderlyingRelationship();
         EditingRefusalAndFailureRestore();
         RefusedFileBindingKeepsHistoryComplete();
@@ -631,6 +632,34 @@ static class BindingTests {
         return (world, sign, other, session, mapEditor, store);
     }
     static Newtonsoft.Json.Linq.JObject Only(PatchEditingSession session) => (Newtonsoft.Json.Linq.JObject)Newtonsoft.Json.Linq.JObject.Parse(session.ScenePatchFileText)["modifications"].Single().First;
+    // A native track edit that removes the segment a marker stands on, such as Dissolve, leaves the marker's graph entry
+    // under that segment until the marker is enabled again (a Map Editor reload). The repair binding needs no reload: its
+    // write removes the left-behind entry and registers the marker at the new location, and Undo returns the broken
+    // binding without the left-behind entry, as a reload leaves it. An entry on a segment that exists still refuses.
+    static void AnEntryLeftOnARemovedSegmentNeedsNoReload() {
+        var (world, sign, other, session, mapEditor, store) = Session();
+        // Dissolve: the segment S9sc is gone, the sign's entry stays under it.
+        world.Segments.Remove("S9sc");
+        Assert(world.Registrations(sign).Count == 1 && world.Registrations(sign)[0].Bucket == "S9sc", "The native edit left the sign's entry under the removed segment");
+        var repair = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 40)));
+        Assert(repair.Applied, "The repair binding applies without a Map Editor reload: " + repair.Error);
+        Assert(Entry(world, sign) == "Nnew|a|40" && !world.Buckets.Any(b => b.Key == "S9sc" && b.Value.ContainsKey(sign.Id)), "The left-behind entry is gone and the sign is registered once at its new location: " + Entry(world, sign));
+        mapEditor.Undo();
+        Assert(sign.Segment == "S9sc" && world.Registrations(sign).Count == 0, "Undo returns the broken binding with no entry, as after a reload");
+        mapEditor.Redo();
+        Assert(Entry(world, sign) == "Nnew|a|40", "Redo applies the repair again");
+        // A placement edit of a marker whose entry was left behind applies too, and removes the entry.
+        (world, sign, other, session, mapEditor, store) = Session();
+        world.Segments.Remove("S9sc");
+        var moved = session.Edit(Sign, new Placement(new[] { 1040.0, 1, 2 }, new[] { 0.0, 0, 0, 1 }), null);
+        Assert(moved.Applied && world.Registrations(sign).Count == 0, "A placement edit applies and leaves no entry for the broken binding: " + moved.Error);
+        // An entry under an existing segment that differs from the binding is still refused before mutation.
+        (world, sign, other, session, mapEditor, store) = Session();
+        world.Buckets["Sjdl"]["Mi4f"] = ("a", 1, sign);
+        var mutations = world.Mutations;
+        var refused = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "a", 40)));
+        Assert(!refused.Applied && refused.Error.Contains("out of sync") && world.Mutations == mutations, "Two entries on existing segments still refuse the edit: " + refused.Error);
+    }
     static void EditingSetReplaceDetachUndoRedo() {
         var (world, sign, other, session, mapEditor, store) = Session();
         var set = session.Bind(Sign, MarkerBinding.At(new TrackLocation("Nnew", "b", 12)));

@@ -30,15 +30,24 @@ namespace RailroaderScenePatcher {
             presentation?.RequestRefresh();
             return false;
         }
+        // The Guided switch opens the task list.
         void OpenGuided() {
             if (guided.Enabled) return;
+            KeepInspectorReturn();
+            EndInspectorWork();
+            guided.Open();
+            feedback.View(GuidedFeedbackView());
+        }
+        // What returning to Inspector restores: the open tab and the world choice confirmed before Guided.
+        void KeepInspectorReturn() {
             guidedInspectorTab = inspectorTab.Value;
             choiceBeforeGuided = selection?.Confirmed;
+        }
+        // Guided ends what the inspector had running: a gizmo, a snap, a world choice and a waiting request.
+        void EndInspectorWork() {
             CancelGizmo(); ClearSnap();
             if (selection?.Pending != null) CancelSelection();
             CancelRequest("you switched to Guided before the action could run");
-            guided.Open();
-            feedback.View(GuidedFeedbackView());
         }
         void CancelGuided() {
             if (guidedInspectorTab != null) {
@@ -98,7 +107,13 @@ namespace RailroaderScenePatcher {
         void StartGuided(GuidedTaskKind kind) {
             var reason = GuidedBlock(kind);
             if (reason != null) { feedback.Refuse(GuidedPlace, GuidedName(kind), reason); return; }
-            OpenGuided();
+            // A task started from a problem in the inspector opens at its Values step. Guided opens when the queued
+            // start runs, after the scene check it may wait for; until then the inspector stays and the footer says
+            // Working. Opening Guided first showed the task list while the check ran, so a start entered at Target
+            // or at Values depending on whether the scene had just been compared. A refused start stays in the
+            // inspector with its reason.
+            var fromInspector = !guided.Enabled;
+            if (fromInspector) EndInspectorWork();
             Queue(GuidedPlace, "Target", pin => {
                 try {
                     guidedInspection = pin(selected);
@@ -109,6 +124,7 @@ namespace RailroaderScenePatcher {
                     guidedBefore = kind == GuidedTaskKind.Placement || kind == GuidedTaskKind.Snap ? CurrentPlacement()
                         : kind == GuidedTaskKind.Activity ? new[] { OwnActivity(selected) ? "Yes" : "No" } : kind == GuidedTaskKind.MarkerId ? new[] { CurrentMarkerId() }
                         : kind == GuidedTaskKind.Wreck ? new[] { CurrentWreck() } : CurrentBinding();
+                    if (fromInspector) KeepInspectorReturn();
                     guided.Start(kind, selected, guidedBefore);
                     feedback.View(GuidedFeedbackView());
                     guidedFields = guided.Draft;
