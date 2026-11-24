@@ -4,6 +4,7 @@ This changelog lists notable changes, newest first.
 
 ## 0.5.0
 
+- A help window that is too long for the screen, such as the outliner's, opens wider so that it fits. It can now use the whole height of the screen. If it still doesn't fit, scroll it to read the rest.
 - The outliner shows the inventory as one tree with two views. **By category** lists category, then kind, then place, then the objects. **By place** lists place, then category, then kind, then the objects. Every list is in alphabetical order, and numbers compare by value, so `T-2` comes before `T-10`. A row's tooltip appears after about half a second.
 - An unprotected crossing without a crossing controller is a game-defined group: its crossbucks and pads. You can select it in the outliner or in the world. Beyond 125 metres it shows as one square marker and one object frame, as a grade-crossing setup does.
 - A hierarchy path that several objects share is refused with the reason "N objects have this hierarchy path, and a scene patch file names an object by its path". The footer says that the object can't be edited while another object has the same hierarchy path.

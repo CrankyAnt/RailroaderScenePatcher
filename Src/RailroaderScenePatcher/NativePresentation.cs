@@ -46,7 +46,8 @@ namespace RailroaderScenePatcher {
     public sealed class HelpWindow : BuilderWindowBase {
         internal Action<UIPanelBuilder> Build;
         internal const string WindowIdentifier = "crankyant/scene-patcher/help";
-        // Width is the content's: the window's frame adds 24, so the window measures 364.
+        // Width is the content's at its narrowest (PanelPlacement.HelpWidths): the window's frame adds 24, so the
+        // window measures 364 then.
         internal const int Width = 340, DefaultHeight = 300, MinimumHeight = 120;
         public override string Identifier => WindowIdentifier;
         public override WindowConfig Config => WindowConfig.Resizable(new Vector2Int(Width, DefaultHeight), new Vector2Int(260, MinimumHeight), Window.Position.UpperLeft);
@@ -392,7 +393,9 @@ namespace RailroaderScenePatcher {
             HelpRegion = null; dirty = true;
         }
         // The help window is as high as its content, within the screen, and stands beside the panel at the height of
-        // the "?" that opened it: right of the panel where the screen has room, else left of it.
+        // the "?" that opened it, moved up where it would pass the screen's bottom: right of the panel where the
+        // screen has room, else left of it. A help too long for the screen at its usual width takes a wider window
+        // (PanelPlacement.HelpSize); what still does not fit is reached by scrolling.
         void SizeHelp() {
             if (help == null || !help.NativeWindow.IsShown) return;
             try {
@@ -400,10 +403,19 @@ namespace RailroaderScenePatcher {
                 var native = help.NativeWindow;
                 var frame = ((RectTransform)native.transform).rect.size - native.GetContentSize();
                 var view = help.GetComponentInChildren<ScrollRect>(true);
-                var wanted = view != null && view.content != null ? LayoutUtility.GetPreferredHeight(view.content) + 12 : native.GetContentSize().y;
-                var most = Mathf.Max(HelpWindow.MinimumHeight, Screen.height / Mathf.Max(0.01f, scale) * 0.8f - frame.y);
-                native.SetContentSize(new Vector2(HelpWindow.Width, Mathf.Clamp(wanted, HelpWindow.MinimumHeight, most)));
+                var screen = Screen.height / Mathf.Max(0.01f, scale);
+                // The text wraps to the window's width, so its height is measured at each width the window may take.
+                float HeightAt(float width) {
+                    if (view == null || view.content == null) return native.GetContentSize().y;
+                    native.SetContentSize(new Vector2(width, screen));
+                    Canvas.ForceUpdateCanvases();
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(view.content);
+                    return LayoutUtility.GetPreferredHeight(view.content) + 12;
+                }
+                var fit = PanelPlacement.HelpSize(HeightAt, screen, frame.y, HelpWindow.MinimumHeight);
+                native.SetContentSize(new Vector2(fit.Width, fit.Height));
                 Canvas.ForceUpdateCanvases();
+                if (view != null) view.verticalNormalizedPosition = 1;
                 var size = Bounds((RectTransform)native.transform).size;
                 // Beside the panel, never over it: the region the help explains stays in view.
                 var panel = PanelBounds;

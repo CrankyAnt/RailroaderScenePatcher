@@ -1049,6 +1049,22 @@ namespace RailroaderScenePatcher {
         // same width. Its height is what remains below that edge, at most the window's default height or what remains
         // below the Map Editor window, whichever is more, and never less than the minimum height.
         // mapEditorWidth is 0 when the Map Editor window is not shown; the window then keeps its default size at the left.
+        // The content size of a help window, in canvas units. It is as high as its content and as narrow as the first
+        // width at which the content fits the screen: a long help, such as the outliner's, takes a wider window
+        // instead of running past what the screen can show. Content that fits at no width takes the widest window at
+        // the screen's height, and its scroll view shows the rest. contentHeight gives the content's height at a width;
+        // screenHeight is the screen's height and frame what the window adds around its content, both in canvas units.
+        internal static readonly float[] HelpWidths = { 340, 430, 520, 610 };
+        internal const float HelpMargin = 8;
+        internal static Area HelpSize(Func<float, float> contentHeight, float screenHeight, float frame, float minimumHeight) {
+            var most = Math.Max(minimumHeight, screenHeight - frame - 2 * HelpMargin);
+            float width = HelpWidths[0], height = most;
+            foreach (var candidate in HelpWidths) {
+                width = candidate; height = contentHeight(candidate);
+                if (height <= most) break;
+            }
+            return new Area { Width = width, Height = Math.Max(minimumHeight, Math.Min(height, most)) };
+        }
         // Where a help window stands: beside the panel, never over it, so the region it explains stays in view. To the
         // right of the panel where the screen has room, else to its left; its top at the "?" that opened it, within
         // the screen. Only when neither side has room does it take the side with more of it, at the screen's edge.

@@ -38,7 +38,11 @@ static class OutlineTreeTests {
             // What has no row, counted from the fixture alone: the three sign containers that hold only track markers,
             // and the track spans no crossing controller holds.
             var containers = new[] { "World/Large Scenery/Bryson/Bryson Signs", "World/Large Scenery/Ela/Signs", "World/Large Scenery/Sylva/Sylva Signs" };
+            // Every listed track span of the base map is a detection span of a crossing controller: the spans the game
+            // builds from its operations data are not in the inventory, so the outliner hides no span here.
             var nativeSpans = entries.Count(e => e.Family == SceneFamilies.TrackSpan && e.HolderPath == null);
+            Check(nativeSpans == 0 && OutlinerGrouping.HiddenCount(entries) == containers.Length, "on the base map the sign containers are the only objects without a row (" + OutlinerGrouping.HiddenCount(entries) + ")");
+            Check(byCategory.Hidden.OrderBy(h => h, StringComparer.Ordinal).SequenceEqual(containers.Select(c => "container object " + c)), "the hidden list names the objects of the inventory without a row: " + String.Join(" | ", byCategory.Hidden));
             Check(OutlinerGrouping.SignContainers(entries).Select(e => e.Identity.Path).OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(containers), "the sign containers are Bryson Signs, Ela Signs and Sylva Signs (got " + String.Join(", ", OutlinerGrouping.SignContainers(entries).Select(e => e.Identity.Path)) + ")");
             foreach (var view in new[] { new { Name = "By category", Tree = byCategory, Place = false }, new { Name = "By place", Tree = byPlace, Place = true } }) {
                 var tops = view.Tree.Tops;
