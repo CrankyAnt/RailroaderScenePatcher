@@ -8,6 +8,7 @@ static class HelpWindowTests {
     static bool Near(float a, float b) => Math.Abs(a - b) < 0.01f;
     internal static void Run() {
         TheWheelMovesAsTheGamesScrollViewsDo();
+        TheWheelReachesTheEndOfTheContent();
         AHelpNeverCoversTheMapEditorsTitleBar();
         AHelpFollowsItsQuestionMarkThroughAScaleChange();
         Console.WriteLine("PASS: help windows scroll at the game's wheel step, keep off the Map Editor's title bar and follow a UI scale change");
@@ -17,6 +18,16 @@ static class HelpWindowTests {
         Check(CommandBand.WheelStep(true, false) == 20, "On Windows a notch moves 20 units, about a text line");
         Check(CommandBand.WheelStep(false, true) == 2, "On macOS a notch moves 2 units");
         Check(CommandBand.WheelStep(false, false) == 1, "Elsewhere a notch moves 1 unit");
+    }
+
+    static void TheWheelReachesTheEndOfTheContent() {
+        // The outliner's help at 1.25: 1100 units of content in a view of 880, so 220 units are hidden.
+        var offset = 0f;
+        for (var notch = 0; notch < 30; notch++) offset = CommandBand.WheelOffset(offset, -1, 20, 1100, 880);
+        Check(Near(offset, 220), "Wheeling down reaches the content's end and stops there");
+        Check(Near(CommandBand.WheelOffset(42, -1, 20, 1100, 880), 62), "One notch down moves one step");
+        Check(Near(CommandBand.WheelOffset(10, 1, 20, 1100, 880), 0), "Wheeling up stops at the top");
+        Check(Near(CommandBand.WheelOffset(0, -1, 20, 600, 880), 0), "Content that fits does not scroll");
     }
 
     static void AHelpNeverCoversTheMapEditorsTitleBar() {

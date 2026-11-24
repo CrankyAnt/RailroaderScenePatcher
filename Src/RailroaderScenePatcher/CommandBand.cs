@@ -195,6 +195,10 @@ namespace RailroaderScenePatcher {
         // The canvas units a scroll view moves per mouse wheel notch, as the game's ScrollRectSettingsApplicator sets
         // them: 20 on Windows, 2 on macOS, and 1 elsewhere. Unity's own default is 1, a twentieth of a text line.
         internal static float WheelStep(bool windows, bool mac) => windows ? 20 : mac ? 2 : 1;
+        // A scroll view's offset from the content's top after wheel notches (positive up), at step units per notch,
+        // within the content's height less the view's: as Unity's ScrollRect moves a clamped view.
+        internal static float WheelOffset(float offset, float notches, float step, float contentHeight, float viewHeight) =>
+            Math.Min(Math.Max(0, offset - notches * step), Math.Max(0, contentHeight - viewHeight));
         internal const float ButtonPadding = 6;
         internal static float ButtonWidth(params float[] labelWidths) {
             float widest = 0;

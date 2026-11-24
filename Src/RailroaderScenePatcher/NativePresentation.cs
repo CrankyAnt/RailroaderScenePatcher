@@ -720,6 +720,7 @@ namespace RailroaderScenePatcher {
             if (scrollRect != null) scrollRect.scrollSensitivity = CommandBand.WheelStep(
                 Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor,
                 Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.OSXEditor);
+            if (scrollRect != null && view.GetComponent<WheelFallback>() == null) view.gameObject.AddComponent<WheelFallback>();
             return view;
         }
         internal Action Action(Action action) => () => {
