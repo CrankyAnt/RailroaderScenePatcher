@@ -216,7 +216,7 @@ static class CoalLoaderTests {
         foreach (var mod in new[] { Mod("mine", MineLoader, BakedSceneryParts.Structure, 1337.85), Mod("mine", MineLoader, BakedSceneryParts.Structure, 1317.85, ",\"active\":false") }) {
             var alone = new LoaderWorld();
             var refused = alone.Engine.Apply(Doc(mod));
-            Assert(refused.Outcomes.Count == 1 && !refused.Outcomes["mine"].Applied && refused.Outcomes["mine"].Error == "Target must resolve uniquely" && alone.LoaderUnedited,
+            Assert(refused.Outcomes.Count == 1 && !refused.Outcomes["mine"].Applied && refused.Outcomes["mine"].Error == PatchEngine.TargetMissing + " " + PatchEngine.TargetMissingAction && alone.LoaderUnedited,
                 "A move or a disable of MineLoader on its own is refused: " + Outcomes(refused) + " | " + alone.State);
         }
 

@@ -314,6 +314,7 @@ class Program {
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();
+        BakedSceneryCheckTests.Run();
         BakedCategoryTests.Run();
         BakedPartTests.Run();
         CrossbuckTests.Run();

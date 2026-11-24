@@ -276,16 +276,17 @@ namespace RailroaderScenePatcher {
             for (var i = 0; i < t.childCount; i++) Signature(t.GetChild(i), depth + 1, key, limit);
             key.Append('/');
         }
-        // One line per candidate of the rule and per scene object below a listed group root, for evidence that compares
-        // the listed and unlisted group roots and parts.
-        internal static IEnumerable<string> Report() =>
-            Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + ": " +
+        // Each candidate of the rule and each scene object below a listed group root, as its scene path with its verdict,
+        // for the debug summary (BakedSceneryChecks.Summary) that compares the listed and unlisted group roots and parts.
+        internal static IEnumerable<KeyValuePair<string, string>> Report() =>
+            Verdicts().Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
                 (p.Value.Disposition == GroupDisposition.Group ? "Listed as a scenery group" : p.Value.Disposition == GroupDisposition.InspectionOnly ? "Listed for inspection only" : p.Value.Disposition == GroupDisposition.ExistingFamily ? "Listed in another object family" : "Not listed") +
-                (p.Value.Reason == null ? "" : ". Reason: " + p.Value.Reason) + (p.Value.Category == null ? "" : ". Category: " + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory)))
-                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Key.scene.name + "/" + p.Value.Path + ": " +
+                Reason(p.Value.Reason) + (p.Value.Category == null ? "" : ". Category: " + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory))))
+                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => new KeyValuePair<string, string>(p.Key.scene.name + "/" + p.Value.Path,
                     (p.Value.Disposition == PartDisposition.Part ? "Listed as a scenery part" : p.Value.Disposition == PartDisposition.ExistingFamily ? "Listed in another object family" : "Not listed as a scenery part") +
-                    (p.Value.Reason == null ? "" : ". Reason: " + p.Value.Reason)))
-                .OrderBy(line => line, StringComparer.Ordinal);
+                    Reason(p.Value.Reason))));
+        // A reason that is a sentence keeps one full stop before the clause that follows it.
+        static string Reason(string reason) => reason == null ? "" : ". Reason: " + reason.TrimEnd('.');
         internal static GroupRootVerdict VerdictOf(GameObject go) => go != null && Verdicts().TryGetValue(go, out var verdict) ? verdict : null;
         // The family an inspection-only candidate of the rule is listed under, or null when the rule lists none. A listed
         // part stands in the family of its group.

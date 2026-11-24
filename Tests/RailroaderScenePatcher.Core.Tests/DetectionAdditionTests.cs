@@ -87,10 +87,10 @@ static partial class CoverageTests {
         Assert(mismatch.Error != null && mismatch.Outcomes.Count == 0 && m.World.Mutations == 0 && m.Native, "A scene patch file for another map adds nothing");
         var u = new Fixture();
         var unknown = new PatchEngine(u.Scene).Apply(Doc(Add("add", Addition("siding"), "World/Crossings/Gone")));
-        Assert(!unknown.Outcomes["add"].Applied && unknown.Outcomes["add"].Error.Contains("resolve uniquely") && u.World.Mutations == 0, "An addition for a missing crossing is refused");
+        Assert(!unknown.Outcomes["add"].Applied && unknown.Outcomes["add"].Error == PatchEngine.TargetMissing + " " + PatchEngine.TargetMissingAction && u.World.Mutations == 0, "An addition for a missing crossing is refused");
         u.World.Objects[CrossingPath].Add(u.Other);
         var ambiguous = new PatchEngine(u.Scene).Apply(Doc(Add("add", Addition("siding"))));
-        Assert(!ambiguous.Outcomes["add"].Applied && ambiguous.Outcomes["add"].Error.Contains("resolve uniquely") && u.World.Mutations == 0, "An addition for an ambiguous crossing is refused");
+        Assert(!ambiguous.Outcomes["add"].Applied && ambiguous.Outcomes["add"].Error == PatchEngine.TargetAmbiguous && u.World.Mutations == 0, "An addition for an ambiguous crossing is refused");
     }
     static void AdditionIdentityIsScopedToItsScenePatchFile() {
         // One scene patch file uses each addition ID once: the ID names one addition of its mod, wherever the entries stand.

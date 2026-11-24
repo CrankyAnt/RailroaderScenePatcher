@@ -91,4 +91,27 @@ namespace RailroaderScenePatcher.Core {
         public void Debug(string key, Func<string> text) { if (PatcherLog.DebugEnabled && First(key)) PatcherLog.Debug(text); }
         public void Clear() { lock (written) written.Clear(); }
     }
+
+    // Writes a debug diagnostic that is checked again and again, such as a frame check, the first time per key and again
+    // only when its text changes. The text is built only while the debug option is on. Clear starts over, for example at
+    // a new load attempt.
+    public sealed class LogOnChange {
+        readonly Dictionary<string, string> last = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Whether the text differs from the last one recorded for the key; a changed text is recorded.
+        public bool Changed(string key, string text) {
+            lock (last) {
+                key = key ?? "";
+                if (last.TryGetValue(key, out var known) && String.Equals(known, text, StringComparison.Ordinal)) return false;
+                last[key] = text;
+                return true;
+            }
+        }
+        public void Debug(string key, Func<string> text) {
+            if (!PatcherLog.DebugEnabled || text == null) return;
+            string built;
+            try { built = text(); } catch { return; }
+            if (built != null && Changed(key, built)) PatcherLog.Debug(built);
+        }
+        public void Clear() { lock (last) last.Clear(); }
+    }
 }

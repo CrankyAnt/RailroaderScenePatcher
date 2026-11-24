@@ -436,7 +436,9 @@ namespace RailroaderScenePatcher.Core {
                 Observe("resolve", scenePatchFileKey, id, identity.Path);
                 IReadOnlyList<object> matches;
                 try { matches = Matches(identity); } catch (InvalidOperationException) { outcome.Cause = FailureCause.InvalidDefinition; throw; }
-                if (matches == null || matches.Count != 1 || matches[0] == null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException("Target must resolve uniquely"); }
+                var unresolved = UnresolvedTarget(matches);
+                // Applying a scene patch file tells the modder what to correct; an edit adds its own recovery guidance.
+                if (unresolved != null) { outcome.Cause = FailureCause.InvalidDefinition; throw new InvalidOperationException(inspectedTargets == null && unresolved == TargetMissing ? unresolved + " " + TargetMissingAction : unresolved); }
                 var resolved = matches[0];
                 Track(identity, resolved);
                 var mapContext = scene.MapIds.ToArray();
@@ -525,9 +527,16 @@ namespace RailroaderScenePatcher.Core {
             }
             return scene.Resolve(identity);
         }
+        // The refusals of a target that does not match exactly one object of the loaded scene.
+        public const string TargetMissing = "No object in the loaded map matches this target.";
+        public const string TargetMissingAction = "Check the target's scene, path and component against the map, or remove this modification from the scene patch file.";
+        public const string TargetAmbiguous = "More than one object in the loaded map matches this target.";
+        static string UnresolvedTarget(IReadOnlyList<object> matches) =>
+            matches == null || matches.Count == 0 || (matches.Count == 1 && matches[0] == null) ? TargetMissing : matches.Count != 1 ? TargetAmbiguous : null;
         internal object ResolveFresh(TargetIdentity identity) {
             var matches = Matches(identity);
-            if (matches == null || matches.Count != 1 || matches[0] == null) throw new InvalidOperationException("Target must resolve uniquely");
+            var unresolved = UnresolvedTarget(matches);
+            if (unresolved != null) throw new InvalidOperationException(unresolved);
             Track(identity, matches[0]);
             return matches[0];
         }

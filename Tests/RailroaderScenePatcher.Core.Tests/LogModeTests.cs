@@ -28,6 +28,7 @@ static class LogModeTests {
         Modes();
         DebugTextIsBuiltOnlyWithDebugOn();
         Once();
+        OnChange();
         ExceptionDetail();
         AbsolutePaths();
         ScenePatchFiles();
@@ -66,8 +67,9 @@ static class LogModeTests {
             LoadedMod.Read("h/unsupported", Info("Unsupported", Patcher), Doc(Move("m", "here", 5, ",\"future\":true") + "," + Move("n", "here", 6))),
         };
         var maps = scene.MapIds.ToArray();
+        var lastRows = new Rows();
         string[] Player(bool debug, out RecordingLog log) {
-            var rows = new Rows();
+            var rows = lastRows = new Rows();
             log = RecordingLog.Capture(debug, () => {
                 foreach (var file in new PatchRuntime(new PatchEngine(scene), rows, "0.6.0", "game").ApplyLoaded(mods, null)) file.WriteLog(1, maps);
             });
@@ -84,6 +86,10 @@ static class LogModeTests {
         Assert(Line("f/format").StartsWith("Warning Format [f/format]: the scene patch file wasn't applied: ", StringComparison.Ordinal) && Line("f/format").Contains("format version 2"), "An unsupported format version is a warning: " + Line("f/format"));
         Assert(Line("g/metadata") == "Warning g/metadata [g/metadata]: the scene patch file wasn't applied: Cannot read scene patch file or supplying metadata: JsonReaderException.", "Unreadable metadata is a warning: " + Line("g/metadata"));
         Assert(Line("h/unsupported").StartsWith("Warning Unsupported [h/unsupported]: modification m wasn't applied because the game can't apply it in play: m: Unsupported", StringComparison.Ordinal), "A modification unsupported in play is a warning that names it: " + Line("h/unsupported"));
+        // The Log window row of a target that is not in the loaded map says what is missing and what the modder can do.
+        var missing = lastRows.Failures.Single(f => f.ModIdentifier == "d/missing-target").Message;
+        Assert(missing.Contains("No object in the loaded map matches this target. Check the target's scene, path and component against the map, or remove this modification from the scene patch file.") && !missing.Contains("resolve uniquely"),
+            "A missing target reads in plain words: " + missing);
         var on = Player(true, out var onLog);
         Assert(on.SequenceEqual(off), "Debug on keeps the same player lines");
         var debug = onLog.At(LogLevel.Debug).Where(l => !l.StartsWith(PatchEngine.AttemptTrace, StringComparison.Ordinal)).ToArray();
@@ -128,6 +134,25 @@ static class LogModeTests {
             once.Warning("culling/a/broken", "Object a: broken");
         });
         Assert(log.At(LogLevel.Warning).SequenceEqual(new[] { "Object a: broken", "Object b: broken", "Object a: broken" }), "A repeated failure is written once per key until the keys clear");
+    }
+
+    // A diagnostic that is checked every frame, such as a frame check: written per key the first time and again only when its
+    // text changes, built only while debug is on.
+    static void OnChange() {
+        var change = new LogOnChange(); var built = 0;
+        Func<string> same = () => { built++; return "Frame check for Heap. Distance: 12 m"; };
+        var off = RecordingLog.Capture(false, () => change.Debug("heap", same));
+        Assert(off.Lines.Count == 0 && built == 0, "Debug off builds and writes no frame check");
+        var log = RecordingLog.Capture(true, () => {
+            for (var frame = 0; frame < 3; frame++) change.Debug("heap", same);
+            change.Debug("dock", () => "Frame check for Dock. Distance: 30 m");
+            change.Debug("heap", () => "Frame check for Heap. Distance: 40 m");
+            change.Debug("heap", () => "Frame check for Heap. Distance: 40 m");
+            change.Clear();
+            change.Debug("heap", () => "Frame check for Heap. Distance: 40 m");
+        });
+        Assert(log.At(LogLevel.Debug).SequenceEqual(new[] { "Frame check for Heap. Distance: 12 m", "Frame check for Dock. Distance: 30 m", "Frame check for Heap. Distance: 40 m", "Frame check for Heap. Distance: 40 m" }),
+            "A frame check is written once per object and again only when it changes, until the keys clear");
     }
 
     static void ExceptionDetail() {

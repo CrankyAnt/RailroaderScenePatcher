@@ -1616,16 +1616,15 @@ namespace RailroaderScenePatcher {
         // A crossing pad's geometry is generated along its track binding: a placement moves the pad object and nothing
         // the player sees, and its result says so.
         bool IsPad => selected != null && selected.Identity.Structure == CrossingPadScene.Structure;
-        // The baked scenery rule's verdicts, a debug line once per load attempt for the evidence of the listed and
-        // unlisted group roots.
+        // The baked scenery rule's verdicts, a debug summary once per load attempt for the evidence of the listed and
+        // unlisted group roots: a count per verdict, with the objects of a verdict that has few.
         string loggedVerdicts;
         void LogGroupVerdicts() {
             if (loggedVerdicts == loadId) return;
             loggedVerdicts = loadId;
             if (!PatcherLog.DebugEnabled) return;
             try {
-                var lines = GroupWorld.Report().ToArray();
-                PatcherLog.Debug("Baked scenery checks for " + lines.Length + " candidate objects:" + Environment.NewLine + String.Join(Environment.NewLine, lines));
+                PatcherLog.Debug(String.Join(Environment.NewLine, BakedSceneryChecks.Summary(GroupWorld.Report())));
             } catch (Exception e) { PatcherLog.Debug("The patcher couldn't report the baked scenery checks: " + e.GetBaseException().Message); }
         }
         void Inspect() {

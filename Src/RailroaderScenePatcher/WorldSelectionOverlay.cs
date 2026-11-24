@@ -323,6 +323,7 @@ namespace RailroaderScenePatcher {
 
         internal void Release() {
             keptBoxes.Clear();
+            frameChecks.Clear(); observedChoice = null;
             if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
             trackMaterial = null;
             ClearInteraction();
@@ -1037,23 +1038,28 @@ namespace RailroaderScenePatcher {
             kinds[renderer] = kind;
             return kind;
         }
-        // Frame diagnostics, debug output: one block per candidate within range when a world choice opens and after each
-        // camera step. With debug off nothing is collected or built.
+        // Frame diagnostics, debug output: candidates within range are checked when a world choice opens or the inspected
+        // object changes, and after each camera step. Each candidate's block is written the first time and again only when
+        // it changes, after the camera line of its check. With debug off nothing is collected or built.
         const float ObservationStep = 25f;
         const double ObservationRange = 1500;
+        // The inspected object's candidate is built anew for each repaint: the choice is told by its scene object.
         object observedChoice;
         Vector3 observedCamera;
         bool observing;
+        // The camera line of the current check, written before its first changed block.
+        string observedCameraLine;
+        readonly LogOnChange frameChecks = new LogOnChange();
         void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
-            var choice = (object)pending ?? source;
+            var choice = (object)pending ?? source?.Choice.Handle;
             observing = PatcherLog.DebugEnabled && choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
             if (!observing) return;
             observedChoice = choice; observedCamera = camera.transform.position;
-            PatcherLog.Debug("Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+            observedCameraLine = "Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
                 camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
-                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.");
+                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.";
         }
-        static void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
+        void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
             List<string> skipped, ObjectMarkingFrame result, Rect view) {
             var text = new System.Text.StringBuilder();
             text.Append("Frame check for ").Append(candidate.Choice.Label).Append(". Distance: ").Append(Number(result.Distance)).Append(" m")
@@ -1069,7 +1075,11 @@ namespace RailroaderScenePatcher {
                     .Append(". Detail group and level: ").Append(lod).Append(". Active: ").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
                     .Append(". Frame result: ").Append(decision.Length == 0 ? "none" : decision);
             }
-            PatcherLog.Debug(text.ToString());
+            var block = text.ToString();
+            var key = candidate.Choice.Label + "|" + (candidate.Choice.Handle is GameObject go && go != null ? BoardScene.PathOf(go.transform) : "");
+            if (!frameChecks.Changed(key, block)) return;
+            if (observedCameraLine != null) { PatcherLog.Debug(observedCameraLine); observedCameraLine = null; }
+            PatcherLog.Debug(block);
         }
         static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
         static string Vector(Vector3 v) => Number(v.x) + "/" + Number(v.y) + "/" + Number(v.z);

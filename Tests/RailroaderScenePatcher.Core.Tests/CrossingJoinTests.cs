@@ -210,7 +210,7 @@ static class CrossingJoinTests {
         twin.Local.Enter("map", new object());
         twin.Coverage.Objects[CrossingPath].Add(new FakeCrossing());
         result = twin.Local.Engine.Apply(File, Pack);
-        Assert(result.Outcomes.Values.All(o => !o.Applied && o.Error.Contains("Target must resolve uniquely")) && twin.Coverage.Mutations == 0 && twin.Equipment.Mutations == 0, "A crossing identity that is ambiguous on this peer changes nothing: " + Errors(result));
+        Assert(result.Outcomes.Values.All(o => !o.Applied && o.Error.Contains(PatchEngine.TargetAmbiguous)) && twin.Coverage.Mutations == 0 && twin.Equipment.Mutations == 0, "A crossing identity that is ambiguous on this peer changes nothing: " + Errors(result));
         Assert(host.Counters == hostState && host.Problem == null && noBell.Diagnostics.Failures.Count == 1 && noBell.Diagnostics.Failures[0].Operation == "equip" && noBell.Diagnostics.Failures[0].ModIdentifier == Pack, "Each failure is reported once on its own peer, and the host keeps its set");
     }
     // The equipment fails while the client builds it. The client restores what the failed modification did, keeps its

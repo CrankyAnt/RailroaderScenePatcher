@@ -204,7 +204,7 @@ static class CrossingPadTests {
             var (world, pad, rear, scene) = Setup();
             world.Objects["Ambiguous"] = new List<object> { pad, rear };
             var outcome = new PatchEngine(scene).Apply(Doc(Binding("rebind", At("Sj7c", "a", 186), path))).Outcomes["rebind"];
-            Assert(!outcome.Applied && outcome.Error.Contains("resolve uniquely") && world.Mutations == 0 && Mesh(world, pad) == Baseline && Mesh(world, rear) == "Sj7c|a|210@1045", name + " changes nothing: " + outcome.Error);
+            Assert(!outcome.Applied && outcome.Error.StartsWith(name == "missing target" ? PatchEngine.TargetMissing : PatchEngine.TargetAmbiguous, StringComparison.Ordinal) && world.Mutations == 0 && Mesh(world, pad) == Baseline && Mesh(world, rear) == "Sj7c|a|210@1045", name + " changes nothing: " + outcome.Error);
         }
         {
             var (world, pad, rear, scene) = Setup();

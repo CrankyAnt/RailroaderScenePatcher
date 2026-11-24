@@ -1064,4 +1064,21 @@ namespace RailroaderScenePatcher.Core {
         public bool Unsettled(object target) => false;
         public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
     }
+
+    // The debug summary of the baked scenery rule's verdicts for one load attempt. The objects that share a verdict are
+    // counted, and only a verdict with few objects names them, so a player's debug log stays readable.
+    public static class BakedSceneryChecks {
+        public const int ListLimit = 30;
+        // checks holds each candidate object's path with its verdict text.
+        public static IEnumerable<string> Summary(IEnumerable<KeyValuePair<string, string>> checks, int listLimit = ListLimit) {
+            var all = (checks ?? Enumerable.Empty<KeyValuePair<string, string>>()).ToArray();
+            yield return "Baked scenery checks for " + all.Length + " candidate objects, by result:";
+            foreach (var verdict in all.GroupBy(c => c.Value, StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)) {
+                var count = verdict.Count();
+                yield return count + (count == 1 ? " object: " : " objects: ") + verdict.Key;
+                if (count > listLimit) continue;
+                foreach (var path in verdict.Select(c => c.Key).OrderBy(p => p, StringComparer.Ordinal)) yield return "  " + path;
+            }
+        }
+    }
 }

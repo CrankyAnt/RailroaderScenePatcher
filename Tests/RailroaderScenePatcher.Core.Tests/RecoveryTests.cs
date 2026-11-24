@@ -330,7 +330,7 @@ static class RecoveryTests {
     static void EditsOfIneffectiveModificationsAreRefused() {
         var cases = new[] {
             ("missing", Mod("move", "p", Fixed(112), "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
-            ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (Target must resolve uniquely)"),
+            ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (No object in the loaded map matches this target)"),
             ("failed deeper", Mod("move", "p", Fixed(112), "[\"middle\"]") + "," + Mod("middle", "q", "\"active\":true", "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
             ("cyclic", Mod("move", "p", Fixed(112), "[\"loop\"]") + "," + Mod("loop", "q", "\"active\":false", "[\"move\"]"), "its dependencies form the cycle move -> loop -> move"),
             ("self", Mod("move", "p", Fixed(112), "[\"move\"]"), "its dependencies form the cycle move -> move"),
