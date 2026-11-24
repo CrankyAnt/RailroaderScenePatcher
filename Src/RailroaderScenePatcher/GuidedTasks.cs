@@ -314,15 +314,21 @@ namespace RailroaderScenePatcher {
                 Typed(Slot("Apply", "Apply the reviewed changes.", wait, ApplyGuided), () => (Requests.Pending ? "Wait for the scene check to finish." : null) ?? guided.ApplyBlock ?? GuidedValuesBlock()),
                 Slot("Target", "Discard the entered values and return to Target.", wait, GuidedTarget) };
         }
+        // Whether the guided Values step chooses a snap target, or a track location for a binding or a starter placement.
+        bool GuidedSnapValues => guided.Step == GuidedTaskStep.Values && guided.Kind == GuidedTaskKind.Snap;
+        bool GuidedTrackValues => guided.Step == GuidedTaskStep.Values && (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement);
         // The Values step's actions that start or use a world choice: Track and Node for a snap, Segment and Picked for a
-        // track location; none for another task. Segment opens the Connections tab unless keepTab is set.
-        Act[] GuidedWorldActs(string wait, bool keepTab = false) {
-            if (guided.Step != GuidedTaskStep.Values) return new Act[0];
-            if (guided.Kind == GuidedTaskKind.Snap) return new[] {
+        // track location; none for another task. In the full window, Segment opens the Connections tab, whose fields show
+        // the chosen location.
+        Act[] GuidedWorldActs(string wait) => GuidedWorldActs(wait, () => inspectorTab.Value = ConnectionsTab);
+        // The same actions for the compact rail, which follows the active tab: Segment keeps it.
+        Act[] GuidedWorldActsInPlace(string wait) => GuidedWorldActs(wait, null);
+        Act[] GuidedWorldActs(string wait, Action beforeSegment) {
+            if (GuidedSnapValues) return new[] {
                 Slot("Track", "Choose the track to snap to.", wait, () => BeginSnap(SelectionKind.TrackSegment)),
                 Slot("Node", "Choose the endpoint to snap to.", wait, () => BeginSnap(SelectionKind.TrackNode)) };
-            if (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement) return new[] {
-                Slot("Segment", "Choose a track segment in the world.", wait, () => { if (!keepTab) inspectorTab.Value = ConnectionsTab; BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: guided.Kind == GuidedTaskKind.Binding); }),
+            if (GuidedTrackValues) return new[] {
+                Slot("Segment", "Choose a track segment in the world.", wait, () => { beforeSegment?.Invoke(); BeginSelection(SelectionKind.TrackSegment, selected, bindingSlot: guided.Kind == GuidedTaskKind.Binding); }),
                 Slot("Picked", "Fill the fields from the confirmed track location.", wait ?? (GuidedPickedTarget() != null ? null : "Choose and confirm a track segment first."), GuidedPicked) };
             return new Act[0];
         }

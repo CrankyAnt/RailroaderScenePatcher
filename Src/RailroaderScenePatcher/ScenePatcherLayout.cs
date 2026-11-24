@@ -519,7 +519,7 @@ namespace RailroaderScenePatcher {
                     })();
                 });
                 var listLayout = outline.GetComponent<LayoutElement>();
-                listLayout.minHeight = 120; listLayout.flexibleHeight = 10000;
+                listLayout.minHeight = CommandBand.OutlinerLeastHeight; listLayout.flexibleHeight = 10000;
                 // The compact rail trims this view to whole rows, and its row tooltips wait in both windows.
                 presentation.OutlinerView = outline.GetComponent<ScrollRect>();
             });
@@ -550,19 +550,14 @@ namespace RailroaderScenePatcher {
                     Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
                     DrawModeSwitch(row);
                 }).ChildrenKeepHeight().Height(RowHeight);
-            } else {
-                var name = selected.DisplayName;
-                var added = IsAdded(selected);
-                headingRow = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path).Height(RowHeight);
-                if (added) FitEquipmentText(headingRow.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
-            }
+            } else headingRow = ObjectHeading(builder).Height(RowHeight);
             LockControls(headingRow);
             var state = StateLine(out var states);
             // The instruction while nothing is inspected wraps at the heading's size and takes the height its lines need, so it
             // is shown in full at any inspector width: one H3 line holds only part of it at the default window width.
             if (selected == null) Heading(builder, state, null, null, wrap: true);
             else LockControls(builder.HStack(row => {
-                Line(row, state, "State", states, RowHeight).EqualFlexibleWidth(0);
+                StateLineRow(row, state, states).EqualFlexibleWidth(0);
                 DrawModeSwitch(row);
             }).ChildrenKeepHeight().Height(RowHeight));
             // The file panel takes the place of the tabs and the tab body, and of the guided steps, until it is resolved.
@@ -609,6 +604,17 @@ namespace RailroaderScenePatcher {
         // One line under the name: the object's badges and problem count, then its family and states, in the native status
         // colors. The line ends in an ellipsis beside the Inspector and Guided switch, so what is cut off is the family's end,
         // never a badge (CommandBand.StateParts).
+        // The inspected object's name as the heading, with its path in the tooltip; an added object's name is fitted to
+        // the width. The full window and the compact rail share it.
+        RectTransform ObjectHeading(UIPanelBuilder builder) {
+            var name = selected.DisplayName;
+            var added = IsAdded(selected);
+            var heading = Heading(builder, Literal(name), "Object", added ? name : selected.Identity.Path);
+            if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
+            return heading;
+        }
+        // The state line of an inspected object, one row high, with the full states in its tooltip.
+        RectTransform StateLineRow(UIPanelBuilder builder, string state, string states) => Line(builder, state, "State", states, RowHeight);
         string StateLine(out string plain) {
             if (selected == null) { plain = "Select an outliner object or click Select in world."; return plain; }
             var text = new List<string> { selected.Family };
@@ -1470,32 +1476,32 @@ namespace RailroaderScenePatcher {
             }
             // The gizmo owns the row only during a drag, when Escape cancels; while it stands, the row is the general one.
             if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the drag and restore the placement.", null, () => gizmo?.Cancel(), "Cancel gizmo drag") };
-            // A starter placement marker's modification is removed or rechecked from every tab.
-            // Recheck does not meet the several-modifications refusal; Remove modification does.
-            return ModificationActs();
+            return new[] { RemoveModificationAct(), RecheckAct(), GuideAct() };
         }
-        // Remove modification, Recheck, and Guide: the footer's idle row. The compact rail leaves out the removal.
-        Act[] ModificationActs(bool removal = true) {
-            var block = FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : ObjectEditBlock();
+        // Why the inspected object's modification cannot be removed or rechecked now, or null. A starter placement
+        // marker's modification is removed or rechecked from every tab.
+        string ModificationBlock() => FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : ObjectEditBlock();
+        // Remove modification, which meets the several-modifications refusal. The whole modification goes: the control
+        // says so in full and takes two cells. It stands in the full window's footer only.
+        Act RemoveModificationAct() {
             var identity = selected?.Identity;
-            var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.") ?? severalModifications;
-            var remove =
-                // The whole modification goes: the control says so in full and takes two cells.
-                Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
-                    var removed = current.Remove(identity, inspection);
-                    // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
-                    if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
-                    return removed;
-                }), null, 2);
-            var rest = new[] {
-                Slot("Recheck", "Compare the object with the scene patch file after a failed edit. Apply the file's settings wherever they differ.", block, () => {
-                    // Recheck finds and inspects the object again: the panel's own Refresh reads the scene first, so a failed
-                    // attempt that changed the object needs no separate Refresh before its Recheck.
-                    Inspect();
-                    Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection), guarded: false);
-                }),
-                GuideAct() };
-            return removal ? new[] { remove }.Concat(rest).ToArray() : rest;
+            var unchanged = ModificationBlock() ?? (IsChanged(selected) ? null : "This mod does not change this object.") ?? severalModifications;
+            return Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
+                var removed = current.Remove(identity, inspection);
+                // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
+                if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
+                return removed;
+            }), null, 2);
+        }
+        // Recheck, which does not meet the several-modifications refusal.
+        Act RecheckAct() {
+            var identity = selected?.Identity;
+            return Slot("Recheck", "Compare the object with the scene patch file after a failed edit. Apply the file's settings wherever they differ.", ModificationBlock(), () => {
+                // Recheck finds and inspects the object again: the panel's own Refresh reads the scene first, so a failed
+                // attempt that changed the object needs no separate Refresh before its Recheck.
+                Inspect();
+                Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection), guarded: false);
+            });
         }
         // While the inspected object's cleanup is unverified: what remains and how the guard ends, or null. Read from the
         // session's record without searching the scene, so it can run with every rebuild.
@@ -1842,7 +1848,7 @@ namespace RailroaderScenePatcher {
                     new[] { "Map Editor reload", "Reloading the Map Editor ends the Undo and Redo history. Leaving the Map Editor discards unsaved work." },
                     new[] { "Current, Stale, Paused, Saved, Unsaved, Blocked", "The lamps above the outliner show whether its contents are current and whether changes need saving. When a lamp shows Paused, follow the instructions in Version choice, Repair, or Import before inspecting objects. Blocked means Save is unavailable. Hover over a lamp for details." },
                     new[] { "* and +", "* marks an object this mod changes. + marks an object this mod adds. The Unsaved lamp tells you when to save." },
-                    new[] { "Footer", "Remove modification, Recheck, and Guide appear below the messages on every tab. Actions specific to a tab appear at the bottom of that tab." },
+                    new[] { "Footer", "In the full window, Remove modification, Recheck, and Guide appear below the messages on every tab. The compact window shows Recheck and Guide on the Changes tab only; Remove modification stays in the full window. Actions specific to a tab appear at the bottom of that tab." },
                     new[] { "Failed edit", "A refused edit changes nothing. If an edit fails after it starts, the patcher restores the object to how it was. If it cannot verify that restoration, the message lists what remains and further edits are blocked until Recheck succeeds or you reload the Map Editor. Guide opens the guide for the failed action." } },
                 Guides = new[] { new[] { "Modder manual", "modder-manual.md" }, new[] { "Guided tasks", "completing-guided-tasks.md" }, new[] { "Scene patch file reference", "scene-patch-file-v1.md" } } },
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
@@ -1908,7 +1914,7 @@ namespace RailroaderScenePatcher {
             builder.AddLabel("<style=H3>" + help.Title + "</style>");
             // The window commands stand in the title bar; where it could not take one, the window's help holds it.
             if (region == NativePresentation.WindowHelpRegion && (!presentation.TitleReset || !presentation.TitleDetails || !presentation.TitleCompact)) builder.HStack(row => {
-                if (!presentation.TitleReset) Button(row, "Reset layout", ResetLayout).Tooltip("Reset layout", "Put the window at its default place again, restore the outliner width, and move the help and session details back beside it.");
+                if (!presentation.TitleReset) Button(row, "Reset layout", ResetLayout).Tooltip("Reset layout", "Put the window at its default place again, restore the outliner width, and move the help and session details back beside it. The compact window returns to the full window.");
                 if (!presentation.TitleDetails) Button(row, "Session details", () => presentation.ToggleDetails()).Tooltip("Session details", "Open or close the session details in their own window.");
                 if (!presentation.TitleCompact) Button(row, "Compact window", () => presentation.ToggleCompact()).Tooltip("Compact window", "Switch to a compact side rail that leaves more of the world in view.");
             }).Height(RowHeight);

@@ -39,9 +39,6 @@ namespace RailroaderScenePatcher {
             }
         }
 
-        bool CompactGuidedSnap => guided.Step == GuidedTaskStep.Values && guided.Kind == GuidedTaskKind.Snap;
-        bool CompactGuidedTrack => guided.Step == GuidedTaskStep.Values && (guided.Kind == GuidedTaskKind.Binding || guided.Kind == GuidedTaskKind.StarterPlacement);
-
         void DrawCompact(UIPanelBuilder builder) {
             typed.Clear();
             gizmoPlacement = null;
@@ -51,17 +48,17 @@ namespace RailroaderScenePatcher {
             CompactLeftBand(builder);
             DrawRightBand(builder);
             CompactHeading(builder, view);
-            if (view.Fills && selected != null) view.Context(builder);
+            if (FillsRail(view)) view.Context(builder);
             else CompactContextBlock(builder, view);
             CompactFooter(builder, view);
             CompactOutlinerSection(builder);
-            builder.Spacer(NativePresentation.CompactGripClearance);
+            builder.Spacer(CompactRail.GripClearance);
         }
 
         // The left band at the rail's width. The full window's width stays as it was for its next build.
         void CompactLeftBand(UIPanelBuilder builder) {
             var fullWidth = leftBandWidth;
-            leftBandWidth = NativePresentation.CompactRailContent;
+            leftBandWidth = CompactRail.Width;
             try { DrawLeftBand(builder); } finally { leftBandWidth = fullWidth; }
         }
 
@@ -70,17 +67,12 @@ namespace RailroaderScenePatcher {
         void CompactHeading(UIPanelBuilder builder, CompactView view) {
             builder.HStack(row => {
                 if (selected == null) Heading(row, "No Selection", null, null).EqualFlexibleWidth(0);
-                else {
-                    var name = selected.DisplayName;
-                    var added = IsAdded(selected);
-                    var heading = Heading(row, Literal(name), "Object", added ? name : selected.Identity.Path).EqualFlexibleWidth(0);
-                    if (added) FitEquipmentText(heading.GetComponent<TMP_Text>(), selected.Family, name, value => "<style=H3>" + Literal(value) + "</style>");
-                }
+                else ObjectHeading(row).EqualFlexibleWidth(0);
                 CompactModeLabel(row, view);
             }).ChildrenKeepHeight().Height(RowHeight);
             var state = StateLine(out var states);
             if (selected == null) Line(builder, state, null, null, RowHeight);
-            else Line(builder, state, "State", states, RowHeight);
+            else StateLineRow(builder, state, states);
         }
 
         void CompactModeLabel(UIPanelBuilder row, CompactView view) {
@@ -111,7 +103,7 @@ namespace RailroaderScenePatcher {
 
         void CompactPlacementContext(UIPanelBuilder builder) {
             var collapsed = !presentation.CompactOutlinerShown;
-            var minHeight = collapsed ? NativePresentation.CompactPlacementCollapsedBody : NativePresentation.CompactPlacementBody;
+            var minHeight = collapsed ? CompactRail.PlacementCollapsedBody : CompactRail.PlacementBody;
             var body = presentation.Scroll(builder, minHeight, content => {
                 content.ConfigureLayout(4f);
                 DrawPlacement(content);
@@ -120,7 +112,7 @@ namespace RailroaderScenePatcher {
             var fill = body.GetComponent<LayoutElement>();
             if (fill != null) {
                 fill.minHeight = minHeight;
-                fill.preferredHeight = NativePresentation.CompactPlacementBody;
+                fill.preferredHeight = CompactRail.PlacementBody;
                 fill.flexibleHeight = collapsed ? 10000 : 0;
             }
             var viewport = body.GetComponent<ScrollRect>().viewport;
@@ -183,10 +175,7 @@ namespace RailroaderScenePatcher {
         }
 
         void CompactBindingContext(UIPanelBuilder builder) {
-            var bindingText = CompactRail.LocationText(CurrentBinding());
-            Line(builder, "<style=FieldLabel>" + (IsPad ? "PAD BINDING" : "TRACK BINDING") + "</style> " + Literal(bindingText),
-                IsPad ? "Crossing pad binding" : "Track binding",
-                IsPad ? "Track location: " + bindingText + ". The pad's geometry is generated along this binding." : "Track location: " + bindingText + ". Changing a binding does not move the object.", LineHeight);
+            CompactBindingLine(builder);
             if (HasPickedBinding) {
                 var pickedText = CompactRail.LocationText(binding);
                 Line(builder, "<style=FieldLabel>PICKED</style> " + Tint(Green, pickedText), "Picked track location", "Picked track location ready for Set: " + pickedText + ".", LineHeight);
@@ -226,14 +215,23 @@ namespace RailroaderScenePatcher {
             var summary = guided.Kind == null ? "No task chosen yet" : GuidedName(guided.Kind.Value) + " (" + guided.Step + ")";
             Line(builder, "<b>" + Literal(summary) + "</b>", "Guided task", summary, LineHeight);
             if (selected != null) CompactHonestPlacement(builder);
-            if (CompactGuidedSnap) {
+            if (GuidedSnapValues) {
                 var snapText = preparedSnap?.Identity.ToString() ?? "None chosen";
                 Line(builder, "<style=FieldLabel>SNAP TARGET</style> " + Literal(snapText), "Snap target", snapText, LineHeight);
-            } else if (CompactGuidedTrack) {
+            } else if (GuidedTrackValues) {
                 var draft = CompactRail.LocationText(guidedFields, "None entered");
                 Line(builder, "<style=FieldLabel>DRAFT LOCATION</style> " + Literal(draft), "Draft track location", draft, LineHeight);
             }
             Line(builder, "<style=Footnote>" + (guided.Kind == null ? "Choose a task in the full window." : "Switch to the full window to finish this guided task.") + "</style>", null, null, LineHeight);
+        }
+
+        // The current track binding on one line: a crossing pad's, which places the pad, or a marker's.
+        void CompactBindingLine(UIPanelBuilder builder) {
+            var bindingText = CompactRail.LocationText(CurrentBinding());
+            Line(builder, "<style=FieldLabel>" + (IsPad ? "PAD BINDING" : "TRACK BINDING") + "</style> " + Literal(bindingText),
+                IsPad ? "Crossing pad binding" : "Track binding",
+                IsPad ? "Track location: " + bindingText + ". The pad is generated along this binding and moves by it, not by its object position."
+                    : "Track location: " + bindingText + ". Changing a binding does not move the object.", LineHeight);
         }
 
         // ---- Placement readouts ----
@@ -243,9 +241,7 @@ namespace RailroaderScenePatcher {
         void CompactHonestPlacement(UIPanelBuilder builder) {
             if (IsStarter) { CompactStarterLines(builder); return; }
             if (IsPad) {
-                var bindingText = CompactRail.LocationText(CurrentBinding());
-                Line(builder, "<style=FieldLabel>PAD BINDING</style> " + Literal(bindingText), "Crossing pad binding",
-                    "Track location: " + bindingText + ". A crossing pad moves by its track binding, not by its object position.", LineHeight);
+                CompactBindingLine(builder);
                 CompactEnabledLine(builder);
                 return;
             }
@@ -296,16 +292,19 @@ namespace RailroaderScenePatcher {
 
         // The footer's own message area, then one action row: a world choice or a gizmo drag takes it over, as in the
         // footer; otherwise it holds the active view's actions.
+        // Whether the view's context, the Placement body of an inspected object, takes the rail's free height.
+        bool FillsRail(CompactView view) => view.Fills && selected != null;
+
         void CompactFooter(UIPanelBuilder builder, CompactView view) {
-            var area = DrawMessages(builder, NativePresentation.CompactMessageHeight);
-            var placementFills = inspectorTab.Value == PlacementTab && !guided.Enabled && selected != null;
-            area.flexibleHeight = !presentation.CompactOutlinerShown && !placementFills ? 10000 : 0;
+            var area = DrawMessages(builder, CompactRail.MessageHeight);
+            // With the outliner hidden, the message area takes the free height unless the Placement body does.
+            area.flexibleHeight = !presentation.CompactOutlinerShown && !FillsRail(view) ? 10000 : 0;
             var acts = selection?.Pending != null || gizmo?.Active == true ? FooterActs() : selected == null && !guided.Enabled ? new Act[0] : view.Acts();
             ActionRow(builder, acts, null);
         }
 
         // The Values step's world choices; Segment keeps the active tab.
-        Act[] CompactGuidedActs() => GuidedWorldActs(Requests.Pending ? "Wait for the scene check to finish." : null, keepTab: true);
+        Act[] CompactGuidedActs() => GuidedWorldActsInPlace(Requests.Pending ? "Wait for the scene check to finish." : null);
 
         // Enable or Disable and Clear activity from the Object tab, and Select group or Select controller.
         Act[] CompactObjectActs() {
@@ -328,7 +327,7 @@ namespace RailroaderScenePatcher {
         }
 
         // Retry from the Changes tab, then Recheck and Guide from the footer; Remove modification stays in the full window.
-        Act[] CompactChangesActs() => TabActs(ChangesTab).Concat(ModificationActs(removal: false)).ToArray();
+        Act[] CompactChangesActs() => TabActs(ChangesTab).Concat(new[] { RecheckAct(), GuideAct() }).ToArray();
 
         // ---- Outliner ----
 

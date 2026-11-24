@@ -252,7 +252,7 @@ namespace RailroaderScenePatcher {
             }
             try {
                 titleReset = TitleIcon(manager, close.transform.parent, "CrankyAnt Scene Patcher reset layout", ResetGlyph(), () => ResetRequested?.Invoke(),
-                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again, restore the outliner width, and move the help and session details back beside it.", lockReason)), out _);
+                    () => new TooltipInfo("Reset layout", CommandBand.Tooltip("Put the window at its default place again, restore the outliner width, and move the help and session details back beside it. The compact window returns to the full window.", lockReason)), out _);
             } catch (Exception e) {
                 if (titleReset != null) UnityEngine.Object.Destroy(titleReset.gameObject);
                 titleReset = null;
@@ -798,10 +798,13 @@ namespace RailroaderScenePatcher {
         // while another tooltip shows; the rest of the game's grace period keeps it from waiting twice. Outside that
         // mode the game's own half second applies. Buttons keep the game's timing.
         const float RowTooltipDelay = 0.45f;
+        // The game's controller keeps the tooltip it shows in a private field; reading it is the only way to know that a
+        // tooltip already shows. Without the field the rows keep the game's own timing.
         static readonly System.Reflection.FieldInfo lastShownTooltip = typeof(UI.Tooltips.UITooltipController).GetField("_lastShownTooltip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        static string dwellTitle;
-        static float dwellSince;
-        static int dwellFrame = -10;
+        // The row title the pointer rests on, since when, and the last frame its tooltip was asked for.
+        string dwellTitle;
+        float dwellSince;
+        int dwellFrame = -10;
 
         // Rows are pooled and made as the list scrolls, so each tick gives any new row its waiting tooltip.
         void DelayRowTooltips() {
@@ -816,7 +819,7 @@ namespace RailroaderScenePatcher {
             }
         }
 
-        static TooltipInfo RowTooltipDwell(string title) {
+        TooltipInfo RowTooltipDwell(string title) {
             var now = Time.realtimeSinceStartup;
             if (title != dwellTitle || Time.frameCount - dwellFrame > 1) { dwellTitle = title; dwellSince = now; }
             dwellFrame = Time.frameCount;

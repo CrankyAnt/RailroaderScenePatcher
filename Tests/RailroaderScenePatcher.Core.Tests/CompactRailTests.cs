@@ -7,7 +7,7 @@ static class CompactRailTests {
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static bool Near(float a, float b) => Math.Abs(a - b) < 0.01f;
     internal static void Run() {
-        TheOutlinerShowsHalfItsEarlierRows();
+        TheRailSizesFollowFromItsRows();
         TheOutlinerShowsOnlyWholeRows();
         ScrollingRestsOnARowBoundaryInItsDirection();
         AShortContextKeepsTheRoomOfThreeLines();
@@ -15,13 +15,18 @@ static class CompactRailTests {
         TheRailOpensAtTheRightEdgeBottomAligned();
         ATrackLocationReadsAsOneLine();
         FiltersKeepTheirFullWindowNames();
-        Console.WriteLine("PASS: compact window rows, scrolling, context room, default place and one-line texts");
+        TheFullWindowComesBackInCanvasUnits();
+        ADraggedRailKeepsItsPlaceOnAScaleChange();
+        TheFullRecordIsWrittenBackWhileCompact();
+        TheSecondaryWindowsMoveOnceTheButtonIsUp();
+        Console.WriteLine("PASS: compact window sizes, rows, scrolling, context room, places across scale changes, full record, secondary windows and one-line texts");
     }
 
-    static void TheOutlinerShowsHalfItsEarlierRows() {
-        // The first accepted compact window showed 12 rows; the default now shows half of them.
-        Check(CompactRail.OutlinerRows * 2 == 12, "The default outliner shows half of the 12 rows it showed before");
-        Check(CompactRail.OutlinerRows * CompactRail.OutlinerRow > 120, "The default rows stand above the outliner's least height of 120");
+    static void TheRailSizesFollowFromItsRows() {
+        Check(Near(CompactRail.CollapsedContent, 476), "With the outliner hidden, the least content height is 476");
+        Check(Near(CompactRail.ExpandedLeastContent, 656), "With the outliner shown, the least content height is 656");
+        Check(CompactRail.OutlinerRows == 6, "The default outliner shows six rows");
+        Check(CompactRail.OutlinerRows * CompactRail.OutlinerRow > CommandBand.OutlinerLeastHeight, "The default rows stand above the outliner's least height");
     }
 
     static void TheOutlinerShowsOnlyWholeRows() {
@@ -78,5 +83,50 @@ static class CompactRailTests {
         Check(CompactRail.FilterName(OutlinerFilter.Changed) == CommandBand.ChangedFilter, "Changed keeps its name");
         Check(CompactRail.FilterName(OutlinerFilter.Disabled) == CommandBand.DisabledFilter, "Disabled keeps its name");
         Check(CompactRail.FilterName(OutlinerFilter.Problems) == CommandBand.ProblemsFilter, "Problems keeps its name");
+    }
+
+    static void TheFullWindowComesBackInCanvasUnits() {
+        // Entered at scale 1.0 with a window of 734 x 660 at (100, 50); left at scale 1.25.
+        var pixels = new PanelPlacement.Area { X = 100, Y = 50, Width = 734, Height = 660 };
+        var canvas = CompactRail.ToCanvas(pixels, 1);
+        var back = CompactRail.RestoredFull(canvas, 1.25f, 704, 470, 2560, 1440);
+        Check(Near(back.X, 125) && Near(back.Y, 62.5f) && Near(back.Width, 917.5f) && Near(back.Height, 825), "The full window keeps its canvas size and place at the new scale");
+        var wide = new PanelPlacement.Area { X = 100, Y = 50, Width = 1000, Height = 700 };
+        var same = CompactRail.RestoredFull(CompactRail.ToCanvas(wide, 1.25f), 1.25f, 704, 470, 2560, 1440);
+        Check(Near(same.X, 100) && Near(same.Y, 50) && Near(same.Width, 1000) && Near(same.Height, 700), "Without a scale change the full window comes back as it was");
+        var small = CompactRail.RestoredFull(new PanelPlacement.Area { X = 0, Y = 0, Width = 600, Height = 400 }, 1, 704, 470, 2560, 1440);
+        Check(Near(small.Width, 704) && Near(small.Height, 470), "The full window comes back at least at its minimum size");
+        var off = CompactRail.RestoredFull(new PanelPlacement.Area { X = 1800, Y = 900, Width = 734, Height = 660 }, 1, 704, 470, 1920, 1080);
+        Check(Near(off.X, 1920 - 734) && Near(off.Y, 1080 - 660), "The full window comes back inside a smaller screen");
+    }
+
+    static void ADraggedRailKeepsItsPlaceOnAScaleChange() {
+        var dragged = new PanelPlacement.Area { X = 800, Y = 300, Width = 400, Height = 700 };
+        var larger = CompactRail.Rescaled(dragged, 1, 1.25f, 450, 600, 2560, 1440);
+        Check(Near(larger.X, 800) && Near(larger.Y, 300) && Near(larger.Width, 500) && Near(larger.Height, 875), "The rail keeps its corner and takes the new scale's size");
+        var edge = CompactRail.Rescaled(new PanelPlacement.Area { X = 2160, Y = 740, Width = 400, Height = 700 }, 1, 1.25f, 450, 600, 2560, 1440);
+        Check(Near(edge.X, 2560 - 500) && Near(edge.Y, 1440 - 875), "A rail at the screen's edge stays inside the screen");
+        var smaller = CompactRail.Rescaled(dragged, 1.25f, 1, 450, 600, 2560, 1440);
+        Check(Near(smaller.Width, 450) && Near(smaller.Height, 600), "The rail keeps at least its least size");
+    }
+
+    static void TheFullRecordIsWrittenBackWhileCompact() {
+        var record = new FullWindowRecord();
+        Check(record.Rewrite("compact") == null, "Without a kept record nothing is written");
+        record.Keep("full");
+        Check(record.Rewrite("compact") == "full", "A record the native persistence changed is written back");
+        Check(record.Rewrite("full") == null, "An unchanged record is not written again");
+        record.Keep(null);
+        Check(record.Rewrite("compact") == null, "A record that could not be read is not written");
+    }
+
+    static void TheSecondaryWindowsMoveOnceTheButtonIsUp() {
+        var reset = new SecondaryWindowReset();
+        Check(!reset.Tick(false) && !reset.Pending, "Without a request nothing moves");
+        reset.Request();
+        Check(!reset.Tick(true) && !reset.Tick(true) && reset.Pending, "Nothing moves while the button is down");
+        Check(!reset.Tick(false), "The first tick after the release lets the window take its place");
+        Check(reset.Tick(false) && !reset.Pending, "The next tick moves the secondary windows");
+        Check(!reset.Tick(false), "They move once per request");
     }
 }

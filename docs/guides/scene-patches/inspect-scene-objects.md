@@ -13,7 +13,7 @@ The minimum size is 704 by 470 units. This leaves the outliner, command band, an
 The title bar has four glyphs to the left of the close control. Each has a tooltip with its name:
 
 - **?** opens help for the whole window.
-- **Reset layout**, a round arrow, restores the window's default position and the outliner width. It also puts the help and the session details back beside the window, and the compact window back at its default place and height.
+- **Reset layout**, a round arrow, restores the window's default position and the outliner width. It also puts the help and the session details back beside the window. In the compact window, it returns to the full window, and the compact window opens at its default place and height next time.
 - **Session details**, a page, opens or closes a separate window with the edited mod's scene patch file, supplied definitions, diagnostics and, during a world choice, its candidates. You can move and resize this window. It keeps its position and closes with the panel.
 - **Compact window**, four corners pointing inwards, switches to the compact window. In the compact window, the glyph shows four corners pointing outwards and is named **Full window**; click it to show the full window again.
 
@@ -33,7 +33,7 @@ The compact window has no tabs, search field, outliner filters, or **Reset filte
 
 The outliner shows only whole rows: scrolling stops on a row, and space left below the last row stays empty. Click **Hide outliner** to make the rail lower; click **Show outliner** to show the rows again.
 
-You can drag and resize the compact window. It keeps that place and size until you leave the Map Editor or click **Reset layout**, and the full window keeps its own place. The patcher always starts in the full window, and the full window's place is the one saved for the next session. Help and the session details that you open in the compact window move beside the full window when you switch back. When a scene patch file needs a decision in the **Version choice** or **Repair** panel, the window switches to the full window.
+You can drag and resize the compact window. It keeps that place and size until you leave the Map Editor or click **Reset layout**, also when you change the UI scale, and the full window keeps its own place and size. The patcher always starts in the full window, and the full window's place is the one saved for the next session. Each time you switch back to the full window, the help and the session details move beside it, wherever you placed them before. When a scene patch file needs a decision in the **Version choice** or **Repair** panel, the window switches to the full window.
 
 Click **Refresh** in the command band to read the loaded scene and the edited mod's supplied definitions and verify stored target identities. Refresh doesn't apply scene patches, save files, change object activity, repair bindings, or regenerate dependent output. An object can appear without a scene patch or warning.
 
