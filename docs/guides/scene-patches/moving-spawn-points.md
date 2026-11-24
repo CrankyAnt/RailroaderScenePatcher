@@ -6,7 +6,7 @@ Move, rotate, disable, or restore a scene spawn point to choose where players st
 
 ## Scene spawn points and native spawns
 
-A scene spawn point is a scene object with a `Character.SpawnPoint` component. The base-game map has 22 scene spawn points under `World/POIs`, with names such as `Alarka` or `Bryson` for their locations. The outliner lists each one once in the **Spawn point** family.
+A scene spawn point is a scene object with a `Character.SpawnPoint` component. The base-game map has 22 scene spawn points under `World/POIs`, with names such as `Alarka` or `Bryson` for their locations. The outliner lists each one once under the **Spawn point** category.
 
 A native spawn is an entry in the `spawns` section of a map's `Map.json`. Edit native spawns in the native map editor's **Spawns** category. The patcher doesn't list or change them. The base-game map declares no native spawns.
 
@@ -25,7 +25,7 @@ A new game reads its start spawn point while the map loads. The patcher applies 
 
 ## Move a spawn point
 
-1. Open **Scene Patcher**, click **Refresh** in the command band, open the **Spawn point** family, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
+1. Open **Scene Patcher**, click **Refresh** in the command band, open the **Spawn point** category, and select the spawn point's row in the outliner. The **Identity** section of the **Object** tab shows the structure `spawn-point-v1`. If **Supported edits** starts with **Not editable:**, the reason follows.
 2. Click **Focus** in the command band. A spawn point has no model, so it shows a [helper marker](select-world-targets.md#helper-markers-for-invisible-objects): a `+` on its pivot.
 3. On the **Placement** tab, enter the position in map coordinates and the rotation in degrees in **Numeric** mode and click **Apply**, or drag the [transform gizmo](using-transform-gizmos.md).
 

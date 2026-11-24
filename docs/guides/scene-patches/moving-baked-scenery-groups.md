@@ -10,7 +10,7 @@ The map's scene stores its baked scenery groups. Props, masks, and other objects
 
 ## Which groups are listed
 
-In the outliner, the **Baked scenery group** family lists each group root once, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object directly below a container object under `World`, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, roots are directly below a place's container object, such as `World/Large Scenery/Bryson/Bryson House Track`. An exception is `World/Large Scenery/Almond Bridge`, which is itself a group root because it holds the construction of one rail bridge. See [rail bridges outside Ela](#rail-bridges-outside-ela).
+In the outliner, each group root appears once, under the group's category. See [selecting in the world](select-world-targets.md). A group root is a scene object directly below a container object under `World`, such as `World/Roads Barkers/1932 Chevy Truck LP`. Under `World/Large Scenery`, roots are directly below a place's container object, such as `World/Large Scenery/Bryson/Bryson House Track`. An exception is `World/Large Scenery/Almond Bridge`, which is itself a group root because it holds the construction of one rail bridge. See [rail bridges outside Ela](#rail-bridges-outside-ela).
 
 To be listed, a group must be saved in the scene, have a renderer, collider, light, storage pile, or log pond at or below its root, and belong to no other family. The following objects have no group entry:
 
@@ -23,11 +23,11 @@ A group contains only the objects saved below its root in the scene. Moving it l
 
 Groups that contain game logic need separate support. They are marked `inspection only`, and the **Object** tab explains why. The same restriction applies to groups containing a station click spot or map icon. A group that holds a scene ground mask is listed; see [buildings with ground masks](#buildings-with-ground-masks) and [road bridges](#road-bridges).
 
-Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the **Baked scenery group** family if it has one. Otherwise, it appears in the **Inspection only** group at the end of the outliner. These groups list no parts.
+Groups containing track markers or spawn points are also marked `inspection only` and can't move as a whole. Edit their markers in the **Track marker** family and their spawn points in the **Spawn point** family. A group marked `inspection only` stays under its category in the outliner. A group that no rule recognises stands under **Unclassified**. These groups list no parts.
 
 ## Which parts are listed
 
-Each group in the **Baked scenery group** family lists its parts below its own row, sorted by name. A part's row shows the path from the group root, such as `Jetty / Piece (2)`. Its tooltip and searches use the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
+Each group lists its parts below its own row, in alphabetical order. A part's row shows the path from the group root, such as `Jetty / Piece (2)`. A search matches the full name, including the group, such as `Whittier Saw Mill / Jetty / Piece (2)`.
 
 A part is a scene object at any depth below the root. Renderers and components aren't parts. To appear in the list, an object must be saved in the scene and have a renderer, collider, light, storage pile, or log pond at or below it. A saved object holding a scene ground mask also appears, even without any of those. Parts can contain other parts, which move with them.
 
@@ -41,7 +41,7 @@ Some objects below a group root are not listed as parts:
 
 ## Move a group in the native map editor
 
-1. Open **Scene Patcher** and click **Refresh** in the command band. Search for the group, for example `Bryson House Track`, and select its row under **Baked scenery group**. You can also use **Select in world** to select it by its marking, as described in [select world targets](select-world-targets.md). On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-group-v1`. **Use in the game** identifies the group as decorative.
+1. Open **Scene Patcher** and click **Refresh** in the command band. Search for the group, for example `Bryson House Track`, and select its row in the outliner. You can also use **Select in world** to select it by its marking, as described in [select world targets](select-world-targets.md). On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-group-v1`. **Use in the game** identifies the group as decorative.
 2. Click **Focus** in the command band to see the group.
 3. On the **Placement** tab, change the six **Numeric** fields for position in map coordinates and rotation in degrees. Click **Apply** at the bottom of the tab. You can also use **Gizmo** or **Snap**, as for other objects, unless a ground mask refuses the move; see [buildings with ground masks](#buildings-with-ground-masks). See [using transform gizmos](using-transform-gizmos.md) and [snapping to track](snapping-to-track.md).
 
@@ -57,7 +57,7 @@ If the root has a simple culler, as at Bryson House Track, the culler stops swit
 
 ## Move or disable a single part
 
-1. Select the part's row under **Baked scenery group**, for example `Bryson House Track / Ramp`. On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-part-v1`. **Use in the game** identifies the part as decorative.
+1. Select the part's row in the outliner, for example `Bryson House Track / Ramp`. On the **Object** tab, **Identity** shows the component `UnityEngine.Transform` and the structure `baked-scenery-part-v1`. **Use in the game** identifies the part as decorative.
 2. On the **Placement** tab, change the **Numeric** fields and click **Apply**, or use **Gizmo** or **Snap** as for other objects, unless a ground mask refuses the move. To switch the part off, click **Disable** at the bottom of the **Object** tab.
 
 A part with a fixed placement stays at its map coordinates when you later move the group, including during a **Gizmo** drag. This also applies when another mod's scene patch file moves the group, regardless of key order or load order. The patcher applies the group placement first, then each part's fixed placement. Parts without fixed placements move with the group.
@@ -77,7 +77,7 @@ On a pile's **Object** tab, **Use in the game** names the storage it shows, such
 
 The industry itself is native map data. Its position, its track spans, and their delivery and loading points stay with the native map editor. The patcher does not move them, and moving a building or pile never moves a track span. To change where cars load and unload, edit the industry's track spans in the native map editor.
 
-The `Coal Loader` at Robinson Gap Mine is a decorative group under **Industry building**, and you move or disable it like any other group. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so moving or disabling the loader doesn't change where loading happens. On its **Object** tab, **Use in the game** shows the same decorative text as the other groups under **Other**.
+The `Coal Loader` at Robinson Gap Mine is a decorative group under **Industry building**, and you move or disable it like any other group. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so moving or disabling the loader doesn't change where loading happens. On its **Object** tab, **Use in the game** shows the same decorative text as the other decorative groups.
 
 ## Lake surfaces
 
@@ -155,7 +155,7 @@ The bridge's colliders and culling move with it. After every edit, the patcher c
 Move the track in the native map editor. It remains native map data and keeps its own trestle or steel flags. A rail bridge doesn't follow its track. **Follow** is unavailable for a rail bridge and its parts, and the patcher refuses a hand-written track-following placement. Move the track first, then move the bridge onto it:
 
 1. In the native map editor, move the track that the bridge carries.
-1. In **Scene Patcher**, select the bridge under **Baked scenery group** > **Bridge** > **Rail bridges** and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
+1. In **Scene Patcher**, select the bridge under **Bridge** > **Rail bridges** in the outliner and move it onto the moved track, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only the steel or the abutments, select that part instead.
 1. Click **Save** in the native map editor.
 
 ### Construction segments
@@ -184,7 +184,7 @@ You can move, rotate or disable a road bridge so that it stands where you moved 
 The road remains native map data. Move it in the native map editor; moving the bridge leaves it in place. A road bridge doesn't follow track. **Follow** is unavailable for a road bridge and its parts, with the reason `Road bridges use fixed placement. They don't support track-following placement. Move the road in the native map editor, then move the bridge onto it.` The patcher also refuses a hand-written track-following placement before changing anything. Move the road first, then move the bridge onto it:
 
 1. In the native map editor, move the road that the bridge carries.
-1. In **Scene Patcher**, select the bridge under **Baked scenery group** > **Bridge** > **Road bridges** and move it onto the moved road, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only one object of the bridge, select that part instead.
+1. In **Scene Patcher**, select the bridge under **Bridge** > **Road bridges** in the outliner and move it onto the moved road, as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor). To move only one object of the bridge, select that part instead.
 1. Click **Save** in the native map editor.
 
 The bridge moves with its colliders and its culling. Each road bridge carries a renderer culler on its root; the patcher moves the culler's sphere to the bridge and keeps its radius. After every edit, the patcher checks that each collider keeps its shape and enabled state, and that the physics bounds of each box, sphere, or capsule collider follow the bridge.
@@ -204,7 +204,7 @@ Two smoke decals at Dillsboro, `World/Roads Dillsboro/Bridge Smoke Decal Project
 
 ## Crossbucks at unprotected crossings
 
-You can move, rotate or disable a crossbuck at an unprotected crossing so that it stands beside the road where you moved the road or track in the native map editor. Each crossbuck is its own group under **Baked scenery group** > **Grade crossing**, wherever its crossing stands below `World`, such as `World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)`. Its row names the crossbuck at its crossing, for example `Sign-Crossing0 (1) at Crossing Unprotected - Bryson Everett`, followed by its location. When other crossings have the same name, the row also names the place where the crossing stands, for example `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Andrews` and `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Topton`. To find a crossing's crossbucks, search the outliner for the crossing's name. The row's tooltip shows the full path. A crossbuck is one entry: its model and LOD levels have no rows of their own.
+You can move, rotate or disable a crossbuck at an unprotected crossing so that it stands beside the road where you moved the road or track in the native map editor. Each crossbuck is its own group under **Grade crossing**, wherever its crossing stands below `World`, such as `World/Roads Andrews/Crossing Unprotected - Robbinsville/Sign-Crossing0 (1)`. Its row names the crossbuck at its crossing, for example `Sign-Crossing0 (1) at Crossing Unprotected - Bryson Everett`. When other crossings have the same name, the row also names the place where the crossing stands, for example `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Andrews` and `Sign-Crossing0 (1) at Crossing Unprotected - Robbinsville in Topton`. To find a crossing's crossbucks, search the outliner for the crossing's name. The row's tooltip shows the full path. A crossbuck is one entry: its model and LOD levels have no rows of their own.
 
 A crossbuck uses fixed placement and **Enabled**. Move it as described in [move a group in the native map editor](#move-a-group-in-the-native-map-editor), and disable it as described in [disable or enable a group](#disable-or-enable-a-group). Only the crossbuck changes. The crossing pad, the whistle signs, and the other crossbuck of the crossing keep their own families and stay where they are. To rebind the pad, see [rebind crossing pads](rebinding-crossing-pads.md); to move a whistle sign, see [repair track bindings](repairing-track-bindings.md).
 

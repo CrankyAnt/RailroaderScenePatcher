@@ -401,7 +401,7 @@ The patcher recognizes parts of groups in the Baked scenery group family. The ta
 
 A part is a scene object at any depth below a listed group root. It isn't a renderer or component. The scene must serialize it. It must have a renderer, collider, light, storage pile, or log pond at or below it, unless it holds a scene ground mask. See [scene ground masks](#scene-ground-masks). The following aren't parts:
 
-- Objects in groups listed in the Inspection only group.
+- Objects in groups listed as inspection only.
 - Siblings with the same name under the same parent, and objects below them.
 - An object with a `KeyValueBoolAnimator`, and everything below it, because the game animates it.
 - A culling container. This is an object below the group root with a simple culler (`Helpers.SimpleCuller`), no renderer, collider, light, storage pile, or log pond of its own, and other objects below it. The objects it contains are parts, and their paths include the container. A modification targeting the container fails before any change and gives that reason.
