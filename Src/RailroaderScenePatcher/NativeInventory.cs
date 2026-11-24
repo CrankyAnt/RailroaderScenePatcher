@@ -477,7 +477,7 @@ namespace RailroaderScenePatcher {
             if (TypeName(c) == ConstructionScenery) Read(() => {
                 var ids = Field(c, "segmentIds") as string[];
                 if (ids == null) throw new InvalidOperationException("Construction segment IDs unavailable");
-                foreach (var id in ids) bindings.Add(CommandBand.SegmentBinding(id, null));
+                bindings.AddRange(CommandBand.ConstructionBindings(ids, segmentIds));
                 constructionIds = ids;
                 var entries = Field(c, "entries") as IEnumerable;
                 if (entries == null) throw new InvalidOperationException("Construction scenery entries unavailable");

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Newtonsoft.Json.Linq;
 using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
@@ -15,6 +17,7 @@ using RailroaderScenePatcher.Core;
 // id is gone and both halves have new ids.
 static class ConstructionSegmentTests {
     static void Assert(bool value, string message) { if (!value) throw new Exception("Construction segments: " + message); }
+    static string Root([CallerFilePath] string path = "") => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), "..", ".."));
     const string SceneName = "BushnellWhittier-MapManager", Bryson = "World/Large Scenery/Bryson/Bridge 1", Almond = "World/Large Scenery/Almond Bridge";
     static TargetIdentity GroupId(string path) => new TargetIdentity(SceneName, path, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
     static string Target(string path) => "\"target\":{\"scene\":\"" + SceneName + "\",\"path\":\"" + path + "\",\"component\":\"" + BakedSceneryGroups.ComponentType + "\",\"structure\":\"" + BakedSceneryGroups.Structure + "\"}";
@@ -356,6 +359,20 @@ static class ConstructionSegmentTests {
         Assert(picked == "S-a, Sg6u0gppt" && CommandBand.AddSegment(picked, "Sg6u04j9v", CommandBand.MissingSegments(lines)) == "S-a, Sg6u0gppt, Sg6u04j9v",
             "Picked replaces a segment that no longer exists and keeps the others: " + picked);
         Assert(CommandBand.AddSegment("S-a, typed", "S-b", CommandBand.MissingSegments(lines)) == "S-a, typed, S-b", "An ID the observed bindings do not name as missing stays");
+        // The Ela controller after a native Subdivide of its only segment: its observed bindings mark 31lvmw as missing on
+        // the loaded track, so two Picked rounds leave only the two halves, and Set is offered.
+        var known = new HashSet<string>(new[] { "Six2y7zi0", "Six2ykbyk" }, StringComparer.Ordinal);
+        var elaLines = CommandBand.ConstructionBindings(new[] { "31lvmw" }, known);
+        var elaPicked = CommandBand.AddSegment(CommandBand.AddSegment("31lvmw", "Six2y7zi0", CommandBand.MissingSegments(elaLines)), "Six2ykbyk", CommandBand.MissingSegments(elaLines));
+        Assert(elaPicked == "Six2y7zi0, Six2ykbyk" && CommandBand.SegmentsReason(null, elaPicked, CommandBand.ConstructionSegments(elaLines)) == null,
+            "Picked drops the Ela controller's missing segment and Set is offered: " + elaPicked);
+        // The construction scenery controller's own observation reads its segments against the loaded track, as the group
+        // root's does; without that check its binding lines name no missing segment and Picked keeps it.
+        var inventory = File.ReadAllText(Path.Combine(Root(), "Src", "RailroaderScenePatcher", "NativeInventory.cs"));
+        var controllerBlock = inventory.Substring(inventory.IndexOf("TypeName(c) == ConstructionScenery", StringComparison.Ordinal));
+        controllerBlock = controllerBlock.Substring(0, controllerBlock.IndexOf("constructionIds = ids;", StringComparison.Ordinal));
+        Assert(controllerBlock.Contains("CommandBand.ConstructionBindings(ids, segmentIds)") && !controllerBlock.Contains("SegmentBinding(id, null)"),
+            "The construction scenery controller marks a segment the loaded track lacks: " + controllerBlock);
         Assert(CommandBand.SegmentsReason(null, "", new[] { "S-a" }) == "Enter at least one segment ID.", "An empty field cannot be set");
         Assert(CommandBand.SegmentsReason(null, "S-b, S-a", new[] { "S-a", "S-b" }) == "The field already lists the construction's current segments.", "The current set cannot be set again, in any order");
         Assert(CommandBand.SegmentsReason(null, "S-a, S-c", new[] { "S-a", "S-b" }) == null && CommandBand.SegmentsReason("Inspect an object first.", "S-c", new[] { "S-a" }) == "Inspect an object first.", "A different set can be set; the general reason comes first");
