@@ -19,7 +19,7 @@ namespace RailroaderScenePatcher {
     // culling sphere to the new bounds. The new renderer starts enabled; queuing the culling token lets the native
     // culling recompute its visibility on the next update.
     internal sealed class CrossingPadWorld : TrackMarkerWorld, ICrossingPadWorld {
-        const string BuilderBase = "BezierCurveMesh.CurveMeshBuilderBase", Manager = "Helpers.Culling.CullingManager";
+        const string BuilderBase = "BezierCurveMesh.CurveMeshBuilderBase", Manager = CullerTypes.CullingManager;
         readonly FieldInfo renderers, token, boundsCenter, boundsRadius, spheres, needsUpdate;
         readonly MethodInfo generate, curves;
         readonly FieldInfo[] curvePoints;

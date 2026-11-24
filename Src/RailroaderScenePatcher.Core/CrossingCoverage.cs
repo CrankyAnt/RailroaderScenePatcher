@@ -228,7 +228,7 @@ namespace RailroaderScenePatcher.Core {
     // and unchanged, so another consumer keeps them; the crossing simply stops evaluating them. Proximity never assigns
     // coverage, and the crossing object itself is never moved or disabled by this capability.
     public sealed class CrossingCoverageScene : IScene, IRelationshipScene, IVersionedScene, IRetainedScene, IDisposable, ICrossingEquipmentScene {
-        public const string Structure = "crossing-coverage-v1", RequiredVersion = "0.5.0", ComponentType = "Track.Crossings.GradeCrossingController";
+        public const string Structure = "crossing-coverage-v1", RequiredVersion = VersionRequirement.Delivery, ComponentType = "Track.Crossings.GradeCrossingController";
         // The start of the ID of every span the patcher owns (NewId); CircuitSpanProblems.CircuitKey reads it back.
         internal const string OwnedPrefix = "CrankyAnt.ScenePatcher.";
         sealed class Circuit { internal string Key; internal object Set; internal object[] Original; }
@@ -271,7 +271,7 @@ namespace RailroaderScenePatcher.Core {
             if (identity.Structure != null && identity.Structure != Structure) return Array.Empty<object>();
             return world.Resolve(identity) ?? Array.Empty<object>();
         }
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == ComponentType) ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
         // Spans the patcher owns for the controller in this load, for inspection.
         public IReadOnlyList<object> OwnedSpans(object target) => baselines.TryGetValue(target, out var b) ? b.Owned.ToArray() : Array.Empty<object>();
         public IReadOnlyList<string> CoveredSegments(object target) {

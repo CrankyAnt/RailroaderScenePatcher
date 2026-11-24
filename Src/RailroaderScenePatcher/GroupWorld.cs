@@ -13,11 +13,11 @@ namespace RailroaderScenePatcher {
     // or a part, the game's cullers in the group and the physics state of its colliders. The rules live in Core's
     // BakedSceneryRules, BakedSceneryGroups and BakedSceneryParts.
     internal sealed class GroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, IDisableRefusal, IDisposable {
-        internal const string SimpleCullerType = "Helpers.SimpleCuller", GameObjectCullerType = "Helpers.Culling.GameObjectCuller";
+        internal const string SimpleCullerType = CullerTypes.SimpleCuller, GameObjectCullerType = CullerTypes.GameObjectCuller;
         static readonly Type simple = Native.Type(SimpleCullerType), renderer = Native.Type(BoardScene.CullerType), switcher = Native.Type(GameObjectCullerType);
         static readonly FieldInfo cullingGroup = simple?.GetField("_cullingGroup", Native.Flags), cullingSpheres = simple?.GetField("_cullingSpheres", Native.Flags),
             rendererToken = renderer?.GetField("_cullingToken", Native.Flags), switcherToken = switcher?.GetField("_cullingToken", Native.Flags),
-            managerSpheres = Native.Type("Helpers.Culling.CullingManager")?.GetField("_spheres", Native.Flags);
+            managerSpheres = NativeCulling.ManagerSpheres;
         static readonly MethodInfo simpleMoved = simple?.GetMethod("OnTransformDidChange", Native.Flags, null, Type.EmptyTypes, null);
         static readonly FieldInfo simpleRadius = simple?.GetField("radius", Native.Flags), rendererRadius = renderer?.GetField("radius", Native.Flags), switcherRadius = switcher?.GetField("radius", Native.Flags),
             switcherState = switcher?.GetField("_cullingState", Native.Flags);

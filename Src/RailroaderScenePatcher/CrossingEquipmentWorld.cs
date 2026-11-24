@@ -48,7 +48,7 @@ namespace RailroaderScenePatcher {
     // source and stay loaded with the map; the copy owns only its GameObjects.
     internal sealed class CrossingEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificationDiagnostics {
         const string LampType = "Track.KeyValueLampMaterialController", GateType = "RollingStock.Controls.KeyValueBoolAnimator", OwnerType = "KeyValue.Runtime.KeyValueObject",
-            CullerType = "Helpers.Culling.GameObjectCuller", SpanType = "Track.TrackSpan", BellType = "Audio.IntegerLoopingPlayer", AnimatorType = "UnityEngine.Animator", TransformerType = "Helpers.WorldTransformer";
+            CullerType = CullerTypes.GameObjectCuller, SpanType = "Track.TrackSpan", BellType = "Audio.IntegerLoopingPlayer", AnimatorType = "UnityEngine.Animator", TransformerType = "Helpers.WorldTransformer";
         internal const string WrapperPrefix = "CrankyAnt Scene Patcher equipment ";
         readonly Type controller, lamp, gate, keyOwner, culler, span, bell, animator, transformer;
         readonly FieldInfo lampKey, lampTargets, lampMaterials, gateKey, gateClip, cullerObjects, cullerState, lampObserver, gateObserver;

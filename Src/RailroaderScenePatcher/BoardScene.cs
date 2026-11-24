@@ -12,8 +12,6 @@ namespace RailroaderScenePatcher {
     // The native operations of the independent-board capability: board transforms, the renderer culler,
     // the circle map mask and the terrain system. The capability rules live in Core's IndependentBoards.
     internal sealed class BoardScene : IBoardWorld, IDisposable {
-        internal const string BoardPath = IndependentBoards.SylvaPath;
-        internal const string BoardSceneName = IndependentBoards.SylvaScene;
         internal const string CullerType = IndependentBoards.CullerType;
         internal const string MaskType = "Map.Runtime.MaskComponents.CircleMapMask";
         internal const string Structure = IndependentBoards.Structure;
@@ -41,7 +39,7 @@ namespace RailroaderScenePatcher {
             keys = maskBase.GetField("_modifierKeys", Native.Flags);
             flatten = mask.GetField("flattenHeightmap", Native.Flags);
             var tokenType = token?.FieldType;
-            spheres = Native.Type("Helpers.Culling.CullingManager")?.GetField("_spheres", Native.Flags);
+            spheres = NativeCulling.ManagerSpheres;
             maskStorage = manager.GetField("_maskModifiers", Native.Flags); heightStorage = manager.GetField("_heightmapModifiers", Native.Flags);
             storedModifiers = maskStorage?.FieldType.GetField("_modifiers", Native.Flags);
             if (tokenType?.GetProperty("Index") == null || tokenType.GetField("Manager") == null || tokenType.GetProperty("IsRemoved") == null || keys == null || flatten == null || spheres == null || maskStorage == null || heightStorage == null || storedModifiers == null)
