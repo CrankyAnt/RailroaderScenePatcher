@@ -88,7 +88,7 @@ An inactive object's name is italic and followed by `inactive`. A row's tooltip 
 - **Placement**, in **Numeric** mode, shows its position in map coordinates and rotation in degrees. Editable objects have six fields. Other objects have two lines of text.
 - **Connections** shows its track binding and observed bindings.
 
-**Copy ID** in the command band copies JSON values from the observation. The footer's message slots and the log then name the object whose identity was copied. Copying an identity doesn't establish that the object can be edited.
+**Copy ID** in the command band copies JSON values from the observation. The footer's message slots then name the object whose identity was copied, and with **Debug logging** on, so does the Player log. Copying an identity doesn't establish that the object can be edited.
 
 An independent object has no invented track binding. A missing or empty segment reference appears as a problem. The construction segments of a rail bridge are listed on the **Connections** tab, and one that no longer exists keeps its ID with the remark `no longer exists`. It is a problem of the construction, which you repair on its **Connections** tab, and the parts of the construction show the remark without a problem; see [repair the construction segments of a rail bridge](repairing-construction-segments.md). A reference to an existing segment can still name the wrong track. The patcher cannot decide whether a valid binding or physical placement matches the map author's intention. Compare the displayed identifiers and placement with the world.
 

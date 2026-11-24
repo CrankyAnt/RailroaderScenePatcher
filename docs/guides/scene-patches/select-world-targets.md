@@ -140,7 +140,7 @@ If the candidate is missing, ambiguous, or has changed since you selected it, ch
 
 A scene patch identifies an object by its scene, path, and component. It can't distinguish two objects that share all three. Confirmation for an edit is then refused, with the shared identity in the reason. Choose an object with a unique path instead. Replacement choices exclude ambiguous objects because the scene patch couldn't identify them.
 
-**Select in world** can still confirm such an object for inspection. **Supported edits** then explains why it cannot be edited. A refused confirmation shows its reason in the footer and the log.
+**Select in world** can still confirm such an object for inspection. **Supported edits** then explains why it cannot be edited. A refused confirmation shows its reason in the footer. With **Debug logging** on, the Player log also records it.
 
 Click **Cancel** in the footer to close a pending choice. Pending choices don't change scene objects, the scene patch file, or completed edit history. Confirmation records a choice for an edit. The [v1 scene patch file reference](scene-patch-file-v1.md) describes the supported fields and how they apply.
 

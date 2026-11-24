@@ -90,7 +90,7 @@ The first message slot shows the action group and **Working...** until the edit 
 
 A refused edit, or one that does not run, reports why. The message area shows the newest message at the top and dims older messages beneath it. Every message starts with its action group. A **Gizmo** result keeps the previous **Copy ID** result below it. Only the latest automatic follow-up message, such as **Terrain output**, remains, so follow-up messages do not displace the action result. Scroll if the messages do not fit. Inspecting another object clears them all.
 
-The line above the messages shows why the inspected object cannot currently be edited under **Editing**, or identifies a pending world choice, gizmo, or prepared snap. An unavailable action stays visible but disabled. Its tooltip explains why, and the log records the reason. Reasons include a stale inventory and what made it stale, unreadable values, or an edit requested while a world selection or gizmo is pending.
+The line above the messages shows why the inspected object cannot currently be edited under **Editing**, or identifies a pending world choice, gizmo, or prepared snap. An unavailable action stays visible but disabled. Its tooltip explains why. With **Debug logging** on, the Player log records the reason too. Reasons include a stale inventory and what made it stale, unreadable values, or an edit requested while a world selection or gizmo is pending.
 
 ## Disable or enable the object
 
