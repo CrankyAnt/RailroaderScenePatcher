@@ -91,8 +91,8 @@ namespace RailroaderScenePatcher {
         }
 
         // What breaks the rules of the tree, one line each: a folder that mixes folders and objects or folders of two
-        // levels, a list out of order, a folder that repeats the name of the folder it stands in, a place below the
-        // top level of the place view, and text that tells how a place was chosen.
+        // levels, a list out of order, a folder that repeats the name of the folder it stands in, and a place below
+        // the top level of the place view.
         internal static List<string> Violations(IReadOnlyList<OutlineNode> tops, bool byPlace, IEnumerable<string> placeNames) {
             var found = new List<string>();
             var places = new HashSet<string>(placeNames ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
@@ -107,7 +107,6 @@ namespace RailroaderScenePatcher {
                 foreach (var child in node.Children) {
                     if (Level(child) != "row" && child.Label.StartsWith(node.Label, StringComparison.OrdinalIgnoreCase)) found.Add("repeat: " + path + " / " + child.Label);
                     if (byPlace && Level(child) != "row" && places.Contains(child.Label)) found.Add("nested place: " + path + " / " + child.Label);
-                    if ((child.Label ?? "").IndexOf("(nearest", StringComparison.OrdinalIgnoreCase) >= 0) found.Add("method text: " + path + " / " + child.Label);
                     if (Level(node) != "row") Walk(child, path + " / " + child.Label, depth + 1);
                 }
             }

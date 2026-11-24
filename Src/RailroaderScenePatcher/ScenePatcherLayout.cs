@@ -648,10 +648,10 @@ namespace RailroaderScenePatcher {
 
         // A rail bridge outside Ela or a road bridge, or a part of one: it takes no
         // track-following placement.
-        string BridgeSubgroup => selected == null || selected.Family != BakedSceneryRules.Family ? null
-            : selected.GroupPath == null ? selected.Subcategory : InventoryPresentationState.GroupOf(inventory, selected)?.Subcategory;
-        bool IsRailBridge => BridgeSubgroup == BakedSceneryCategories.RailBridges;
-        bool IsRoadBridge => BridgeSubgroup == BakedSceneryCategories.RoadBridges;
+        BridgeKind InspectedBridge => selected == null || selected.Family != BakedSceneryRules.Family ? BridgeKind.None
+            : selected.GroupPath == null ? selected.Bridge : InventoryPresentationState.GroupOf(inventory, selected)?.Bridge ?? BridgeKind.None;
+        bool IsRailBridge => InspectedBridge == BridgeKind.Rail;
+        bool IsRoadBridge => InspectedBridge == BridgeKind.Road;
         // An explicit disable holds the inspected object off against a switch of the game: its track construction,
         // progression or a map feature. The amber warning shows on the Object tab and in the footer; null otherwise.
         string HoldWarning => selected?.Handle is GameObject held ? GroupWorld.HoldWarning(held, FollowsGroup) : null;
@@ -1799,7 +1799,7 @@ namespace RailroaderScenePatcher {
             ["outliner"] = new HelpText { Title = "Outliner", Intro = "Find an object and inspect it here, or select it in the world.",
                 Terms = new[] {
                     new[] { "Search", "Matches names, paths, families, binding IDs, dependencies, and problems, and each object's category, kind, place, and crossing." },
-                    new[] { "By category", "The first view icon. Lists objects by what they are: category, then kind where a category has kinds, then place. Bridge has the kinds Rail bridges and Road bridges." },
+                    new[] { "By category", "The first view icon. Lists objects by what they are: category, then kind, then place. A category shows kinds when its objects share them, such as Rail bridges and Road bridges under Bridge, or Speed signs and Mileposts under Sign." },
                     new[] { "By place", "The second view icon. Lists objects by the place they stand at, with the same categories and kinds under each place. Without a search or filter, every place the game names is listed, also one without objects." },
                     new[] { "Place", "The place an object's name or hierarchy path names, or else the nearest place the game names." },
                     new[] { "Changed", "Objects this mod changes, marked *. An object whose modification is refused is marked × instead. Its Changes tab gives the reason." },

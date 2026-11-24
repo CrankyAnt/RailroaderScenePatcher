@@ -156,7 +156,7 @@ namespace RailroaderScenePatcher {
             return group != null && path.StartsWith(group + "/", StringComparison.Ordinal) ? path.Substring(group.Length + 1).Replace("/", " / ") : part.DisplayName;
         }
         // The family of the crossing controllers, which also lists each controller's detection spans.
-        internal const string HolderFamily = "Crossing controller";
+        internal const string HolderFamily = SceneFamilies.CrossingController;
         // The inventory entry of the controller that holds a detection span, or null: for an object no controller holds, and
         // while the inventory does not hold exactly one entry for the controller.
         internal static SceneObservation HolderOf(SceneInventory inventory, SceneObservation held) {
@@ -183,7 +183,7 @@ namespace RailroaderScenePatcher {
         // (Track.TrackMarkerType), read from the observation's marker line. Never a name: a station sign and a whistle
         // sign are both Generic markers to the game. A starter marker has no subgroup here.
         internal static string Subgroup(SceneObservation entry) {
-            if (entry == null || entry.Family != "Track marker") return null;
+            if (entry == null || entry.Family != SceneFamilies.TrackMarker) return null;
             foreach (var line in entry.Bindings) {
                 if (!line.StartsWith(MarkerIdLine, StringComparison.Ordinal)) continue;
                 var at = line.IndexOf("; type=", StringComparison.Ordinal);

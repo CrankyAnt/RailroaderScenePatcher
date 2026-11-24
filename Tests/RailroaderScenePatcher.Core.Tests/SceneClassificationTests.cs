@@ -19,6 +19,7 @@ static class SceneClassificationTests {
         EveryListedObjectHasItsExpectedOutcome(map);
         NothingLandsInACatchAll(map);
         ChangesAreTheKnownOnes(map);
+        OutcomesMatchWhatTheNamesSay(map);
         PlacesFallTogether(map);
         FictionalObjects();
         Console.WriteLine("PASS: scene classification");
@@ -68,22 +69,49 @@ static class SceneClassificationTests {
     // Every listed object whose category differs from the one it had before the generic rules, by the rule that
     // changes it. Before, a group root took its category from the category table of the 7962df1 inventory, and
     // every other object from its family and name.
-    static readonly Dictionary<string, int> KnownChanges = new Dictionary<string, int> {
-        // A loader that fills cars (RollingStock.CarContentSwapper) is an industry building: the Coal Loader.
-        ["Other -> Industry building"] = 1,
-        // A lake surface (LakePolygon) is water: Fontana Lake (1) and (2).
-        ["Other -> Water"] = 2,
-        // What stands along a road and is nothing else is road scenery: the 1932 Chevy Truck LP.
-        ["Other -> Road scenery"] = 1,
-        // A track marker on a station building is that station: Hemingway flagstopstation.
-        ["Track marker -> Station building"] = 1,
+    static readonly Dictionary<string, string[]> KnownChanges = new Dictionary<string, string[]> {
+        // A loader that fills cars (RollingStock.CarContentSwapper) is an industry building.
+        ["Other -> Industry building"] = new[] { "World/Large Scenery/Robinson Gap Mine/Coal Loader" },
+        // A lake surface (LakePolygon) is water.
+        ["Other -> Water"] = new[] { "World/Rivers/Fontana Lake (1)", "World/Rivers/Fontana Lake (2)" },
+        // What stands along a road and is nothing else is road scenery.
+        ["Other -> Road scenery"] = new[] { "World/Roads Barkers/1932 Chevy Truck LP" },
+        // A track marker on a station building is that station.
+        ["Track marker -> Station building"] = new[] { "World/Large Scenery/Hemingway/Hemingway flagstopstation" },
     };
     static void ChangesAreTheKnownOnes(BaseMapFixture map) {
         var changes = map.Objects.Where(o => o.Listed && !o.BakedPart).Select(o => new { o.Path, From = o.Today.Split(new[] { " / " }, StringSplitOptions.None)[0], To = map.ClassOf(o).Category })
             .Where(c => c.From != c.To).GroupBy(c => c.From + " -> " + c.To).ToDictionary(g => g.Key, g => g.Select(c => c.Path).ToArray());
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_READOUT") == "1") foreach (var change in changes) Console.WriteLine("CHANGE " + change.Key + " (" + change.Value.Length + "): " + String.Join(", ", change.Value));
-        var unknown = changes.Where(c => !KnownChanges.TryGetValue(c.Key, out var count) || count != c.Value.Length).Select(c => c.Key + " (" + c.Value.Length + "): " + String.Join(", ", c.Value.Take(5))).ToArray();
+        var unknown = changes.Where(c => !KnownChanges.TryGetValue(c.Key, out var paths) || !paths.OrderBy(p => p, StringComparer.Ordinal).SequenceEqual(c.Value.OrderBy(p => p, StringComparer.Ordinal))).Select(c => c.Key + " (" + c.Value.Length + "): " + String.Join(", ", c.Value.Take(5))).ToArray();
         Check(unknown.Length == 0 && changes.Count == KnownChanges.Count, "the categories that change are the known ones; unexpected: " + String.Join(" | ", unknown));
+    }
+
+    // Expectations that do not come from the rules' own output: the kind of every bridge by its name, the kind of
+    // every sign by the words of its name, the Loc: boards and the mileposts by their family, and the place of every
+    // object that stands in a place folder and no farther than the rules' own reach from that place.
+    static void OutcomesMatchWhatTheNamesSay(BaseMapFixture map) {
+        var wrong = new List<string>();
+        foreach (var o in map.Objects.Where(o => o.Listed && !o.BakedPart)) {
+            var found = map.ClassOf(o); var name = o.Name;
+            string kind = null;
+            if (o.BakedRoot && o.Today == "Bridge") kind = name.Contains("Road Bridge") ? "Road bridges" : "Rail bridges";
+            else if (name.StartsWith("Loc: ", StringComparison.Ordinal)) kind = "Location signs";
+            else if (o.Family == "Milepost") kind = "Mileposts";
+            else if (name.StartsWith("Whistle Sign", StringComparison.Ordinal)) kind = "Whistle signs";
+            else if (name.StartsWith("Speed", StringComparison.Ordinal)) kind = "Speed signs";
+            else if (name.StartsWith("Yard Limit", StringComparison.Ordinal)) kind = "Yard limits";
+            if (kind != null && found.Kind != kind) wrong.Add(o.Path + ": kind " + found.Kind + ", expected " + kind);
+            if (kind != null && found.Category != (kind.EndsWith("bridges", StringComparison.Ordinal) ? "Bridge" : "Sign")) wrong.Add(o.Path + ": category " + found.Category);
+        }
+        Check(wrong.Count == 0, "bridges and signs take the kind their names say: " + String.Join(" | ", wrong.Take(10)));
+        // The towns of the map data: an object in a town's folder stands at that town, unless its own name or a folder
+        // between names another place, or it stands far from the town.
+        var towns = new HashSet<string>(map.MapData.Select(p => p.Name), StringComparer.Ordinal);
+        var misplaced = map.Objects.Where(o => o.Listed && !o.BakedPart && o.Path.StartsWith("World/Large Scenery/", StringComparison.Ordinal)).Select(o => new { o, Parts = o.Path.Split('/') })
+            .Where(x => x.Parts.Length == 4 && towns.Contains(x.Parts[2]) && !towns.Any(t => t != x.Parts[2] && x.Parts[3].Contains(t.Split(' ')[0])) && map.Places.Distance(map.Places.Named(x.Parts[2]), x.o.At) <= ScenePlaces.Close)
+            .Where(x => map.Places.Of(x.o.Path, x.o.At)?.Name != x.Parts[2]).Select(x => x.o.Path + " @ " + map.Places.Of(x.o.Path, x.o.At)?.Name).ToArray();
+        Check(misplaced.Length == 0, "an object directly in a town's folder that stands in that town is listed at that town: " + String.Join(" | ", misplaced.Take(10)));
     }
 
     static void PlacesFallTogether(BaseMapFixture map) {

@@ -10,8 +10,8 @@ using OutlineNode = RailroaderScenePatcher.InventoryPresentationState.OutlineNod
 namespace RailroaderScenePatcher {
     // The crossings of the outliner: one node per crossing under Grade crossing.
     internal static partial class OutlinerGrouping {
-        const string ControllerFamily = InventoryPresentationState.HolderFamily, MastFamily = "Crossing mast", BellFamily = "Crossing bell",
-            PadFamily = "Crossing pad marker", SpanFamily = FocusTarget.Span, TrackMarkerFamily = "Track marker", MilepostFamily = "Milepost";
+        const string ControllerFamily = SceneFamilies.CrossingController, MastFamily = SceneFamilies.CrossingMast, BellFamily = SceneFamilies.CrossingBell,
+            PadFamily = SceneFamilies.CrossingPad, SpanFamily = SceneFamilies.TrackSpan, TrackMarkerFamily = SceneFamilies.TrackMarker;
         static readonly Regex CrossingWord = new Regex(@"crossing", RegexOptions.IgnoreCase);
         const string Scenery = "World/Large Scenery/";
         // World, World/Large Scenery and a place's own object directly below it stop every upward walk for a crossing.

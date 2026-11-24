@@ -17,12 +17,24 @@ namespace RailroaderScenePatcher.Core {
         public override string ToString() => Kind == null ? Category : Category + " / " + Kind;
     }
 
+    // The families the inventory lists objects in, by their names: one place for the code that asks which family an
+    // object is in. A family is the object's technical kind, which its edits follow.
+    public static class SceneFamilies {
+        public const string BakedScenery = BakedSceneryRules.Family, TrackMarker = "Track marker", Milepost = "Milepost", IndependentBoard = "Independent board",
+            CrossingController = ObjectMarkingGeometry.ControllerFamily, CrossingPad = "Crossing pad marker", CrossingMast = ExistingEquipmentScene.MastFamily, CrossingBell = ExistingEquipmentScene.BellFamily,
+            TrackSpan = FocusTarget.Span, AddedEquipment = "Added light or gate", AddedBell = "Added bell", Bridge = BakedSceneryCategories.BridgeFamily, BridgeConstruction = BakedSceneryCategories.ConstructionFamily,
+            SpawnPoint = SpawnPoints.Family, StarterPlacement = StarterPlacements.Family, StationMapIcon = StationMapIconRules.Family;
+        // The families of a crossing's own objects: its controller, its equipment and its detection spans.
+        public static readonly IReadOnlyList<string> Crossing = Array.AsReadOnly(new[] { CrossingController, CrossingMast, CrossingBell, CrossingPad, TrackSpan, AddedEquipment, AddedBell });
+    }
+
     // What an object is, decided from what it provides: its components, the components and names below it, its own
     // name and its hierarchy path. No rule names one object: a rule names a component the game gives a kind of object,
     // or a word the game's names use for it, so an object that a later game version or a mod adds in the same
     // construction is recognised without a change here.
     public static class SceneClassification {
-        public const string TrackMarker = "Track marker", SpawnPoint = "Spawn point", StarterPlacement = "Starter placement", StationMapIcon = "Station map icon";
+        // The categories of the families whose objects are a kind of their own: each is named as its family.
+        public const string TrackMarker = SceneFamilies.TrackMarker, SpawnPoint = SceneFamilies.SpawnPoint, StarterPlacement = SceneFamilies.StarterPlacement, StationMapIcon = SceneFamilies.StationMapIcon;
         public const string LocationSigns = "Location signs", LocationMarkers = "Location markers", Mileposts = "Mileposts", OtherSigns = "Other signs", SetupMarkers = "Setup markers";
         public const string ProtectedCrossings = "Crossings with signals", UnprotectedCrossings = "Crossings without signals";
         public const string LakeSurfaces = "Lake surfaces", StoragePiles = "Storage piles", LogPonds = "Log ponds";
@@ -153,30 +165,30 @@ namespace RailroaderScenePatcher.Core {
             // A Loc: object is a location board when it has something to show, and an invisible marker otherwise.
             if (name.StartsWith(LocPrefix, StringComparison.Ordinal))
                 return Shows(atOrBelow) ? new SceneClass(BakedSceneryCategories.Sign, LocationSigns) : new SceneClass(TrackMarker, LocationMarkers);
-            if (Has(own, MapIcon) || family == StationMapIcon) return new SceneClass(StationMapIcon, null);
-            if (Has(own, SpawnPointComponent) || family == SpawnPoint) return new SceneClass(SpawnPoint, null);
-            if (family == StarterPlacement) return new SceneClass(StarterPlacement, null);
+            if (Has(own, MapIcon) || family == SceneFamilies.StationMapIcon) return new SceneClass(StationMapIcon, null);
+            if (Has(own, SpawnPointComponent) || family == SceneFamilies.SpawnPoint) return new SceneClass(SpawnPoint, null);
+            if (family == SceneFamilies.StarterPlacement) return new SceneClass(StarterPlacement, null);
             if (Has(own, MilepostComponent)) return new SceneClass(BakedSceneryCategories.Sign, Mileposts);
             // An object outside World is game setup, not scenery: its name says nothing about what stands in the world.
             if (path == null || !path.StartsWith(World, StringComparison.Ordinal))
-                return CrossingFamilies.Contains(family) ? new SceneClass(BakedSceneryCategories.GradeCrossing, null) : new SceneClass(family ?? TrackMarker, family == TrackMarker ? SetupMarkers : null, family != null);
-            if (family == BakedSceneryRules.Family) return OfGroup(path, own, atOrBelow, namesBelow, stripPlaces);
+                return SceneFamilies.Crossing.Contains(family) ? new SceneClass(BakedSceneryCategories.GradeCrossing, null) : new SceneClass(family ?? TrackMarker, family == SceneFamilies.TrackMarker ? SetupMarkers : null, family != null);
+            if (family == SceneFamilies.BakedScenery) return OfGroup(path, own, atOrBelow, namesBelow, stripPlaces);
             var found = ByComponents(own, null) ?? ByName(name, stripPlaces);
             // What stands below a crossing belongs to it: its masts, its bell, its pads and its detection spans.
-            if (found == null && (Crossing.IsMatch(Parent(path) ?? "") || CrossingFamilies.Contains(family))) found = new SceneClass(BakedSceneryCategories.GradeCrossing, null);
+            if (found == null && (Crossing.IsMatch(Parent(path) ?? "") || SceneFamilies.Crossing.Contains(family))) found = new SceneClass(BakedSceneryCategories.GradeCrossing, null);
             if (found == null) found = OfFamily(family) ?? ByContainer(path, name, stripPlaces);
             if (found.Category == BakedSceneryCategories.GradeCrossing) return new SceneClass(found.Category, null);
             return found;
         }
         static string Parent(string path) { var at = path.LastIndexOf('/'); return at < 0 ? null : path.Substring(0, at); }
-        static readonly string[] CrossingFamilies = { "Crossing controller", "Crossing mast", "Crossing bell", "Crossing pad marker", "Track span", "Added light or gate", "Added bell" };
         // What the technical family says when the object itself says nothing more.
         static SceneClass OfFamily(string family) {
             switch (family) {
-                case "Milepost": return new SceneClass(BakedSceneryCategories.Sign, Mileposts);
-                case "Independent board": return new SceneClass(BakedSceneryCategories.Sign, OtherSigns);
-                case BakedSceneryCategories.BridgeFamily: case BakedSceneryCategories.ConstructionFamily: return new SceneClass(BakedSceneryCategories.Bridge, BakedSceneryCategories.RailBridges);
-                case TrackMarker: return new SceneClass(TrackMarker, null);
+                case SceneFamilies.Milepost: return new SceneClass(BakedSceneryCategories.Sign, Mileposts);
+                case SceneFamilies.IndependentBoard: return new SceneClass(BakedSceneryCategories.Sign, OtherSigns);
+                // The bridge and the construction controller of a rail bridge construction stand with the other rail bridges.
+                case SceneFamilies.Bridge: case SceneFamilies.BridgeConstruction: return new SceneClass(BakedSceneryCategories.Bridge, BakedSceneryCategories.RailBridges);
+                case SceneFamilies.TrackMarker: return new SceneClass(TrackMarker, null);
                 default: return null;
             }
         }

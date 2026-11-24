@@ -744,7 +744,7 @@ namespace RailroaderScenePatcher {
             return new SceneObservation(go, new TargetIdentity(go.scene.name, BoardScene.PathOf(go.transform), TypeName(c), structure, padMarkerId), family,
                 active, coordinatesAvailable ? new double[] { position.x, position.y, position.z } : Array.Empty<double>(), new double[] { rotation.x, rotation.y, rotation.z, rotation.w },
                 bindings, duplicate.Concat(dependencies.Distinct().OrderBy(x => x, StringComparer.Ordinal)), defects, operations, runtime.Distinct().OrderBy(x => x, StringComparer.Ordinal), enabled, notes, only, displayName: displayName, groupPath: groupPath,
-                category: groupRoot ? verdict?.Category : BakedSceneryCategories.OfFamily(family)?[0], subcategory: groupRoot ? verdict?.Subcategory : BakedSceneryCategories.OfFamily(family)?[1],
+                category: groupRoot ? verdict?.Category : null, subcategory: groupRoot ? verdict?.Subcategory : null, bridge: groupRoot && verdict != null ? verdict.Bridge : BridgeKind.None,
                 holderPath: spanHolder == null ? null : BoardScene.PathOf(spanHolder.transform), storage: storageName);
         }
         // The names of the objects that enclose a transform, from its parent upwards.

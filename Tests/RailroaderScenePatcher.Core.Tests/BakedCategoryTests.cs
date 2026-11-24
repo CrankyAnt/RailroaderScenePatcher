@@ -122,10 +122,7 @@ Wilmot | Wilmot Station | Group | Station building";
     }
 
     static void CategoryNames() {
-        Check(BakedSceneryCategories.All.SequenceEqual(Categories), "the outliner has the categories of the ticket, then Water, Road scenery and the category of last resort (got " + String.Join(", ", BakedSceneryCategories.All) + ")");
-        Check(BakedSceneryCategories.Subcategories("Bridge").SequenceEqual(new[] { "Rail bridges", "Road bridges" }), "Bridge has the subgroups Rail bridges and Road bridges");
-        Check(Categories.Where(c => c != "Bridge").All(c => BakedSceneryCategories.Subcategories(c).Count == 0), "no other category has subgroups");
-        Check(Rows.Where(r => !r.Container).All(r => Categories.Contains(r.Category)), "every category in the category table is one of the family's categories");
+        Check(Rows.Where(r => !r.Container).All(r => Categories.Contains(r.Category)), "every category in the catalogue is one of the categories of the rules");
     }
 
     // The world of the catalogue: every row a scene object at its path. A crossbuck stands in an unprotected
@@ -276,8 +273,33 @@ Wilmot | Wilmot Station | Group | Station building";
         }
         var span = At(verdicts, "World/Large Scenery/Newtown/Plate Girder Bridge Span");
         Check(span?.Category == "Bridge" && span.Subcategory == "Rail bridges", "a rail bridge in a new town stands under Bridge / Rail bridges");
-        Check(BakedSceneryCategories.OfFamily("Bridge").SequenceEqual(new[] { "Bridge", "Rail bridges" }) && BakedSceneryCategories.OfFamily("Bridge construction scenery").SequenceEqual(new[] { "Bridge", "Rail bridges" })
-            && BakedSceneryCategories.OfFamily("Track marker") == null && BakedSceneryCategories.OfFamily(null) == null, "the bridge and the construction controller of a rail bridge construction stand under Bridge / Rail bridges; no other family has a category");
+        string Of(string family, string path) => SceneClassification.Of(family, path, new string[0], new string[0], new string[0]).ToString();
+        Check(Of("Bridge", "World/Large Scenery/Ela/Span") == "Bridge / Rail bridges" && Of("Bridge construction scenery", "World/Large Scenery/Ela/Scenery") == "Bridge / Rail bridges" && Of("Track marker", "World/Large Scenery/Ela/Marker") == "Track marker",
+            "the bridge and the construction controller of a rail bridge construction stand under Bridge / Rail bridges by their family, whatever their names");
+        BridgeEditsDoNotFollowTheCategory();
+    }
+
+    // Whether a group is a rail or a road bridge for its edits is a rule of its own (BakedSceneryRules.RailBridge,
+    // RoadBridge), not the outliner's category: a group the outliner files under Bridge by another word, or by what it
+    // holds, is edited as any group.
+    static void BridgeEditsDoNotFollowTheCategory() {
+        var world = new Node("World", new Node("Large Scenery", new Node("Newtown",
+            new Node("Bridge 2", new Node("Steel").Solid()), new Node("Newtown Road Bridge", new Node("Deck").Solid()),
+            new Node("Timber Trestle", new Node("Bent").Solid()), new Node("Newtown Culled", new Node("Road Bridge Abutment").Solid(), new Node("Road Bridge Side").Solid()).With("Helpers.SimpleCuller"),
+            new Node("Newtown Depot", new Node("Roof").Solid()))));
+        var verdicts = BakedSceneryRules.Classify(world);
+        GroupRootVerdict V(string name) => At(verdicts, "World/Large Scenery/Newtown/" + name);
+        Check(V("Bridge 2").Bridge == BridgeKind.Rail && V("Bridge 2").Subcategory == "Rail bridges" && V("Newtown Road Bridge").Bridge == BridgeKind.Road && V("Newtown Road Bridge").Subcategory == "Road bridges",
+            "a rail bridge and a road bridge are bridges for their edits, and the outliner files them as such");
+        Check(V("Timber Trestle").Category == "Bridge" && V("Timber Trestle").Subcategory == "Rail bridges" && V("Timber Trestle").Bridge == BridgeKind.None,
+            "a trestle is filed under Bridge by the outliner's word and is no bridge for its edits (got " + V("Timber Trestle").Bridge + ")");
+        Check(V("Newtown Culled").Category == "Bridge" && V("Newtown Culled").Bridge == BridgeKind.None, "a group filed under Bridge by what it holds is no bridge for its edits (got " + V("Newtown Culled").Category + " " + V("Newtown Culled").Bridge + ")");
+        Check(V("Newtown Depot").Bridge == BridgeKind.None, "a depot is no bridge");
+        Check(BakedSceneryRules.FollowingRefusal(V("Bridge 2").Bridge) == BakedSceneryRules.RailBridgeNoFollowing && BakedSceneryRules.FollowingRefusal(V("Newtown Road Bridge").Bridge) == BakedSceneryRules.RoadBridgeNoFollowing
+            && BakedSceneryRules.FollowingRefusal(V("Timber Trestle").Bridge) == null && BakedSceneryRules.FollowingRefusal(V("Newtown Culled").Bridge) == null,
+            "only a bridge by the edit rule refuses track following");
+        Check(BakedSceneryRules.RailBridge(null, "Plate Girder Bridge End (1)") && BakedSceneryRules.RailBridge(null, "Almond Bridge") && !BakedSceneryRules.RailBridge(null, "Almond Road Bridge") && !BakedSceneryRules.RailBridge(null, "Bridgewater Mill") && !BakedSceneryRules.RailBridge(null, "Timber Trestle"),
+            "the edit rule reads the word Bridge in the root's name, and a road bridge is no rail bridge");
     }
 
     static void SelectGroupFindsTheGroup() {

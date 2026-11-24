@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace RailroaderScenePatcher.Core {
     // One loaded scene object as the baked scenery rule reads it: its name, the components on it, and its children.
@@ -40,6 +41,10 @@ namespace RailroaderScenePatcher.Core {
         // Which coverage rule keeps the object out; null for a listed part and for an object an existing family lists.
         public string Reason { get; }
     }
+    // The bridge a group root is for its edits: a rail bridge stands on native track and a road bridge on a native
+    // road, so each takes fixed placement only, and a rail bridge may hold its own construction controller. This is
+    // the group's technical kind. The outliner's category does not decide it.
+    public enum BridgeKind { None, Rail, Road }
     public enum GroupDisposition { Group, InspectionOnly, ExistingFamily, NotListed, ContainerObject }
     // What the rule decided for one candidate: a group root of the Baked scenery group family, a group root that a later
     // ticket covers, an object an existing family lists, or an object a coverage rule keeps out.
@@ -61,6 +66,8 @@ namespace RailroaderScenePatcher.Core {
         // recognises, and for an object that is no group.
         public string Category { get; internal set; }
         public string Subcategory { get; internal set; }
+        // Whether the group is a rail bridge or a road bridge for its edits (BakedSceneryRules.RailBridge, RoadBridge).
+        public BridgeKind Bridge { get; internal set; }
         // A crossbuck of an unprotected crossing: a group of its own under Grade crossing, whose models are no parts.
         public bool Crossbuck { get; internal set; }
         // For a crossbuck, the marker ID of its crossing's pad, or null when the crossing has no pad with one id.
@@ -74,18 +81,10 @@ namespace RailroaderScenePatcher.Core {
             // The category of last resort, for a listed group that no rule recognises.
             Unclassified = "Unclassified";
         public const string RailBridges = "Rail bridges", RoadBridges = "Road bridges";
-        // The categories in the order the outliner shows them.
-        public static readonly IReadOnlyList<string> All = Array.AsReadOnly(new[] { StationBuilding, Platform, Lights, Sign, GradeCrossing, Bridge, IndustryBuilding, StorageDisplay, RailroadServiceBuilding, Water, RoadScenery, Unclassified });
-        static readonly IReadOnlyList<string> BridgeSubgroups = Array.AsReadOnly(new[] { RailBridges, RoadBridges }), None = Array.AsReadOnly(new string[0]);
-        // The subgroups of a category, in the order the outliner shows them: only Bridge has them.
-        public static IReadOnlyList<string> Subcategories(string category) => category == Bridge ? BridgeSubgroups : None;
-        // The category and subgroup of an object that another family lists, or null: the bridge and the construction
-        // controller of a rail bridge construction stand under Bridge / Rail bridges with the other rail bridges.
+        // The families of the bridge and of the construction controller of the Ela rail bridge construction.
         public const string BridgeFamily = "Bridge", ConstructionFamily = "Bridge construction scenery";
-        static readonly IReadOnlyList<string> RailBridge = Array.AsReadOnly(new[] { Bridge, RailBridges });
-        public static IReadOnlyList<string> OfFamily(string family) => family == BridgeFamily || family == ConstructionFamily ? RailBridge : null;
         // The scene objects in a group-root position that have no model or function in the game: an inactive default
-        // cube and five objects without a model. They are not supported and stay out of the inventory.
+        // cube and a folder of lights without a model. They are not supported and stay out of the inventory.
         public static readonly IReadOnlyList<string> WithoutFunction = Array.AsReadOnly(new[] { "World/Large Scenery/Almond/Cube", "World/Large Scenery/Bryson/Bryson Appalachian Hardwoods" });
     }
     // Which scene objects below World are the roots of baked scenery groups.
@@ -218,10 +217,12 @@ namespace RailroaderScenePatcher.Core {
         // A road bridge, wherever it stands: a root whose name contains Road Bridge. Its road is native
         // map data; the bridge carries a renderer culler and its own scene ground mask.
         public static bool RoadBridge(string name) => name != null && name.IndexOf("Road Bridge", StringComparison.Ordinal) >= 0;
-        // A rail bridge outside Ela, wherever it stands: a root whose name says bridge, trestle or viaduct and not
-        // road bridge. town is the name of the scene object below World/Large Scenery it stands in; it decides nothing.
-        public static bool RailBridge(string town, string name) =>
-            name != null && !RoadBridge(name) && SceneClassification.ByName(name) is SceneClass found && found.Category == BakedSceneryCategories.Bridge && found.Kind == BakedSceneryCategories.RailBridges;
+        // A rail bridge outside Ela, wherever it stands: a root whose name holds the word Bridge and that is no road
+        // bridge, such as Bridge 1, Almond Bridge and Plate Girder Bridge End. The rule is this one's own: the words
+        // the outliner files objects by (SceneClassification) do not decide what a group's edits may do. town is the
+        // name of the scene object below World/Large Scenery it stands in; it decides nothing.
+        static readonly Regex BridgeWord = new Regex(@"\bBridge\b", RegexOptions.CultureInvariant);
+        public static bool RailBridge(string town, string name) => name != null && !RoadBridge(name) && BridgeWord.IsMatch(name);
         // The construction controller of a rail bridge (Game.Mow.TrackConstructionScenery): it switches the objects of
         // its entries on and off by the construction state of the track segments it names, wherever it stands.
         public const string ConstructionController = "Game.Mow.TrackConstructionScenery";
@@ -233,10 +234,10 @@ namespace RailroaderScenePatcher.Core {
         // Why a road bridge or a part of one takes no track-following placement: it stands where its road
         // goes, which is native map data, and track following follows track.
         public const string RoadBridgeNoFollowing = "Road bridges use fixed placement. They don't support track-following placement.";
-        // Why a group of the subgroup, or a part of one, takes no track-following placement, or null: a bridge of
-        // either subgroup is placed onto its moved track or road with fixed placement.
-        public static string FollowingRefusal(string subcategory) =>
-            subcategory == BakedSceneryCategories.RailBridges ? RailBridgeNoFollowing : subcategory == BakedSceneryCategories.RoadBridges ? RoadBridgeNoFollowing : null;
+        // Why a bridge, or a part of one, takes no track-following placement, or null: a bridge of either kind is
+        // placed onto its moved track or road with fixed placement.
+        public static string FollowingRefusal(BridgeKind bridge) =>
+            bridge == BridgeKind.Rail ? RailBridgeNoFollowing : bridge == BridgeKind.Road ? RoadBridgeNoFollowing : null;
         // Why a rail bridge with track-owned components in its hierarchy cannot be edited: the track and
         // what the game builds for it belong to the native map data, which a bridge move must leave in place.
         public static string TrackOwnedRefusal(IEnumerable<string> types) {
@@ -318,8 +319,8 @@ namespace RailroaderScenePatcher.Core {
             }
             // Physical presence comes first: an object without a renderer, collider or light is not listed, whatever it holds.
             if (!Physical(node)) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.NotListed, NoPhysicalPresence)); return; }
-            // A bridge takes its category from this rule wherever it stands, as
-            // the road bridges below the World/Roads container objects do.
+            // A bridge is a bridge by this rule wherever it stands, as the road bridges below the World/Roads
+            // container objects are. Its category in the outliner follows from it, not the other way round.
             var road = RoadBridge(node.Name);
             var rail = RailBridge(town, node.Name);
             // A supported rail bridge construction holds its own construction controller; any other group holding one is left out.
@@ -327,8 +328,8 @@ namespace RailroaderScenePatcher.Core {
             if (road || rail) {
                 var subgroup = road ? BakedSceneryCategories.RoadBridges : BakedSceneryCategories.RailBridges;
                 verdicts.Add(excluded != null
-                    ? new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup }
-                    : new GroupRootVerdict(node, path, GroupDisposition.Group, null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup });
+                    ? new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail }
+                    : new GroupRootVerdict(node, path, GroupDisposition.Group, null) { Category = BakedSceneryCategories.Bridge, Subcategory = subgroup, Bridge = road ? BridgeKind.Road : BridgeKind.Rail });
                 return;
             }
             if (excluded != null) { verdicts.Add(new GroupRootVerdict(node, path, GroupDisposition.InspectionOnly, excluded.Reason ?? "baked scenery groups that hold a " + excluded.Kind, excluded.Ticket, excluded.Reason != null)); return; }

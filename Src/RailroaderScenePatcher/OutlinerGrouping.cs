@@ -79,7 +79,6 @@ namespace RailroaderScenePatcher {
             internal readonly List<Unit> Units = new List<Unit>();
             internal readonly Dictionary<ScenePath, Unit> ByPath = new Dictionary<ScenePath, Unit>();
             internal readonly Dictionary<ScenePath, SceneObservation> RootEntries = new Dictionary<ScenePath, SceneObservation>();
-            internal readonly HashSet<ScenePath> ContainerObjects = new HashSet<ScenePath>();
             internal readonly HashSet<SceneObservation> Hidden = new HashSet<SceneObservation>();
             internal Unit Make(SceneObservation row, ScenePath at, bool context) {
                 var label = row == null ? Last(at.Path) : OwnName(row);
@@ -101,12 +100,26 @@ namespace RailroaderScenePatcher {
         static string Parent(string path) { var at = path.LastIndexOf('/'); return at < 0 ? null : path.Substring(0, at); }
         static string Round(double v) => Math.Round(v).ToString(CultureInfo.InvariantCulture);
 
-        // A Sign group that holds only signs other families list gets no row (Bryson Signs, Ela Signs, Sylva Signs);
-        // its signs are rows of their own.
-        internal static bool IsContainer(SceneObservation r) => r.GroupPath == null && r.Category == BakedSceneryCategories.Sign && r.InspectionOnly != null;
+        // A container of signs: a Sign group that lists no part of its own and holds objects another family lists, as
+        // Bryson Signs, Ela Signs and Sylva Signs hold track markers. It gets no row; the signs it holds are rows of
+        // their own. Why such a group has no edit does not decide this: a Sign group without such objects keeps its row.
+        static IReadOnlyList<SceneObservation> containersFrom;
+        static HashSet<SceneObservation> containers = new HashSet<SceneObservation>();
+        internal static ISet<SceneObservation> SignContainers(IReadOnlyList<SceneObservation> entries) {
+            if (entries == null) return new HashSet<SceneObservation>();
+            if (ReferenceEquals(containersFrom, entries)) return containers;
+            var found = new HashSet<SceneObservation>();
+            foreach (var group in entries.Where(e => e.Family == SceneFamilies.BakedScenery && e.GroupPath == null && e.Category == BakedSceneryCategories.Sign)) {
+                var below = group.Identity.Path + "/";
+                bool Inside(SceneObservation e) => e.Identity.Scene == group.Identity.Scene && e.Identity.Path.StartsWith(below, StringComparison.Ordinal);
+                if (!entries.Any(e => e.GroupPath == group.Identity.Path && e.Identity.Scene == group.Identity.Scene) && entries.Any(e => e.Family != SceneFamilies.BakedScenery && Inside(e))) found.Add(group);
+            }
+            containersFrom = entries; containers = found;
+            return found;
+        }
         // A serialized track span that no crossing controller holds is a native track span and leaves the list.
         internal static bool IsNativeSpan(SceneObservation r) => r.Family == SpanFamily && r.HolderPath == null && !r.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal);
-        internal static int HiddenCount(IReadOnlyList<SceneObservation> entries) => entries == null ? 0 : entries.Count(r => IsContainer(r) || IsNativeSpan(r));
+        internal static int HiddenCount(IReadOnlyList<SceneObservation> entries) => entries == null ? 0 : SignContainers(entries).Count + entries.Count(IsNativeSpan);
         // The outliner's count line: the rows the tree lists, of the objects it can list.
         internal static string Summary(Result result, IReadOnlyList<SceneObservation> entries) =>
             result.Listed.ToString(CultureInfo.InvariantCulture) + " of " + Math.Max(0, (entries?.Count ?? 0) - HiddenCount(entries)).ToString(CultureInfo.InvariantCulture) + " objects";
@@ -126,7 +139,7 @@ namespace RailroaderScenePatcher {
         // Refresh reads the places again.
         internal static void InvalidatePlaces() {
             cachedWorldKey = null; placesBuiltWithEntries = false; preparedEntries = null;
-            places = null; placeCache = null; measured = null; classCache = null; searchTags = null; kindsFrom = null;
+            places = null; placeCache = null; measured = null; classCache = null; searchTags = null; kindsFrom = null; containersFrom = null;
         }
         static bool HasPosition(SceneObservation e) => e.Position != null && e.Position.Count >= 3;
         static bool Finite(double x, double z) => !Double.IsNaN(x) && !Double.IsNaN(z) && !Double.IsInfinity(x) && !Double.IsInfinity(z);
@@ -285,24 +298,22 @@ namespace RailroaderScenePatcher {
 
         // Container objects and native track spans leave the list.
         static void HideContainersAndNativeSpans(BuildContext b) {
-            foreach (var r in b.Rows.Where(r => IsContainer(r) || IsNativeSpan(r))) {
+            var signContainers = SignContainers(b.Entries);
+            foreach (var r in b.Rows.Where(r => signContainers.Contains(r) || IsNativeSpan(r))) {
                 b.Hidden.Add(r);
-                if (b.Diagnostics) b.Result.Hidden.Add((IsContainer(r) ? "container object " : "native track span ") + r.Identity.Path);
+                if (b.Diagnostics) b.Result.Hidden.Add((signContainers.Contains(r) ? "container object " : "native track span ") + r.Identity.Path);
             }
             foreach (var e in b.Entries) {
                 var at = new ScenePath(e.Identity.Scene, e.Identity.Path);
-                if (IsContainer(e)) b.ContainerObjects.Add(at);
                 if (e.GroupPath == null && e.HolderPath == null && !b.RootEntries.ContainsKey(at)) b.RootEntries[at] = e;
             }
         }
         // Units: every object outside a group and outside a controller, with its parts or detection spans beneath it. A
-        // part or span whose holder the search left out brings its holder, dimmed. A part of a container object stands
-        // on its own.
+        // part or span whose holder the search left out brings its holder, dimmed.
         static void BuildUnits(BuildContext b) {
-            bool InContainer(SceneObservation r) => r.GroupPath != null && b.ContainerObjects.Contains(new ScenePath(r.Identity.Scene, r.GroupPath));
-            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r) && (r.GroupPath == null && r.HolderPath == null || InContainer(r))))
+            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r) && r.GroupPath == null && r.HolderPath == null))
                 b.Make(row, new ScenePath(row.Identity.Scene, row.Identity.Path), false).Node.Count = 1;
-            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r) && (r.GroupPath != null && !InContainer(r) || r.HolderPath != null))) {
+            foreach (var row in b.Rows.Where(r => !b.Hidden.Contains(r) && (r.GroupPath != null || r.HolderPath != null))) {
                 var holderAt = new ScenePath(row.Identity.Scene, row.GroupPath ?? row.HolderPath);
                 if (!b.ByPath.TryGetValue(holderAt, out var holder)) {
                     b.RootEntries.TryGetValue(holderAt, out var found);

@@ -433,7 +433,7 @@ namespace RailroaderScenePatcher {
         internal static string UseInGame(SceneObservation selected, SceneObservation group) {
             var isPart = selected.GroupPath != null;
             var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings);
-            return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Subcategory : selected.Subcategory) == BakedSceneryCategories.RoadBridges);
+            return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Bridge : selected.Bridge) == BridgeKind.Road);
         }
         // A road bridge is decorative, and its road is native map data: moving the bridge does not move
         // the road.
@@ -737,7 +737,7 @@ namespace RailroaderScenePatcher {
         }
         // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
         // crossing's Connections tab, not on the object itself.
-        internal const string AddedEquipmentFamily = "Added light or gate", AddedBellFamily = "Added bell";
+        internal const string AddedEquipmentFamily = SceneFamilies.AddedEquipment, AddedBellFamily = SceneFamilies.AddedBell;
         // The guide link offered below a list of equipment sources: its label and the guide page with the anchor of its
         // eligibility reasons, or null while every source of the list is eligible. A list of bell definitions links to the bell
         // guide, a list of devices to the light and gate guide.

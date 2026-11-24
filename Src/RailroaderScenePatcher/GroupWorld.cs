@@ -252,7 +252,7 @@ namespace RailroaderScenePatcher {
         internal static bool HoldsToggles(GameObject root) { if (root == null) return false; Verdicts(); return toggleRoots.Contains(root); }
         internal static PartVerdict PartVerdictOf(GameObject go) { if (go == null) return null; Verdicts(); return partVerdicts.TryGetValue(go, out var verdict) ? verdict : null; }
         // Whether the object is the root of a baked scenery group for world marking: a listed group root, or an
-        // inspection-only one that the category table names. The inventory objects below it are the group's objects.
+        // inspection-only one that has a category. The inventory objects below it are the group's objects.
         internal static bool IsGroupRoot(GameObject go) {
             var verdict = VerdictOf(go);
             return verdict != null && (verdict.Disposition == GroupDisposition.Group || (verdict.Disposition == GroupDisposition.InspectionOnly && verdict.Category != null));
@@ -408,9 +408,9 @@ namespace RailroaderScenePatcher {
             if (go == null) return null;
             var verdict = VerdictOf(go);
             if (verdict?.Disposition != GroupDisposition.Group) verdict = VerdictOf(GroupRootOf(go));
-            return verdict?.Disposition == GroupDisposition.Group ? BakedSceneryRules.FollowingRefusal(verdict.Subcategory) : null;
+            return verdict?.Disposition == GroupDisposition.Group ? BakedSceneryRules.FollowingRefusal(verdict.Bridge) : null;
         }
-        static bool RailBridgeRoot(GameObject go) { var verdict = VerdictOf(go); return verdict?.Disposition == GroupDisposition.Group && verdict.Subcategory == BakedSceneryCategories.RailBridges; }
+        static bool RailBridgeRoot(GameObject go) { var verdict = VerdictOf(go); return verdict?.Disposition == GroupDisposition.Group && verdict.Bridge == BridgeKind.Rail; }
         // A rail bridge's construction controller (Game.Mow.TrackConstructionScenery): the track segment ids it reads and
         // the objects of its entries, which it switches on and off by the construction state of those segments. Read
         // lazily: a group without a controller needs none of these, and one with a controller is refused while one is
@@ -653,8 +653,8 @@ namespace RailroaderScenePatcher {
             var own = GroupOf(OwnSimple(root));
             var verdict = VerdictOf(root);
             // Every edit of a bridge construction verifies its colliders; a rail bridge also the track-owned scenery beside it.
-            var bridge = verdict?.Disposition == GroupDisposition.Group && verdict.Category == BakedSceneryCategories.Bridge;
-            var rail = bridge && verdict.Subcategory == BakedSceneryCategories.RailBridges;
+            var bridge = verdict?.Disposition == GroupDisposition.Group && verdict.Bridge != BridgeKind.None;
+            var rail = bridge && verdict.Bridge == BridgeKind.Rail;
             return new GroupObservation(state, parts, cullers, t.parent, own == null ? (bool?)null : own.enabled, bridge ? Colliders(t) : null, rail ? TrackScenery(root) : null);
         }
         // The generated trestles near a rail bridge, as the Ela bridge describes them: selected at the first observation

@@ -6,6 +6,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using RailroaderScenePatcher;
 using RailroaderScenePatcher.Core;
 
 // The base map of Railroader 0.6.3 as the inventory of patcher build 7962df1 listed it, read from
@@ -86,6 +87,45 @@ sealed class BaseMapFixture {
         return SceneClassification.Of(o.Family, o.Path, o.Node.Components, types, BakedSceneryRules.NamesBelow(o.Node), Places.StripPlaces);
     }
     public string Outcome(BaseMapObject o) => ClassOf(o) + " @ " + (Places.Of(o.Path, o.At)?.Name ?? "no place");
+
+    // The inventory the outliner gets for this map: one observation per listed object, a part with its group, a
+    // detection span with its controller, and a group root with the category and the reason the rules give it.
+    public List<SceneObservation> Observations(out Dictionary<SceneObservation, BaseMapObject> source) {
+        var roots = Verdicts.Where(v => v.Disposition == GroupDisposition.Group || v.Disposition == GroupDisposition.InspectionOnly).GroupBy(v => v.Path).ToDictionary(g => g.Key, g => g.First());
+        var controllers = new HashSet<string>(Objects.Where(o => o.Listed && o.Family == SceneFamilies.CrossingController).Select(o => o.Path));
+        string Above(string path, Func<string, bool> found) {
+            for (var slash = path.LastIndexOf('/'); slash > 0; slash = path.LastIndexOf('/')) { path = path.Substring(0, slash); if (found(path)) return path; }
+            return null;
+        }
+        source = new Dictionary<SceneObservation, BaseMapObject>();
+        var rows = new List<SceneObservation>();
+        foreach (var o in Objects.Where(o => o.Listed)) {
+            GroupRootVerdict root = null;
+            if (o.BakedRoot) roots.TryGetValue(o.Path, out root);
+            var row = new SceneObservation(new object(), new TargetIdentity("BushnellWhittier-MapManager", o.Path, "UnityEngine.Transform", o.Structure), o.Family, true, new[] { o.At[0], 0, o.At[1] }, new double[] { 0, 0, 0, 1 },
+                new string[0], new string[0], new string[0], "Placement", inspectionOnly: root?.Disposition == GroupDisposition.InspectionOnly ? root.Reason : null,
+                groupPath: o.BakedPart ? Above(o.Path, roots.ContainsKey) : null, category: root?.Category, subcategory: root?.Subcategory,
+                holderPath: o.Family == SceneFamilies.TrackSpan ? Above(o.Path, controllers.Contains) : null, bridge: root?.Bridge ?? BridgeKind.None);
+            source[row] = o; rows.Add(row);
+        }
+        return rows;
+    }
+    // The world the outliner reads beside that inventory: what the fixture recorded on and below each object, the
+    // game's map data, and the places the unlisted objects name. No object has bounds: each stands at its position.
+    public IOutlinerScene Scene(Dictionary<SceneObservation, BaseMapObject> source) => new FixtureScene { Map = this, Source = source };
+    sealed class FixtureScene : IOutlinerScene {
+        public BaseMapFixture Map; public Dictionary<SceneObservation, BaseMapObject> Source;
+        public string WorldKey => "base map";
+        public ObjectFacts Facts(SceneObservation entry) {
+            var o = Source[entry];
+            if (o.Node == null) return new ObjectFacts { Own = o.Components, AtOrBelow = o.Components };
+            var types = new HashSet<string>(); Below(o.Node, types);
+            return new ObjectFacts { Own = o.Node.Components.ToArray(), AtOrBelow = types.ToArray(), NamesBelow = BakedSceneryRules.NamesBelow(o.Node).ToArray() };
+        }
+        public double[] Bounds(SceneObservation entry) => null;
+        public IEnumerable<PlaceSource> PlaceSources(IReadOnlyList<SceneObservation> entries, List<string> notes) =>
+            Map.MapData.Concat(Map.Objects.Where(o => !o.Listed).SelectMany(o => ScenePlaces.SourcesOf(o.Path, o.At)));
+    }
 
     // Writes the outcomes of the rules into the fixture's expected column, after they were reviewed.
     public void WriteExpected() {

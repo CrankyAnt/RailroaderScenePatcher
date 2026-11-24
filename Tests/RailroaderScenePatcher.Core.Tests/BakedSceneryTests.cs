@@ -311,7 +311,7 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
     public string FollowingRefusal(object target) {
         var group = target is FakeGroup root ? root : ((FakePart)target).Group;
-        return group.RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : BakedSceneryRules.FollowingRefusal(GroupVerdict(PathOf(group))?.Subcategory);
+        return group.RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : BakedSceneryRules.FollowingRefusal(GroupVerdict(PathOf(group))?.Bridge ?? BridgeKind.None);
     }
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;
