@@ -56,6 +56,7 @@ static class FittedFrameTests {
         PartByPart();
         GroupFrameFollowsItsObjects();
         GroupDistanceToItsBox();
+        ScatteredPiecesKeepTheRootsAxes();
         Console.WriteLine("PASS: frames follow their models");
     }
 
@@ -185,6 +186,45 @@ static class FittedFrameTests {
     // A group shows its objects, its marker or its frame by the distance to the same box its marker stands on. A
     // trestle 60 m long on a diagonal, seen from 150 m across it: the world-aligned bounds around it would come
     // within 125 m, while the trestle itself is 147 m away, so the group shows its marker and frame.
+    // Bryson Depot: the group's boxes are only clocks and station signs, small pieces scattered over the building,
+    // whose own mesh is not among them. The root stands at 70 degrees, along the building. The pieces lie at its
+    // corners, the far pair a metre further out on one side, so a box turned about 2 degrees is some 8 percent
+    // smaller than the box in the root's axes. Small scattered pieces are no shape to follow: the box keeps the
+    // root's axes. A coherent shape still turns: the trestle and the pad cases above.
+    static void ScatteredPiecesKeepTheRootsAxes() {
+        double y = 70 * Math.PI / 180;
+        WorldPoint right = new WorldPoint(Math.Cos(y), 0, -Math.Sin(y)), forward = new WorldPoint(Math.Sin(y), 0, Math.Cos(y));
+        var root = new WorldBasis(right, new WorldPoint(0, 1, 0), forward);
+        WorldPoint[] Piece(double u, double v) {
+            var corners = new WorldPoint[8];
+            for (int i = 0; i < 8; i++) {
+                double a = u + ((i & 1) == 0 ? -.5 : .5), h = 3 + ((i & 2) == 0 ? -.5 : .5), b = v + ((i & 4) == 0 ? -.5 : .5);
+                corners[i] = new WorldPoint(a * right.X + b * forward.X, h, 100 + a * right.Z + b * forward.Z);
+            }
+            return corners;
+        }
+        var pieces = new[] { Piece(-15, -6), Piece(15, -5), Piece(-15, 5), Piece(15, 6) };
+        var boxes = pieces.Select((c, k) => BoxOf("sign " + k, c)).ToArray();
+        var eye = new WorldPoint(0, 80, 40); var view = Camera(eye, 60);
+        var framed = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, boxes, view, View, null, ObjectMarkingGeometry.FrameDistance, root, true);
+        var rootBox = ObjectMarkingGeometry.Enclose(pieces.SelectMany(c => c), root);
+        // The points alone would turn: the box along them is smaller by more than the share for a mesh's points.
+        var alongPoints = ObjectMarkingGeometry.BoxAlong(pieces.SelectMany(c => c), root);
+        Check(!SameBox(alongPoints, rootBox), "the points of the scattered pieces alone give a turned box");
+        Check(framed.Box != null && SameBox(framed.Box, rootBox), "small scattered pieces keep the root's axes: box yaw " + ObjectMarkingGeometry.Yaw(framed.Box) + " against " + ObjectMarkingGeometry.Yaw(rootBox));
+        // Two slabs that together make a deck 30 by 10 m, turned 2 degrees off the root, are a shape: their box,
+        // some 10 percent smaller than the root's, lies along the deck.
+        var deck = new[] { Turned(-7.5 * Math.Cos(72 * Math.PI / 180), 1, 100 + 7.5 * Math.Sin(72 * Math.PI / 180), 15, 2, 10, -72), Turned(7.5 * Math.Cos(72 * Math.PI / 180), 1, 100 - 7.5 * Math.Sin(72 * Math.PI / 180), 15, 2, 10, -72) };
+        var deckFrame = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, deck.Select((c, k) => BoxOf("slab " + k, c)).ToArray(), view, View, null, ObjectMarkingGeometry.FrameDistance, root, true);
+        Check(deckFrame.Box != null && Near3(Edges(deckFrame.Box), 2, 10, 30), "a coherent shape a little off its root lies along the shape: " + String.Join(", ", Edges(deckFrame.Box)));
+        // As a group of those pieces, from beyond 125 m, the same.
+        var far = new WorldPoint(0, 200, -100); var farView = Camera(far, 60);
+        var frames = boxes.Select(b => ObjectMarkingGeometry.Frame(b.Center, far, new[] { b }, farView, View, null, Double.PositiveInfinity)).ToArray();
+        var group = ObjectMarkingGeometry.GroupFrame(far, boxes.Select(b => b.Center).ToArray(), frames, root, null, farView, View);
+        var rootFrame = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), far, new[] { BoxOf("root axes", rootBox) }, farView, View, null, Double.PositiveInfinity);
+        Check(group.Frame.HasValue && Math.Abs(Shoelace(group.Outline) - Shoelace(rootFrame.Outline)) < 1e-6 * Shoelace(rootFrame.Outline), "a group of small scattered pieces keeps its root's axes");
+    }
+
     static void GroupDistanceToItsBox() {
         var trestle = Turned(0, 4, 1000, 60, 8, 6, 45);
         double d = 150, h = Math.Sqrt(.5);

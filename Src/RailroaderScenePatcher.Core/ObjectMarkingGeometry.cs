@@ -90,7 +90,7 @@ namespace RailroaderScenePatcher.Core {
         // The boxes of the framed piece, whether or not the object has a frame at its distance: a group's one box
         // surrounds them.
         readonly IReadOnlyList<ObjectMarkingBox> piece;
-        internal IEnumerable<WorldPoint> PieceCorners() => piece == null ? Enumerable.Empty<WorldPoint>() : piece.SelectMany(ObjectMarkingGeometry.CornersOf);
+        internal IEnumerable<IReadOnlyList<WorldPoint>> PieceBoxes() => piece == null ? Enumerable.Empty<IReadOnlyList<WorldPoint>>() : piece.Select(ObjectMarkingGeometry.CornersOf);
         // The world-aligned box around the framed piece, which the distance runs to; null when no piece was found.
         public WorldBox? Bounds { get; }
         // The rectangle around the outline in top-left screen pixels, or null when the object shows only its square
@@ -255,7 +255,7 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var box in piece) decisions?.Add(box.Name + ": Used for the marker, but too far away for a frame at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m.");
                 // Without a frame the marker stands on the center of the uncut box around the piece: the ground is
                 // not read for an object that shows only its marker.
-                var uncut = piece.Count == 1 ? CornersOf(piece[0]) : BoxAlong(piece.SelectMany(CornersOf), orientation ?? BasisOf(seed));
+                var uncut = piece.Count == 1 ? CornersOf(piece[0]) : BoxAlongPieces(piece.Select(CornersOf), orientation ?? BasisOf(seed));
                 return new ObjectMarkingFrame(null, distance, null, bounds, piece, uncut == null ? null : CenterOf(new List<Piece> { new Piece { Corners = uncut.ToArray() } }));
             }
             // The box is clipped to the view only now, so a box that crosses the near plane or a view edge still
@@ -302,7 +302,7 @@ namespace RailroaderScenePatcher.Core {
             } else if (standing.Count > 1) {
                 // Several boxes: one box around all of them that follows them, cut at the surface it
                 // stands in, as for a single box.
-                var box = BoxAlong(standing.SelectMany(entry => CornersOf(entry.Key)), orientation ?? BasisOf(seed));
+                var box = BoxAlongPieces(standing.Select(entry => CornersOf(entry.Key)), orientation ?? BasisOf(seed));
                 enclosing = box;
                 var ground = standing.Select(entry => entry.Key.Ground).FirstOrDefault(g => g != null);
                 var pieces = Pieces(box, ground);
@@ -376,6 +376,37 @@ namespace RailroaderScenePatcher.Core {
             if (points != null) builder.Add(points);
             return builder.Box;
         }
+        // The one box around the boxes of an object or a group that follows them, as BoxAlong gives it, but only for
+        // pieces that form a shape: a box turned away from the object's own axes stays only when it is far smaller
+        // than theirs, at most ScatterShare of their size, or when the pieces cover at least CoherentShare of its
+        // ground. Small pieces scattered over a building whose own mesh is not among them, such as the clocks and
+        // signs of a station, give an outline that follows their scatter, not the building: the box keeps the
+        // object's axes. A piece of a single point, where an object without boxes stands, covers nothing.
+        public static WorldPoint[] BoxAlongPieces(IEnumerable<IReadOnlyList<WorldPoint>> pieces, WorldBasis axes) {
+            var list = pieces?.Where(p => p != null).ToList() ?? new List<IReadOnlyList<WorldPoint>>();
+            var builder = new BoxAlongBuilder(axes);
+            foreach (var piece in list) builder.Add(piece);
+            WorldPoint[] alongBox = builder.Box, axisBox = builder.AxisBox;
+            if (alongBox == null || axisBox == null || Same(alongBox, axisBox)) return axisBox;
+            if (Measure(alongBox) <= ScatterShare * Measure(axisBox)) return alongBox;
+            var ground = Footprint(alongBox);
+            var covered = list.Sum(piece => piece.Count == 8 ? Footprint(piece) : 0);
+            return ground > 0 && covered >= CoherentShare * ground ? alongBox : axisBox;
+        }
+        // Pieces that cover less than CoherentShare of the ground of the box along them turn it only from
+        // ScatterShare of the size of the box in the object's axes down.
+        public const double ScatterShare = .8, CoherentShare = .25;
+        // The ground area of a box seen from above: the area of the outline of its corners.
+        static double Footprint(IReadOnlyList<WorldPoint> box) {
+            var outline = WorldRibbonGeometry.Hull(box.Where(Valid).Select(p => new ScreenPoint(p.X, p.Z)).ToList());
+            double sum = 0;
+            for (int i = 0; i < outline.Count; i++) { var a = outline[i]; var b = outline[(i + 1) % outline.Count]; sum += a.X * b.Y - b.X * a.Y; }
+            return Math.Abs(sum) / 2;
+        }
+        static bool Same(IReadOnlyList<WorldPoint> a, IReadOnlyList<WorldPoint> b) {
+            for (int i = 0; i < 8; i++) if (a[i].X != b[i].X || a[i].Y != b[i].Y || a[i].Z != b[i].Z) return false;
+            return true;
+        }
         // Whether an object with these axes stands upright: its up axis lies within StandsAngle of the world's.
         public static bool Stands(WorldBasis axes) {
             var up = Unit(axes)[1];
@@ -430,13 +461,13 @@ namespace RailroaderScenePatcher.Core {
             anchors = Listed(anchors, listed); frames = frames == null ? null : Listed(frames, listed);
             // Where an object stands counts for the box only without boxes of its own: the pivot of a group root can
             // stand apart from its building, and would widen the box over ground the group does not cover.
-            var held = new List<WorldPoint>();
+            var held = new List<IReadOnlyList<WorldPoint>>();
             for (int k = 0; k < anchors.Count; k++) {
-                var corners = frames != null && k < frames.Count && frames[k] != null ? frames[k].PieceCorners().ToList() : null;
-                if (corners != null && corners.Count != 0) held.AddRange(corners);
-                else if (Valid(anchors[k])) held.Add(anchors[k]);
+                var boxes = frames != null && k < frames.Count && frames[k] != null ? frames[k].PieceBoxes().ToList() : null;
+                if (boxes != null && boxes.Count != 0) held.AddRange(boxes);
+                else if (Valid(anchors[k])) held.Add(new[] { anchors[k] });
             }
-            var box = BoxAlong(held, orientation ?? WorldBasis.World);
+            var box = BoxAlongPieces(held, orientation ?? WorldBasis.World);
             if (box == null || !Valid(camera)) return new GroupMarking(Double.NaN, default, null, null);
             // The group shows its objects, its marker or its frame by the distance to that box, on whose center its
             // marker stands, so the switch and the marker agree.

@@ -315,6 +315,7 @@ namespace RailroaderScenePatcher {
             Enumerable.Range(0, 8).Select(i => Point(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)))).ToArray();
 
         internal void Release() {
+            observedBoxes.Clear(); writtenCameraLine = null;
             keptBoxes.Clear();
             rendererBoxes?.Clear();
             if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
@@ -1025,24 +1026,39 @@ namespace RailroaderScenePatcher {
             kinds[renderer] = kind;
             return kind;
         }
-        // Frame diagnostics, debug output: one block per candidate within range when a world choice opens and after each
-        // camera step. With debug off nothing is collected or built.
-        const float ObservationStep = 25f;
+        // Frame diagnostics, debug output: one block per candidate within range, written once and again only when the
+        // one box its frame outlines changes. The camera line goes before the first block written from a camera
+        // position, once per position. With debug off nothing is collected or built.
         const double ObservationRange = 1500;
-        object observedChoice;
-        Vector3 observedCamera;
         bool observing;
+        // The camera line of the pass, and the last one written.
+        string cameraLine, writtenCameraLine;
+        // Per candidate, the box its last written block named.
+        readonly Dictionary<string, string> observedBoxes = new Dictionary<string, string>(StringComparer.Ordinal);
         void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
-            var choice = (object)pending ?? source;
-            observing = PatcherLog.DebugEnabled && choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
+            observing = PatcherLog.DebugEnabled && ((object)pending ?? source) != null;
             if (!observing) return;
-            observedChoice = choice; observedCamera = camera.transform.position;
-            PatcherLog.Debug("Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+            cameraLine = "Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
                 camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
-                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.");
+                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.";
         }
-        static void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
+        // The box a block names, to a centimetre, and how many renderers it lists: a block is written again only when
+        // that changes.
+        static string BoxSignature(ObjectMarkingFrame result, int renderers) {
+            if (result.Box == null) return "no box/" + renderers;
+            var text = new System.Text.StringBuilder();
+            foreach (var corner in result.Box) text.Append(Math.Round(corner.X, 2).ToString(CultureInfo.InvariantCulture)).Append(',').Append(Math.Round(corner.Y, 2).ToString(CultureInfo.InvariantCulture))
+                .Append(',').Append(Math.Round(corner.Z, 2).ToString(CultureInfo.InvariantCulture)).Append(';');
+            return text.Append(renderers).ToString();
+        }
+        void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
             List<string> skipped, ObjectMarkingFrame result, Rect view, WorldBasis objectAxes) {
+            var key = candidate.Choice.Label + "|" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(candidate.Choice.Handle).ToString(CultureInfo.InvariantCulture);
+            var signature = BoxSignature(result, renderers.Length);
+            if (observedBoxes.TryGetValue(key, out var written) && written == signature) return;
+            if (observedBoxes.Count > 20000) observedBoxes.Clear();
+            observedBoxes[key] = signature;
+            if (cameraLine != null && cameraLine != writtenCameraLine) { PatcherLog.Debug(cameraLine); writtenCameraLine = cameraLine; }
             var text = new System.Text.StringBuilder();
             text.Append("Frame check for ").Append(candidate.Choice.Label).Append(". Distance: ").Append(Number(result.Distance)).Append(" m")
                 .Append(result.Frame.HasValue ? ". Frame size as a fraction of the view: " + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + "." : ". Marker only.");

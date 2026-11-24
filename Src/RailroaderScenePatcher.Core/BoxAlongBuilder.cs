@@ -40,6 +40,8 @@ namespace RailroaderScenePatcher.Core {
             }
             if (stands) outline = WorldRibbonGeometry.Hull(flat);
         }
+        // The box of the points so far in the object's own axes; null without points.
+        public WorldPoint[] AxisBox => min[0] > max[0] ? null : ObjectMarkingGeometry.Corners(axes, min, max);
         // The box of the points so far; null without points.
         public WorldPoint[] Box {
             get {
