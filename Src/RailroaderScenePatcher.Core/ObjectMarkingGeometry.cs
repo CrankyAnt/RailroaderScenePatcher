@@ -204,15 +204,15 @@ namespace RailroaderScenePatcher.Core {
             if (project == null) throw new ArgumentNullException(nameof(project));
             var open = new List<ObjectMarkingBox>();
             foreach (var box in boxes) {
-                var reason = box.Kind == ObjectMarkingBoxKind.Effect ? "effect"
-                    : box.Kind == ObjectMarkingBoxKind.ShadowsOnly ? "shadows only"
-                    : box.Kind == ObjectMarkingBoxKind.LowerLod ? "lower level of detail"
-                    : !Valid(box.Center) || !Valid(box.Extents) || box.Extents.X < 0 || box.Extents.Y < 0 || box.Extents.Z < 0 ? "bounds not finite"
+                var reason = box.Kind == ObjectMarkingBoxKind.Effect ? "it is an effect"
+                    : box.Kind == ObjectMarkingBoxKind.ShadowsOnly ? "it draws only shadows"
+                    : box.Kind == ObjectMarkingBoxKind.LowerLod ? "it is a lower level of detail"
+                    : !Valid(box.Center) || !Valid(box.Extents) || box.Extents.X < 0 || box.Extents.Y < 0 || box.Extents.Z < 0 ? "its box has invalid coordinates or size"
                     : null;
-                if (reason == null) open.Add(box); else decisions?.Add(box.Name + ": excluded, " + reason);
+                if (reason == null) open.Add(box); else decisions?.Add(box.Name + ": Not used for the frame because " + reason + ".");
             }
             if (open.Count == 0 || !Valid(anchor) || !Valid(camera)) {
-                foreach (var box in open) decisions?.Add(box.Name + ": excluded, no anchor or camera");
+                foreach (var box in open) decisions?.Add(box.Name + ": Not used for the frame because the object or camera position is invalid.");
                 return new ObjectMarkingFrame(null, Double.NaN);
             }
             // The box the marker belongs to: under it, else the nearest; then the centre nearest it; then the smaller.
@@ -227,7 +227,7 @@ namespace RailroaderScenePatcher.Core {
             var piece = new List<ObjectMarkingBox> { seed };
             open.Remove(seed);
             for (int i = open.Count - 1; i >= 0; i--)
-                if (Size(open[i]) > limit) { decisions?.Add(open[i].Name + ": excluded, far larger than the box at the marker"); open.RemoveAt(i); }
+                if (Size(open[i]) > limit) { decisions?.Add(open[i].Name + ": Not used for the frame because its box is much larger than the box at the marker."); open.RemoveAt(i); }
             double minX = seed.Center.X - seed.Extents.X, maxX = seed.Center.X + seed.Extents.X, minY = seed.Center.Y - seed.Extents.Y,
                 maxY = seed.Center.Y + seed.Extents.Y, minZ = seed.Center.Z - seed.Extents.Z, maxZ = seed.Center.Z + seed.Extents.Z;
             for (bool joined = true; joined;) {
@@ -242,12 +242,12 @@ namespace RailroaderScenePatcher.Core {
                     piece.Add(p); open.RemoveAt(i); joined = true;
                 }
             }
-            foreach (var box in open) decisions?.Add(box.Name + ": excluded, apart from the object's piece");
+            foreach (var box in open) decisions?.Add(box.Name + ": Not used for the frame because its box is too far from the boxes at the marker.");
             double dx = Gap(minX, maxX, camera.X, 0), dy = Gap(minY, maxY, camera.Y, 0), dz = Gap(minZ, maxZ, camera.Z, 0);
             var distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
             var bounds = new WorldBox(new WorldPoint(minX, minY, minZ), new WorldPoint(maxX, maxY, maxZ));
             if (!(distance <= frameDistance)) {
-                foreach (var box in piece) decisions?.Add(box.Name + ": included, beyond the frame distance at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m");
+                foreach (var box in piece) decisions?.Add(box.Name + ": Used for the marker, but too far away for a frame at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m.");
                 // Without a frame the marker stands on the center of the uncut box around the piece: the ground is
                 // not read for an object that shows only its marker.
                 var uncut = piece.Count == 1 ? CornersOf(piece[0]) : Enclose(piece.SelectMany(CornersOf), orientation ?? BasisOf(seed));
@@ -271,7 +271,7 @@ namespace RailroaderScenePatcher.Core {
             }
             var standing = new List<KeyValuePair<ObjectMarkingBox, List<Piece>>>();
             foreach (var entry in cut) {
-                if (stands && !entry.Value.Any(q => q.Above)) decisions?.Add(entry.Key.Name + ": included, under the surface");
+                if (stands && !entry.Value.Any(q => q.Above)) decisions?.Add(entry.Key.Name + ": Selected as part of the object, but below the surface and not used for the frame.");
                 else standing.Add(entry);
             }
             List<ScreenPoint> points = null;
@@ -291,7 +291,7 @@ namespace RailroaderScenePatcher.Core {
                     points = Project(box, false, project, view, out finite);
                     marker = CenterOf(box);
                 }
-                decisions?.Add(sourceBox.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
+                decisions?.Add(sourceBox.Name + (points != null ? ": Used for the frame." : finite ? ": Selected for the frame, but outside the view." : ": Selected for the frame, but its screen position is invalid."));
             } else if (standing.Count > 1) {
                 // Several boxes: one box around all of them, in the object's orientation, cut at the surface it
                 // stands in, as for a single box.
@@ -303,7 +303,7 @@ namespace RailroaderScenePatcher.Core {
                 points = Project(drawn, false, project, view, out var finite);
                 marker = CenterOf(drawn);
                 foreach (var entry in standing)
-                    decisions?.Add(entry.Key.Name + (points != null ? ": included" : finite ? ": included, outside the view" : ": included, projection not finite"));
+                    decisions?.Add(entry.Key.Name + (points != null ? ": Used for the frame." : finite ? ": Selected for the frame, but outside the view." : ": Selected for the frame, but its screen position is invalid."));
             }
             if (points == null || points.Count == 0) return new ObjectMarkingFrame(null, distance, null, bounds, piece);
             double left = points.Min(q => q.X) - Margin, top = points.Min(q => q.Y) - Margin, right = points.Max(q => q.X) + Margin, bottom = points.Max(q => q.Y) + Margin;

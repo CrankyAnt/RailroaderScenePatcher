@@ -33,7 +33,7 @@ namespace RailroaderScenePatcher {
                 harmony = patcher;
             } catch (Exception e) {
                 patcher.UnpatchAll(Id);
-                Error = "Map Editor reload unavailable on this build: " + e.GetBaseException().Message;
+                Error = "The patcher couldn't prepare to reload the Map Editor: " + e.GetBaseException().Message;
             }
         }
         internal static void Remove() {
@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher {
                 if (dismissed) return;
                 // Like the native generic factory, a failed callback leaves the prompt open.
                 try { choose(value); }
-                catch (Exception e) { PatcherLog.Error("The Map Editor reload choice didn't run; the prompt stays open", e); return; }
+                catch (Exception e) { PatcherLog.Error("The Map Editor couldn't carry out your reload choice. The prompt stays open", e); return; }
                 dismissed = true;
                 dismiss();
             }
@@ -123,8 +123,8 @@ namespace RailroaderScenePatcher {
                 var selector = Native.Read(Native.Type("CameraSelector"), "shared");
                 var point = GroundPoint(selector);
                 var id = returns.Capture(mapIdentifier, ControllerId(), Coordinates(point), DateTime.UtcNow);
-                PatcherLog.Debug("Reload captured working map location " + point + " for " + mapIdentifier + "; return " + id + ".");
-            } catch (Exception e) { returns.Cancel(); PatcherLog.Debug("Working-location capture unavailable; reload will use the native camera location: " + e.GetBaseException().Message); }
+                PatcherLog.Debug("Recorded working location " + point + " on map " + mapIdentifier + " for reload return " + id + ".");
+            } catch (Exception e) { returns.Cancel(); PatcherLog.Debug("Couldn't record the working location for reload. The game will choose the camera location: " + e.GetBaseException().Message); }
         }
         static int ControllerId() {
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as UnityEngine.Object;
@@ -166,13 +166,13 @@ namespace RailroaderScenePatcher {
                     var strategy = Enum.Parse(selectorType.GetNestedType("CameraIdentifier", Native.Flags), "Strategy");
                     if (!returns.MarkRequested(pending.RequestId, map, controller, now)) return;
                     Native.Call(selector, "JumpToPoint", point, Quaternion.identity, strategy);
-                    PatcherLog.Debug("Reload requested return " + pending.RequestId + " to working map location " + point + "; arrival is pending.");
+                    PatcherLog.Debug("Reload return " + pending.RequestId + " requested to working location " + point + ". Waiting for arrival.");
                     return;
                 }
                 var measured = GroundPoint(selector);
                 if (returns.Complete(pending.RequestId, map, controller, Coordinates(measured), now)) {
                     relaunching = false;
-                    PatcherLog.Debug("Reload checked return " + pending.RequestId + " at working map location " + measured + ".");
+                    PatcherLog.Debug("Reload return " + pending.RequestId + " completed at working location " + measured + ".");
                 }
             } catch (Exception e) {
                 relaunching = false; returns.Cancel();

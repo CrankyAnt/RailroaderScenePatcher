@@ -1549,7 +1549,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // Why scene patch editing refuses every edit of an object before any change: several modifications of the scene patch
         // file target it. The panel shows the controls of such an object inactive with this reason; the edit still refuses.
-        public const string SeveralModifications = "Several modifications in the scene patch file target this object. Combine those modifications into one in the scene patch file";
+        public const string SeveralModifications = "This scene patch file has more than one modification for this object. Combine them into one modification in the file";
         // SeveralModifications when more than one modification of the scene patch file targets the object, or null.
         public string SeveralModificationsBlock(TargetIdentity target) => Own(engine.ResolveUnique(target)).Count > 1 ? SeveralModifications : null;
         List<JObject> Own(object target) {

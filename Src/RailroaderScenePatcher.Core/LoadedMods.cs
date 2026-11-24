@@ -94,7 +94,7 @@ namespace RailroaderScenePatcher.Core {
                 " (layers " + (maps.Count < 2 ? "none" : String.Join(", ", maps.Skip(1))) + "): " + (source.Name ?? source.Identifier) + " [" + source.Identifier + "] scene patch file";
             var map = MapId;
             var named = start + (map == null ? "" : " for " + map);
-            if (Result == null) return named + " skipped: " + (Skipped ?? "not handed to the patch engine");
+            if (Result == null) return named + " skipped: " + (Skipped ?? "the patcher didn't attempt to apply it");
             if (ForOtherMap(maps)) return named + " skipped: not the loaded map or one of its layers";
             if (Result.Error != null) return named + " not applied: " + Result.Error;
             var outcomes = Result.Outcomes?.Values.ToArray() ?? Array.Empty<Outcome>();

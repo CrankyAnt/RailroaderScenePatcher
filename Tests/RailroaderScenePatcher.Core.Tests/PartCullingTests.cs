@@ -770,7 +770,7 @@ static class PartCullingTests {
         Assert(warnings.Count(w => w.Contains("of " + Mill + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1
             && warnings.Count(w => w.Contains("of " + Other + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1, "Two groups with the same failure each get one warning that names the group: " + String.Join(" | ", warnings));
         Assert(warnings.Count(w => w.EndsWith(": another failure", StringComparison.Ordinal)) == 2, "A new failure of the same group is written once more");
-        Assert(warnings[0] == "Moved parts of " + Mill + " may show or hide at the wrong distance, because the patcher couldn't update their culling: game function gone", "The warning says what the player may see: " + warnings[0]);
+        Assert(warnings[0] == "Moved parts of " + Mill + " may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone", "The warning says what the player may see: " + warnings[0]);
         // One failing group leaves the other updating.
         f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) ? new InvalidOperationException("only the mill") : null;
         f.World.Objects.Remove(Other);

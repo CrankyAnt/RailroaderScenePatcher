@@ -32,7 +32,7 @@ namespace RailroaderScenePatcher.Core {
         HistoryTracking,
         // The Map Editor's title and Save button could not be refreshed.
         ChromeRefresh,
-        // A Map Editor history step could not be checked.
+        // A Map Editor Undo or Redo step could not be checked.
         HistoryCheck,
     }
 
@@ -48,16 +48,16 @@ namespace RailroaderScenePatcher.Core {
                 case EditingFailure.ReloadStopped:
                 case EditingFailure.HookUnavailable: return detail;
                 case EditingFailure.ReloadCancelled: return "Reload cancelled: " + detail;
-                case EditingFailure.ReturnTimedOut: return "The return to your working location did not complete within five minutes. Check the game's load diagnostics before trying again.";
+                case EditingFailure.ReturnTimedOut: return "The return to your working location did not complete within five minutes. Check the Player log for loading errors before trying again.";
                 case EditingFailure.LocationNotRestored: return "The Map Editor reloaded, but your working location could not be restored: " + detail;
-                case EditingFailure.OutstandingUnknown: return "Outstanding work could not be determined; the native map editor is treated as unsaved: " + detail;
+                case EditingFailure.OutstandingUnknown: return "The patcher couldn't check for unsaved changes. It treats the Map Editor as unsaved: " + detail;
                 case EditingFailure.HistoryError: return "A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: " + detail;
-                case EditingFailure.ExitCancelled: return "Exit cancelled because outstanding work could not be confirmed. " + detail;
+                case EditingFailure.ExitCancelled: return "The Map Editor stayed open because the patcher couldn't check for unsaved changes. " + detail;
                 case EditingFailure.FileCheck: return "Could not check the scene patch file: " + detail;
-                case EditingFailure.GizmoCleanup: return "The patcher could not verify cleanup after using the gizmo. Reload the Map Editor. " + detail;
-                case EditingFailure.HistoryTracking: return "Could not track a change to the Map Editor history: " + detail;
-                case EditingFailure.ChromeRefresh: return "Native map editor title and Save button could not be refreshed: " + detail;
-                case EditingFailure.HistoryCheck: return "The Map Editor history step couldn't be checked: " + detail;
+                case EditingFailure.GizmoCleanup: return "The patcher couldn't confirm that it removed the temporary changes made while using the gizmo. Reload the Map Editor. " + detail;
+                case EditingFailure.HistoryTracking: return "The patcher couldn't track an Undo or Redo history change in the Map Editor: " + detail;
+                case EditingFailure.ChromeRefresh: return "The Map Editor title and Save button couldn't be updated: " + detail;
+                case EditingFailure.HistoryCheck: return "The Map Editor Undo or Redo step couldn't be checked: " + detail;
                 default: throw new ArgumentOutOfRangeException(nameof(failure));
             }
         }

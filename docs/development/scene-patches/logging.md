@@ -9,7 +9,7 @@ The patcher writes all of its log lines through one entry point, `PatcherLog` (`
 | Mode | Written | Lines |
 | --- | --- | --- |
 | Player | Always | Warnings and errors that a player or modder must see and that the game does not already show. A normal session (load, edit, save) writes none. |
-| Debug | Only while the debug option is on | Load steps; the outcome of each scene patch file for each load attempt; edit results (`[Place] path: message Outstanding: ...`); save and Map Editor history steps; world-choice refusals (`[World choice] ...`); diagnostics such as `Group skipped: ...`, the baked scenery rule report, the frame diagnostics and the attempt traces. |
+| Debug | Only while the debug option is on | Load steps; the outcome of each scene patch file for each load attempt; edit results (`[Place] path: message Outstanding: ...`); save and Map Editor Undo or Redo steps; world-choice refusals (`[World choice] ...`); diagnostics such as `Group skipped: ...`, the baked scenery rule report, the frame diagnostics and the attempt traces. |
 
 World-choice refusals also appear in the footer in both modes. A row that the game shows in its **Log** window is written once, by the game.
 
@@ -35,7 +35,7 @@ Two classes in `Src/RailroaderScenePatcher/LogOutputs.cs` are the only places th
 - `NativeRows` (`Src/RailroaderScenePatcher.Core/NativeRows.cs`) delivers the patcher's Log window rows once per load attempt, when the Log window is ready. A row that cannot be delivered, because the Log window fails or the load attempt or the world ends first, is written once as a player warning: `The game's Log window didn't show this message: <originator>: <message>`.
 - `EditingFault` (`Src/RailroaderScenePatcher.Core/EditingFaults.cs`) holds the red line of the Scene Patcher window for one Map Editor. `Fail` takes one of the `EditingFailure` sites, such as a cancelled reload or a failed native Undo, stands in the window and is written once per text as a player error; a native Undo or Redo error reaches the log only. `Refuse` shows the refusal of an editing action, such as **Use file version**, and writes no player line: its edit feedback writes the debug line.
 
-## The debug option
+## Debug logging
 
 - The option is the key `debugLogging` in `settings.json`, in the patcher's own mod folder: `{"debugLogging": true}`. The package ships no such file. The patcher creates it the first time the checkbox changes, and keeps its other values. A missing file means off. A value that is not `true` or `false` gives a player warning and leaves the option off.
 - `Src/RailroaderScenePatcher.Core/DebugOption.cs` reads and writes the file through `ISettingsStore`, sets `PatcherLog.DebugEnabled`, and takes effect at once, without a restart. A session that cannot store the value keeps it for that session and gives a player error.

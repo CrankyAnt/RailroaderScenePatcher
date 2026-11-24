@@ -119,7 +119,7 @@ static class RetainedWorldTests {
         var first = binding.State;
         fail = true; binding.EndAttempt();
         var entry = binding.Enter("map", "graph");
-        Assert(binding.ReentryError != null && binding.ReentryError.Contains("Retained world reconciliation failed") && binding.ReentryError.Contains("injected reconciliation fault"), "The failure is recorded for local reporting: " + binding.ReentryError);
+        Assert(binding.ReentryError != null && binding.ReentryError.Contains("The patcher couldn't check its earlier changes when loading again in the same world") && binding.ReentryError.Contains("injected reconciliation fault"), "The failure is recorded for local reporting: " + binding.ReentryError);
         Assert(entry == WorldEntry.Started && scenes.Count == 2 && scenes[0].Disposed && binding.State != null && !ReferenceEquals(binding.State, first) && binding.Error == null, "The failed state is released and a new state starts for the same map");
         Assert(binding.State.Engine.Apply(Doc(Item("move-board", "board")), "pack").Outcomes["move-board"].Applied, "The new state applies the scene patch file");
         Assert(binding.Enter("map", "graph") == WorldEntry.Repeated && binding.ReentryError != null, "Repeated callbacks in that load attempt keep the report");

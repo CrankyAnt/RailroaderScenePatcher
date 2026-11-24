@@ -120,8 +120,8 @@ namespace RailroaderScenePatcher {
         public void Dispose() {
             if (disposed) return;
             disposed = true;
-            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("Moved baked scenery parts may show or hide at the wrong distance, because the patcher couldn't hand their culling back to the game", e); }
-            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("Moved baked scenery parts may not follow the game's switches, because the patcher couldn't hand them back to the game", e); }
+            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't return control of when moved baked scenery parts are shown to the game. They may appear or disappear at the wrong distance", e); }
+            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("The patcher couldn't return control of moved baked scenery parts to the game's switches. The switches may no longer turn these parts on or off", e); }
             if (ReferenceEquals(switches, ownSwitches)) { switches = null; switchHost = null; }
             ownHost.Dispose();
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
@@ -279,8 +279,12 @@ namespace RailroaderScenePatcher {
         // One line per candidate of the rule and per scene object below a listed group root, for evidence that compares
         // the listed and unlisted group roots and parts.
         internal static IEnumerable<string> Report() =>
-            Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + p.Value.Disposition + (p.Value.Reason == null ? "" : "; " + p.Value.Reason) + (p.Value.Ticket == null ? "" : " (" + p.Value.Ticket + ")") + (p.Value.Category == null ? "" : " [" + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory) + "]"))
-                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Key.scene.name + "/" + p.Value.Path + " => " + (p.Value.Disposition == PartDisposition.Part ? "Part" : "Part " + p.Value.Disposition) + (p.Value.Reason == null ? "" : "; " + p.Value.Reason)))
+            Verdicts().Select(p => p.Key.scene.name + "/" + p.Value.Path + ": " +
+                (p.Value.Disposition == GroupDisposition.Group ? "Listed as a scenery group" : p.Value.Disposition == GroupDisposition.InspectionOnly ? "Listed for inspection only" : p.Value.Disposition == GroupDisposition.ExistingFamily ? "Listed in another object family" : "Not listed") +
+                (p.Value.Reason == null ? "" : ". Reason: " + p.Value.Reason) + (p.Value.Category == null ? "" : ". Category: " + p.Value.Category + (p.Value.Subcategory == null ? "" : " / " + p.Value.Subcategory)))
+                .Concat(partVerdicts.Where(p => p.Key != null).Select(p => p.Key.scene.name + "/" + p.Value.Path + ": " +
+                    (p.Value.Disposition == PartDisposition.Part ? "Listed as a scenery part" : p.Value.Disposition == PartDisposition.ExistingFamily ? "Listed in another object family" : "Not listed as a scenery part") +
+                    (p.Value.Reason == null ? "" : ". Reason: " + p.Value.Reason)))
                 .OrderBy(line => line, StringComparer.Ordinal);
         internal static GroupRootVerdict VerdictOf(GameObject go) => go != null && Verdicts().TryGetValue(go, out var verdict) ? verdict : null;
         // The family an inspection-only candidate of the rule is listed under, or null when the rule lists none. A listed
@@ -436,8 +440,8 @@ namespace RailroaderScenePatcher {
         static bool FeatureReadable => ObjectList(featureObjects);
         // Why the patcher cannot see what progression or a map feature switches, or null.
         static string SwitchMembersProblem =>
-            progression != null && !ProgressionReadable ? "The game's progression controller members are unavailable, so progression can override an explicit disable."
-            : mapFeature != null && !FeatureReadable ? "The game's map feature members are unavailable, so a map feature can override an explicit disable." : null;
+            progression != null && !ProgressionReadable ? "The patcher can't read the game's progression controls. Progression may enable an object that a scene patch file disables."
+            : mapFeature != null && !FeatureReadable ? "The patcher can't read the game's map feature controls. A map feature may enable an object that a scene patch file disables." : null;
         // The loaded components of the switch types, read again only when the loaded scenes change: a switch is a scene
         // component, so the frames between scene changes find the same ones.
         static readonly Dictionary<Type, Component[]> loadedSwitches = new Dictionary<Type, Component[]>();
@@ -894,6 +898,6 @@ namespace RailroaderScenePatcher {
         void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Failed(e); } }
         // A switch can turn many times in one frame: each failure is written once.
         static readonly LogOnce failures = new LogOnce();
-        static void Failed(Exception e) { var message = e.GetBaseException().Message; failures.Warning(message, "A moved baked scenery part may not follow a game switch, because the patcher couldn't update it: " + message); }
+        static void Failed(Exception e) { var message = e.GetBaseException().Message; failures.Warning(message, "A moved baked scenery part may not turn on or off with a game switch because the patcher couldn't update it: " + message); }
     }
 }

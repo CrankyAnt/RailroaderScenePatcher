@@ -35,7 +35,7 @@ namespace RailroaderScenePatcher {
             catch (Exception e) {
                 if (!mapPatchFallbackLogged) {
                     mapPatchFallbackLogged = true;
-                    PatcherLog.Debug("Could not identify map patches in the map context. The native map editor cannot reject a scene patch file for naming a map patch. Details: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Couldn't identify the map patches in the current map. The Map Editor can't reject a scene patch file for naming a map patch: " + e.GetBaseException().Message);
                 }
                 return new string[0];
             }

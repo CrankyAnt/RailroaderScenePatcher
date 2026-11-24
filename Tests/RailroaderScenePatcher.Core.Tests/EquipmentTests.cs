@@ -237,7 +237,7 @@ static class EquipmentTests {
         Assert(f.Crossing.Position.SequenceEqual(new double[] { 5, 0, 7 }) && f.Crossing.Circuits.Count == 1
             && refusal.Outcomes["signals"].Error == "The change failed. The object is back as it was. Reason: Applied crossing equipment did not verify: equipment west differs from the mod's source or placement"
             && failed.World.VerificationFailures.Count == 1
-            && failed.World.VerificationFailures[0] == "reason=\"mismatch\" identity=true source=true position=false rotation=true positionTolerance=0.0005-per-axis-or-equal-float32 rotationTolerance=normalized-absolute-dot>=0.99999999 desired={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10,0,7],rotation=[0,0,0,1]} observed={scope=\"author/pack\",id=\"west\",pattern=\"crossing-light-gate-v1\",sourceScene=\"BushnellWhittier\",sourcePath=\"" + SignalPath + "\",position=[10.125,0,7],rotation=[0,0,0,1]}", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
+            && failed.World.VerificationFailures[0] == "Equipment differs from the requested equipment. Mod, equipment ID, pattern, and source match: true; source matches: true; position matches: false; rotation matches: true. Positions match when each coordinate has a finite 32-bit floating-point value and either differs by at most 0.0005 or has the same stored 32-bit value. Rotations match when the absolute dot product of the normalized rotations is at least 0.99999999. Requested: {mod=\"author/pack\", ID=\"west\", pattern=\"crossing-light-gate-v1\", source scene=\"BushnellWhittier\", source path=\"" + SignalPath + "\", position=[10,0,7], rotation=[0,0,0,1]}. Found: {mod=\"author/pack\", ID=\"west\", pattern=\"crossing-light-gate-v1\", source scene=\"BushnellWhittier\", source path=\"" + SignalPath + "\", position=[10.125,0,7], rotation=[0,0,0,1]}.", "Equipment leaves the crossing unchanged and a failed verification records the difference without changing the refusal");
     }
     static bool FloatStoredPlacementsVerify() {
         // Desired and observed values from the Allen journey, plus negative and larger map coordinates.
@@ -859,7 +859,7 @@ static class EquipmentTests {
         var runtime = new PatchRuntime(new PatchEngine(f.Scene), warnings, "0.5.0", "0.6.3");
         runtime.Apply(Doc(Equip("signals", Addition("west", x: 12))), new PatchSource("author/pack", "Pack", "1.0.0"));
         var message = warnings.Failures.Single().Message;
-        Assert(message.Contains("The change was undone. An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map.")
+        Assert(message.Contains("The change was undone, but an empty object remains where a light, gate, or bell was added at this crossing. This leftover object won't be saved with the map.")
             && message.Split(new[] { "empty object" }, StringSplitOptions.None).Length == 2
             && !message.Contains("Remaining state:") && !message.Contains("Recheck") && message.EndsWith("Report to the patcher maintainer.", StringComparison.Ordinal),
             "The world-load warning explains the leftover once and retains the player reporting route: " + message);

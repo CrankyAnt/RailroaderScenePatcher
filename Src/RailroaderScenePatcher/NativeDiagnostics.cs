@@ -55,7 +55,7 @@ namespace RailroaderScenePatcher {
                 if (method == null || method.ReturnType != typeof(void)) throw new MissingMethodException("TrackMarker.OnEnable");
                 harmony = new Harmony(Id);
                 harmony.Patch(method, prefix: new HarmonyMethod(typeof(NativeRepairHooks), nameof(Before)), postfix: new HarmonyMethod(typeof(NativeRepairHooks), nameof(After)), finalizer: new HarmonyMethod(typeof(NativeRepairHooks), nameof(Finish)));
-            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "Early marker warning hook unavailable: " + e.GetBaseException().Message; }
+            } catch (Exception e) { harmony?.UnpatchAll(Id); harmony = null; Error = "The patcher couldn't prepare to repair track markers before the game checks them: " + e.GetBaseException().Message; }
         }
         internal static void Reset() { warnings.Clear(); graph = null; }
         internal static void Remove() { harmony?.UnpatchAll(Id); harmony = null; owner = null; Reset(); }

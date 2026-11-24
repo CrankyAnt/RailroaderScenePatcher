@@ -62,7 +62,7 @@ static class BellTests {
     static void UnavailableBellRowsUseShortReasons() {
         foreach (var (problem, expected) in new[] {
             (EquipmentAddition.BellsUnavailable, "Crossing bells are unavailable in this version of the game."),
-            (EquipmentAddition.BellDefinitionsUnreadable, "Bells cannot be offered because the game's bell list could not be read. Report this to the patcher maintainer with the log.") }) {
+            (EquipmentAddition.BellDefinitionsUnreadable, "The patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log.") }) {
             var row = SourceCandidate.UnavailableBells(problem);
             Assert(!row.Eligible && RailroaderScenePatcher.CommandBand.Sentence(row.Problem) == expected,
                 "An unavailable bell row gives a short reason: " + row.Problem);
@@ -155,7 +155,7 @@ static class BellTests {
         // A bell whose source names a scene object is no definition: it is invalid, so no scene is resolved or loaded for it.
         var g = new Fixture();
         var scene = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("bell", source: "{\"scene\":\"UnloadedScene\",\"path\":\"World/Bell\"}"))));
-        Assert(!scene.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment bell needs a bell definition as its source", "scene patch file (Data/scene-patches.json)", "only a definition" }.All(scene.Outcomes["bad"].Error.Contains) && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
+        Assert(!scene.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment bell needs a bell definition as its source", "scene patch file (Data/scene-patches.json)", "set the source's definition to the bell definition's identifier", "remove any other members from the source" }.All(scene.Outcomes["bad"].Error.Contains) && g.World.Mutations == 0 && g.Unchanged, "A bell from a scene path is refused without resolving a scene: " + scene.Outcomes["bad"].Error);
         var light = new PatchEngine(g.Scene).Apply(Doc(Equip("bad", Bell("lamp", pattern: EquipmentAddition.LightGatePattern))));
         Assert(!light.Outcomes["bad"].Applied && new[] { "Invalid relationship: equipment lamp needs a light or gate in the map as its source", "scene patch file (Data/scene-patches.json)", "only a scene and a path" }.All(light.Outcomes["bad"].Error.Contains) && g.Unchanged, "A light or gate from a definition is refused: " + light.Outcomes["bad"].Error);
     }

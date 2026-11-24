@@ -59,11 +59,12 @@ namespace RailroaderScenePatcher.Core {
     }
     internal static class EquipmentCleanupText {
         internal static string For(EquipmentCleanupContext context) {
+            if (context == EquipmentCleanupContext.WorldLoad)
+                return "The change was undone, but an empty object remains where a light, gate, or bell was added at this crossing. This leftover object won't be saved with the map.";
             var description = EquipmentAddition.EmptyEquipmentObject + ". It won't be saved with the map.";
             if (context == EquipmentCleanupContext.Recheck) description += " Your edits are kept.";
             else description = "The change was undone. " + description;
-            return context == EquipmentCleanupContext.WorldLoad ? description
-                : description + " Click Recheck to try removing it, or reload the native map editor.";
+            return description + " Click Recheck to try removing it, or reload the native map editor.";
         }
     }
     // A failure after a mutation started, with what it left behind.

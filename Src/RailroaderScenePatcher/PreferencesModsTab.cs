@@ -26,7 +26,7 @@ namespace RailroaderScenePatcher {
         static readonly UIState<bool> expanded = new UIState<bool>(true);
         internal const string Title = "Scene Patcher";
         internal const string DebugLabel = "Debug logging";
-        internal const string DebugTooltip = "Adds detail to the Player log: load steps, the result of each scene patch file, edits, saves and diagnostics. Turn it on before you reproduce a problem you report, and off again afterward.";
+        internal const string DebugTooltip = "Records load steps, scene patch file results, edits, saves, and diagnostics in the Player log. Turn this on before reproducing a problem you want to report. Turn it off when you're done.";
         // Installs the section and returns the debug option, which is unavailable when the Preferences hook is incompatible.
         internal static DebugOption Install(string modDirectory) {
             var available = false;
@@ -36,19 +36,19 @@ namespace RailroaderScenePatcher {
                 if (String.IsNullOrEmpty(modDirectory)) throw new InvalidOperationException("the patcher's mod folder is unknown");
                 settings = Path.Combine(modDirectory, DebugOption.FileName);
                 // Another mod's registry under the shared key, of another type, is left as it is.
-                if (AppDomain.CurrentDomain.GetData(Slot) != null && Sections(false) == null) throw new InvalidOperationException("the shared Mods tab registry holds something this patcher can't read");
+                if (AppDomain.CurrentDomain.GetData(Slot) != null && Sections(false) == null) throw new InvalidOperationException("the patcher can't read the list of mod settings sections");
                 var target = AccessTools.Method(typeof(UI.PreferencesWindow.PreferencesBuilder), "BuildTabs", new[] { typeof(UITabbedPanelBuilder) });
                 if (target == null || target.ReturnType != typeof(void)) throw new MissingMethodException("PreferencesBuilder.BuildTabs");
                 patcher.Patch(target, postfix: new HarmonyMethod(typeof(PreferencesModsTab), nameof(AfterBuildTabs)));
                 section = DrawSection;
-                var list = Sections(true) ?? throw new InvalidOperationException("the shared Mods tab registry holds something this patcher can't read");
+                var list = Sections(true) ?? throw new InvalidOperationException("the patcher can't read the list of mod settings sections");
                 lock (list) list.Add(section);
                 harmony = patcher;
                 available = true;
             } catch (Exception e) {
                 try { patcher.UnpatchAll(Id); } catch { }
                 section = null;
-                PatcherLog.Warning("The debug option is unavailable because the patcher can't add its section to the Mods tab in Preferences", e);
+                PatcherLog.Warning("Debug logging is unavailable because the patcher can't add its section to the Mods tab in Preferences", e);
             }
             return option = new DebugOption(new SettingsFile(settings), available);
         }
@@ -100,7 +100,7 @@ namespace RailroaderScenePatcher {
                     row.Spacer(12f);
                     row.AddToggle(() => current.On, on => {
                         try { current.Set(on); }
-                        catch (Exception e) { PatcherLog.Error("The debug option couldn't be changed", e); }
+                        catch (Exception e) { PatcherLog.Error("Debug logging couldn't be changed", e); }
                     });
                     row.Spacer(8f);
                     row.AddLabel(DebugLabel, text => { text.fontStyle |= FontStyles.Bold; text.alignment = TextAlignmentOptions.Left; }).FlexibleWidth();

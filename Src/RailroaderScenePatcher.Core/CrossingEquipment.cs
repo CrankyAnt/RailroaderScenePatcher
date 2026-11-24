@@ -46,7 +46,7 @@ namespace RailroaderScenePatcher.Core {
         // The reason a bell source is refused when this game version cannot provide crossing bells. Unlike the
         // other source refusals, it is no problem of the mod author's scene patch file.
         public const string BellsUnavailable = "crossing bells are unavailable in this version of the game";
-        public const string BellDefinitionsUnreadable = "bells cannot be offered because the game's bell list could not be read. Report this to the patcher maintainer with the log";
+        public const string BellDefinitionsUnreadable = "the patcher couldn't read the bell definitions from the game's content library, so it can't list bells. Report this to the patcher maintainer and include the Player log";
         internal const string EmptyEquipmentObject = "An added light, gate, or bell left an empty object at this crossing";
         // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
         // audio of a bell definition.
@@ -505,30 +505,30 @@ namespace RailroaderScenePatcher.Core {
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
-                if (now == null) { Diagnose(controller, want, null, "missing"); return "equipment " + want.Id + " is missing"; }
-                if (!EquipmentAddition.Same(now, want)) { Diagnose(controller, want, now, "mismatch"); return "equipment " + want.Id + " differs from the mod's source or placement"; }
+                if (now == null) { Diagnose(controller, want, null, "Requested equipment is missing"); return "equipment " + want.Id + " is missing"; }
+                if (!EquipmentAddition.Same(now, want)) { Diagnose(controller, want, now, "Equipment differs from the requested equipment"); return "equipment " + want.Id + " differs from the mod's source or placement"; }
             }
             var extra = observed.Additions.FirstOrDefault(a => desired.Find(a.Key) == null);
-            if (extra != null) { Diagnose(controller, null, extra, "extra"); return "equipment " + extra.Id + " remains although it was removed"; }
+            if (extra != null) { Diagnose(controller, null, extra, "Equipment remains although it was removed"); return "equipment " + extra.Id + " remains although it was removed"; }
             var problem = Coherence(owned);
-            if (problem != null) { Diagnose(controller, null, null, "coherence: " + problem); return problem; }
+            if (problem != null) { Diagnose(controller, null, null, "Equipment problem: " + problem); return problem; }
             // Report a lone empty wrapper only after the remaining additions have passed their checks.
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); throw new EmptyEquipmentObjectException(); }
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "An empty equipment object remains"); throw new EmptyEquipmentObjectException(); }
             return null;
         }
         static string Quoted(string value) => value == null ? "null" : "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
         static string Values(IReadOnlyList<double> values) => values == null ? "null" : "[" + String.Join(",", values.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]";
-        static string Detail(EquipmentAddition a) => a == null ? "null" : "{scope=" + Quoted(a.Scope) + ",id=" + Quoted(a.Id) + ",pattern=" + Quoted(a.Pattern)
-            + ",sourceScene=" + Quoted(a.Source.Scene) + ",sourcePath=" + Quoted(a.Source.Path) + ",position=" + Values(a.Placement?.Position) + ",rotation=" + Values(a.Placement?.Rotation) + "}";
+        static string Detail(EquipmentAddition a) => a == null ? "none" : "{mod=" + Quoted(a.Scope) + ", ID=" + Quoted(a.Id) + ", pattern=" + Quoted(a.Pattern)
+            + ", source scene=" + Quoted(a.Source.Scene) + ", source path=" + Quoted(a.Source.Path) + ", position=" + Values(a.Placement?.Position) + ", rotation=" + Values(a.Placement?.Rotation) + "}";
         void Diagnose(object controller, EquipmentAddition want, EquipmentAddition now, string reason) {
             if (!(world is ICrossingEquipmentVerificationDiagnostics sink)) return;
             try {
                 var comparable = want != null && now != null;
-                var comparison = comparable ? " identity=" + EquipmentAddition.SameBuild(now, want).ToString().ToLowerInvariant()
-                    + " source=" + EquipmentSource.Same(now.Source, want.Source).ToString().ToLowerInvariant()
-                    + " position=" + EquipmentAddition.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
-                    + " rotation=" + PatchEditingSession.SameRotation(now.Placement?.Rotation, want.Placement?.Rotation).ToString().ToLowerInvariant() : "";
-                sink.VerificationFailed(controller, "reason=" + Quoted(reason) + comparison + " positionTolerance=0.0005-per-axis-or-equal-float32 rotationTolerance=normalized-absolute-dot>=0.99999999 desired=" + Detail(want) + " observed=" + Detail(now));
+                var comparison = comparable ? " Mod, equipment ID, pattern, and source match: " + EquipmentAddition.SameBuild(now, want).ToString().ToLowerInvariant()
+                    + "; source matches: " + EquipmentSource.Same(now.Source, want.Source).ToString().ToLowerInvariant()
+                    + "; position matches: " + EquipmentAddition.SamePosition(now.Placement?.Position, want.Placement?.Position).ToString().ToLowerInvariant()
+                    + "; rotation matches: " + PatchEditingSession.SameRotation(now.Placement?.Rotation, want.Placement?.Rotation).ToString().ToLowerInvariant() + "." : "";
+                sink.VerificationFailed(controller, reason + "." + comparison + " Positions match when each coordinate has a finite 32-bit floating-point value and either differs by at most 0.0005 or has the same stored 32-bit value. Rotations match when the absolute dot product of the normalized rotations is at least 0.99999999. Requested: " + Detail(want) + ". Found: " + Detail(now) + ".");
             } catch { /* Diagnostics must not change verification or restoration. */ }
         }
         internal IReadOnlyList<SourceCandidate> Candidates(object controller) => world.Candidates(controller) ?? Array.Empty<SourceCandidate>();

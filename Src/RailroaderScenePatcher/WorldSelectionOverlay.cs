@@ -814,7 +814,7 @@ namespace RailroaderScenePatcher {
                     // A renderer switched off by the scene or a modder is passed over; one the game's culling hides
                     // now still outlines the object, from its mesh.
                     if (index >= outlines.Length || !outlines[index]) {
-                        skipped?.Add(name + ": skipped, switched off");
+                        skipped?.Add(name + ": Not used for the frame because it is switched off.");
                         continue;
                     }
                     var shows = renderer.enabled && renderer.gameObject.activeInHierarchy;
@@ -837,7 +837,7 @@ namespace RailroaderScenePatcher {
                     var box = ObjectMarkingGeometry.RendererBox(shows, visible, own, kept, p => Point(toWorld.MultiplyPoint3x4(Vector(p))));
                     // A hidden renderer without a box of its own and never seen since the world loaded adds nothing.
                     if (box == null) {
-                        skipped?.Add(name + ": skipped, hidden without a known box");
+                        skipped?.Add(name + ": Not used for the frame because it is hidden and its box is unknown.");
                         // It still makes its object visible: a mesh renderer outlines the object once it shows, so the
                         // object shows no helper marker (HelperMarkers.Shows). Its kind is read within the pass's share.
                         if (!kinds.TryGetValue(renderer, out var hiddenKind)) {
@@ -858,7 +858,7 @@ namespace RailroaderScenePatcher {
                         foreach (var corner in oriented) bounds.Encapsulate(new Vector3((float)corner.X, (float)corner.Y, (float)corner.Z));
                     }
                     if (bounds.size.sqrMagnitude < .000001f) {
-                        skipped?.Add(name + ": skipped, empty bounds");
+                        skipped?.Add(name + ": Not used for the frame because its box is empty.");
                         continue;
                     }
                     // A renderer that is switched off was passed over above and is never read. The kind of one that
@@ -1049,25 +1049,25 @@ namespace RailroaderScenePatcher {
             observing = PatcherLog.DebugEnabled && choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
             if (!observing) return;
             observedChoice = choice; observedCamera = camera.transform.position;
-            PatcherLog.Debug("Frame diagnostics pass camera=" + Vector(camera.transform.position) + " view=" + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
-                camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " near=" + Number(camera.nearClipPlane) + " far=" + Number(camera.farClipPlane) +
-                " frameDistance=" + Number(ObjectMarkingGeometry.FrameDistance));
+            PatcherLog.Debug("Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+                camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
+                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.");
         }
         static void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
             List<string> skipped, ObjectMarkingFrame result, Rect view) {
             var text = new System.Text.StringBuilder();
-            text.Append("Frame diagnostics candidate ").Append(candidate.Choice.Label).Append(" distance=").Append(Number(result.Distance))
-                .Append(result.Frame.HasValue ? " frame=" + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + " of view" : " marker only");
+            text.Append("Frame check for ").Append(candidate.Choice.Label).Append(". Distance: ").Append(Number(result.Distance)).Append(" m")
+                .Append(result.Frame.HasValue ? ". Frame size as a fraction of the view: " + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + "." : ". Marker only.");
             var lines = decisions.Concat(skipped).ToList();
             for (int index = 0; index < renderers.Length; index++) {
                 var renderer = renderers[index];
                 var name = "#" + index;
                 var decision = String.Join(" / ", lines.Where(l => l.StartsWith(name + ":", StringComparison.Ordinal)).Select(l => l.Substring(name.Length + 2)));
-                var lod = lods.TryGetValue(renderer, out var level) ? BoardScene.PathOf(level.Key.transform) + " LOD" + level.Value : "none";
-                text.Append("\n  ").Append(name).Append(' ').Append(BoardScene.PathOf(renderer.transform)).Append(" type=").Append(renderer.GetType().Name)
-                    .Append(" size=").Append(Vector(renderer.bounds.size)).Append(" staticBatch=").Append(renderer.isPartOfStaticBatch)
-                    .Append(" lod=").Append(lod).Append(" active=").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
-                    .Append(" decision=").Append(decision.Length == 0 ? "none" : decision);
+                var lod = lods.TryGetValue(renderer, out var level) ? BoardScene.PathOf(level.Key.transform) + ", level " + level.Value : "none";
+                text.Append("\n  ").Append(name).Append(' ').Append(BoardScene.PathOf(renderer.transform)).Append(". Drawing component: ").Append(renderer.GetType().Name)
+                    .Append(". Box size: ").Append(Vector(renderer.bounds.size)).Append(". Combined with other static scenery for drawing: ").Append(renderer.isPartOfStaticBatch)
+                    .Append(". Detail group and level: ").Append(lod).Append(". Active: ").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
+                    .Append(". Frame result: ").Append(decision.Length == 0 ? "none" : decision);
             }
             PatcherLog.Debug(text.ToString());
         }

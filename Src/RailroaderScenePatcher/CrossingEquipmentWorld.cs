@@ -94,7 +94,7 @@ namespace RailroaderScenePatcher {
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         public void VerificationFailed(object target, string detail) {
             var path = BoardScene.PathOf(((GameObject)target).transform).Replace("\r", "\\r").Replace("\n", "\\n");
-            PatcherLog.Debug("Crossing equipment verification failed: destination=" + path + " " + detail);
+            PatcherLog.Debug("The crossing equipment check failed at " + path + ". " + detail);
         }
         static Component[] All(GameObject root, Type type) => root.GetComponentsInChildren(type, true).Where(c => c != null).ToArray();
         static bool Inside(GameObject root, GameObject child) { for (var t = child == null ? null : child.transform; t != null; t = t.parent) if (t == root.transform) return true; return false; }
@@ -186,7 +186,7 @@ namespace RailroaderScenePatcher {
                     foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
                     result.AddRange(found);
                 } catch (Exception e) {
-                    PatcherLog.Warning("The bell list is empty because the patcher can't read the bell definitions from the game's content library", e);
+                    PatcherLog.Warning("The patcher couldn't list the available bells because it couldn't read the bell definitions in the game's content library", e);
                     result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellDefinitionsUnreadable));
                 }
             }

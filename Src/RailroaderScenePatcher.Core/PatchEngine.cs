@@ -936,7 +936,7 @@ namespace RailroaderScenePatcher.Core {
                 EquipmentSource from;
                 // A bell loads the audio of a bell definition; a light or gate copies a loaded device.
                 if (pattern == EquipmentAddition.BellPattern) {
-                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a bell definition as its source. In your mod's scene patch file (Data/scene-patches.json), give this addition's source only a definition, set to the bell definition's identifier");
+                    if (source == null || !Only(source, "definition") || !RequiredString(source, "definition")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a bell definition as its source. In your mod's scene patch file (Data/scene-patches.json), set the source's definition to the bell definition's identifier and remove any other members from the source");
                     from = EquipmentSource.ForDefinition((string)source["definition"]);
                 } else {
                     if (source == null || !Only(source, "scene", "path") || !RequiredString(source, "scene") || !RequiredString(source, "path")) throw new InvalidOperationException("Invalid relationship: equipment " + id + " needs a light or gate in the map as its source. In your mod's scene patch file (Data/scene-patches.json), give this addition's source only a scene and a path that identify the light or gate to copy");

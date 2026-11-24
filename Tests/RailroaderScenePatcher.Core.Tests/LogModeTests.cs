@@ -181,17 +181,17 @@ static class LogModeTests {
             [EditingFailure.ReloadPending] = "A working-location return is still pending.",
             [EditingFailure.ReloadStopped] = "Save failed.",
             [EditingFailure.ReloadCancelled] = "Reload cancelled: x",
-            [EditingFailure.ReturnTimedOut] = "The return to your working location did not complete within five minutes. Check the game's load diagnostics before trying again.",
+            [EditingFailure.ReturnTimedOut] = "The return to your working location did not complete within five minutes. Check the Player log for loading errors before trying again.",
             [EditingFailure.LocationNotRestored] = "The Map Editor reloaded, but your working location could not be restored: x",
-            [EditingFailure.OutstandingUnknown] = "Outstanding work could not be determined; the native map editor is treated as unsaved: x",
+            [EditingFailure.OutstandingUnknown] = "The patcher couldn't check for unsaved changes. It treats the Map Editor as unsaved: x",
             [EditingFailure.HistoryError] = "A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: x",
-            [EditingFailure.ExitCancelled] = "Exit cancelled because outstanding work could not be confirmed. x",
+            [EditingFailure.ExitCancelled] = "The Map Editor stayed open because the patcher couldn't check for unsaved changes. x",
             [EditingFailure.FileCheck] = "Could not check the scene patch file: x",
-            [EditingFailure.GizmoCleanup] = "The patcher could not verify cleanup after using the gizmo. Reload the Map Editor. x",
+            [EditingFailure.GizmoCleanup] = "The patcher couldn't confirm that it removed the temporary changes made while using the gizmo. Reload the Map Editor. x",
             [EditingFailure.HookUnavailable] = "Map Editor reload hook unavailable",
-            [EditingFailure.HistoryTracking] = "Could not track a change to the Map Editor history: x",
-            [EditingFailure.ChromeRefresh] = "Native map editor title and Save button could not be refreshed: x",
-            [EditingFailure.HistoryCheck] = "The Map Editor history step couldn't be checked: x",
+            [EditingFailure.HistoryTracking] = "The patcher couldn't track an Undo or Redo history change in the Map Editor: x",
+            [EditingFailure.ChromeRefresh] = "The Map Editor title and Save button couldn't be updated: x",
+            [EditingFailure.HistoryCheck] = "The Map Editor Undo or Redo step couldn't be checked: x",
         };
         string Detail(EditingFailure site) => site == EditingFailure.ReloadPending ? "A working-location return is still pending." : site == EditingFailure.ReloadStopped ? "Save failed." : site == EditingFailure.HookUnavailable ? "Map Editor reload hook unavailable" : "x";
         Assert(Enum.GetValues(typeof(EditingFailure)).Length == expected.Count, "Every editing failure site has its expected text");
@@ -221,8 +221,8 @@ static class LogModeTests {
             once.Warning("j", BakedSceneryRules.CullingUpdateFailure(null), failure);
         });
         Assert(log.At(LogLevel.Warning).SequenceEqual(new[] {
-            "Moved parts of BushnellWhittier-MapManager/World/Mill may show or hide at the wrong distance, because the patcher couldn't update their culling: game function gone",
-            "Moved baked scenery parts may show or hide at the wrong distance, because the patcher couldn't update their culling: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
+            "Moved parts of BushnellWhittier-MapManager/World/Mill may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone",
+            "Moved baked scenery parts may appear or disappear at the wrong distance because the patcher couldn't update when they are shown: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
         Assert(log.At(LogLevel.Debug).Count() == 2 && log.At(LogLevel.Debug).All(l => l.Contains("System.InvalidOperationException")), "Each written warning adds its full exception as a debug line");
     }
 

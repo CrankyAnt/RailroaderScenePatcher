@@ -519,7 +519,7 @@ namespace RailroaderScenePatcher.Core {
         }
         void Failed(GroupState state, Exception error) {
             state.Dirty = true;
-            var message = "Own culling callback failed: " + error.GetBaseException().Message;
+            var message = "Moved scenery parts may appear or disappear at the wrong distance because the patcher couldn't respond to a visibility change: " + error.GetBaseException().Message;
             if (faults.Add(message)) Fault?.Invoke(message);
         }
         // A sphere changed. A released registration, a destroyed manager, part or culler writes nothing.

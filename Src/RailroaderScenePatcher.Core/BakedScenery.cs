@@ -498,8 +498,8 @@ namespace RailroaderScenePatcher.Core {
         // patcher's handler stays in the chain and only passes the game's events on. Information, not a warning.
         // A failed update of own culling, for the group it names, or for moved parts in general when no group is known.
         public static string CullingUpdateFailure(string group) =>
-            (String.IsNullOrEmpty(group) ? "Moved baked scenery parts" : "Moved parts of " + group) + " may show or hide at the wrong distance, because the patcher couldn't update their culling";
-        public static string LeftoverWrapper(string culler) => "Own culling left a pass-through handler on " + culler + " because another handler was installed after it";
+            (String.IsNullOrEmpty(group) ? "Moved baked scenery parts" : "Moved parts of " + group) + " may appear or disappear at the wrong distance because the patcher couldn't update when they are shown";
+        public static string LeftoverWrapper(string culler) => "The patcher still passes visibility changes on for " + culler + " because other code added its own visibility controls afterward. The patcher no longer changes visibility";
         // A scene ground mask is a component in this namespace (Map.Runtime.MaskComponents): it registers a shape in
         // the game's terrain system where its object stands, which shapes the ground and the vegetation there. A group
         // that holds one is a group of the family, and the object that holds it is a part.

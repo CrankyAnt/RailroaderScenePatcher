@@ -58,7 +58,7 @@ namespace RailroaderScenePatcher.Core {
                 open = true; startedHere = false; ReentryError = null;
                 if (State == null) { Start(); return; }
                 try { reenter(State); return; }
-                catch (Exception e) { ReentryError = "Retained world reconciliation failed: " + e.GetBaseException().Message; }
+                catch (Exception e) { ReentryError = "The patcher couldn't check its earlier changes when loading again in the same world: " + e.GetBaseException().Message; }
                 Discard();
                 this.world = world; bound = true; open = true;
                 Start();
@@ -71,7 +71,7 @@ namespace RailroaderScenePatcher.Core {
         void Start() {
             startedHere = true;
             try { State = create() ?? throw new InvalidOperationException("Local world state unavailable"); Error = null; }
-            catch (Exception e) { State = null; Error = "Capability prerequisites unavailable: " + e.GetBaseException().Message; }
+            catch (Exception e) { State = null; Error = "The patcher couldn't prepare to apply scene patch files: " + e.GetBaseException().Message; }
         }
         void Discard() {
             var state = State;

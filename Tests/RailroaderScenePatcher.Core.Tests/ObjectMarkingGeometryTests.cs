@@ -209,8 +209,8 @@ static class ObjectMarkingGeometryTests {
         Check(joined.Frame.HasValue && joined.Frame.Value.Height > shed.Frame.Value.Height && joined.Frame.Value.Height < 2.5 * shed.Frame.Value.Height,
             "the roof joins the walls and the proxy does not stretch the frame");
         Check(joined.Frame.Value.Right < 1280 + 400, "the sign 40 m away stays outside the frame");
-        foreach (var expected in new[] { "walls: included", "roof: included", "proxy: excluded, far larger than the box at the marker",
-            "sign: excluded, apart from the object's piece", "smoke: excluded, effect", "shadow: excluded, shadows only", "lod1: excluded, lower level of detail" })
+        foreach (var expected in new[] { "walls: Used for the frame.", "roof: Used for the frame.", "proxy: Not used for the frame because its box is much larger than the box at the marker.",
+            "sign: Not used for the frame because its box is too far from the boxes at the marker.", "smoke: Not used for the frame because it is an effect.", "shadow: Not used for the frame because it draws only shadows.", "lod1: Not used for the frame because it is a lower level of detail." })
             Check(decisions.Contains(expected), "decision recorded: " + expected + " in " + String.Join("; ", decisions));
         Check(Frame(new WorldPoint(0, -5, 100), Box("walls", 0, 0, 100, 5, 5, 5), Box("porch", 0, -5.5, 106, 3, 1, 1.5f)).Frame.Value.Bottom >
             shed.Frame.Value.Bottom, "a box within the join distance joins the frame");
@@ -532,7 +532,7 @@ static class ObjectMarkingGeometryTests {
         var decided = new List<string>();
         var footed = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { UprightBox("post", 2, 3, .5, flat), UprightBox("footing", -3, 1, 1.5, flat) }, Camera, View, decided);
         var postOnly = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), Eye, new[] { UprightBox("post", 2, 3, .5, flat) }, Camera, View, new List<string>());
-        Check(footed.Frame.Value.Bottom == postOnly.Frame.Value.Bottom && footed.Frame.Value.Width == postOnly.Frame.Value.Width && decided.Contains("footing: included, under the surface"), "a wholly buried footing of an object that stands above the ground is not framed");
+        Check(footed.Frame.Value.Bottom == postOnly.Frame.Value.Bottom && footed.Frame.Value.Width == postOnly.Frame.Value.Width && decided.Contains("footing: Selected as part of the object, but below the surface and not used for the frame."), "a wholly buried footing of an object that stands above the ground is not framed");
         // A wide pier of several pieces, wholly buried, under a deck that stands above the ground.
         var piered = ObjectMarkingGeometry.Frame(new WorldPoint(0, 2, 100), Eye, new[] { UprightBox("deck", 2, 1, 2, flat), UprightBox("pier", -4, 2, 18, flat) }, Camera, View, new List<string>());
         var deckOnly = ObjectMarkingGeometry.Frame(new WorldPoint(0, 2, 100), Eye, new[] { UprightBox("deck", 2, 1, 2, flat) }, Camera, View, new List<string>());
@@ -592,7 +592,7 @@ static class ObjectMarkingGeometryTests {
             new[] { new ObjectMarkingBox("Sign-Whistle", new WorldPoint(4192.8, 529.575, 5302.4), new WorldPoint(.114, 1.275, .278)) },
             Strategy(new WorldPoint(4486.1, 582.5, 5315.7), 30, 60), View, signDecisions);
         Check(Math.Abs(sign.Distance - 298) < 1, "the sign is about 298 m from the camera: " + sign.Distance);
-        Check(!sign.Frame.HasValue && signDecisions.Contains("Sign-Whistle: included, outside the view"),
+        Check(!sign.Frame.HasValue && signDecisions.Contains("Sign-Whistle: Selected for the frame, but outside the view."),
             "an object outside the view has no frame: " + String.Join("; ", signDecisions));
         // A box partly in view is cut at the view's edges: its frame reaches at most the margin past them.
         var wall = Frame(new WorldPoint(0, -5, 100), Box("wall", -300, 0, 100, 300, 5, 1));
@@ -647,7 +647,7 @@ static class ObjectMarkingGeometryTests {
         var decisions = new List<string>();
         var both = ObjectMarkingGeometry.Frame(anchor, Eye, new[] { wall, tower }, Camera, View, decisions);
         var whole = Frame(anchor, Box("whole", 0, 5, 100, 5, 5, 1));
-        Check(decisions.Contains("wall: included") && decisions.Contains("tower: included"), "both boxes belong to the framed piece: " + String.Join("; ", decisions));
+        Check(decisions.Contains("wall: Used for the frame.") && decisions.Contains("tower: Used for the frame."), "both boxes belong to the framed piece: " + String.Join("; ", decisions));
         Check(Math.Abs(both.Frame.Value.X - whole.Frame.Value.X) < 1e-6 && Math.Abs(both.Frame.Value.Right - whole.Frame.Value.Right) < 1e-6 && Math.Abs(both.Frame.Value.Y - whole.Frame.Value.Y) < 1e-6 && Math.Abs(both.Frame.Value.Bottom - whole.Frame.Value.Bottom) < 1e-6,
             "an object of several boxes is framed by one box around all its boxes");
         Check(Math.Abs(Shoelace(both.Outline) - Shoelace(whole.Outline)) < 1e-3, "the outline of that box is the outline of one box of its size");
@@ -708,7 +708,7 @@ static class ObjectMarkingGeometryTests {
         };
         var partly = new List<string>();
         var lampOnly = ObjectMarkingGeometry.Frame(root, Eye, Depot(), Camera, View, partly);
-        Check(lampOnly.Frame.HasValue && lampOnly.Frame.Value.Width < 40 && partly.Contains("hall: excluded, far larger than the box at the marker"),
+        Check(lampOnly.Frame.HasValue && lampOnly.Frame.Value.Width < 40 && partly.Contains("hall: Not used for the frame because its box is much larger than the box at the marker."),
             "an object framed by the piece at its marker leaves a far larger box out: " + String.Join("; ", partly));
         // Framed whole, the box surrounds every box of the group, the far sign included; effects stay out.
         var all = new List<string>();
@@ -717,7 +717,7 @@ static class ObjectMarkingGeometryTests {
         Check(depot.Frame.HasValue && Math.Abs(depot.Frame.Value.X - hull.Frame.Value.X) < 1e-6 && Math.Abs(depot.Frame.Value.Right - hull.Frame.Value.Right) < 1e-6 &&
             Math.Abs(depot.Frame.Value.Y - hull.Frame.Value.Y) < 1e-6 && Math.Abs(depot.Frame.Value.Bottom - hull.Frame.Value.Bottom) < 1e-6,
             "an object that stands for everything below it is framed by one box around all its boxes");
-        foreach (var expected in new[] { "lamp: included", "hall: included", "platform: included", "far sign: included", "smoke: excluded, effect" })
+        foreach (var expected in new[] { "lamp: Used for the frame.", "hall: Used for the frame.", "platform: Used for the frame.", "far sign: Used for the frame.", "smoke: Not used for the frame because it is an effect." })
             Check(all.Contains(expected), "framed whole, decision recorded: " + expected + " in " + String.Join("; ", all));
         Check(Math.Abs(depot.Distance - 95) < 1e-9 && depot.Bounds.Value.Min.X == -60.5 && depot.Bounds.Value.Max.X == 22, "its distance runs to the bounds of all its boxes");
         Check(depot.Frame.Value.Width > 10 * lampOnly.Frame.Value.Width, "the whole frame is the building's, not the lamp's");

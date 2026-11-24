@@ -11,7 +11,7 @@ namespace RailroaderScenePatcher.Core {
         void Write(string text);
     }
 
-    // The debug option: off by default, stored in the patcher's settings file, and in effect at once. It is available only
+    // Debug logging: off by default, stored in the patcher's settings file, and in effect at once. It is available only
     // while the Preferences hook that shows its checkbox is compatible; otherwise the log stays in player mode.
     public sealed class DebugOption {
         public const string FileName = "settings.json";
@@ -22,7 +22,7 @@ namespace RailroaderScenePatcher.Core {
             Available = available;
             string text = null;
             try { text = store.Read(); }
-            catch (Exception e) { PatcherLog.Warning("The debug option is off because the patcher's " + FileName + " can't be read", e); }
+            catch (Exception e) { PatcherLog.Warning("Debug logging is off because the patcher's " + FileName + " can't be read", e); }
             stored = text != null && Read(text, true);
             Apply();
         }
@@ -38,7 +38,7 @@ namespace RailroaderScenePatcher.Core {
             Apply();
             // The option takes effect for this session even when it can't be stored.
             try { store.Write(With(text, on)); }
-            catch (Exception e) { PatcherLog.Error("The debug option is " + (on ? "on" : "off") + " for this session only, because the patcher's " + FileName + " can't be saved", e); }
+            catch (Exception e) { PatcherLog.Error("Debug logging is " + (on ? "on" : "off") + " for this session only, because the patcher's " + FileName + " can't be saved", e); }
         }
         void Apply() { PatcherLog.DebugEnabled = On; }
         public static bool Read(string text) => Read(text, false);
@@ -49,7 +49,7 @@ namespace RailroaderScenePatcher.Core {
                 if (value == null) return false;
                 if (value.Type == JTokenType.Boolean) return (bool)value;
             } catch (JsonException) { }
-            if (warn) PatcherLog.Warning("The debug option is off because the patcher's " + FileName + " has no true or false value for " + Key + ".");
+            if (warn) PatcherLog.Warning("Debug logging is off because the patcher's " + FileName + " has no true or false value for " + Key + ".");
             return false;
         }
         // The settings file text with the debug option set, keeping its other values.
