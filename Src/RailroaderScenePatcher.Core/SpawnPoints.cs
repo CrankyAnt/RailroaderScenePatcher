@@ -25,7 +25,7 @@ namespace RailroaderScenePatcher.Core {
     // jumps to where each stands (TeleportCommand). Each reads the transform when it runs, so a moved spawn point is
     // used at its new place.
     public static class SpawnPoints {
-        public const string Family = "Spawn point", Component = "Character.SpawnPoint", Structure = "spawn-point-v1", RequiredVersion = "0.5.0";
+        public const string Family = "Spawn point", Component = "Character.SpawnPoint", Structure = "spawn-point-v1", RequiredVersion = VersionRequirement.Delivery;
         public const string Operations = "Move, rotate, enable, or disable this spawn point. Edit native spawns in the map data under Spawns in the Map Editor.";
         public const string Dependency = "Player start, rescue, and teleport read this spawn point's placement when they run. Only active spawn points are offered. A start setup reads it even when it's disabled.";
         // The family of a component below a scene root of this name, or null: every scene spawn point that the inventory
@@ -171,7 +171,6 @@ namespace RailroaderScenePatcher.Core {
                 return GroupChecks.SamePlacement(current.Placement, captured.Placement) && current.Active == captured.Active;
             } catch { return false; }
         }
-        public string MinimumPatcherVersion(TargetIdentity target) =>
-            target != null && (target.Structure == SpawnPoints.Structure || (target.Structure == null && target.Component == SpawnPoints.Component)) ? SpawnPoints.RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, SpawnPoints.Structure, SpawnPoints.Component, SpawnPoints.RequiredVersion);
     }
 }

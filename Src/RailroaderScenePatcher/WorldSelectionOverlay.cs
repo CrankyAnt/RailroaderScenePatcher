@@ -116,17 +116,6 @@ namespace RailroaderScenePatcher {
                 return ObjectMarkingGeometry.Outlines(renderer.enabled, !renderer.enabled && HeldByCuller(renderer), chain);
             } catch { return renderer.enabled && renderer.gameObject.activeInHierarchy; }
         }
-        // A renderer's box in its own space and the matrix to the world. The mesh gives it whether or not the renderer
-        // shows now; a static batch has no own mesh any more. False when neither is known.
-        static bool LocalBox(Renderer renderer, out Bounds local, out Matrix4x4 matrix) {
-            local = default; matrix = renderer.localToWorldMatrix;
-            if (renderer is SkinnedMeshRenderer skinned) { local = skinned.localBounds; matrix = (skinned.rootBone != null ? skinned.rootBone : skinned.transform).localToWorldMatrix; return true; }
-            if (renderer.isPartOfStaticBatch) return false;
-            var filter = renderer.GetComponent<MeshFilter>();
-            if (filter != null && filter.sharedMesh != null) { local = filter.sharedMesh.bounds; return true; }
-            if (renderer.enabled && renderer.gameObject.activeInHierarchy) { local = renderer.localBounds; return true; }
-            return false;
-        }
         // The storage piles and log ponds at and below an object that outline it: listed with its renderers, and passed
         // over while the scene or a modder switched them off, as a renderer is. Both lay out their logs through the
         // game's instancer and have no renderer of their own.
@@ -313,16 +302,22 @@ namespace RailroaderScenePatcher {
             foreach (var gone in piles.Keys.Where(key => key == null).ToArray()) piles.Remove(gone);
             foreach (var gone in kinds.Keys.Where(key => key == null).ToArray()) kinds.Remove(gone);
             foreach (var gone in keptBoxes.Keys.Where(key => key == null).ToArray()) keptBoxes.Remove(gone);
+            rendererBoxes?.Prune();
         }
         // The world box of each static-batched renderer from when it last showed, in its object's own space: the box it
         // outlines with while the game's culling hides it. It is taken again whenever the renderer shows, and it
         // follows its object when the patcher moves it. Kept until the overlay is released.
         readonly Dictionary<Renderer, WorldPoint[]> keptBoxes = new Dictionary<Renderer, WorldPoint[]>();
-        static WorldPoint[] BoxCorners(Bounds b) =>
+        // The box that follows each renderer's mesh, read within the pass's share (RendererBoxes).
+        RendererBoxes rendererBoxes;
+        RendererBoxes Boxes => rendererBoxes ?? (rendererBoxes = new RendererBoxes(budget));
+        internal static WorldPoint[] BoxCorners(Bounds b) =>
             Enumerable.Range(0, 8).Select(i => Point(b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)))).ToArray();
 
         internal void Release() {
+            observedBoxes.Clear(); writtenCameraLine = null;
             keptBoxes.Clear();
+            rendererBoxes?.Clear();
             if (trackMaterial != null) UnityEngine.Object.Destroy(trackMaterial);
             trackMaterial = null;
             ClearInteraction();
@@ -530,11 +525,14 @@ namespace RailroaderScenePatcher {
                 }
                 var anchors = objects.Select(member => Point(Live(member, origin))).ToArray();
                 var frames = parts.Select(part => part?.Frame).ToArray();
-                // The group's one box stands in the orientation of the scene object that anchors it, the crossing
-                // controller's root, around where its objects stand and around the boxes of their pieces, and is cut
-                // at the surface like the box of an object.
+                // The group's one box follows its objects (ObjectMarkingGeometry.BoxAlong), around the boxes of their pieces,
+                // with the orientation of the scene object that anchors it, the crossing controller's root, as its
+                // fallback, and is cut at the surface like the box of an object.
                 var root = groups[g].Root;
                 var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera), listed);
+                // Objects that stand apart, such as the signs of a container along the track, form no group: each shows
+                // on its own.
+                if (marking.Spread) continue;
                 bool Inspected(SpatialCandidate member) => inspected != null && Same(member, inspected.Choice);
                 // The root of a group with parts stands for the group: at the group distance or less only the
                 // parts show, and the root shows only as the candidate of a choice or as the inspected object.
@@ -585,7 +583,7 @@ namespace RailroaderScenePatcher {
             return ScreenRect.FromEdges(view.xMin, Screen.height - view.yMax, view.xMax, Screen.height - view.yMin);
         }
         // An object's own right, up and forward: the directions of the one box that frames it.
-        static WorldBasis Basis(Transform transform) => new WorldBasis(Point(transform.right), Point(transform.up), Point(transform.forward));
+        internal static WorldBasis Basis(Transform transform) => new WorldBasis(Point(transform.right), Point(transform.up), Point(transform.forward));
         // The one marking of a group: its square marker at the centre of its frame, or, beyond the frame distance,
         // at the middle of its bounds. Null when neither is in view.
         Shape GroupShape(GroupMarking marking, Camera camera) {
@@ -835,19 +833,13 @@ namespace RailroaderScenePatcher {
                     // the world-aligned box stays per renderer, and only while it shows. That box is kept, in the
                     // object's own space, for while the game's culling hides the renderer
                     // (ObjectMarkingGeometry.RendererBox).
-                    var hasLocal = LocalBox(renderer, out var local, out var matrix);
-                    WorldPoint[] own = null;
-                    if (hasLocal) {
-                        own = new WorldPoint[8];
-                        for (int i = 0; i < 8; i++)
-                            own[i] = Point(matrix.MultiplyPoint3x4(local.center + Vector3.Scale(local.extents,
-                                new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1))));
-                    }
+                    if (!Boxes.Own(renderer, out var ownCorners, out var ownSource)) { waits = true; break; }
+                    decisions?.Add(name + ": Own box: " + RendererBoxes.Describe(ownSource) + ".");
                     WorldPoint[] visible = shows ? BoxCorners(renderer.bounds) : null;
-                    if (shows && own == null) { var toLocal = renderer.transform.worldToLocalMatrix; keptBoxes[renderer] = visible.Select(p => Point(toLocal.MultiplyPoint3x4(Vector(p)))).ToArray(); }
+                    if (shows && ownCorners == null) { var toLocal = renderer.transform.worldToLocalMatrix; keptBoxes[renderer] = visible.Select(p => Point(toLocal.MultiplyPoint3x4(Vector(p)))).ToArray(); }
                     keptBoxes.TryGetValue(renderer, out var kept);
                     var toWorld = renderer.transform.localToWorldMatrix;
-                    var box = ObjectMarkingGeometry.RendererBox(shows, visible, own, kept, p => Point(toWorld.MultiplyPoint3x4(Vector(p))));
+                    var box = ObjectMarkingGeometry.RendererBox(shows, visible, ownCorners, kept, p => Point(toWorld.MultiplyPoint3x4(Vector(p))));
                     // A hidden renderer without a box of its own and never seen since the world loaded adds nothing.
                     if (box == null) {
                         skipped?.Add(name + ": Not used for the frame because it is hidden and its box is unknown.");
@@ -860,9 +852,9 @@ namespace RailroaderScenePatcher {
                         if (hiddenKind == ObjectMarkingBoxKind.Mesh) unseen++;
                         continue;
                     }
-                    // A mesh renderer that shows outlines with its own oriented box inside its world box; a hidden one
-                    // with the box RendererBox gave.
-                    var oriented = shows ? (renderer is MeshRenderer ? own : null) : box.ToArray();
+                    // A mesh renderer that shows outlines with its own oriented box; a hidden one with the box
+                    // RendererBox gave.
+                    var oriented = shows ? (renderer is MeshRenderer ? ownCorners : null) : box.ToArray();
                     Bounds bounds;
                     if (shows) bounds = renderer.bounds;
                     else {
@@ -895,7 +887,7 @@ namespace RailroaderScenePatcher {
                 if (waits) boxes.Clear();
                 var view = camera.pixelRect;
                 // One frame per object, around the piece its marker belongs to. Picking uses the same rectangle.
-                // The frame around multiple boxes uses the object's orientation.
+                // The frame around multiple boxes follows them, with the object's orientation as its fallback.
                 var result = ObjectMarkingGeometry.Frame(Point(candidate.Position + origin), Point(camera.transform.position), boxes, Projection(camera), ViewOf(camera), decisions, frameDistance, Basis(go.transform),
                     ObjectMarkingGeometry.FramesWhole(candidate.Observation.Family));
                 measured = new Measured { Frame = result };
@@ -940,7 +932,7 @@ namespace RailroaderScenePatcher {
                     var half = (float)(ObjectMarkingGeometry.MarkerSize / 2 + ObjectMarkingGeometry.MarkerMargin);
                     shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
                 }
-                if (observing && !(result.Distance > ObservationRange)) Observe(candidate, renderers, lods ?? Lods(go), decisions, skipped, result, view);
+                if (observing && !(result.Distance > ObservationRange)) Observe(candidate, renderers, lods ?? Lods(go), decisions, skipped, result, view, Basis(go.transform));
             }
             if (candidate.ControlPoints != null) {
                 if (trackRadius == 0) {
@@ -1050,28 +1042,47 @@ namespace RailroaderScenePatcher {
             kinds[renderer] = kind;
             return kind;
         }
-        // Frame diagnostics, debug output: one block per candidate within range when a world choice opens and after each
-        // camera step. With debug off nothing is collected or built.
-        const float ObservationStep = 25f;
+        // Frame diagnostics, debug output: one block per candidate within range, written once and again only when the
+        // one box its frame outlines changes. The camera line goes before the first block written from a camera
+        // position, once per position. With debug off nothing is collected or built.
         const double ObservationRange = 1500;
-        object observedChoice;
-        Vector3 observedCamera;
         bool observing;
+        // The camera line of the pass, and the last one written.
+        string cameraLine, writtenCameraLine;
+        // Per candidate, the box its last written block named.
+        readonly Dictionary<string, string> observedBoxes = new Dictionary<string, string>(StringComparer.Ordinal);
         void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
-            var choice = (object)pending ?? source;
-            observing = PatcherLog.DebugEnabled && choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
+            observing = PatcherLog.DebugEnabled && ((object)pending ?? source) != null;
             if (!observing) return;
-            observedChoice = choice; observedCamera = camera.transform.position;
-            PatcherLog.Debug("Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+            cameraLine = "Frame check. Camera position: " + Vector(camera.transform.position) + ". View size: " + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
                 camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " pixels. Near view limit: " + Number(camera.nearClipPlane) + " m. Far view limit: " + Number(camera.farClipPlane) +
-                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.");
+                " m. Maximum frame distance: " + Number(ObjectMarkingGeometry.FrameDistance) + " m.";
         }
-        static void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
-            List<string> skipped, ObjectMarkingFrame result, Rect view) {
+        // The box a block names, to a centimetre, and how many renderers it lists: a block is written again only when
+        // that changes.
+        static string BoxSignature(ObjectMarkingFrame result, int renderers) {
+            if (result.Box == null) return "no box/" + renderers;
+            var text = new System.Text.StringBuilder();
+            foreach (var corner in result.Box) text.Append(Math.Round(corner.X, 2).ToString(CultureInfo.InvariantCulture)).Append(',').Append(Math.Round(corner.Y, 2).ToString(CultureInfo.InvariantCulture))
+                .Append(',').Append(Math.Round(corner.Z, 2).ToString(CultureInfo.InvariantCulture)).Append(';');
+            return text.Append(renderers).ToString();
+        }
+        void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
+            List<string> skipped, ObjectMarkingFrame result, Rect view, WorldBasis objectAxes) {
+            var key = candidate.Choice.Label + "|" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(candidate.Choice.Handle).ToString(CultureInfo.InvariantCulture);
+            var signature = BoxSignature(result, renderers.Length);
+            if (observedBoxes.TryGetValue(key, out var written) && written == signature) return;
+            if (observedBoxes.Count > 20000) observedBoxes.Clear();
+            observedBoxes[key] = signature;
+            if (cameraLine != null && cameraLine != writtenCameraLine) { PatcherLog.Debug(cameraLine); writtenCameraLine = cameraLine; }
             var text = new System.Text.StringBuilder();
             text.Append("Frame check for ").Append(candidate.Choice.Label).Append(". Distance: ").Append(Number(result.Distance)).Append(" m")
                 .Append(result.Frame.HasValue ? ". Frame size as a fraction of the view: " + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + "." : ". Marker only.");
             var lines = decisions.Concat(skipped).ToList();
+            // How the one box stands: the object's yaw and the box's, which follows its boxes (BoxAlongBuilder).
+            if (result.Box != null)
+                text.Append(" Frame box: ").Append(result.Boxes).Append(result.Boxes == 1 ? " box" : " boxes").Append(", object yaw ").Append(ObjectMarkingGeometry.Yaw(objectAxes.X, objectAxes.Z))
+                    .Append(", box yaw ").Append(ObjectMarkingGeometry.Yaw(result.Box)).Append('.');
             for (int index = 0; index < renderers.Length; index++) {
                 var renderer = renderers[index];
                 var name = "#" + index;

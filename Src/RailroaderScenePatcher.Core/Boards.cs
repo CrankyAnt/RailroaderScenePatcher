@@ -81,7 +81,7 @@ namespace RailroaderScenePatcher.Core {
     // then regenerates the output at the old and new positions, which this capability tracks to completion.
     public sealed class IndependentBoards : IScene, IInspectionScene, IDependentOutputScene, IVersionedScene, IDisposable {
         public const string Structure = "independent-board-v1";
-        public const string CullerType = "Helpers.Culling.RendererCuller";
+        public const string CullerType = CullerTypes.RendererCuller;
         public const string SylvaScene = "BushnellWhittier-MapManager", SylvaPath = "World/Signs/Loc: Sylva Int";
         // Pattern-based boards share the delivery minimum; the original Sylva target retains its legacy support.
         public const string PatternVersion = "0.5.0";

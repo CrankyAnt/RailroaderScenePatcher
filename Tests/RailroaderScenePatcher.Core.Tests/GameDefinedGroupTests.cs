@@ -409,7 +409,7 @@ static class GameDefinedGroupTests {
         Check(spanned.Frame.HasValue && Math.Abs(spanned.Frame.Value.X - g.X) < 1e-6 && Math.Abs(spanned.Frame.Value.Right - g.Right) < 1e-6 && Math.Abs(spanned.Frame.Value.Y - g.Y) < 1e-6 && Math.Abs(spanned.Frame.Value.Bottom - g.Bottom) < 1e-6,
             "a detection span does not count for the group's frame");
         var counted = ObjectMarkingGeometry.GroupFrame(eye800, anchors.Concat(new[] { span }).ToArray(), frames.Concat(new ObjectMarkingFrame[] { null }).ToArray(), null, null, Camera(eye800), View);
-        Check(counted.Frame.Value.Right > g.Right + 1, "without the listed members every object counts, the span included");
+        Check(counted.Spread && !counted.Frame.HasValue, "without the listed members every object counts: the span 300 m off makes the objects stand apart");
         // The frame is one box around the members, not the outline of the members: the place above the low post,
         // at the height of the mast's top, lies inside it, although no member reaches there.
         var above = Screen(new WorldPoint(10, 5.5, 999), eye800);
@@ -442,9 +442,11 @@ static class GameDefinedGroupTests {
         foreach (var point in diagonal) Check(turned.Any(c => Math.Abs(c.X - point.X) < 1e-9 && Math.Abs(c.Y - point.Y) < 1e-9 && Math.Abs(c.Z - point.Z) < 1e-9), "the turned box has the objects at its corners");
         Check(ObjectMarkingGeometry.Enclose(new WorldPoint[0], WorldBasis.World) == null, "no points have no box");
         Check(Edge(ObjectMarkingGeometry.Enclose(diagonal, new WorldBasis(new WorldPoint(0, 0, 0), new WorldPoint(0, 1, 0), new WorldPoint(0, 0, 1))), 1) == 20, "a basis without a direction gives the world's directions");
-        // The group's frame follows that orientation: the same members give another outline in another orientation.
+        // The group's frame lies along its objects: an anchor turned a quarter against the row of masts, whose box
+        // would be far larger, gives the same frame as the world's directions, along the row (FittedFrameTests).
         var quarter = At(800, out _, new WorldBasis(new WorldPoint(1, 0, 1), new WorldPoint(0, 1, 0), new WorldPoint(-1, 0, 1))).Frame.Value;
-        Check(quarter.Right > g.Right + 1e-3 && quarter.X < g.X - 1e-3, "the group's box turns with the scene object that anchors the group");
+        Check(Math.Abs(quarter.Right - g.Right) < 1e-6 && Math.Abs(quarter.X - g.X) < 1e-6 && Math.Abs(quarter.Y - g.Y) < 1e-6 && Math.Abs(quarter.Bottom - g.Bottom) < 1e-6,
+            "the group's box lies along its objects, not along an anchor turned against them");
 
         // On each side of 125 metres: the bounds begin at z 999.
         Check(At(999 - 125, out _).Shows == GroupShows.Objects && At(999 - 125.5, out _).Shows == GroupShows.MarkerAndFrame, "at 125 metres from its bounds a group shows its objects, beyond it one marker and one frame");

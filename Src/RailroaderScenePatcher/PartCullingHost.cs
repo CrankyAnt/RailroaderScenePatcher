@@ -20,7 +20,7 @@ namespace RailroaderScenePatcher {
             rendererList = typeof(RendererCuller).GetField("_cullRenderers", Native.Flags), rendererManager = typeof(RendererCuller).GetField("cullingManagerName", Native.Flags),
             rendererState = typeof(RendererCuller).GetField("_cullingState", Native.Flags), switcherManager = typeof(GameObjectCuller).GetField("cullingManagerName", Native.Flags),
             switcherMode = typeof(GameObjectCuller).GetField("cullingMode", Native.Flags), switcherState = typeof(GameObjectCuller).GetField("_cullingState", Native.Flags),
-            managerSpheres = typeof(CullingManager).GetField("_spheres", Native.Flags);
+            managerSpheres = NativeCulling.ManagerSpheres;
         readonly IDisposable[] subscriptions;
         bool unloading;
         // Raised when the map starts to unload, before anything else may touch a culling manager.

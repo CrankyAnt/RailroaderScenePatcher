@@ -416,7 +416,7 @@ namespace RailroaderScenePatcher.Core {
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
         public bool StillIdentifies(object target, TargetIdentity identity) => relationship.StillIdentifies(target, identity);
         public void PreflightPlacement(object target) => relationship.PreflightPlacement(target);
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == "Track.TrackMarker") ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, "Track.TrackMarker", RequiredVersion);
         public void Preflight(object target) => relationship.Preflight(target);
         public void CheckRelationships(object target, ObjectState state) {
             relationship.CheckRelationships(target, state);

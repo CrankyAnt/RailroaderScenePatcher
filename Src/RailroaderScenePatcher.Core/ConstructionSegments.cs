@@ -146,6 +146,6 @@ namespace RailroaderScenePatcher.Core {
                 return ConstructionSegmentRule.Verify(world, target, captured) == null;
             } catch { return false; }
         }
-        public string MinimumPatcherVersion(TargetIdentity target) => target != null && (target.Structure == Structure || (target.Structure == null && target.Component == ComponentType)) ? ConstructionSegmentRule.RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, ConstructionSegmentRule.RequiredVersion);
     }
 }

@@ -244,7 +244,7 @@ namespace RailroaderScenePatcher.Core {
             return owned == null ? null : "This rail bridge contains the track-owned component " + owned + ", which belongs to the native track. The bridge can't be moved, enabled, or disabled.";
         }
         public const string CrossingController = "Track.Crossings.GradeCrossingController", PadBuilder = "Track.TrackCurveMeshBuilder", Marker = "Track.TrackMarker",
-            RendererCuller = "Helpers.Culling.RendererCuller", ContainerRule = "Container objects above group roots";
+            RendererCuller = CullerTypes.RendererCuller, ContainerRule = "Container objects above group roots";
         // Crossbucks at unprotected crossings: each crossbuck is a group of its own under Grade crossing, wherever it
         // stands below World. Its models, the LOD levels below it, belong to its entry and are no parts.
         public const string CrossbuckModels = "A crossbuck's models belong to its entry.";
@@ -375,7 +375,7 @@ namespace RailroaderScenePatcher.Core {
         // culler sits on the root of a prefab that culls its own children, such as a lamp post (Tall Post Shade), a
         // crossbuck or a sign, and that root is the object a modder moves: a part where it stands below a group
         // root, and a group root where it stands in a group-root position, as the yard lamp posts of Bryson Yard do.
-        public const string SimpleCuller = "Helpers.SimpleCuller", GameObjectCuller = "Helpers.Culling.GameObjectCuller";
+        public const string SimpleCuller = CullerTypes.SimpleCuller, GameObjectCuller = CullerTypes.GameObjectCuller;
         public static readonly IReadOnlyList<string> Cullers = Array.AsReadOnly(new[] { SimpleCuller, RendererCuller, GameObjectCuller });
         // A culling container, such as Bryson House Track/Culled, is a scene object below a group root that only holds
         // other objects for a simple culler: it carries a simple culler, has no renderer, collider or light of its own
@@ -905,7 +905,7 @@ namespace RailroaderScenePatcher.Core {
                     && GroupChecks.Colliders(captured, current) == null && GroupChecks.Culling(current, root.Active != false, plan) == null && current.RootCulling == captured.RootCulling;
             } catch { return false; }
         }
-        public string MinimumPatcherVersion(TargetIdentity target) => target != null && (target.Structure == Structure || (target.Structure == null && target.Component == ComponentType)) ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
     }
     // Parts of baked scenery groups: places and enables or disables one scene object inside a listed group. A part edit
     // is an ordinary scene-object edit; the group root and the other parts keep their placement and activity. A fixed
@@ -1028,6 +1028,6 @@ namespace RailroaderScenePatcher.Core {
             holds.Set(target, null);
         }
         public bool Unsettled(object target) => false;
-        public string MinimumPatcherVersion(TargetIdentity target) => target != null && (target.Structure == Structure || (target.Structure == null && target.Component == ComponentType)) ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, ComponentType, RequiredVersion);
     }
 }

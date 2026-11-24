@@ -83,7 +83,7 @@ namespace RailroaderScenePatcher {
         static double[] OriginOffset() => Doubles((Vector3)Native.Call(Native.Type("Helpers.WorldTransformer"), "GameToWorld", Vector3.zero));
         static double[] Doubles(Vector3 v) => new double[] { v.x, v.y, v.z };
         static Vector3 Vector(double[] v) => new Vector3((float)v[0], (float)v[1], (float)v[2]);
-        const string GameObjectCuller = "Helpers.Culling.GameObjectCuller";
+        const string GameObjectCuller = CullerTypes.GameObjectCuller;
         // The equipment of a crossing whose activity the game switches by camera distance through a culler.
         static readonly HashSet<string> CulledFamilies = new HashSet<string>(StringComparer.Ordinal) { MastFamily, BellFamily };
         const string MastFamily = ExistingEquipmentScene.MastFamily, BellFamily = ExistingEquipmentScene.BellFamily;
@@ -96,7 +96,7 @@ namespace RailroaderScenePatcher {
         internal NativeInventory(Func<GameObject, string> boardRefusal = null) { this.boardRefusal = boardRefusal; }
         static bool Loaded(Component c) => c != null && c.gameObject.scene.IsValid() && c.gameObject.scene.isLoaded;
         static string TypeName(Component c) => c == null ? "missing component" : c.GetType().FullName;
-        static Component Get(GameObject go, string type) => go.GetComponents<Component>().FirstOrDefault(c => c != null && TypeName(c) == type);
+        static Component Get(GameObject go, string type) => TrackMarkerWorld.Get(go, type);
         static Component Parent(Component c, string type) {
             for (var t = c.transform; t != null; t = t.parent) { var found = Get(t.gameObject, type); if (found != null) return found; }
             return null;
