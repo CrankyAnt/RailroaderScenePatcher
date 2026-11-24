@@ -105,14 +105,14 @@ namespace RailroaderScenePatcher {
         bool repairMode => lockReason != null;
         internal void SetFileLock(string reason) {
             lockReason = reason;
-            // PROTOTYPE hook: leave compact mode when a file decision locks the window.
-            if (reason != null && PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=file lock"); }
+            // A file decision needs the full window: compact mode ends when one locks the window.
+            if (reason != null && Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=file lock"); }
             if (reason != null && HelpRegion != WindowHelpRegion) CloseHelp();
             if (divider != null) divider.enabled = reason == null;
             SetTitleRepairControls();
         }
         void SetTitleRepairControls() {
-            foreach (var rect in new[] { titleReset, titleClose, titleCompactPrototype }) {
+            foreach (var rect in new[] { titleReset, titleClose, titleCompact }) {
                 var button = rect == null ? null : rect.GetComponent<Button>();
                 if (button != null) button.interactable = !repairMode;
             }
@@ -265,7 +265,7 @@ namespace RailroaderScenePatcher {
                 titleDetails = null; detailsGlyph = null;
                 TitleIconProblem = (TitleIconProblem == null ? "" : TitleIconProblem + "; ") + "Session details: " + e.GetBaseException().Message;
             }
-            AddPrototypeCompactIcon(manager, close.transform.parent);
+            AddCompactIcon(manager, close.transform.parent);
             PlaceTitleHelp();
             SetTitleRepairControls();
         }
@@ -334,7 +334,7 @@ namespace RailroaderScenePatcher {
             if (height <= 0 || width <= 0) return;
             var middle = (lowerLeft.y + upperLeft.y) * 0.5f;
             var right = lowerLeft.x - 2;
-            foreach (var icon in new[] { titleHelp, titleReset, titleDetails, titleCompactPrototype }) {
+            foreach (var icon in new[] { titleHelp, titleReset, titleDetails, titleCompact }) {
                 if (icon == null) continue;
                 icon.sizeDelta = new Vector2(width, height);
                 icon.localPosition = new Vector3(right, middle, 0);
@@ -668,9 +668,9 @@ namespace RailroaderScenePatcher {
         }
         // Forgets the saved bounds and places the window at its default position again.
         internal void ResetLayout() {
-            if (PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=reset layout"); }
-            PrototypeForgetLayout();
-            PrototypeResetExtraWindows();
+            if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=reset layout"); }
+            ForgetCompactLayout();
+            ResetSecondaryWindows();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
             // The request comes from a button press, and layout moves nothing while a button is down: the next layout
             // after the release places the window.
@@ -771,7 +771,7 @@ namespace RailroaderScenePatcher {
         }
         void Close() {
             if (disposed) return;
-            if (PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=close"); }
+            if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=close"); }
             ClearFocus();
             window.NativeWindow.CloseWindow();
             // Native close completes after the end-of-frame yield. Notify only from its transition event.
@@ -786,11 +786,57 @@ namespace RailroaderScenePatcher {
             HelpRegion = null;
             closed();
         }
+        // ---- Outliner row tooltips ----
+
+        // The outliner's scroll view, set each time the outliner builds its rows, in the full and the compact window.
+        internal ScrollRect OutlinerView;
+
+        // The game shows a tooltip after the pointer rests half a second, but once one shows, the next one follows at
+        // once. In the outliner the rows touch, so scrolling or moving down the list showed a tooltip for every row.
+        // A row's tooltip waits until the pointer has rested on that row for nearly the game's half second, also
+        // while another tooltip shows; the rest of the game's grace period keeps it from waiting twice. Outside that
+        // mode the game's own half second applies. Buttons keep the game's timing.
+        const float RowTooltipDelay = 0.45f;
+        static readonly System.Reflection.FieldInfo lastShownTooltip = typeof(UI.Tooltips.UITooltipController).GetField("_lastShownTooltip", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        static string dwellTitle;
+        static float dwellSince;
+        static int dwellFrame = -10;
+
+        // Rows are pooled and made as the list scrolls, so each tick gives any new row its waiting tooltip.
+        void DelayRowTooltips() {
+            var view = OutlinerView;
+            if (view == null || view.content == null) return;
+            var content = view.content;
+            for (var i = 0; i < content.childCount; i++) {
+                var provider = content.GetChild(i).GetComponent<UI.Tooltips.UITooltipProvider>();
+                if (provider == null || provider.DynamicTooltipInfo != null) continue;
+                var row = provider;
+                row.DynamicTooltipInfo = () => RowTooltipDwell(row.Title);
+            }
+        }
+
+        static TooltipInfo RowTooltipDwell(string title) {
+            var now = Time.realtimeSinceStartup;
+            if (title != dwellTitle || Time.frameCount - dwellFrame > 1) { dwellTitle = title; dwellSince = now; }
+            dwellFrame = Time.frameCount;
+            var info = new TooltipInfo(title, "");
+            if (String.IsNullOrEmpty(title) || !TooltipShowing()) return info;
+            return now - dwellSince >= RowTooltipDelay ? info : TooltipInfo.Empty;
+        }
+
+        static bool TooltipShowing() {
+            try {
+                var controller = UI.Tooltips.UITooltipController.Shared;
+                return controller != null && lastShownTooltip != null && lastShownTooltip.GetValue(controller) is TooltipInfo shown && !shown.IsEmpty;
+            } catch { return false; }
+        }
+
         internal void Tick() {
             if (disposed) return;
             if (openOnTick) { openOnTick = false; if (!IsOpen) Toggle(); }
             Layout(false);
-            PrototypeTick();
+            DelayRowTooltips();
+            CompactTick();
             if (IsOpen) PlaceTitleHelp();
             RemoveClosedHelp();
             if (helpSizing > 0 && --helpSizing == 0) SizeHelp();
@@ -965,8 +1011,8 @@ namespace RailroaderScenePatcher {
                 Place((RectTransform)entry.transform, entryRect);
             }
             if (!IsOpen) return;
-            // PROTOTYPE hook: keep a compact window inside the screen without overwriting saved full bounds.
-            if (PrototypeCompact) { PrototypeClampLayout(); return; }
+            // A compact window stays inside the screen without overwriting the full window's saved bounds.
+            if (Compact) { ClampCompactLayout(); return; }
             var current = PanelBounds;
             var within = PanelPlacement.Within(new PanelPlacement.Area { X = current.x, Y = current.y, Width = current.width, Height = current.height }, Screen.width, Screen.height);
             // A placed window stays where it is, as native windows do: native UI that opens over it, chrome rebuilds and
@@ -1049,8 +1095,8 @@ namespace RailroaderScenePatcher {
         }
         public void Dispose() {
             if (disposed) return;
-            // PROTOTYPE hook: the window goes while compact, such as when the Map Editor is left.
-            if (PrototypeCompact) { try { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=window removed (Map Editor left or reloaded)"); } catch { } }
+            // The window can go while compact, such as when the Map Editor is left.
+            if (Compact) { try { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=window removed (Map Editor left or reloaded)"); } catch { } }
             HideTooltip();
             ClearFocus(); disposed = true;
             entryPanel?.Dispose();
@@ -1061,7 +1107,7 @@ namespace RailroaderScenePatcher {
             if (resetTexture != null) UnityEngine.Object.Destroy(resetTexture);
             if (detailsSprite != null) UnityEngine.Object.Destroy(detailsSprite);
             if (detailsTexture != null) UnityEngine.Object.Destroy(detailsTexture);
-            PrototypeDispose();
+            DisposeCompact();
             if (window != null) {
                 window.Build = null;
                 window.NativeWindow.DelegateRequestClose = null;

@@ -516,7 +516,7 @@ namespace RailroaderScenePatcher {
                         CancelRequest("the panel was closed before the request ran");
                     });
                     presentation.ResetRequested = ResetLayout;
-                    presentation.PrototypeSwitched = PrototypeLog;
+                    presentation.CompactSwitched = LogCompactSwitch;
                     presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
                     presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
                     if (presentation.TitleIconProblem != null) PatcherLog.Debug("The patcher couldn't add an icon to the title bar (" + presentation.TitleIconProblem + "). The window help has a button for it.");

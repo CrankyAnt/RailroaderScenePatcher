@@ -200,8 +200,8 @@ namespace RailroaderScenePatcher {
         const string GuideRoot = "https://github.com/CrankyAnt/RailroaderScenePatcher/blob/main/docs/guides/scene-patches/";
 
         void DrawWindow(UIPanelBuilder builder) {
-            // PROTOTYPE hook: the compact window draws its own content unless the file panel locks the window.
-            if (presentation.PrototypeCompact && !FileLocked) { DrawCompactPrototype(builder); return; }
+            // The compact window draws its own content unless the file panel locks the window.
+            if (presentation.Compact && !FileLocked) { DrawCompact(builder); return; }
             typed.Clear();
             builder.ConfigureLayout(4f);
             // The command band is split at the column divider: each column starts with its own band, so the left band is
@@ -520,8 +520,8 @@ namespace RailroaderScenePatcher {
                 });
                 var listLayout = outline.GetComponent<LayoutElement>();
                 listLayout.minHeight = 120; listLayout.flexibleHeight = 10000;
-                // PROTOTYPE hook: the compact rail trims this view to whole rows, and its row tooltips wait in both windows.
-                presentation.PrototypeOutlinerView = outline.GetComponent<ScrollRect>();
+                // The compact rail trims this view to whole rows, and its row tooltips wait in both windows.
+                presentation.OutlinerView = outline.GetComponent<ScrollRect>();
             });
         }
         void FitOutliner(TMP_Text measure) {
@@ -1472,17 +1472,22 @@ namespace RailroaderScenePatcher {
             if (gizmo?.Active == true) return new[] { Slot("Cancel", "Cancel the drag and restore the placement.", null, () => gizmo?.Cancel(), "Cancel gizmo drag") };
             // A starter placement marker's modification is removed or rechecked from every tab.
             // Recheck does not meet the several-modifications refusal; Remove modification does.
+            return ModificationActs();
+        }
+        // Remove modification, Recheck, and Guide: the footer's idle row. The compact rail leaves out the removal.
+        Act[] ModificationActs(bool removal = true) {
             var block = FileLocked ? FileLockReason : selected == null ? "Inspect an object first." : IsStarter ? StarterBlock() : ObjectEditBlock();
             var identity = selected?.Identity;
             var unchanged = block ?? (IsChanged(selected) ? null : "This mod does not change this object.") ?? severalModifications;
-            return new[] {
+            var remove =
                 // The whole modification goes: the control says so in full and takes two cells.
                 Slot(CommandBand.RemoveModification, selected != null && selected.Identity.Structure == CrossingCoverageScene.Structure ? "Remove this mod's modification. Each circuit returns to the coverage it would have without this modification. This mod's detection additions and added lights, gates, and bells are deleted." : "Remove this mod's modification. The object returns to its underlying state.", unchanged, () => Edit(ModificationPlace, "Removal", (current, inspection) => {
                     var removed = current.Remove(identity, inspection);
                     // Removal deletes the crossing's additions and returns its circuits: a form that was open for one closes.
                     if (removed?.Applied == true) { CloseCoverageForm(); CloseEquipmentForm(); }
                     return removed;
-                }), null, 2),
+                }), null, 2);
+            var rest = new[] {
                 Slot("Recheck", "Compare the object with the scene patch file after a failed edit. Apply the file's settings wherever they differ.", block, () => {
                     // Recheck finds and inspects the object again: the panel's own Refresh reads the scene first, so a failed
                     // attempt that changed the object needs no separate Refresh before its Recheck.
@@ -1490,6 +1495,7 @@ namespace RailroaderScenePatcher {
                     Edit(ModificationPlace, "Recheck", (current, inspection) => current.Recheck(identity, inspection), guarded: false);
                 }),
                 GuideAct() };
+            return removal ? new[] { remove }.Concat(rest).ToArray() : rest;
         }
         // While the inspected object's cleanup is unverified: what remains and how the guard ends, or null. Read from the
         // session's record without searching the scene, so it can run with every rebuild.
@@ -1615,42 +1621,8 @@ namespace RailroaderScenePatcher {
                             Slot(CommandBand.ClearCircuit, "Preview clearing this mod's value for the circuit; it returns to its underlying coverage.", none, () => PrepareCoverage(session, identity, circuitKey, null, null), null, 1, 112),
                             Slot("Apply", "Apply the previewed coverage.", none ?? (prepared == null ? "Click Preview first." : null), apply, null, 1, 62) };
                     }
-                    if (structure == StarterPlacementScene.Structure) {
-                        var confirmedTrack = ConfirmedForInspected?.Identity;
-                        var picked = confirmedTrack != null && confirmedTrack.Kind == SelectionKind.TrackSegment;
-                        return new[] {
-                            Typed(Slot("Set", "Place the front of the car cut at the entered track location. The whole cut is checked first; the object does not move.", null, ApplyStarterLocation, "Set track location", 1, 56),
-                                () => CommandBand.FieldReason(block, binding, CurrentBinding(), CommandBand.SameLocation, CommandBand.BindingIds)),
-                            Slot("Detach", "Detach the marker from its track.", block ?? StarterPlacements.NoDetach, () => { }, "Detach track location", 1, 72),
-                            Slot(CommandBand.ClearLocation, "Clear this mod's value for the track location; the marker returns to its underlying track location.", block ?? CommandBand.ClearLocationReason(HasStarterTrack(identity)),
-                                () => Edit(BindingPlace, "Clearing the track location's mod value", (current, inspection) => current.ClearStarterTrack(identity, inspection)), null, 1, 124),
-                            HasPickedBinding ? Slot("Cancel", "Restore the current track location in the fields.", null, CancelPickedBinding) :
-                            Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment", 1, 70) };
-                    }
-                    if (HoldsConstructionSegments) {
-                        var current = CurrentSegments();
-                        var chosen = ConfirmedForInspected?.Identity;
-                        var pickedSegment = chosen != null && chosen.Kind == SelectionKind.TrackSegment;
-                        return new[] {
-                            Typed(Slot("Set", "Replace the construction segments with exactly the segments in the field. The bridge does not move.", null, ApplySegments, "Set construction segments", 1, 56),
-                                () => CommandBand.SegmentsReason(block, segmentFields[0], current)),
-                            Slot("Detach", "Detach the construction from its segments.", block ?? CommandBand.SegmentDetachReason, () => { }, "Detach construction segments", 1, 72),
-                            Slot(CommandBand.ClearSegments, "Clear this mod's construction segments value to return the construction to its underlying segments.", block ?? CommandBand.ClearSegmentsReason(HasSegmentValue(identity)),
-                                () => Edit(SegmentsPlace, "Clearing the construction segments value", (edit, inspection) => edit.SetConstructionSegments(identity, null, inspection)), null, 1, 124),
-                            Slot("Picked", "Add the confirmed segment to the segments field and remove segments that no longer exist.", block ?? (pickedSegment ? null : "Click Segment to choose a segment, then confirm it."),
-                                () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier, CommandBand.MissingSegments(selected?.Bindings)); FieldsChanged(); }, "Picked segment", 1, 70) };
-                    }
-                    var pad = structure == CrossingPadScene.Structure;
-                    // An object without a binding names that first; why it cannot be edited in general comes second.
-                    var unavailable = pad || structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure ? block : selected == null ? block : BindingUnavailable();
-                    var confirmed = ConfirmedForInspected?.Identity;
-                    var segment = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
-                    return new[] {
-                        Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding", 1, 56), () => CommandBand.FieldReason(unavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds)),
-                        Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : CurrentBinding()[0].Length == 0 ? CommandBand.AlreadyDetached : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)), "Detach binding", 1, 72),
-                        Slot(CommandBand.ClearBinding, "Clear this mod's value for the binding; the marker returns to its underlying binding.", unavailable ?? CommandBand.ClearBindingReason(HasBindingValue(identity)), () => Edit(BindingPlace, "Clearing the binding's mod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
-                        HasPickedBinding ? Slot("Cancel", "Restore the current binding in the fields.", null, CancelPickedBinding) :
-                        Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70) };
+                    var row = TrackLocationActs(block);
+                    return new[] { row.Set, row.Detach, row.Clear, row.Pick };
                 }
                 case ChangesTab: {
                     // Retry belongs to terrain output: an object without it has no action on this tab.
@@ -1676,6 +1648,53 @@ namespace RailroaderScenePatcher {
                             () => Edit(ActivityPlace, "Clearing the activity's mod value", (current, inspection) => current.ClearActivity(identity, inspection)), null, 2) };
                 }
             }
+        }
+        // The four slots of the Connections tab's track location row for a starter placement marker, a rail bridge
+        // construction's segments, or a binding: Set, Detach, Clear for the mod value, and Picked or Cancel. The compact
+        // rail keeps Set and the last slot.
+        struct TrackLocationRow {
+            internal Act Set, Detach, Clear, Pick;
+            internal TrackLocationRow(Act set, Act detach, Act clear, Act pick) { Set = set; Detach = detach; Clear = clear; Pick = pick; }
+        }
+        TrackLocationRow TrackLocationActs(string block) {
+            var identity = selected?.Identity;
+            var structure = identity?.Structure;
+            if (structure == StarterPlacementScene.Structure) {
+                var confirmedTrack = ConfirmedForInspected?.Identity;
+                var picked = confirmedTrack != null && confirmedTrack.Kind == SelectionKind.TrackSegment;
+                return new TrackLocationRow(
+                    Typed(Slot("Set", "Place the front of the car cut at the entered track location. The whole cut is checked first; the object does not move.", null, ApplyStarterLocation, "Set track location", 1, 56),
+                        () => CommandBand.FieldReason(block, binding, CurrentBinding(), CommandBand.SameLocation, CommandBand.BindingIds)),
+                    Slot("Detach", "Detach the marker from its track.", block ?? StarterPlacements.NoDetach, () => { }, "Detach track location", 1, 72),
+                    Slot(CommandBand.ClearLocation, "Clear this mod's value for the track location; the marker returns to its underlying track location.", block ?? CommandBand.ClearLocationReason(HasStarterTrack(identity)),
+                        () => Edit(BindingPlace, "Clearing the track location's mod value", (current, inspection) => current.ClearStarterTrack(identity, inspection)), null, 1, 124),
+                    HasPickedBinding ? Slot("Cancel", "Restore the current track location in the fields.", null, CancelPickedBinding) :
+                    Slot("Picked", "Fill the segment field with the confirmed segment.", block ?? (picked ? null : "Choose a segment with Segment and confirm it first."), () => { binding[0] = confirmedTrack.Identifier; }, "Picked segment", 1, 70));
+            }
+            if (HoldsConstructionSegments) {
+                var current = CurrentSegments();
+                var chosen = ConfirmedForInspected?.Identity;
+                var pickedSegment = chosen != null && chosen.Kind == SelectionKind.TrackSegment;
+                return new TrackLocationRow(
+                    Typed(Slot("Set", "Replace the construction segments with exactly the segments in the field. The bridge does not move.", null, ApplySegments, "Set construction segments", 1, 56),
+                        () => CommandBand.SegmentsReason(block, segmentFields[0], current)),
+                    Slot("Detach", "Detach the construction from its segments.", block ?? CommandBand.SegmentDetachReason, () => { }, "Detach construction segments", 1, 72),
+                    Slot(CommandBand.ClearSegments, "Clear this mod's construction segments value to return the construction to its underlying segments.", block ?? CommandBand.ClearSegmentsReason(HasSegmentValue(identity)),
+                        () => Edit(SegmentsPlace, "Clearing the construction segments value", (edit, inspection) => edit.SetConstructionSegments(identity, null, inspection)), null, 1, 124),
+                    Slot("Picked", "Add the confirmed segment to the segments field and remove segments that no longer exist.", block ?? (pickedSegment ? null : "Click Segment to choose a segment, then confirm it."),
+                        () => { segmentFields[0] = CommandBand.AddSegment(segmentFields[0], chosen.Identifier, CommandBand.MissingSegments(selected?.Bindings)); FieldsChanged(); }, "Picked segment", 1, 70));
+            }
+            var pad = structure == CrossingPadScene.Structure;
+            // An object without a binding names that first; why it cannot be edited in general comes second.
+            var unavailable = pad || structure == TrackMarkerScene.Structure || structure == MilepostScene.Structure ? block : selected == null ? block : BindingUnavailable();
+            var confirmed = ConfirmedForInspected?.Identity;
+            var segment = confirmed != null && confirmed.Kind == SelectionKind.TrackSegment;
+            return new TrackLocationRow(
+                Typed(Slot("Set", pad ? "Register the pad's marker at the entered track location and regenerate the pad there." : "Register the marker at the entered track location. The object does not move.", null, ApplyBinding, "Set binding", 1, 56), () => CommandBand.FieldReason(unavailable, binding, CurrentBinding(), CommandBand.SameBinding, CommandBand.BindingIds)),
+                Slot("Detach", "Detach the marker from its track.", unavailable ?? (pad ? "A crossing pad cannot be detached. Disable it on the Object tab to hide it." : CurrentBinding()[0].Length == 0 ? CommandBand.AlreadyDetached : null), () => Edit(BindingPlace, "Track detachment", (current, inspection) => current.Bind(identity, MarkerBinding.Detached, inspection)), "Detach binding", 1, 72),
+                Slot(CommandBand.ClearBinding, "Clear this mod's value for the binding; the marker returns to its underlying binding.", unavailable ?? CommandBand.ClearBindingReason(HasBindingValue(identity)), () => Edit(BindingPlace, "Clearing the binding's mod value", (current, inspection) => current.Bind(identity, null, inspection)), null, 1, 124),
+                HasPickedBinding ? Slot("Cancel", "Restore the current binding in the fields.", null, CancelPickedBinding) :
+                Slot("Picked", "Fill the segment field with the confirmed segment.", unavailable ?? (segment ? null : "Choose a replacement segment and confirm it first."), () => { binding[0] = confirmed.Identifier; }, "Picked segment", 1, 70));
         }
         // Why no placement mode edits the inspected object when it is a crossing pad; null for any other object.
         string PadBlock => IsPad ? CommandBand.PadFollowsTrack : null;
