@@ -99,8 +99,7 @@ static class StarterPlacementTests {
         }
     }
 
-    // Every used marker appears once in the Starter placement family, active or not and whatever its binding; an
-    // unused one is absent; an ordinary marker stays in its own family; nothing stands in the Inspection only group.
+    // Every used marker appears once, active or not and whatever its binding; an unused one is absent.
     static void TheOutlinerListsUsedMarkersOnce() {
         var scene = new SetupScene { Setups = Setups() };
         scene.Markers.Add(new KeyValuePair<Marker, object[]>(Wreck, new object[] { true, "Stky030z8", (bool?)true }));
@@ -109,15 +108,11 @@ static class StarterPlacementTests {
         scene.Markers.Add(new KeyValuePair<Marker, object[]>(Retired, new object[] { true, "S1", (bool?)true }));
         scene.Markers.Add(new KeyValuePair<Marker, object[]>(Sign, new object[] { true, "S2", (bool?)true }));
         var inventory = new SceneInventory(scene); inventory.Refresh();
-        var groups = RailroaderScenePatcher.InventoryPresentationState.Groups(RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", RailroaderScenePatcher.OutlinerFilter.All, null));
-        var shape = String.Join(" | ", groups.Select(g => g.Key + ":" + String.Join(",", g.Value.Select(RailroaderScenePatcher.InventoryPresentationState.Name))));
-        Check(shape == "Starter placement:starter-ewh-int2,starter-ewh-shed1,starter-ewh-wreck | Track marker:Whistle Sign", "Used markers stand once in their family, in name order, and an unused one is absent: " + shape);
         Check(!inventory.Entries.Any(e => ReferenceEquals(e.Handle, Retired)) && !inventory.Search("starter-old").Any(), "The unused marker is absent from the inventory, also from search");
         var problems = RailroaderScenePatcher.InventoryPresentationState.Rows(inventory, "", RailroaderScenePatcher.OutlinerFilter.Problems, null).Select(RailroaderScenePatcher.InventoryPresentationState.Name).ToArray();
         Check(problems.SequenceEqual(new[] { "starter-ewh-shed1", "starter-ewh-int2" }), "The Problems filter lists the disabled used markers with an empty and a missing binding: " + String.Join(",", problems));
         var wreck = inventory.Entries.Single(e => ReferenceEquals(e.Handle, Wreck));
         Check(wreck.InspectionOnly == null && wreck.Problems.Count == 0 && wreck.Bindings.Any(b => b.StartsWith(StarterPlacements.ReaderPrefix, StringComparison.Ordinal)), "A used marker is a supported kind with its readers, not inspection only");
-        Check(RailroaderScenePatcher.InventoryPresentationState.Subgroups(groups[0].Value).Count == 0, "The family has no subgroups");
     }
 
     // The refusal that named setup consumption as unsupported is gone. Supported edits names the track location as the

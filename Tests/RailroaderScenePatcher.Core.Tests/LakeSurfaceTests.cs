@@ -48,7 +48,7 @@ static class LakeSurfaceTests {
             Assert(group.Length == 1 && group[0].Disposition == GroupDisposition.Group, path + " is listed once as a group: " + String.Join(", ", group.Select(g => g.Disposition + " " + g.Reason)));
         }
         Assert(At(verdicts, LogPond).Category == BakedSceneryCategories.StorageDisplay, "The log pond stands under Storage display: " + At(verdicts, LogPond).Category);
-        Assert(At(verdicts, Fontana1).Category == BakedSceneryCategories.Other && At(verdicts, Fontana2).Category == BakedSceneryCategories.Other, "The Fontana lakes stand under Other");
+        Assert(At(verdicts, Fontana1).Category == BakedSceneryCategories.Water && At(verdicts, Fontana2).Category == BakedSceneryCategories.Water, "The Fontana lakes stand under Water");
         var parts = BakedSceneryRules.Parts(verdicts).Where(p => p.Disposition == PartDisposition.Part).ToArray();
         Assert(parts.Count(p => p.Path == Water) == 1 && parts.Count(p => p.Path == Logs) == 1, "The water mesh and the logs are each one part of the log pond: " + String.Join(", ", parts.Select(p => p.Path)));
         Assert(parts.Where(p => p.Path.StartsWith(LogPond + "/", StringComparison.Ordinal)).All(p => p.GroupPath == LogPond), "The log pond's parts belong to its group");
@@ -94,7 +94,7 @@ static class LakeSurfaceTests {
             "A part above a log pond speaks of itself");
         Assert(CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, null, new string[0]) == "Decorative. The industry loads and unloads on its native track spans, so moving or disabling this part doesn't affect loading or unloading.",
             "The water mesh is a decorative part of the storage display");
-        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Other, null, new string[0]) == CommandBand.Decorative, "A Fontana lake is decorative");
+        Assert(CommandBand.UseInGame(false, BakedSceneryCategories.Water, null, new string[0]) == CommandBand.Decorative, "A Fontana lake is decorative");
         // Piles keep the texts of #98, chosen from the same bindings.
         Assert(CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, new[] { CommandBand.PilesBinding(2) }) == CommandBand.UseInGame(false, BakedSceneryCategories.StorageDisplay, null, true)
             && CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", new[] { CommandBand.StorageBinding("a.b", "pulpwood") }) == CommandBand.UseInGame(true, BakedSceneryCategories.StorageDisplay, "pulpwood storage of Sylva Paperboard", false),

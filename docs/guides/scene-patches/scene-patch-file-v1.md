@@ -365,7 +365,7 @@ To appear in this family, a root must meet all these conditions:
 
 A candidate without one of those components isn't listed at all. A collider built by the game while the camera is near doesn't count. For a storage pile, the pile itself counts, but its generated collider doesn't.
 
-`World/Large Scenery/Robinson Gap Mine/Coal Loader`, which holds a car loader (`RollingStock.CarContentSwapper`), is a decorative group under Other. Target it and its parts with `baked-scenery-group-v1` and `baked-scenery-part-v1`, as any group and part. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so neither `placement` nor `active` changes where loading happens.
+`World/Large Scenery/Robinson Gap Mine/Coal Loader`, which holds a car loader (`RollingStock.CarContentSwapper`), is a decorative group under Industry building. Target it and its parts with `baked-scenery-group-v1` and `baked-scenery-part-v1`, as any group and part. The game loads Robinson Gap coal by teleport between the industry's native track spans, not at the loader, so neither `placement` nor `active` changes where loading happens.
 
 The family excludes a group that holds a track marker, station click spot, spawn point, or map icon at any depth. It also excludes a group that holds a construction controller (`Game.Mow.TrackConstructionScenery`) but isn't a rail bridge construction. Those objects are inspection only. You can't move a group with a spawn point as a whole. Edit its spawn points individually in the [Spawn point](#spawn-point) family.
 
@@ -401,7 +401,7 @@ The patcher recognizes parts of groups in the Baked scenery group family. The ta
 
 A part is a scene object at any depth below a listed group root. It isn't a renderer or component. The scene must serialize it. It must have a renderer, collider, light, storage pile, or log pond at or below it, unless it holds a scene ground mask. See [scene ground masks](#scene-ground-masks). The following aren't parts:
 
-- Objects in groups listed in the Inspection only group.
+- Objects in groups listed as inspection only.
 - Siblings with the same name under the same parent, and objects below them.
 - An object with a `KeyValueBoolAnimator`, and everything below it, because the game animates it.
 - A culling container. This is an object below the group root with a simple culler (`Helpers.SimpleCuller`), no renderer, collider, light, storage pile, or log pond of its own, and other objects below it. The objects it contains are parts, and their paths include the container. A modification targeting the container fails before any change and gives that reason.

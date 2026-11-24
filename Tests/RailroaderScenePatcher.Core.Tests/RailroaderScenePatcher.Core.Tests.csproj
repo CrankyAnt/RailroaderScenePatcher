@@ -5,6 +5,9 @@
   <ItemGroup><ProjectReference Include="../../Src/RailroaderScenePatcher.Core/RailroaderScenePatcher.Core.csproj" /></ItemGroup>
   <ItemGroup>
     <Compile Include="../../Src/RailroaderScenePatcher/InventoryPresentationState.cs" Link="InventoryPresentationState.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/OutlineTree.cs" Link="OutlineTree.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/OutlinerGrouping.cs" Link="OutlinerGrouping.cs" />
+    <Compile Include="../../Src/RailroaderScenePatcher/OutlinerCrossings.cs" Link="OutlinerCrossings.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/EditFeedback.cs" Link="EditFeedback.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/FilePanelState.cs" Link="FilePanelState.cs" />
     <Compile Include="../../Src/RailroaderScenePatcher/GuidedTaskState.cs" Link="GuidedTaskState.cs" />

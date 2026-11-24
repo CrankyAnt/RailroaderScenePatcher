@@ -195,10 +195,10 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     public IReadOnlyList<KeyValuePair<object, string>> CrossbucksAt(string scene, string path) =>
         CrossbuckIds.TryGetValue(path, out var found) ? found : new List<KeyValuePair<object, string>>();
     public IReadOnlyList<object> Find(string scene, string path) {
-        if (GroupVerdicts != null && !BakedSceneryRules.ResolvesGroup(GroupVerdict(path), path)) return new List<object>();
+        if (GroupVerdicts != null && !BakedSceneryRules.ResolvesGroup(GroupVerdict(path))) return new List<object>();
         return Objects.TryGetValue(path, out var found) ? found : new List<object>();
     }
-    public string Refusal(object group) => (GroupVerdicts == null || GroupVerdict(PathOf(group)) != null ? null : BakedSceneryRules.GroupRefusal(PathOf(group))) ?? Refused;
+    public string Refusal(object group) => (GroupVerdicts == null ? null : BakedSceneryRules.GroupRefusal(GroupVerdict(PathOf(group)))) ?? Refused;
     static double[] Add(double[] a, double[] b) => a.Zip(b, (x, y) => x + y).ToArray();
     static double[] Sub(double[] a, double[] b) => a.Zip(b, (x, y) => x - y).ToArray();
     double[] Map(double[] scene) => new[] { scene[0] + Origin, scene[1], scene[2] };
@@ -311,7 +311,7 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
     public string ActivityRefusal(object part) => ((FakePart)part).Switched || ListedPart((FakePart)part) ? "A culler of the game switches this part by camera distance" : null;
     public string FollowingRefusal(object target) {
         var group = target is FakeGroup root ? root : ((FakePart)target).Group;
-        return group.RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : BakedSceneryRules.FollowingRefusal(GroupVerdict(PathOf(group))?.Subcategory);
+        return group.RailBridge ? BakedSceneryRules.RailBridgeNoFollowing : BakedSceneryRules.FollowingRefusal(GroupVerdict(PathOf(group))?.Bridge ?? BridgeKind.None);
     }
     public PartObservation ObservePart(object target) {
         var part = (FakePart)target; var group = part.Group;

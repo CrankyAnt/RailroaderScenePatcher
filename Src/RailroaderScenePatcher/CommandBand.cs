@@ -84,6 +84,17 @@ namespace RailroaderScenePatcher {
         internal static bool RecoveryWarning(FailureKind kind) => kind == FailureKind.AwaitingOutput;
         // A reason as one plain sentence after a label such as "Unavailable:", without a label of its own, starting with a
         // capital and ending with a full stop.
+        // A file path as the window shows it, never from the drive: below the game folder the path from that folder,
+        // and elsewhere the path from the mod's own folder, the one that holds its Data folder.
+        internal static string ShownPath(string path, string gameFolder) {
+            if (String.IsNullOrEmpty(path)) return path;
+            var parts = path.Split('\\', '/');
+            var game = String.IsNullOrEmpty(gameFolder) ? new string[0] : gameFolder.TrimEnd('\\', '/').Split('\\', '/');
+            if (game.Length != 0 && parts.Length > game.Length && game.Select((part, i) => String.Equals(part, parts[i], StringComparison.OrdinalIgnoreCase)).All(same => same))
+                return String.Join("/", parts.Skip(game.Length));
+            var data = Array.FindLastIndex(parts, part => String.Equals(part, "Data", StringComparison.OrdinalIgnoreCase));
+            return String.Join("/", parts.Skip(data > 0 ? data - 1 : parts.Length - 1));
+        }
         internal static string Sentence(string reason) {
             var text = (reason ?? "").Trim();
             for (var stripped = true; stripped;) {
@@ -155,8 +166,11 @@ namespace RailroaderScenePatcher {
         // no correction.
         internal static string NotEditable(string reason) => NotEditablePrefix + reason;
         // Why an object whose hierarchy path and component more than one loaded object holds cannot be edited, or null:
-        // a patch names its target by them, so it cannot name one of the holders.
-        internal static string SharedPath(int holders) => holders > 1 ? holders + " objects share this hierarchy path and component, so a patch cannot name one of them" : null;
+        // a scene patch file names its target by them, so it cannot name one of the holders. Supported edits says this
+        // about the object; the footer says what it means for an edit now (SharedPathBlock).
+        const string SharedPathTail = " objects have this hierarchy path, and a scene patch file names an object by its path";
+        internal static string SharedPath(int holders) => holders > 1 ? holders + SharedPathTail : null;
+        internal const string SharedPathBlock = "This object can't be edited while another object has the same hierarchy path.";
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable
@@ -282,7 +296,7 @@ namespace RailroaderScenePatcher {
         // The name of a binding edit, with the track location it sets.
         internal static string BindingAction(string segment, string end, double distance) =>
             "Track binding to " + segment + " / " + (end ?? "").ToLowerInvariant() + " / " + Number(distance);
-        // Not "Inspection only": that names the outliner's group of objects no supported family covers.
+        // Not "Inspection only": that marks an object no supported family covers.
         const string NotEditablePrefix = "Not editable: ";
         // The reason of such a text, or null for an object that can be edited.
         internal static string Refusal(string operations) => operations != null && operations.StartsWith(NotEditablePrefix, StringComparison.Ordinal) ? operations.Substring(NotEditablePrefix.Length) : null;
@@ -419,7 +433,7 @@ namespace RailroaderScenePatcher {
         internal static string UseInGame(SceneObservation selected, SceneObservation group) {
             var isPart = selected.GroupPath != null;
             var use = UseInGame(isPart, isPart ? group?.Category : selected.Category, selected.Storage, selected.Bindings);
-            return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Subcategory : selected.Subcategory) == BakedSceneryCategories.RoadBridges);
+            return GroundMaskUse(use, isPart, selected.Dependencies, (isPart ? group?.Bridge : selected.Bridge) == BridgeKind.Road);
         }
         // A road bridge is decorative, and its road is native map data: moving the bridge does not move
         // the road.
@@ -723,7 +737,7 @@ namespace RailroaderScenePatcher {
         }
         // The families of a light or gate and of a bell this patcher added: supported families whose edits live on their
         // crossing's Connections tab, not on the object itself.
-        internal const string AddedEquipmentFamily = "Added light or gate", AddedBellFamily = "Added bell";
+        internal const string AddedEquipmentFamily = SceneFamilies.AddedEquipment, AddedBellFamily = SceneFamilies.AddedBell;
         // The guide link offered below a list of equipment sources: its label and the guide page with the anchor of its
         // eligibility reasons, or null while every source of the list is eligible. A list of bell definitions links to the bell
         // guide, a list of devices to the light and gate guide.
@@ -766,6 +780,8 @@ namespace RailroaderScenePatcher {
         internal static string EditReason(string operations) {
             var own = operations?.Trim();
             if (own != null && own.EndsWith(". " + AddedEquipmentReason, StringComparison.Ordinal)) return AddedEquipmentReason;
+            // Supported edits says why the object has no edits; the footer says what holds an edit back now.
+            if (own != null && own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) && own.TrimEnd('.').EndsWith(SharedPathTail, StringComparison.Ordinal)) return SharedPathBlock;
             if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal) || own.StartsWith(NotEditableAsGroupPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
             return Sentence(own);
         }

@@ -12,7 +12,7 @@ Open your mod's map definition from the Editor menu. The patcher reads and write
 
 A new scene patch file names the map definition's bottom map layer as its scene target map. If the definition has no map layers, the file names the definition itself. When the bottom map layer is the base-game map, the file also applies to a save of that map, where your map-changing script or map patch supplies your native changes. An existing scene patch file keeps its scene target map. See [the scene patch file reference](scene-patch-file-v1.md#scene-patch-file-fields).
 
-Open **Scene Patcher**, then click the page icon to open the session details. Under **Editing**, **Editing ready for** followed by the scene patch file path means you can begin.
+Open **Scene Patcher**, then click the page icon to open the session details. Under **Editing**, **Editing ready for** followed by the scene patch file's path means you can begin. The path is relative to the game folder, such as `SelfMadeMapTest/Data/scene-patches.json`.
 
 If this section reports a problem, the scene patch file is protected. The patcher never overwrites an unreadable file, a file in a newer format, or one for another map. The **Scene patch file** section identifies the problem. Correct the file and read it again, or back it up and make a fresh start. See [Recover a protected scene patch file](recover-scene-patch-files.md).
 

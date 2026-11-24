@@ -47,14 +47,14 @@ The editor lists every bell definition in the content library and explains why a
 - The bell observes the controller's bell key. The controller sets this key in response to the crossing's circuits to ring its own bell. The added bell reads the key's current value when it is created and follows every later change, so both bells ring and stop together. The controller remains unchanged and does not know about the added bell.
 - The bell loads its definition's audio through the content library and holds its own reference to that audio for as long as it exists. While the audio loads, the bell stays silent and its state shows that it is loading. Removing the bell stops it, stops it observing the bell key, cancels any unfinished load, and releases its audio reference. The crossing's own bell keeps its audio.
 - Like the crossing's own bell, the added bell does not join a culler.
-- Each bell is an added object. The outliner lists it once in the **Added bell** family, marked with `+`, and its state line shows **+ ADDED**. When added bells at the same crossing share a name, each name ends in `(added, N of M)`. Where space is limited, the editor shortens the name before the copy number. Edit the bell on its crossing's **Connections** tab.
+- Each bell is an added object. The outliner lists it once under its category, marked with `+`, and its state line shows **+ ADDED**. When added bells at the same crossing share a name, each name ends in `(added, N of M)`. Where space is limited, the editor shortens the name before the copy number. Edit the bell on its crossing's **Connections** tab.
 - A bell whose audio fails to load blocks other equipment edits of that crossing until you remove it or replace its definition. Removing or replacing it stays available, and so do coverage and detection edits of the same crossing.
 - The crossing object, its coverage, and its native equipment do not change.
 - Each bell needs an ID that no other bell, light, or gate in your scene patch file uses. Only one modification may use that ID. IDs are scoped to your mod, so another supplying mod can use the same ID without a conflict. Your scene patch file never moves or removes another mod's bells. Repeated loads keep one player, one observer, and one audio reference per ID.
 
 ## Add a bell in the native map editor
 
-1. Open the Scene Patcher window and inspect the crossing controller. Find it in the outliner's **Crossing controller** family or select it in the world.
+1. Open the Scene Patcher window and inspect the crossing controller. Find it under **Grade crossing** in the outliner or select it in the world.
 2. Open the **Connections** tab. **Lights, gates, and bells** lists the current additions. **Add a bell** lists the bell definitions, with a reason for each one that does not qualify. **Why a bell definition isn't eligible** opens the table above.
 3. Click **Use** for an eligible definition. Each button shows its display name, such as **Use US&S Teardrop Crossing Bell**. A form opens at the top of the tab with an unused **Equipment ID** and a position five meters beside the inspected crossing. Change the **Equipment ID**, **Position** in map coordinates, and **Rotation** in degrees as needed.
 4. Click **Preview** at the bottom of the tab. The **Preview** section shows what will be added, moved, rebuilt, or removed. Nothing changes yet.
