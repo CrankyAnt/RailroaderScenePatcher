@@ -115,7 +115,7 @@ static class MilepostTests {
         foreach (var m in world.Objects["World/Mile Posts/T-48"].Cast<FakeMarker>()) world.Posts[m] = new FakeMilepostWorld.Post { Mileage = 48, Text = "48" };
         var result = new PatchEngine(scene).Apply(Doc(Item("missing", Bind(Detach), "World/Mile Posts/T-99") + "," + Item("ambiguous", Bind(Detach), "World/Mile Posts/T-48") + "," + Item("keep", Place(1070), T47)));
         Assert(!result.Outcomes["missing"].Applied && result.Outcomes["missing"].Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal), "A missing milepost fails its modification: " + result.Outcomes["missing"].Error);
-        Assert(!result.Outcomes["ambiguous"].Applied && result.Outcomes["ambiguous"].Error == PatchEngine.TargetAmbiguous, "An ambiguous milepost fails its modification: " + result.Outcomes["ambiguous"].Error);
+        Assert(!result.Outcomes["ambiguous"].Applied && result.Outcomes["ambiguous"].Error == PatchEngine.TargetAmbiguous + " " + PatchEngine.TargetAmbiguousAction, "An ambiguous milepost fails its modification: " + result.Outcomes["ambiguous"].Error);
         Assert(result.Outcomes["keep"].Applied && t47.Position[0] == 70, "An independent milepost edit still applies");
         Assert(Entry(world, t46) == "Stvw|b|51.20403" && twin.Segment == "Stvw", "No substitute target changes");
         // A track-marker target names no milepost: the two capabilities never claim the same object.

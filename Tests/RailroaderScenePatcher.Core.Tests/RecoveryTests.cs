@@ -69,6 +69,7 @@ static class RecoveryTests {
         FreshStartRefusesWhatItCannotSecure();
         DependedModificationsCannotLeaveTheScenePatchFile();
         EditsOfIneffectiveModificationsAreRefused();
+        TargetRefusalsGetTheirOwnGuidance();
         Console.WriteLine("PASS: unknown runtime content, format version first, diagnostics, confirmed re-reading, backup-protected fresh start and dependsOn refusals");
     }
 
@@ -323,6 +324,23 @@ static class RecoveryTests {
             Assert(removed.Applied, "Once no modification names it, " + target.Path + " can leave the scene patch file: " + removed.Error);
         }
         Assert(w.Box.Active && w.Session.ScenePatchFileText.Contains("\"modifications\": {}"), "The removals return the objects to their underlying state");
+    }
+
+    // An edit whose target matches no object asks for a refresh; one whose target matches several objects asks for a target
+    // that names one object. Neither repeats the refusal.
+    static void TargetRefusalsGetTheirOwnGuidance() {
+        var gone = new World(Doc(""));
+        gone.Scene.Objects["p"] = new List<object>();
+        var missing = gone.Session.Edit(P, At(150), null);
+        var none = RecoveryGuidance.For(missing, "Placement", "Placement", null);
+        Assert(!missing.Applied && missing.Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal) && none.Correction == "Nothing changed. Refresh the object list and inspect the object again.",
+            "A target without a match asks for a refresh: " + missing.Error + " | " + none?.Correction);
+        var twin = new World(Doc(""));
+        twin.Scene.Objects["p"].Add(new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } });
+        var ambiguous = twin.Session.Edit(P, At(150), null);
+        var several = RecoveryGuidance.For(ambiguous, "Placement", "Placement", null);
+        Assert(!ambiguous.Applied && ambiguous.Error.StartsWith(PatchEngine.TargetAmbiguous, StringComparison.Ordinal) && several.Correction == "Nothing changed. The target must name one object, for example by a longer path or by its component.",
+            "A target with several matches asks for a target that names one object: " + ambiguous.Error + " | " + several?.Correction);
     }
 
     // An edit of a modification that does not take effect because a dependency is missing, failed or cyclic is refused

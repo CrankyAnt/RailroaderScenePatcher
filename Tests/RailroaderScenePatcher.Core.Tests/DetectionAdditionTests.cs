@@ -90,7 +90,7 @@ static partial class CoverageTests {
         Assert(!unknown.Outcomes["add"].Applied && unknown.Outcomes["add"].Error == PatchEngine.TargetMissing + " " + PatchEngine.TargetMissingAction && u.World.Mutations == 0, "An addition for a missing crossing is refused");
         u.World.Objects[CrossingPath].Add(u.Other);
         var ambiguous = new PatchEngine(u.Scene).Apply(Doc(Add("add", Addition("siding"))));
-        Assert(!ambiguous.Outcomes["add"].Applied && ambiguous.Outcomes["add"].Error == PatchEngine.TargetAmbiguous && u.World.Mutations == 0, "An addition for an ambiguous crossing is refused");
+        Assert(!ambiguous.Outcomes["add"].Applied && ambiguous.Outcomes["add"].Error == PatchEngine.TargetAmbiguous + " " + PatchEngine.TargetAmbiguousAction && u.World.Mutations == 0, "An addition for an ambiguous crossing is refused");
     }
     static void AdditionIdentityIsScopedToItsScenePatchFile() {
         // One scene patch file uses each addition ID once: the ID names one addition of its mod, wherever the entries stand.
