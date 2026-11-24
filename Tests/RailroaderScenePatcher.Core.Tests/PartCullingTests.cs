@@ -81,6 +81,7 @@ static class PartCullingTests {
         EndingThePatcherReturnsTheCullingToTheGame();
         InstallWaitsForTheGamesCuller();
         StaleCallbacksWriteNothing();
+        UpdateFailureIsWrittenOncePerGroupAndFailure();
         UnloadReadsNoCullingManager();
         LeftoverWrapperIsReported();
         InspectorNamesOwnCulling();
@@ -744,6 +745,37 @@ static class PartCullingTests {
         Assert(faults.Count == 1 && g.World.Culling.Waiting, "A failing callback does not throw and is reported once: " + faults.Count);
         g.World.Native.FailWrites = false; g.World.Culling.Tick();
         Assert(!g.Post.Active && !g.World.Culling.Waiting, "The next update brings the group to its spheres");
+    }
+
+    // The update runs every frame. A failure of one group is written once per group and failure, names the group, and
+    // leaves the other groups updating.
+    static void UpdateFailureIsWrittenOncePerGroupAndFailure() {
+        const string Other = "World/Large Scenery/Whittier/Whittier Saw Mill Culled";
+        var (f, _) = WithFarPost();
+        var second = new FakeGroup();
+        f.World.Objects[Other] = new List<object> { second };
+        f.World.PartsAt[Other + "/Lamp"] = new List<object> { second.Parts[2] };
+        Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Mod("far-lamp", Other + "/Lamp", BakedSceneryParts.Structure, new[] { 1160.0, 10, 30 }, null)), "Both groups have a moved part out of their culler's sphere");
+        Assert(Spheres(f).Count == 2, "Each group holds its own sphere");
+        f.World.Culling.Name = group => ReferenceEquals(group, f.Group) ? Mill : ReferenceEquals(group, second) ? Other : null;
+        var failure = "game function gone";
+        f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) || ReferenceEquals(target, second) ? new InvalidOperationException(failure) : null;
+        var log = RecordingLog.Capture(false, () => {
+            for (var frame = 0; frame < 3; frame++) f.World.Culling.Tick();
+            failure = "another failure";
+            f.World.Culling.Tick(); f.World.Culling.Tick();
+        });
+        var warnings = log.At(LogLevel.Warning).ToArray();
+        Assert(warnings.Length == 4, "Each group and failure is written once over five frames: " + String.Join(" | ", warnings));
+        Assert(warnings.Count(w => w.Contains("of " + Mill + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1
+            && warnings.Count(w => w.Contains("of " + Other + " may") && w.EndsWith(": game function gone", StringComparison.Ordinal)) == 1, "Two groups with the same failure each get one warning that names the group: " + String.Join(" | ", warnings));
+        Assert(warnings.Count(w => w.EndsWith(": another failure", StringComparison.Ordinal)) == 2, "A new failure of the same group is written once more");
+        Assert(warnings[0] == "Moved parts of " + Mill + " may show or hide at the wrong distance, because the patcher couldn't update their culling: game function gone", "The warning says what the player may see: " + warnings[0]);
+        // One failing group leaves the other updating.
+        f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) ? new InvalidOperationException("only the mill") : null;
+        f.World.Objects.Remove(Other);
+        var quiet = RecordingLog.Capture(false, () => f.World.Culling.Tick());
+        Assert(quiet.At(LogLevel.Warning).Single().Contains("of " + Mill + " may") && f.World.Culling.RegionCount == 1, "The other group still updates and gives back its sphere when it goes, while the failing group keeps its own");
     }
 
     static void UnloadReadsNoCullingManager() {

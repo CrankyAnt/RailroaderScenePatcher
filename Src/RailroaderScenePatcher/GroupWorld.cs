@@ -101,6 +101,7 @@ namespace RailroaderScenePatcher {
             var current = culling; var shared = switches; var stands = switchHost;
             host.Unloaded = () => { current.Unload(); shared.Unload(); stands.Unload(); trestles.Clear(); };
             culling.Fault = PatcherLog.Warning;
+            culling.Name = group => group is GameObject root && root != null ? root.scene.name + "/" + BoardScene.PathOf(root.transform) : null;
             // Without the members of a progression controller or a map feature, the patcher cannot see what they switch:
             // their switches then set the objects as without the patcher, and an explicit disable holds only until then.
             if (SwitchMembersProblem != null) PatcherLog.Warning(SwitchMembersProblem);
@@ -126,7 +127,8 @@ namespace RailroaderScenePatcher {
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
         }
         // Every frame: installs own culling that waited for a game culler to start.
-        // Runs every frame: a failure is written once per failure, not on every frame.
+        // Runs every frame. The controller writes a group's failure once per group and failure; a failure outside its
+        // groups is written once per failure.
         internal static void Tick() { try { culling?.Tick(); } catch (Exception e) { var message = e.GetBaseException().Message; tickFailures.Warning(message, "Moved baked scenery parts may show or hide at the wrong distance, because the patcher couldn't update their culling: " + message); } }
         static readonly LogOnce tickFailures = new LogOnce();
         // A world load started.

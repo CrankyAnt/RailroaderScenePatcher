@@ -374,7 +374,9 @@ class FakeGroupWorld : IGroupWorld, ICrossbuckWorld, IConstructionSegmentWorld, 
         sealed class HookToken { internal Action Before, Installed; }
         public bool Available => !Unloading;
         FakeGroup GroupOf(FakeCuller culler) => world.Objects.Values.SelectMany(list => list).OfType<FakeGroup>().FirstOrDefault(g => g.Cullers.Contains(culler));
-        public bool Alive(object target) =>
+        // Throws for the objects it names, as a game function that fails during an update.
+        public Func<object, Exception> FailAlive;
+        public bool Alive(object target) => FailAlive?.Invoke(target) is Exception failure ? throw failure :
             target is FakeCuller culler ? GroupOf(culler) != null && (culler.On == null || world.Alive(culler.On)) : target is FakeRenderer renderer ? world.Alive(renderer.On) : world.Alive(target);
         public bool Started(object culler) => ((FakeCuller)culler).Started;
         public bool Visible(object simpleCuller) => ((FakeCuller)simpleCuller).Visible;

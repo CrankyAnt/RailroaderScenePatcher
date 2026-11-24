@@ -436,18 +436,31 @@ namespace RailroaderScenePatcher.Core {
         public void Tick() {
             if (!host.Available || groups.Count == 0) return;
             foreach (var state in groups.Values.ToList()) {
-                if (!host.Alive(state.Group)) {
-                    foreach (var region in state.Regions.Values) { region.Released = true; if (region.Registration != null && host.Live(region.Registration)) host.Release(region.Registration); }
-                    foreach (var hook in state.Hooks.Values) hook.Removed = true;
-                    groups.Remove(state.Group);
-                    continue;
-                }
-                // A waiting group costs a few checks per frame: it is reconciled only once a culler it waits for has
-                // started, or a sphere that found no culling manager can be registered.
-                if (!state.Dirty && !state.Awaiting.Any(culler => !host.Alive(culler) || host.Started(culler)) && !(state.AwaitRegister && Probe(state))) continue;
-                Reconcile(state);
-                if (state.Empty) groups.Remove(state.Group);
+                try {
+                    if (!host.Alive(state.Group)) {
+                        foreach (var region in state.Regions.Values) { region.Released = true; if (region.Registration != null && host.Live(region.Registration)) host.Release(region.Registration); }
+                        foreach (var hook in state.Hooks.Values) hook.Removed = true;
+                        groups.Remove(state.Group);
+                        continue;
+                    }
+                    // A waiting group costs a few checks per frame: it is reconciled only once a culler it waits for has
+                    // started, or a sphere that found no culling manager can be registered.
+                    if (!state.Dirty && !state.Awaiting.Any(culler => !host.Alive(culler) || host.Started(culler)) && !(state.AwaitRegister && Probe(state))) continue;
+                    Reconcile(state);
+                    if (state.Empty) groups.Remove(state.Group);
+                } catch (Exception e) { state.Dirty = true; UpdateFailed(state.Group, e); }
             }
+        }
+        // Names a group in a warning, such as its scene and path.
+        public Func<object, string> Name;
+        // An update runs every frame: a failure is written once per group and failure, and the other groups still update.
+        readonly LogOnce updateFailures = new LogOnce();
+        void UpdateFailed(object group, Exception error) {
+            string name = null;
+            try { name = Name?.Invoke(group); } catch { }
+            name = String.IsNullOrEmpty(name) ? "a baked scenery group" : name;
+            var message = error.GetBaseException().Message;
+            updateFailures.Warning(name + "\n" + message, "Moved parts of " + name + " may show or hide at the wrong distance, because the patcher couldn't update their culling: " + message);
         }
         // The patcher's state ends while the scene stays: every group gives back what own culling took over, as if
         // its plan were empty. While the map unloads there is nothing to give back.
