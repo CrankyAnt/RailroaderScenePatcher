@@ -508,6 +508,8 @@ namespace RailroaderScenePatcher {
                 });
                 var listLayout = outline.GetComponent<LayoutElement>();
                 listLayout.minHeight = 120; listLayout.flexibleHeight = 10000;
+                // PROTOTYPE hook: the compact rail trims this view to whole rows, and its row tooltips wait in both windows.
+                presentation.PrototypeOutlinerView = outline.GetComponent<ScrollRect>();
             });
         }
         void FitOutliner(TMP_Text measure) {

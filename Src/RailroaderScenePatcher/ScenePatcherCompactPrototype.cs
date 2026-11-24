@@ -29,13 +29,15 @@ namespace RailroaderScenePatcher {
             internal string Title;
             internal Action<UIPanelBuilder> Context;
             internal Func<Act[]> Acts;
+            // The Placement body fills the space it is given; every other context has the least lines below.
+            internal bool Fills;
         }
 
         // The one place that maps the active tab or guided task to the rail's view.
         PrototypeView PrototypeCurrentView() {
             if (guided.Enabled) return new PrototypeView { Title = "Guided", Context = PrototypeGuidedContext, Acts = PrototypeGuidedActs };
             switch (inspectorTab.Value) {
-                case PlacementTab: return new PrototypeView { Title = "Placement", Context = PrototypePlacementContext, Acts = () => TabActs(PlacementTab) };
+                case PlacementTab: return new PrototypeView { Title = "Placement", Context = PrototypePlacementContext, Acts = () => TabActs(PlacementTab), Fills = true };
                 case ConnectionsTab: return new PrototypeView { Title = "Connections", Context = PrototypeConnectionsContext, Acts = PrototypeConnectionsActs };
                 case ChangesTab: return new PrototypeView { Title = "Changes", Context = PrototypeChangesContext, Acts = PrototypeChangesActs };
                 default: return new PrototypeView { Title = "Object", Context = PrototypeObjectContext, Acts = PrototypeObjectActs };
@@ -54,8 +56,8 @@ namespace RailroaderScenePatcher {
             PrototypeLeftBand(builder);
             DrawRightBand(builder);
             PrototypeHeading(builder, view);
-            if (guided.Enabled || selected != null) view.Context(builder);
-            else Line(builder, Literal("Select a row in the outliner or click Select in world."), null, null, RowHeight);
+            if (view.Fills && selected != null) view.Context(builder);
+            else PrototypeContextBlock(builder, view);
             PrototypeFooter(builder, view);
             PrototypeOutlinerSection(builder);
             builder.Spacer(CommandBand.GripClearance(GripHeight, RowPadding));
@@ -99,6 +101,22 @@ namespace RailroaderScenePatcher {
         }
 
         // ---- Context sections ----
+
+        // The context lines most views show: position, rotation, and enabled for an object with a placement of its own.
+        // A context with fewer lines keeps that height, so inspecting an object after a world choice or the hint does
+        // not move the message area, the actions, or the outliner. A context with more lines, such as a problem, a
+        // changed object's settings, or a guided task, still grows.
+        const int PrototypeContextLines = 3;
+
+        void PrototypeContextBlock(UIPanelBuilder builder, PrototypeView view) {
+            var block = builder.VStack(column => {
+                column.ConfigureLayout(4f);
+                if (guided.Enabled || selected != null) view.Context(column);
+                else Line(column, Literal("Select a row in the outliner or click Select in world."), null, null, LineHeight);
+            });
+            var lines = block.childCount;
+            if (lines < PrototypeContextLines) builder.Spacer((PrototypeContextLines - lines) * (LineHeight + 4f) - 4f);
+        }
 
         void PrototypePlacementContext(UIPanelBuilder builder) {
             var collapsed = !presentation.PrototypeOutlinerOpen;
@@ -328,7 +346,9 @@ namespace RailroaderScenePatcher {
 
         // ---- Outliner ----
 
-        // A filter-status bar with Reset filter and Hide outliner or Show outliner, above the outliner rows.
+        // The outliner's summary line with Hide outliner or Show outliner at its right, above the outliner rows. The
+        // filter cannot be changed or reset here: the compact window has no search field or filters, so filtering
+        // means switching to the full window.
         void PrototypeOutlinerSection(UIPanelBuilder builder) {
             builder.AddHRule();
             var filtered = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
@@ -340,16 +360,15 @@ namespace RailroaderScenePatcher {
                 ? "<style=Footnote><color=" + Amber + ">" + Literal(summary) + "</color> (" + Literal(String.Join(", ", filterParts)) + ")</style>"
                 : "<style=Footnote>" + Literal(summary) + "</style>";
             var labelTip = filtered
-                ? summary + ". Active outliner filter: " + String.Join(", ", filterParts) + ". Click Reset filter to show all objects."
+                ? summary + ". Active outliner filter: " + String.Join(", ", filterParts) + ". Switch to the full window to change or reset the filter."
                 : summary + ". Inactive loaded objects are included.";
-            // The summary has a line of its own: beside the two buttons a filtered summary lost its filter to the ellipsis.
-            var summaryRect = Line(builder, labelMarkup, "Outliner", labelTip, LineHeight);
-            var measure = summaryRect.GetComponent<TMP_Text>() ?? summaryRect.GetComponentInChildren<TMP_Text>(true);
+            TMP_Text measure = null;
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                row.Spacer();
-                Button(row, "Reset filter", () => { filter = ""; outlinerFilter = OutlinerFilter.All; }).Inactive(!filtered)
-                    .Tooltip("Reset filter", CommandBand.Tooltip("Clear the outliner search text and filter to show all objects.", filtered ? null : "No outliner search or filter is active."));
+                // A long filter ends in an ellipsis beside the button; the tooltip holds the whole summary.
+                var summaryRect = Line(row, labelMarkup, "Outliner", labelTip, RowHeight);
+                summaryRect.EqualFlexibleWidth(0);
+                measure = summaryRect.GetComponent<TMP_Text>() ?? summaryRect.GetComponentInChildren<TMP_Text>(true);
                 var open = presentation.PrototypeOutlinerOpen;
                 var toggle = Button(row, open ? "Hide outliner" : "Show outliner", () => presentation.PrototypeToggleOutliner());
                 FitButton(toggle, "Hide outliner", "Show outliner");

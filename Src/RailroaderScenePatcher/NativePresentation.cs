@@ -394,15 +394,8 @@ namespace RailroaderScenePatcher {
                     details.Build = builder => Details?.Invoke(builder);
                 }
                 details.Show();
-                if (!detailsPlaced) {
-                    // Beside the panel, at its top: to its right where the screen has room, else to its left.
-                    var panel = PanelBounds;
-                    float width = SessionDetailsWindow.DefaultWidth * scale, height = SessionDetailsWindow.DefaultHeight * scale, gap = 8 * scale;
-                    var x = panel.xMax + gap + width <= Screen.width ? panel.xMax + gap : panel.xMin - gap - width >= 0 ? panel.xMin - gap - width : Mathf.Max(0, Screen.width - width);
-                    Place((RectTransform)details.transform, new Rect(x, Mathf.Clamp(panel.yMin, 0, Mathf.Max(0, Screen.height - height)), width, height));
-                    detailsPlaced = true;
-                    SaveBounds(details.NativeWindow);
-                } else {
+                if (!detailsPlaced) PlaceDetailsBeside();
+                else {
                     // Bounds saved smaller than the window's least size, such as by an earlier version with a lower
                     // minimum, are raised to the default size where they fall short.
                     var bounds = (RectTransform)details.transform;
@@ -415,6 +408,15 @@ namespace RailroaderScenePatcher {
                 boundsFrame = -1; dirty = true;
                 DetailsProblem = null;
             } catch (Exception e) { DetailsProblem = e.GetBaseException().Message; }
+        }
+        // Beside the panel, at its top: to its right where the screen has room, else to its left.
+        void PlaceDetailsBeside() {
+            var panel = PanelBounds;
+            float width = SessionDetailsWindow.DefaultWidth * scale, height = SessionDetailsWindow.DefaultHeight * scale, gap = 8 * scale;
+            var x = panel.xMax + gap + width <= Screen.width ? panel.xMax + gap : panel.xMin - gap - width >= 0 ? panel.xMin - gap - width : Mathf.Max(0, Screen.width - width);
+            Place((RectTransform)details.transform, new Rect(x, Mathf.Clamp(panel.yMin, 0, Mathf.Max(0, Screen.height - height)), width, height));
+            detailsPlaced = true;
+            SaveBounds(details.NativeWindow);
         }
         // Whether this is the window's first open: no bounds were saved for it.
         internal bool FirstOpen => !hadSavedBounds;
@@ -628,6 +630,7 @@ namespace RailroaderScenePatcher {
         internal void ResetLayout() {
             if (PrototypeCompact) { PrototypeExitCompact(); PrototypeSwitched?.Invoke(PrototypeState() + "; reason=reset layout"); }
             PrototypeForgetLayout();
+            PrototypeResetExtraWindows();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
             // The request comes from a button press, and layout moves nothing while a button is down: the next layout
             // after the release places the window.
