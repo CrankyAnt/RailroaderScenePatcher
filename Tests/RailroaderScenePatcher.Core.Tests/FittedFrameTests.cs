@@ -51,7 +51,11 @@ static class FittedFrameTests {
         MeshAlongACurve();
         GroupRootSquareToTheWorld();
         SmallGainKeepsTheObjectsAxes();
+        TiltedObjectKeepsItsAxes();
+        WithoutAnOrientation();
+        PartByPart();
         GroupFrameFollowsItsObjects();
+        GroupDistanceToItsBox();
         Console.WriteLine("PASS: frames follow their models");
     }
 
@@ -60,14 +64,14 @@ static class FittedFrameTests {
     // larger square-to-the-world box.
     static void MeshAlongACurve() {
         var pad = Turned(0, .1, 0, 6, .2, 3, 25);
-        var fitted = ObjectMarkingGeometry.Fit(pad, WorldBasis.World);
+        var fitted = ObjectMarkingGeometry.BoxAlong(pad, WorldBasis.World);
         Check(Near3(Edges(fitted), .2, 3, 6), "the box around a turned pad's points is the pad's own box: " + String.Join(", ", Edges(fitted)));
         foreach (var corner in pad) Check(fitted.Any(c => Math.Abs(c.X - corner.X) < 1e-6 && Math.Abs(c.Y - corner.Y) < 1e-6 && Math.Abs(c.Z - corner.Z) < 1e-6), "the fitted box has the pad's corners at its corners");
         // The points of a mesh need not be a box: the corners of a pad and some points along its middle give the same box.
         var more = pad.Concat(new[] { new WorldPoint(0, .2, 0), new WorldPoint(1, 0, .5) }).ToArray();
-        Check(Near3(Edges(ObjectMarkingGeometry.Fit(more, WorldBasis.World)), .2, 3, 6), "points inside the pad change nothing");
+        Check(Near3(Edges(ObjectMarkingGeometry.BoxAlong(more, WorldBasis.World)), .2, 3, 6), "points inside the pad change nothing");
         // Points that are no shape give no box.
-        Check(ObjectMarkingGeometry.Fit(new WorldPoint[0], WorldBasis.World) == null, "no points give no box");
+        Check(ObjectMarkingGeometry.BoxAlong(new WorldPoint[0], WorldBasis.World) == null, "no points give no box");
     }
 
     // Bryson Coal Dealer: its root stands nearly square to the world, while the trestle and the bins lie along the
@@ -99,23 +103,97 @@ static class FittedFrameTests {
         var far = new WorldPoint(0, 600, -400);
         var marker = ObjectMarkingGeometry.Frame(root, far, boxes, Camera(far, 55), View, null, ObjectMarkingGeometry.FrameDistance, square, true);
         Check(marker.Marker.HasValue && !marker.Frame.HasValue, "beyond the frame distance only the marker shows");
-        var fitted = ObjectMarkingGeometry.Fit(trestle.Concat(bins), square);
+        var fitted = ObjectMarkingGeometry.BoxAlong(trestle.Concat(bins), square);
         double mx = fitted.Average(p => p.X), my = fitted.Average(p => p.Y), mz = fitted.Average(p => p.Z);
         Check(Math.Abs(marker.Marker.Value.X - mx) < 1e-6 && Math.Abs(marker.Marker.Value.Y - my) < 1e-6 && Math.Abs(marker.Marker.Value.Z - mz) < 1e-6, "the far marker stands on the center of the fitted box");
     }
 
-    // A box that fits only a little better does not replace the object's own axes: a building of two square halves,
-    // with the object turned 3 degrees, keeps the object's axes, so a frame does not swing for a model that is
-    // nearly square to its object or nearly round.
+    // The object's own axes keep their box unless the box along the points is clearly smaller: at most FitShare of
+    // its size. A 6 by 3 m pad whose axes are 1 degree off keeps them (the box along it is 0.959 of theirs); at 1.4
+    // degrees (0.944) and at 5 degrees, a small but consistent skew against the rails, the box lies along the pad.
+    static WorldBasis Yawed(double degrees) {
+        double c = Math.Cos(degrees * Math.PI / 180), s = Math.Sin(degrees * Math.PI / 180);
+        return new WorldBasis(new WorldPoint(c, 0, s), new WorldPoint(0, 1, 0), new WorldPoint(-s, 0, c));
+    }
+    static bool SameBox(IReadOnlyList<WorldPoint> a, IReadOnlyList<WorldPoint> b) =>
+        a != null && b != null && a.Count == 8 && b.Count == 8 && Enumerable.Range(0, 8).All(i => Math.Abs(a[i].X - b[i].X) < 1e-9 && Math.Abs(a[i].Y - b[i].Y) < 1e-9 && Math.Abs(a[i].Z - b[i].Z) < 1e-9);
     static void SmallGainKeepsTheObjectsAxes() {
-        var halves = Turned(-5, 5, 100, 10, 10, 20, 0).Concat(Turned(5, 5, 100, 10, 10, 20, 0)).ToArray();
-        var turned = new WorldBasis(new WorldPoint(Math.Cos(3 * Math.PI / 180), 0, -Math.Sin(3 * Math.PI / 180)), new WorldPoint(0, 1, 0), new WorldPoint(Math.Sin(3 * Math.PI / 180), 0, Math.Cos(3 * Math.PI / 180)));
-        var fitted = ObjectMarkingGeometry.Fit(halves, turned);
-        var own = ObjectMarkingGeometry.Enclose(halves, turned);
-        for (int i = 0; i < 8; i++) Check(Math.Abs(fitted[i].X - own[i].X) < 1e-9 && Math.Abs(fitted[i].Y - own[i].Y) < 1e-9 && Math.Abs(fitted[i].Z - own[i].Z) < 1e-9, "a small gain keeps the object's axes");
+        var pad = Turned(0, .1, 0, 6, .2, 3, 0);
+        Check(SameBox(ObjectMarkingGeometry.BoxAlong(pad, Yawed(1)), ObjectMarkingGeometry.Enclose(pad, Yawed(1))), "axes 1 degree off a pad keep their box, just over the share");
+        Check(Near3(Edges(ObjectMarkingGeometry.BoxAlong(pad, Yawed(1.4))), .2, 3, 6), "axes 1.4 degrees off a pad give way to the pad's own box, just under the share");
+        Check(Near3(Edges(ObjectMarkingGeometry.BoxAlong(pad, Yawed(5))), .2, 3, 6), "a consistent 5 degree skew on a 6 by 3 m pad lies along the rails");
+        // A nearly round tank, a ring of 16 points 5 m out, keeps its object's axes whatever their turn: no box
+        // along it is clearly smaller.
+        var ring = Enumerable.Range(0, 32).Select(k => new WorldPoint(5 * Math.Cos(Math.PI * (k / 2) / 8), (k & 1) * 8, 5 * Math.Sin(Math.PI * (k / 2) / 8))).ToArray();
+        foreach (var turn in new[] { 0.0, 5, 11.25 })
+            Check(SameBox(ObjectMarkingGeometry.BoxAlong(ring, Yawed(turn)), ObjectMarkingGeometry.Enclose(ring, Yawed(turn))), "a nearly round model keeps its object's axes at " + turn + " degrees");
         // An L of two bars square to the world: the world's box is the smallest; the box along the L's diagonal edge is larger.
         var ell = Turned(5, 1, 1, 10, 2, 2, 0).Concat(Turned(1, 1, 5, 2, 2, 10, 0)).ToArray();
-        Check(Near3(Edges(ObjectMarkingGeometry.Fit(ell, WorldBasis.World)), 2, 10, 10), "an L square to the world keeps the world's box");
+        Check(Near3(Edges(ObjectMarkingGeometry.BoxAlong(ell, WorldBasis.World)), 2, 10, 10), "an L square to the world keeps the world's box");
+    }
+
+    // A tilted object keeps the box of its own axes, which turns with it: a box is fitted upright only to an object
+    // that stands upright. A pad tilted 10 degrees about its length, with axes 25 degrees off it about the vertical,
+    // keeps those axes.
+    static void TiltedObjectKeepsItsAxes() {
+        double t = 10 * Math.PI / 180;
+        var tilted = new WorldBasis(new WorldPoint(Math.Cos(25 * Math.PI / 180), 0, Math.Sin(25 * Math.PI / 180)),
+            new WorldPoint(-Math.Sin(25 * Math.PI / 180) * Math.Sin(t), Math.Cos(t), Math.Cos(25 * Math.PI / 180) * Math.Sin(t)),
+            new WorldPoint(-Math.Sin(25 * Math.PI / 180) * Math.Cos(t), -Math.Sin(t), Math.Cos(25 * Math.PI / 180) * Math.Cos(t)));
+        var pad = Turned(0, .1, 0, 6, .2, 3, 0);
+        Check(SameBox(ObjectMarkingGeometry.BoxAlong(pad, tilted), ObjectMarkingGeometry.Enclose(pad, tilted)), "a tilted object keeps the box of its own axes");
+        Check(ObjectMarkingGeometry.Stands(Yawed(30)) && ObjectMarkingGeometry.Stands(WorldBasis.World) && !ObjectMarkingGeometry.Stands(tilted), "an object stands upright when its up axis is the world's");
+    }
+
+    // Without an orientation the box of several boxes takes the directions of the box at the marker; a box square
+    // to the world gives the world's, and the box still lies along the boxes. A group without an anchoring object
+    // does the same with the world's directions.
+    static void WithoutAnOrientation() {
+        var eye = new WorldPoint(0, 120, 20); var view = Camera(eye, 55);
+        var first = Turned(0, 1, 100, 2, 2, 2, 0); var second = Turned(14, 1, 114, 2, 2, 2, 0); var third = Turned(-14, 1, 86, 2, 2, 2, 0);
+        // Three cubes of 2 m on a diagonal 40 m long, joined in one piece: their box is about 41.6 by 2.8 m along
+        // the diagonal, where the world's would be 30 by 30 m.
+        var boxes = new[] { first, second, third }.Select((c, k) => BoxOf("cube " + k, c)).ToArray();
+        var framed = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, boxes, view, View, null, ObjectMarkingGeometry.FrameDistance, null, true);
+        var along = ObjectMarkingGeometry.BoxAlong(first.Concat(second).Concat(third), WorldBasis.World);
+        var single = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { BoxOf("along", along) }, view, View, null);
+        Check(framed.Frame.HasValue && Math.Abs(Shoelace(framed.Outline) - Shoelace(single.Outline)) < 1e-6 * Shoelace(single.Outline), "without an orientation the box lies along the boxes");
+        Check(Edges(along).Last() > 40 && Edges(along).Skip(1).First() < 3, "the box along the diagonal is long and narrow: " + String.Join(", ", Edges(along)));
+        var far = new WorldPoint(0, 300, -100); var farView = Camera(far, 60);
+        var frames = boxes.Select(b => ObjectMarkingGeometry.Frame(b.Center, far, new[] { b }, farView, View, null, Double.PositiveInfinity)).ToArray();
+        var group = ObjectMarkingGeometry.GroupFrame(far, boxes.Select(b => b.Center).ToArray(), frames, null, null, farView, View);
+        var alone = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), far, new[] { BoxOf("along", along) }, farView, View, null, Double.PositiveInfinity);
+        Check(group.Frame.HasValue && Math.Abs(Shoelace(group.Outline) - Shoelace(alone.Outline)) < 1e-6 * Shoelace(alone.Outline), "a group without an anchoring object lies along its objects");
+    }
+
+    // A mesh is read in parts, so that no single read of a large mesh takes a frame's share: the box built from
+    // the points part by part is the box of all points at once, upright or tilted.
+    static void PartByPart() {
+        var rng = new Random(38);
+        var points = Enumerable.Range(0, 2000).Select(_ => {
+            double a = rng.NextDouble() * 40 - 20, b = rng.NextDouble() * 4 - 2;
+            return new WorldPoint(a * Math.Cos(.6) - b * Math.Sin(.6), rng.NextDouble() * 6, a * Math.Sin(.6) + b * Math.Cos(.6));
+        }).ToArray();
+        foreach (var axes in new[] { WorldBasis.World, Yawed(12), new WorldBasis(new WorldPoint(1, 0, 0), new WorldPoint(0, Math.Cos(.3), Math.Sin(.3)), new WorldPoint(0, -Math.Sin(.3), Math.Cos(.3))) }) {
+            var builder = new BoxAlongBuilder(axes);
+            for (int at = 0; at < points.Length; at += 300) builder.Add(points.Skip(at).Take(300));
+            Check(SameBox(builder.Box, ObjectMarkingGeometry.BoxAlong(points, axes)), "the box built part by part is the box of all points");
+        }
+        Check(new BoxAlongBuilder(WorldBasis.World).Box == null, "a builder without points has no box");
+    }
+
+    // A group shows its objects, its marker or its frame by the distance to the same box its marker stands on. A
+    // trestle 60 m long on a diagonal, seen from 150 m across it: the world-aligned bounds around it would come
+    // within 125 m, while the trestle itself is 147 m away, so the group shows its marker and frame.
+    static void GroupDistanceToItsBox() {
+        var trestle = Turned(0, 4, 1000, 60, 8, 6, 45);
+        double d = 150, h = Math.Sqrt(.5);
+        var eye = new WorldPoint(d * h, 4, 1000 - d * h); var view = Camera(eye, 0);
+        var frame = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 1000), eye, new[] { BoxOf("trestle", trestle) }, view, View, null, Double.PositiveInfinity);
+        var group = ObjectMarkingGeometry.GroupFrame(eye, new[] { new WorldPoint(0, 0, 1000) }, new[] { frame }, null, null, view, View);
+        Check(Math.Abs(group.Distance - (d - 3)) < 1e-6, "the distance runs to the group's box: " + group.Distance);
+        Check(group.Shows == GroupShows.MarkerAndFrame, "beyond 125 m from its box the group shows its marker and frame");
+        Check(Math.Abs(group.Center.X) < 1e-6 && Math.Abs(group.Center.Y - 4) < 1e-6 && Math.Abs(group.Center.Z - 1000) < 1e-6, "the group's center is the center of its box");
     }
 
     // A group's one box lies along its objects too, and where its objects stand counts only for an object without a

@@ -70,14 +70,14 @@ static class ObjectMarkingGeometryTests {
         var boxes = new[] {
             new ObjectMarkingBox("shed", new WorldPoint(0, 4, 0), new WorldPoint(10, 4, 6), null, ObjectMarkingBoxKind.Mesh, ground),
             new ObjectMarkingBox("bin", new WorldPoint(18, 2, 4), new WorldPoint(4, 2, 4), null, ObjectMarkingBoxKind.Mesh, ground),
-            new ObjectMarkingBox("lamp", new WorldPoint(-25, 3, -8), new WorldPoint(.3, 3, .3), null, ObjectMarkingBoxKind.Mesh, ground),
+            new ObjectMarkingBox("lamp", new WorldPoint(-25, 3, 0), new WorldPoint(.3, 3, .3), null, ObjectMarkingBoxKind.Mesh, ground),
             // A pier footing runs 5 m into the ground: the cut box stands from the ground to the roof, the uncut box
             // reaches down to the footing.
             new ObjectMarkingBox("pier", new WorldPoint(5, -1, 0), new WorldPoint(1, 4, 1), null, ObjectMarkingBoxKind.Mesh, ground)
         };
-        // The one box around the boxes runs from x -25.3 to 22, y -5 to 8 and z -8.3 to 8; cut at the ground it runs
-        // from y 0 to 8.
-        var cut = new WorldPoint(-1.65, 4, -.15); var uncut = new WorldPoint(-1.65, 1.5, -.15);
+        // The one box around the boxes, square to the world, runs from x -25.3 to 22, y -5 to 8 and z -6 to 8; cut at
+        // the ground it runs from y 0 to 8.
+        var cut = new WorldPoint(-1.65, 4, 1); var uncut = new WorldPoint(-1.65, 1.5, 1);
         bool At(WorldPoint? p, WorldPoint q) => p.HasValue && Math.Abs(p.Value.X - q.X) < 1e-6 && Math.Abs(p.Value.Y - q.Y) < 1e-6 && Math.Abs(p.Value.Z - q.Z) < 1e-6;
         var anchor = new WorldPoint(0, 0, 0);
         var cameras = new[] { new WorldPoint(0, 40, -134), new WorldPoint(0, 60, -190), new WorldPoint(-120, 50, -110), new WorldPoint(70, 180, -40) };
