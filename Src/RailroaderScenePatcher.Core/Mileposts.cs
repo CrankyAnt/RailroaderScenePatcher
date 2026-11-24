@@ -53,7 +53,7 @@ namespace RailroaderScenePatcher.Core {
     // mile value and display, and the origin cache keeps its entry: every write is checked against the state before it,
     // and a difference fails the write, which the engine then restores.
     public sealed class MilepostScene : IScene, IRelationshipScene, IVersionedScene, ITargetConfirmation, IPlacementPreflight, IFollowUpdateScene {
-        public const string Structure = "milepost-v1", RequiredVersion = "0.5.0", Component = "Helpers.MilePost";
+        public const string Structure = "milepost-v1", RequiredVersion = VersionRequirement.Delivery, Component = "Helpers.MilePost";
         readonly MarkerRelationship relationship;
         readonly IMilepostWorld world;
         public MilepostScene(IMilepostWorld world, Capability capability) {
@@ -65,7 +65,7 @@ namespace RailroaderScenePatcher.Core {
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => identity.Component == Component ? relationship.Resolve(identity) : Array.Empty<object>();
         public bool StillIdentifies(object target, TargetIdentity identity) => identity.Component == Component && relationship.StillIdentifies(target, identity);
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure || (target.Structure == null && target.Component == Component) ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, Component, RequiredVersion);
         public void Preflight(object target) => relationship.Preflight(target);
         public void PreflightPlacement(object target) => relationship.PreflightPlacement(target);
         public void CheckRelationships(object target, ObjectState state) => relationship.CheckRelationships(target, state);

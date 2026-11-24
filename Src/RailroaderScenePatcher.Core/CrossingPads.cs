@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher.Core {
         public IEnumerable<string> MapIds => relationship.MapIds;
         public Capability Capability { get; }
         public IReadOnlyList<object> Resolve(TargetIdentity identity) => relationship.Resolve(identity);
-        public string MinimumPatcherVersion(TargetIdentity target) => target.Structure == Structure ? RequiredVersion : null;
+        public string MinimumPatcherVersion(TargetIdentity target) => VersionRequirement.For(target, Structure, null, RequiredVersion);
         public void Preflight(object target) => relationship.Preflight(target);
         // The shared relationship checks first, so the refusal of an edit of a pad that holds a duplicate marker ID
         // names that marker ID.
