@@ -820,7 +820,7 @@ namespace RailroaderScenePatcher {
                 try { selection.Pick(pointer, presentation.WorldUiBounds()); selectionProblem = null; }
                 catch (Exception e) {
                     selection.Pending.Offer(Array.Empty<SelectionCandidate>());
-                    selectionProblem = "World selection unavailable: " + e.GetBaseException().Message;
+                    selectionProblem = "Couldn't process the world click. " + e.GetBaseException().Message.TrimEnd('.', ' ') + ".";
                 }
             }
             if (inMapEditor && open && inventory != null) {
@@ -1055,7 +1055,7 @@ namespace RailroaderScenePatcher {
                 // The refusal of an earlier action, such as a Set, does not stand beside the new choice.
                 if (selection.Pending != null) feedback.ChoiceStarted();
             }
-            catch (Exception e) { selectionProblem = "World selection unavailable: " + e.GetBaseException().Message; }
+            catch (Exception e) { selectionProblem = "Couldn't start world selection. " + e.GetBaseException().Message.TrimEnd('.', ' ') + "."; }
         }
         // Over the panel Escape can disarm a standing or queued tool as well as cancel a world choice or drag.
         bool EscapeGizmo() => PointerOverPanel() && (gizmo?.Shown == true || Requests.Place == GizmoPlace);

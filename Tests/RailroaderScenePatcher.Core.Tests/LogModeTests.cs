@@ -89,7 +89,7 @@ static class LogModeTests {
         Assert(Line("h/unsupported").StartsWith("Warning Unsupported [h/unsupported]: modification m wasn't applied because the game can't apply it in play: m: Unsupported", StringComparison.Ordinal), "A modification unsupported in play is a warning that names it: " + Line("h/unsupported"));
         // The Log window row of a target that is not in the loaded map says what is missing and what the modder can do.
         var missing = lastRows.Failures.Single(f => f.ModIdentifier == "d/missing-target").Message;
-        Assert(missing.Contains("No object in the loaded map matches this target. Check the target's scene, path and component against the map, or remove this modification from the scene patch file.") && !missing.Contains("resolve uniquely"),
+        Assert(missing.Contains("This target doesn't match any object in the loaded map. Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.") && !missing.Contains("resolve uniquely"),
             "A missing target reads in plain words: " + missing);
         var on = Player(true, out var onLog);
         Assert(on.SequenceEqual(off), "Debug on keeps the same player lines");

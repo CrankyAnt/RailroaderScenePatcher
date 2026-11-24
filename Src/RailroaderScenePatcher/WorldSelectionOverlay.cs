@@ -938,7 +938,7 @@ namespace RailroaderScenePatcher {
                 if (trackRadius == 0) {
                     trackRadius = (float)Native.Read(Native.Type("Game.MapEditor.TrackClickPicker"), "SnapRadius");
                     if (Single.IsNaN(trackRadius) || Single.IsInfinity(trackRadius) || trackRadius <= 0)
-                        throw new InvalidOperationException("Native track pick radius unavailable");
+                        throw new InvalidOperationException("The patcher couldn't prepare track selection. Report this to the patcher maintainer and include the Player log. Details: invalid TrackClickPicker.SnapRadius.");
                 }
                 // Clip the physical corridor and its end geometry before perspective division.
                 // An offscreen projected width cannot become a screen-wide stroke or hit area.

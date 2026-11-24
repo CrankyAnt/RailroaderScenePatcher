@@ -333,13 +333,13 @@ static class RecoveryTests {
         gone.Scene.Objects["p"] = new List<object>();
         var missing = gone.Session.Edit(P, At(150), null);
         var none = RecoveryGuidance.For(missing, "Placement", "Placement", null);
-        Assert(!missing.Applied && missing.Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal) && none.Correction == "Nothing changed. Refresh the object list and inspect the object again.",
+        Assert(!missing.Applied && missing.Error.StartsWith(PatchEngine.TargetMissing, StringComparison.Ordinal) && none.Correction == "Nothing changed. Refresh the object list, then inspect the object again.",
             "A target without a match asks for a refresh: " + missing.Error + " | " + none?.Correction);
         var twin = new World(Doc(""));
         twin.Scene.Objects["p"].Add(new Box { Position = new[] { 1.0, 2, 3 }, Rotation = new[] { 0.0, 0, 0, 1 } });
         var ambiguous = twin.Session.Edit(P, At(150), null);
         var several = RecoveryGuidance.For(ambiguous, "Placement", "Placement", null);
-        Assert(!ambiguous.Applied && ambiguous.Error.StartsWith(PatchEngine.TargetAmbiguous, StringComparison.Ordinal) && several.Correction == "Nothing changed. The target must name one object, for example by a longer path or by its component.",
+        Assert(!ambiguous.Applied && ambiguous.Error.StartsWith(PatchEngine.TargetAmbiguous, StringComparison.Ordinal) && several.Correction == "Nothing changed. Use a more specific path or component so the target matches only one object.",
             "A target with several matches asks for a target that names one object: " + ambiguous.Error + " | " + several?.Correction);
     }
 
@@ -348,7 +348,7 @@ static class RecoveryTests {
     static void EditsOfIneffectiveModificationsAreRefused() {
         var cases = new[] {
             ("missing", Mod("move", "p", Fixed(112), "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
-            ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (No object in the loaded map matches this target)"),
+            ("failed", Mod("move", "p", Fixed(112), "[\"broken\"]") + "," + Mod("broken", "missing", Fixed(1)), "dependency broken does not take effect (This target doesn't match any object in the loaded map)"),
             ("failed deeper", Mod("move", "p", Fixed(112), "[\"middle\"]") + "," + Mod("middle", "q", "\"active\":true", "[\"gone\"]"), "dependency gone is missing from the scene patch file"),
             ("cyclic", Mod("move", "p", Fixed(112), "[\"loop\"]") + "," + Mod("loop", "q", "\"active\":false", "[\"move\"]"), "its dependencies form the cycle move -> loop -> move"),
             ("self", Mod("move", "p", Fixed(112), "[\"move\"]"), "its dependencies form the cycle move -> move"),

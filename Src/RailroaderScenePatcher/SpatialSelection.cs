@@ -69,7 +69,7 @@ namespace RailroaderScenePatcher {
 
             var graph = Native.Read(Native.Type("Track.Graph"), "Shared");
             var members = Native.Read(graph, kind == SelectionKind.TrackSegment ? "AllSegments" : "Nodes") as IEnumerable;
-            if (members == null) throw new InvalidOperationException("The loaded track graph is unavailable");
+            if (members == null) throw new InvalidOperationException("The patcher can't read the loaded map's tracks. Report this to the patcher maintainer and include the Player log.");
             foreach (var member in members) {
                 var candidate = Of(kind, member);
                 if (candidate != null) yield return candidate;
@@ -228,13 +228,13 @@ namespace RailroaderScenePatcher {
         IReadOnlyList<SelectionIdentity> excluded;
         internal void Begin(SelectionKind kind, SceneObservation origin, bool inspectOnly = false, IReadOnlyList<SelectionIdentity> excluded = null, string purpose = null) {
             if (Pending != null) return;
-            if (Camera.main == null) throw new InvalidOperationException("The native map editor camera is unavailable");
+            if (Camera.main == null) throw new InvalidOperationException("The patcher can't access the Map Editor camera. Report this to the patcher maintainer and include the Player log.");
             WorldOffset();
             this.inspectOnly = inspectOnly;
             this.excluded = excluded;
             var current = Offered(kind, inspectOnly);
             var newSource = origin == null ? null : SpatialSelectionScene.Observe(origin);
-            if (current.Length == 0) throw new InvalidOperationException("No candidates with usable world positions were found");
+            if (current.Length == 0) throw new InvalidOperationException("No eligible objects or tracks were found in the loaded map. Check scene objects in the outliner or tracks in the Map Editor.");
             purpose = purpose ?? (kind == SelectionKind.SceneObject
                 ? (origin == null ? "Select scene object" : "Select replacement scene object")
                 : (kind == SelectionKind.TrackSegment ? "Select replacement track segment" : "Select replacement track node"));

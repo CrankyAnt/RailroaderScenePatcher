@@ -528,10 +528,10 @@ namespace RailroaderScenePatcher.Core {
             return scene.Resolve(identity);
         }
         // The refusals of a target that does not match exactly one object of the loaded scene.
-        public const string TargetMissing = "No object in the loaded map matches this target.";
-        public const string TargetMissingAction = "Check the target's scene, path and component against the map, or remove this modification from the scene patch file.";
-        public const string TargetAmbiguous = "More than one object in the loaded map matches this target.";
-        public const string TargetAmbiguousAction = "Make the target name one object, for example by a longer path or by its component.";
+        public const string TargetMissing = "This target doesn't match any object in the loaded map.";
+        public const string TargetMissingAction = "Inspect the intended object in the Scene Patcher. On the Object tab, compare its Identity fields with the target's scene, path, and component in the scene patch file. Correct the target or remove this modification from the file.";
+        public const string TargetAmbiguous = "This target matches more than one object in the loaded map.";
+        public const string TargetAmbiguousAction = "Use a more specific path or component so the target matches only one object.";
         static string UnresolvedTarget(IReadOnlyList<object> matches) =>
             matches == null || matches.Count == 0 || (matches.Count == 1 && matches[0] == null) ? TargetMissing : matches.Count != 1 ? TargetAmbiguous : null;
         internal object ResolveFresh(TargetIdentity identity) {
