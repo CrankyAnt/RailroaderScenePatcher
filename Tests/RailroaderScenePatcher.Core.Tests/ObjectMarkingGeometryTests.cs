@@ -686,7 +686,12 @@ static class ObjectMarkingGeometryTests {
         var along = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null, ObjectMarkingGeometry.FrameDistance, own);
         var world = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null, ObjectMarkingGeometry.FrameDistance, WorldBasis.World);
         var unknown = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, slabs, slant, View, null);
-        Check(along.Frame.HasValue && world.Frame.HasValue && Shoelace(along.Outline) < .35 * Shoelace(world.Outline), "the box of several boxes stands in the object's orientation: " + Shoelace(along.Outline) + " against " + Shoelace(world.Outline));
+        // In the world's directions the box would be a square of about 15 m: as a single box of those corners.
+        var square = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), eye, new[] { new ObjectMarkingBox("square", new WorldPoint(5 * h, 0, 100 + 5 * h), new WorldPoint(10.5 * h, .5, 10.5 * h)) }, slant, View, null);
+        Check(along.Frame.HasValue && square.Frame.HasValue && Shoelace(along.Outline) < .35 * Shoelace(square.Outline), "the box of several boxes stands in the object's orientation: " + Shoelace(along.Outline) + " against " + Shoelace(square.Outline));
+        // An object whose own axes are the world's while its boxes lie along the diagonal is framed along them
+        // (FittedFrameTests).
+        Check(world.Frame.HasValue && Math.Abs(Shoelace(world.Outline) - Shoelace(along.Outline)) < 1e-3 * Shoelace(along.Outline), "the box lies along the boxes, not along axes that do not fit them");
         Check(Math.Abs(Shoelace(unknown.Outline) - Shoelace(along.Outline)) < 1e-3, "without an orientation the box takes the directions of the box at the marker");
         // Both ends of both slabs lie inside the frame.
         foreach (var slab in slabs) foreach (var point in slab.Oriented) {
