@@ -353,7 +353,8 @@ namespace RailroaderScenePatcher {
         internal string HelpRegion { get; private set; }
         internal string HelpProblem { get; private set; }
         HelpWindow help;
-        Rect helpBeside;
+        // The top of the "?" that opened the help, in canvas units below the panel's top (PanelPlacement.AnchorOffset).
+        float helpAnchor;
         int helpSizing;
         internal void ToggleHelp(string region, RectTransform beside) {
             if (disposed || region == null) return;
@@ -365,7 +366,7 @@ namespace RailroaderScenePatcher {
                     help.NativeWindow.OnShownDidChange += HelpShown;
                 }
                 HelpRegion = region;
-                helpBeside = beside == null ? PanelBounds : Bounds(beside);
+                helpAnchor = beside == null ? 0 : PanelPlacement.AnchorOffset(Bounds(beside).yMin, PanelBounds.yMin, scale);
                 if (help.NativeWindow.IsShown) help.Refresh(); else help.Show();
                 // The content is laid out over the next frames; the window takes its size and place after that.
                 helpSizing = 2;
@@ -423,7 +424,15 @@ namespace RailroaderScenePatcher {
                 var size = Bounds((RectTransform)native.transform).size;
                 // Beside the panel, never over it: the region the help explains stays in view.
                 var panel = PanelBounds;
-                var area = PanelPlacement.Beside(panel.xMin, panel.xMax, helpBeside.yMin, size.x, size.y, Screen.width, Screen.height, 8 * scale);
+                var area = PanelPlacement.Beside(panel.xMin, panel.xMax, PanelPlacement.AnchorTop(helpAnchor, panel.yMin, scale), size.x, size.y, Screen.width, Screen.height, 8 * scale, MapEditorTitleBar());
+                // Below the Map Editor's title bar the help can be lower than its content: its content takes that height
+                // and scrolls.
+                if (area.Height < size.y - 0.5f) {
+                    var unit = size.y / Mathf.Max(1, ((RectTransform)native.transform).rect.size.y);
+                    native.SetContentSize(new Vector2(fit.Width, Mathf.Max(HelpWindow.MinimumHeight, area.Height / unit - frame.y)));
+                    Canvas.ForceUpdateCanvases();
+                    area.Height = Bounds((RectTransform)native.transform).height;
+                }
                 Place((RectTransform)native.transform, new Rect(area.X, area.Y, area.Width, area.Height));
                 boundsFrame = -1;
             } catch (Exception e) { HelpProblem = e.GetBaseException().Message; }
@@ -685,11 +694,13 @@ namespace RailroaderScenePatcher {
         // the pointer over the world.
         internal void ResetLayout() => Defer(() => {
             if (disposed) return;
-            if (Compact) { ExitCompact(); CompactSwitched?.Invoke(CompactState() + "; reason=reset layout"); }
+            if (Compact) ExitCompact();
             ForgetCompactLayout();
             ResetSecondaryWindows();
             try { Game.GlobalPreferences.SetString("window." + ScenePatchWindow.WindowIdentifier, ""); } catch { }
             hadSavedBounds = false; panelPlaced = false; nextLayout = 0;
+            // Logged in both modes, with whether the rail still keeps a dragged place, which Reset layout forgets.
+            CompactSwitched?.Invoke(CompactState() + "; reason=reset layout; dragged rail=" + (railPlace.Dragged == null ? "forgotten" : "kept"));
         });
         // A native vertical scroll region that takes the remaining height and never less than minimumHeight. A content
         // refresh keeps the distance scrolled from the top of the region built last.
@@ -701,8 +712,14 @@ namespace RailroaderScenePatcher {
         }
         static RectTransform NativeScroll(UIPanelBuilder builder, Action<UIPanelBuilder> body) {
             var view = builder.VScrollView(body);
-            // The game sets its wheel step on scroll views through this component.
+            // The game sets its wheel step on scroll views through this component, but only in its Start, which a view
+            // that is built while inactive, or rebuilt, can miss: the help then kept Unity's step of 1 unit per notch.
+            // The step is therefore also set here, to the same value.
             if (view.GetComponent<Game.Settings.ScrollRectSettingsApplicator>() == null) view.gameObject.AddComponent<Game.Settings.ScrollRectSettingsApplicator>();
+            var scrollRect = view.GetComponent<ScrollRect>();
+            if (scrollRect != null) scrollRect.scrollSensitivity = CommandBand.WheelStep(
+                Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor,
+                Application.platform == RuntimePlatform.OSXPlayer || Application.platform == RuntimePlatform.OSXEditor);
             return view;
         }
         internal Action Action(Action action) => () => {
@@ -964,6 +981,9 @@ namespace RailroaderScenePatcher {
             // Let native controls finish a press/drag before moving any hit rectangle.
             if (Input.GetMouseButton(0) || Input.GetMouseButtonUp(0)) return;
             nextLayout = Time.unscaledTime + 0.5f;
+            // An open help is sized and placed for the scale it opened at: on a scale change it is sized and placed
+            // again, as when it opens.
+            if (currentScale != scale && help != null && help.NativeWindow.IsShown) helpSizing = 1;
             screen = size; scale = currentScale;
             boundsFrame = -1;
             float margin = 12 * scale, gap = 8 * scale;
@@ -1034,6 +1054,27 @@ namespace RailroaderScenePatcher {
         }
         // Whether the last default placement took the top right of the screen.
         internal bool DefaultAtTopRight { get; private set; }
+        // The native Map Editor window's title bar with its close cross, in screen pixels, or null while the Map Editor
+        // window is not shown. The window's chrome names it "Title Bar"; without it, the strip above the window's
+        // content stands for it.
+        static PanelPlacement.Area? MapEditorTitleBar() {
+            try {
+                var type = Native.Type("Game.MapEditor.MapEditorWindow");
+                var mapEditor = type == null ? null : UnityEngine.Object.FindAnyObjectByType(type) as Component;
+                var native = mapEditor == null ? null : mapEditor.GetComponent<Window>();
+                if (native == null || !native.IsShown) return null;
+                var whole = Bounds((RectTransform)native.transform);
+                Rect bar;
+                var titleBar = native.GetComponentsInChildren<RectTransform>(true).FirstOrDefault(r => r.name == "Title Bar");
+                if (titleBar != null) bar = Bounds(titleBar);
+                else {
+                    var units = ((RectTransform)native.transform).rect.size;
+                    var frame = units.y - native.GetContentSize().y;
+                    bar = new Rect(whole.x, whole.y, whole.width, whole.height * Mathf.Clamp01(frame / Mathf.Max(1, units.y)));
+                }
+                return new PanelPlacement.Area { X = bar.x, Y = bar.y, Width = bar.width, Height = bar.height };
+            } catch { return null; }
+        }
         static Rect MapEditorBounds() {
             try {
                 var type = Native.Type("Game.MapEditor.MapEditorWindow");

@@ -313,6 +313,7 @@ class Program {
         ProseTests.Run();
         CommandBandTests.Run();
         CompactRailTests.Run();
+        HelpWindowTests.Run();
         EnteredEditValuesTests.Run();
         BridgeTests.Run();
         BakedSceneryTests.Run();

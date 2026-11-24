@@ -71,7 +71,9 @@ namespace RailroaderScenePatcher {
                 CompactModeLabel(row, view);
             }).ChildrenKeepHeight().Height(RowHeight);
             var state = StateLine(out var states);
-            if (selected == null) Line(builder, state, null, null, RowHeight);
+            // Without an inspected object the state line is an instruction, which wraps so it shows in full at the
+            // rail's width.
+            if (selected == null) WrappedLine(builder, state);
             else StateLineRow(builder, state, states);
         }
 
@@ -87,6 +89,11 @@ namespace RailroaderScenePatcher {
             layout.flexibleWidth = 0;
         }
 
+        // A line that wraps at the rail's width and takes the height of its lines, for an instruction that has to show
+        // in full.
+        static RectTransform WrappedLine(UIPanelBuilder builder, string markup) =>
+            builder.AddLabel(markup).TextWrap(TextOverflowModes.Overflow, TextWrappingModes.Normal);
+
         // ---- Context sections ----
 
         // A context with fewer lines than most views show keeps their height (CompactRail.ContextPadding), so inspecting
@@ -95,7 +102,7 @@ namespace RailroaderScenePatcher {
             var block = builder.VStack(column => {
                 column.ConfigureLayout(4f);
                 if (guided.Enabled || selected != null) view.Context(column);
-                else Line(column, Literal("Select a row in the outliner or click Select in world."), null, null, LineHeight);
+                else WrappedLine(column, Literal("Select a row in the outliner or click Select in world."));
             });
             var padding = CompactRail.ContextPadding(block.childCount, LineHeight, 4f);
             if (padding > 0) builder.Spacer(padding);

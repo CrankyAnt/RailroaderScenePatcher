@@ -192,6 +192,9 @@ namespace RailroaderScenePatcher {
         // on the band: "Refresh" is 62.15 wide in a button of 74.15). A button whose label changes in place, such as
         // Disable and Enable or "?" and "x", takes the width of its widest label, so the change moves nothing. No
         // button has a width of its own beside this rule.
+        // The canvas units a scroll view moves per mouse wheel notch, as the game's ScrollRectSettingsApplicator sets
+        // them: 20 on Windows, 2 on macOS, and 1 elsewhere. Unity's own default is 1, a twentieth of a text line.
+        internal static float WheelStep(bool windows, bool mac) => windows ? 20 : mac ? 2 : 1;
         internal const float ButtonPadding = 6;
         internal static float ButtonWidth(params float[] labelWidths) {
             float widest = 0;
@@ -1079,6 +1082,22 @@ namespace RailroaderScenePatcher {
             var y = Math.Max(0, Math.Min(anchorTop, screenHeight - height));
             return new Area { X = x, Y = y, Width = width, Height = height };
         }
+        // Beside, and never over the native Map Editor window's title bar (titleBar, null when it is not shown): its
+        // close cross and title stay reachable. A help whose place would cover the title bar starts below it and is
+        // no higher than the screen leaves there; what it then cannot show is reached by scrolling.
+        internal static Area Beside(float panelLeft, float panelRight, float anchorTop, float width, float height, float screenWidth, float screenHeight, float gap, Area? titleBar) {
+            var area = Beside(panelLeft, panelRight, anchorTop, width, height, screenWidth, screenHeight, gap);
+            if (!(titleBar is Area bar) || bar.Width <= 0 || bar.Height <= 0) return area;
+            var overlaps = area.X < bar.X + bar.Width && area.X + area.Width > bar.X && area.Y < bar.Y + bar.Height && area.Y + area.Height > bar.Y;
+            if (!overlaps) return area;
+            area.Y = Math.Min(bar.Y + bar.Height + gap, screenHeight);
+            area.Height = Math.Max(0, Math.Min(area.Height, screenHeight - area.Y));
+            return area;
+        }
+        // A help's anchor, the top of the "?" that opened it, as canvas units below the panel's top, so that a UI scale
+        // change, which keeps the panel's top-left corner and scales its content, moves the anchor with the "?".
+        internal static float AnchorOffset(float anchorTop, float panelTop, float scale) => (anchorTop - panelTop) / (scale > 0 ? scale : 1);
+        internal static float AnchorTop(float offset, float panelTop, float scale) => panelTop + offset * scale;
         // Where a placed window goes once it no longer lies within the screen, such as after its corner was dragged past
         // the screen's bottom edge: moved back inside with its own size, as the native window keeps itself within its
         // parent (Window.ClampToParentBounds), and never larger than the screen. A window within the screen, up to half a

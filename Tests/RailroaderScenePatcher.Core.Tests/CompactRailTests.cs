@@ -156,5 +156,10 @@ static class CompactRailTests {
         Check(!place.Observe(nativeResize, 1.25f, false), "The native resize on a scale change is no drag");
         place.Forget();
         Check(place.Dragged == null && place.AfterScaleChange(1.25f, 380, 738, 2560, 1440) == null, "Reset layout forgets the drag");
+        // After Reset layout the next compact mode places the rail at its default place, and that place is no drag.
+        var standard = new PanelPlacement.Area { X = 2180, Y = 702, Width = 380, Height = 738 };
+        place.Placed(standard, 1);
+        Check(place.Dragged == null && !place.Observe(standard, 1, false), "After Reset layout the rail's default place is no drag");
+        Check(place.AfterScaleChange(1.25f, 475, 922, 2560, 1440) == null, "After Reset layout a scale change goes to the default place");
     }
 }

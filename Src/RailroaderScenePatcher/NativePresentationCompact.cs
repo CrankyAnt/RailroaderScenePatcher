@@ -222,7 +222,7 @@ namespace RailroaderScenePatcher {
         void PlaceSecondaryWindowsBeside() {
             if (disposed || !IsOpen) return;
             try { if (DetailsOpen) PlaceDetailsBeside(); } catch (Exception e) { DetailsProblem = e.GetBaseException().Message; }
-            if (help != null && help.NativeWindow.IsShown) { helpBeside = PanelBounds; helpSizing = 1; }
+            if (help != null && help.NativeWindow.IsShown) { helpAnchor = 0; helpSizing = 1; }
             boundsFrame = -1;
         }
 
