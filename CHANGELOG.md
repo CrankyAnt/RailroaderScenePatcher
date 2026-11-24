@@ -4,6 +4,7 @@ This changelog lists notable changes, newest first.
 
 ## 0.5.0
 
+- A baked scenery group with a flattening ground mask, such as **Wilmot Station**, can be enabled and disabled again after the Map Editor opened another map in the same session. Only its move stays refused. Before, every edit of such a group was refused with `The game's ground mask members are unavailable`.
 - **Repair with guided task** always opens the task at **Values**. While the patcher checks the scene first, the inspector stays and the footer shows `Working...`.
 - After a native track edit removes the segment a marker stands on, such as **Dissolve**, you can repair the marker's binding without reloading the Map Editor first.
 - On the **Connections** tab of a crossing, clicking **Use** or **Edit** in the list of lights, gates, and bells scrolls the opened form into view. The **Scene Patcher** window opens without errors in the Player log.

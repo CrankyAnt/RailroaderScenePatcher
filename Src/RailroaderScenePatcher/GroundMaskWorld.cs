@@ -24,7 +24,10 @@ namespace RailroaderScenePatcher {
         static readonly MethodInfo rebuild = maskBase?.GetMethod("Rebuild", Native.Flags, null, Type.EmptyTypes, null);
         readonly BoardScene terrain;
         // Whether a world reads and rebuilds the masks in this load: without one, a group that holds a mask is refused.
-        internal static bool Available { get; private set; }
+        // The world that checked the members owns it. When the map context changes, the next host's world takes it
+        // before Unity destroys the earlier host, whose teardown then leaves it standing (WorldOwnedFlag).
+        static readonly WorldOwnedFlag availability = new WorldOwnedFlag();
+        internal static bool Available => availability.Held;
         internal GroundMaskWorld(BoardScene terrain) {
             this.terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
             // The members this world reads are checked here: a missing one fails the adapter with its name, not an edit.
@@ -32,9 +35,9 @@ namespace RailroaderScenePatcher {
             if (keys == null || rebuild == null) throw new MissingMemberException("The ground mask registration members are unavailable.");
             if (flatten?.FieldType != typeof(bool) || targets == null || sizeX?.FieldType != typeof(float) || sizeZ?.FieldType != typeof(float) || degrees?.FieldType != typeof(float)) throw new MissingMemberException("The ground mask shape members are unavailable.");
             if (targetKind == null || targetBiome?.FieldType != typeof(int) || targetName == null || !targetName.FieldType.IsEnum) throw new MissingMemberException("The ground mask target members are unavailable.");
-            Available = true;
+            availability.Take(this);
         }
-        internal static void Unavailable() => Available = false;
+        internal static void Release(GroundMaskWorld world) => availability.Release(world);
         // Whether a scene ground mask stands at or below the object, by the scene's own objects.
         internal static bool Holds(GameObject go) => go != null && maskBase != null && Components(go).Length != 0;
         // The scene objects at and below the object that hold a mask the inspector names, and whether one of the masks

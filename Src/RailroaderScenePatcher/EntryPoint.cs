@@ -142,6 +142,7 @@ namespace RailroaderScenePatcher {
         IndependentBoards scene;
         // The scene ground masks of baked scenery groups and of marker objects, with their terrain output.
         GroundMasks groundMasks;
+        GroundMaskWorld groundMaskWorld;
         NativeInventory native;
         SceneCapabilities capabilities;
         PatchEngine engine;
@@ -264,9 +265,9 @@ namespace RailroaderScenePatcher {
                 // a mask is refused.
                 try {
                     if (world == null) throw new InvalidOperationException("the terrain system is unavailable");
-                    groundMasks = new GroundMasks(new GroundMaskWorld(world));
+                    groundMasks = new GroundMasks(groundMaskWorld = new GroundMaskWorld(world));
                 } catch (Exception e) {
-                    groundMasks = null; GroundMaskWorld.Unavailable();
+                    groundMasks = null; groundMaskWorld = null;
                     PatcherLog.Debug("The patcher couldn't prepare to change ground masks: " + e.GetBaseException().Message);
                 }
                 PrepareRuntime(value);
@@ -1025,14 +1026,18 @@ namespace RailroaderScenePatcher {
             // The world ends: a row the Log window didn't take is written once to the player log instead.
             rows?.Abandon();
         }
-        internal void Release() { ReleaseParts(); }
+        // A host is released when its world ends and again by its OnDestroy, which Unity runs at the end of the frame:
+        // by then the next host can stand, so a second release must not touch what that host set up, such as the
+        // static hooks Detach clears. Only the first release acts.
+        bool released;
+        internal void Release() { if (released) return; released = true; ReleaseParts(); }
         void ReleaseParts() {
             if (worldLabelBacking != null) Destroy(worldLabelBacking); worldLabelBacking = null;
             presentation?.Dispose(); presentation = null; attachedMapEditor = null;
             Detach(); inputBlocker?.Release(); inputBlocker = null; selection?.Release(); selection = null;
             // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
             capabilities?.Dispose();
-            groundMasks?.Dispose(); groundMasks = null; GroundMaskWorld.Unavailable(); scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
+            groundMasks?.Dispose(); groundMasks = null; GroundMaskWorld.Release(groundMaskWorld); groundMaskWorld = null; scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
             runtime = null; markerWorld = null; markerScene = null; nativeDiagnostics = null; rows?.Abandon(); rows = null; overlapNotices = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);

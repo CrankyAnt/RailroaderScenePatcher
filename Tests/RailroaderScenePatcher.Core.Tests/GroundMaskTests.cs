@@ -152,7 +152,26 @@ static class GroundMaskTests {
     static readonly TargetIdentity StationId = new TargetIdentity(SceneName, Station, BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure);
     static readonly TargetIdentity FoundationId = new TargetIdentity(SceneName, Foundation, BakedSceneryParts.ComponentType, BakedSceneryParts.Structure);
 
+    // A map context change in one session, such as the editor's default map and then a mod's map: the earlier host is
+    // released, the next host checks the game's ground mask members, and only then does Unity destroy the earlier host,
+    // whose OnDestroy releases it again. The members stay available for the next world, so Disable stays offered on a
+    // group with a flattening mask and only its move is refused.
+    static void TheNextWorldKeepsTheMaskMembersWhenTheEarlierHostIsDestroyed() {
+        var availability = new WorldOwnedFlag();
+        object earlier = new object(), next = new object();
+        availability.Take(earlier);
+        availability.Release(earlier);
+        Assert(!availability.Held, "The released world gives up the members");
+        availability.Take(next);
+        availability.Release(earlier);
+        Assert(availability.Held, "The earlier host's OnDestroy at the end of the frame leaves the next world's members available");
+        availability.Release(null);
+        Assert(availability.Held, "A host that never checked the members releases nothing");
+        availability.Release(next);
+        Assert(!availability.Held, "The owning world's teardown makes them unavailable");
+    }
     public static void Run() {
+        TheNextWorldKeepsTheMaskMembersWhenTheEarlierHostIsDestroyed();
         GroupMoveCarriesTheMaskOfItsRoot();
         PartMoveCarriesTheMaskItHolds();
         HeldMaskPartStaysWhenItsGroupMoves();
