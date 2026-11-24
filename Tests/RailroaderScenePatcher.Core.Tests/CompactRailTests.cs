@@ -7,6 +7,7 @@ static class CompactRailTests {
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     static bool Near(float a, float b) => Math.Abs(a - b) < 0.01f;
     internal static void Run() {
+        TheOutlinerShowsHalfItsEarlierRows();
         TheOutlinerShowsOnlyWholeRows();
         ScrollingRestsOnARowBoundaryInItsDirection();
         AShortContextKeepsTheRoomOfThreeLines();
@@ -15,6 +16,12 @@ static class CompactRailTests {
         ATrackLocationReadsAsOneLine();
         FiltersKeepTheirFullWindowNames();
         Console.WriteLine("PASS: compact window rows, scrolling, context room, default place and one-line texts");
+    }
+
+    static void TheOutlinerShowsHalfItsEarlierRows() {
+        // The first accepted compact window showed 12 rows; the default now shows half of them.
+        Check(CompactRail.OutlinerRows * 2 == 12, "The default outliner shows half of the 12 rows it showed before");
+        Check(CompactRail.OutlinerRows * CompactRail.OutlinerRow > 120, "The default rows stand above the outliner's least height of 120");
     }
 
     static void TheOutlinerShowsOnlyWholeRows() {
@@ -44,11 +51,11 @@ static class CompactRailTests {
     }
 
     static void TheRailFitsItsHeightToTheDefaultRows() {
-        // Eighteen rows' space at scale 1 gives up six rows of 26 units.
-        Check(Near(CompactRail.FittedHeight(800, 468, 1, 400, 1440), 644), "The rail gives up the rows above the default");
-        Check(Near(CompactRail.FittedHeight(800, 468, 1.25f, 400, 1440), 605), "The rows are scaled to pixels");
-        Check(Near(CompactRail.FittedHeight(800, 256, 1, 400, 1440), 856), "Too few rows make the rail higher");
-        Check(Near(CompactRail.FittedHeight(500, 556, 1, 450, 1440), 450), "The rail keeps its least height");
+        // Twelve rows' space at scale 1 gives up six rows of 26 units.
+        Check(Near(CompactRail.FittedHeight(800, 312, 1, 400, 1440), 644), "The rail gives up the rows above the default");
+        Check(Near(CompactRail.FittedHeight(800, 312, 1.25f, 400, 1440), 605), "The rows are scaled to pixels");
+        Check(Near(CompactRail.FittedHeight(800, 100, 1, 400, 1440), 856), "Too few rows make the rail higher");
+        Check(Near(CompactRail.FittedHeight(500, 400, 1, 450, 1440), 450), "The rail keeps its least height");
         Check(Near(CompactRail.FittedHeight(1400, 0, 1, 400, 1440), 1440), "The rail stays within the screen");
     }
 

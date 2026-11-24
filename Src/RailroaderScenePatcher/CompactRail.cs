@@ -9,8 +9,9 @@ namespace RailroaderScenePatcher {
     internal static class CompactRail {
         // The native outline row's height.
         internal const float OutlinerRow = 26;
-        // The rows the outliner shows at the default height.
-        internal const int OutlinerRows = 12;
+        // The rows the outliner shows at the default height: half of the twelve it showed before, so the whole rail is
+        // six rows lower.
+        internal const int OutlinerRows = 6;
         // The context lines most views show: position, rotation, and enabled for an object with a placement of its own.
         internal const int ContextLines = 3;
 
