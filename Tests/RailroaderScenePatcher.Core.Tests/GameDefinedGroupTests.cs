@@ -381,7 +381,7 @@ static class GameDefinedGroupTests {
         Check(spanned.Frame.HasValue && Math.Abs(spanned.Frame.Value.X - g.X) < 1e-6 && Math.Abs(spanned.Frame.Value.Right - g.Right) < 1e-6 && Math.Abs(spanned.Frame.Value.Y - g.Y) < 1e-6 && Math.Abs(spanned.Frame.Value.Bottom - g.Bottom) < 1e-6,
             "a detection span does not count for the group's frame");
         var counted = ObjectMarkingGeometry.GroupFrame(eye800, anchors.Concat(new[] { span }).ToArray(), frames.Concat(new ObjectMarkingFrame[] { null }).ToArray(), null, null, Camera(eye800), View);
-        Check(counted.Frame.Value.Right > g.Right + 1, "without the listed members every object counts, the span included");
+        Check(counted.Spread && !counted.Frame.HasValue, "without the listed members every object counts: the span 300 m off makes the objects stand apart");
         // The frame is one box around the members, not the outline of the members: the place above the low post,
         // at the height of the mast's top, lies inside it, although no member reaches there.
         var above = Screen(new WorldPoint(10, 5.5, 999), eye800);

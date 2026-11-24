@@ -57,6 +57,7 @@ static class FittedFrameTests {
         GroupFrameFollowsItsObjects();
         GroupDistanceToItsBox();
         ScatteredPiecesKeepTheRootsAxes();
+        SpreadContainerHasNoEnclosingFrame();
         Console.WriteLine("PASS: frames follow their models");
     }
 
@@ -223,6 +224,36 @@ static class FittedFrameTests {
         var group = ObjectMarkingGeometry.GroupFrame(far, boxes.Select(b => b.Center).ToArray(), frames, root, null, farView, View);
         var rootFrame = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 100), far, new[] { BoxOf("root axes", rootBox) }, farView, View, null, Double.PositiveInfinity);
         Check(group.Frame.HasValue && Math.Abs(Shoelace(group.Outline) - Shoelace(rootFrame.Outline)) < 1e-6 * Shoelace(rootFrame.Outline), "a group of small scattered pieces keeps its root's axes");
+    }
+
+    // Ela Signs: a container whose signs stand along the track, hundreds of metres apart, is listed as one object
+    // framed whole, but its signs form no one thing. It gets no frame enclosing them: one box around them would cover
+    // the land between them, and a click on an empty field there would find the container. It shows its marker
+    // only, as an object without boxes does. A group of such objects is no group either: its objects show on their
+    // own. Objects whose boxes stand together, such as a station with its clocks and signs, keep their frame.
+    static void SpreadContainerHasNoEnclosingFrame() {
+        var eye = new WorldPoint(0, 150, -200); var view = Camera(eye, 30);
+        var signs = new[] { Turned(-300, 2, 200, 1, 4, .2, 0), Turned(0, 2, 200, 1, 4, .2, 0), Turned(400, 2, 200, 1, 4, .2, 0) };
+        var boxes = signs.Select((c, k) => BoxOf("sign " + k, c)).ToArray();
+        var decisions = new List<string>();
+        var framed = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 200), eye, boxes, view, View, decisions, ObjectMarkingGeometry.FrameDistance, null, true);
+        Check(!framed.Frame.HasValue && framed.Outline == null && framed.Box == null, "a container of spread objects gets no enclosing frame");
+        Check(!framed.Marker.HasValue, "its marker stands where the object stands, as for an object without boxes");
+        Check(decisions.Any(d => d.Contains("spread")), "the frame check says why: " + String.Join("; ", decisions));
+        // An empty field between two signs lies inside no outline.
+        var field = view(new WorldPoint(-150, 0, 200));
+        double fx = View.X + (field.X / field.W + 1) * View.Width / 2, fy = View.Y + (1 - field.Y / field.W) * View.Height / 2;
+        Check(!ObjectMarkingGeometry.Contains(framed.Outline, fx, fy), "a click on an empty field between the signs finds no frame");
+        // The same signs as the objects of a group: no group frame and no group.
+        var far = new WorldPoint(0, 400, -300); var farView = Camera(far, 45);
+        var frames = boxes.Select(b => ObjectMarkingGeometry.Frame(b.Center, far, new[] { b }, farView, View, null, Double.PositiveInfinity)).ToArray();
+        var group = ObjectMarkingGeometry.GroupFrame(far, boxes.Select(b => b.Center).ToArray(), frames, null, null, farView, View);
+        Check(group.Spread && !group.Frame.HasValue, "a group of spread objects is no group and has no frame");
+        // A station 30 m long with clocks and signs a few metres apart keeps its frame, as one object and as a group.
+        var station = new[] { Turned(-14, 3, 200, 1, 1, .2, 0), Turned(14, 3, 200, 1, 1, .2, 0), Turned(0, 5, 206, 2, 1, .2, 0) }.Select((c, k) => BoxOf("clock " + k, c)).ToArray();
+        Check(ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 200), eye, station, view, View, null, ObjectMarkingGeometry.FrameDistance, null, true).Frame.HasValue, "boxes that stand together keep their frame");
+        var stationFrames = station.Select(b => ObjectMarkingGeometry.Frame(b.Center, far, new[] { b }, farView, View, null, Double.PositiveInfinity)).ToArray();
+        Check(!ObjectMarkingGeometry.GroupFrame(far, station.Select(b => b.Center).ToArray(), stationFrames, null, null, farView, View).Spread, "a group whose objects stand together is a group");
     }
 
     static void GroupDistanceToItsBox() {

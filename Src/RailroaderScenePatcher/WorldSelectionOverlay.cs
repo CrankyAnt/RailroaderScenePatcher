@@ -517,6 +517,9 @@ namespace RailroaderScenePatcher {
                 // fallback, and is cut at the surface like the box of an object.
                 var root = groups[g].Root;
                 var marking = ObjectMarkingGeometry.GroupFrame(eye, anchors, frames, root != null ? Basis(root.transform) : (WorldBasis?)null, GroundAt, Projection(camera), ViewOf(camera), listed);
+                // Objects that stand apart, such as the signs of a container along the track, form no group: each shows
+                // on its own.
+                if (marking.Spread) continue;
                 bool Inspected(SpatialCandidate member) => inspected != null && Same(member, inspected.Choice);
                 // The root of a group with parts stands for the group: at the group distance or less only the
                 // parts show, and the root shows only as the candidate of a choice or as the inspected object.

@@ -55,9 +55,12 @@ namespace RailroaderScenePatcher.Core {
     // How a game-defined group shows from one camera position: the distance to its bounds, what it shows at that
     // distance, the middle of its bounds, where its square marker stands without a frame, and its one object frame.
     public sealed class GroupMarking {
-        internal GroupMarking(double distance, WorldPoint center, ScreenRect? frame, IReadOnlyList<ScreenPoint> outline, WorldPoint? marker = null) {
-            Distance = distance; Center = center; Frame = frame; Outline = outline; Shows = GameDefinedGroups.Shows(distance); Marker = marker ?? center;
+        internal GroupMarking(double distance, WorldPoint center, ScreenRect? frame, IReadOnlyList<ScreenPoint> outline, WorldPoint? marker = null, bool spread = false) {
+            Distance = distance; Center = center; Frame = frame; Outline = outline; Shows = GameDefinedGroups.Shows(distance); Marker = marker ?? center; Spread = spread;
         }
+        // Whether the group's objects stand apart (ObjectMarkingGeometry.Spread): such objects form no group, and each
+        // shows on its own.
+        public bool Spread { get; }
         // The world point the group's square marker stands at: the center of its one box, which stays where it is as
         // the camera zooms and turns; the middle of its bounds for a group whose box is not known.
         public WorldPoint Marker { get; }
@@ -251,6 +254,13 @@ namespace RailroaderScenePatcher.Core {
             double dx = Gap(minX, maxX, camera.X, 0), dy = Gap(minY, maxY, camera.Y, 0), dz = Gap(minZ, maxZ, camera.Z, 0);
             var distance = Math.Sqrt(dx * dx + dy * dy + dz * dz);
             var bounds = new WorldBox(new WorldPoint(minX, minY, minZ), new WorldPoint(maxX, maxY, maxZ));
+            // An object framed whole whose boxes stand apart, such as a container of signs along the track, forms no
+            // one thing: one box around its boxes would cover the land between them and catch clicks on it. It gets no
+            // frame and lends no boxes to a group; its marker stands where the object stands.
+            if (whole && piece.Count > 1 && Spread(piece.Select(CornersOf))) {
+                foreach (var box in piece) decisions?.Add(box.Name + ": Not used for the frame because the object's boxes are spread more than " + SpreadGap.ToString("0", CultureInfo.InvariantCulture) + " m apart.");
+                return new ObjectMarkingFrame(null, distance, null, bounds);
+            }
             if (!(distance <= frameDistance)) {
                 foreach (var box in piece) decisions?.Add(box.Name + ": Used for the marker, but too far away for a frame at " + distance.ToString("0.0", CultureInfo.InvariantCulture) + " m.");
                 // Without a frame the marker stands on the center of the uncut box around the piece: the ground is
@@ -393,6 +403,33 @@ namespace RailroaderScenePatcher.Core {
             var covered = list.Sum(piece => piece.Count == 8 ? Footprint(piece) : 0);
             return ground > 0 && covered >= CoherentShare * ground ? alongBox : axisBox;
         }
+        // Whether boxes, or single points, stand apart: they do not all join into one piece when each joins those
+        // within SpreadGap of it. The parts of a building, a crossing, a bridge or a storage display stand closer.
+        public static bool Spread(IEnumerable<IReadOnlyList<WorldPoint>> pieces) {
+            var boxes = new List<double[]>();
+            foreach (var piece in pieces ?? Enumerable.Empty<IReadOnlyList<WorldPoint>>()) {
+                var valid = piece?.Where(Valid).ToList();
+                if (valid == null || valid.Count == 0) continue;
+                boxes.Add(new[] { valid.Min(p => p.X), valid.Max(p => p.X), valid.Min(p => p.Y), valid.Max(p => p.Y), valid.Min(p => p.Z), valid.Max(p => p.Z) });
+            }
+            if (boxes.Count < 2) return false;
+            var joined = new bool[boxes.Count]; joined[0] = true;
+            var reach = new Queue<int>(); reach.Enqueue(0);
+            var count = 1;
+            while (reach.Count != 0) {
+                var a = boxes[reach.Dequeue()];
+                for (int k = 0; k < boxes.Count; k++) {
+                    if (joined[k]) continue;
+                    var b = boxes[k];
+                    double gx = Math.Max(0, Math.Max(a[0] - b[1], b[0] - a[1])), gy = Math.Max(0, Math.Max(a[2] - b[3], b[2] - a[3])), gz = Math.Max(0, Math.Max(a[4] - b[5], b[4] - a[5]));
+                    if (Math.Sqrt(gx * gx + gy * gy + gz * gz) > SpreadGap) continue;
+                    joined[k] = true; count++; reach.Enqueue(k);
+                }
+            }
+            return count < boxes.Count;
+        }
+        // Metres between boxes beyond which they stand apart.
+        public const double SpreadGap = 100;
         // Pieces that cover less than CoherentShare of the ground of the box along them turn it only from
         // ScatterShare of the size of the box in the object's axes down.
         public const double ScatterShare = .8, CoherentShare = .25;
@@ -473,6 +510,8 @@ namespace RailroaderScenePatcher.Core {
             // marker stands, so the switch and the marker agree.
             var distance = DistanceTo(box, camera);
             var center = CenterOf(new List<Piece> { new Piece { Corners = box } }) ?? default;
+            // Objects that stand apart form no group: no frame, and its objects show on their own.
+            if (held.Count > 1 && Spread(held)) return new GroupMarking(distance, center, null, null, null, true);
             var shows = GameDefinedGroups.Shows(distance);
             if (shows == GroupShows.Objects) return new GroupMarking(distance, center, null, null);
             // Beyond the frame distance the group shows only its marker, on the center of its box uncut by the ground.
