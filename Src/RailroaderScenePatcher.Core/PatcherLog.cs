@@ -97,6 +97,10 @@ namespace RailroaderScenePatcher.Core {
     // a new load attempt.
     public sealed class LogOnChange {
         readonly Dictionary<string, string> last = new Dictionary<string, string>(StringComparer.Ordinal);
+        // The key of one scene object. Objects can share a path and a label, such as the pads of crossings that share one:
+        // its identity, such as the game's instance ID, keeps each on its own entry.
+        public static string ObjectKey(string path, string label, int identity) =>
+            (path ?? "") + "|" + (label ?? "") + "#" + identity.ToString(System.Globalization.CultureInfo.InvariantCulture);
         // Whether the text differs from the last one recorded for the key; a changed text is recorded.
         public bool Changed(string key, string text) {
             lock (last) {

@@ -1030,8 +1030,9 @@ namespace RailroaderScenePatcher {
             return kind;
         }
         // Frame diagnostics, debug output: one block per candidate within range, written once per object and again only
-        // when the one box its frame outlines changes (LogOnChange, keyed by the object's path). The camera line goes before
-        // the first block written from a camera position, once per position. With debug off nothing is collected or built.
+        // when the one box its frame outlines changes (LogOnChange, keyed by the object's path, label and instance ID).
+        // The camera line goes before the first block written from a camera position, once per position. With debug off
+        // nothing is collected or built.
         const double ObservationRange = 1500;
         bool observing;
         // The camera line of the pass, and the last one written.
@@ -1069,8 +1070,10 @@ namespace RailroaderScenePatcher {
             // An object that the game moves while running as a whole has no stable box: it is left out of the frame log.
             var go = candidate.Choice.Handle as GameObject;
             if (go != null && GroupWorld.MovesWhileRunning(go.transform)) return;
-            // Objects can share a path, such as the crossbucks of crossings that share one: the label tells them apart.
-            var key = (go != null ? BoardScene.PathOf(go.transform) : "") + "|" + candidate.Choice.Label;
+            // Objects can share a path and a label, such as the pads of crossings that share one: the instance ID keeps each
+            // on its own entry.
+            var key = LogOnChange.ObjectKey(go != null ? BoardScene.PathOf(go.transform) : "", candidate.Choice.Label,
+                go != null ? go.GetInstanceID() : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(candidate.Choice.Handle));
             if (!frameChecks.Changed(key, BoxSignature(result, renderers))) return;
             if (cameraLine != null && cameraLine != writtenCameraLine) { PatcherLog.Debug(cameraLine); writtenCameraLine = cameraLine; }
             var text = new System.Text.StringBuilder();

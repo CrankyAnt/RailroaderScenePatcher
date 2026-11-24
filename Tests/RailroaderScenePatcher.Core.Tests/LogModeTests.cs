@@ -29,6 +29,7 @@ static class LogModeTests {
         DebugTextIsBuiltOnlyWithDebugOn();
         Once();
         OnChange();
+        OnChangeSharedPath();
         ExceptionDetail();
         AbsolutePaths();
         ScenePatchFiles();
@@ -153,6 +154,20 @@ static class LogModeTests {
         });
         Assert(log.At(LogLevel.Debug).SequenceEqual(new[] { "Frame check for Heap. Distance: 12 m", "Frame check for Dock. Distance: 30 m", "Frame check for Heap. Distance: 40 m", "Frame check for Heap. Distance: 40 m" }),
             "A frame check is written once per object and again only when it changes, until the keys clear");
+    }
+
+    // Three crossing pads share one path and one label, as at Old River Rd: each keeps its own entry by its identity, so
+    // checking them in turn every frame writes each block once instead of rewriting it as the key flips between them.
+    static void OnChangeSharedPath() {
+        var change = new LogOnChange();
+        const string path = "World/Roads Bryson/Old River Rd/Crossing Unprotected/Crossing Pad";
+        var log = RecordingLog.Capture(true, () => {
+            for (var frame = 0; frame < 26; frame++)
+                foreach (var pad in new[] { 101, 202, 303 })
+                    change.Debug(LogOnChange.ObjectKey(path, "Crossing pad", pad), () => "Frame check for Crossing pad " + pad);
+        });
+        Assert(log.At(LogLevel.Debug).SequenceEqual(new[] { "Frame check for Crossing pad 101", "Frame check for Crossing pad 202", "Frame check for Crossing pad 303" }),
+            "Objects with one path and label are written once each: " + log.Lines.Count + " lines");
     }
 
     static void ExceptionDetail() {
