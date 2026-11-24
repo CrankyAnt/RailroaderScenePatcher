@@ -113,7 +113,7 @@ Crossings and hidden rows are placed as follows:
 
 - A protected crossing's controller row holds its detection spans and members (`OutlinerCrossings`).
 - An unprotected crossing gets its own node, named for the crossing object (`OutlinerCrossings`).
-- A container of signs and a native track span get no row (`OutlinerGrouping.SignContainers`, `IsNativeSpan`). A container of signs is a Sign group that lists no part of its own and holds objects another family lists. Why the group has no edit does not decide it.
+- A container of signs and a native track span get no row (`OutlinerGrouping.SignContainers`, `IsNativeSpan`). A container of signs is a Sign group that lists no part of its own and holds objects another family lists. Why the group has no edit does not decide it. The debug line `Outliner hidden` lists these objects of the inventory. The spans the game builds from its operations data are not in the inventory (`BakedSceneryRules.SpanListed`), so that line does not list them; on the base map it lists the three containers of signs.
 
 Row tooltips wait 0.45 seconds before they show (`OutlinerWindow`). Row text and tooltips are built in `OutlinerGrouping.Tooltip` and the layout's row drawing.
 

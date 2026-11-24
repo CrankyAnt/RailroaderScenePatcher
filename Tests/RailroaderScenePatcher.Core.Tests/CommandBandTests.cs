@@ -503,6 +503,22 @@ static class CommandBandTests {
         Check(low.Y == 280 && low.X == 742, "A help that would leave the screen moves up, not over the panel: " + low.Y);
         var both = PanelPlacement.Beside(0, 734, 100, 364, 1101, 2560, 1440, 8);
         Check(both.X >= 734 && both.Y == 100, "The outliner's help at 2560 x 1440 stands right of the whole panel, not over the outliner");
+        // The help window is as high as its content. A help that does not fit the screen at its usual width takes the
+        // first wider one at which it fits; one that fits at no width takes the widest at the screen's height.
+        float Wrapped(float width) => 340f * 900 / width;
+        var shortHelp = PanelPlacement.HelpSize(width => 300, 1080, 60, 120);
+        Check(shortHelp.Width == 340 && shortHelp.Height == 300, "A short help keeps the usual width and its content's height: " + shortHelp.Width + " x " + shortHelp.Height);
+        var fits = PanelPlacement.HelpSize(Wrapped, 1080, 60, 120);
+        Check(fits.Width == 340 && fits.Height == 900, "A help that fits the screen keeps the usual width: " + fits.Width + " x " + fits.Height);
+        var longHelp = PanelPlacement.HelpSize(width => 340f * 1500 / width, 1080, 60, 120);
+        Check(longHelp.Width == 520 && Math.Abs(longHelp.Height - 340f * 1500 / 520) < 0.01f && longHelp.Height + 60 <= 1080, "The outliner's help at UI scale 1.0 takes a wider window and fits the screen: " + longHelp.Width + " x " + longHelp.Height);
+        var middle = PanelPlacement.HelpSize(width => 340f * 1200 / width, 1080, 60, 120);
+        Check(middle.Width == 430, "A help takes the first width at which it fits: " + middle.Width);
+        var scaled = PanelPlacement.HelpSize(width => 340f * 1500 / width, 864, 60, 120);
+        Check(scaled.Width == 610 && scaled.Height == 864 - 60 - 2 * PanelPlacement.HelpMargin && scaled.Height < 340f * 1500 / 610, "At UI scale 1.25 the same help takes the widest window at the screen's height, and the rest scrolls: " + scaled.Width + " x " + scaled.Height);
+        Check(PanelPlacement.HelpSize(width => 10, 1080, 60, 120).Height == 120 && PanelPlacement.HelpSize(width => 5000, 100, 60, 120).Height == 120, "The help window is never lower than its least height");
+        var placed = PanelPlacement.Beside(0, 734, 100, 634, scaled.Height + 60, 2560, 864, 8);
+        Check(placed.Y + placed.Height <= 864 && placed.Y >= 0, "The widest help at the screen's height stands within the screen: " + placed.Y);
         var cramped = PanelPlacement.Beside(200, 900, 0, 364, 400, 1000, 800, 8);
         Check(cramped.X == 0, "Without room on either side it takes the side with more room, at the screen's edge: " + cramped.X);
         Check(PanelPlacement.Beside(100, 950, 0, 364, 400, 1000, 800, 8).X == 0 && PanelPlacement.Beside(100, 900, 0, 364, 400, 1000, 800, 8).X == 636, "More room at the left takes the left edge; equal room takes the right edge");

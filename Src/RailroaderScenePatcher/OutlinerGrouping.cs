@@ -117,7 +117,9 @@ namespace RailroaderScenePatcher {
             containersFrom = entries; containers = found;
             return found;
         }
-        // A serialized track span that no crossing controller holds is a native track span and leaves the list.
+        // A track span of the scene that no crossing controller holds is a native track span and gets no row. The
+        // base map has none: the spans the game builds from its operations data while it runs never enter the
+        // inventory (BakedSceneryRules.SpanListed), so they are not hidden here and are in no count.
         internal static bool IsNativeSpan(SceneObservation r) => r.Family == SpanFamily && r.HolderPath == null && !r.Identity.Path.StartsWith(InventoryPresentationState.CoverageRoot, StringComparison.Ordinal);
         internal static int HiddenCount(IReadOnlyList<SceneObservation> entries) => entries == null ? 0 : SignContainers(entries).Count + entries.Count(IsNativeSpan);
         // The outliner's count line: the rows the tree lists, of the objects it can list.
@@ -387,7 +389,7 @@ namespace RailroaderScenePatcher {
         static bool detailLogged;
         // Debug lines, one per view switch: view, top-level nodes, objects listed, objects in a catch-all node, and
         // what breaks the rules of the tree. The detail lines follow with an empty search: places, crossings,
-        // inspection-only rows, hidden objects.
+        // inspection-only rows, and the hidden objects, which are the objects of the inventory that get no row.
         internal static void Log(Result result, int rowsShown, string search, string filter) {
             var tops = String.Join(", ", result.Tops.Select(t => t.Label + "=" + t.Count.ToString(CultureInfo.InvariantCulture)));
             PatcherLog.Debug("Outliner: view=" + (ByPlace ? "Place" : "Category") + " tops=" + result.Tops.Count
@@ -399,7 +401,7 @@ namespace RailroaderScenePatcher {
             PatcherLog.Debug("Outliner places: " + placesLine);
             PatcherLog.Debug("Outliner crossings: " + result.Crossings.Count + " {" + String.Join(" | ", result.Crossings) + "}");
             PatcherLog.Debug("Outliner inspection only: " + result.InspectionOnlyRows.Count + " {" + String.Join(" | ", result.InspectionOnlyRows) + "}");
-            PatcherLog.Debug("Outliner hidden: " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
+            PatcherLog.Debug("Outliner hidden (inventory objects without a row): " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
         }
     }
 }

@@ -45,7 +45,7 @@ With the pointer over the window, Escape first closes an open choice list, then 
 
 Commands that cannot run remain in place, unavailable. **Select in world** is unavailable during a pending world choice; **Focus** and **Copy ID** are unavailable when nothing is inspected. **Copy ID** is also unavailable when the edited mod's scene patch file cannot be read, and **Clear** when nothing is inspected and no world choice is pending. Its tooltip then gives only the reason, after **Unavailable:**, as one plain sentence without a label of its own.
 
-Each **?** opens a separate help window beside the panel, at the height of that **?**, with an introduction, short explanations, and links to the guides. Only one help window can be open at a time, and it never covers the panel's content. A tab's help closes when you open another tab. Click the same **?** again or use the help window's close button to close it.
+Each **?** opens a separate help window beside the panel, at the height of that **?**, with an introduction, short explanations, and links to the guides. A long help, such as the outliner's, opens in a wider window so that it fits the screen. If it still doesn't fit, scroll the help window to read the rest. Only one help window can be open at a time, and it never covers the panel's content. A tab's help closes when you open another tab. Click the same **?** again or use the help window's close button to close it.
 
 Below the command band, the outliner on the left has a search field, a **?** for outliner help, the object tree, and a count in the form `N of M objects`. The **By category** and **By place** buttons choose how the tree is arranged. Use its filters to choose what appears:
 
