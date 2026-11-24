@@ -354,7 +354,7 @@ namespace RailroaderScenePatcher {
                         if (ids != null && idsAt == TrackMarkerWorld.IdWrites) return ids;
                         if (idsError == null) {
                             try { idsAt = TrackMarkerWorld.IdWrites; return ids = TrackMarkerWorld.MarkerIds(); }
-                            catch (Exception e) { idsError = "The scene's marker IDs couldn't be read: " + e.GetBaseException().Message; Debug.LogWarning("Scene Patcher inventory: " + idsError); }
+                            catch (Exception e) { idsError = "The scene's marker IDs couldn't be read: " + e.GetBaseException().Message; PatcherLog.Warning(idsError + ". Marker ID checks in the Scene Patcher window don't work."); }
                         }
                         throw new InvalidOperationException(idsError);
                     };

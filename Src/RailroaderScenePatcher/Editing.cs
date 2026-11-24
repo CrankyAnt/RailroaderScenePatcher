@@ -62,7 +62,7 @@ namespace RailroaderScenePatcher {
             try { refusal = current.Session.SaveRefusalBeforeWrite(); }
             catch (Exception e) { refusal = "The scene patch file could not be checked before saving: " + e.GetBaseException().Message; }
             if (refusal == null) return true;
-            try { current.Log("Save refused: " + refusal); current.SaveRefused(refusal); }
+            try { PatcherLog.Debug("Save refused: " + refusal); current.SaveRefused(refusal); }
             finally { current.VersionChanged(); current.RefreshChrome(); }
             return false;
         }
@@ -103,8 +103,14 @@ namespace RailroaderScenePatcher {
         internal readonly object MapEditor, Manager;
         internal readonly PatchEditingSession Session;
         internal readonly string PatchPath;
-        internal string Fault;
-        internal Action<string> Log = _ => { };
+        // A failure of this native map editor's editing that the window shows in red. Each new one is also written to the
+        // player log once as an error: the window is the only other place it reaches.
+        internal string Fault {
+            get => fault;
+            set { fault = value; if (value != null) faults.Error(value, value); }
+        }
+        string fault;
+        readonly LogOnce faults = new LogOnce();
         internal Action VersionChanged = () => { };
         internal Action<string> SaveRefused = _ => { };
         internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list.Select(PatchEditingSession.DisplayItem)); }
@@ -208,14 +214,14 @@ namespace RailroaderScenePatcher {
             if (current == null) return;
             current.Session.CompleteNativeSave();
             current.NativeSaved();
-            current.Log("Save completed: " + String.Join(", ", current.Session.LastSave.Completed.Select(PatchEditingSession.DisplayItem)) + "; outstanding: " + current.Outstanding());
+            PatcherLog.Debug(() => "Save completed: " + String.Join(", ", current.Session.LastSave.Completed.Select(PatchEditingSession.DisplayItem)) + "; outstanding: " + current.Outstanding());
         }
         static Exception SaveFinalizer(object __instance, Exception __exception) {
             var current = For(__instance);
             if (__exception == null || current == null) return __exception;
             try {
                 var failure = new IOException(current.Session.FailSave(__exception), __exception);
-                current.Log("Save failed: " + failure.Message);
+                PatcherLog.Error("The Map Editor didn't save: " + failure.Message);
                 return failure;
             } catch { return __exception; }
         }
@@ -232,8 +238,9 @@ namespace RailroaderScenePatcher {
                 current.EndHistoryExecution(__exception);
                 // Native Undo and Redo rebuild the chrome before the history identity is settled here.
                 current.RefreshChrome();
-                try { current.Log("Native history executed" + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; outstanding: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
-                catch (Exception e) { current.Fault = e.GetBaseException().Message; }
+                if (__exception != null) PatcherLog.Error("A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: " + __exception.GetBaseException().Message);
+                try { PatcherLog.Debug(() => "Map Editor history step" + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; outstanding: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
+                catch (Exception e) { current.Fault = "The Map Editor history step couldn't be checked: " + e.GetBaseException().Message; }
             }
             return __exception;
         }

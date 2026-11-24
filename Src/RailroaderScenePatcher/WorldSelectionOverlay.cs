@@ -268,8 +268,8 @@ namespace RailroaderScenePatcher {
                 terrainLayer = LayerMask.NameToLayer("Terrain"); trackLayer = LayerMask.NameToLayer("Track");
                 // A layer the game does not have gives no mask bit: without the terrain nothing is cut, without the
                 // track the cut is at the terrain alone. Said once.
-                if (terrainLayer < 0) Debug.LogWarning("Scene Patcher: this game build has no Terrain layer; object frames are not cut off at the ground.");
-                else if (trackLayer < 0) Debug.LogWarning("Scene Patcher: this game build has no Track layer; object frames are cut off at the terrain and not at the ballast.");
+                if (terrainLayer < 0) PatcherLog.Debug("This game build has no Terrain layer; object frames are not cut off at the ground.");
+                else if (trackLayer < 0) PatcherLog.Debug("This game build has no Track layer; object frames are cut off at the terrain and not at the ballast.");
             }
             if (terrainLayer < 0) return null;
             long key = ((long)Math.Floor(x * 2) << 32) ^ ((long)Math.Floor(z * 2) & 0xFFFFFFFFL);
@@ -462,12 +462,12 @@ namespace RailroaderScenePatcher {
                     }
                     inventoryGroups = found.ToArray();
                 }
-            } catch (Exception e) { Debug.LogWarning("Scene Patcher: game-defined groups could not be read; every object shows on its own. " + e.GetBaseException().Message); }
+            } catch (Exception e) { PatcherLog.Warning("The Scene Patcher window shows every object on its own, because the game-defined groups couldn't be read", e); }
             return inventoryGroups;
         }
         // A group that world marking skips shows its objects on its own; one developer diagnostic line says so, once
         // per group root and reason.
-        static readonly GroupSkips skips = new GroupSkips(line => Debug.Log("Scene Patcher: " + line));
+        static readonly GroupSkips skips = new GroupSkips(PatcherLog.Debug);
         static string RootPath(GameObject root) => root == null ? null : root.scene.name + "/" + BoardScene.PathOf(root.transform);
         internal static void Skipped(GameObject root, string reason) => skips.Skip(RootPath(root), reason);
         // Reads the parts of one family group; a group whose parts cannot be read is skipped with one line.
@@ -624,10 +624,8 @@ namespace RailroaderScenePatcher {
             inspectedMark = source;
             budget.Begin();
             Prune();
-#if ISSUE42_OBSERVATION
             BeginObservation(pending, source, camera);
             try {
-#endif
             if (textStyle == null) {
                 // Skin labels can carry one-line height/offset constraints. Measure and draw with
                 // an unconstrained style so the opaque backing encloses every wrapped identity line.
@@ -781,9 +779,7 @@ namespace RailroaderScenePatcher {
                     } finally { GUI.EndGroup(); }
                 }
             } finally { GUI.color = oldColor; GUI.contentColor = oldContent; }
-#if ISSUE42_OBSERVATION
             } finally { observing = false; }
-#endif
         }
 
         Shape Project(SpatialCandidate candidate, Camera camera, Vector3 origin) => Project(candidate, camera, origin, ObjectMarkingGeometry.FrameDistance, out _);
@@ -809,12 +805,8 @@ namespace RailroaderScenePatcher {
                 var waits = false;
                 // The mesh renderers that are on but hidden without a known box yet.
                 var unseen = 0;
-#if ISSUE42_OBSERVATION
                 var decisions = observing ? new List<string>() : null;
                 var skipped = observing ? new List<string>() : null;
-#else
-                List<string> decisions = null;
-#endif
                 for (int index = 0; index < renderers.Length; index++) {
                     var renderer = renderers[index];
                     var name = "#" + index;
@@ -822,9 +814,7 @@ namespace RailroaderScenePatcher {
                     // A renderer switched off by the scene or a modder is passed over; one the game's culling hides
                     // now still outlines the object, from its mesh.
                     if (index >= outlines.Length || !outlines[index]) {
-#if ISSUE42_OBSERVATION
                         skipped?.Add(name + ": skipped, switched off");
-#endif
                         continue;
                     }
                     var shows = renderer.enabled && renderer.gameObject.activeInHierarchy;
@@ -847,9 +837,7 @@ namespace RailroaderScenePatcher {
                     var box = ObjectMarkingGeometry.RendererBox(shows, visible, own, kept, p => Point(toWorld.MultiplyPoint3x4(Vector(p))));
                     // A hidden renderer without a box of its own and never seen since the world loaded adds nothing.
                     if (box == null) {
-#if ISSUE42_OBSERVATION
                         skipped?.Add(name + ": skipped, hidden without a known box");
-#endif
                         // It still makes its object visible: a mesh renderer outlines the object once it shows, so the
                         // object shows no helper marker (HelperMarkers.Shows). Its kind is read within the pass's share.
                         if (!kinds.TryGetValue(renderer, out var hiddenKind)) {
@@ -870,9 +858,7 @@ namespace RailroaderScenePatcher {
                         foreach (var corner in oriented) bounds.Encapsulate(new Vector3((float)corner.X, (float)corner.Y, (float)corner.Z));
                     }
                     if (bounds.size.sqrMagnitude < .000001f) {
-#if ISSUE42_OBSERVATION
                         skipped?.Add(name + ": skipped, empty bounds");
-#endif
                         continue;
                     }
                     // A renderer that is switched off was passed over above and is never read. The kind of one that
@@ -941,9 +927,7 @@ namespace RailroaderScenePatcher {
                     var half = (float)(ObjectMarkingGeometry.MarkerSize / 2 + ObjectMarkingGeometry.MarkerMargin);
                     shape.Objects.Add(new Rect(anchor.x - half, anchor.y - half, 2 * half, 2 * half));
                 }
-#if ISSUE42_OBSERVATION
                 if (observing && !(result.Distance > ObservationRange)) Observe(candidate, renderers, lods ?? Lods(go), decisions, skipped, result, view);
-#endif
             }
             if (candidate.ControlPoints != null) {
                 if (trackRadius == 0) {
@@ -1053,8 +1037,8 @@ namespace RailroaderScenePatcher {
             kinds[renderer] = kind;
             return kind;
         }
-#if ISSUE42_OBSERVATION
-        // Frame diagnostics: one block per candidate within range when a world choice opens and after each camera step.
+        // Frame diagnostics, debug output: one block per candidate within range when a world choice opens and after each
+        // camera step. With debug off nothing is collected or built.
         const float ObservationStep = 25f;
         const double ObservationRange = 1500;
         object observedChoice;
@@ -1062,17 +1046,17 @@ namespace RailroaderScenePatcher {
         bool observing;
         void BeginObservation(PendingSelection pending, SpatialCandidate source, Camera camera) {
             var choice = (object)pending ?? source;
-            observing = choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
+            observing = PatcherLog.DebugEnabled && choice != null && (!ReferenceEquals(choice, observedChoice) || (camera.transform.position - observedCamera).magnitude >= ObservationStep);
             if (!observing) return;
             observedChoice = choice; observedCamera = camera.transform.position;
-            Debug.Log("[Issue42Frames] pass camera=" + Vector(camera.transform.position) + " view=" + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
+            PatcherLog.Debug("Frame diagnostics pass camera=" + Vector(camera.transform.position) + " view=" + camera.pixelRect.width.ToString("0", CultureInfo.InvariantCulture) + "x" +
                 camera.pixelRect.height.ToString("0", CultureInfo.InvariantCulture) + " near=" + Number(camera.nearClipPlane) + " far=" + Number(camera.farClipPlane) +
                 " frameDistance=" + Number(ObjectMarkingGeometry.FrameDistance));
         }
         static void Observe(SpatialCandidate candidate, Renderer[] renderers, Dictionary<Renderer, KeyValuePair<LODGroup, int>> lods, List<string> decisions,
             List<string> skipped, ObjectMarkingFrame result, Rect view) {
             var text = new System.Text.StringBuilder();
-            text.Append("[Issue42Frames] candidate ").Append(candidate.Choice.Label).Append(" distance=").Append(Number(result.Distance))
+            text.Append("Frame diagnostics candidate ").Append(candidate.Choice.Label).Append(" distance=").Append(Number(result.Distance))
                 .Append(result.Frame.HasValue ? " frame=" + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + " of view" : " marker only");
             var lines = decisions.Concat(skipped).ToList();
             for (int index = 0; index < renderers.Length; index++) {
@@ -1085,11 +1069,10 @@ namespace RailroaderScenePatcher {
                     .Append(" lod=").Append(lod).Append(" active=").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
                     .Append(" decision=").Append(decision.Length == 0 ? "none" : decision);
             }
-            Debug.Log(text.ToString());
+            PatcherLog.Debug(text.ToString());
         }
         static string Number(double value) => value.ToString("0.###", CultureInfo.InvariantCulture);
         static string Vector(Vector3 v) => Number(v.x) + "/" + Number(v.y) + "/" + Number(v.z);
-#endif
         static bool InFront(Camera camera, Vector3 point) => point.z >= camera.nearClipPlane && point.z <= camera.farClipPlane;
         static Rect Offset(Rect rect, Vector2 origin) => new Rect(rect.position - origin, rect.size);
 

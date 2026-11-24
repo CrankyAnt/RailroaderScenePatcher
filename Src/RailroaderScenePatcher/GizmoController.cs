@@ -108,7 +108,6 @@ namespace RailroaderScenePatcher {
                 if (visual.Camera == null) throw new InvalidOperationException("The Map Editor camera is unavailable");
                 visual.Space = TransformGizmoSpace.World; visual.Mode = mode; visual.Visible = true;
                 visual.SetPose(position, Rotation(shown));
-                lastPose = position;
                 activated = Time.unscaledTime;
                 visual.CanStartDrag = CanDrag;
                 visual.DragStarted += Begin; visual.DragUpdated += Preview; visual.DragEnded += Complete;
@@ -218,40 +217,16 @@ namespace RailroaderScenePatcher {
         void OriginChanged(WorldDidMoveEvent change) {
             if (visual == null || !Shown) return;
             visual.ShiftOrigin(change.Offset);
-            // The last pose shifts with the gizmo, so an origin change is no pose change.
-            if (lastPose.HasValue) lastPose = lastPose.Value + change.Offset;
         }
         // Sets the standing gizmo on the object's placement now. Only a drag moves the gizmo with its object. A hold
-        // follows a change of the object itself, such as a native Undo or Redo, and moves the gizmo with it; any other
-        // pose that changes the gizmo's world position by more than a centimeter outside a drag is written to the log
-        // as a developer diagnostic line, so a gizmo that wanders while the camera moves leaves evidence.
+        // follows a change of the object itself, such as a native Undo or Redo, and moves the gizmo with it.
         void Pose(string reason) {
-            var position = MapToWorld(shown);
-            if (reason != "hold" && lastPose.HasValue && (lastPose.Value - position).sqrMagnitude > .0001f)
-                Debug.Log("Scene Patcher: Gizmo pose changed without a drag (" + reason + "): " + identity?.Path + " from " + lastPose.Value.ToString("F2") + " to " + position.ToString("F2"));
-            visual.SetPose(position, Rotation(shown));
-            lastPose = position;
-        }
-        Vector3? lastPose;
-        // While the gizmo stands without a drag, the world position it draws at is compared with the object's
-        // placement every frame; a difference of more than a centimeter writes one diagnostic line per episode.
-        static readonly System.Reflection.FieldInfo gizmoController = typeof(TransformGizmo).GetField("_controller", Native.Flags);
-        bool drifting;
-        void CheckDrift() {
-            if (!Shown || Active || holding || shown == null || gizmoController == null) { drifting = false; return; }
-            try {
-                var drawn = (Vector3)Native.Read(gizmoController.GetValue(visual), "Position");
-                var expected = MapToWorld(shown);
-                var apart = (drawn - expected).sqrMagnitude > .0001f;
-                if (apart && !drifting) Debug.Log("Scene Patcher: Gizmo stands apart from its object without a drag: " + identity?.Path + " drawn at " + drawn.ToString("F2") + ", object at " + expected.ToString("F2"));
-                drifting = apart;
-            } catch { }
+            visual.SetPose(MapToWorld(shown), Rotation(shown));
         }
         void Update() {
             if (!Shown) return;
             if (controller == null || !controller.isActiveAndEnabled || !ReferenceEquals(Native.Read(controller, "MapEditor"), attachment.MapEditor) || Camera.main == null || Mouse.current == null) { Close(); return; }
             if (Active && Keyboard.current?.escapeKey.wasPressedThisFrame == true) Cancel();
-            CheckDrift();
         }
         void OnApplicationFocus(bool focused) { if (!focused && Active) Cancel(); }
         void OnDisable() { if (!stopping) Close(); }

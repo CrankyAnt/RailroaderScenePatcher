@@ -9,15 +9,25 @@ param(
     [long]$ThroughSequence=[long]::MaxValue
 )
 $ErrorActionPreference='Stop'
+# The patcher's debug line of one engine stage: "Attempt trace: " and one JSON object, followed by the game's line properties.
+function TracePayload([string]$message) {
+    $marker='Attempt trace: ';$at=$message.IndexOf($marker,[StringComparison]::Ordinal)
+    if($at -lt 0){throw 'Invalid trace payload'}
+    $text=$message.Substring($at+$marker.Length);$depth=0;$quoted=$false;$escaped=$false
+    for($i=0;$i -lt $text.Length;$i++){
+        $c=$text[$i]
+        if($quoted){if($escaped){$escaped=$false}elseif($c -eq '\'){$escaped=$true}elseif($c -eq '"'){$quoted=$false};continue}
+        if($c -eq '"'){$quoted=$true}elseif($c -eq '{'){$depth++}elseif($c -eq '}'){$depth--;if($depth -eq 0){return $text.Substring(0,$i+1)|ConvertFrom-Json}}
+    }
+    throw 'Invalid trace payload'
+}
 $active=@();$unassigned=@();$replays=@()
 foreach($line in Get-Content -LiteralPath $ObservationPath) {
     if(!$line){continue};$row=$line|ConvertFrom-Json
     if($row.processId -ne $ProcessId -or $row.sequence -gt $ThroughSequence){continue}
     if($row.event -eq 'replay-end' -and $row.loadId -ceq $LoadId){$replays+=@{sequence=$row.sequence;engineSame=$row.engineSame};continue}
     if($row.event -notin @('attempt-trace','unassigned-attempt-trace')){continue}
-    $message=[string]$row.message
-    if(!$message.Contains('{')){throw 'Invalid trace payload'}
-    $trace=$message.Substring($message.IndexOf('{'))|ConvertFrom-Json
+    $trace=if($row.trace){$row.trace}else{TracePayload ([string]$row.message)}
     if($trace.engineRuntimeId -ne $EngineRuntimeId){continue}
     $item=@{stage=$trace.stage;id=$trace.id;document=$trace.document;sequence=$row.sequence;sourceFrame=$row.sourceFrame;sourceUtc=$row.sourceUtc;error=$trace.error}
     if($row.event -eq 'attempt-trace' -and $row.loadId -ceq $LoadId -and $row.sourceLoadId -ceq $LoadId -and $row.sourceLifecycle -ceq 'active-world'){$active+=$item}else{$unassigned+=$item}

@@ -265,20 +265,24 @@ class Program {
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Replace("\"formatVersion\":1", "\"formatVersion\":2"), "Unsupported scene patch file version with a valid entry");
         AssertWholeScenePatchFileRejected(Doc(validIndependent).Substring(0, Doc(validIndependent).Length - 1), "Unreadable truncated scene patch file containing a valid entry");
         AssertWholeScenePatchFileRejected(null, "Unreadable null input");
-#if ISSUE39_OBSERVATION
-        var traces = new List<Newtonsoft.Json.Linq.JObject>();
-        JourneyObservation.Sink = value => traces.Add(Newtonsoft.Json.Linq.JObject.Parse(value));
+        // The attempt trace of each engine stage is debug output: with debug off nothing is built or written.
         var observedEngine = new PatchEngine(scene);
-        observedEngine.Apply(Doc(Item("missing-target", "missing") + "," + Item("independent", "p")), "fixture");
-        observedEngine.Apply(Doc(Item("missing-target", "p") + "," + Item("independent", "p")), "fixture");
+        var quiet = RecordingLog.Capture(false, () => observedEngine.Apply(Doc(Item("missing-target", "missing") + "," + Item("independent", "p")), "fixture"));
+        Assert(quiet.Lines.Count == 0, "Debug off writes no attempt trace");
+        observedEngine = new PatchEngine(scene);
+        var traced = RecordingLog.Capture(true, () => {
+            observedEngine.Apply(Doc(Item("missing-target", "missing") + "," + Item("independent", "p")), "fixture");
+            observedEngine.Apply(Doc(Item("missing-target", "p") + "," + Item("independent", "p")), "fixture");
+        });
+        var traces = traced.At(LogLevel.Debug).Where(l => l.StartsWith(PatchEngine.AttemptTrace, StringComparison.Ordinal))
+            .Select(l => Newtonsoft.Json.Linq.JObject.Parse(l.Substring(PatchEngine.AttemptTrace.Length))).ToList();
         Assert(traces.Count(t => (string)t["stage"] == "resolve" && (string)t["id"] == "missing-target") == 1, "Trace distinguishes the one initial failed resolution from a replay");
         Assert(traces.Count(t => (string)t["stage"] == "retry-blocked" && (string)t["id"] == "missing-target") == 1, "Trace demonstrates the same-load failed retry was blocked");
         Assert(!traces.Any(t => (string)t["stage"] == "mutation" && (string)t["id"] == "missing-target"), "Trace does not report mutation for a missing or previously failed identity");
         Assert(traces.Count(t => (string)t["stage"] == "mutation" && (string)t["id"] == "independent") == 2, "Independent valid operation remains observable on both dispatches");
-        JourneyObservation.Sink = null;
-#else
-        Assert(typeof(PatchEngine).Assembly.GetType("RailroaderScenePatcher.Core.JourneyObservation") == null, "The normal product build exposes no journey observation sink");
-#endif
+        Assert(traces.All(t => t["engineRuntimeId"] != null), "Each trace names its engine for the attempt summary");
+        LogModeTests.Run();
+        LogSourceTests.Run();
         WorldRibbonGeometryTests.Run();
         WorldStrokeGeometryTests.Run();
         ObjectMarkingGeometryTests.Run();

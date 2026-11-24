@@ -768,20 +768,15 @@ static class PartCullingTests {
         Action other = () => { }; own.Handler = other;
         Assert(session.Remove(PartId("Jetty")).Applied, "Removal still applies");
         Assert(own.Handler == other && f.World.Culling.Leftovers.SequenceEqual(new[] { own.Id }), "A wrapper that could not be taken out is named, and the other handler stays");
-        // The report goes to the log at information level, once, and never as a warning.
-        var log = new Log();
-        f.World.Culling.Fault = log.Warning;
-        f.World.Culling.Report(log); f.World.Culling.Report(log);
-        Assert(log.Informations.Count == 1 && log.Warnings.Count == 0, "The wrapper that stays is reported once at information level, not as a warning: " + log.Informations.Count + " / " + log.Warnings.Count);
-        Assert(log.Informations[0] == "Scene inventory: " + BakedSceneryRules.LeftoverWrapper(own.Id) && log.Informations[0].Contains(own.Id), "The line names the culler: " + log.Informations[0]);
-        var quiet = new Log(); new Fixture().World.Culling.Report(quiet);
-        Assert(quiet.Informations.Count == 0 && quiet.Warnings.Count == 0, "Without such a wrapper nothing is reported");
-    }
-
-    sealed class Log : ICullingLog {
-        public readonly List<string> Informations = new List<string>(), Warnings = new List<string>();
-        public void Information(string message) => Informations.Add(message);
-        public void Warning(string message) => Warnings.Add(message);
+        // The report is a debug line, once, and never a warning.
+        var faults = new List<string>();
+        f.World.Culling.Fault = faults.Add;
+        var log = RecordingLog.Capture(true, () => { f.World.Culling.Report(); f.World.Culling.Report(); });
+        Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Debug && faults.Count == 0, "The wrapper that stays is reported once as a debug line, not as a warning: " + log.Lines.Count + " / " + faults.Count);
+        Assert(log.Lines[0].Value == BakedSceneryRules.LeftoverWrapper(own.Id) && log.Lines[0].Value.Contains(own.Id), "The line names the culler: " + log.Lines[0].Value);
+        var playerMode = RecordingLog.Capture(false, () => new Fixture().World.Culling.Report());
+        var quiet = RecordingLog.Capture(true, () => new Fixture().World.Culling.Report());
+        Assert(quiet.Lines.Count == 0 && playerMode.Lines.Count == 0, "Without such a wrapper nothing is reported");
     }
 
     static void InspectorNamesOwnCulling() {

@@ -227,8 +227,8 @@ namespace RailroaderScenePatcher {
                 + ". Remove or replace the bell, or correct its bell definition.";
             try {
                 if (Warn != null) Warn("bell-audio/" + bell.Scope + "/" + bell.Id + "/" + bell.ControllerPath, message, bell.Scope + ":Data/scene-patches.json");
-                else Debug.LogWarning("Scene Patcher: " + message);
-            } catch (Exception e) { Debug.LogWarning("Scene Patcher: " + message + " (warning delivery failed: " + e.GetBaseException().Message + ")"); }
+                else PatcherLog.Warning(message);
+            } catch (Exception e) { PatcherLog.Warning(message); PatcherLog.Debug(() => "The warning about the bell didn't reach the Log window: " + e); }
         }
         // Configures a controller's own bell player again with the clip the controller loaded, its definition's indexes
         // and volume: what GradeCrossingController.LoadBellAudio does once. A player that was disabled destroyed the

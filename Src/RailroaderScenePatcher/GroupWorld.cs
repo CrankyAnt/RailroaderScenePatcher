@@ -100,10 +100,10 @@ namespace RailroaderScenePatcher {
             own = culling; ownHost = host; ownSwitches = switches;
             var current = culling; var shared = switches; var stands = switchHost;
             host.Unloaded = () => { current.Unload(); shared.Unload(); stands.Unload(); trestles.Clear(); };
-            culling.Fault = message => Debug.LogWarning("Scene Patcher: " + message);
+            culling.Fault = PatcherLog.Warning;
             // Without the members of a progression controller or a map feature, the patcher cannot see what they switch:
             // their switches then set the objects as without the patcher, and an explicit disable holds only until then.
-            if (SwitchMembersProblem != null) Debug.LogWarning("Scene Patcher: " + SwitchMembersProblem);
+            if (SwitchMembersProblem != null) PatcherLog.Warning(SwitchMembersProblem);
         }
         readonly PartCullingController own;
         readonly PartCullingHost ownHost;
@@ -119,18 +119,20 @@ namespace RailroaderScenePatcher {
         public void Dispose() {
             if (disposed) return;
             disposed = true;
-            try { own.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling release failed: " + e.GetBaseException().Message); }
-            try { ownSwitches.ReleaseAll(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: switched activity release failed: " + e.GetBaseException().Message); }
+            try { own.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("Moved baked scenery parts may show or hide at the wrong distance, because the patcher couldn't hand their culling back to the game", e); }
+            try { ownSwitches.ReleaseAll(); } catch (Exception e) { PatcherLog.Warning("Moved baked scenery parts may not follow the game's switches, because the patcher couldn't hand them back to the game", e); }
             if (ReferenceEquals(switches, ownSwitches)) { switches = null; switchHost = null; }
             ownHost.Dispose();
             if (ReferenceEquals(culling, own)) { culling = null; host = null; }
         }
         // Every frame: installs own culling that waited for a game culler to start.
-        internal static void Tick() { try { culling?.Tick(); } catch (Exception e) { Debug.LogWarning("Scene Patcher: own culling update failed: " + e.GetBaseException().Message); } }
+        // Runs every frame: a failure is written once per failure, not on every frame.
+        internal static void Tick() { try { culling?.Tick(); } catch (Exception e) { var message = e.GetBaseException().Message; tickFailures.Warning(message, "Moved baked scenery parts may show or hide at the wrong distance, because the patcher couldn't update their culling: " + message); } }
+        static readonly LogOnce tickFailures = new LogOnce();
         // A world load started.
         internal static void WorldLoaded() => host?.WorldLoaded();
         // Reports what own culling could not take out again, each once, at information level.
-        internal static void ReportCulling(ICullingLog log) => culling?.Report(log);
+        internal static void ReportCulling() => culling?.Report();
         // The objects own culling took out of a game-object culler's list, with that culler and whether the object's
         // own sphere shows it now.
         internal static IEnumerable<Tuple<GameObject, Component, bool>> HandedOver() =>
@@ -887,7 +889,10 @@ namespace RailroaderScenePatcher {
     // OnDisable when the switch sets its activity.
     internal sealed class SwitchStandIn : MonoBehaviour {
         internal Action<bool> Changed;
-        void OnEnable() { try { Changed?.Invoke(true); } catch (Exception e) { Debug.LogWarning("Scene Patcher: switched activity update failed: " + e.GetBaseException().Message); } }
-        void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Debug.LogWarning("Scene Patcher: switched activity update failed: " + e.GetBaseException().Message); } }
+        void OnEnable() { try { Changed?.Invoke(true); } catch (Exception e) { Failed(e); } }
+        void OnDisable() { try { Changed?.Invoke(false); } catch (Exception e) { Failed(e); } }
+        // A switch can turn many times in one frame: each failure is written once.
+        static readonly LogOnce failures = new LogOnce();
+        static void Failed(Exception e) { var message = e.GetBaseException().Message; failures.Warning(message, "A moved baked scenery part may not follow a game switch, because the patcher couldn't update it: " + message); }
     }
 }

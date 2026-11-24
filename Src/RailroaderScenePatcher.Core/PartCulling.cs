@@ -340,10 +340,6 @@ namespace RailroaderScenePatcher.Core {
     }
 
     // Where own culling reports: information for what needs no action, a warning for a failure.
-    public interface ICullingLog {
-        void Information(string message);
-        void Warning(string message);
-    }
     // The game-facing operations of own culling. Positions are map coordinates.
     public interface ICullingHost {
         // False while the map unloads: nothing registers, moves, releases or reads a sphere then.
@@ -417,9 +413,9 @@ namespace RailroaderScenePatcher.Core {
         int reportedLeftovers;
         // Reports each such handler once, at information level: it only passes the game's events on, so it needs no
         // action and is no warning.
-        public void Report(ICullingLog log) {
-            if (log == null) throw new ArgumentNullException(nameof(log));
-            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) log.Information("Scene inventory: " + BakedSceneryRules.LeftoverWrapper(leftovers[reportedLeftovers]));
+        // A wrapper that stays needs no action and is no warning: it is a debug line, written once.
+        public void Report() {
+            for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) { var leftover = leftovers[reportedLeftovers]; PatcherLog.Debug(() => BakedSceneryRules.LeftoverWrapper(leftover)); }
         }
         public int RegionCount => groups.Values.Sum(g => g.Regions.Count);
         // Whether a load-order retry or a failed callback waits for the next Tick.

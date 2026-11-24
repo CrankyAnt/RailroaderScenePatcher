@@ -35,13 +35,12 @@ namespace RailroaderScenePatcher {
             catch (Exception e) {
                 if (!mapPatchFallbackLogged) {
                     mapPatchFallbackLogged = true;
-                    Log?.Invoke("Could not identify map patches in the map context. The native map editor cannot reject a scene patch file for naming a map patch. Details: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Could not identify map patches in the map context. The native map editor cannot reject a scene patch file for naming a map patch. Details: " + e.GetBaseException().Message);
                 }
                 return new string[0];
             }
         }
         // Receives the one log line of the fallback above; the mod sets it to its log.
-        internal static Action<string> Log;
         static bool mapPatchFallbackLogged;
         static string[] ReadMapPatchIds() {
             var role = Native.Type("Model.Definition.Data.MapRole");

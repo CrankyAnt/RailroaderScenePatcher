@@ -7,7 +7,10 @@ try {
     foreach($stage in @('resolve','retry-blocked','mutation')) {
         $unassigned=$stage -eq 'mutation'
         $payload=@{stage=$stage;id='missing-target';document='fixture';engineRuntimeId=42}|ConvertTo-Json -Compress
-        $lines+=@{event=$(if($unassigned){'unassigned-attempt-trace'}else{'attempt-trace'});processId=123;engineRuntimeId=42;loadId='current';sourceLoadId=$(if($unassigned){$null}else{'current'});sourceLifecycle=$(if($unassigned){'unassigned'}else{'active-world'});sequence=$lines.Count+1;message='[Issue39Attempt] '+$payload}|ConvertTo-Json -Compress
+        $record=@{event=$(if($unassigned){'unassigned-attempt-trace'}else{'attempt-trace'});processId=123;engineRuntimeId=42;loadId='current';sourceLoadId=$(if($unassigned){$null}else{'current'});sourceLifecycle=$(if($unassigned){'unassigned'}else{'active-world'});sequence=$lines.Count+1;message='[12:00:00 INF] Scene Patcher 0.5.0 [debug]: Attempt trace: '+$payload+' {ModPack="crankyant/scene-patcher"}'}
+        # The observer adds the parsed trace; a record without it is read from the debug line itself.
+        if($stage -eq 'resolve'){$record.trace=$payload|ConvertFrom-Json}
+        $lines+=$record|ConvertTo-Json -Compress -Depth 5
     }
     [IO.File]::WriteAllText($path,($lines -join "`n")+"`n")
     $result=& "$PSScriptRoot/Summarize-Attempts.ps1" -ObservationPath $path -ProcessId 123 -EngineRuntimeId 42 -LoadId current|ConvertFrom-Json

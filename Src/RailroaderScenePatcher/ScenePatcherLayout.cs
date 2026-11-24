@@ -19,6 +19,8 @@ namespace RailroaderScenePatcher {
     // Every region has a fixed height or scrolls inside its own rectangle, so showing or hiding text or feedback
     // moves no other control.
     public sealed partial class PatcherBehaviour {
+        // An equipment status that fails is checked again at every redraw; each failure is one debug line.
+        readonly LogOnce equipmentStatusFailures = new LogOnce();
         const string ObjectTab = "object", PlacementTab = "placement", ConnectionsTab = "connections", ChangesTab = "changes";
         static readonly string[] TabIds = { ObjectTab, PlacementTab, ConnectionsTab, ChangesTab };
         // Canvas units.
@@ -997,7 +999,8 @@ namespace RailroaderScenePatcher {
                         try { state = attachment.Session.EquipmentStatus(identity, item.Id); }
                         catch (Exception e) {
                             state = "The equipment status could not be checked";
-                            Debug.LogWarning("Scene Patcher: Could not check equipment status for " + item.Id + ": " + e.GetBaseException());
+                            var failure = e;
+                            equipmentStatusFailures.Debug(item.Id + "/" + e.GetBaseException().Message, () => "Could not check equipment status for " + item.Id + ": " + failure.GetBaseException());
                         }
                     }
                     EquipmentNameField(builder, item, name, entry.Built != null);

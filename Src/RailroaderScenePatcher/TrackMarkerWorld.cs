@@ -314,7 +314,7 @@ namespace RailroaderScenePatcher {
                     finally { collector.OnMessageAdded -= observe; collector.OnMessageUpdated -= observe; }
                     return emitted.Count == 1 ? emitted[0] : null;
                 });
-            } catch (Exception e) { Debug.LogWarning("Scene Patcher could not reconcile the restored marker's native warning; current rows remain: " + e.GetBaseException().Message); }
+            } catch (Exception e) { PatcherLog.Debug("The Log window row of the restored marker wasn't updated; its current rows stay: " + e.GetBaseException().Message); }
         }
         object Builder() => Native.Read(mapBuilder, "Shared");
         // The registered map labels in this object's hierarchy; the map builder caches the track group of the nearest marker location above each.

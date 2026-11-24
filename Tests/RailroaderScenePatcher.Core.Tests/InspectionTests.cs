@@ -12,7 +12,12 @@ static class InspectionTests {
         public readonly List<SceneObservation> Objects = new List<SceneObservation>();
         public IEnumerable<SceneObservation> Discover() => Objects;
     }
+    // Edit results are debug lines, so these checks read them with the debug option on.
     internal static void Run() {
+        var debug = PatcherLog.DebugEnabled; PatcherLog.DebugEnabled = true;
+        try { RunWithDebug(); } finally { PatcherLog.DebugEnabled = debug; }
+    }
+    static void RunWithDebug() {
         var fixture = new Fixture();
         fixture.Objects.Add(new SceneObservation(new object(), new TargetIdentity("scene", "World/Board", "Culler"), "Independent board", false,
             new double[] { 12, 2, 3 }, new double[] { 0, 0, 0, 1 }, new string[0], new[] { "Culling registration", "Terrain mask" }, new string[0], "Inspection only"));
@@ -298,7 +303,7 @@ static class InspectionTests {
         var scenePatchFile = "{\"formatVersion\":1,\"sourceMap\":{\"mapId\":\"map\"},\"modifications\":{\"move\":{\"target\":{\"scene\":\"scene\",\"path\":\"p\",\"component\":\"Culler\"},\"placement\":{\"mode\":\"fixed\",\"position\":[112,2,3],\"rotation\":[0,0,0,1]},\"dependsOn\":[]}}}";
         var inventory = new SceneInventory(scene); inventory.Refresh();
         var log = new List<string>(); var calls = 0;
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         Func<InspectedTarget, Outcome> move = inspection => { calls++; return new PatchEngine(scene).Apply(scenePatchFile, "pack", new Dictionary<string, InspectedTarget> { ["move"] = inspection }).Outcomes["move"]; };
 
         box.X = 8;
@@ -992,7 +997,7 @@ static class InspectionTests {
     // The message area shows the result of the last action and the latest follow-up of that action above it.
     static void FollowUpsKeepTheActionResultVisible() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         string Line(RailroaderScenePatcher.EditFeedback.Message m) => m.Source + ": " + m.Text;
         feedback.Follow("Terrain output", "Terrain output complete.");
         Check(feedback.Messages.Select(Line).SequenceEqual(new[] { "Terrain output: Terrain output complete." }), "A follow-up without a result is shown");
@@ -1209,7 +1214,7 @@ static class InspectionTests {
     // history moves: after a native Undo, "Enable completed" would be untrue.
     static void RepeatedMessagesCollapse() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         feedback.Refuse("Placement", "Placement", "The object list is stale");
         feedback.Refuse("Placement", "Placement", "The object list is stale");
         Check(feedback.Messages.Count == 1 && log.Count == 2, "The same refusal again is one message, and both are logged");
@@ -1248,7 +1253,7 @@ static class InspectionTests {
     // Each message keeps the action group it came from, and inspecting another object clears the messages.
     static void MessagesKeepTheirSourceNewestFirst() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         Check(feedback.Messages.Count == 0, "No message before the first result");
         feedback.Refuse("Track binding", "Track binding", "enter a segment ID");
         Check(feedback.Messages.Select(m => m.Source + ": " + m.Text).SequenceEqual(new[] { "Track binding: Track binding refused. Enter a segment ID." }), "A message keeps its source");
@@ -1265,7 +1270,7 @@ static class InspectionTests {
     // A result or refusal is about the object that was inspected when it was reported.
     static void ResultsBelongToTheInspectedObject() {
         var log = new List<string>();
-        var feedback = new RailroaderScenePatcher.EditFeedback { Log = log.Add };
+        var feedback = new RailroaderScenePatcher.EditFeedback { Describe = text => { log.Add(text); return text; } };
         object first = new object(), second = new object();
         feedback.Inspecting(first);
         feedback.Refuse("placement", "Placement", "Target must resolve uniquely");

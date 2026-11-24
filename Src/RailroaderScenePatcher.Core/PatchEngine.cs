@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace RailroaderScenePatcher.Core {
@@ -12,12 +11,6 @@ namespace RailroaderScenePatcher.Core {
     public sealed class InvalidPatchDefinitionException : InvalidOperationException {
         public InvalidPatchDefinitionException(string message) : base(message) { }
     }
-#if ISSUE39_OBSERVATION
-    // Only the explicitly instrumented integration-test build exposes this sink.
-    public static class JourneyObservation {
-        public static Action<string> Sink;
-    }
-#endif
     public enum Capability { Checked, Unchecked, Incompatible }
     public sealed class TargetIdentity {
         internal TargetIdentity() { }
@@ -243,17 +236,16 @@ namespace RailroaderScenePatcher.Core {
         internal sealed class Modification {
             internal string Id; internal TargetIdentity Identity; internal ObjectState State; internal string[] Dependencies;
         }
-        [Conditional("ISSUE39_OBSERVATION")]
+        // The start of an attempt trace line: the debug output of one engine stage, as JSON that the native observation
+        // and the attempt summary read.
+        public const string AttemptTrace = "Attempt trace: ";
         void Observe(string stage, string scenePatchFile, string id = null, string path = null, string error = null) {
-#if ISSUE39_OBSERVATION
-            try {
-                JourneyObservation.Sink?.Invoke(new JObject {
-                    ["stage"] = stage, ["document"] = scenePatchFile, ["id"] = id,
-                    ["path"] = path, ["error"] = error,
-                    ["engineRuntimeId"] = RuntimeHelpers.GetHashCode(this)
-                }.ToString(Newtonsoft.Json.Formatting.None));
-            } catch { /* Observation cannot alter application or failure handling. */ }
-#endif
+            // Observation cannot alter application or failure handling; with debug off it builds nothing.
+            PatcherLog.Debug(() => AttemptTrace + new JObject {
+                ["stage"] = stage, ["document"] = scenePatchFile, ["id"] = id,
+                ["path"] = path, ["error"] = error,
+                ["engineRuntimeId"] = RuntimeHelpers.GetHashCode(this)
+            }.ToString(Newtonsoft.Json.Formatting.None));
         }
         public PatchEngine(IScene scene) { this.scene = scene ?? throw new ArgumentNullException(nameof(scene)); }
         void Track(TargetIdentity identity, object target) {

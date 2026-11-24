@@ -141,7 +141,7 @@ static class RecoveryTests {
             Assert(versioned.Error != null && versioned.Error.StartsWith(reason, StringComparison.Ordinal) && versioned.Outcomes.Count == 0 && box.X == 0 && scene.MutationCalls == 1,
                 name + ": runtime applies none of the scene patch file's operations: " + versioned.Error);
             Assert(results[1].Result.Outcomes["move"].Applied && other.X == 50, name + ": another applicable scene patch file still applies");
-            var line = results[0].LogLine("0.6.0", 1, new[] { "elsewhere" });
+            var line = results[0].DebugLine(1, new[] { "elsewhere" });
             Assert(line.Contains("scene patch file not applied: " + reason) && !line.Contains("skipped"), name + ": the log reports the format version, whatever map the scene patch file names: " + line);
             var w = new World(text);
             Assert(w.Session.Blocked != null && w.Session.Blocked.StartsWith(reason, StringComparison.Ordinal) && w.Session.Blocked.Contains("protected from overwrite")

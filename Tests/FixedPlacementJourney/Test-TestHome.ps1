@@ -19,6 +19,8 @@ try {
     $ownedDll=Join-Path $homePath 'Mods/Issue39ScenePatcher/RailroaderScenePatcher.dll'
     Check (Test-Path $ownedDll) 'Owned DLL must be installed'
     $ownedIcon=Join-Path $homePath 'Mods/Issue39ScenePatcher/Icons/SceneWrench.png'
+    $debugSettings=Join-Path $homePath 'Mods/Issue39ScenePatcher/settings.json'
+    Check ((Get-Content -LiteralPath $debugSettings -Raw | ConvertFrom-Json).debugLogging -eq $true) 'The test copy of the patcher starts with its debug option on, so the observation reads its attempt traces'
     Check (Test-Path $ownedIcon) 'The entry icon must be installed beside the product assembly'
     $stopped=$false
     try {& "$PSScriptRoot/TestHome.ps1" @common -Action Install -ProductOutput $product -ObserverDll $observer -FixtureSource (Join-Path $fixtures 'Baseline')} catch {$stopped=$true}

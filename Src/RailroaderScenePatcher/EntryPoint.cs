@@ -19,11 +19,20 @@ namespace RailroaderScenePatcher {
         IModContext context;
         LocalWorldBinding<PatcherBehaviour> world;
         public void OnModLoad(IModContext value) {
-            context = value; Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install(); NewGameStartHook.Install(this);
-            if (NativeSaveClick.Problem != null) context.Log.Info(NativeSaveClick.Problem);
-            if (NativeRepairHooks.Error != null) context.Log.Info(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
-            if (DeferredRestores.Error != null) context.Log.Info(DeferredRestores.Error + ". The game runs its restore-time callbacks before scene patch files apply.");
-            if (NewGameStartHook.Error != null) context.Log.Info(NewGameStartHook.Error + ". A new game starts at the spawn point's scene placement.");
+            context = value;
+            // Every patcher log line goes to the player log through the mod logger, without the player's folders.
+            PatcherLog.Output = new ModLogOutput(context.Log);
+            try {
+                var home = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(context.ModDirectory)));
+                if (!String.IsNullOrEmpty(home)) PatcherLog.HideRoot(home, "");
+                PatcherLog.HideRoot(System.IO.Path.GetDirectoryName(Application.dataPath), "");
+            } catch { }
+            PreferencesModsTab.Install(context.ModDirectory);
+            Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install(); NewGameStartHook.Install(this);
+            if (NativeSaveClick.Problem != null) PatcherLog.Warning(NativeSaveClick.Problem);
+            if (NativeRepairHooks.Error != null) PatcherLog.Warning(NativeRepairHooks.Error + ". Native marker checks and their warnings remain active.");
+            if (DeferredRestores.Error != null) PatcherLog.Warning(DeferredRestores.Error + ". The game runs its restore-time callbacks before scene patch files apply.");
+            if (NewGameStartHook.Error != null) PatcherLog.Warning(NewGameStartHook.Error + ". A new game starts at the spawn point's scene placement.");
         }
         LocalWorldBinding<PatcherBehaviour> Binding() => world ?? (world = new LocalWorldBinding<PatcherBehaviour>(CreateHost, DestroyHost, h => h.BeginAttempt()));
         // Every exit path hands the restore-time callbacks the patcher deferred back to the game, after the apply.
@@ -41,7 +50,7 @@ namespace RailroaderScenePatcher {
             var binding = Binding();
             binding.Enter(map, attempt);
             var state = binding.State;
-            if (state == null) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": " + binding.Error); return; }
+            if (state == null) { PatcherLog.Error("No scene patch file was applied in this load because the patcher couldn't prepare the world: " + binding.Error); return; }
             if (binding.ReentryError != null) state.ReportWorld(binding.ReentryError + ". The patcher started over for this world. Report to the patcher maintainer.");
             if (!state.Initialized) state.Initialize(context); else state.ApplyScenePatchFiles();
         }
@@ -96,11 +105,11 @@ namespace RailroaderScenePatcher {
             try {
                 var binding = Binding();
                 var state = binding.Prepare(MapContext());
-                if (state == null) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": spawn points keep their scene placement for the new game start: " + binding.Error); return; }
+                if (state == null) { PatcherLog.Warning("Spawn points keep their scene placement for the new game start: " + binding.Error); return; }
                 var applied = state.BeforeNewGameStart(context);
-                if (applied > 0) context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": " + applied + " spawn point modification" + (applied == 1 ? "" : "s") + " applied before the new game start");
+                if (applied > 0) PatcherLog.Debug(applied + " spawn point modification" + (applied == 1 ? "" : "s") + " applied before the new game start");
             }
-            catch (Exception e) { context?.Log.Info("Scene Patcher " + PatcherBehaviour.Version + ": spawn points keep their scene placement for the new game start: " + e.GetBaseException().Message); }
+            catch (Exception e) { PatcherLog.Warning("Spawn points keep their scene placement for the new game start", e); }
         }
         // The world's patcher state stays for a later load attempt over the same map context; the next attempt releases the
         // state of every object that did not survive. Parts bound to the native map editor end with the world.
@@ -116,6 +125,8 @@ namespace RailroaderScenePatcher {
             world?.Release();
             ReleaseReporter();
             MapEditorReload.Remove(); NativeSaveClick.Remove(); Hooks.Remove(); NativeRepairHooks.Remove(); DeferredRestores.Remove(); NewGameStartHook.Remove();
+            PreferencesModsTab.Remove();
+            PatcherLog.DebugEnabled = false; PatcherLog.Output = null; PatcherLog.HideRoot(null, null);
         }
         void ReleaseReporter() {
             if (reporter == null) return;
@@ -134,10 +145,10 @@ namespace RailroaderScenePatcher {
         PatchEngine engine;
         PatchRuntime runtime;
         NativePatchDiagnostics nativeDiagnostics;
-        readonly Dictionary<string, KeyValuePair<string, string>> pendingWarnings = new Dictionary<string, KeyValuePair<string, string>>();
-        // Informational overlap notices by native deduplication key; a newer notice for the same object replaces the pending one.
-        readonly Dictionary<string, KeyValuePair<string, string>> pendingNotices = new Dictionary<string, KeyValuePair<string, string>>();
-        bool presentationErrorLogged;
+        // The Log window rows of this load attempt, each delivered once. A newer overlap notice for the same object
+        // replaces the pending one.
+        NativeRows rows;
+        NativeRows Rows => rows ?? (rows = new NativeRows(new NativeRowOutput(() => loadId)));
         TrackMarkerWorld markerWorld;
         TrackMarkerScene markerScene;
         internal bool Initialized { get; private set; }
@@ -232,14 +243,11 @@ namespace RailroaderScenePatcher {
             context = value;
             outlinerWidth = ReadOutlinerWidth();
             Initialized = true;
-            feedback.Log = message => {
+            feedback.Describe = message => {
                 var outstanding = "";
                 try { if (attachment != null) outstanding = " Outstanding: " + attachment.Outstanding(); } catch { }
-                context?.Log.Info(CommandBand.LogLine(feedback.Place, selected?.Identity.Path, message) + outstanding);
+                return CommandBand.LogLine(feedback.Place, selected?.Identity.Path, message) + outstanding;
             };
-#if ISSUE39_OBSERVATION
-            JourneyObservation.Sink = message => Debug.Log("[Issue39Attempt] " + message);
-#endif
             try {
                 inMapEditor = ModScenePatchFiles.IsMapEditor;
                 try {
@@ -257,7 +265,7 @@ namespace RailroaderScenePatcher {
                     groundMasks = new GroundMasks(new GroundMaskWorld(world));
                 } catch (Exception e) {
                     groundMasks = null; GroundMaskWorld.Unavailable();
-                    context.Log.Info("Scene Patcher " + Version + ": ground mask handling incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Ground mask handling incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 PrepareRuntime(value);
                 // A runtime prepared before the world load, for a new game's start or a marker check, built the marker capability without them.
@@ -287,7 +295,7 @@ namespace RailroaderScenePatcher {
                 try { capabilities.Add(new BridgeScene(new BridgeWorld(), Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(BridgeScene.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Bridge capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 // Groups and their parts share one world and the fixed placements that hold parts when their group moves.
                 GroupWorld groupWorld = null;
@@ -298,7 +306,7 @@ namespace RailroaderScenePatcher {
                 } catch (Exception e) {
                     capabilities.AddUnavailable(BakedSceneryGroups.Structure, e.GetBaseException().Message);
                     capabilities.AddUnavailable(BakedSceneryParts.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": baked scenery group capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Baked scenery group capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new ConstructionSceneryScene(new ConstructionSceneryWorld())); }
                 catch (Exception e) {
@@ -307,30 +315,30 @@ namespace RailroaderScenePatcher {
                 try { capabilities.Add(new CrossingPadScene(new CrossingPadWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingPadScene.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": crossing-pad capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Crossing-pad capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new MilepostScene(new MilepostWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(MilepostScene.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": milepost capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Milepost capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new StationMapIconScene(new MapIconWorld())); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(StationMapIconRules.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": station map icon capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Station map icon capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Add(new StarterPlacementScene(new StarterPlacementWorld { KnownReferrers = KnownReferrers }, Capability.Unchecked)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(StarterPlacementScene.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": starter placement capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Starter placement capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 CrossingEquipmentWorld equipmentWorld = null;
                 try { equipmentWorld = new CrossingEquipmentWorld { Warn = Report }; }
-                catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": crossing-equipment capability incompatible or unavailable: " + e.GetBaseException().Message); }
+                catch (Exception e) { PatcherLog.Debug("Crossing-equipment capability incompatible or unavailable: " + e.GetBaseException().Message); }
                 try { capabilities.Add(crossingCoverageScene = new CrossingCoverageScene(new CrossingCoverageWorld(), Capability.Unchecked, equipmentWorld)); }
                 catch (Exception e) {
                     capabilities.AddUnavailable(CrossingCoverageScene.Structure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": crossing-coverage capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Crossing-coverage capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 // Existing masts and bells take their transforms, cullers and own culling from the group world, with their
                 // crossing controller as the group; one set of fixed placements gives each crossing one culling plan.
@@ -342,11 +350,11 @@ namespace RailroaderScenePatcher {
                 } catch (Exception e) {
                     capabilities.AddUnavailable(ExistingEquipmentScene.MastStructure, e.GetBaseException().Message);
                     capabilities.AddUnavailable(ExistingEquipmentScene.BellStructure, e.GetBaseException().Message);
-                    context.Log.Info("Scene Patcher " + Version + ": existing crossing equipment capability incompatible or unavailable: " + e.GetBaseException().Message);
+                    PatcherLog.Debug("Existing crossing equipment capability incompatible or unavailable: " + e.GetBaseException().Message);
                 }
                 try { capabilities.Tracks = trackPoses = new NativeTrackPoses(); }
-                catch (Exception e) { context.Log.Info("Scene Patcher " + Version + ": track-following placement unavailable: " + e.GetBaseException().Message); }
-                context.Log.Info("Scene Patcher " + Version + ": native capabilities checked; game " + Application.version + "; production integration unchecked");
+                catch (Exception e) { PatcherLog.Debug("Track-following placement unavailable: " + e.GetBaseException().Message); }
+                PatcherLog.Debug("Game capabilities checked; game " + Application.version + ".");
                 ApplyScenePatchFiles();
             } catch (Exception e) {
                 status = "Scene capabilities unavailable: " + e.GetBaseException().Message;
@@ -357,7 +365,6 @@ namespace RailroaderScenePatcher {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
-            ModScenePatchFiles.Log = message => context?.Log.Info(message);
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
@@ -365,7 +372,7 @@ namespace RailroaderScenePatcher {
             try { capabilities.Add(new SpawnPointScene(new SpawnPointWorld(), Capability.Unchecked)); }
             catch (Exception e) {
                 capabilities.AddUnavailable(SpawnPoints.Structure, e.GetBaseException().Message);
-                context?.Log.Info("Scene Patcher " + Version + ": spawn point capability incompatible or unavailable: " + e.GetBaseException().Message);
+                PatcherLog.Debug("Spawn point capability incompatible or unavailable: " + e.GetBaseException().Message);
             }
             engine = new PatchEngine(capabilities);
             nativeDiagnostics = new NativePatchDiagnostics(Report);
@@ -395,7 +402,7 @@ namespace RailroaderScenePatcher {
             foreach (var mod in ModScenePatchFiles.Discover()) {
                 if (mod == null || mod.Error != null || !mod.Applicable) continue;
                 try { applied += runtime.BeforeNewGameStart(mod.Json, mod.Source).Outcomes.Values.Count(o => o.Applied); }
-                catch (Exception e) { context?.Log.Info(Describe(mod, "Spawn point placement before the new game start failed: " + e.GetBaseException().Message)); }
+                catch (Exception e) { PatcherLog.Warning(Describe(mod, "Spawn point placement before the new game start failed: " + e.GetBaseException().Message)); }
             }
             return applied;
         }
@@ -408,17 +415,17 @@ namespace RailroaderScenePatcher {
             IReadOnlyList<LoadedScenePatchFile> scenePatchFiles;
             try { scenePatchFiles = runtime.ApplyLoaded(ModScenePatchFiles.Discover(), overlapNotices ?? (overlapNotices = new NativeOverlapNotices(this))); }
             catch (Exception e) { Report("discovery", "Loaded mod discovery failed. Report to the patcher maintainer. " + e.GetBaseException().Message); return; }
-            // One line per scene patch file per load attempt says what happened to it, also when nothing else is reported, such
-            // as for a mod without the patcher dependency.
+            // Each scene patch file's outcome in this load attempt is a debug line; a file-level failure that gives no Log
+            // window row, such as a mod without the patcher dependency, is one player warning.
             loadAttempts++;
             string[] maps = null;
             try { maps = ModScenePatchFiles.MapIds(); } catch { }
             foreach (var scenePatchFile in scenePatchFiles) {
                 var mod = scenePatchFile.Mod;
-                try { context?.Log.Info(scenePatchFile.LogLine(Version, loadAttempts, maps)); } catch { }
+                try { scenePatchFile.WriteLog(loadAttempts, maps); } catch { }
                 // Follow-up work for one scene patch file cannot stop the others; their application has already happened in load order.
                 try {
-                    if (scenePatchFile.PresentationError != null) context?.Log.Info(Describe(mod, scenePatchFile.PresentationError));
+                    if (scenePatchFile.PresentationError != null) PatcherLog.Warning(Describe(mod, scenePatchFile.PresentationError));
                     if (scenePatchFile.Result == null) {
                         if (mod.Error != null) EditedScenePatchFileDiagnostic(mod, Describe(mod, mod.Error));
                         continue;
@@ -435,20 +442,18 @@ namespace RailroaderScenePatcher {
                         }
                         else ReconcileMarkerWarning(mod, item.Key, item.Value);
                     }
-                } catch (Exception e) { context?.Log.Info(Describe(mod, "Follow-up after application failed: " + e.GetBaseException().Message)); }
+                } catch (Exception e) { PatcherLog.Warning(Describe(mod, "The checks after the scene patch file was applied didn't finish: " + e.GetBaseException().Message)); }
             }
             status = "Scene patch files processed. " + (scene?.Status ?? "");
         }
         NativeOverlapNotices overlapNotices;
-        // The load attempts of this world so far; the log lines of one attempt carry its number.
+        // The load attempts of this world so far; the debug lines of one attempt carry its number.
         int loadAttempts;
         sealed class NativeOverlapNotices : IOverlapNotices {
             readonly PatcherBehaviour owner;
             internal NativeOverlapNotices(PatcherBehaviour owner) { this.owner = owner; }
             public void Notice(OverlapNotice notice) {
-                owner.context?.Log.Info("Scene Patcher overlap notice: " + notice.Message);
-                owner.pendingNotices[notice.Key] = new KeyValuePair<string, string>(notice.Target.Scene + "/" + notice.Target.Path, notice.Message);
-                owner.FlushWarnings();
+                owner.Rows.Notice(notice.Key, notice.Target.Scene + "/" + notice.Target.Path, notice.Message);
             }
         }
         void ReconcileMarkerWarning(LoadedMod mod, string operation, Outcome outcome) {
@@ -466,7 +471,7 @@ namespace RailroaderScenePatcher {
                     capabilities.Preflight(target);
                     var actual = markerWorld.Location(target);
                     return ModScenePatchFiles.MapIds().Contains((string)scenePatchFile["sourceMap"]["mapId"], StringComparer.Ordinal) && actual != null && actual.Segment == (string)binding["segment"] && actual.End == (string)binding["end"] && Math.Abs(actual.Distance - (double)binding["distance"]) <= 0.001 && markerWorld.DependentProblem(target) == null;
-                })) context?.Log.Info("Scene Patcher reconciled one exactly attributed current marker warning after verified repair. Earlier route unavailable: " + attribution.EarlyRouteUnavailable);
+                })) PatcherLog.Debug("A track marker warning in the Log window was removed after its repair was verified. The repair couldn't run before the game's marker check: " + attribution.EarlyRouteUnavailable);
             }
         }
         static string Describe(LoadedMod loaded, string message) {
@@ -485,36 +490,11 @@ namespace RailroaderScenePatcher {
         // game that reports it, as native rows name a mod file or definition with their subsystem. The source is this
         // patcher's one name; the originator is the supplying mod's scene patch file, the object of an overlap notice, or
         // the patcher's own mod for a state of the patcher.
-        const string LogSource = "Railroader Scene Patcher";
+        // The row is the player's line: the game writes it to the player log, so the patcher writes no line beside it.
         void Report(string key, string message, string originator = LoadedMod.PatcherId) {
             if (!reported.Add(key)) return;
             diagnostics.Add(message); status = message;
-            context?.Log.Info(message);
-            pendingWarnings[key] = new KeyValuePair<string, string>(originator, message);
-            FlushWarnings();
-        }
-        void FlushWarnings() {
-            // Before collector initialization MessageLog falls back to Serilog, which is not player presentation.
-            if (Game.Diagnostics.MessageCollector.Shared == null) return;
-            foreach (var item in pendingWarnings.ToArray()) {
-                try {
-                    Game.Diagnostics.MessageLog.Warning(item.Value.Key, item.Value.Value, LogSource, loadId + item.Key);
-                    pendingWarnings.Remove(item.Key);
-                } catch (Exception e) {
-                    if (!presentationErrorLogged) { presentationErrorLogged = true; context?.Log.Info("Native structured warning delivery unavailable; delivery remains pending: " + e.GetBaseException().Message); }
-                    return;
-                }
-            }
-            // An informational row: it reports possible incompatibility and is never a failure warning.
-            foreach (var item in pendingNotices.ToArray()) {
-                try {
-                    Game.Diagnostics.MessageLog.Info(item.Value.Key, item.Value.Value, LogSource, loadId + item.Key);
-                    pendingNotices.Remove(item.Key);
-                } catch (Exception e) {
-                    if (!presentationErrorLogged) { presentationErrorLogged = true; context?.Log.Info("Native structured notice delivery unavailable; delivery remains pending: " + e.GetBaseException().Message); }
-                    return;
-                }
-            }
+            Rows.Warning(key, originator, message);
         }
         // The native map editor appears after world load and is replaced by a native map editor reload.
         void Attach() {
@@ -536,12 +516,12 @@ namespace RailroaderScenePatcher {
                     presentation.ResetRequested = ResetLayout;
                     presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
                     presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
-                    if (presentation.TitleIconProblem != null) context?.Log.Info("A title-bar icon could not join the title bar (" + presentation.TitleIconProblem + "); the window help holds a button for it.");
-                    if (presentation.TitleHelpProblem != null) context?.Log.Info("The window help button could not join the title bar (" + presentation.TitleHelpProblem + "); it stands in the command band.");
+                    if (presentation.TitleIconProblem != null) PatcherLog.Debug("A title-bar icon could not join the title bar (" + presentation.TitleIconProblem + "); the window help holds a button for it.");
+                    if (presentation.TitleHelpProblem != null) PatcherLog.Debug("The window help button could not join the title bar (" + presentation.TitleHelpProblem + "); it stands in the command band.");
                 }
                 catch (Exception e) {
                     Report("inspection-presentation", "Inspection UI unavailable: " + e.GetBaseException().Message);
-                    context?.Log.Info("Inspection UI unavailable: " + e);
+                    PatcherLog.Debug(() => "Inspection UI unavailable: " + e);
                 }
             }
             if (Hooks.Error != null) { refusedMapEditor = found; editingStatus = Hooks.Error; return; }
@@ -560,7 +540,6 @@ namespace RailroaderScenePatcher {
                 ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
                 filled = false;
                 snap = new SnapController(attachment.Session, capabilities, new NativeSnapScene(native));
-                attachment.Log = message => context?.Log.Info(message);
                 editingStatus = attachment.Session.Blocked ?? "Editing ready for " + attachment.PatchPath;
                 // The native map editor built its title before this session could account for the scene patch file.
                 attachment.RefreshChrome();
@@ -718,21 +697,13 @@ namespace RailroaderScenePatcher {
             attachment?.RefreshChrome();
             presentation?.RequestRefresh();
         }
-        // Own culling's reports in the mod log: information as information, a failure as a Unity warning.
-        sealed class CullingLog : ICullingLog {
-            readonly IModContext context;
-            internal CullingLog(IModContext context) { this.context = context; }
-            public void Information(string message) => context.Log.Info(message);
-            public void Warning(string message) => Debug.LogWarning("Scene Patcher: " + message);
-        }
-        CullingLog cullingLog;
         void Update() {
-            FlushWarnings();
+            rows?.Flush();
             if (!Initialized || engine == null) return;
             // Own culling of moved parts installs what waited for a game culler to start. What it could not take out
             // again is information for the log, not a warning.
             GroupWorld.Tick();
-            if (context != null) GroupWorld.ReportCulling(cullingLog ?? (cullingLog = new CullingLog(context)));
+            GroupWorld.ReportCulling();
             // Focus callbacks can arrive before the editor attachment is ready. Keep the check pending until Update
             // has attached it, and also observe the focus edge when Unity does not deliver the callback to this host.
             var focused = Application.isFocused;
@@ -821,7 +792,7 @@ namespace RailroaderScenePatcher {
                 });
                 else UI.GameInput.UnregisterEscapeHandler(UI.GameInput.EscapeHandler.Transient);
                 escapeHeld = escapable;
-            } catch (Exception e) { escapeHeld = escapable; context?.Log.Info("Escape handling for the world choice and the gizmo is unavailable: " + e.GetBaseException().Message); }
+            } catch (Exception e) { escapeHeld = escapable; PatcherLog.Debug("Escape handling for the world choice and the gizmo is unavailable: " + e.GetBaseException().Message); }
             try { Attach(); }
             catch (Exception e) { editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }
             if (fileCheckAfterFocus && applicationFocused && attachment != null) {
@@ -876,7 +847,7 @@ namespace RailroaderScenePatcher {
             } else inventory?.CancelFreshnessCheck();
             if (inventory != null && inventory.IsStale != staleLogged) {
                 staleLogged = inventory.IsStale;
-                if (staleLogged) context?.Log.Info("Scene inventory marked stale: " + inventory.StaleReason);
+                if (staleLogged) PatcherLog.Debug("Scene inventory marked stale: " + inventory.StaleReason);
             }
             FollowTracks();
             // Every move of the native map editor's history can change the surface the frames are cut at: a placement edit with
@@ -927,7 +898,7 @@ namespace RailroaderScenePatcher {
                 if (!attachment.Session.HasTrackFollowing) return;
                 foreach (var item in attachment.Session.ReconcileTrackFollowing())
                     if (item.Value.Applied) {
-                        context?.Log.Info("Scene Patcher: " + item.Key + " followed its track");
+                        PatcherLog.Debug(item.Key + " followed its track");
                         // The move is this patcher's own: the object is observed again, as after Undo of its own step,
                         // so the comparison does not read its new placement as a foreign change.
                         // A follow outcome names the object it moved, not an identity.
@@ -937,9 +908,9 @@ namespace RailroaderScenePatcher {
                     }
                     else if (reported.Add("follow/" + item.Key + "/" + item.Value.Error)) {
                         diagnostics.Add(item.Key + " could not follow its track: " + item.Value.Error);
-                        context?.Log.Info("Scene Patcher: " + item.Key + " could not follow its track: " + item.Value.Error);
+                        PatcherLog.Debug(item.Key + " could not follow its track: " + item.Value.Error);
                     }
-            } catch (Exception e) { if (reported.Add("follow/" + e.GetBaseException().Message)) context?.Log.Info("Scene Patcher: track following stopped: " + e.GetBaseException().Message); }
+            } catch (Exception e) { if (reported.Add("follow/" + e.GetBaseException().Message)) PatcherLog.Warning("Objects that follow their track stopped following it: " + e.GetBaseException().Message); }
         }
         // Differs whenever the set of objects the scene patch file changes can differ.
         string ChangeStamp() { try { return attachment?.ChangeKey; } catch { return null; } }
@@ -1003,9 +974,10 @@ namespace RailroaderScenePatcher {
             var reentry = engine.Reenter();
             runtime = new PatchRuntime(engine, nativeDiagnostics, Version, Application.version);
             overlapNotices = null;
-            // Warnings not yet delivered belong to the previous load attempt.
-            reported.Clear(); diagnostics.Clear(); editedDiagnostics.Clear(); pendingWarnings.Clear(); pendingNotices.Clear();
-            loadId = Guid.NewGuid().ToString("N"); presentationErrorLogged = false;
+            // Rows not yet delivered belong to the previous load attempt: each is written once to the player log instead.
+            rows?.Abandon(); rows = null;
+            reported.Clear(); diagnostics.Clear(); editedDiagnostics.Clear();
+            loadId = Guid.NewGuid().ToString("N");
             if (inventory != null) { inventory = new SceneInventory(native); staleLogged = true; }
             selected = null; selectionProblem = null; scenePatchFileInspection = "";
             // The panel's state belongs to the load attempt as well: what it read, compared, reported and had open. The
@@ -1016,7 +988,7 @@ namespace RailroaderScenePatcher {
             CloseCoverageForm(); CloseEquipmentForm();
             feedback.Clear();
             status = "Load attempt over the retained world";
-            context?.Log.Info("Scene Patcher " + Version + ": load attempt over the retained world; " + reentry.Retained + " objects retained, " + reentry.Released + " released, " + reentry.Failures.Count + " cleanup failures");
+            PatcherLog.Debug("Load attempt over the retained world: " + reentry.Retained + " objects retained, " + reentry.Released + " released, " + reentry.Failures.Count + " cleanup failures.");
             // Local only: no other peer is told, rolled back or disconnected.
             foreach (var failure in reentry.Failures)
                 Report("reentry/" + failure, "Retained world cleanup is incomplete on this peer: " + failure + ". The patcher retries at the next load; reload the map to clear it. Report to the patcher maintainer.");
@@ -1031,6 +1003,8 @@ namespace RailroaderScenePatcher {
             replayed.Clear(); moved.Clear();
             inventory?.CancelFreshnessCheck();
             if (escapeHeld) { try { UI.GameInput.UnregisterEscapeHandler(UI.GameInput.EscapeHandler.Transient); } catch { } escapeHeld = false; }
+            // The world ends: a row the Log window didn't take is written once to the player log instead.
+            rows?.Abandon();
         }
         internal void Release() { ReleaseParts(); }
         void ReleaseParts() {
@@ -1040,7 +1014,7 @@ namespace RailroaderScenePatcher {
             // Ending the capabilities returns patched crossings to their native coverage when the scene stays.
             capabilities?.Dispose();
             groundMasks?.Dispose(); groundMasks = null; GroundMaskWorld.Unavailable(); scene?.Dispose(); scene = null; world?.Dispose(); world = null; capabilities = null; crossingCoverageScene = null; engine = null; inventory = null; native = null; selected = null;
-            runtime = null; markerWorld = null; markerScene = null; nativeDiagnostics = null; pendingWarnings.Clear(); pendingNotices.Clear(); overlapNotices = null;
+            runtime = null; markerWorld = null; markerScene = null; nativeDiagnostics = null; rows?.Abandon(); rows = null; overlapNotices = null;
         }
         static string Join(IReadOnlyList<string> items) => items.Count == 0 ? "none" : String.Join("; ", items);
         void OnDestroy() { Release(); }
@@ -1206,7 +1180,8 @@ namespace RailroaderScenePatcher {
             var line = problem == null ? null : CommandBand.ChoiceLog(forObject, problem, offers);
             if (line == loggedChoiceProblem) return;
             loggedChoiceProblem = line;
-            if (line != null) context?.Log.Info(line);
+            // A world-choice refusal is a debug line; the message area shows it in both modes.
+            if (line != null) PatcherLog.Debug(line);
         }
         void ResetLayout() { outlinerWidth = OutlinerDefaultWidth; ForgetOutlinerWidth(); presentation?.ResetLayout(); }
 
@@ -1639,16 +1614,17 @@ namespace RailroaderScenePatcher {
         // A crossing pad's geometry is generated along its track binding: a placement moves the pad object and nothing
         // the player sees, and its result says so.
         bool IsPad => selected != null && selected.Identity.Structure == CrossingPadScene.Structure;
-        // The baked scenery rule's verdicts, written to the log once per load attempt for the evidence of the listed and
+        // The baked scenery rule's verdicts, a debug line once per load attempt for the evidence of the listed and
         // unlisted group roots.
         string loggedVerdicts;
         void LogGroupVerdicts() {
             if (loggedVerdicts == loadId) return;
             loggedVerdicts = loadId;
+            if (!PatcherLog.DebugEnabled) return;
             try {
                 var lines = GroupWorld.Report().ToArray();
-                context?.Log.Info("Scene Patcher " + Version + ": baked scenery rule, " + lines.Length + " candidates:" + Environment.NewLine + String.Join(Environment.NewLine, lines));
-            } catch (Exception e) { context?.Log.Info("Scene Patcher " + Version + ": baked scenery rule report unavailable: " + e.GetBaseException().Message); }
+                PatcherLog.Debug("Baked scenery rule, " + lines.Length + " candidates:" + Environment.NewLine + String.Join(Environment.NewLine, lines));
+            } catch (Exception e) { PatcherLog.Debug("Baked scenery rule report unavailable: " + e.GetBaseException().Message); }
         }
         void Inspect() {
             feedback.Refreshed();

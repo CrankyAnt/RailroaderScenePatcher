@@ -80,7 +80,7 @@ namespace RailroaderScenePatcher {
                 if (transformer.GetMethods(Native.Flags).Count(m => m.Name == method && m.GetParameters().Length == 1) != 1) throw new MissingMethodException(TransformerType, method);
             try { bells = new CrossingBells(controller); } catch (Exception e) {
                 bellsUnavailable = EquipmentAddition.BellsUnavailable;
-                Debug.LogWarning("Scene Patcher: crossing bells are unavailable: " + e);
+                PatcherLog.Debug(() => "Crossing bells are unavailable: " + e);
             }
         }
         // Why bells are unavailable on this build, or null.
@@ -94,7 +94,7 @@ namespace RailroaderScenePatcher {
         static bool Loaded(GameObject g) => g != null && g.scene.IsValid() && g.scene.isLoaded;
         public void VerificationFailed(object target, string detail) {
             var path = BoardScene.PathOf(((GameObject)target).transform).Replace("\r", "\\r").Replace("\n", "\\n");
-            Debug.LogWarning("Scene Patcher crossing equipment verification failed: destination=" + path + " " + detail);
+            PatcherLog.Debug("Crossing equipment verification failed: destination=" + path + " " + detail);
         }
         static Component[] All(GameObject root, Type type) => root.GetComponentsInChildren(type, true).Where(c => c != null).ToArray();
         static bool Inside(GameObject root, GameObject child) { for (var t = child == null ? null : child.transform; t != null; t = t.parent) if (t == root.transform) return true; return false; }
@@ -186,7 +186,7 @@ namespace RailroaderScenePatcher {
                     foreach (var bell in bells.All()) found.Add(SourceCandidate.Bell(bell.Identifier, bell.Name, SourceProblem(bell, destination, EquipmentAddition.BellPattern)));
                     result.AddRange(found);
                 } catch (Exception e) {
-                    Debug.LogWarning("Scene Patcher: cannot read bell definitions from the content library: " + e);
+                    PatcherLog.Warning("The bell list is empty because the patcher can't read the bell definitions from the game's content library", e);
                     result.Add(SourceCandidate.UnavailableBells(EquipmentAddition.BellDefinitionsUnreadable));
                 }
             }

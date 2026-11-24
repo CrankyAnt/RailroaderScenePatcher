@@ -85,7 +85,7 @@ namespace RailroaderScenePatcher {
                 if (dismissed) return;
                 // Like the native generic factory, a failed callback leaves the prompt open.
                 try { choose(value); }
-                catch (Exception e) { Debug.LogException(e); return; }
+                catch (Exception e) { PatcherLog.Error("The Map Editor reload choice didn't run; the prompt stays open", e); return; }
                 dismissed = true;
                 dismiss();
             }
@@ -123,8 +123,8 @@ namespace RailroaderScenePatcher {
                 var selector = Native.Read(Native.Type("CameraSelector"), "shared");
                 var point = GroundPoint(selector);
                 var id = returns.Capture(mapIdentifier, ControllerId(), Coordinates(point), DateTime.UtcNow);
-                current.Log("Reload captured working map location " + point + " for " + mapIdentifier + "; return " + id + ".");
-            } catch (Exception e) { returns.Cancel(); current.Log("Working-location capture unavailable; reload will use the native camera location: " + e.GetBaseException().Message); }
+                PatcherLog.Debug("Reload captured working map location " + point + " for " + mapIdentifier + "; return " + id + ".");
+            } catch (Exception e) { returns.Cancel(); PatcherLog.Debug("Working-location capture unavailable; reload will use the native camera location: " + e.GetBaseException().Message); }
         }
         static int ControllerId() {
             var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared") as UnityEngine.Object;
@@ -166,13 +166,13 @@ namespace RailroaderScenePatcher {
                     var strategy = Enum.Parse(selectorType.GetNestedType("CameraIdentifier", Native.Flags), "Strategy");
                     if (!returns.MarkRequested(pending.RequestId, map, controller, now)) return;
                     Native.Call(selector, "JumpToPoint", point, Quaternion.identity, strategy);
-                    current.Log("Reload requested return " + pending.RequestId + " to working map location " + point + "; arrival is pending.");
+                    PatcherLog.Debug("Reload requested return " + pending.RequestId + " to working map location " + point + "; arrival is pending.");
                     return;
                 }
                 var measured = GroundPoint(selector);
                 if (returns.Complete(pending.RequestId, map, controller, Coordinates(measured), now)) {
                     relaunching = false;
-                    current.Log("Reload checked return " + pending.RequestId + " at working map location " + measured + ".");
+                    PatcherLog.Debug("Reload checked return " + pending.RequestId + " at working map location " + measured + ".");
                 }
             } catch (Exception e) {
                 relaunching = false; returns.Cancel();
