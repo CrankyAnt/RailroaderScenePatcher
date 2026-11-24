@@ -205,8 +205,9 @@ namespace RailroaderScenePatcher {
             hooks = null;
             try {
                 if (cleanup.Count != 0) {
-                    var message = "The patcher could not verify cleanup after using the gizmo. Reload the Map Editor. " + String.Join("; ", cleanup);
-                    attachment.Fault = message;
+                    var detail = String.Join("; ", cleanup);
+                    var message = EditingFault.Describe(EditingFailure.GizmoCleanup, detail);
+                    attachment.Fault.Fail(EditingFailure.GizmoCleanup, detail);
                     if (notify) finished?.Invoke(result, message);
                 } else if (notify) finished?.Invoke(result, result?.Error == null ? "Gizmo drag cancelled; the prior placement is restored." : "Gizmo cancellation failed: " + result.Error);
             } finally { if (gameObject != null) Destroy(gameObject); }

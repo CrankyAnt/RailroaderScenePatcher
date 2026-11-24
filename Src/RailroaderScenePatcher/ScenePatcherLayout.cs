@@ -1760,7 +1760,7 @@ namespace RailroaderScenePatcher {
                 if (MapEditorReload.Error != null) PlainLabel(builder, MapEditorReload.Error);
                 if (session.LastSave != null && session.LastSave.Error != null) builder.AddLabel(Tint(Red, "Last Save failed: " + session.LastSave.Error + " Completed: " + (session.LastSave.Completed.Count == 0 ? "none" : String.Join(", ", session.LastSave.Completed.Select(PatchEditingSession.DisplayItem))) + ". Outstanding: " + String.Join(", ", session.LastSave.Outstanding.Select(PatchEditingSession.DisplayItem)) + ". Edits remain in memory; correct the cause and Save again."));
                 if (session.IncompleteOperation != null) builder.AddLabel(Tint(Red, "Incomplete operation: " + session.IncompleteOperation));
-                if (attachment.Fault != null) builder.AddLabel(Tint(Red, attachment.Fault));
+                if (attachment.Fault.Text != null) builder.AddLabel(Tint(Red, attachment.Fault.Text));
             }
             DrawScenePatchFileRecovery(builder);
             Section(builder, "Supplied definitions");

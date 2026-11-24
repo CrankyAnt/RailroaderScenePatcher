@@ -30,13 +30,18 @@ namespace RailroaderScenePatcher {
         // Installs the section and returns the debug option, which is unavailable when the Preferences hook is incompatible.
         internal static DebugOption Install(string modDirectory) {
             var available = false;
+            string settings = null;
             var patcher = new Harmony(Id);
             try {
+                if (String.IsNullOrEmpty(modDirectory)) throw new InvalidOperationException("the patcher's mod folder is unknown");
+                settings = Path.Combine(modDirectory, DebugOption.FileName);
+                // Another mod's registry under the shared key, of another type, is left as it is.
+                if (AppDomain.CurrentDomain.GetData(Slot) != null && Sections(false) == null) throw new InvalidOperationException("the shared Mods tab registry holds something this patcher can't read");
                 var target = AccessTools.Method(typeof(UI.PreferencesWindow.PreferencesBuilder), "BuildTabs", new[] { typeof(UITabbedPanelBuilder) });
                 if (target == null || target.ReturnType != typeof(void)) throw new MissingMethodException("PreferencesBuilder.BuildTabs");
                 patcher.Patch(target, postfix: new HarmonyMethod(typeof(PreferencesModsTab), nameof(AfterBuildTabs)));
                 section = DrawSection;
-                var list = Sections(true);
+                var list = Sections(true) ?? throw new InvalidOperationException("the shared Mods tab registry holds something this patcher can't read");
                 lock (list) list.Add(section);
                 harmony = patcher;
                 available = true;
@@ -45,7 +50,7 @@ namespace RailroaderScenePatcher {
                 section = null;
                 PatcherLog.Warning("The debug option is unavailable because the patcher can't add its section to the Mods tab in Preferences", e);
             }
-            return option = new DebugOption(new SettingsFile(Path.Combine(modDirectory, DebugOption.FileName)), available);
+            return option = new DebugOption(new SettingsFile(settings), available);
         }
         internal static void Remove() {
             try {
@@ -57,8 +62,12 @@ namespace RailroaderScenePatcher {
         }
         static List<Action<UIPanelBuilder>> Sections(bool create) {
             var domain = AppDomain.CurrentDomain;
-            var list = domain.GetData(Slot) as List<Action<UIPanelBuilder>>;
-            if (list == null && create) { list = new List<Action<UIPanelBuilder>>(); domain.SetData(Slot, list); }
+            var value = domain.GetData(Slot);
+            if (value is List<Action<UIPanelBuilder>> list) return list;
+            // Only an empty slot is filled; a value of another type belongs to another mod and stays.
+            if (value != null || !create) return null;
+            list = new List<Action<UIPanelBuilder>>();
+            domain.SetData(Slot, list);
             return list;
         }
         static void AfterBuildTabs(UITabbedPanelBuilder builder) {
@@ -105,12 +114,18 @@ namespace RailroaderScenePatcher {
     internal sealed class SettingsFile : ISettingsStore {
         readonly string path;
         internal SettingsFile(string path) { this.path = path; }
-        public string Read() => File.Exists(path) ? File.ReadAllText(path) : null;
+        public string Read() => path != null && File.Exists(path) ? File.ReadAllText(path) : null;
         public void Write(string text) {
+            if (path == null) throw new InvalidOperationException("the patcher's mod folder is unknown");
             var temporary = path + ".tmp";
-            File.WriteAllText(temporary, text);
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
+            try {
+                File.WriteAllText(temporary, text);
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+            } catch {
+                try { if (File.Exists(temporary)) File.Delete(temporary); } catch { }
+                throw;
+            }
         }
     }
 }

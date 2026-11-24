@@ -48,8 +48,8 @@ namespace RailroaderScenePatcher {
             return false;
         }
         internal static void Request(MapEditorAttachment current, string mapIdentifier) {
-            if (Error != null) { current.Fault = Error; return; }
-            if (!returns.CanReload(DateTime.UtcNow, message => current.Fault = message)) return;
+            if (Error != null) { current.Fault.Fail(EditingFailure.HookUnavailable, Error); return; }
+            if (!returns.CanReload(DateTime.UtcNow, message => current.Fault.Fail(EditingFailure.ReloadPending, message))) return;
             if (confirming || relaunching) return;
             try {
                 current.Session.CheckFileVersion();
@@ -70,13 +70,13 @@ namespace RailroaderScenePatcher {
                         finally { allowed = false; }
                     });
                     if (problem != null) {
-                        current.Fault = problem;
+                        current.Fault.Fail(EditingFailure.ReloadStopped, problem);
                         Hooks.PresentMethod().Invoke(null, new object[] { "Reload Cancelled", problem + " The Map Editor remains open. You can try again, discard the remaining unsaved work, or cancel.", new[] { (0, "OK") }, (Action<int>)(_ => { }) });
                     }
                 };
                 confirming = true;
                 PresentChoices(message, choose, canSave, unsaved);
-            } catch (Exception e) { confirming = false; current.Fault = "Reload cancelled: " + e.GetBaseException().Message; }
+            } catch (Exception e) { confirming = false; current.Fault.Fail(EditingFailure.ReloadCancelled, e.GetBaseException().Message); }
         }
         // Without unsaved work the reload discards nothing, so its one action is Reload.
         static void PresentChoices(string message, Action<int> choose, bool canSave, bool unsaved) {
@@ -140,7 +140,7 @@ namespace RailroaderScenePatcher {
         internal static void Poll(MapEditorAttachment current) {
             var now = DateTime.UtcNow;
             if (!returns.Active(now)) {
-                if (relaunching && current != null) current.Fault = "The return to your working location did not complete within five minutes. Check the game's load diagnostics before trying again.";
+                if (relaunching && current != null) current.Fault.Fail(EditingFailure.ReturnTimedOut);
                 relaunching = false;
                 return;
             }
@@ -176,7 +176,7 @@ namespace RailroaderScenePatcher {
                 }
             } catch (Exception e) {
                 relaunching = false; returns.Cancel();
-                if (current != null) current.Fault = "The Map Editor reloaded, but your working location could not be restored: " + e.GetBaseException().Message;
+                if (current != null) current.Fault.Fail(EditingFailure.LocationNotRestored, e.GetBaseException().Message);
             }
         }
     }

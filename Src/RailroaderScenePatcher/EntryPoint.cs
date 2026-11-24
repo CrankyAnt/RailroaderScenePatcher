@@ -26,6 +26,8 @@ namespace RailroaderScenePatcher {
                 var home = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(context.ModDirectory)));
                 if (!String.IsNullOrEmpty(home)) PatcherLog.HideRoot(home, "");
                 PatcherLog.HideRoot(System.IO.Path.GetDirectoryName(Application.dataPath), "");
+                PatcherLog.HideRoot(Application.persistentDataPath, "");
+                PatcherLog.HideRoot(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "~");
             } catch { }
             PreferencesModsTab.Install(context.ModDirectory);
             Hooks.Install(); NativeSaveClick.Install(); MapEditorReload.Install(); NativeRepairHooks.Install(this); DeferredRestores.Install(); NewGameStartHook.Install(this);
@@ -676,7 +678,7 @@ namespace RailroaderScenePatcher {
                 var changed = feedback.CheckFileVersion(session, RecoveryPlace);
                 if (session.ImportOutdated) { session.ImportOutdated = false; feedback.Report(ImportPlace, FilePanelState.ImportOutdated); changed = true; }
                 if (changed) VersionChanged();
-            } catch (Exception e) { attachment.Fault = "Could not check the scene patch file: " + e.GetBaseException().Message; }
+            } catch (Exception e) { attachment.Fault.Fail(EditingFailure.FileCheck, e.GetBaseException().Message); }
         }
         void VersionChanged() {
             if (attachment != null) feedback.ObserveFileVersion(attachment.Session, RecoveryPlace);
@@ -923,7 +925,7 @@ namespace RailroaderScenePatcher {
                     outstanding = OutstandingSnapshot() + "|" +
                         session.LastSave?.Error + "|" + (session.LastSave == null ? "" : String.Join(", ", session.LastSave.Completed)) + "|" +
                         (session.LastSave == null ? "" : String.Join(", ", session.LastSave.Outstanding)) + "|" +
-                        session.IncompleteOperation + "|" + attachment.Fault;
+                        session.IncompleteOperation + "|" + attachment.Fault.Text;
                 }
             } catch (Exception e) { outstanding = e.GetBaseException().Message; }
             return String.Join("|", guided.Enabled, guided.Step, guided.Kind, guided.Message, guided.Recovery, inspectorTab.Value, presentation?.HelpRegion, candidateDetails, gizmoTool, Requests.Place, status, scene?.Status, inventory?.IsStale, inventory?.StaleReason, definitionsStale, editingStatus, feedback.Place, feedback.Result,

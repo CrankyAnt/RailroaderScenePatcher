@@ -757,7 +757,7 @@ static class PartCullingTests {
         f.World.PartsAt[Other + "/Lamp"] = new List<object> { second.Parts[2] };
         Assert(Applies(f, Part("far-post", "Jetty/Post", FarPost), Mod("far-lamp", Other + "/Lamp", BakedSceneryParts.Structure, new[] { 1160.0, 10, 30 }, null)), "Both groups have a moved part out of their culler's sphere");
         Assert(Spheres(f).Count == 2, "Each group holds its own sphere");
-        f.World.Culling.Name = group => ReferenceEquals(group, f.Group) ? Mill : ReferenceEquals(group, second) ? Other : null;
+        f.World.Culling.GroupName = group => ReferenceEquals(group, f.Group) ? Mill : ReferenceEquals(group, second) ? Other : null;
         var failure = "game function gone";
         f.World.Native.FailAlive = target => ReferenceEquals(target, f.Group) || ReferenceEquals(target, second) ? new InvalidOperationException(failure) : null;
         var log = RecordingLog.Capture(false, () => {

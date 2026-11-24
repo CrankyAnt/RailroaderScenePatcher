@@ -39,8 +39,8 @@ namespace RailroaderScenePatcher.Core {
             try { built = text(); } catch { return; }
             Write(LogLevel.Debug, built);
         }
-        // Leaves a known folder out of every line, replaced by a label; an empty label leaves the relative path. A null
-        // root clears the known folders.
+        // Leaves a known folder out of every line, replaced by a label such as ~; an empty label leaves the relative
+        // path. A null root clears the known folders.
         public static void HideRoot(string root, string label) {
             lock (gate) {
                 if (root == null) { roots.Clear(); return; }
@@ -55,9 +55,13 @@ namespace RailroaderScenePatcher.Core {
             if (output == null || text == null) return;
             try { output.Write(level, WithoutAbsolutePaths(text)); } catch { /* Logging cannot stop the work it reports. */ }
         }
-        // Folders up to a file name: a drive path on Windows, or a home or system folder elsewhere.
-        static readonly Regex drivePath = new Regex(@"(?<![A-Za-z0-9])[A-Za-z]:[\\/](?:[^\\/\r\n""'<>|:*?]*[\\/])*", RegexOptions.CultureInvariant);
-        static readonly Regex homePath = new Regex(@"(?<![\w.~])/(?:home|Users|mnt|media|Volumes|var|tmp|opt|private|usr|run|root)/(?:[^/\r\n""'<>|:*?]*/)*", RegexOptions.CultureInvariant);
+        // One folder name: any characters a file system allows, with an apostrophe only inside a name, as in O'Neil, so
+        // the quote that closes a quoted path is no part of a folder name.
+        const string Folder = @"(?:[^\\/\r\n""'<>|:*?]|'(?=[^\s\\/'""]))*";
+        // Folders up to a file name: a drive path or a network share on Windows, or a home or system folder elsewhere.
+        static readonly Regex drivePath = new Regex(@"(?<![A-Za-z0-9])[A-Za-z]:[\\/](?:" + Folder + @"[\\/])*", RegexOptions.CultureInvariant);
+        static readonly Regex sharePath = new Regex(@"(?<![\\/\w])\\\\" + Folder + @"\\(?:" + Folder + @"\\)*", RegexOptions.CultureInvariant);
+        static readonly Regex homePath = new Regex(@"(?<![\w.~])/(?:home|Users|mnt|media|Volumes|var|tmp|opt|private|usr|run|root)/(?:" + Folder.Replace(@"\\/", "/") + @"/)*", RegexOptions.CultureInvariant);
         public static string WithoutAbsolutePaths(string text) {
             if (String.IsNullOrEmpty(text)) return text;
             KeyValuePair<string, string>[] known;
@@ -66,10 +70,12 @@ namespace RailroaderScenePatcher.Core {
                 foreach (var separator in new[] { '\\', '/' })
                     foreach (var form in new[] { root.Key, root.Key.Replace('\\', '/'), root.Key.Replace('/', '\\') }.Distinct()) {
                         var prefix = form + separator;
-                        for (var at = text.IndexOf(prefix, StringComparison.OrdinalIgnoreCase); at >= 0; at = text.IndexOf(prefix, at + root.Value.Length, StringComparison.OrdinalIgnoreCase))
-                            text = text.Substring(0, at) + root.Value + text.Substring(at + prefix.Length);
+                        // A label keeps the separator after it, as in ~\AppData; no label leaves the relative path.
+                        var replacement = root.Value.Length == 0 ? "" : root.Value + separator;
+                        for (var at = text.IndexOf(prefix, StringComparison.OrdinalIgnoreCase); at >= 0; at = text.IndexOf(prefix, at + replacement.Length, StringComparison.OrdinalIgnoreCase))
+                            text = text.Substring(0, at) + replacement + text.Substring(at + prefix.Length);
                     }
-            return homePath.Replace(drivePath.Replace(text, ""), "");
+            return homePath.Replace(sharePath.Replace(drivePath.Replace(text, ""), ""), "");
         }
     }
 
@@ -79,6 +85,8 @@ namespace RailroaderScenePatcher.Core {
         readonly HashSet<string> written = new HashSet<string>(StringComparer.Ordinal);
         public bool First(string key) { lock (written) return written.Add(key ?? ""); }
         public void Warning(string key, string text) { if (First(key)) PatcherLog.Warning(text); }
+        // With the exception: its base message in the player line and the full exception as a debug line.
+        public void Warning(string key, string text, Exception failure) { if (First(key)) PatcherLog.Warning(text, failure); }
         public void Error(string key, string text) { if (First(key)) PatcherLog.Error(text); }
         public void Debug(string key, Func<string> text) { if (PatcherLog.DebugEnabled && First(key)) PatcherLog.Debug(text); }
         public void Clear() { lock (written) written.Clear(); }

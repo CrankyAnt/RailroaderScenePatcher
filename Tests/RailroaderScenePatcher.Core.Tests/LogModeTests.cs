@@ -34,6 +34,8 @@ static class LogModeTests {
         UndeliveredRows();
         DebugOptionSetting();
         EditResults();
+        EditingFaults();
+        CullingUpdateFailure();
         Console.WriteLine("PASS: log modes");
     }
 
@@ -152,6 +154,76 @@ static class LogModeTests {
         Assert(lines[2] == @"Read failed at Info.json: denied", "A home path keeps only its file name: " + lines[2]);
         Assert(lines[3] == @"Object World/Signs/Loc: Sylva Int kept its place", "A scene object path is not a file path");
         Assert(lines[4] == @"stack at EntryPoint.cs:line 12", "A debug line has no absolute path either: " + lines[4]);
+
+        var more = RecordingLog.Capture(false, () => {
+            PatcherLog.HideRoot(@"C:\Users\O'Neil", "~");
+            PatcherLog.Warning(@"Could not find file 'C:\Users\O'Neil\AppData\LocalLow\Stanislaw Szczepanowski\Railroader\Player.log'.");
+            PatcherLog.HideRoot(null, null);
+            PatcherLog.Warning(@"Could not find file 'C:\Users\O'Neil\AppData\LocalLow\Stanislaw Szczepanowski\Railroader\Player.log'.");
+            PatcherLog.Warning(@"Read failed at 'D:\Games (old)\R&R, copy #2\Mods\Info.json'.");
+            PatcherLog.Warning(@"Access to the path '\\server\share\Railroader\Mods\settings.json' is denied.");
+            PatcherLog.Warning(@"Read failed at /Users/o'neil/Library/Application Support/Railroader/Player.log");
+            PatcherLog.Warning(@"The mod's Info.json doesn't list it; object World/Signs/Loc: Sylva Int's sign stays.");
+        });
+        var other = more.Lines.Select(l => l.Value).ToArray();
+        Assert(other[0] == @"Could not find file '~\AppData\LocalLow\Stanislaw Szczepanowski\Railroader\Player.log'.", "The user folder is left out as a known root, also with an apostrophe: " + other[0]);
+        Assert(other[1] == @"Could not find file 'Player.log'.", "An unknown LocalLow path below a user folder with an apostrophe keeps only its file name: " + other[1]);
+        Assert(other[2] == @"Read failed at 'Info.json'.", "Folder names with punctuation are removed: " + other[2]);
+        Assert(other[3] == @"Access to the path 'settings.json' is denied.", "A UNC path keeps only its file name: " + other[3]);
+        Assert(other[4] == @"Read failed at Player.log", "A macOS home path with an apostrophe and spaces keeps only its file name: " + other[4]);
+        Assert(other[5] == @"The mod's Info.json doesn't list it; object World/Signs/Loc: Sylva Int's sign stays.", "Ordinary text with apostrophes stays");
+    }
+
+    // The failures of scene patch editing that the window shows in red. A patcher failure is written once as a player
+    // error; a refusal of an editing action writes no player line, and its edit feedback writes its debug line.
+    static void EditingFaults() {
+        var expected = new Dictionary<EditingFailure, string> {
+            [EditingFailure.ReloadPending] = "A working-location return is still pending.",
+            [EditingFailure.ReloadStopped] = "Save failed.",
+            [EditingFailure.ReloadCancelled] = "Reload cancelled: x",
+            [EditingFailure.ReturnTimedOut] = "The return to your working location did not complete within five minutes. Check the game's load diagnostics before trying again.",
+            [EditingFailure.LocationNotRestored] = "The Map Editor reloaded, but your working location could not be restored: x",
+            [EditingFailure.OutstandingUnknown] = "Outstanding work could not be determined; the native map editor is treated as unsaved: x",
+            [EditingFailure.HistoryError] = "A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: x",
+            [EditingFailure.ExitCancelled] = "Exit cancelled because outstanding work could not be confirmed. x",
+            [EditingFailure.FileCheck] = "Could not check the scene patch file: x",
+            [EditingFailure.GizmoCleanup] = "The patcher could not verify cleanup after using the gizmo. Reload the Map Editor. x",
+            [EditingFailure.HookUnavailable] = "Map Editor reload hook unavailable",
+            [EditingFailure.HistoryTracking] = "Could not track a change to the Map Editor history: x",
+            [EditingFailure.ChromeRefresh] = "Native map editor title and Save button could not be refreshed: x",
+            [EditingFailure.HistoryCheck] = "The Map Editor history step couldn't be checked: x",
+        };
+        string Detail(EditingFailure site) => site == EditingFailure.ReloadPending ? "A working-location return is still pending." : site == EditingFailure.ReloadStopped ? "Save failed." : site == EditingFailure.HookUnavailable ? "Map Editor reload hook unavailable" : "x";
+        Assert(Enum.GetValues(typeof(EditingFailure)).Length == expected.Count, "Every editing failure site has its expected text");
+        foreach (var site in expected.Keys) {
+            var fault = new EditingFault();
+            var log = RecordingLog.Capture(false, () => { fault.Fail(site, Detail(site)); fault.Fail(site, Detail(site)); });
+            Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Error && log.Lines[0].Value == expected[site], site + " is written once as a player error: " + String.Join(" | ", log.Lines.Select(l => l.Value)));
+            Assert(fault.Text == (site == EditingFailure.HistoryError ? null : expected[site]), site + (site == EditingFailure.HistoryError ? " reaches only the log" : " stands in the window"));
+        }
+        var refused = new EditingFault();
+        var refusal = RecordingLog.Capture(false, () => refused.Refuse("The file version can't be used: it is unreadable."));
+        Assert(refusal.Lines.Count == 0 && refused.Text == "The file version can't be used: it is unreadable.", "A refusal stands in the window and writes no player line");
+        var refusalDebug = RecordingLog.Capture(true, () => refused.Refuse("The file version can't be used: it is unreadable."));
+        Assert(refusalDebug.Lines.Count == 0, "A refusal writes no second line beside its edit feedback");
+        refused.Clear();
+        Assert(refused.Text == null, "Clear empties the window line");
+    }
+
+    // The culling update failure: one text for a named group and for a failure outside any group, with the reason in
+    // the player line and the full exception as a debug line.
+    static void CullingUpdateFailure() {
+        var failure = new InvalidOperationException("outer", new Exception("game function gone"));
+        var once = new LogOnce();
+        var log = RecordingLog.Capture(true, () => {
+            once.Warning("k", BakedSceneryRules.CullingUpdateFailure("BushnellWhittier-MapManager/World/Mill"), failure);
+            once.Warning("k", BakedSceneryRules.CullingUpdateFailure("BushnellWhittier-MapManager/World/Mill"), failure);
+            once.Warning("j", BakedSceneryRules.CullingUpdateFailure(null), failure);
+        });
+        Assert(log.At(LogLevel.Warning).SequenceEqual(new[] {
+            "Moved parts of BushnellWhittier-MapManager/World/Mill may show or hide at the wrong distance, because the patcher couldn't update their culling: game function gone",
+            "Moved baked scenery parts may show or hide at the wrong distance, because the patcher couldn't update their culling: game function gone" }), "One text names the group or the parts: " + String.Join(" | ", log.At(LogLevel.Warning)));
+        Assert(log.At(LogLevel.Debug).Count() == 2 && log.At(LogLevel.Debug).All(l => l.Contains("System.InvalidOperationException")), "Each written warning adds its full exception as a debug line");
     }
 
     // The game's Log window as the patcher reaches it: ready once the game's collector runs, and able to fail.

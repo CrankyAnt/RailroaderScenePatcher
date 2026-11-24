@@ -103,14 +103,9 @@ namespace RailroaderScenePatcher {
         internal readonly object MapEditor, Manager;
         internal readonly PatchEditingSession Session;
         internal readonly string PatchPath;
-        // A failure of this native map editor's editing that the window shows in red. Each new one is also written to the
-        // player log once as an error: the window is the only other place it reaches.
-        internal string Fault {
-            get => fault;
-            set { fault = value; if (value != null) faults.Error(value, value); }
-        }
-        string fault;
-        readonly LogOnce faults = new LogOnce();
+        // The window's red line for this native map editor: a patcher failure, also written once as a player error, or
+        // the refusal of an editing action.
+        internal readonly EditingFault Fault = new EditingFault();
         internal Action VersionChanged = () => { };
         internal Action<string> SaveRefused = _ => { };
         internal string Outstanding() { var list = Session.Outstanding(NativeDirty); return list.Count == 0 ? "none" : String.Join(", ", list.Select(PatchEditingSession.DisplayItem)); }
@@ -134,7 +129,7 @@ namespace RailroaderScenePatcher {
             Session.OutstandingMayHaveChanged = RefreshChrome;
             handler = () => {
                 try { Session.HistoryChanged(); var ignored = NativeDirty; }
-                catch (Exception e) { Fault = "Could not track a change to the Map Editor history: " + e.GetBaseException().Message; }
+                catch (Exception e) { Fault.Fail(EditingFailure.HistoryTracking, e.GetBaseException().Message); }
             };
             changed.AddEventHandler(Manager, handler);
         }
@@ -159,7 +154,7 @@ namespace RailroaderScenePatcher {
                 var controller = Native.Read(Native.Type("Game.MapEditor.MapEditorController"), "Shared");
                 var window = controller as UnityEngine.Object == null ? null : Native.Read(controller, "_window");
                 if (window as UnityEngine.Object != null) Native.Call(window, "RefreshChrome");
-            } catch (Exception e) { Fault = "Native map editor title and Save button could not be refreshed: " + e.GetBaseException().Message; }
+            } catch (Exception e) { Fault.Fail(EditingFailure.ChromeRefresh, e.GetBaseException().Message); }
         }
         public void Dispose() { changed.RemoveEventHandler(Manager, handler); }
     }
@@ -229,7 +224,7 @@ namespace RailroaderScenePatcher {
             var current = For(__instance);
             if (current == null) return;
             try { __result = current.Session.IsDirty(current.NativeDirty); }
-            catch (Exception e) { __result = true; current.Fault = "Outstanding work could not be determined; the native map editor is treated as unsaved: " + e.GetBaseException().Message; }
+            catch (Exception e) { __result = true; current.Fault.Fail(EditingFailure.OutstandingUnknown, e.GetBaseException().Message); }
         }
         static void BeforeHistory(object __instance) { ForManager(__instance)?.BeginHistoryExecution(); }
         static Exception HistoryFinalizer(object __instance, Exception __exception) {
@@ -238,9 +233,9 @@ namespace RailroaderScenePatcher {
                 current.EndHistoryExecution(__exception);
                 // Native Undo and Redo rebuild the chrome before the history identity is settled here.
                 current.RefreshChrome();
-                if (__exception != null) PatcherLog.Error("A Map Editor Undo or Redo step failed, so scene patch editing may not match the scene: " + __exception.GetBaseException().Message);
+                if (__exception != null) current.Fault.Fail(EditingFailure.HistoryError, __exception.GetBaseException().Message);
                 try { PatcherLog.Debug(() => "Map Editor history step" + (__exception == null ? "" : " with error " + __exception.GetBaseException().Message) + "; outstanding: " + current.Outstanding() + (current.Session.IncompleteOperation == null ? "" : "; incomplete: " + current.Session.IncompleteOperation)); }
-                catch (Exception e) { current.Fault = "The Map Editor history step couldn't be checked: " + e.GetBaseException().Message; }
+                catch (Exception e) { current.Fault.Fail(EditingFailure.HistoryCheck, e.GetBaseException().Message); }
             }
             return __exception;
         }
@@ -265,7 +260,7 @@ namespace RailroaderScenePatcher {
                 };
                 PresentMethod().Invoke(null, new object[] { "Exit Map Editor", message, new[] { (0, "Cancel"), (1, "Exit") }, choose });
                 return false;
-            } catch (Exception e) { current.Fault = "Exit cancelled because outstanding work could not be confirmed. " + e.GetBaseException().Message; return false; }
+            } catch (Exception e) { current.Fault.Fail(EditingFailure.ExitCancelled, e.GetBaseException().Message); return false; }
         }
     }
 }

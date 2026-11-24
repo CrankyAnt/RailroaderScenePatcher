@@ -339,7 +339,6 @@ namespace RailroaderScenePatcher.Core {
         public bool Shows { get; }
     }
 
-    // Where own culling reports: information for what needs no action, a warning for a failure.
     // The game-facing operations of own culling. Positions are map coordinates.
     public interface ICullingHost {
         // False while the map unloads: nothing registers, moves, releases or reads a sphere then.
@@ -408,12 +407,11 @@ namespace RailroaderScenePatcher.Core {
         // Receives each distinct failure of a callback once.
         public Action<string> Fault;
         // The simple cullers whose handler could not be put back at release, so the hook stays as a pass-through. For
-        // the inventory diagnostics, at information level.
+        // the inventory diagnostics.
         public IReadOnlyList<string> Leftovers => leftovers;
         int reportedLeftovers;
-        // Reports each such handler once, at information level: it only passes the game's events on, so it needs no
-        // action and is no warning.
-        // A wrapper that stays needs no action and is no warning: it is a debug line, written once.
+        // Reports each such handler once as a debug line: it only passes the game's events on, so it needs no action
+        // and is no warning.
         public void Report() {
             for (; reportedLeftovers < leftovers.Count; reportedLeftovers++) { var leftover = leftovers[reportedLeftovers]; PatcherLog.Debug(() => BakedSceneryRules.LeftoverWrapper(leftover)); }
         }
@@ -451,16 +449,14 @@ namespace RailroaderScenePatcher.Core {
                 } catch (Exception e) { state.Dirty = true; UpdateFailed(state.Group, e); }
             }
         }
-        // Names a group in a warning, such as its scene and path.
-        public Func<object, string> Name;
+        // Names a group in a warning, such as its scene and path; without it a warning names no group.
+        public Func<object, string> GroupName { get; set; }
         // An update runs every frame: a failure is written once per group and failure, and the other groups still update.
         readonly LogOnce updateFailures = new LogOnce();
         void UpdateFailed(object group, Exception error) {
             string name = null;
-            try { name = Name?.Invoke(group); } catch { }
-            name = String.IsNullOrEmpty(name) ? "a baked scenery group" : name;
-            var message = error.GetBaseException().Message;
-            updateFailures.Warning(name + "\n" + message, "Moved parts of " + name + " may show or hide at the wrong distance, because the patcher couldn't update their culling: " + message);
+            try { name = GroupName?.Invoke(group); } catch { }
+            updateFailures.Warning((name ?? "") + "\n" + error.GetBaseException().Message, BakedSceneryRules.CullingUpdateFailure(name), error);
         }
         // The patcher's state ends while the scene stays: every group gives back what own culling took over, as if
         // its plan were empty. While the map unloads there is nothing to give back.

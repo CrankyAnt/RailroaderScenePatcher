@@ -24,7 +24,7 @@ Two classes in `Src/RailroaderScenePatcher/LogOutputs.cs` are the only places th
 - `ModLogOutput` writes to the game's mod logger, which tags each line with the patcher's mod. The game writes its debug level only when it starts with `-logLevelDebug`, so a debug line goes out at the information level with the `[debug]` marker. The mod logger reads text as a message template, so braces are doubled.
 - `NativeRowOutput` writes the game's Log window rows (`Game.Diagnostics.MessageLog`). The game writes each row it shows to the Player log itself, so the patcher writes no second line beside it.
 
-`PatcherLog` removes absolute paths from every line before it reaches an output. Known folders, such as the home folder and the game's data folder, are registered with `PatcherLog.HideRoot` in `EntryPoint.cs` and replaced by a label or removed. Any other drive path or home-style path is removed by pattern. No line may carry an absolute path, because players post their logs publicly.
+`PatcherLog` removes absolute paths from every line before it reaches an output. Known folders, such as the game's home folder, the game's install and data folders, and the user folder (shown as `~`), are registered with `PatcherLog.HideRoot` in `EntryPoint.cs` and replaced by a label or removed. Any other drive path, network share path or home-style path is removed by pattern, up to its file name; folder names may hold spaces, apostrophes and other punctuation. No line may carry an absolute path, because players post their logs publicly.
 
 ## Entry points
 
@@ -33,6 +33,7 @@ Two classes in `Src/RailroaderScenePatcher/LogOutputs.cs` are the only places th
 - `PatcherLog.Debug(() => text)` does the same, but builds the text only while debug is on. Use it for text that costs work to build. A failure while the text is built drops the line.
 - `LogOnce` writes a repeated failure once per key. Its `Warning`, `Error` and `Debug` methods take a key. `Clear` starts over, for example at a new load attempt.
 - `NativeRows` (`Src/RailroaderScenePatcher.Core/NativeRows.cs`) delivers the patcher's Log window rows once per load attempt, when the Log window is ready. A row that cannot be delivered, because the Log window fails or the load attempt or the world ends first, is written once as a player warning: `The game's Log window didn't show this message: <originator>: <message>`.
+- `EditingFault` (`Src/RailroaderScenePatcher.Core/EditingFaults.cs`) holds the red line of the Scene Patcher window for one Map Editor. `Fail` takes one of the `EditingFailure` sites, such as a cancelled reload or a failed native Undo, stands in the window and is written once per text as a player error; a native Undo or Redo error reaches the log only. `Refuse` shows the refusal of an editing action, such as **Use file version**, and writes no player line: its edit feedback writes the debug line.
 
 ## The debug option
 
