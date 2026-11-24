@@ -14,9 +14,10 @@ static class OutlinerGroupingTests {
 
     const string SceneName = "scene", Baked = BakedSceneryRules.Family, Bryson = "World/Large Scenery/Bryson/", Dealer = Bryson + "Bryson Coal Dealer", Signs = Bryson + "Bryson Signs",
         Allen = "World/Roads Sylva/Grade Crossing - Allen", Stenzel = "World/Roads Whittier/Crossing Unprotected - Stenzel";
-    static SceneObservation Entry(string path, string family, double x, double z, string category = null, string groupPath = null, string holderPath = null, string only = null, string[] problems = null, string padMarkerId = null, string displayName = null) =>
+    // An inspection-only entry carries its reason as its supported edits too, as NativeInventory builds it (operations = only).
+    static SceneObservation Entry(string path, string family, double x, double z, string category = null, string groupPath = null, string holderPath = null, string only = null, string[] problems = null, string padMarkerId = null, string displayName = null, string subcategory = null) =>
         new SceneObservation(new object(), new TargetIdentity(SceneName, path, "UnityEngine.Transform", padMarkerId: padMarkerId), family, true, new[] { x, 10, z }, new double[] { 0, 0, 0, 1 },
-            new string[0], new string[0], problems ?? new string[0], only ?? "Placement", inspectionOnly: only, displayName: displayName, groupPath: groupPath, category: category, holderPath: holderPath);
+            new string[0], new string[0], problems ?? new string[0], only ?? "Placement", inspectionOnly: only, displayName: displayName, groupPath: groupPath, category: category, subcategory: subcategory, holderPath: holderPath);
     sealed class Inventory : IInspectionScene {
         public List<SceneObservation> Objects = new List<SceneObservation>();
         public IEnumerable<string> MapIds => new[] { "map" };
@@ -41,6 +42,61 @@ static class OutlinerGroupingTests {
         return null;
     }
 
+    // #110: an object that no supported operation covers stands under its category, kind and place in both views,
+    // marked inspection only, with its reason in its tooltip and on its Object tab; an object that fits no category
+    // stands under Unclassified. Fictional objects: the base-map fixture has no inspection-only object.
+    static void InspectionOnlyRowsStandUnderTheirCategory() {
+        var scene = new Inventory();
+        string GroupReason = CommandBand.NotYetSupported("bridges with a moving span"), FamilyReason = CommandBand.InspectionOnly("Odd fixture", false);
+        // A rail bridge no operation covers, beside an editable rail bridge and a road bridge: Bridge shows its kinds.
+        var swing = Entry(Bryson + "Swing Bridge", Baked, 4450, 5450, "Bridge", only: GroupReason, subcategory: "Rail bridges");
+        var girder = Entry(Bryson + "Bridge 9", Baked, 4460, 5460, "Bridge", subcategory: "Rail bridges");
+        var road = Entry("World/Large Scenery/Sylva/Sylva Road Bridge", Baked, 25040, -840, "Bridge", subcategory: "Road bridges");
+        // An object of a family no operation covers and no category names, and a listed group no rule recognises.
+        var stand = Entry("World/Large Scenery/Sylva/Odd Fixture", "Odd fixture", 25050, -850, only: FamilyReason);
+        var thing = Entry("World/Large Scenery/Sylva/Thing", Baked, 25060, -860, BakedSceneryCategories.Unclassified);
+        // An inspection-only group whose verdict has no category (BakedCategoryTests: "Masked Thing").
+        var masked = Entry("World/Large Scenery/Sylva/Masked Thing", Baked, 25070, -870, only: CommandBand.NotYetSupported("groups with a spawn point"));
+        scene.Objects.AddRange(new[] { swing, girder, road, stand, thing, masked });
+        var inventory = new SceneInventory(scene); inventory.Refresh();
+        OutlinerGrouping.InvalidatePlaces();
+        OutlinerGrouping.Scene = new World();
+        OutlinerGrouping.LogPending = false;
+        try {
+            var all = OutlinerGrouping.Rows(inventory, "", OutlinerFilter.All, null, null);
+            OutlinerGrouping.ByPlace = false;
+            var tree = OutlinerGrouping.Build(all, inventory.Entries, "", false, null);
+            Check(Shape(new[] { Find(tree.Tops, "Bridge") }) == "[Bridge]{[Rail bridges]{[Bryson]{Bridge 9 Swing Bridge}} [Road bridges]{[Sylva]{Sylva Road Bridge}}}",
+                "by category, the inspection-only bridge stands under its category, kind and place beside the editable one (got " + Shape(tree.Tops) + ")");
+            Check(Shape(new[] { Find(tree.Tops, BakedSceneryCategories.Unclassified) }) == "[Unclassified]{[Sylva]{Masked Thing Odd Fixture Thing}}",
+                "an object that fits no category stands under Unclassified, also when it is inspection only (got " + Shape(tree.Tops) + ")");
+            Check(!tree.Tops.Any(t => t.Label.IndexOf("Inspection only", StringComparison.OrdinalIgnoreCase) >= 0), "there is no Inspection only group in the tree");
+            OutlinerGrouping.ByPlace = true;
+            var byPlace = OutlinerGrouping.Build(all, inventory.Entries, "", false, null);
+            Check(Shape(new[] { Find(byPlace.Tops, "Bryson") }) == "[Bryson]{[Bridge]{[Rail bridges]{Bridge 9 Swing Bridge}}}",
+                "by place, the inspection-only bridge stands under its place, category and kind (got " + Shape(new[] { Find(byPlace.Tops, "Bryson") }) + ")");
+            Check(Shape(new[] { Find(Find(byPlace.Tops, "Sylva").Children, BakedSceneryCategories.Unclassified) }) == "[Unclassified]{Masked Thing Odd Fixture Thing}",
+                "by place, an object that fits no category stands under its place and Unclassified (got " + Shape(new[] { Find(byPlace.Tops, "Sylva") }) + ")");
+            // The row is marked inspection only, and only an inspection-only object is.
+            Check(InventoryPresentationState.RowMark(swing) == "inspection only" && InventoryPresentationState.RowMark(stand) == "inspection only" && InventoryPresentationState.RowMark(masked) == "inspection only"
+                && InventoryPresentationState.RowMark(girder) == null && InventoryPresentationState.RowMark(thing) == null, "the row of an inspection-only object, and only that row, is marked inspection only");
+            // The tooltip carries the reason, in both views, and says where the row stands.
+            foreach (var (built, view) in new[] { (tree, "by category"), (byPlace, "by place") }) {
+                var tip = OutlinerGrouping.Tooltip(built, swing, false, null);
+                Check(tip == "Swing Bridge\n" + Bryson + "Swing Bridge\nBridge / Rail bridges\nPlace: Bryson\n" + CommandBand.InspectionOnlyLine(GroupReason), view + ": the tooltip gives the place in the tree and the reason (got " + tip + ")");
+                Check(OutlinerGrouping.Tooltip(built, stand, false, null).EndsWith("\n" + CommandBand.InspectionOnlyLine(FamilyReason), StringComparison.Ordinal)
+                    && OutlinerGrouping.Tooltip(built, stand, false, null).Contains("\nUnclassified\nPlace: Sylva\n"), view + ": an unclassified inspection-only object's tooltip names Unclassified, its place and its reason");
+                Check(!OutlinerGrouping.Tooltip(built, girder, false, null).Contains("Inspection only"), view + ": an editable object's tooltip gives no reason");
+            }
+            // The Object tab carries the same reason: Supported edits shows the entry's operations, which hold the reason,
+            // and the state line's tooltip adds the same Inspection only line as the row's tooltip.
+            Check(swing.Operations == GroupReason && stand.Operations == FamilyReason, "Supported edits on the Object tab gives the reason");
+            Check(CommandBand.InspectionOnlyLine(GroupReason) == "Inspection only: Bridges with a moving span cannot be edited.",
+                "the Inspection only line holds the reason as one sentence (got " + CommandBand.InspectionOnlyLine(GroupReason) + ")");
+        } finally {
+            OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
+        }
+    }
     public static void Run() {
         var scene = new Inventory();
         var dealer = Entry(Dealer, Baked, 4410, 5410, "Industry building");
@@ -147,6 +203,7 @@ static class OutlinerGroupingTests {
         } finally {
             OutlinerGrouping.Scene = null; OutlinerGrouping.ByPlace = false; OutlinerGrouping.LogPending = true; OutlinerGrouping.InvalidatePlaces();
         }
+        InspectionOnlyRowsStandUnderTheirCategory();
         Console.WriteLine("PASS: outliner grouping");
     }
 }

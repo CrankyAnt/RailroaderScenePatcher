@@ -219,12 +219,13 @@ Wilmot | Wilmot Station | Group | Station building";
             Check(verdict?.Disposition == GroupDisposition.NotListed && verdict.Reason == BakedSceneryRules.NoFunction && verdict.Category == null, path + " is not listed: it has no function in the game");
         }
         Check(!BakedSceneryRules.Parts(verdicts).Any(p => p.Path.Contains("Appalachian")), "an object that is not listed lists no parts");
-        // A new group takes its category from the rules; a listed group no rule recognises stands under Unclassified,
-        // and a group no supported operation covers and no rule recognises stays in the Inspection only group.
+        // A new group takes its category from the rules; a listed group no rule recognises stands under Unclassified.
+        // A group no supported operation covers and no rule recognises has no category in its verdict; the outliner
+        // files it under Unclassified, marked inspection only (OutlinerGroupingTests.InspectionOnlyRowsStandUnderTheirCategory).
         Check(At(verdicts, "World/Large Scenery/Sylva/New Shed")?.Category == "Industry building", "a new shed is an industry building by its name");
         Check(At(verdicts, "World/Large Scenery/Sylva/Thing")?.Category == "Unclassified", "a listed group no rule recognises stands under Unclassified");
         var masked = At(verdicts, "World/Large Scenery/Sylva/Masked Thing");
-        Check(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Category == null, "an inspection-only group that no category covers has no category: it stays in the Inspection only group");
+        Check(masked?.Disposition == GroupDisposition.InspectionOnly && masked.Category == null, "an inspection-only group that no category covers has no category in its verdict");
     }
 
     // The outliner rows of a small inventory: groups, parts, an inspection-only group with a category, and one without.

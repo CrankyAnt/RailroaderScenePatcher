@@ -176,6 +176,9 @@ namespace RailroaderScenePatcher {
             return found.Length == 1 ? found[0] : null;
         }
         // The Object tab's line that names a part's group, or null for any object that is no part.
+        // The mark after an outliner row's name for an object that no supported operation covers; null otherwise.
+        internal const string InspectionOnlyMark = "inspection only";
+        internal static string RowMark(SceneObservation entry) => entry?.InspectionOnly == null ? null : InspectionOnlyMark;
         internal static string PartOf(SceneObservation entry) =>
             entry?.GroupPath == null ? null : "Part of: " + entry.GroupPath.Substring(entry.GroupPath.LastIndexOf('/') + 1);
 

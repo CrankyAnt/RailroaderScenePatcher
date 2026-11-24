@@ -480,7 +480,8 @@ namespace RailroaderScenePatcher {
                     // that has them. "*" marks a changed object and never unsaved work. An object without a
                     // supported edit says so, and an inactive object is italic and says so.
                     var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added, failure);
-                    var context = item.InspectionOnly == null ? "" : "  <alpha=#99>inspection only<alpha=#FF>";
+                    var mark = InventoryPresentationState.RowMark(item);
+                    var context = mark == null ? "" : "  <alpha=#99>" + mark + "<alpha=#FF>";
                     var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
                     string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
                     // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
