@@ -27,7 +27,13 @@ public sealed class Observation : MonoBehaviour {
     bool loaded, ready, tracingSnapshot; Vector3? baselinePoint; long sequence; readonly List<JObject> buffered = new List<JObject>(); object terrain; EventInfo tileEvent; Action<Bounds> tileHandler;
     Rect window = new Rect(740, 30, 380, 290);
     public void Init(string path) { directory = path; Application.logMessageReceived += Log; }
-    public void WorldLoad() { Unsubscribe(); loaded = true; ready = false; mapId = null; loadId = Guid.NewGuid().ToString("N"); baselinePoint = null; referenceSource = null; referenceError = null; }
+    // The patcher applies its scene patch files in its own world-load callback, which the game calls before this
+    // observer's, because the observer depends on the patcher. The traces buffered since the last world unload belong to
+    // this load: they get its load ID, and assignedAtWorldLoad marks that they arrived before this callback.
+    public void WorldLoad() {
+        Unsubscribe(); loaded = true; ready = false; mapId = null; loadId = Guid.NewGuid().ToString("N"); baselinePoint = null; referenceSource = null; referenceError = null;
+        foreach (var trace in buffered) if (trace["sourceLoadId"]?.Type == JTokenType.Null || trace["sourceLoadId"] == null) { trace["sourceLoadId"] = loadId; trace["sourceLifecycle"] = "active-world"; trace["assignedAtWorldLoad"] = true; }
+    }
     public void WorldUnload() { if (ready && GuardStillValid()) Emit("world-unload", new JObject()); loaded = false; ready = false; Unsubscribe(); buffered.Clear(); }
     void OnDestroy() { Application.logMessageReceived -= Log; Unsubscribe(); }
     // Attempt traces are recorded on any map in the isolated home; snapshots, tiles, focus and replay need the fixture map.

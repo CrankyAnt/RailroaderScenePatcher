@@ -65,7 +65,7 @@ One line per validation or test command and per CI workflow the repository runs.
 - `dotnet build Tests/NativeObservation -p:GameManaged=<Railroader_Data/Managed>`: builds the isolated native observation artifact
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-FixturePreparation.ps1`: validates baseline-derived fixture generation in the keyed document shape with its key orders, and the common dependency minimum, with synthetic measurements
 - `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-TestHome.ps1`: validates test-copy ownership and cleanup, and the debug option of the test copy, in a synthetic home
-- `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates separation of active-world and unassigned attempt evidence read from the patcher's debug lines
+- `pwsh -NoProfile -File Tests/FixedPlacementJourney/Test-AttemptSummary.ps1`: validates separation of active-world and unassigned attempt evidence read from the patcher's debug lines, including a line that ends with the game's property suffix
 - `ci` (shared, `v1`): runs repository hygiene and the configured CI parts and reports the one required check `ci / verdict`
 - `automation` (shared, `v1`): runs the configured parts that write, including Dependabot auto-merge, additions, full recording and issue-title normalisation
 - `release` (shared, `v1`): runs the configured release part on a pushed tag or a start by hand and publishes nothing without release configuration

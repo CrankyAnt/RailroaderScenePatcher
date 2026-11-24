@@ -2,7 +2,7 @@
 <!-- SPDX-License-Identifier: MIT -->
 # Record the native fixed-placement journey
 
-Traces captured outside an identified active world carry `sourceLifecycle: unassigned` and a null `sourceLoadId`. They emit as `unassigned-attempt-trace` and remain separate from active-world counts. A deliberate replay after observer readiness measures same-engine retries without silently attributing early callbacks to a later world.
+The patcher applies its scene patch files in its own world-load callback, which the game calls before the observer's, because the observer depends on the patcher. The traces captured since the last world unload therefore belong to the load that follows: the observer's world-load callback gives them that load's `sourceLoadId` and `sourceLifecycle: active-world`, marks them `assignedAtWorldLoad: true`, and they emit as `attempt-trace` once the observer is ready. A world unload drops the traces still buffered. A buffered trace whose load ID is not the current one, as after a second world load without an unload, emits as `unassigned-attempt-trace` and stays out of active-world counts. A deliberate replay after observer readiness measures same-engine retries.
 
 This test-only mod records observations for the fixed-placement fixture. It does not install itself or start the game. Build it against the installed game assemblies, placing all build outputs outside the repository:
 
