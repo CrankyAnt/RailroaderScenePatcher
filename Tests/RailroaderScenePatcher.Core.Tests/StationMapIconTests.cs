@@ -30,9 +30,8 @@ static class StationMapIconTests {
         Console.WriteLine("PASS: station map icons");
     }
 
-    // The Station Icons container object is no group and gets no row: its icons keep their own family, each once. The map label
-    // beside it stays out, and nothing in the container object is inspection only. In the outliner every icon stands once in the
-    // Station map icon family, outside the Inspection only group.
+    // The Station Icons container object is no group: its icons keep their own family, each once. The map label
+    // beside it stays out, and nothing in the container object is inspection only.
     static void InventoryListsEveryStationMapIconOnce() {
         var verdicts = BakedSceneryRules.Classify(World());
         Assert(!verdicts.Any(v => v.Path == IconsPath), "The Station Icons container object has no verdict of its own: " + String.Join(", ", verdicts.Where(v => v.Path == IconsPath).Select(v => v.Disposition + " " + v.Reason)));
@@ -44,17 +43,7 @@ static class StationMapIconTests {
         Assert(!verdicts.Any(v => v.Disposition == GroupDisposition.InspectionOnly), "Nothing is inspection only: " + String.Join(", ", verdicts.Where(v => v.Disposition == GroupDisposition.InspectionOnly).Select(v => v.Path)));
         Assert(!BakedSceneryRules.Exclusions.Any(e => e.Ticket == "#89" && e.Component == StationMapIconRules.Component), "No exclusion of a map icon waits for #89 any more");
 
-        var rows = new[] { Bryson, Cochran, Whittier }.Select(path => Row(path)).ToList();
-        rows.Add(new SceneObservation(new object(), new TargetIdentity(SceneName, "World/Large Scenery/Bryson/Bryson House Track", BakedSceneryGroups.ComponentType, BakedSceneryGroups.Structure),
-            BakedSceneryRules.Family, true, new[] { 0.0, 0, 0 }, new[] { 0.0, 0, 0, 1 }, new string[0], new string[0], new string[0], CommandBand.GroupOperations, category: BakedSceneryCategories.Platform));
-        var groups = InventoryPresentationState.Groups(rows);
-        var icons = groups.Where(g => g.Key == StationMapIconRules.Family).ToArray();
-        Assert(icons.Length == 1 && icons[0].Value.Select(r => r.Identity.Path).SequenceEqual(new[] { Bryson, Cochran, Whittier }), "The outliner lists every icon once in the Station map icon family: "
-            + String.Join("; ", groups.Select(g => g.Key + "=" + g.Value.Count)));
-        Assert(!groups.Any(g => g.Key == InventoryPresentationState.InspectionOnlyGroup), "No icon stands in the Inspection only group");
     }
-    static SceneObservation Row(string path) => new SceneObservation(new object(), new TargetIdentity(SceneName, path, StationMapIconRules.Component, StationMapIconRules.Structure),
-        StationMapIconRules.Family, true, new[] { 1.0, 2, 3 }, new[] { 0.0, 0, 0, 1 }, new string[0], new[] { StationMapIconRules.Dependency }, new string[0], StationMapIconRules.Operations);
 
     // Only map icons below the Station Icons container object are station map icons; the capability resolves no other target.
     static void OnlyStationIconsAreListed() {

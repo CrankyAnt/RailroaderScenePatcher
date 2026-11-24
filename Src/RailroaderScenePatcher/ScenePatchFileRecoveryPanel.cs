@@ -146,7 +146,7 @@ namespace RailroaderScenePatcher {
             recoveryStep = RecoveryStep.None;
             if (!outcome.Applied) { feedback.Refuse(RecoveryPlace, action, outcome.Error); return; }
             var session = attachment.Session;
-            editingStatus = "Editing ready for " + attachment.PatchPath;
+            editingStatus = "Editing ready for " + CommandBand.ShownPath(attachment.PatchPath, GameFolder);
             if (session.FreshStartPending) {
                 freshStartMessage = "Start fresh completed. The original is backed up at " + session.LastBackup + ". Save replaces it with an empty scene patch file.";
                 feedback.Report(RecoveryPlace, freshStartMessage);

@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
-// PROTOTYPE: throwaway crossings of the outliner grouping prototype: one node per crossing under Grade crossing.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +8,8 @@ using RailroaderScenePatcher.Core;
 using OutlineNode = RailroaderScenePatcher.InventoryPresentationState.OutlineNode;
 
 namespace RailroaderScenePatcher {
-    internal static partial class PrototypeOutlinerGrouping {
+    // The crossings of the outliner: one node per crossing under Grade crossing.
+    internal static partial class OutlinerGrouping {
         const string ControllerFamily = InventoryPresentationState.HolderFamily, MastFamily = "Crossing mast", BellFamily = "Crossing bell",
             PadFamily = "Crossing pad marker", SpanFamily = FocusTarget.Span, TrackMarkerFamily = "Track marker", MilepostFamily = "Milepost";
         static readonly Regex CrossingWord = new Regex(@"crossing", RegexOptions.IgnoreCase);
@@ -74,7 +74,6 @@ namespace RailroaderScenePatcher {
         });
         static void Join(Unit holder, Unit member) {
             member.Node.Label = CrossingMemberLabel(member.Row, member.Node.Label);
-            member.Node.Where = null;
             holder.Node.Children.Add(member.Node);
             holder.Node.Count += member.Node.Count;
         }

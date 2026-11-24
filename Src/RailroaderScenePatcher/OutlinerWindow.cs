@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
-// PROTOTYPE: throwaway hooks of the outliner grouping prototype into the scene patch window.
 using System;
 using System.Collections.Generic;
 using RailroaderScenePatcher.Core;
@@ -10,7 +9,7 @@ namespace RailroaderScenePatcher {
     // then, for half a second after the pointer leaves it, shows the next one at once: over a list every row under
     // the moving pointer would show its tooltip at once. Here a row's tooltip also waits while the game is in that
     // state, a little shorter than the game's own wait, so it appears while the game still shows tooltips at once.
-    internal sealed class PrototypeOutlineTooltips : UnityEngine.MonoBehaviour {
+    internal sealed class OutlineTooltipDelay : UnityEngine.MonoBehaviour {
         const float Wait = 0.45f, Gap = 0.25f;
         static UI.Tooltips.UITooltipProvider current;
         static string currentTitle;
@@ -50,35 +49,30 @@ namespace RailroaderScenePatcher {
     }
     public sealed partial class PatcherBehaviour {
         // The map x/z where a starter placement marker or track span acts, from the same track points Focus uses. The
-        // grouping asks only for those families (PrototypeOutlinerGrouping.UsesTrackPoint).
-        double[] PrototypeTrackPoint(SceneObservation entry) {
+        // outliner asks only for those families (OutlinerGrouping.UsesTrackPoint).
+        double[] OutlinerTrackPoint(SceneObservation entry) {
             var point = FocusTarget.Point(entry.Family, null, TrackPoints(entry), out _);
             return point != null && point.Length >= 3 ? new[] { point[0], point[2] } : null;
         }
+        // The folder of the game: a path below it shows from there (CommandBand.ShownPath).
+        static string GameFolder => System.IO.Path.GetDirectoryName(UnityEngine.Application.dataPath);
+        // Each level of the outliner's tree below the first indents a row by this much.
+        const float OutlineIndent = 16f;
 
         // The crossing node the outliner has selected, while no object is inspected: a game-defined group without a
         // row of its own. Focus goes to the middle of its members.
-        string prototypeGroupKey;
-        PrototypeOutlinerGrouping.GroupNode prototypeGroupNode;
-        void SelectGroupNode(string key, PrototypeOutlinerGrouping.GroupNode node) {
+        string crossingNodeKey;
+        OutlinerGrouping.GroupNode crossingNode;
+        void SelectCrossingNode(string key, OutlinerGrouping.GroupNode node) {
             if (selected != null) ClearInspection();
             if (selected != null) return;
-            prototypeGroupKey = key; prototypeGroupNode = node;
+            crossingNodeKey = key; crossingNode = node;
         }
-        void FocusGroupNode() {
-            var point = prototypeGroupNode?.Point;
+        void FocusCrossingNode() {
+            var point = crossingNode?.Point;
             if (point == null) return;
             try { JumpTo(new UnityEngine.Vector3((float)point[0], (float)point[1], (float)point[2])); }
             catch (Exception e) { feedback.Report("Focus", "Focus refused: " + e.GetBaseException().Message); }
-        }
-
-        // The outliner rows, with the prototype's search over place, kind and crossing; the current rows when it fails.
-        System.Collections.Generic.IReadOnlyList<SceneObservation> PrototypeRows() {
-            try { return PrototypeOutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, PrototypeTrackPoint); }
-            catch (Exception e) when (!(e is OutOfMemoryException)) {
-                PrototypeOutlinerGrouping.WarnOnce("rows", "the grouping search failed, so the search matches object fields only: " + e);
-                return InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged);
-            }
         }
     }
 }

@@ -243,7 +243,7 @@ namespace RailroaderScenePatcher {
             var unsaved = Unsaved(out var saveText);
             builder.HStack(row => {
                 row.ConfigureLayout(4f);
-                var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileLocked) { PrototypeOutlinerGrouping.InvalidatePlaces(); Inspect(); } });
+                var refresh = Button(row, "Refresh", () => { CheckFileVersion(); if (!FileLocked) { OutlinerGrouping.InvalidatePlaces(); Inspect(); } });
                 refreshButton = refresh.RectTransform;
                 if (FileLocked) AllowDuringRepair(refresh.RectTransform);
                 refresh.Tooltip("Refresh", "Read the scene, scene patch file, and supplied definitions again without applying changes.");
@@ -318,11 +318,11 @@ namespace RailroaderScenePatcher {
                 var select = CommandBand.SelectInWorld(selection != null, pending);
                 Button(row, "Select in world", () => BeginSelection(SelectionKind.SceneObject, null)).Inactive(select != null)
                     .Tooltip("Select in world", CommandBand.Tooltip("Click a marking in the world to choose the object to inspect.", select));
-                // PROTOTYPE: a crossing node of the outliner is a game-defined group: Focus goes to the crossing.
-                var groupNode = selected == null ? prototypeGroupNode : null;
+                // A crossing node of the outliner is a game-defined group: Focus goes to the crossing.
+                var groupNode = selected == null ? crossingNode : null;
                 var focus = groupNode != null ? (groupNode.Point == null ? "This crossing has no position." : null) : CommandBand.Focus(selected != null, FocusUnavailable());
                 var starter = selected != null && selected.Family == StarterPlacements.Family;
-                Button(row, "Focus", () => { if (selected != null) Focus(selected); else FocusGroupNode(); }).Inactive(focus != null)
+                Button(row, "Focus", () => { if (selected != null) Focus(selected); else FocusCrossingNode(); }).Inactive(focus != null)
                     .Tooltip("Focus", CommandBand.Tooltip(groupNode != null ? "Move the camera to the selected crossing." : starter ? "Move the camera to the marker's track point, where the start setup places its cars." : "Move the camera to the inspected object.", focus));
                 // Beside Focus, as the native map editor has Focus and Clear on its selection row.
                 var keepDraft = guided.Enabled && (guided.Step == GuidedTaskStep.Values || guided.Step == GuidedTaskStep.Review);
@@ -405,8 +405,8 @@ namespace RailroaderScenePatcher {
                 segments.AddSegment(CommandBand.DisabledFilter, outlinerFilter == OutlinerFilter.Disabled, presentation.Action(() => outlinerFilter = OutlinerFilter.Disabled)).Tooltip(CommandBand.DisabledFilter, "Show the objects that are switched off, whatever their parents are.");
                 segments.AddSegment(CommandBand.ProblemsFilter, outlinerFilter == OutlinerFilter.Problems, presentation.Action(() => outlinerFilter = OutlinerFilter.Problems)).Tooltip(CommandBand.ProblemsFilter, "Show the objects with a detected problem.");
             });
-            // PROTOTYPE: the object count line with right-aligned view icons sits outside the rebuildable list so typing
-            // in Search updates the count without rebuilding the view switch.
+            // The object count line with the view switch stands outside the rebuildable list, so typing in Search
+            // updates the count without rebuilding the switch.
             TMP_Text measure = null;
             builder.HStack(countRow => {
                 countRow.ConfigureLayout(4f);
@@ -415,146 +415,97 @@ namespace RailroaderScenePatcher {
                 if (measure != null) measure.verticalAlignment = VerticalAlignmentOptions.Middle;
                 var grow = countLine.GetComponent<LayoutElement>() ?? countLine.gameObject.AddComponent<LayoutElement>();
                 grow.flexibleWidth = 1; grow.minWidth = 0;
-                PrototypeViewIcons(countRow);
+                DrawViewSwitch(countRow);
             }).ChildrenKeepHeight().Height(RowHeight);
             results = builder.AddRebuildableSection(items => {
                 items.ConfigureLayout(4f);
-                // PROTOTYPE: search also matches computed place, kind and crossing name.
-                var shown = PrototypeRows();
                 var rows = new List<UIOutlineItem>();
                 var byKey = new Dictionary<string, SceneObservation>();
-                // PROTOTYPE: the crossing nodes, by the key of their outline row.
-                var groupNodeKeys = new Dictionary<string, string>();
+                // The crossing nodes, by the key of their outline row.
+                var crossingKeys = new Dictionary<string, string>();
                 string selectedKey = null;
                 var narrowed = !String.IsNullOrEmpty(filter) || outlinerFilter != OutlinerFilter.All;
                 var state = narrowed ? filteredOutline : inventoryOutline;
                 var indices = new Dictionary<SceneObservation, int>();
                 if (inventory != null) for (var i = 0; i < inventory.Entries.Count; i++) indices[inventory.Entries[i]] = i;
-                // PROTOTYPE: the top-level nodes come from the one-tree grouping.
-                PrototypeOutlinerGrouping.Result proto = null;
-                try { proto = PrototypeOutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, PrototypeTrackPoint); }
-                catch (Exception e) { PatcherLog.Warning("The outliner grouping failed, so the outliner lists objects by family", e); }
-                // PROTOTYPE: header count matches the visible tree (excluding hidden container objects and native track spans).
-                var summary = inventory == null ? "Inspection is unavailable"
-                    : proto != null ? proto.Listed.ToString(CultureInfo.InvariantCulture) + " of " + Math.Max(0, inventory.Entries.Count - PrototypeOutlinerGrouping.HiddenCount(inventory.Entries)).ToString(CultureInfo.InvariantCulture) + " objects"
-                    : InventoryPresentationState.Summary(inventory, filter, outlinerFilter, IsChanged);
+                // One tree across families: its top level is the categories or the places.
+                OutlinerGrouping.Result tree = null;
+                IReadOnlyList<SceneObservation> shown = Array.Empty<SceneObservation>();
+                try {
+                    shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, OutlinerTrackPoint);
+                    tree = OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
+                } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The outliner couldn't list the objects", e); }
+                // The count is that of the tree: container objects and native track spans have no row.
+                var summary = inventory == null ? "Inspection is unavailable" : tree == null ? "The object list couldn't be built. The log has the cause." : OutlinerGrouping.Summary(tree, inventory.Entries);
                 if (measure != null) measure.text = "<style=Footnote>" + Literal(summary) + "</style>";
-                var protoTops = proto == null ? null : proto.Tops.ToDictionary(top => top.Key);
-                var drawn = proto == null ? InventoryPresentationState.Groups(shown)
-                    : (IReadOnlyList<KeyValuePair<string, IReadOnlyList<SceneObservation>>>)proto.Tops.Select(top => new KeyValuePair<string, IReadOnlyList<SceneObservation>>(top.Key, Array.Empty<SceneObservation>())).ToList();
-                // PROTOTYPE: consume LogPending only once the inventory has been populated, not on the initial empty build.
-                if (PrototypeOutlinerGrouping.LogPending && inventory != null && inventory.Entries.Count > 0) {
-                    PrototypeOutlinerGrouping.LogPending = false;
-                    if (proto != null) PrototypeOutlinerGrouping.Log(proto, shown.Count, filter, outlinerFilter.ToString());
+                // The debug lines of the tree are written once the inventory holds objects, and again after a view switch.
+                if (tree != null && OutlinerGrouping.LogPending && inventory != null && inventory.Entries.Count > 0) {
+                    OutlinerGrouping.LogPending = false;
+                    OutlinerGrouping.Log(tree, shown.Count, filter, outlinerFilter.ToString());
                 }
-                foreach (var group in drawn) {
-                    var protoTop = protoTops?[group.Key];
-                    // The Inspection only group stands after the families and has a key no family can have.
-                    var groupKey = protoTop != null ? "proto:" + (PrototypeOutlinerGrouping.ByPlace ? "p:" : "c:") + group.Key
-                        : (ReferenceEquals(group.Key, InventoryPresentationState.InspectionOnlyGroup) ? "group:" : "family:") + group.Key;
-                    // The count stands first, so a narrow column cuts the family name and never the count; the name
-                    // follows it directly.
-                    var parent = new UIOutlineItem(groupKey, "<alpha=#99>" + (protoTop != null ? "(" + protoTop.Count.ToString(CultureInfo.InvariantCulture) + ")" : group.Value.Count.ToString(CultureInfo.InvariantCulture)) + "<alpha=#FF> " + Literal(protoTop?.Label ?? group.Key));
-                    if (protoTop != null) parent.Tooltip = PrototypeOutlinerGrouping.FolderTooltip(protoTop);
-                    var repeated = new HashSet<string>(group.Value.GroupBy(InventoryPresentationState.Name).Where(names => names.Count() > 1).Select(names => names.Key));
-                    // A family whose objects the game itself tells apart shows them under subgroups; a family group
-                    // only, never the Inspection only group.
-                    var subgroups = groupKey.StartsWith("family:", StringComparison.Ordinal) ? InventoryPresentationState.Subgroups(group.Value) : null;
-                    var folders = new Dictionary<SceneObservation, UIOutlineItem>(); var folderKeys = new Dictionary<SceneObservation, string>();
-                    if (subgroups != null) foreach (var subgroup in subgroups) {
-                        var subKey = groupKey + "/" + subgroup.Key;
-                        var folder = new UIOutlineItem(subKey, "<alpha=#99>" + subgroup.Value.Count.ToString(CultureInfo.InvariantCulture) + "<alpha=#FF> " + Literal(subgroup.Key));
-                        parent.AddChild(folder);
-                        foreach (var row in subgroup.Value) { folders[row] = folder; folderKeys[row] = subKey; }
+                var view = OutlinerGrouping.ByPlace ? "place/" : "category/";
+                // One row: label is the name the row shows, and above the keys of the folders and rows it stands in.
+                // dimmed marks a group shown only to hold a matching part, which is no match itself.
+                UIOutlineItem Row(SceneObservation item, string label, IEnumerable<string> above, bool dimmed) {
+                    var key = indices[item].ToString(CultureInfo.InvariantCulture);
+                    byKey[key] = item;
+                    if (ReferenceEquals(selected, item)) {
+                        selectedKey = key;
+                        // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
+                        if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; foreach (var open in above) state.SetExpanded(open, true); }
                     }
-                    // One row: label is the name the row shows, and above the keys of the folders and rows it stands in.
-                    // where is the place a group row names after its name, and dimmed marks a group shown only to hold
-                    // a matching part, which is no match itself.
-                    UIOutlineItem Row(SceneObservation item, string label, IEnumerable<string> above, string where = null, bool dimmed = false) {
-                        var key = indices[item].ToString(CultureInfo.InvariantCulture);
-                        byKey[key] = item;
-                        if (ReferenceEquals(selected, item)) {
-                            selectedKey = key;
-                            // A newly inspected object is revealed once; afterwards its folder stays as the user leaves it.
-                            if (!ReferenceEquals(revealed, item.Handle)) { revealed = item.Handle; foreach (var open in above) state.SetExpanded(open, true); }
-                        }
-                        var name = InventoryPresentationState.Name(item);
-                        var changed = IsChanged(item); var added = IsAdded(item); var failure = CommandBand.ShownFailure(changed, changed ? FailureOf(item) : null);
-                        // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so
-                        // that they stay visible when the end of a long name is cut off; they take room only on a row
-                        // that has them. "*" marks a changed object and never unsaved work. A name that repeats in its
-                        // folder carries its parent, dimmed; an inactive object is italic and says so.
-                        var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added, failure);
-                        var segments = item.Identity.Path.Split('/');
-                        var context = label == null && repeated.Contains(name) && segments.Length > 1 ? "  <alpha=#99>" + Literal(segments[segments.Length - 2]) + "<alpha=#FF>" : "";
-                        // A row of the Inspection only group names its family, which its folder does not. A group
-                        // that stays under its category without a supported edit is marked as inspection only.
-                        // PROTOTYPE: in the one-tree outliner every inspection-only row sits in its category or family folder and carries "inspection only".
-                        if (item.InspectionOnly != null) context += "  <alpha=#99>" + (protoTop != null || item.Category != null ? "inspection only" : Literal(item.Family)) + "<alpha=#FF>";
-                        if (where != null) context = "  <alpha=#99>" + Literal(where) + "<alpha=#FF>" + context;
-                        var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
-                        string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
-                        // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
-                        var shown = label ?? InventoryPresentationState.NarrowName(item.Family, name, OutlinerMinimumWidth - RowDecoration,
-                            value => measure.GetPreferredValues(prefix + NameMarkup(value)).x);
-                        var text = NameMarkup(shown);
-                        if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
-                        return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) {
-                            Tooltip = proto != null ? PrototypeOutlinerGrouping.Tooltip(proto, item, changed, failure) : InventoryPresentationState.OutlinerTooltip(item, changed, failure)
-                        };
-                    }
-                    // The Baked scenery group family lists its groups under their categories and each group's parts
-                    // beneath it; a part never stands as a loose row.
-                    void Nest(UIOutlineItem holder, InventoryPresentationState.OutlineNode node, string[] above) {
-                        UIOutlineItem made; string key;
-                        if (node.Row == null) {
-                            key = groupKey + "/" + node.Key;
-                            made = new UIOutlineItem(key, "<alpha=#99>" + (protoTop != null ? "(" + node.Count.ToString(CultureInfo.InvariantCulture) + ")" : node.Count.ToString(CultureInfo.InvariantCulture)) + "<alpha=#FF> " + Literal(node.Label) + (node.Where == null ? "" : "  <alpha=#99>" + Literal(node.Where) + "<alpha=#FF>"));
-                            if (protoTop != null) {
-                                made.Tooltip = PrototypeOutlinerGrouping.FolderTooltip(node);
-                                if (proto.GroupNodes.ContainsKey(node.Key)) {
-                                    groupNodeKeys[key] = node.Key;
-                                    if (selected == null && prototypeGroupKey == node.Key) { selectedKey = key; prototypeGroupNode = proto.GroupNodes[node.Key]; }
-                                }
-                            }
-                        } else {
-                            key = indices[node.Row].ToString(CultureInfo.InvariantCulture);
-                            made = Row(node.Row, node.Label, above, node.Where, node.Context);
-                        }
-                        holder.AddChild(made);
-                        var below = above.Concat(new[] { key }).ToArray();
-                        foreach (var child in node.Children) Nest(made, child, below);
-                    }
-                    if (protoTop != null)
-                        foreach (var child in protoTop.Children) Nest(parent, child, new[] { groupKey });
-                    else if (groupKey == "family:" + BakedSceneryRules.Family)
-                        foreach (var category in InventoryPresentationState.Categories(group.Value, inventory?.Entries, filter)) Nest(parent, category, new[] { groupKey });
-                    // The Crossing controller family lists each controller with the spans it holds beneath it.
-                    else if (groupKey == "family:" + InventoryPresentationState.HolderFamily)
-                        foreach (var holder in InventoryPresentationState.Held(group.Value, inventory?.Entries)) Nest(parent, holder, new[] { groupKey });
-                    else foreach (var item in group.Value) {
-                        var holder = folders.TryGetValue(item, out var inFolder) ? inFolder : parent;
-                        holder.AddChild(Row(item, null, folderKeys.TryGetValue(item, out var folderKey) ? new[] { groupKey, folderKey } : new[] { groupKey }));
-                    }
-                    rows.Add(parent);
+                    var changed = IsChanged(item); var added = IsAdded(item); var failure = CommandBand.ShownFailure(changed, changed ? FailureOf(item) : null);
+                    // The native outline appends " *" and " +" to a name. Here the markers stand before the name, so
+                    // that they stay visible when the end of a long name is cut off; they take room only on a row
+                    // that has them. "*" marks a changed object and never unsaved work. An object without a
+                    // supported edit says so, and an inactive object is italic and says so.
+                    var markers = CommandBand.RowMarkers(item.Problems.Count != 0, changed, added, failure);
+                    var context = item.InspectionOnly == null ? "" : "  <alpha=#99>inspection only<alpha=#FF>";
+                    var prefix = markers.Replace("!", "<color=" + Red + "><b>!</b></color>").Replace("*", "<color=" + Amber + "><b>*</b></color>").Replace("+", "<color=" + Green + "><b>+</b></color>").Replace("×", "<color=" + Red + "><b>×</b></color>") + (markers.Length == 0 ? "" : " ");
+                    string NameMarkup(string value) => item.Active ? Literal(value) : "<i>" + Literal(value) + "</i>";
+                    // The divider can shrink the list without rebuilding its rows. Use the minimum column's width.
+                    var name = InventoryPresentationState.NarrowName(item.Family, label, OutlinerMinimumWidth - RowDecoration, value => measure.GetPreferredValues(prefix + NameMarkup(value)).x);
+                    var text = NameMarkup(name);
+                    if (dimmed) text = "<alpha=#99>" + text + "<alpha=#FF>";
+                    return new UIOutlineItem(key, prefix + text + context + (item.Active ? "" : "  <alpha=#99>inactive<alpha=#FF>"), item) { Tooltip = OutlinerGrouping.Tooltip(tree, item, changed, failure) };
                 }
+                // A folder shows its count first, so a narrow column cuts the name and never the count. A crossing
+                // without a controller is a folder that can be selected.
+                void Nest(UIOutlineItem holder, InventoryPresentationState.OutlineNode node, string[] above) {
+                    UIOutlineItem made; string key;
+                    if (node.Row == null) {
+                        key = view + node.Key;
+                        made = new UIOutlineItem(key, "<alpha=#99>(" + node.Count.ToString(CultureInfo.InvariantCulture) + ")<alpha=#FF> " + Literal(node.Label)) { Tooltip = OutlinerGrouping.FolderTooltip(node) };
+                        if (tree.GroupNodes.ContainsKey(node.Key)) {
+                            crossingKeys[key] = node.Key;
+                            if (selected == null && crossingNodeKey == node.Key) { selectedKey = key; crossingNode = tree.GroupNodes[node.Key]; }
+                        }
+                    } else {
+                        key = indices[node.Row].ToString(CultureInfo.InvariantCulture);
+                        made = Row(node.Row, node.Label, above, node.Context);
+                    }
+                    if (holder == null) rows.Add(made); else holder.AddChild(made);
+                    var below = above.Concat(new[] { key }).ToArray();
+                    foreach (var child in node.Children) Nest(made, child, below);
+                }
+                if (tree != null) foreach (var top in tree.Tops) Nest(null, top, new string[0]);
                 var outline = items.AddOutlineView(rows, state, new UIState<string>(selectedKey), key => {
                     if (!byKey.TryGetValue(key, out var observation)) {
-                        // PROTOTYPE: a click on a crossing node selects the crossing, so Focus goes to it.
-                        if (proto != null && groupNodeKeys.TryGetValue(key, out var nodeKey) && proto.GroupNodes.TryGetValue(nodeKey, out var node)) presentation.Action(() => SelectGroupNode(nodeKey, node))();
+                        // A click on a crossing node selects the crossing, so Focus goes to it.
+                        if (tree != null && crossingKeys.TryGetValue(key, out var nodeKey) && tree.GroupNodes.TryGetValue(nodeKey, out var node)) presentation.Action(() => SelectCrossingNode(nodeKey, node))();
                         return;
                     }
                     presentation.Action(() => {
                         if (!GuidedSelect(observation)) return;
-                        prototypeGroupKey = null; prototypeGroupNode = null;
+                        crossingNodeKey = null; crossingNode = null;
                         // A click on the row that is inspected already clears the inspection.
                         if (CommandBand.ClearsInspection(selected, observation)) { ClearInspection(); return; }
                         if (!inventoryPresentation.CanSelect(inventory, observation)) return;
                         CancelGizmo(); ClearSnap(); coverageCircuit = coverageAddition = null; CloseEquipmentForm(); selected = inventoryPresentation.CurrentSelection(inventory, observation); ReadPlacement();
                     })();
                 });
-                // PROTOTYPE: a row's tooltip waits as long as a button's, also while the pointer moves from row to row.
-                if (outline.GetComponent<PrototypeOutlineTooltips>() == null) outline.gameObject.AddComponent<PrototypeOutlineTooltips>();
+                // A row's tooltip waits as long as a button's, also while the pointer moves from row to row.
+                if (outline.GetComponent<OutlineTooltipDelay>() == null) outline.gameObject.AddComponent<OutlineTooltipDelay>();
                 var listLayout = outline.GetComponent<LayoutElement>();
                 listLayout.minHeight = 120; listLayout.flexibleHeight = 10000;
             });
@@ -568,10 +519,8 @@ namespace RailroaderScenePatcher {
         }
         void FitOutliner(TMP_Text measure) {
             if (measure == null || inventory == null) return;
-            // PROTOTYPE: include deeper prototype indentation and Where suffixes when fitting the column.
-            var widths = PrototypeOutlinerGrouping.FitWidths(measure)
-                ?? InventoryPresentationState.Rows(inventory, filter, outlinerFilter, IsChanged).Select(row =>
-                    measure.GetPreferredValues(InventoryPresentationState.Name(row)).x).ToArray();
+            // The row decoration covers one folder level; each deeper level of the tree adds its indent.
+            var widths = OutlinerGrouping.FitLabels().Select(label => measure.GetPreferredValues(label.Key).x + Math.Max(0, label.Value - 1) * OutlineIndent).ToArray();
             var divider = NativePresentation.DividerWidth + 26;
             outlinerWidth = InventoryPresentationState.FitWidth(widths, RowDecoration, presentation.ContentWidth, OutlinerMinimumWidth, InspectorMinimumWidth, divider);
             StoreOutlinerWidth(outlinerWidth);
@@ -1805,7 +1754,8 @@ namespace RailroaderScenePatcher {
             PlainLabel(builder, status);
             if (scene != null) PlainLabel(builder, scene.Status);
             Section(builder, "Editing");
-            builder.AddLabel(PathBreaks(Literal(String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : editingStatus)));
+            // A message from the game or the file system can hold a full path: only its part below a known folder is shown.
+            builder.AddLabel(PathBreaks(Literal(String.IsNullOrEmpty(editingStatus) ? "Editing is unavailable." : PatcherLog.WithoutAbsolutePaths(editingStatus))));
             if (attachment != null) {
                 var session = attachment.Session;
                 if (reloadRequirement != null) PlainLabel(builder, "Reload required: " + reloadRequirement);

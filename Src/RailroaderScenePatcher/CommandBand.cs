@@ -84,6 +84,17 @@ namespace RailroaderScenePatcher {
         internal static bool RecoveryWarning(FailureKind kind) => kind == FailureKind.AwaitingOutput;
         // A reason as one plain sentence after a label such as "Unavailable:", without a label of its own, starting with a
         // capital and ending with a full stop.
+        // A file path as the window shows it, never from the drive: below the game folder the path from that folder,
+        // and elsewhere the path from the mod's own folder, the one that holds its Data folder.
+        internal static string ShownPath(string path, string gameFolder) {
+            if (String.IsNullOrEmpty(path)) return path;
+            var parts = path.Split('\\', '/');
+            var game = String.IsNullOrEmpty(gameFolder) ? new string[0] : gameFolder.TrimEnd('\\', '/').Split('\\', '/');
+            if (game.Length != 0 && parts.Length > game.Length && game.Select((part, i) => String.Equals(part, parts[i], StringComparison.OrdinalIgnoreCase)).All(same => same))
+                return String.Join("/", parts.Skip(game.Length));
+            var data = Array.FindLastIndex(parts, part => String.Equals(part, "Data", StringComparison.OrdinalIgnoreCase));
+            return String.Join("/", parts.Skip(data > 0 ? data - 1 : parts.Length - 1));
+        }
         internal static string Sentence(string reason) {
             var text = (reason ?? "").Trim();
             for (var stripped = true; stripped;) {
@@ -155,8 +166,11 @@ namespace RailroaderScenePatcher {
         // no correction.
         internal static string NotEditable(string reason) => NotEditablePrefix + reason;
         // Why an object whose hierarchy path and component more than one loaded object holds cannot be edited, or null:
-        // a patch names its target by them, so it cannot name one of the holders.
-        internal static string SharedPath(int holders) => holders > 1 ? holders + " objects have this same hierarchy path, so a scene patch file can't tell them apart" : null;
+        // a scene patch file names its target by them, so it cannot name one of the holders. Supported edits says this
+        // about the object; the footer says what it means for an edit now (SharedPathBlock).
+        const string SharedPathTail = " objects have this hierarchy path, and a scene patch file names an object by its path";
+        internal static string SharedPath(int holders) => holders > 1 ? holders + SharedPathTail : null;
+        internal const string SharedPathBlock = "This object can't be edited while another object has the same hierarchy path.";
         // The Track group line of the Object tab. An object without edits is told what its activity follows, not what
         // Disable and Clear activity would do.
         internal static string TrackGroup(bool editable) => editable
@@ -766,6 +780,8 @@ namespace RailroaderScenePatcher {
         internal static string EditReason(string operations) {
             var own = operations?.Trim();
             if (own != null && own.EndsWith(". " + AddedEquipmentReason, StringComparison.Ordinal)) return AddedEquipmentReason;
+            // Supported edits says why the object has no edits; the footer says what holds an edit back now.
+            if (own != null && own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) && own.TrimEnd('.').EndsWith(SharedPathTail, StringComparison.Ordinal)) return SharedPathBlock;
             if (String.IsNullOrEmpty(own) || !(own.StartsWith(NotEditablePrefix, StringComparison.Ordinal) || own.StartsWith(NotYetSupportedPrefix, StringComparison.Ordinal) || own.StartsWith(NotEditableAsGroupPrefix, StringComparison.Ordinal))) return "This object cannot be edited here.";
             return Sentence(own);
         }

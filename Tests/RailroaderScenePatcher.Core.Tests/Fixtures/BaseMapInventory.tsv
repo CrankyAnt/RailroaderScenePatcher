@@ -1,7 +1,8 @@
 # Base map inventory of Railroader 0.6.3 (BushnellWhittier), trimmed from the inventory dump of patcher build 7962df1.
 # C: component index and type. M: a place of the game's map data, with map x and z.
 # O: L (listed by the inventory) or K (context, not listed), hierarchy path, component indexes, family, structure,
-#    map x, map z, the category at 7962df1 (group roots) or of the round 6 prototype (others), and the expected
+#    map x, map z, the category before the generic rules (the category table for group roots, the family and
+#    name for others), and the expected
 #    category / kind @ place of the generic rules. A hyphen is an empty cell.
 C	0	Audio.IntegerLoopingPlayer
 C	1	Character.SpawnPoint

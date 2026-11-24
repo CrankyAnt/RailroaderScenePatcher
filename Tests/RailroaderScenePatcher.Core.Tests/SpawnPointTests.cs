@@ -245,11 +245,7 @@ static class SpawnPointTests {
         Assert(SpawnPoints.FamilyOf("Helpers.MilePost", "World") == null, "Another component is not a spawn point");
         Assert(SpawnPoints.FamilyOf(SpawnPoints.Component, "Setups") == null, "An object below a kept-out root stays out");
         var rows = new[] { Row("Bryson", true), Row("Alarka", false), Row("Whittier", true) };
-        var groups = InventoryPresentationState.Groups(rows);
-        var family = groups.Single(g => g.Key == SpawnPoints.Family);
-        Assert(family.Value.Select(r => r.Identity.Path).SequenceEqual(new[] { "World/POIs/Alarka", "World/POIs/Bryson", "World/POIs/Whittier" }) && groups.Count == 1,
-            "Every spawn point stands once in the Spawn point family, in name order");
-        Assert(family.Value.All(r => r.Problems.Count == 0 && r.InspectionOnly == null), "An inactive spawn point shows no problem and none is inspection only");
+        Assert(rows.All(r => r.Problems.Count == 0 && r.InspectionOnly == null), "An inactive spawn point shows no problem and none is inspection only");
     }
     static void GroupsWithSpawnPointsPointToTheFamily() {
         var verdict = BakedSceneryRules.Classify(new Node("World", new Node("Large Scenery", new Node("Town", new Node("Depot", new Node("Spawn").With(SpawnPoints.Component), new Node("Shell").Solid())))))

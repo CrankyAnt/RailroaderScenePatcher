@@ -367,6 +367,7 @@ namespace RailroaderScenePatcher {
             if (engine != null) return;
             context = value; inMapEditor = ModScenePatchFiles.IsMapEditor;
             native = new NativeInventory(g => scene == null ? "Independent board editing is unavailable" : scene.Refusal(g));
+            OutlinerGrouping.Scene = new OutlinerScene();
             capabilities = new SceneCapabilities(ModScenePatchFiles.MapIds, native) { MapPatches = ModScenePatchFiles.MapPatchIds };
             try { markerWorld = new TrackMarkerWorld(); markerWorld.KnownReferrers = KnownReferrers; capabilities.Add(markerScene = new TrackMarkerScene(markerWorld, Capability.Unchecked, groundMasks)); }
             catch (Exception e) { capabilities.AddUnavailable(TrackMarkerScene.Structure, e.GetBaseException().Message); }
@@ -542,7 +543,7 @@ namespace RailroaderScenePatcher {
                 ModScenePatchFiles.Written = text => { try { definitions.Written(ModScenePatchFiles.EditedModId(), text); } catch { } };
                 filled = false;
                 snap = new SnapController(attachment.Session, capabilities, new NativeSnapScene(native));
-                editingStatus = attachment.Session.Blocked ?? "Editing ready for " + attachment.PatchPath;
+                editingStatus = attachment.Session.Blocked ?? "Editing ready for " + CommandBand.ShownPath(attachment.PatchPath, GameFolder);
                 // The native map editor built its title before this session could account for the scene patch file.
                 attachment.RefreshChrome();
             } catch (Exception e) { refusedMapEditor = found; editingStatus = "Editing unavailable: " + e.GetBaseException().Message; }

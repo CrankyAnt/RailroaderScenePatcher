@@ -109,7 +109,7 @@ static class ExistingEquipmentTests {
         RejoinAppliesOnceToTheRebuiltCrossing();
         PatternsNameWhyEquipmentDoesNotConform();
         Assert(ExistingEquipmentScene.MastStructure == "existing-crossing-mast-v1" && ExistingEquipmentScene.BellStructure == "existing-crossing-bell-v1", "The structure names that scene patch files hold");
-        OutlinerListsMastsAsOneEntryAndSpansUnderTheirController();
+        DetectionSpansNameTheirController();
         InspectorNamesWhatAppliesAndWhy();
         Console.WriteLine("PASS: existing crossing equipment: mast and bell placement, rotation and Enabled, own culling, refusal, restoration, history, save, reload and removal");
     }
@@ -415,10 +415,8 @@ static class ExistingEquipmentTests {
         new SceneObservation(new object(), new TargetIdentity(SceneName, path, component, structure), family, true, new double[] { 1, 2, 3 }, Identity, new string[0], new string[0], new string[0], operations,
             inspectionOnly: inspectionOnly, displayName: displayName, holderPath: holder);
 
-    // A mast is one entry in the Crossing mast family. A detection span, a span that a crossing controller holds in
-    // a circuit, stands under that controller in the Crossing controller family, not in the Track span family or the Inspection
-    // only group; the group holds no crossing light, gate, bell or span.
-    static void OutlinerListsMastsAsOneEntryAndSpansUnderTheirController() {
+    // A detection span is a span that a crossing controller holds in a circuit; it names that controller.
+    static void DetectionSpansNameTheirController() {
         var controller = Entry(Crossing, CrossingCoverageScene.ComponentType, "Crossing controller", structure: CrossingCoverageScene.Structure);
         var mast = Entry(Mast1Path, ExistingEquipmentScene.MastComponent, ExistingEquipmentScene.MastFamily, CommandBand.MastOperations, displayName: "Signal 1 at Bryson Everett", structure: ExistingEquipmentScene.MastStructure);
         var bell = Entry(BellPath, ExistingEquipmentScene.BellComponent, ExistingEquipmentScene.BellFamily, CommandBand.BellOperations, structure: ExistingEquipmentScene.BellStructure);
@@ -428,17 +426,6 @@ static class ExistingEquipmentTests {
         Assert(CommandBand.SpanInspectionOnly(true) == null && CommandBand.SpanInspectionOnly(false) == CommandBand.InspectionOnly("Track span", false) && CommandBand.SpanInspectionOnly(false) != null, "The span's holder decides whether it is inspection only");
         var loose = Entry("World/Loose Span", "Track.TrackSpan", "Track span", "x", CommandBand.SpanInspectionOnly(false));
         var rows = new[] { island, mast, loose, controller, east, bell };
-        var groups = InventoryPresentationState.Groups(rows);
-        Assert(groups.Select(g => g.Key).SequenceEqual(new[] { "Crossing bell", "Crossing controller", "Crossing mast", InventoryPresentationState.InspectionOnlyGroup }), "Families: " + String.Join(", ", groups.Select(g => g.Key)));
-        var crossing = groups.Single(g => g.Key == "Crossing controller").Value;
-        Assert(crossing.Count == 3 && crossing.Contains(island) && crossing.Contains(east) && crossing.Contains(controller), "The controller's family holds the controller and its spans");
-        Assert(groups.Single(g => g.Key == InventoryPresentationState.InspectionOnlyGroup).Value.SequenceEqual(new[] { loose }), "Only a span no controller holds stays inspection only");
-        Assert(groups.Single(g => g.Key == "Crossing mast").Value.SequenceEqual(new[] { mast }), "The mast stands in its own family");
-        var nested = InventoryPresentationState.Held(crossing, rows);
-        Assert(nested.Count == 1 && ReferenceEquals(nested[0].Row, controller) && nested[0].Children.Select(c => c.Label).SequenceEqual(new[] { "Track 1 East", "Track 1 Island" }) && nested[0].Count == 3 && !nested[0].Context, "The spans stand under their controller, by name");
-        // A search that finds only a span shows its controller as the holder, taken from the whole inventory.
-        var only = InventoryPresentationState.Held(new[] { island }, rows);
-        Assert(only.Count == 1 && ReferenceEquals(only[0].Row, controller) && only[0].Context && only[0].Count == 1 && only[0].Children.Count == 1, "A span whose controller the search left out is shown under that controller");
         var inventory = new SceneInventory(new Scene { Maps = new[] { "map" }, Observations = () => rows }); inventory.Refresh();
         Assert(ReferenceEquals(InventoryPresentationState.HolderOf(inventory, island), controller) && InventoryPresentationState.HolderOf(inventory, mast) == null && InventoryPresentationState.HeldBy(island) == "Detection span of: Grade Crossing - Bryson Everett" && InventoryPresentationState.HeldBy(mast) == null,
             "A detection span names its controller, which Select controller inspects");
@@ -454,7 +441,7 @@ static class ExistingEquipmentTests {
             Assert(CommandBand.ModeBlock(mode, false, true, CommandBand.MastOperations, equipment: true) == null, "Mode " + mode + " applies to a mast");
         Assert(CommandBand.ModeBlock(CommandBand.FollowMode, false, true, CommandBand.MastOperations, equipment: true) == CommandBand.EquipmentNoFollow && CommandBand.EquipmentNoFollow.Contains("fixed placement"), "Follow says why it does not apply");
         Assert(CommandBand.Tooltip("Keep the object's placement relative to a chosen track or endpoint.", CommandBand.EquipmentNoFollow).StartsWith("Unavailable: ", StringComparison.Ordinal), "A disabled mode's tooltip gives the reason");
-        NonconformingEquipmentStaysListedWithItsOperationsDisabled();
+        NonconformingEquipmentHasItsOperationsDisabled();
         // A bell's sound has no direction: its rotation stays visible and disabled with that reason; a mast's applies.
         Assert(CommandBand.RotationBlock(ExistingEquipmentScene.BellStructure) == CommandBand.BellNoRotation && CommandBand.BellNoRotation.Contains("no direction") && CommandBand.RotationBlock(ExistingEquipmentScene.MastStructure) == null && CommandBand.RotationBlock(null) == null,
             "Rotation does not apply to a bell and applies to a mast");
@@ -502,20 +489,15 @@ static class ExistingEquipmentTests {
         Assert(CommandBand.HoldsMarker(StarterPlacements.Family) && !CommandBand.HoldsMarker("Track span") && !CommandBand.HoldsMarker(null), "The marker families are one list");
     }
 
-    // A mast or bell that does not conform to its pattern is listed in its family, not left out and not inspection only.
-    // The inventory gives it no structure and its refusal under Supported edits, so the inspector cannot edit it: every
-    // placement mode, Numeric included, the rotation fields and Enabled are disabled with the concrete reason, and the
-    // reason links to the operation guidance.
-    static void NonconformingEquipmentStaysListedWithItsOperationsDisabled() {
+    // A mast or bell that does not conform to its pattern gets no structure and its refusal under Supported edits, so the
+    // inspector cannot edit it: every placement mode, Numeric included, the rotation fields and Enabled are disabled with
+    // the concrete reason, and the reason links to the operation guidance.
+    static void NonconformingEquipmentHasItsOperationsDisabled() {
         var problem = ExistingEquipmentPattern.MastProblem(new MastFacts { Lamps = { new LampFacts { Name = "Signal 1", Key = "power", Targets = 1, Materials = 1, RendererUsesMaterial = true } } }, new[] { "lights", "gates" });
         var bellProblem = ExistingEquipmentPattern.BellProblem(new ExistingBellFacts { ControllerActive = false });
         var mast = Entry(Mast1Path, ExistingEquipmentScene.MastComponent, ExistingEquipmentScene.MastFamily, CommandBand.NotEditable(problem), displayName: "Signal 1 at Bryson Everett");
         var bell = Entry(BellPath, ExistingEquipmentScene.BellComponent, ExistingEquipmentScene.BellFamily, CommandBand.NotEditable(bellProblem));
         var conforming = Entry(Mast2Path, ExistingEquipmentScene.MastComponent, ExistingEquipmentScene.MastFamily, CommandBand.MastOperations, structure: ExistingEquipmentScene.MastStructure);
-        var inventory = new SceneInventory(new Scene { Maps = new[] { "map" }, Observations = () => new[] { mast, bell, conforming } }); inventory.Refresh();
-        var groups = InventoryPresentationState.Groups(inventory.Entries);
-        Assert(groups.Single(g => g.Key == ExistingEquipmentScene.MastFamily).Value.Contains(mast) && groups.Single(g => g.Key == ExistingEquipmentScene.BellFamily).Value.Contains(bell)
-            && !groups.Any(g => g.Key == InventoryPresentationState.InspectionOnlyGroup), "The nonconforming mast and bell are listed in their families: " + String.Join(", ", groups.Select(g => g.Key + "=" + g.Value.Count)));
         foreach (var (row, reason) in new[] { (mast, problem), (bell, bellProblem) }) {
             var operations = row.Operations;
             Assert(!CommandBand.EditableStructure(row.Identity.Structure) && CommandBand.Refusal(operations) == reason, "The entry cannot be edited and states its refusal under Supported edits: " + operations);

@@ -18,7 +18,7 @@ static class SceneClassificationTests {
         GroupRootsAreTheInventorys(map);
         EveryListedObjectHasItsExpectedOutcome(map);
         NothingLandsInACatchAll(map);
-        ChangesFromTodayAreTheKnownOnes(map);
+        ChangesAreTheKnownOnes(map);
         PlacesFallTogether(map);
         FictionalObjects();
         Console.WriteLine("PASS: scene classification");
@@ -65,8 +65,9 @@ static class SceneClassificationTests {
         Check(lost.Length == 0, "no listed object is left without a category or a place: " + String.Join(", ", lost));
     }
 
-    // Every listed object whose category differs from today's, by the rule that changes it. Today is the category of
-    // the 7962df1 inventory for a group root, and of the round 6 prototype for every other object.
+    // Every listed object whose category differs from the one it had before the generic rules, by the rule that
+    // changes it. Before, a group root took its category from the category table of the 7962df1 inventory, and
+    // every other object from its family and name.
     static readonly Dictionary<string, int> KnownChanges = new Dictionary<string, int> {
         // A loader that fills cars (RollingStock.CarContentSwapper) is an industry building: the Coal Loader.
         ["Other -> Industry building"] = 1,
@@ -74,17 +75,15 @@ static class SceneClassificationTests {
         ["Other -> Water"] = 2,
         // What stands along a road and is nothing else is road scenery: the 1932 Chevy Truck LP.
         ["Other -> Road scenery"] = 1,
-        // A sign container that holds only track markers has a category now, where the table gave it one.
         // A track marker on a station building is that station: Hemingway flagstopstation.
         ["Track marker -> Station building"] = 1,
-        // A Loc: board that is no location sign by name does not exist; boards without a Loc: name would be signs.
     };
-    static void ChangesFromTodayAreTheKnownOnes(BaseMapFixture map) {
+    static void ChangesAreTheKnownOnes(BaseMapFixture map) {
         var changes = map.Objects.Where(o => o.Listed && !o.BakedPart).Select(o => new { o.Path, From = o.Today.Split(new[] { " / " }, StringSplitOptions.None)[0], To = map.ClassOf(o).Category })
             .Where(c => c.From != c.To).GroupBy(c => c.From + " -> " + c.To).ToDictionary(g => g.Key, g => g.Select(c => c.Path).ToArray());
         if (Environment.GetEnvironmentVariable("RSP_FIXTURE_READOUT") == "1") foreach (var change in changes) Console.WriteLine("CHANGE " + change.Key + " (" + change.Value.Length + "): " + String.Join(", ", change.Value));
         var unknown = changes.Where(c => !KnownChanges.TryGetValue(c.Key, out var count) || count != c.Value.Length).Select(c => c.Key + " (" + c.Value.Length + "): " + String.Join(", ", c.Value.Take(5))).ToArray();
-        Check(unknown.Length == 0 && changes.Count == KnownChanges.Count, "the categories that change from today are the known ones; unexpected: " + String.Join(" | ", unknown));
+        Check(unknown.Length == 0 && changes.Count == KnownChanges.Count, "the categories that change are the known ones; unexpected: " + String.Join(" | ", unknown));
     }
 
     static void PlacesFallTogether(BaseMapFixture map) {

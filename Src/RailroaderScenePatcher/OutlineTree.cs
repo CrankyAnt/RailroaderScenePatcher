@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
-// PROTOTYPE: the one tree of the outliner grouping prototype, without the engine: the same levels in every folder.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -108,7 +107,7 @@ namespace RailroaderScenePatcher {
                 foreach (var child in node.Children) {
                     if (Level(child) != "row" && child.Label.StartsWith(node.Label, StringComparison.OrdinalIgnoreCase)) found.Add("repeat: " + path + " / " + child.Label);
                     if (byPlace && Level(child) != "row" && places.Contains(child.Label)) found.Add("nested place: " + path + " / " + child.Label);
-                    if (((child.Label ?? "") + " " + (child.Where ?? "")).IndexOf("nearest", StringComparison.OrdinalIgnoreCase) >= 0) found.Add("method text: " + path + " / " + child.Label + " " + child.Where);
+                    if ((child.Label ?? "").IndexOf("(nearest", StringComparison.OrdinalIgnoreCase) >= 0) found.Add("method text: " + path + " / " + child.Label);
                     if (Level(node) != "row") Walk(child, path + " / " + child.Label, depth + 1);
                 }
             }

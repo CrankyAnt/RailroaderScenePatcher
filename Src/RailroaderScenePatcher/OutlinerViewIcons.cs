@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 CrankyAnt
 // SPDX-License-Identifier: MIT
-// PROTOTYPE: throwaway view switch and layout helpers of the outliner grouping prototype.
 using System;
 using System.Linq;
 using RailroaderScenePatcher.Core;
@@ -18,9 +17,9 @@ namespace RailroaderScenePatcher {
         static bool spriteLibraryLogged;
 
         void SwitchOutlinerView(bool place) {
-            if (PrototypeOutlinerGrouping.ByPlace == place) return;
-            PrototypeOutlinerGrouping.ByPlace = place;
-            PrototypeOutlinerGrouping.LogPending = true;
+            if (OutlinerGrouping.ByPlace == place) return;
+            OutlinerGrouping.ByPlace = place;
+            OutlinerGrouping.LogPending = true;
             // Reveal the currently inspected object in the new view's hierarchy.
             revealed = null;
         }
@@ -28,7 +27,7 @@ namespace RailroaderScenePatcher {
         // Two compact native segments on the object count line: native segmentSelected / segment styling marks the
         // active view while both icons stay full white (never dimmed like a disabled button). Clicks on the active
         // view are ignored.
-        void PrototypeViewIcons(UIPanelBuilder row) {
+        void DrawViewSwitch(UIPanelBuilder row) {
             try {
                 RegisterViewIcons();
                 var items = new[] {
@@ -37,20 +36,20 @@ namespace RailroaderScenePatcher {
                 };
                 row.AddSegmentedControlCompact(segments => {
                     foreach (var (iconName, sprite, place, title, body) in items) {
-                        var active = PrototypeOutlinerGrouping.ByPlace == place;
+                        var active = OutlinerGrouping.ByPlace == place;
                         var action = active ? (Action)(() => { }) : presentation.Action(() => SwitchOutlinerView(place));
                         var segment = segments.AddSegment("", active, action);
                         segment.Tooltip(title, body + (active ? " Shown now." : ""));
-                        AttachPrototypeIcon(segment.RectTransform, sprite, iconName);
+                        AttachViewIcon(segment.RectTransform, sprite, iconName);
                     }
                 });
             } catch (Exception e) {
                 PatcherLog.Warning("The outliner view icons are unavailable, so the switch shows text", e);
-                Button(row, PrototypeOutlinerGrouping.ByPlace ? "By category" : "By place", () => SwitchOutlinerView(!PrototypeOutlinerGrouping.ByPlace));
+                Button(row, OutlinerGrouping.ByPlace ? "By category" : "By place", () => SwitchOutlinerView(!OutlinerGrouping.ByPlace));
             }
         }
 
-        static void AttachPrototypeIcon(RectTransform segment, Sprite fallback, string iconName) {
+        static void AttachViewIcon(RectTransform segment, Sprite fallback, string iconName) {
             foreach (var label in segment.GetComponentsInChildren<TMP_Text>(true)) label.gameObject.SetActive(false);
             var hlg = segment.GetComponent<HorizontalLayoutGroup>();
             if (hlg != null) {
@@ -86,8 +85,8 @@ namespace RailroaderScenePatcher {
                 spriteLibraryLogged = true;
                 try {
                     var names = UI.SpriteLibrary.Shared == null ? "no shared library" : String.Join(", ", UI.SpriteLibrary.Shared.entries.Select(entry => entry.name));
-                    PatcherLog.Debug("Outliner grouping sprite library: " + names);
-                } catch (Exception e) { PatcherLog.Debug("Outliner grouping sprite library unreadable: " + e.GetBaseException().Message); }
+                    PatcherLog.Debug("Outliner sprite library: " + names);
+                } catch (Exception e) { PatcherLog.Debug("Outliner sprite library unreadable: " + e.GetBaseException().Message); }
             }
             if (byCategorySprite == null) byCategorySprite = Draw(ByCategoryIcon, ListPixel);
             if (byPlaceSprite == null) byPlaceSprite = Draw(ByPlaceIcon, PinPixel);
