@@ -139,7 +139,7 @@ static class RoadBridgeTests {
         var bare = CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { "Culling" }, roadBridge: true);
         Assert(bare == "The bridge is decorative. Its road is native map data that the Map Editor edits. Moving or disabling this group changes no game function.", "The use of a road bridge without a mask: " + bare);
         Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, new[] { "Culling" }, roadBridge: true) == CommandBand.PartDecorative, "A part of a road bridge keeps the part's text");
-        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) }) == "The building is decorative. Its ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
+        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) }) == "The building is decorative. The ground mask of its part Mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "A building keeps its text");
     }
 

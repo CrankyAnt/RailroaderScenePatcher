@@ -20,6 +20,7 @@ static class CommandBandTests {
         ADisabledControlKeepsItsDescription();
         HierarchyLinesHaveAShortForm();
         ChoiceLabelsLeadWithWhatTellsThemApart();
+        TheWindowLogsItsOpeningsAndIconClicks();
         AnOpenedFormScrollsIntoView();
         PartsReadAsPartsInWorldChoicesAndTheStateLine();
         AConfirmedWorldChoiceIsADebugLineLikeItsRefusals();
@@ -786,6 +787,12 @@ static class CommandBandTests {
         Check(CommandBand.RevealLog(new float[] { 900, 0, 0, 220, 400, 1400 }) == "Scrolled the opened form into view: from 900 to 0. Form 0 to 220, view 400 of 1400.", "A reveal that scrolls logs from where to where: " + CommandBand.RevealLog(new float[] { 900, 0, 0, 220, 400, 1400 }));
         Check(CommandBand.RevealLog(new float[] { 100, 100, 150, 300, 400, 1400 }).StartsWith("The opened form is in view already at 100.", StringComparison.Ordinal), "A form in view is logged as such");
         Check(CommandBand.RevealLog(null) == "The opened form wasn't scrolled into view: no scroll region holds it.", "A form outside a scroll region is logged");
+    }
+    // The next run shows whether the first icon click found the window counted as open, and where it stood.
+    static void TheWindowLogsItsOpeningsAndIconClicks() {
+        var line = CommandBand.WindowLog("icon clicked", true, true, new float[] { 0, 520, 570, 600, 2560, 1440 });
+        Check(line == "Scene Patcher window icon clicked: open, object active, at 0, 520 size 570 x 600 on a screen of 2560 x 1440.", "The icon click line: " + line);
+        Check(CommandBand.WindowLog("opened as it was when the Map Editor was left", false, false, new float[] { 0, 0, 0, 0, 1920, 1080 }).Contains(": closed, object inactive,"), "A closed, inactive window says so");
     }
     static bool AddedChoicesKeepTheirVisibleName() {
         SceneObservation Added(string id) => new SceneObservation(new object(),

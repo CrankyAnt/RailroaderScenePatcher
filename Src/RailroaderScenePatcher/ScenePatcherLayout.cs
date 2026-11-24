@@ -1269,10 +1269,26 @@ namespace RailroaderScenePatcher {
             // holds a scene ground mask or stands above one. The section is there only for those, in plain words.
             if (!HasTerrain) return;
             Section(builder, "Terrain");
+            var text = TerrainLine(out var failed);
+            if (failed) builder.AddLabel(Tint(Red, text)); else PlainLabel(builder, text);
+        }
+        // The Terrain line of the inspected object: the output of its own edits. A part whose own edits wrote none,
+        // such as the part Mask after its group was disabled, shows its group's output with the group named: the
+        // terrain is the part's mask, and the edit that changed it is the group's (CommandBand.GroupTerrain).
+        readonly InspectedOutput inspectedGroupOutput = new InspectedOutput();
+        string TerrainLine(out bool failed) {
             var problem = (string)null;
             var output = attachment == null || !Editable ? DependentOutput.None : inspectedOutput.Of(attachment.Session, selected, out problem);
-            var text = CommandBand.Terrain(problem, output.Error, output.Settled, Join(output.Completed), Join(output.Outstanding), output.Completed.Count != 0);
-            if (problem != null) builder.AddLabel(Tint(Red, text)); else PlainLabel(builder, text);
+            failed = problem != null;
+            var own = CommandBand.Terrain(problem, output.Error, output.Settled, Join(output.Completed), Join(output.Outstanding), output.Completed.Count != 0);
+            if (problem != null || output.Error != null || output.Completed.Count != 0 || output.Outstanding.Count != 0 || selected.GroupPath == null) return own;
+            var group = InventoryPresentationState.GroupOf(inventory, selected);
+            if (group == null || attachment == null) return own;
+            var groupProblem = (string)null;
+            var held = inspectedGroupOutput.Of(attachment.Session, group, out groupProblem);
+            if (groupProblem != null || (held.Error == null && held.Completed.Count == 0 && held.Outstanding.Count == 0)) return own;
+            var text = CommandBand.Terrain(null, held.Error, held.Settled, Join(held.Completed), Join(held.Outstanding), held.Completed.Count != 0);
+            return CommandBand.GroupTerrain(group.DisplayName, text, held.Error != null || held.Outstanding.Count != 0);
         }
         // Whether the inspected object has terrain output at all.
         bool HasTerrain => selected != null && (selected.Identity.Structure == IndependentBoards.Structure || CommandBand.HoldsGroundMask(selected.Dependencies));

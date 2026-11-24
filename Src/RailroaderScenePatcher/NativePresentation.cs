@@ -550,7 +550,7 @@ namespace RailroaderScenePatcher {
                     entry.layer = manager.windowPrefab.gameObject.layer;
                     entry.transform.SetParent(manager.transform, false);
                     entryPanel = UIPanel.Create((RectTransform)entry.transform, manager.builderAssets, b =>
-                        b.AddButtonCompact(() => entryCaption, Toggle).Tooltip(() => new TooltipInfo(entryCaption, entryReason)));
+                        b.AddButtonCompact(() => entryCaption, EntryClicked).Tooltip(() => new TooltipInfo(entryCaption, entryReason)));
                 }
                 AddTitleHelp(manager);
                 Layout(true);
@@ -646,7 +646,7 @@ namespace RailroaderScenePatcher {
                 if (left.Length != 0) throw new InvalidOperationException("native components could not be removed: " + String.Join(", ", left));
                 var button = clone.GetComponent<Button>();
                 button.onClick = new Button.ButtonClickedEvent();
-                button.onClick.AddListener(Toggle);
+                button.onClick.AddListener(EntryClicked);
                 button.interactable = true;
                 var tooltip = clone.GetComponentInChildren<UI.Tooltips.UITooltipProvider>(true) ?? clone.AddComponent<UI.Tooltips.UITooltipProvider>();
                 tooltip.DynamicTooltipInfo = () => new TooltipInfo(entryCaption, entryReason);
@@ -796,6 +796,22 @@ namespace RailroaderScenePatcher {
         }
         // Feature-owned persistent feedback can update the entry without rebuilding an active input field.
         internal void SetEntryStatus(string caption, string reason) { entryCaption = caption; entryReason = reason; }
+        // Whether the game is ready for the window to open by itself, which a window that was open when the Map Editor
+        // was left does: the world has finished loading. Opened during the load, the window counted as open but the
+        // modder did not see it, so the first click on the icon closed it and only the second opened it. Null: ready.
+        internal Func<bool> AutoOpenReady;
+        // Receives the debug lines of the window's openings and of the icon's clicks.
+        internal Action<string> Logged;
+        string WindowState(string reason) {
+            var bounds = window == null ? Rect.zero : Bounds((RectTransform)window.transform);
+            return CommandBand.WindowLog(reason, IsOpen, window != null && window.gameObject.activeInHierarchy,
+                new[] { bounds.x, bounds.y, bounds.width, bounds.height, Screen.width, Screen.height });
+        }
+        void EntryClicked() {
+            if (disposed) return;
+            try { Logged?.Invoke(WindowState("icon clicked")); } catch { }
+            Toggle();
+        }
         void Toggle() {
             if (IsOpen) { Close(); return; }
             dirty = false;
@@ -855,7 +871,10 @@ namespace RailroaderScenePatcher {
 
         internal void Tick() {
             if (disposed) return;
-            if (openOnTick) { openOnTick = false; if (!IsOpen) Toggle(); }
+            if (openOnTick && (AutoOpenReady == null || AutoOpenReady())) {
+                openOnTick = false;
+                if (!IsOpen) { Toggle(); try { Logged?.Invoke(WindowState("opened as it was when the Map Editor was left")); } catch { } }
+            }
             Layout(false);
             CompactTick();
             if (IsOpen) PlaceTitleHelp();

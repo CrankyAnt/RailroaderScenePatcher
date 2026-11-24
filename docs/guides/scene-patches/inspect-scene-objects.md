@@ -8,7 +8,7 @@ The window opens flush with the left screen edge, directly below the native Map 
 
 Drag the title to move the window. Use its close control or click its entry again to close it and cancel any pending world choice. The window keeps the position and size you choose, even when a native window or menu opens over it. It moves automatically only if a screen or UI-scale change leaves it partly off screen.
 
-The minimum size is 704 by 470 units. This leaves the outliner, command band, and a tab body in view, with independent scrolling for the tab body and message area. If the panel was open when you left the native map editor, it opens again when you return.
+The minimum size is 704 by 470 units. This leaves the outliner, command band, and a tab body in view, with independent scrolling for the tab body and message area. If the panel was open when you left the native map editor, it opens again when you return, once the world has finished loading.
 
 The title bar has four glyphs to the left of the close control. Each has a tooltip with its name:
 

@@ -551,14 +551,24 @@ static class GroundMaskTests {
         var holder = new[] { CommandBand.GroundMaskDependency(true, new[] { "Mask" }, false) }; var above = new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, false) };
         Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, holder) == "Ground mask: it shapes the ground and the vegetation where this part stands. Moving or disabling this part changes the terrain there.",
             "The holder's use: " + CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, holder));
-        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, above) == "The building is decorative. Its ground mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
+        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, above) == "The building is decorative. The ground mask of its part Mask shapes the ground and the vegetation where it stands, so moving or disabling this group changes the terrain there.",
             "The group's use: " + CommandBand.GroundMaskUse(CommandBand.Decorative, false, above));
         Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, new[] { "Culling" }) == CommandBand.PartDecorative, "A part without a mask keeps its text");
+        // The part that holds the mask shows the terrain result of its group's edit, with the group named.
+        Assert(CommandBand.GroupTerrain("Wilmot Station", CommandBand.Terrain(null, null, true, "16525.9, 2300.8", "", true), false) == "By the edit of its group Wilmot Station: Terrain updated: 16525.9, 2300.8.",
+            "The holder names its group's result: " + CommandBand.GroupTerrain("Wilmot Station", CommandBand.Terrain(null, null, true, "16525.9, 2300.8", "", true), false));
+        Assert(CommandBand.GroupTerrain("Wilmot Station", CommandBand.Terrain(null, null, false, "none", "16525.9, 2300.8", false), true).EndsWith("Retry is on the group's Changes tab.", StringComparison.Ordinal),
+            "A pending or stopped write says where Retry is");
         // A flattening mask cannot be moved, so its use names only what an edit can do: disabling.
         Assert(CommandBand.GroundMaskUse(CommandBand.PartDecorative, true, new[] { CommandBand.GroundMaskDependency(true, new[] { "Mask" }, true) }) == "Ground mask: it shapes the ground and the vegetation where this part stands. Disabling this part changes the terrain there.",
             "The use of a flattening holder names no move");
-        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }) == "The building is decorative. Its ground mask shapes the ground and the vegetation where it stands, so disabling this group changes the terrain there.",
-            "The use of a group above a flattening mask names no move");
+        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true) }) == "The building is decorative. The ground mask of its part Mask shapes the ground and the vegetation where it stands, so disabling this group changes the terrain there.",
+            "The use of a group above a flattening mask names its holder and no move, as Wilmot Station's");
+        // Several holders are named together; the group root's own mask stays "Its ground mask".
+        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, false) }) == "The building is decorative. The ground masks of its parts Mask and Pad shape the ground and the vegetation where they stand, so moving or disabling this group changes the terrain there.",
+            "Several holders: " + CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(false, new[] { "Mask", "Pad" }, false) }));
+        Assert(CommandBand.GroundMaskUse(CommandBand.Decorative, false, new[] { CommandBand.GroundMaskDependency(true, new[] { "Root" }, false, group: true) }).StartsWith("The building is decorative. Its ground mask shapes", StringComparison.Ordinal),
+            "A mask on the group root is the group's own");
         // Below a marker object the holder is no part of a family: the line calls it an object.
         Assert(CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false) == "Ground mask: the object Mask holds the scene ground mask, which also flattens the terrain height. This object can't be moved because the game might not restore the terrain height after a move.",
             "The line of a marker object above the holder: " + CommandBand.GroundMaskDependency(false, new[] { "Mask" }, true, parts: false));

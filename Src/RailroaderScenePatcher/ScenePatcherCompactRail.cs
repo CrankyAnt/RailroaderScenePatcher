@@ -198,10 +198,8 @@ namespace RailroaderScenePatcher {
             if (changed && attachment != null) CompactChangedSettings(builder);
             else CompactHonestPlacement(builder);
             if (!HasTerrain) return;
-            var problem = (string)null;
-            var output = attachment == null || !Editable ? DependentOutput.None : inspectedOutput.Of(attachment.Session, selected, out problem);
-            var terrain = CommandBand.Terrain(problem, output.Error, output.Settled, Join(output.Completed), Join(output.Outstanding), output.Completed.Count != 0);
-            Line(builder, problem != null ? Tint(Red, terrain) : Literal(terrain), "Terrain", terrain, LineHeight);
+            var terrain = TerrainLine(out var failed);
+            Line(builder, failed ? Tint(Red, terrain) : Literal(terrain), "Terrain", terrain, LineHeight);
         }
 
         // Up to two changed settings; the tooltip holds them all.

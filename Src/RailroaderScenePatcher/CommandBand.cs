@@ -294,6 +294,17 @@ namespace RailroaderScenePatcher {
             : error != null ? "Terrain update stopped: " + error + ". Updated: " + completed + ". Pending: " + outstanding + ". The edit is kept."
             : !settled ? "Terrain pending: the game is regenerating " + outstanding + ". Updated so far: " + completed + "."
             : anyCompleted ? "Terrain updated: " + completed + "." : "Terrain unchanged.";
+        // The Terrain line of a part whose own edits wrote no terrain output while its group's edit did, such as the part
+        // that holds a station's ground mask after the station was disabled: the group's result, with the group named,
+        // and where Retry is while a write still waits or stopped.
+        internal static string GroupTerrain(string group, string groupResult, bool retry) =>
+            "By the edit of its group " + group + ": " + groupResult + (retry ? " Retry is on the group's Changes tab." : "");
+        // The debug line of the window's state at an opening or an icon click: what happened, whether the native window
+        // counts as open, whether its object is active, and its bounds and the screen in pixels (x, y, width, height,
+        // screen width, screen height).
+        internal static string WindowLog(string reason, bool open, bool active, float[] bounds) =>
+            "Scene Patcher window " + reason + ": " + (open ? "open" : "closed") + ", object " + (active ? "active" : "inactive")
+            + ", at " + Number(bounds[0]) + ", " + Number(bounds[1]) + " size " + Number(bounds[2]) + " x " + Number(bounds[3]) + " on a screen of " + Number(bounds[4]) + " x " + Number(bounds[5]) + ".";
         // A log line names the action group, the object and what happened.
         internal static string LogLine(string place, string objectPath, string message) =>
             (String.IsNullOrEmpty(place) ? "" : "[" + place + "] ") + (String.IsNullOrEmpty(objectPath) ? "" : objectPath + ": ") + message;
@@ -462,8 +473,21 @@ namespace RailroaderScenePatcher {
             if (line == null) return use;
             var edits = line.EndsWith(HeightUnconfirmed, StringComparison.Ordinal) ? "disabling" : "moving or disabling";
             if (line.StartsWith(GroundMaskPrefix + "this part", StringComparison.Ordinal)) return edits == "disabling" ? GroundMaskHolderUse.Replace("Moving or disabling", "Disabling") : GroundMaskHolderUse;
-            var shaping = "Its ground mask shapes the ground and the vegetation where it stands, so " + edits + " this " + (part ? "part" : "group") + " changes the terrain there.";
+            var shaping = MaskOwner(line) + " so " + edits + " this " + (part ? "part" : "group") + " changes the terrain there.";
             return use == Decorative || use == PartDecorative ? "The building is decorative. " + shaping : use + " " + shaping;
+        }
+        // Whose mask shapes the terrain, as the dependency line names its holders: the object's own when the group root
+        // holds it, otherwise the part or parts below that hold it, by name, as Dependencies names them.
+        static string MaskOwner(string line) {
+            var who = line.Substring(GroundMaskPrefix.Length);
+            const string one = " holds the scene ground mask", several = " hold scene ground masks";
+            var single = who.IndexOf(one, StringComparison.Ordinal);
+            var plural = who.IndexOf(several, StringComparison.Ordinal);
+            if (!who.StartsWith(GroupRootHolds, StringComparison.Ordinal) && who.StartsWith("the ", StringComparison.Ordinal)) {
+                if (plural > 0) return "The ground masks of its " + who.Substring(4, plural - 4) + " shape the ground and the vegetation where they stand,";
+                if (single > 0) return "The ground mask of its " + who.Substring(4, single - 4) + " shapes the ground and the vegetation where it stands,";
+            }
+            return "Its ground mask shapes the ground and the vegetation where it stands,";
         }
         // The ids by which a pile's or log pond's storage synchronizer reads the storage it shows, as one binding line.
         const string StoragePrefix = "Industry storage=";

@@ -551,6 +551,8 @@ namespace RailroaderScenePatcher {
                 });
                 presentation.ResetRequested = ResetLayout;
                 presentation.CompactSwitched = LogCompactSwitch;
+                presentation.AutoOpenReady = SessionReady;
+                presentation.Logged = line => PatcherLog.Debug(line);
                 presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
                 presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
                 if (presentation.TitleIconProblem != null) PatcherLog.Debug("The patcher couldn't add one or both of the Reset layout and Session details icons to the title bar (" + presentation.TitleIconProblem + "). Open the Scene Patcher window help to use the Reset layout or Session details button for each missing icon.");
@@ -563,6 +565,14 @@ namespace RailroaderScenePatcher {
                 Report("inspection-presentation", "The Scene Patcher window couldn't open: " + e.GetBaseException().Message);
                 PatcherLog.Debug(() => "The Scene Patcher window couldn't open: " + e);
             }
+        }
+        // Whether the game finished loading the world: the Map Editor appears, and the window is built, before that.
+        // A check the game build does not offer counts as ready, so the window never waits for it forever.
+        static bool SessionReady() {
+            try {
+                var state = Native.Read(Native.Type("Game.State.StateManager"), "Shared");
+                return state == null || !(Native.Read(state, "IsSessionReady") is bool ready) || ready;
+            } catch { return true; }
         }
         void Detach() {
             reloadRequirement = null;
