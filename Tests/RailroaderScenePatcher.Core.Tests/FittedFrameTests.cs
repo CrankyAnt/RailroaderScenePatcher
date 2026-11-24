@@ -239,7 +239,7 @@ static class FittedFrameTests {
         var framed = ObjectMarkingGeometry.Frame(new WorldPoint(0, 0, 200), eye, boxes, view, View, decisions, ObjectMarkingGeometry.FrameDistance, null, true);
         Check(!framed.Frame.HasValue && framed.Outline == null && framed.Box == null, "a container of spread objects gets no enclosing frame");
         Check(!framed.Marker.HasValue, "its marker stands where the object stands, as for an object without boxes");
-        Check(decisions.Any(d => d.Contains("spread")), "the frame check says why: " + String.Join("; ", decisions));
+        Check(decisions.Any(d => d.Contains("form separate sets")), "the frame check says why: " + String.Join("; ", decisions));
         // An empty field between two signs lies inside no outline.
         var field = view(new WorldPoint(-150, 0, 200));
         double fx = View.X + (field.X / field.W + 1) * View.Width / 2, fy = View.Y + (1 - field.Y / field.W) * View.Height / 2;

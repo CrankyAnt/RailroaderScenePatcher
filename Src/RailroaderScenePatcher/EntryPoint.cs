@@ -520,7 +520,7 @@ namespace RailroaderScenePatcher {
                     presentation.CompactSwitched = LogCompactSwitch;
                     presentation.Details = builder => presentation.Scroll(builder, 120, content => { content.ConfigureLayout(4f); DrawSession(content); }, false);
                     presentation.Help = (builder, region) => presentation.Scroll(builder, 80, content => { content.ConfigureLayout(4f); DrawHelp(content, region); }, false);
-                    if (presentation.TitleIconProblem != null) PatcherLog.Debug("The patcher couldn't add an icon to the title bar (" + presentation.TitleIconProblem + "). The window help has a button for it.");
+                    if (presentation.TitleIconProblem != null) PatcherLog.Debug("The patcher couldn't add one or both of the Reset layout and Session details icons to the title bar (" + presentation.TitleIconProblem + "). Open the Scene Patcher window help to use the Reset layout or Session details button for each missing icon.");
                     if (presentation.TitleHelpProblem != null) PatcherLog.Debug("The patcher couldn't add the help button to the title bar (" + presentation.TitleHelpProblem + "). It is shown in the command band.");
                 }
                 catch (Exception e) {
@@ -992,7 +992,7 @@ namespace RailroaderScenePatcher {
             CloseCoverageForm(); CloseEquipmentForm();
             feedback.Clear();
             status = "Load attempt over the retained world";
-            PatcherLog.Debug("Loading again in the same world: " + reentry.Retained + " objects retained, " + reentry.Released + " released, " + reentry.Failures.Count + " cleanup failures.");
+            PatcherLog.Debug("Loading again in the same world. Previously tracked scene patch targets: " + reentry.Retained + " still tracked, " + reentry.Released + " removed from tracking, " + reentry.Failures.Count + " cleanup failures.");
             // Local only: no other peer is told, rolled back or disconnected.
             foreach (var failure in reentry.Failures)
                 Report("reentry/" + failure, "The patcher couldn't finish cleaning up its earlier changes on this computer: " + failure + ". The patcher retries at the next load; reload the map to clear it. Report to the patcher maintainer.");

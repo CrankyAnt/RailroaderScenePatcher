@@ -35,7 +35,7 @@ namespace RailroaderScenePatcher {
         internal static IOutlinerScene Scene { get; set; }
         static readonly LogOnce warnings = new LogOnce();
         // One warning per kind of failure, so a failure on each of 1,900 objects writes one line.
-        internal static void WarnOnce(string kind, string message) => warnings.Warning(kind, "The outliner could not read something: " + message);
+        internal static void WarnOnce(string kind, string message) => warnings.Warning(kind, "The outliner is missing information. " + message + ". Try Refresh. If this continues, report it to the patcher maintainer and include the Player log.");
 
         // A scene object's identity in the hierarchy: its scene and path.
         readonly struct ScenePath : IEquatable<ScenePath> {
@@ -158,11 +158,11 @@ namespace RailroaderScenePatcher {
                 try {
                     var point = trackPoint(e);
                     if (point != null && point.Length >= 2 && Finite(point[0], point[1])) result = new[] { point[0], point[1] };
-                } catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("track point", "a track point could not be resolved, so the object is placed by its own position: " + ex.GetBaseException().Message); }
+                } catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("track point", "The patcher couldn't find an object's position on its track. The outliner will try the object's visible shape or its own position to find its place: " + ex.GetBaseException().Message); }
             }
             if (result == null && Scene != null) {
                 try { result = Scene.Bounds(e); }
-                catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("bounds", "an object's renderers could not be read, so it is placed by its own position: " + ex.GetBaseException().Message); }
+                catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("bounds", "The patcher couldn't read an object's drawing components. The outliner uses the object's own position to find its place: " + ex.GetBaseException().Message); }
             }
             if (result == null && HasPosition(e) && Finite(e.Position[0], e.Position[2])) result = new[] { e.Position[0], e.Position[2] };
             return measured[e] = result;
@@ -170,7 +170,7 @@ namespace RailroaderScenePatcher {
         static ObjectFacts FactsOf(SceneObservation e) {
             if (Scene == null) return new ObjectFacts();
             try { return Scene.Facts(e) ?? new ObjectFacts(); }
-            catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("facts", "an object's components could not be read, so it is classified by its name and family: " + ex.GetBaseException().Message); return new ObjectFacts(); }
+            catch (Exception ex) when (!(ex is OutOfMemoryException)) { WarnOnce("facts", "The patcher couldn't read an object's components. The outliner uses its name and object family to choose its category and kind: " + ex.GetBaseException().Message); return new ObjectFacts(); }
         }
         // The category and kind of a listed object that is no part, from the generic rules. A group root keeps the
         // category the inventory gave it by the same rules.
@@ -194,7 +194,7 @@ namespace RailroaderScenePatcher {
             if (places != null && ReferenceEquals(preparedEntries, entries)) return;
             string worldKey = null;
             try { worldKey = Scene?.WorldKey; }
-            catch (Exception e) when (!(e is OutOfMemoryException)) { WarnOnce("world", "the loaded world could not be read: " + e.GetBaseException().Message); }
+            catch (Exception e) when (!(e is OutOfMemoryException)) { WarnOnce("world", "The patcher couldn't identify the loaded world: " + e.GetBaseException().Message); }
             var hasEntries = entries.Count > 0;
             if (places != null && cachedWorldKey == worldKey && (placesBuiltWithEntries || !hasEntries)) {
                 preparedEntries = entries;
@@ -209,14 +209,14 @@ namespace RailroaderScenePatcher {
             // What the world names beside the listed objects, the game's map data first.
             if (Scene != null) {
                 try { sources.AddRange(Scene.PlaceSources(entries, notes)); }
-                catch (Exception e) when (!(e is OutOfMemoryException)) { notes.Add("the world's places could not be read: " + e.GetBaseException().Message); }
+                catch (Exception e) when (!(e is OutOfMemoryException)) { notes.Add("The patcher couldn't read the world's places: " + e.GetBaseException().Message); }
             }
             // What the listed objects name by their path and name: place folders, Roads folders, station map icons, Loc: boards.
             foreach (var e in entries.Where(e => e.GroupPath == null && e.HolderPath == null)) sources.AddRange(ScenePlaces.SourcesOf(e.Identity.Path, Measure(e, trackPoint)));
             places = ScenePlaces.From(sources);
             placesLine = String.Join(" | ", places.All.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).Select(p =>
                 p.Name + " [" + p.From + "] {" + String.Join("; ", p.Names) + "} " + String.Join(" ", p.Points.Select(at => "@" + Round(at[0]) + "," + Round(at[1])))))
-                + (notes.Count == 0 ? "" : " NOTES: " + String.Join("; ", notes));
+                + (notes.Count == 0 ? "" : " Problems reading places: " + String.Join("; ", notes));
         }
         // An edit replaces observations; drop the cached verdicts of the ones no longer listed.
         static void TrimObservationCaches(IReadOnlyList<SceneObservation> entries) {
@@ -392,16 +392,16 @@ namespace RailroaderScenePatcher {
         // inspection-only rows, and the hidden objects, which are the objects of the inventory that get no row.
         internal static void Log(Result result, int rowsShown, string search, string filter) {
             var tops = String.Join(", ", result.Tops.Select(t => t.Label + "=" + t.Count.ToString(CultureInfo.InvariantCulture)));
-            PatcherLog.Debug("Outliner: view=" + (ByPlace ? "Place" : "Category") + " tops=" + result.Tops.Count
-                + " listed=" + result.Listed + " shown=" + rowsShown + " hidden=" + result.Hidden.Count + " catchAll=" + result.Unplaced + " dropped=" + (rowsShown - result.Hidden.Count - result.Listed)
-                + " filter=" + filter + " search='" + search + "' kinds={" + String.Join(", ", kindCategories.OrderBy(k => k, StringComparer.Ordinal)) + "} [" + tops + "]");
-            PatcherLog.Debug("Outliner detail: catchAll=" + result.CatchAll.Count + " {" + String.Join(" | ", result.CatchAll) + "} violations=" + result.Violations.Count + " {" + String.Join(" | ", result.Violations) + "}");
+            PatcherLog.Debug("Built the outliner. View: " + (ByPlace ? "Place" : "Category") + ". Top-level folders: " + result.Tops.Count
+                + ". Objects listed: " + result.Listed + ". Objects matching the search and filter: " + rowsShown + ". Objects with no row of their own: " + result.Hidden.Count + ". Objects under No place or Unclassified: " + result.Unplaced + ". Objects missing from the tree: " + (rowsShown - result.Hidden.Count - result.Listed)
+                + ". Filter: " + filter + ". Search: '" + search + "'. Categories with kind subfolders: {" + String.Join(", ", kindCategories.OrderBy(k => k, StringComparer.Ordinal)) + "}. Top-level object counts: [" + tops + "]");
+            PatcherLog.Debug("Outliner objects with no place or category: " + result.CatchAll.Count + " {" + String.Join(" | ", result.CatchAll) + "}. Problems in the outliner tree: " + result.Violations.Count + " {" + String.Join(" | ", result.Violations) + "}");
             if (detailLogged && !String.IsNullOrEmpty(search)) return;
             detailLogged = true;
-            PatcherLog.Debug("Outliner places: " + placesLine);
-            PatcherLog.Debug("Outliner crossings: " + result.Crossings.Count + " {" + String.Join(" | ", result.Crossings) + "}");
-            PatcherLog.Debug("Outliner inspection only: " + result.InspectionOnlyRows.Count + " {" + String.Join(" | ", result.InspectionOnlyRows) + "}");
-            PatcherLog.Debug("Outliner hidden (inventory objects without a row): " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
+            PatcherLog.Debug("Places found for the outliner: " + placesLine);
+            PatcherLog.Debug("Crossings grouped in the outliner: " + result.Crossings.Count + " {" + String.Join(" | ", result.Crossings) + "}");
+            PatcherLog.Debug("Objects listed for inspection only in the outliner: " + result.InspectionOnlyRows.Count + " {" + String.Join(" | ", result.InspectionOnlyRows) + "}");
+            PatcherLog.Debug("Objects kept out of the outliner because they are containers or track spans managed by the game: " + result.Hidden.Count + " {" + String.Join(" | ", result.Hidden) + "}");
         }
     }
 }

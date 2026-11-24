@@ -258,7 +258,7 @@ namespace RailroaderScenePatcher.Core {
             // one thing: one box around its boxes would cover the land between them and catch clicks on it. It gets no
             // frame and lends no boxes to a group; its marker stands where the object stands.
             if (whole && piece.Count > 1 && Spread(piece.Select(CornersOf))) {
-                foreach (var box in piece) decisions?.Add(box.Name + ": Not used for the frame because the object's boxes are spread more than " + SpreadGap.ToString("0", CultureInfo.InvariantCulture) + " m apart.");
+                foreach (var box in piece) decisions?.Add(box.Name + ": Not used for the frame because the object's boxes form separate sets with gaps over " + SpreadGap.ToString("0", CultureInfo.InvariantCulture) + " m between them.");
                 return new ObjectMarkingFrame(null, distance, null, bounds);
             }
             if (!(distance <= frameDistance)) {

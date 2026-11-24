@@ -247,7 +247,7 @@ static class GameDefinedGroupTests {
     }
     static void SkippedGroupLine() =>
         Check(GameDefinedGroups.SkippedLine("BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer", "none of its objects has a usable position") ==
-            "Group skipped: BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer: none of its objects has a usable position", "a skipped group gives one line Group skipped: <group root>: <reason>");
+            "The patcher couldn't finish preparing a group of scene objects at BrysonCoalDealer/World/Large Scenery/Bryson/Bryson Coal Dealer: none of its objects has a usable position", "a skipped group gives one line The patcher couldn't finish preparing a group of scene objects at <group root>: <reason>");
     // The family decides its groups again after every scene change; a group whose parts cannot be read keeps its root
     // entry without parts and logs exactly one line, once per root and reason, in the agreed format.
     static void SkippedFamilyOnce() {
@@ -259,7 +259,7 @@ static class GameDefinedGroupTests {
             Check(skips.ReadParts(() => { computed++; return "s/World/B"; }, () => read++), "a group whose parts are read is not skipped");
         }
         Check(computed == 0 && read == 3, "the root of a group whose parts are read is not computed (computed " + computed + " times), and its parts are read each pass");
-        Check(lines.SequenceEqual(new[] { "Group skipped: s/World/A: its parts could not be read: broken" }), "exactly one line for the skipped family: " + String.Join(" | ", lines));
+        Check(lines.SequenceEqual(new[] { "The patcher couldn't finish preparing a group of scene objects at s/World/A: its parts could not be read: broken" }), "exactly one line for the skipped family: " + String.Join(" | ", lines));
     }
     // World marking decides its groups again after every scene change; a skipped group logs its line once per root
     // and reason.
@@ -276,7 +276,7 @@ static class GameDefinedGroupTests {
         // A root that cannot be computed skips only its own group.
         Check(skips.Read<object>(() => throw new InvalidOperationException("no root"), () => throw new InvalidOperationException("broken")) == null && skips.Read(() => "s/World/B", () => "read") == "read",
             "a group whose root cannot be computed is skipped alone");
-        Check(lines.SequenceEqual(new[] { "Group skipped: s/World/A: its objects could not be read: broken", "Group skipped: s/World/A: none of its objects has a usable position", "Group skipped: unknown group root: its objects could not be read: broken" }),
+        Check(lines.SequenceEqual(new[] { "The patcher couldn't finish preparing a group of scene objects at s/World/A: its objects could not be read: broken", "The patcher couldn't finish preparing a group of scene objects at s/World/A: none of its objects has a usable position", "The patcher couldn't finish preparing a group of scene objects at unknown group root: its objects could not be read: broken" }),
             "one line per group root and reason: " + String.Join(" | ", lines));
     }
 

@@ -466,7 +466,7 @@ namespace RailroaderScenePatcher.Core {
         // A failed update of own culling, for the group it names, or for moved parts in general when no group is known.
         public static string CullingUpdateFailure(string group) =>
             (String.IsNullOrEmpty(group) ? "Moved baked scenery parts" : "Moved parts of " + group) + " may appear or disappear at the wrong distance because the patcher couldn't update when they are shown";
-        public static string LeftoverWrapper(string culler) => "The patcher still passes visibility changes on for " + culler + " because other code added its own visibility controls afterward. The patcher no longer changes visibility";
+        public static string LeftoverWrapper(string culler) => "Another component changed the show and hide handler for game culler " + culler + ", which controls scenery visibility. The patcher left that handler in place and stopped applying its own visibility rules for this culler. If the patcher's handler is still called, it only passes requests to the previous handler";
         // A scene ground mask is a component in this namespace (Map.Runtime.MaskComponents): it registers a shape in
         // the game's terrain system where its object stands, which shapes the ground and the vegetation there. A group
         // that holds one is a group of the family, and the object that holds it is a part.
@@ -1039,7 +1039,7 @@ namespace RailroaderScenePatcher.Core {
         // checks holds each candidate object's path with its verdict text.
         public static IEnumerable<string> Summary(IEnumerable<KeyValuePair<string, string>> checks, int listLimit = ListLimit) {
             var all = (checks ?? Enumerable.Empty<KeyValuePair<string, string>>()).ToArray();
-            yield return "Baked scenery checks for " + all.Length + " candidate objects, by result:";
+            yield return "Checked " + all.Length + " candidate baked scenery objects. Counts by result:";
             foreach (var verdict in all.GroupBy(c => c.Value, StringComparer.Ordinal).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal)) {
                 var count = verdict.Count();
                 yield return count + (count == 1 ? " object: " : " objects: ") + verdict.Key;

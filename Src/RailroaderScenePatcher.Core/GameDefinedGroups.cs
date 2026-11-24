@@ -145,7 +145,7 @@ namespace RailroaderScenePatcher.Core {
         }
         // The developer diagnostic line for a group that world marking or the family skips: one line per group root
         // and reason, in the Player log.
-        public static string SkippedLine(string root, string reason) => "Group skipped: " + (root ?? "unknown group root") + ": " + (reason ?? "no reason given");
+        public static string SkippedLine(string root, string reason) => "The patcher couldn't finish preparing a group of scene objects at " + (root ?? "unknown group root") + ": " + (reason ?? "no reason given");
 
         // Beyond this distance from the camera to a group's bounds, in metres, the group shows as one square marker
         // and one object frame; at this distance or less each of its objects shows on its own.

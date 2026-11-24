@@ -436,7 +436,7 @@ namespace RailroaderScenePatcher {
             try {
                 shown = OutlinerGrouping.Rows(inventory, filter, outlinerFilter, IsChanged, OutlinerTrackPoint);
                 return OutlinerGrouping.Build(shown, inventory?.Entries, filter, narrowed, OutlinerTrackPoint);
-            } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The outliner couldn't list the objects", e); return null; }
+            } catch (Exception e) when (!(e is OutOfMemoryException)) { PatcherLog.Error("The patcher couldn't build the outliner. Try Refresh. If the object list still doesn't appear, report this to the patcher maintainer and include the Player log.", e); return null; }
         }
         // The object count line's text. The count is that of the tree: container objects and native track spans have no row.
         string OutlinerSummary(OutlinerGrouping.Result tree) =>

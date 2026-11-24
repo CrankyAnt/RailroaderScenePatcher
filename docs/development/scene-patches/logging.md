@@ -9,7 +9,7 @@ The patcher writes all of its log lines through one entry point, `PatcherLog` (`
 | Mode | Written | Lines |
 | --- | --- | --- |
 | Player | Always | Warnings and errors that a player or modder must see and that the game does not already show. A normal session (load, edit, save) writes none. |
-| Debug | Only while the debug option is on | Load steps; the outcome of each scene patch file for each load attempt; edit results (`[Place] path: message Outstanding: ...`); save and Map Editor Undo or Redo steps; world-choice refusals (`[World choice] ...`); diagnostics such as `Group skipped: ...`, the baked scenery rule report, the frame diagnostics and the attempt traces. |
+| Debug | Only while the debug option is on | Load steps; the outcome of each scene patch file for each load attempt; edit results (`[Place] path: message Outstanding: ...`); save and Map Editor Undo or Redo steps; world-choice refusals (`[World choice] ...`); diagnostics such as `The patcher couldn't finish preparing a group of scene objects at ...`, the baked scenery rule report, the frame diagnostics and the attempt traces. |
 
 World-choice refusals also appear in the footer in both modes. A row that the game shows in its **Log** window is written once, by the game.
 

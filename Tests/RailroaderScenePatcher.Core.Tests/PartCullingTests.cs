@@ -805,7 +805,7 @@ static class PartCullingTests {
         f.World.Culling.Fault = faults.Add;
         var log = RecordingLog.Capture(true, () => { f.World.Culling.Report(); f.World.Culling.Report(); });
         Assert(log.Lines.Count == 1 && log.Lines[0].Key == LogLevel.Debug && faults.Count == 0, "The wrapper that stays is reported once as a debug line, not as a warning: " + log.Lines.Count + " / " + faults.Count);
-        Assert(log.Lines[0].Value == BakedSceneryRules.LeftoverWrapper(own.Id) && log.Lines[0].Value.Contains(own.Id), "The line names the culler: " + log.Lines[0].Value);
+        Assert(log.Lines[0].Value == "Another component changed the show and hide handler for game culler " + own.Id + ", which controls scenery visibility. The patcher left that handler in place and stopped applying its own visibility rules for this culler. If the patcher's handler is still called, it only passes requests to the previous handler", "The line names the visibility controller and distinguishes released rules from conditional forwarding: " + log.Lines[0].Value);
         var playerMode = RecordingLog.Capture(false, () => new Fixture().World.Culling.Report());
         var quiet = RecordingLog.Capture(true, () => new Fixture().World.Culling.Report());
         Assert(quiet.Lines.Count == 0 && playerMode.Lines.Count == 0, "Without such a wrapper nothing is reported");

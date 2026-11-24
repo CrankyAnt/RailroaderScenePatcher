@@ -69,7 +69,7 @@ static class FaultInjectionTests {
             Assert(skips.ReadParts(() => other, () => { }) && skips.ReadParts(() => root + "/Part", () => { }), "Another root reads its parts normally");
         }
         Assert(reads == 0, "The armed root's parts are not read");
-        Assert(lines.SequenceEqual(new[] { "Group skipped: " + root + ": its parts could not be read: Injected unreadable parts" }), "Exactly one line for the skipped family: " + String.Join(" | ", lines));
+        Assert(lines.SequenceEqual(new[] { "The patcher couldn't finish preparing a group of scene objects at " + root + ": its parts could not be read: Injected unreadable parts" }), "Exactly one line for the skipped family: " + String.Join(" | ", lines));
         Assert(FaultInjection.LastTrip.StartsWith("Tripped unreadable-parts for " + root + " at ", StringComparison.Ordinal), "Last names the tripped root: " + FaultInjection.LastTrip);
         FaultInjection.ArmUnreadableGroup(other);
         Assert(FaultInjection.UnreadableParts == root, "Arming the unreadable-group point leaves the unreadable-parts point armed");
@@ -106,7 +106,7 @@ static class FaultInjectionTests {
         }
         skips.Skip(root, "none of its objects has a usable position");
         skips.Skip(root, "none of its objects has a usable position");
-        Assert(lines.SequenceEqual(new[] { "Group skipped: " + root + ": its objects could not be read: Injected unreadable group", "Group skipped: " + root + ": none of its objects has a usable position" }),
+        Assert(lines.SequenceEqual(new[] { "The patcher couldn't finish preparing a group of scene objects at " + root + ": its objects could not be read: Injected unreadable group", "The patcher couldn't finish preparing a group of scene objects at " + root + ": none of its objects has a usable position" }),
             "One line per group root and reason: " + String.Join(" | ", lines));
         Assert(FaultInjection.LastTrip.StartsWith("Tripped unreadable-group for " + root + " at ", StringComparison.Ordinal), "Last names the tripped root: " + FaultInjection.LastTrip);
         FaultInjection.Disarm();

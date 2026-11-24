@@ -44,7 +44,7 @@ namespace RailroaderScenePatcher {
                     }
                 });
             } catch (Exception e) {
-                PatcherLog.Warning("The outliner view icons are unavailable, so the switch shows text", e);
+                PatcherLog.Warning("The patcher couldn't show the outliner view icons. Use the By category or By place button beside the object count to switch views. Report this to the patcher maintainer and include the Player log.", e);
                 Button(row, OutlinerGrouping.ByPlace ? "By category" : "By place", () => SwitchOutlinerView(!OutlinerGrouping.ByPlace));
             }
         }
@@ -84,9 +84,9 @@ namespace RailroaderScenePatcher {
             if (!spriteLibraryLogged) {
                 spriteLibraryLogged = true;
                 try {
-                    var names = UI.SpriteLibrary.Shared == null ? "no shared library" : String.Join(", ", UI.SpriteLibrary.Shared.entries.Select(entry => entry.name));
-                    PatcherLog.Debug("Outliner sprite library: " + names);
-                } catch (Exception e) { PatcherLog.Debug("Outliner sprite library unreadable: " + e.GetBaseException().Message); }
+                    var names = UI.SpriteLibrary.Shared == null ? "the game has no shared icon library" : String.Join(", ", UI.SpriteLibrary.Shared.entries.Select(entry => entry.name));
+                    PatcherLog.Debug("Icon names available to the outliner: " + names);
+                } catch (Exception e) { PatcherLog.Debug("The patcher couldn't read the game's icon names for the outliner: " + e.GetBaseException().Message); }
             }
             if (byCategorySprite == null) byCategorySprite = Draw(ByCategoryIcon, ListPixel);
             if (byPlaceSprite == null) byPlaceSprite = Draw(ByPlaceIcon, PinPixel);

@@ -46,7 +46,7 @@ namespace RailroaderScenePatcher.Core {
                     if (row.Notice) output.Notice(row.Originator, row.Message, row.Key);
                     else output.Warning(row.Originator, row.Message, row.Key);
                 } catch (Exception e) {
-                    PatcherLog.Debug(() => "The game's Log window failed: " + e);
+                    PatcherLog.Debug(() => "The patcher couldn't deliver a message to the game's Log window. Undelivered messages will be written as warnings in the Player log: " + e);
                     Abandon();
                     return;
                 }

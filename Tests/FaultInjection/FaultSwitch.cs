@@ -19,7 +19,7 @@ public sealed class FaultSwitch : MonoBehaviour {
     const string TypeName = "RailroaderScenePatcher.Core.FaultInjection";
     static readonly string[] Points = { "after-mutation", "during-restoration", "between-addition-steps" };
     Rect window = new Rect(20, 200, 360, 0);
-    // The group root for the unreadable-group and unreadable-parts points, as the Group skipped line names it:
+    // The group root for the unreadable-group and unreadable-parts points, as the group preparation failure line names it:
     // scene name/path.
     string groupRoot = "";
     // Why the last Arm unreadable-group or Arm unreadable-parts failed; the Last line shows it until an arm succeeds or

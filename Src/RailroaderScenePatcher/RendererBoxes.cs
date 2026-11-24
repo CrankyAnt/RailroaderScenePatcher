@@ -80,12 +80,12 @@ namespace RailroaderScenePatcher {
         static void Unavailable(string reason) {
             if (unavailableSaid) return;
             unavailableSaid = true;
-            PatcherLog.Debug("Static-batched parts are framed by their world boxes, because this game build does not expose where a part lies in its static batch: " + reason + ".");
+            PatcherLog.Debug("The patcher uses the game's world-aligned boxes to frame scenery parts drawn together. This game build doesn't provide each part's location in the combined drawing data: " + reason + ".");
         }
         static void NotReadable(Mesh mesh) {
             if (notReadableSaid) return;
             notReadableSaid = true;
-            PatcherLog.Debug("Static-batched parts are framed by their world boxes where the combined mesh cannot be read, such as " + mesh.name + ".");
+            PatcherLog.Debug("The patcher uses the game's world-aligned boxes to frame scenery parts whose combined drawing data can't be read. One example is " + mesh.name + ".");
         }
         static bool Expected(Exception e) => e is UnityException || e is MissingReferenceException || e is TargetInvocationException || e is ArgumentException || e is InvalidCastException;
 
@@ -224,12 +224,12 @@ namespace RailroaderScenePatcher {
         }
         public static string Describe(OwnBoxSource source) {
             switch (source) {
-                case OwnBoxSource.MeshPoints: return "fitted to its mesh points";
-                case OwnBoxSource.MeshBounds: return "mesh bounds";
-                case OwnBoxSource.BatchPoints: return "fitted to its part of the static batch";
-                case OwnBoxSource.BatchNotReadable: return "world box, the static batch cannot be read";
-                case OwnBoxSource.BatchUnavailable: return "world box, the static batch layout is unavailable";
-                default: return "none";
+                case OwnBoxSource.MeshPoints: return "fitted to the points that define this part's shape";
+                case OwnBoxSource.MeshBounds: return "taken from this part's shape bounds";
+                case OwnBoxSource.BatchPoints: return "fitted to this part's points in the combined drawing data";
+                case OwnBoxSource.BatchNotReadable: return "taken from the game's world-aligned box because the combined drawing data can't be read";
+                case OwnBoxSource.BatchUnavailable: return "taken from the game's world-aligned box because this part's location in the combined drawing data is unavailable";
+                default: return "not available";
             }
         }
         // Lets go of what is kept for destroyed meshes and renderers.

@@ -834,7 +834,7 @@ namespace RailroaderScenePatcher {
                     // object's own space, for while the game's culling hides the renderer
                     // (ObjectMarkingGeometry.RendererBox).
                     if (!Boxes.Own(renderer, out var ownCorners, out var ownSource)) { waits = true; break; }
-                    decisions?.Add(name + ": Own box: " + RendererBoxes.Describe(ownSource) + ".");
+                    decisions?.Add(name + ": The box for this drawing component was " + RendererBoxes.Describe(ownSource) + ".");
                     WorldPoint[] visible = shows ? BoxCorners(renderer.bounds) : null;
                     if (shows && ownCorners == null) { var toLocal = renderer.transform.worldToLocalMatrix; keptBoxes[renderer] = visible.Select(p => Point(toLocal.MultiplyPoint3x4(Vector(p)))).ToArray(); }
                     keptBoxes.TryGetValue(renderer, out var kept);
@@ -1091,21 +1091,21 @@ namespace RailroaderScenePatcher {
             if (cameraLine != null && cameraLine != writtenCameraLine) { PatcherLog.Debug(cameraLine); writtenCameraLine = cameraLine; }
             var text = new System.Text.StringBuilder();
             text.Append("Frame check for ").Append(candidate.Choice.Label).Append(". Distance: ").Append(Number(result.Distance)).Append(" m")
-                .Append(result.Frame.HasValue ? ". Frame size as a fraction of the view: " + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + "." : ". Marker only.");
+                .Append(result.Frame.HasValue ? ". Frame width and height as fractions of the view: " + Number(result.Frame.Value.Width / view.width) + "x" + Number(result.Frame.Value.Height / view.height) + "." : ". Only the marker is shown.");
             var lines = decisions.Concat(skipped).ToList();
             // How the one box stands: the object's yaw and the box's, which follows its boxes (BoxAlongBuilder).
             if (result.Box != null)
-                text.Append(" Frame box: ").Append(result.Boxes).Append(result.Boxes == 1 ? " box" : " boxes").Append(", object yaw ").Append(ObjectMarkingGeometry.Yaw(objectAxes.X, objectAxes.Z))
-                    .Append(", box yaw ").Append(ObjectMarkingGeometry.Yaw(result.Box)).Append('.');
+                text.Append(" The frame combines ").Append(result.Boxes).Append(result.Boxes == 1 ? " box" : " boxes").Append(". Object rotation about the vertical axis: ").Append(ObjectMarkingGeometry.Yaw(objectAxes.X, objectAxes.Z))
+                    .Append(". Frame box rotation about the vertical axis: ").Append(ObjectMarkingGeometry.Yaw(result.Box)).Append('.');
             for (int index = 0; index < renderers.Length; index++) {
                 var renderer = renderers[index];
                 var name = "#" + index;
                 var decision = String.Join(" / ", lines.Where(l => l.StartsWith(name + ":", StringComparison.Ordinal)).Select(l => l.Substring(name.Length + 2)));
                 var lod = lods.TryGetValue(renderer, out var level) ? BoardScene.PathOf(level.Key.transform) + ", level " + level.Value : "none";
                 text.Append("\n  ").Append(name).Append(' ').Append(BoardScene.PathOf(renderer.transform)).Append(". Drawing component: ").Append(renderer.GetType().Name)
-                    .Append(". Box size: ").Append(Vector(renderer.bounds.size)).Append(". Combined with other static scenery for drawing: ").Append(renderer.isPartOfStaticBatch)
-                    .Append(". Detail group and level: ").Append(lod).Append(". Active: ").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
-                    .Append(". Frame result: ").Append(decision.Length == 0 ? "none" : decision);
+                    .Append(". Box width/height/depth in metres: ").Append(Vector(renderer.bounds.size)).Append(". Drawn together with other scenery: ").Append(renderer.isPartOfStaticBatch)
+                    .Append(". Distance-based detail group and level: ").Append(lod).Append(". Drawing component switched on: ").Append(renderer.enabled && renderer.gameObject.activeInHierarchy)
+                    .Append(". Frame decision: ").Append(decision.Length == 0 ? "No decision recorded." : decision);
             }
             PatcherLog.Debug(text.ToString());
         }
