@@ -58,7 +58,7 @@ namespace RailroaderScenePatcher.Core {
         public string Reason { get; }
         // The category the outliner lists the group under, and its subgroup there, such as Bridge and Rail bridges.
         // A listed group no rule recognises stands under Unclassified. Null for an inspection-only group no rule
-        // recognises, which stays in the Inspection only group, and for an object that is no group.
+        // recognises, and for an object that is no group.
         public string Category { get; internal set; }
         public string Subcategory { get; internal set; }
         // A crossbuck of an unprotected crossing: a group of its own under Grade crossing, whose models are no parts.
@@ -132,7 +132,7 @@ namespace RailroaderScenePatcher.Core {
             }
             // A group stands under the category the generic rules give it, whatever supports it. A listed group that
             // no rule recognises stands under the category of last resort; an inspection-only group that no rule
-            // recognises has no category and stays in the Inspection only group.
+            // recognises has no category.
             foreach (var verdict in verdicts) {
                 if (verdict.Category != null || (verdict.Disposition != GroupDisposition.Group && verdict.Disposition != GroupDisposition.InspectionOnly)) continue;
                 var found = ClassOf(verdict.Node, verdict.Path);

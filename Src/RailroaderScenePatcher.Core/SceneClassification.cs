@@ -169,7 +169,7 @@ namespace RailroaderScenePatcher.Core {
             return found;
         }
         static string Parent(string path) { var at = path.LastIndexOf('/'); return at < 0 ? null : path.Substring(0, at); }
-        static readonly string[] CrossingFamilies = { "Crossing controller", "Crossing mast", "Crossing bell", "Crossing pad marker", "Track span", "Added crossing equipment", "Added crossing bell" };
+        static readonly string[] CrossingFamilies = { "Crossing controller", "Crossing mast", "Crossing bell", "Crossing pad marker", "Track span", "Added light or gate", "Added bell" };
         // What the technical family says when the object itself says nothing more.
         static SceneClass OfFamily(string family) {
             switch (family) {

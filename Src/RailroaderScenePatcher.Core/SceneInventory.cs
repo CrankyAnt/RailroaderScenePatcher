@@ -148,7 +148,7 @@ namespace RailroaderScenePatcher.Core {
         // problems: they are shown without the problem marker.
         public IReadOnlyList<string> Notes { get; }
         // Why this object is inspection only, or null: the inventory finds it, no supported family covers its kind and
-        // the native map editor does not edit it. Such an object is listed in the Inspection only group, shows no
+        // the native map editor does not edit it. Such an object is listed under its category, marked inspection only, shows no
         // problem and offers no edit; what would be a problem for a supported kind is a note here.
         public string InspectionOnly { get; }
         // For a part of a baked scenery group, the hierarchy path of its group root; null for every other object.

@@ -296,7 +296,7 @@ namespace RailroaderScenePatcher {
         // The name of a binding edit, with the track location it sets.
         internal static string BindingAction(string segment, string end, double distance) =>
             "Track binding to " + segment + " / " + (end ?? "").ToLowerInvariant() + " / " + Number(distance);
-        // Not "Inspection only": that names the outliner's group of objects no supported family covers.
+        // Not "Inspection only": that marks an object no supported family covers.
         const string NotEditablePrefix = "Not editable: ";
         // The reason of such a text, or null for an object that can be edited.
         internal static string Refusal(string operations) => operations != null && operations.StartsWith(NotEditablePrefix, StringComparison.Ordinal) ? operations.Substring(NotEditablePrefix.Length) : null;
