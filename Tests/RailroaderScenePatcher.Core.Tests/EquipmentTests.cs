@@ -70,7 +70,7 @@ class FakeEquipmentWorld : ICrossingEquipmentWorld, ICrossingEquipmentVerificati
     public IReadOnlyList<object> ResolveSource(EquipmentSource source) => source.IsDefinition ? Bells.Where(b => b.Identifier == source.Definition).Cast<object>().ToArray()
         : Devices.Where(d => d.Owner == null && d.Scene == source.Scene && d.Path == source.Path).Cast<object>().ToArray();
     public string SourceProblem(object source, object controller, string pattern) {
-        if (source is FakeBell unavailable && unavailable.BuildUnavailable != null) return EquipmentAddition.BellsUnavailable + unavailable.BuildUnavailable;
+        if (source is FakeBell unavailable && unavailable.BuildUnavailable != null) return EquipmentAddition.BellsUnavailable;
         if (source is FakeBell bell) return pattern != EquipmentAddition.BellPattern ? "the pattern " + pattern + " is not supported for a definition" : BellPattern.Problem(bell.Facts);
         if (pattern == EquipmentAddition.BellPattern) return "a loaded device is no bell definition";
         var d = (FakeDevice)source;
@@ -785,6 +785,9 @@ static class EquipmentTests {
         f.World.ConstructOffset = 0.125; f.World.StickyDestroy = true;
         var failed = session.Recheck(Crossing);
         Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing), "An unverified cleanup guards the crossing: " + failed.Failure + " " + failed.Error);
+        var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
+        Assert(!recovery.Contains("your edits are kept") && recovery.Contains("differs from the mod's source or placement"),
+            "A stale wrapper with a misplaced rebuilt addition keeps the placement failure visible: " + recovery);
         Assert(!session.AddEquipment(Crossing, West(20, CrossingPath + "/Signal 2", "east")).Applied, "Another edit is blocked while it is guarded");
         f.World.ConstructOffset = 0; f.World.StickyDestroy = false;
         var recheck = session.Recheck(Crossing);
@@ -803,11 +806,23 @@ static class EquipmentTests {
         var lost = f.Live.Single(); lost.CopyLost = true;
         f.World.StickyDestroy = true;
         var failed = session.Recheck(Crossing);
-        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("The patcher could not remove the empty object that held equipment west at this crossing"),
+        Assert(!failed.Applied && failed.Failure == FailureKind.IncompleteCleanup && session.CleanupUnverified(Crossing) && failed.Error.Contains("An added light, gate, or bell left an empty object at this crossing"),
             "A stale wrapper that stays after its rebuild is reported: " + failed.Failure + " " + failed.Error);
         var recovery = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
-        Assert(recovery.Contains("The patcher could not remove the empty object that held equipment west at this crossing.") && recovery.EndsWith("Click Recheck or reload the Map Editor.", StringComparison.Ordinal),
+        Assert(recovery == "An added light, gate, or bell left an empty object at this crossing. It won't be saved with the map; your edits are kept. Click Recheck to try removing it, or reload the Map Editor.",
             "The cleanup reason composes with the recovery action: " + recovery);
+        // The short explanation is safe only when the empty wrapper is the sole unverified change.
+        var remaining = failed.Remaining;
+        foreach (var uncertain in new[] {
+            Array.Empty<string>(),
+            new[] { "Position: now 80, 2, 3, before 4, 2, 3" },
+            new[] { "The settings match their values before the attempt. The patcher could not verify the related changes. Reason: separate restoration failure" } }) {
+            typeof(Outcome).GetProperty(nameof(Outcome.Remaining)).SetValue(failed, uncertain);
+            var mixed = RecoveryGuidance.For(failed, "Connections", "Recheck", null).Line("Recheck");
+            Assert(!mixed.Contains("your edits are kept") && uncertain.All(mixed.Contains),
+                "A separate or unknown cleanup state keeps its uncertainty: " + mixed);
+        }
+        typeof(Outcome).GetProperty(nameof(Outcome.Remaining)).SetValue(failed, remaining);
         Assert(f.Live.Count(a => !a.CopyLost) == 1 && f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west") == "lamp and gate observers registered",
             "Status reads the rebuilt addition: " + f.Scene.EquipmentStatus(f.Crossing, "author/pack", "west"));
         var again = session.Recheck(Crossing);
@@ -911,7 +926,7 @@ static class EquipmentTests {
         var h = new Fixture();
         h.World.Bell("rr/bell", b => b.BuildUnavailable = "the bell player type is missing"); h.World.LoadsPending = false;
         var build = new PatchEngine(h.Scene).Apply(Doc(Equip("bad", BellAddition("ring"))), "author/pack").Outcomes["bad"];
-        Assert(!build.Applied && build.Error.Contains(EquipmentAddition.BellsUnavailable) && build.Cause != FailureCause.InvalidDefinition,
+        Assert(!build.Applied && build.Error.Contains(EquipmentAddition.BellsUnavailable) && !build.Error.Contains("the bell player type is missing") && build.Cause != FailureCause.InvalidDefinition,
             "Bells this game build cannot provide stay a patcher problem: " + build.Cause + " " + build.Error);
     }
     // A modification whose additions include one with a nonconforming source is refused as one coherent operation, as the

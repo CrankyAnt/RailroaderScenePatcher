@@ -43,9 +43,11 @@ namespace RailroaderScenePatcher.Core {
         // The audio priority of an added bell's player: the native crossing bell's own, so the game sorts both alike.
         // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer.
         public const int BellPriority = 9;
-        // The start of the reason a bell source is refused when this game build cannot provide crossing bells. Unlike the
+        // The reason a bell source is refused when this game version cannot provide crossing bells. Unlike the
         // other source refusals, it is no problem of the mod author's scene patch file.
-        public const string BellsUnavailable = "crossing bells are unavailable on this game build: ";
+        public const string BellsUnavailable = "crossing bells are unavailable in this version of the game";
+        public const string BellDefinitionsUnreadable = "cannot read bell definitions from the content library";
+        internal const string EmptyEquipmentObject = "An added light, gate, or bell left an empty object at this crossing";
         // Why the source kind does not fit the pattern, or null: a light or gate copies a loaded device, and a bell loads the
         // audio of a bell definition.
         public static string SourceKindProblem(string pattern, EquipmentSource source) {
@@ -500,7 +502,6 @@ namespace RailroaderScenePatcher.Core {
         internal string Verify(object controller, List<object> owned, CrossingEquipment desired) {
             // A stale wrapper the set cleared and that still stands is owned state the change did not remove.
             var left = owned.FirstOrDefault(a => Stale(a) && Clears(a, desired));
-            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return "The patcher could not remove the empty object that held equipment " + record.Id + " at this crossing"; }
             var observed = Observed(controller, owned);
             foreach (var want in desired.Additions) {
                 var now = observed.Find(want.Key);
@@ -510,8 +511,10 @@ namespace RailroaderScenePatcher.Core {
             var extra = observed.Additions.FirstOrDefault(a => desired.Find(a.Key) == null);
             if (extra != null) { Diagnose(controller, null, extra, "extra"); return "equipment " + extra.Id + " remains although it was removed"; }
             var problem = Coherence(owned);
-            if (problem != null) Diagnose(controller, null, null, "coherence: " + problem);
-            return problem;
+            if (problem != null) { Diagnose(controller, null, null, "coherence: " + problem); return problem; }
+            // Report a lone empty wrapper only after the remaining additions have passed their checks.
+            if (left != null) { var record = world.Describe(left); Diagnose(controller, null, record, "stale"); return EquipmentAddition.EmptyEquipmentObject; }
+            return null;
         }
         static string Quoted(string value) => value == null ? "null" : "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
         static string Values(IReadOnlyList<double> values) => values == null ? "null" : "[" + String.Join(",", values.Select(v => v.ToString("R", CultureInfo.InvariantCulture))) + "]";

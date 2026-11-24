@@ -461,7 +461,7 @@ namespace RailroaderScenePatcher.Core {
                 var desired = change;
                 equipment.Write(target, baseline.Equipment, desired);
                 var difference = equipment.Verify(target, baseline.Equipment, desired);
-                if (difference != null) throw new InvalidOperationException("Applied crossing equipment did not verify: " + difference);
+                if (difference != null) throw new InvalidOperationException(difference == EquipmentAddition.EmptyEquipmentObject ? difference : "Applied crossing equipment did not verify: " + difference);
             }
         }
         public bool Restore(object target, object snapshot) {

@@ -119,6 +119,10 @@ namespace RailroaderScenePatcher.Core {
         // One line for the message area, read as one label followed by plain sentences, as every refusal in the message
         // area reads: the action with its heading, the problem, what remains and the correction.
         public string Line(string action) {
+            // A leftover equipment wrapper needs one explanation, without repeating the same reason in Remaining.
+            if (Kind == FailureKind.IncompleteCleanup && Problem.Contains(EquipmentAddition.EmptyEquipmentObject)
+                && Remaining.Count == 1 && Remaining[0] == "The settings match their values before the attempt. The patcher could not verify the related changes. Reason: " + EquipmentAddition.EmptyEquipmentObject)
+                return EquipmentAddition.EmptyEquipmentObject + ". It won't be saved with the map; your edits are kept. Click Recheck to try removing it, or reload the Map Editor.";
             var detail = Kind == FailureKind.Blocked ? "" : Problem;
             if (Kind == FailureKind.Restored || Kind == FailureKind.AwaitingOutput || Kind == FailureKind.IncompleteCleanup) {
                 const string reason = " Reason: ";

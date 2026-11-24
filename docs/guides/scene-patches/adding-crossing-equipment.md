@@ -79,6 +79,8 @@ Save writes the additions to `Data/scene-patches.json` and raises the patcher de
 
 If an edit fails, the message area reports whether the prior equipment was restored. When cleanup is incomplete, the crossing refuses further edits until **Recheck** in the footer succeeds or the native map editor reloads.
 
+If an added light, gate, or bell leaves an empty object at the crossing, the message says it won't be saved with the map and your edits are kept. Click **Recheck** to try removing it, or reload the Map Editor.
+
 ## Write equipment in the scene patch file
 
 Target the crossing controller as you would for coverage, using `Track.Crossings.GradeCrossingController` for `component` and `crossing-coverage-v1` for `structure`. Put each addition under its ID in `relationships.crossingEquipment`. Put the modification itself under its ID in `modifications`:

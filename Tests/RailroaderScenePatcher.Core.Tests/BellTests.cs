@@ -51,12 +51,22 @@ static class BellTests {
         EditingOffersBellsAndUndoRedoRemoveThem();
         SaveAndReloadReproduceOneBell();
         AddedBellsSortLikeTheNativeCrossingBell();
+        UnavailableBellRowsUseShortReasons();
         Console.WriteLine("PASS: controller-bound crossing bell eligibility, construction, audio lifetime, refusal, restoration and scene patch editing");
     }
     // Railroader 0.6.3, Track.Crossings.GradeCrossingController.CreateBellPlayer gives its crossing bell player audio
     // priority 9 (0.6.2: 10). An added bell's player uses the same priority, so the game sorts it like the native bell.
     static void AddedBellsSortLikeTheNativeCrossingBell() {
         Assert(EquipmentAddition.BellPriority == 9, "An added bell uses the native crossing bell's audio priority");
+    }
+    static void UnavailableBellRowsUseShortReasons() {
+        foreach (var (problem, expected) in new[] {
+            (EquipmentAddition.BellsUnavailable, "Crossing bells are unavailable in this version of the game."),
+            (EquipmentAddition.BellDefinitionsUnreadable, "Cannot read bell definitions from the content library.") }) {
+            var row = SourceCandidate.UnavailableBells(problem);
+            Assert(!row.Eligible && RailroaderScenePatcher.CommandBand.Sentence(row.Problem) == expected,
+                "An unavailable bell row gives a short reason: " + row.Problem);
+        }
     }
     static void ABellIsBuiltFromItsDefinitionAndBoundToTheController() {
         var f = new Fixture();

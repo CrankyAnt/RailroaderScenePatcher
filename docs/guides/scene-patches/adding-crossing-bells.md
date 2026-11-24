@@ -35,7 +35,8 @@ The editor lists every bell definition in the content library and explains why a
 | its audio indexes must be finite times greater than 0, in strictly increasing order | The player could not split the clip. |
 | the destination crossing controller has ... key-value objects, so it cannot address the bell | The controller has no key-value object or more than one, so the bell could not be addressed unambiguously. |
 | the destination crossing controller is inactive, so an added bell would not start | A bell beneath it would not start, and its audio could not be released when the scene unloads. |
-| crossing bells are unavailable on this game build: ... | This game build lacks something the bell pattern needs; lights and gates stay available. The editor shows this reason in **Add a bell**. |
+| Crossing bells are unavailable in this version of the game. | This version of the game lacks something the bell pattern needs; lights and gates stay available. The editor shows this reason in **Add a bell**. The log has the technical details. |
+| Cannot read bell definitions from the content library. | The patcher cannot list bell definitions. The log has the technical details. |
 | bell definition ... is unavailable in the content library | The named definition is missing, for example because the mod that supplies it is not loaded. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition. The patcher does not choose a replacement. |
 | is ambiguous; ... bell definitions share its identifier | More than one bell definition matches the identifier. Edit this addition on the crossing's Connections tab to select another bell definition, or remove the addition. |
 | its audio index ... s does not split its clip of ... s into parts of at least one sample | After the audio loads, the clip proves too short for the definition's indexes. The bell stays silent and a warning identifies it. |

@@ -172,7 +172,7 @@ static class CommandBandTests {
             "An unbuilt bell whose definition is available uses its metadata name");
         Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.Bell("rr/bell-plain", null, null)) == "bell-plain",
             "A bell definition without a name is offered under its identifier's last part");
-        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.UnavailableBells("crossing bells are unavailable on this game build")) == "Bell",
+        Check(InventoryPresentationState.EquipmentSourceName(SourceCandidate.UnavailableBells(EquipmentAddition.BellsUnavailable)) == "Bell",
             "The rejected row that stands for unavailable bell definitions is not an addition and keeps the name Bell");
         var identity = new TargetIdentity("scene", "World/Crossings/CrankyAnt Scene Patcher equipment author:pack signal-1-added", "OwnedEquipment");
         var added = new SceneObservation(new object(), identity, CommandBand.AddedEquipmentFamily, true, Array.Empty<double>(), Array.Empty<double>(),
